@@ -1,0 +1,387 @@
+/**
+ * PlatformPluginBridge.mm
+ *
+ * Objective-C++ wiring for the Apple "platform" engine plugin (AVSpeechSynthesizer-
+ * backed System TTS). Mirrors Swift's `CppBridge+Platform.swift` so the
+ * commons router can resolve `framework == .systemTts` model loads through
+ * the platform vtable on iOS/macOS.
+ *
+ * Why this file exists:
+ *   `rac_backend_platform_register()` only registers the module + built-in
+ *   catalog entries; it does NOT wire the unified plugin vtable into the
+ *   plugin router. Without this step the router has no `platform` engine
+ *   so `loadModel` for `framework == .systemTts` returns "no backend route
+ *   supports requested model for framework platform". This file:
+ *     1. Implements AVSpeechSynthesizer-backed C trampolines.
+ *     2. Calls `rac_platform_tts_set_callbacks(...)`.
+ *     3. Calls `rac_backend_platform_register()`.
+ *     4. Calls `rac_plugin_register(rac_plugin_entry_platform())` so the
+ *        router can actually find the platform vtable.
+ *
+ * Mirrors the Swift SDK path:
+ *   sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Platform.swift
+ *   sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/System/SystemTTSService.swift
+ *
+ * Apple-only — Android has no commons-level platform-TTS plugin (see
+ * sdk/runanywhere-commons/CMakeLists.txt:732 `if(APPLE AND RAC_BUILD_PLATFORM)`).
+ */
+
+#import <AVFoundation/AVFoundation.h>
+#import <Foundation/Foundation.h>
+
+#include <atomic>
+#include <mutex>
+#include <os/log.h>
+
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/platform/rac_tts_platform.h"
+#include "rac/plugin/rac_plugin_entry.h"
+
+// rac_backend_platform_register lives in rac_llm_platform.h on iOS.
+extern "C" rac_result_t rac_backend_platform_register(void);
+
+// rac_plugin_entry_platform() is defined in commons (Apple-only TU) but
+// not exposed via a public header. Forward-declare here so the ObjC++
+// linker resolves it from RACommons.xcframework. Signature matches the
+// RAC_PLUGIN_ENTRY_DEF(platform) definition in
+// sdk/runanywhere-commons/src/features/platform/rac_plugin_entry_platform.cpp.
+extern "C" const rac_engine_vtable_t* rac_plugin_entry_platform(void);
+
+// =============================================================================
+// Logging — `log stream --predicate 'subsystem CONTAINS "com.runanywhere"'`
+// =============================================================================
+namespace {
+
+inline os_log_t ra_platform_log() {
+    static os_log_t logger = nullptr;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        logger = os_log_create("com.runanywhere", "PlatformPluginBridge");
+    });
+    return logger;
+}
+
+}  // namespace
+
+#define RA_PLATFORM_LOG_INFO(fmt, ...)  os_log_info(ra_platform_log(), fmt, ##__VA_ARGS__)
+#define RA_PLATFORM_LOG_DEBUG(fmt, ...) os_log_debug(ra_platform_log(), fmt, ##__VA_ARGS__)
+#define RA_PLATFORM_LOG_ERROR(fmt, ...) os_log_error(ra_platform_log(), fmt, ##__VA_ARGS__)
+
+// =============================================================================
+// System TTS Service — AVSpeechSynthesizer wrapper
+// =============================================================================
+
+/**
+ * Drives AVSpeechSynthesizer for the platform TTS callbacks. Each
+ * `rac_platform_tts_create_fn` invocation returns one of these (wrapped in
+ * `rac_handle_t`). `synthesize` blocks the caller until playback completes
+ * because the C ABI is synchronous (matches the iOS Swift SDK reference
+ * which uses `DispatchGroup.wait()` for the same reason).
+ */
+@interface RAFlutterSystemTTSService : NSObject <AVSpeechSynthesizerDelegate>
+@property(nonatomic, strong) AVSpeechSynthesizer* synthesizer;
+@property(nonatomic, strong) dispatch_semaphore_t completionSemaphore;
+@property(nonatomic, assign) BOOL cancelled;
+@end
+
+@implementation RAFlutterSystemTTSService
+
+- (instancetype)init {
+    if ((self = [super init])) {
+        _synthesizer = [[AVSpeechSynthesizer alloc] init];
+        _synthesizer.delegate = self;
+        _completionSemaphore = nil;
+        _cancelled = NO;
+    }
+    return self;
+}
+
+- (rac_result_t)speakText:(NSString*)text
+                     rate:(float)rate
+                    pitch:(float)pitch
+                   volume:(float)volume
+                  voiceId:(NSString*)voiceId {
+    @autoreleasepool {
+        // The audio session may still be in .record mode from the Voice Agent's
+        // audio capture phase. Switch to .playback so AVSpeechSynthesizer can
+        // actually route audio to the speaker. Matches SystemTTSService.swift.
+#if TARGET_OS_IOS || TARGET_OS_TV
+        AVAudioSession* session = [AVAudioSession sharedInstance];
+        NSError* sessionError = nil;
+        [session setCategory:AVAudioSessionCategoryPlayback
+                        mode:AVAudioSessionModeDefault
+                     options:AVAudioSessionCategoryOptionDuckOthers
+                       error:&sessionError];
+        if (sessionError == nil) {
+            [session setActive:YES error:&sessionError];
+        }
+        if (sessionError != nil) {
+            RA_PLATFORM_LOG_ERROR("Audio session config failed: %{public}@",
+                                  sessionError.localizedDescription);
+        }
+#endif
+
+        AVSpeechUtterance* utterance = [[AVSpeechUtterance alloc] initWithString:text];
+
+        // Resolve voice — voiceId can be a system identifier, a language code,
+        // or empty/"system"/"system-tts" (default voice).
+        AVSpeechSynthesisVoice* voice = nil;
+        if (voiceId.length > 0 &&
+            ![voiceId isEqualToString:@"system"] &&
+            ![voiceId isEqualToString:@"system-tts"]) {
+            voice = [AVSpeechSynthesisVoice voiceWithIdentifier:voiceId];
+            if (voice == nil) {
+                voice = [AVSpeechSynthesisVoice voiceWithLanguage:voiceId];
+            }
+        }
+        if (voice == nil) {
+            voice = [AVSpeechSynthesisVoice voiceWithLanguage:@"en-US"];
+        }
+        utterance.voice = voice;
+
+        // AVSpeechUtterance rate is multiplied against the default rate;
+        // a SwiftUI-style `1.0` means "normal speed".
+        utterance.rate = (rate > 0.0f ? rate : 1.0f) * AVSpeechUtteranceDefaultSpeechRate;
+        utterance.pitchMultiplier = (pitch > 0.0f ? pitch : 1.0f);
+        utterance.volume = (volume > 0.0f ? volume : 1.0f);
+        utterance.preUtteranceDelay = 0.0;
+        utterance.postUtteranceDelay = 0.0;
+
+        self.cancelled = NO;
+        self.completionSemaphore = dispatch_semaphore_create(0);
+
+        // AVSpeechSynthesizer must be driven from the main queue.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.synthesizer speakUtterance:utterance];
+        });
+
+        // Block until completion / cancellation. The semaphore is signaled by
+        // didFinishSpeechUtterance or didCancelSpeechUtterance.
+        dispatch_semaphore_wait(self.completionSemaphore, DISPATCH_TIME_FOREVER);
+        self.completionSemaphore = nil;
+
+        return self.cancelled ? RAC_ERROR_CANCELLED : RAC_SUCCESS;
+    }
+}
+
+- (void)stop {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.synthesizer stopSpeakingAtBoundary:AVSpeechBoundaryImmediate];
+    });
+}
+
+#pragma mark - AVSpeechSynthesizerDelegate
+
+- (void)speechSynthesizer:(AVSpeechSynthesizer*)synthesizer
+   didFinishSpeechUtterance:(AVSpeechUtterance*)utterance {
+    (void)synthesizer;
+    (void)utterance;
+    RA_PLATFORM_LOG_DEBUG("System TTS finished");
+    if (self.completionSemaphore != nil) {
+        dispatch_semaphore_signal(self.completionSemaphore);
+    }
+}
+
+- (void)speechSynthesizer:(AVSpeechSynthesizer*)synthesizer
+   didCancelSpeechUtterance:(AVSpeechUtterance*)utterance {
+    (void)synthesizer;
+    (void)utterance;
+    RA_PLATFORM_LOG_DEBUG("System TTS cancelled");
+    self.cancelled = YES;
+    if (self.completionSemaphore != nil) {
+        dispatch_semaphore_signal(self.completionSemaphore);
+    }
+}
+
+@end
+
+// =============================================================================
+// C trampolines wired into rac_platform_tts_callbacks_t
+// =============================================================================
+namespace {
+
+static std::atomic<bool> sRegistered{false};
+static std::mutex sRegistrationMutex;
+
+// All RAFlutterSystemTTSService instances are retained in a thread-safe
+// registry keyed by the raw pointer we hand back as rac_handle_t. The C++
+// destroy trampoline pulls them out and releases the strong reference,
+// allowing ARC to clean up.
+struct ServiceRegistry {
+    std::mutex mutex;
+    NSMutableDictionary<NSValue*, RAFlutterSystemTTSService*>* services = nil;
+};
+
+static ServiceRegistry& serviceRegistry() {
+    static ServiceRegistry reg;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        reg.services = [NSMutableDictionary new];
+    });
+    return reg;
+}
+
+static void retainService(void* handle, RAFlutterSystemTTSService* service) {
+    auto& reg = serviceRegistry();
+    std::lock_guard<std::mutex> lock(reg.mutex);
+    [reg.services setObject:service forKey:[NSValue valueWithPointer:handle]];
+}
+
+static RAFlutterSystemTTSService* findService(void* handle) {
+    auto& reg = serviceRegistry();
+    std::lock_guard<std::mutex> lock(reg.mutex);
+    return [reg.services objectForKey:[NSValue valueWithPointer:handle]];
+}
+
+static void releaseService(void* handle) {
+    auto& reg = serviceRegistry();
+    std::lock_guard<std::mutex> lock(reg.mutex);
+    [reg.services removeObjectForKey:[NSValue valueWithPointer:handle]];
+}
+
+// MARK: - can_handle
+static rac_bool_t platform_tts_can_handle(const char* voice_id, void* /*user_data*/) {
+    if (voice_id == nullptr) {
+        // System TTS is a sensible fallback when no voice is specified.
+        return RAC_TRUE;
+    }
+    NSString* s = [[NSString stringWithUTF8String:voice_id] lowercaseString];
+    if ([s containsString:@"system-tts"] ||
+        [s containsString:@"system_tts"] ||
+        [s isEqualToString:@"system"]) {
+        return RAC_TRUE;
+    }
+    return RAC_FALSE;
+}
+
+// MARK: - create
+static rac_handle_t platform_tts_create(const rac_tts_platform_config_t* /*config*/,
+                                        void* /*user_data*/) {
+    RAFlutterSystemTTSService* service = [[RAFlutterSystemTTSService alloc] init];
+    if (service == nil) {
+        RA_PLATFORM_LOG_ERROR("Failed to allocate System TTS service");
+        return nullptr;
+    }
+    // The raw __bridge_retained pointer is what we hand back to commons. We
+    // also keep a strong reference in the registry so callers don't have to
+    // worry about ownership semantics — destroy() drops both.
+    void* handle = (__bridge_retained void*)service;
+    retainService(handle, service);
+    RA_PLATFORM_LOG_INFO("System TTS service created");
+    return handle;
+}
+
+// MARK: - synthesize
+static rac_result_t platform_tts_synthesize(rac_handle_t handle,
+                                            const char* text,
+                                            const rac_tts_platform_options_t* options,
+                                            void* /*user_data*/) {
+    if (handle == nullptr || text == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    RAFlutterSystemTTSService* service = findService(handle);
+    if (service == nil) {
+        RA_PLATFORM_LOG_ERROR("synthesize: unknown service handle");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    NSString* textStr = [NSString stringWithUTF8String:text];
+    if (textStr == nil) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    float rate = 1.0f, pitch = 1.0f, volume = 1.0f;
+    NSString* voiceId = @"";
+    if (options != nullptr) {
+        if (options->rate > 0.0f)   rate   = options->rate;
+        if (options->pitch > 0.0f)  pitch  = options->pitch;
+        if (options->volume > 0.0f) volume = options->volume;
+        if (options->voice_id != nullptr) {
+            NSString* v = [NSString stringWithUTF8String:options->voice_id];
+            if (v != nil) {
+                voiceId = v;
+            }
+        }
+    }
+
+    return [service speakText:textStr rate:rate pitch:pitch volume:volume voiceId:voiceId];
+}
+
+// MARK: - stop
+static void platform_tts_stop(rac_handle_t handle, void* /*user_data*/) {
+    if (handle == nullptr) return;
+    RAFlutterSystemTTSService* service = findService(handle);
+    if (service != nil) {
+        [service stop];
+    }
+}
+
+// MARK: - destroy
+static void platform_tts_destroy(rac_handle_t handle, void* /*user_data*/) {
+    if (handle == nullptr) return;
+    RAFlutterSystemTTSService* service = findService(handle);
+    if (service != nil) {
+        [service stop];
+    }
+    releaseService(handle);
+    // Pair the __bridge_retained in `create`. ARC releases the underlying
+    // service once both this transfer and the registry strong-ref are gone.
+    CFTypeRef cf = (CFTypeRef)handle;
+    if (cf != nullptr) {
+        CFRelease(cf);
+    }
+    RA_PLATFORM_LOG_DEBUG("System TTS service destroyed");
+}
+
+}  // namespace
+
+// =============================================================================
+// Public C entry point — called from Swift façade during plugin registration.
+// =============================================================================
+
+extern "C" void ra_flutter_register_platform_tts(void) {
+    std::lock_guard<std::mutex> lock(sRegistrationMutex);
+    if (sRegistered.load()) {
+        RA_PLATFORM_LOG_DEBUG("Platform TTS plugin already registered");
+        return;
+    }
+
+    rac_platform_tts_callbacks_t callbacks = {};
+    callbacks.can_handle = &platform_tts_can_handle;
+    callbacks.create     = &platform_tts_create;
+    callbacks.synthesize = &platform_tts_synthesize;
+    callbacks.stop       = &platform_tts_stop;
+    callbacks.destroy    = &platform_tts_destroy;
+    callbacks.user_data  = nullptr;
+
+    rac_result_t setCbRc = rac_platform_tts_set_callbacks(&callbacks);
+    if (setCbRc != RAC_SUCCESS) {
+        RA_PLATFORM_LOG_ERROR("rac_platform_tts_set_callbacks failed: %d", (int)setCbRc);
+        return;
+    }
+
+    rac_result_t backendRc = rac_backend_platform_register();
+    if (backendRc != RAC_SUCCESS && backendRc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        RA_PLATFORM_LOG_ERROR("rac_backend_platform_register failed: %d", (int)backendRc);
+        return;
+    }
+
+    // Register the unified-plugin vtable so the router actually has a route
+    // for framework == .systemTts. Matches Swift's
+    // CppBridge.Platform.registerPlatformPlugin().
+    const rac_engine_vtable_t* vtable = rac_plugin_entry_platform();
+    if (vtable == nullptr) {
+        RA_PLATFORM_LOG_ERROR("rac_plugin_entry_platform() returned null");
+        return;
+    }
+    rac_result_t pluginRc = rac_plugin_register(vtable);
+    if (pluginRc != RAC_SUCCESS && pluginRc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        RA_PLATFORM_LOG_ERROR("rac_plugin_register(platform) failed: %d", (int)pluginRc);
+        return;
+    }
+
+    sRegistered.store(true);
+    RA_PLATFORM_LOG_INFO("Platform TTS plugin registered (AVSpeechSynthesizer)");
+}

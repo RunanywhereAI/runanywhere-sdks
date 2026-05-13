@@ -39,9 +39,6 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_genie/native/genie_bindings.dart';
 
-// Re-export for backward compatibility
-export 'genie_error.dart';
-
 /// Experimental Qualcomm Genie NPU module for LLM text generation.
 ///
 /// Provides large language model capability only after SDK-backed native

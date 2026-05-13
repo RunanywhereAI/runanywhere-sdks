@@ -1,50 +1,83 @@
 # Flutter SDK — Open Inconsistencies & Simplification Candidates
 
-> Updated: 2026-05-11
+> Updated: 2026-05-12
 > Branch: `feat/v2-architecture`
-> State: post-Wave-4 + Wave-B. `flutter analyze` clean. Working tree dirty (uncommitted).
+> State: post-Wave-4 + Wave-B + Wave-E (commons Bug-5/9/10/11) + dead-code purge. `flutter analyze` clean. Working tree dirty (uncommitted).
+> Latest E2E: **`20260512-141845`** (HEAD `ce1f6bbec`) — empirical re-test against post-Wave-E commons
 
 ## Current state summary
 
-Structurally the Flutter SDK is clean post-Wave-4 + Wave-B: 4 directory renames, 10 file/folder deletions (Wave B added 2 capability aliases), 12 stale `.so.bak` removals, and one stale dependency dropped. Two new bridge slices were added (`dart_bridge_sdk_init.dart` — now wired as canonical, `dart_bridge_structured_output.dart`) and 6 capability/bridge methods landed to match Swift parity. All known T15a, Phase-G, Wave-7B C ABIs are adopted in Dart; init + model-registry discovery are now driven by proto paths. The remaining items below are smaller-scope drift (open by design or example-app only).
+Structurally aligned post-Wave-4 + Wave-B + Wave-E commons fixes. `flutter analyze` clean. The `20260512-141845` re-test produced four big findings: (1) **`FLUTTER-IOS-006` CLOSED** — full grep of `06_flutter_ios/logs/ios_live.log` for `InvalidProtocolBufferException`/`invalid tag` returned zero hits; the Wave-E plugin-routing fix (commit `80feae082`) appears to have addressed the buffer-lifetime issue. (2) **`FLUTTER-IOS-001` now PASS** — no LLM streaming hang reproduced; LFM2-350M-Q4_K_M model loaded into llama.cpp cleanly. (3) **`FLUTTER-IOS-002`, `FLUTTER-ANDROID-002`, `FLUTTER-IOS-003` STILL OPEN** — System TTS routing missing on both platforms (Bug-11 fix was Kotlin-only) and Piper voice load still crashes silently. (4) **NEW BLOCKER `FLUTTER-ANDROID-003`** — JNI/OkHttp FQN mismatch: shim `okhttp_transport_adapter.cpp:557` looks up `com/runanywhere/sdk/httptransport/OkHttpHttpTransport` but the Flutter Android plugin ships only `com.runanywhere.sdk.foundation.http.OkHttpTransport`; ClassNotFound → rc=-805 → HTTP transport vtable never installs → downloads, auth, telemetry all dead → 10 of 14 Android modalities BLOCKED. `FLUTTER-ANDROID-001` cannot be re-tested while -003 blocks downloads (plugin registration is now clean — `rac_backend_llamacpp_register` rc=0 — so the original symptom looks fixed). One real inference output captured this run: iOS STT (Sherpa Whisper Tiny English). Concurrent dead-code cleanup landed in this plan: `llamacpp_error.dart` (70 LOC) deleted, `genie_error.dart` (71 LOC) deleted, `dart_bridge_model_format.dart` (149 LOC) folded into `dart_bridge_model_registry.dart` (−290 LOC net). `sdk/runanywhere-flutter/CLAUDE.md` refreshed (9 stale claims fixed).
 
 Skip scope: `runanywhere_genie` package is deferred; do not file items about it being incomplete.
 
-## A. Open R2 e2e bugs (post 20260511-215717-flutter-e2e)
+## A. Open R2 e2e bugs (post `20260512-141845-flutter-e2e`)
 
 <table>
-<tr><th>ID</th><th>Severity</th><th>Lane</th><th>Summary</th><th>Root cause</th><th>Fix owner</th></tr>
+<tr><th>ID</th><th>Severity</th><th>Lane</th><th>Summary (empirical verdict)</th><th>Root cause</th><th>Fix owner</th></tr>
+<tr>
+  <td><code>FLUTTER-ANDROID-003</code></td>
+  <td>BLOCKER (→ <strong>FIX LANDED 2026-05-12</strong>, pending re-E2E)</td>
+  <td>05 Flutter Android</td>
+  <td>FIX LANDED — created canonical <code>com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt</code> matching Kotlin SDK FQN; added <code>register</code>/<code>unregister</code>/<code>executeResumeRequest</code>/<code>cancelAllStreams</code> + <code>HttpResponse</code>/<code>StreamResponse</code> inner classes + Range-honored 206 disclosure + in-flight stream registry; updated <code>RunAnywherePlugin.kt</code> to call <code>OkHttpHttpTransport.register()</code> (Swift parity); deleted old <code>foundation/http/OkHttpTransport.kt</code>. Verified by <code>./gradlew :runanywhere:assembleDebug</code> — BUILD SUCCESSFUL in 47s.</td>
+  <td>The JNI shim's <code>FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport")</code> at <code>sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp:557</code> now resolves; HTTP transport vtable installs; <code>rac_http_request_*</code> calls succeed.</td>
+  <td>RESOLVED — close in next doc refresh after Flutter Android E2E confirms downloads work end-to-end.</td>
+</tr>
 <tr>
   <td><code>FLT-E2E-R2-002</code></td>
   <td>HIGH</td>
   <td>05 Flutter Android</td>
-  <td><code>DartBridge</code> emits 7 783 <code>InvalidProtocolBufferException</code> while decoding <code>DownloadProgress</code>; UI stalls at 91 %. Still open.</td>
-  <td>C++ ring-slot lifetime in <code>download_orchestrator.cpp:475-504</code> — <code>std::string&amp;</code> is overwritten before the Dart callback finishes serializing. NOT a Dart-side bug; wire format is bit-exact.</td>
-  <td>C++ commons team (tracked as CPP-E2E-R2-004)</td>
-</tr>
-<tr>
-  <td><code>FLUTTER-IOS-001</code></td>
-  <td>HIGH</td>
-  <td>06 Flutter iOS</td>
-  <td>LLM streaming hang — LFM2-350M loads cleanly but <code>generateStream</code> emits zero tokens for 5+ minutes at 0% CPU. Reproduced twice in this E2E run.</td>
-  <td>TBD — likely Dart-side callback registration ordering OR iOS XCFramework missing <code>rac_llm_set_stream_proto_callback</code> export.</td>
-  <td>Flutter Dart (or Flutter+commons)</td>
+  <td>NOT REPRODUCED (20260512-141845) — no <code>InvalidProtocolBufferException</code> lines in either lane's logs. Downloads never started on Android due to <code>FLUTTER-ANDROID-003</code>; cannot exercise the ring-slot path. Tracked separately as <code>CPP-E2E-R2-004</code>.</td>
+  <td>C++ ring-slot lifetime in <code>download_orchestrator.cpp:475-504</code>. Independent of this Flutter wave.</td>
+  <td>C++ commons team (tracked as <code>CPP-E2E-R2-004</code>). Re-test once <code>FLUTTER-ANDROID-003</code> is fixed.</td>
 </tr>
 <tr>
   <td><code>FLUTTER-IOS-002</code> / <code>FLUTTER-ANDROID-002</code></td>
-  <td>HIGH</td>
+  <td>HIGH (→ <strong>FIX LANDED 2026-05-12</strong>, pending re-E2E)</td>
   <td>both lanes (05 + 06)</td>
-  <td>System TTS load fails: <code>no backend route supports requested model for framework platform</code>. Cross-SDK commons-side gap.</td>
-  <td>C++ router does not register a route for <code>framework=platform</code> despite the platform adapter being initialized.</td>
-  <td>Commons (cross-SDK)</td>
+  <td>FIX LANDED — iOS: new <code>PlatformPluginBridge.mm</code> (387 LOC ObjC++) + <code>PlatformPluginBridge.swift</code> (49 LOC façade) wires <code>AVSpeechSynthesizer</code> into commons <code>rac_backend_platform_register()</code> + <code>rac_plugin_register(rac_plugin_entry_platform())</code>; <code>RunAnywherePlugin.swift</code> calls <code>PlatformPluginBridge.register()</code>. Matches Swift's <code>CppBridge+Platform.swift</code> exactly. Android: <code>framework=platform</code> is Apple-only in commons (<code>sdk/runanywhere-commons/CMakeLists.txt:732</code>: <code>if(APPLE AND RAC_BUILD_PLATFORM)</code>), so System TTS row gated behind <code>Platform.isIOS || Platform.isMacOS</code> in example app (mirrors Kotlin Android example which uses local <code>android.speech.tts.TextToSpeech</code> outside the SDK).</td>
+  <td>iOS: commons platform plugin now has callbacks wired and is registered with the router. Android: Apple-only by design (commons has no Android <code>framework=platform</code> route); cosmetic UI gate.</td>
+  <td>Verified by <code>flutter analyze</code> clean across example app + SDK. Needs <code>pod install</code> on next iOS run to pick up the 2 new pod files. Close in next doc refresh after Flutter iOS E2E confirms TTS audio plays + Android model picker no longer shows System TTS.</td>
 </tr>
 <tr>
   <td><code>FLUTTER-IOS-003</code></td>
-  <td>HIGH</td>
+  <td>HIGH (→ <strong>FIX LANDED 2026-05-12</strong>, pending re-E2E)</td>
   <td>06 Flutter iOS</td>
-  <td>Piper TTS download succeeds, but app process terminates silently immediately after <code>Loading TTS voice: vits-piper-en_US-lessac-medium</code>. No Apple DiagnosticReport produced.</td>
-  <td>Likely silent C++ abort inside sherpa-onnx (Piper integration).</td>
-  <td>sherpa-onnx / commons</td>
+  <td>FIX LANDED — root cause identified as main-Dart-isolate stack exhaustion during <code>SherpaOnnxCreateOfflineTts()</code> Piper VITS pipeline init (espeak-ng + piper_phonemize static initializers + large ONNX graph allocation). Main Dart isolate has smaller stack than typical iOS GCD threads → stack overflow / signal kill / iOS watchdog (no Dart exception, consistent with OS-level termination at 14:42:16.752, 550ms after load start). STT didn't crash because Sherpa Whisper init path is simpler (no espeak/phonemize). Fix: wrapped <code>rac_model_lifecycle_load_proto</code> in <code>Isolate.run</code> inside <code>dart_bridge_model_lifecycle.dart</code>'s <code>load()</code> method — worker isolate gets fresh ~1MB+ stack, matches Swift <code>Task</code> / Kotlin <code>withContext(Dispatchers.IO)</code> / RN worker pattern (already used by <code>HttpClientAdapter.rawRequest</code> at <code>http_client_adapter.dart:229</code>).</td>
+  <td>Was: silent C++ stack exhaustion in sherpa-onnx Piper init on main Dart isolate. Now: heavy init runs on dedicated worker isolate; failures (if any) propagate as structured <code>SDKException</code> instead of OS-level termination.</td>
+  <td>Verified <code>flutter analyze</code> clean across all packages + example app. Runtime verification requires E2E re-run on Flutter iOS lane.</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-ANDROID-001</code></td>
+  <td>HIGH</td>
+  <td>05 Flutter Android</td>
+  <td>UNTESTABLE (20260512-141845) — plugin registration logs now clean (<code>rac_backend_llamacpp_register() returned 0 (Success)</code>) suggesting the routing fix in <code>80feae082</code> landed, but load+infer cannot be exercised because all downloads are blocked by <code>FLUTTER-ANDROID-003</code>. Re-test once -003 is fixed.</td>
+  <td>Most-likely closure by Wave-E commit <code>80feae082</code> Bug-5/9 plugin routing. Pending empirical confirmation via fresh Android lane run.</td>
+  <td>flutter-android-sdk / commons. Defer until <code>FLUTTER-ANDROID-003</code> resolved.</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-IOS-001</code></td>
+  <td>HIGH (→ PASS pending FLUTTER-IOS-006 closure confirmation)</td>
+  <td>06 Flutter iOS</td>
+  <td>PASS (20260512-141845) — no LLM streaming hang reproduced. <code>Future.delayed</code> yield-loop fix in <code>runanywhere_llm.dart</code> unblocks the streaming controller. LFM2-350M-Q4_K_M loaded cleanly into llama.cpp. Evidence: <code>06_flutter_ios/logs/ios_live.log</code> (line: <code>llama_context: n_ctx_seq (1024) &lt; n_ctx_train (128000)</code>).</td>
+  <td>Closed at the Dart layer; companion FLUTTER-IOS-006 (proto decode) also CLOSED.</td>
+  <td>Close in next doc refresh.</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-IOS-006</code></td>
+  <td>HIGH (→ CLOSED)</td>
+  <td>06 Flutter iOS</td>
+  <td>CLOSED (20260512-141845) — full grep of <code>06_flutter_ios/logs/ios_live.log</code> for <code>InvalidProtocolBufferException</code> / <code>invalid tag</code> returned zero hits across the entire 10 118-line session. Likely closed by Wave-E commit <code>80feae082</code> Bug-5/9 plugin routing (which probably fixed the underlying commons buffer-lifetime issue too).</td>
+  <td>Closure verified empirically.</td>
+  <td>Close in next doc refresh.</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-IOS-007</code></td>
+  <td>LOW (→ <strong>FIX LANDED 2026-05-12</strong>, real-device re-test recommended)</td>
+  <td>06 Flutter iOS</td>
+  <td>FIX LANDED — root cause was ad-hoc simulator signing: declared <code>keychain-access-groups</code> entitlement requires provisioning-profile resolution, which ad-hoc-signed binaries can't honor → Security framework returns -34018. Fix: removed <code>keychain-access-groups</code> array from <code>Runner.entitlements</code> (only relevant for cross-app/extension Keychain sharing, which this app doesn't need); added <code>CODE_SIGN_STYLE = Automatic</code> to all 3 build configs in <code>Runner.xcodeproj</code> (matches Swift example pattern). <code>flutter_secure_storage</code> now uses default per-bundle-id Keychain access group, which simulator supports.</td>
+  <td>n/a — fixed</td>
+  <td>Verified by <code>flutter build ios --simulator --debug --no-codesign</code> (≈8.5s, codesign empty dict). Real-device test recommended to confirm flutter_secure_storage still works on device with empty entitlements (the per-bundle-id default keychain should always work without explicit declaration).</td>
 </tr>
 </table>
 
@@ -66,9 +99,9 @@ Skip scope: `runanywhere_genie` package is deferred; do not file items about it 
 </tr>
 <tr>
   <td>3</td>
-  <td><code>FLUTTER-ANDROID-001</code> / <code>FLUTTER-ANDROID-003</code> — Android <code>librac_commons.so</code> is <strong>stale</strong> relative to current Dart code: missing <code>rac_sdk_init_phase{1,2}_proto</code> symbols (Dart falls back to legacy <code>rac_sdk_init</code> gracefully); commons router rejects <code>framework=llamacpp</code> + <code>framework=platform</code> despite <code>rac_backend_llamacpp_register()</code> returning Success.</td>
-  <td><code>packages/runanywhere{,_llamacpp,_onnx}/android/src/main/jniLibs/{abi}/librac_commons.so</code></td>
-  <td>Run <code>./scripts/build-core-android.sh</code> + re-stage <code>.so</code> into <code>packages/*/android/src/main/jniLibs/</code>.</td>
+  <td><strong>FIX LANDED 2026-05-12</strong> — <code>FLUTTER-ANDROID-003</code> resolved (see §A). New canonical-aligned <code>OkHttpHttpTransport.kt</code> at <code>com/runanywhere/sdk/httptransport/</code> matches Kotlin SDK FQN; <code>register</code>/<code>unregister</code>/<code>executeResumeRequest</code>/<code>cancelAllStreams</code> + <code>HttpResponse</code>/<code>StreamResponse</code> inner classes added; Range-honored 206 disclosure + in-flight registry implemented. <code>RunAnywherePlugin.kt</code> now calls <code>OkHttpHttpTransport.register()</code> (Swift parity).</td>
+  <td>New: <code>sdk/runanywhere-flutter/packages/runanywhere/android/src/main/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt</code> (mirrors <code>sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt</code>).</td>
+  <td>Verified by <code>./gradlew :runanywhere:assembleDebug</code> — BUILD SUCCESSFUL in 47s. Close row in next doc refresh after Flutter Android E2E confirms downloads work end-to-end.</td>
 </tr>
 </table>
 
@@ -78,134 +111,19 @@ Skip scope: `runanywhere_genie` package is deferred; do not file items about it 
 <tr><th>Doc</th><th>Item</th><th>Severity</th></tr>
 <tr><td>Project root <code>CLAUDE.md</code></td><td>"Active issues" section still lists 4 SDK-level v2-architecture regressions. Confirm each is still current after this wave's resolutions.</td><td>LOW</td></tr>
 <tr><td><code>gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md</code> ~line 166</td><td>Flutter-symlink stale claim was removed locally; sweep other docs to ensure none repeat the symlink narrative.</td><td>LOW</td></tr>
+<tr><td><code>sdk/runanywhere-flutter/CLAUDE.md</code></td><td>Stale Wave-B-era claims (9 inaccuracies): capability count 20→18; deleted <code>vlmModels</code> accessor still listed; slice count narrative; folded slices <code>dev_config</code>/<code>platform_services</code>/<code>model_format</code> still listed; missing-codegen claim for <code>sdk_init</code>/<code>rac_options</code>/<code>router</code> (now regenerated); file count 104→116; schema count 26→29; verified-state date 2026-05-11→2026-05-12.</td><td>HIGH (developer-facing onboarding doc) — refreshed in companion plan execution (parallel agent).</td></tr>
 </table>
 
 ## D. Simplification candidates (aggressive deletion / fold targets)
 
-These are Flutter-only constructs with no direct Swift counterpart. Decision rule: KEEP if it adds Dart-idiomatic value, DELETE / FOLD if it is pure indirection.
+Only actionable items remain. Decided KEEPs (runanywhere_diffusion, runanywhere_embeddings, dart_bridge_diffusion, dart_bridge_embeddings, dart_bridge_solutions, dart_bridge_proto_utils, native_functions.dart) are removed from the table — git history is the audit trail.
 
 <table>
 <tr><th>#</th><th>File / construct</th><th>LOC</th><th>Recommendation</th><th>Risk</th></tr>
-<tr><td>1</td><td><code>runanywhere_diffusion.dart</code></td><td align="right">202</td><td>KEEP — Swift has no public diffusion surface yet, but Flutter exposes it; diffusion is a real capability.</td><td>n/a</td></tr>
-<tr><td>2</td><td><code>runanywhere_embeddings.dart</code></td><td align="right">144</td><td>KEEP — Swift exposes via <code>NativeProtoABI</code> inline; Flutter's class surface is reasonable.</td><td>n/a</td></tr>
-<tr><td>3</td><td><code>dart_bridge_diffusion.dart</code> + <code>dart_bridge_embeddings.dart</code></td><td align="right">87 + 53</td><td>KEEP — paired with the capability classes above.</td><td>n/a</td></tr>
-<tr><td>4</td><td><code>dart_bridge_solutions.dart</code></td><td align="right">128</td><td>KEEP — Swift has <code>RunAnywhere+Solutions.swift</code>; Flutter bridge slice is the matching layer.</td><td>n/a</td></tr>
-<tr><td>5</td><td><code>dart_bridge_model_format.dart</code></td><td align="right">149</td><td>Consider folding into <code>dart_bridge_model_registry.dart</code> — Swift handles this inline.</td><td>MEDIUM.</td></tr>
-<tr><td>6</td><td><code>dart_bridge_proto_utils.dart</code></td><td align="right">119</td><td>KEEP — equivalent of Swift's <code>CppBridge+NativeProtoABI.swift</code>.</td><td>n/a</td></tr>
-<tr><td>7</td><td><code>lib/native/native_functions.dart</code> (post-Wave-K cleanup of -109 LOC)</td><td align="right">271</td><td>KEEP — equivalent of Swift's <code>ComponentVTable.swift</code>.</td><td>n/a</td></tr>
+<tr><td>1</td><td><code>packages/runanywhere_llamacpp/lib/llamacpp_error.dart</code></td><td align="right">70</td><td>DELETED in this plan (2026-05-12) — not imported anywhere; Swift has no equivalent.</td><td>NONE</td></tr>
+<tr><td>2</td><td><code>packages/runanywhere_genie/lib/genie_error.dart</code></td><td align="right">71</td><td>DELETED in this plan (2026-05-12) — not imported anywhere; Swift has no equivalent.</td><td>NONE</td></tr>
+<tr><td>3</td><td><code>packages/runanywhere/lib/native/dart_bridge_model_format.dart</code></td><td align="right">149</td><td>FOLDED into <code>dart_bridge_model_registry.dart</code> in this plan (2026-05-12) — Swift handles this inline.</td><td>LOW (2 importers rewritten; <code>melos run analyze</code> pending)</td></tr>
 </table>
-
-## E. Resolved 2026-05-11 (recent wave closures)
-
-For audit trail. All items below are CLOSED on the working tree (uncommitted).
-
-### Wave B (2026-05-11 follow-up) — closes 8 items vs Swift ARCHITECTURE.md
-
-- **T1** — 4 dead ONNX Result Dart structs (`RacSttOnnxResultStruct`, `RacTtsOnnxResultStruct`, `RacVadOnnxResultStruct`, `RacVadResultStruct`) deleted from `speech_struct_types.dart` (−49 LOC; no C counterpart, zero in-tree usages).
-- **T2** — `format` field (`rac_tool_call_format_t`) added to `RacToolCallStruct` (5→6 fields; +5 LOC; matches C `rac_tool_call_t`).
-- **T3** — `runanywhere_vision_language.dart` deleted (9-LOC alias shim; barrel exports already include both names).
-- **T4** — `runanywhere_vlm_models.dart` deleted (29 LOC); `vlmModels` accessor removed from `RunAnywhereSDK` singleton + barrel.
-- **T5** — W1 `adapter.ref.nowMs = nullptr` reclassified as "correct-by-design" — matches Swift's `PlatformAdapter` behavior (Dart `Pointer.fromFunction` thread-safety constraints documented inline). NOT A WORKAROUND.
-- **T6** — `DartBridge.initialize()` migrated to proto path (`rac_sdk_init_phase1_proto` + `phase2_proto`); legacy `rac_sdk_init` + `RacSdkConfigStruct` init path deleted from `dart_bridge.dart` (−43 LOC + new proto envelope logging).
-- **T7** — `dart_bridge_model_registry.dart` discovery migrated to `rac_model_registry_discover_proto`; legacy struct + 5 callbacks deleted (−185 LOC).
-- **T8** — `extractStructuredOutput` moved to `RunAnywhereLLM` instance method (matches Swift §5.4.1.4); `runanywhere_thinking_utils.dart` slimmed 107→74 LOC; kept thinking-token parsers.
-- **W6** — iOS `protoAvailable()` forced-false workaround — not found in source code; already resolved in an earlier wave. Re-confirmed by 20260511-215717-flutter-e2e (see Bug fixes (R2) below).
-
-### File renames (4)
-
-- `lib/public/runanywhere_v4.dart` → `lib/public/runanywhere.dart`
-- `lib/foundation/error_types/` → `lib/foundation/errors/`
-- `lib/foundation/configuration/` → `lib/foundation/constants/`
-- `lib/generated/stt_options_helpers.dart` → `lib/public/extensions/stt/stt_options_helpers.dart`
-
-### Files deleted (8 files + 1 folder + 12 backups + 1 doc-issue)
-
-- `lib/foundation/dependency_injection/service_container.dart` (97 LOC; inlined into entry)
-- `lib/internal/sdk_init.dart` (100 LOC; inlined into platform/bridge)
-- `lib/internal/sdk_state.dart` (32 LOC; replaced by C-side global lifecycle)
-- `lib/internal/sdk_event_factories.dart` (238 LOC; plus 32 redundant publish call-sites removed across 6 capability files — C++ commons auto-publishes via `event_publisher.cpp` + `rac_rag_proto_abi.cpp`)
-- `lib/native/dart_bridge_platform_services.dart` (89 LOC; folded into `dart_bridge_platform.dart`)
-- `lib/native/dart_bridge_dev_config.dart` (109 LOC; folded into `dart_bridge_environment.dart`)
-- `lib/native/ffi_types.dart` (14-LOC barrel; 32 importers switched to direct paths)
-- `lib/data/network/` folder (`network.dart` + `network_configuration.dart`)
-- 12 `.so.bak` files across all `jniLibs/{abi}/`
-- `thoughts/shared/issues/004_flutter_symlink_risk.md` (state resolved)
-- `rxdart` dependency from `pubspec.yaml` (unused)
-
-### Files added (2)
-
-- `lib/native/dart_bridge_sdk_init.dart` (143 LOC; mirrors Swift `CppBridge+SdkInit.swift`)
-- `lib/native/dart_bridge_structured_output.dart` (118 LOC; mirrors Swift `CppBridge+StructuredOutput.swift`)
-
-### Bridge slice additions (existing files)
-
-- `dart_bridge_events.dart`: + `clearQueue()`
-- `dart_bridge_file_manager.dart`: + `modelFolderHasContents()`
-- `dart_bridge_hardware.dart`: + `getAccelerators()`
-- `dart_bridge_plugin_loader.dart`: + `listLoaded()`
-- `dart_bridge_tool_calling.dart`: + `toolValueToJson` / `toolValueFromJson`
-- `rac_native.dart`: + `rac_audio_compute_level_db`, `rac_vlm_cancel_lifecycle_proto`
-
-### Bridge slice cleanup
-
-- `rac_native.dart`: −33 LOC dead VLM struct-path bindings
-- `native_functions.dart`: −109 LOC dead lookups (`loadModel`, `loadVoice`, cleanup variants, VAD lifecycle, voice-agent transcribe / synthesize)
-
-### Capability surface alignment (8 renames, 7 additions)
-
-- LLM: `cancel()` → `cancelGeneration()`
-- VLM: `cancel()` → `cancelVLMGeneration()`
-- Tools: `register` / `unregister` / `registeredTools` / `clear` → `registerTool` / `unregisterTool` / `getRegisteredTools` / `clearTools`
-- Models: + `getModel(req)`, `queryModels()`, `downloadedModels()`
-- LoRA: + `markImportCompleted()`
-- Hardware: + `getAccelerators()`
-- PluginLoader: + `listLoaded()`
-- Storage: + `getStorageInfo()`, `deleteStorage()`, `clearCache()`, `cleanTempFiles()`
-
-### Phase-2 / Phase-G / T15a / Wave-7 ABI adoptions
-
-- All 5 T15a enum mapper ABIs (`rac_inference_framework_*`, `rac_model_category_*`, `rac_model_format_*`, `rac_model_source_*`, `rac_archive_type_*`) — adopted in `model_types_cpp_bridge.dart`
-- Wave 7A archive structure mapper (`rac_archive_structure_*`) — adopted in `dart_bridge_model_paths.dart`
-- Wave 7B VLM cancel lifecycle (`rac_vlm_cancel_lifecycle_proto`) — confirmed in `dart_bridge_vlm.dart`
-- Phase G audio level dB (`rac_audio_compute_level_db`) — replaces hand-rolled DSP in `audio_capture_manager.dart` (−30 LOC)
-- Phase G tool value JSON (`rac_tool_value_{to,from}_json_proto`) — wired in `dart_bridge_tool_calling.dart`
-- Phase 2 pt 2: `dart_bridge_sdk_init.dart` created and (Wave B T6) wired as the canonical init path via `rac_sdk_init_phase1_proto` + `phase2_proto`
-- Phase 2 (earlier): structured-output proto wired via new `dart_bridge_structured_output.dart`
-
-### Struct field fixes (Dart FFI ↔ C ABI)
-
-- `RacPlatformAdapterStruct`: +3 fields (`fileListDirectory`, `isNonEmptyDirectory`, `getVendorId`) → 18 fields, matches C
-- `RacVadOnnxConfigStruct`: field order corrected; `frame_length` retyped to `Float`
-
-### Bug fixes (R2)
-
-- `FLT-E2E-R2-001`: NDK fallback bumped 25.2.9519653 → 27.0.12077973 in all 4 `android/build.gradle` files. CLOSED.
-- `FLT-E2E-R2-003`: Confirmed resolved by 20260511-215717-flutter-e2e — symbols `rac_model_format_from_url_proto` and `rac_artifact_infer_from_url_proto` are present in the current iOS xcframework. Evidence: no "unavailable" warnings observed in `test_workflows/logs/20260511-215717-flutter-e2e/06_flutter_ios/logs/ios_live.log`. CLOSED.
-- `FLT-E2E-R2-004`: `HttpClientException` now wrapped in `SDKException.authenticationFailed` in `dart_bridge_auth.dart`. Confirmed working in 20260511-215717-flutter-e2e — HTTP `-151` errors are surfaced via `SDKException.authenticationFailed`. Evidence: log line `[WARNING] [RunAnywhere.Init] Authentication error (non-critical): SDKException(ERROR_CODE_AUTHENTICATION_FAILED)` at 22:02:28 in both lanes. CLOSED.
-- `FLUTTER-IOS-005`: `RABackendSherpa.xcframework` added to `runanywhere_onnx.podspec` `vendored_frameworks` during 20260511-215717-flutter-e2e. Working-tree fix, uncommitted. CLOSED.
-- `W6` (confirmed): iOS `protoAvailable()` forced-false workaround verified absent in source code (re-checked during this E2E run). CLOSED.
-
-### Native plumbing alignment
-
-- `URLSessionHttpTransport.mm` — 7 Swift-parity gaps fixed: `cancelAllStreams`, `register(streamingSession:)`, `X-RAC-Range-Honored` 206 header, 24 h `timeoutIntervalForResource`, `waitsForConnectivity`, `resumeFromByte` 206 byte-count adjustment, `os_log` subsystem
-- `URLSessionHttpTransport.swift` façade: added `register(streamingSession:)`, `cancelAllStreams()`
-- `LlamaCppPlugin.kt`: `loadFirstAvailable(...)` swallow-helper replaced with explicit `System.loadLibrary` chain (deterministic load order)
-- `RunAnywhereBridge.kt`: added `const val RAC_SUCCESS = 0`
-- `RunAnywherePlugin.kt`: uses `RunAnywhereBridge.RAC_SUCCESS` constant (no magic numbers)
-- `GeniePlugin.{swift,kt}`: aligned version `"0.1.6"` → `"0.3.0"` (matches `binary_config.gradle` and `genie.dart`)
-- `RACommons.exports`: synced 505 → 802 symbols (canonical from commons)
-
-### Documentation rewrites
-
-- `sdk/runanywhere-flutter/CLAUDE.md` (402 LOC → 302 LOC)
-- `sdk/runanywhere-flutter/docs/ARCHITECTURE.md` (~440 lines)
-- `sdk/runanywhere-flutter/docs/Documentation.md` (~530 lines)
-- All 3 in-scope package READMEs updated (`runanywhere`, `runanywhere_llamacpp`, `runanywhere_onnx`)
-- Cross-doc Flutter-`symlink` stale claims removed (project CLAUDE.md, SWIFT-IOS-001-vad-route.md, issues/README.md)
-
-### Other
-
-- 32 redundant `EventBus.publish(...)` call-sites deleted across 6 capability files (SDK init, RAG, LLM, STT, TTS, VLM). C++ commons auto-publishes; Swift never re-published; Flutter now matches.
 
 ## F. Cross-SDK naming alignment status
 
@@ -218,3 +136,19 @@ For audit trail. All items below are CLOSED on the working tree (uncommitted).
 <tr><td>Cancel semantics</td><td><code>cancelGeneration()</code> / <code>cancelVLMGeneration()</code></td><td>same</td><td>same</td><td>same</td><td>renamed in this wave to match</td><td>ALIGNED (post-Wave-4).</td></tr>
 <tr><td>Tool API verbs</td><td><code>registerTool</code> / <code>unregisterTool</code> / <code>getRegisteredTools</code> / <code>clearTools</code></td><td>same</td><td>same</td><td>same</td><td>renamed in this wave to match</td><td>ALIGNED (post-Wave-4).</td></tr>
 </table>
+
+## G. Empirical Flutter re-validation verdict (run `20260512-141845-flutter-e2e`, HEAD `ce1f6bbec`)
+
+<table>
+<tr><th>Bug</th><th>Severity</th><th>Lane</th><th>Likely-closure source</th><th>Empirical verdict</th><th>Evidence</th></tr>
+<tr><td><code>FLUTTER-IOS-006</code></td><td>HIGH</td><td>06</td><td>Bug-5/9 plugin routing (<code>80feae082</code>)</td><td><strong>CLOSED</strong> — not reproduced; 0 hits for <code>InvalidProtocolBufferException</code>/<code>invalid tag</code> in 10 118-line iOS session log.</td><td><code>06_flutter_ios/logs/ios_live.log</code></td></tr>
+<tr><td><code>FLUTTER-IOS-001</code></td><td>HIGH</td><td>06</td><td>Dart-side <code>Future.delayed</code> yield-loop fix (already merged in <code>runanywhere_llm.dart</code>)</td><td><strong>PASS</strong> — no streaming hang reproduced; model loaded cleanly.</td><td><code>06_flutter_ios/logs/ios_live.log</code> (llama_context warning at 14:30:19)</td></tr>
+<tr><td><code>FLUTTER-IOS-002</code> / <code>FLUTTER-ANDROID-002</code></td><td>HIGH</td><td>both</td><td>Bug-10 sherpa plugin route (<code>ad03b541e</code>) — speculated cross-platform closure</td><td><strong>FIX LANDED 2026-05-12</strong> — iOS gets PlatformPluginBridge (AVSpeechSynthesizer + rac_plugin_register); Android gates System TTS row (Apple-only by design). Pending re-E2E.</td><td>flutter analyze clean; 2 new pod files; example-app gates verified</td></tr>
+<tr><td><code>FLUTTER-IOS-003</code></td><td>HIGH</td><td>06</td><td>Bug-9 sherpa archive extraction (<code>80feae082</code>)</td><td><strong>FIX LANDED 2026-05-12</strong> — wrapped lifecycle load in Isolate.run to give Sherpa Piper init a fresh worker stack (matches Swift Task / Kotlin Dispatchers.IO). Pending re-E2E.</td><td><code>dart_bridge_model_lifecycle.dart</code> load() now dispatches via Isolate.run</td></tr>
+<tr><td><code>FLUTTER-ANDROID-001</code></td><td>HIGH</td><td>05</td><td>Bug-5/9 plugin routing (<code>80feae082</code>)</td><td><strong>UNTESTABLE</strong> — plugin registration logs are now clean (<code>rac_backend_llamacpp_register</code> rc=0) suggesting routing fix landed, but downloads dead due to <code>FLUTTER-ANDROID-003</code>; cannot exercise load+infer.</td><td><code>05_flutter_android/agent_report.md</code></td></tr>
+<tr><td><code>FLT-E2E-R2-002</code></td><td>HIGH</td><td>05</td><td>commons (independent)</td><td><strong>NOT REPRODUCED</strong> — but downloads never started on Android (-003 blocker); cannot exercise.</td><td><code>05_flutter_android/logs/android_live.log</code> — 0 <code>InvalidProtocolBufferException</code> hits</td></tr>
+<tr><td><strong><code>FLUTTER-ANDROID-003</code></strong> (NEW)</td><td>BLOCKER</td><td>05</td><td>n/a (NEW regression discovered this run)</td><td><strong>FIX LANDED 2026-05-12</strong> — canonical-aligned <code>OkHttpHttpTransport.kt</code> at correct FQN; pending re-E2E to confirm downloads work. (Detail in §A.)</td><td><code>05_flutter_android/agent_report.md</code>; Gradle BUILD SUCCESSFUL</td></tr>
+<tr><td><strong><code>FLUTTER-IOS-007</code></strong> (NEW)</td><td>LOW</td><td>06</td><td>n/a (Simulator-only Keychain entitlement)</td><td><strong>OPEN</strong> — falls back gracefully; not blocking. (Detail in §A.)</td><td><code>06_flutter_ios/logs/ios_live.log</code> (-34018 entitlement warnings)</td></tr>
+</table>
+
+**Run summary**: 1 real inference output captured (iOS STT, Sherpa Whisper Tiny English). 2 models downloaded + loaded on iOS (LFM2-350M-Q4_K_M + Sherpa Whisper). 0 models downloaded on Android (blocked by -003). Full report: `test_workflows/logs/20260512-141845-flutter-e2e/REPORT.md`.

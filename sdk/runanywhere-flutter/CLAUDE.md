@@ -1,6 +1,6 @@
 # CLAUDE.md — RunAnywhere Flutter SDK
 
-Verified state: 2026-05-11 against working tree on `feat/v2-architecture`.
+Verified state: 2026-05-12 against working tree on `feat/v2-architecture`.
 For exhaustive file-by-file inventory, see `gaps/gaps/file organization/flutter.md`.
 
 ## Repository Structure
@@ -71,9 +71,9 @@ flutter build apk | ios        # Build per-platform artifacts
 ```
 Flutter Application
     ↓
-RunAnywhereSDK.instance              (Public singleton; 20 capability accessors)
+RunAnywhereSDK.instance              (Public singleton; 18 capability accessors)
     ↓
-public/capabilities/* (20 classes)   (RunAnywhereLLM, RunAnywhereSTT, etc.)
+public/capabilities/* (18 classes)   (RunAnywhereLLM, RunAnywhereSTT, etc.)
     ↓
 lib/native/dart_bridge_*.dart (33)   (DartBridge slice per C++ subsystem)
     ↓
@@ -86,7 +86,7 @@ LlamaCpp | Sherpa/ONNX | Genie NPU   (Backend engines registered via vtable v3)
 
 ### Key Architectural Patterns
 
-1. **Proto-driven public surface.** All public API types (LLM/STT/TTS/VAD/VLM/voice/RAG/tools/etc.) are protobuf-generated. 104 `.pb*.dart` files live under `lib/generated/`. Never hand-edit.
+1. **Proto-driven public surface.** All public API types (LLM/STT/TTS/VAD/VLM/voice/RAG/tools/etc.) are protobuf-generated. 116 `.pb*.dart` files live under `lib/generated/`. Never hand-edit.
 2. **Isolate-per-FFI-call for blocking ops.** Capability layer + bridge slices wrap blocking C calls in `Isolate.run` (LLM generate, TTS synthesize, VLM process, voice agent turns, tool calls, downloads, HTTP, platform probes). Streaming uses **`NativeCallable.listener`** with a broadcast `StreamController` for fan-out (`dart:async`, never rxdart).
 3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2.
 4. **Platform HTTP transport injection.** iOS registers a URLSession-backed `rac_http_transport_ops_t` vtable from ObjC++; Android registers an OkHttp-backed vtable via JNI. C++ uses the installed transport for all HTTP.
@@ -116,13 +116,12 @@ await RunAnywhereSDK.instance.initialize(
   environment: SDKEnvironment.development, // or staging, production
 );
 
-// 20 capability accessors (lazy singletons)
+// 18 capability accessors (lazy singletons)
 RunAnywhereSDK.instance.llm       // RunAnywhereLLM
 RunAnywhereSDK.instance.stt       // RunAnywhereSTT
 RunAnywhereSDK.instance.tts       // RunAnywhereTTS
 RunAnywhereSDK.instance.vad       // RunAnywhereVAD
 RunAnywhereSDK.instance.vlm       // RunAnywhereVLM
-RunAnywhereSDK.instance.vlmModels // RunAnywhereVLMModels
 RunAnywhereSDK.instance.voice     // RunAnywhereVoice
 RunAnywhereSDK.instance.voiceAgent // RunAnywhereVoiceAgent
 RunAnywhereSDK.instance.models    // RunAnywhereModels
@@ -158,12 +157,12 @@ packages/runanywhere/lib/
 │   ├── errors/                   # sdk_exception.dart (40+ factory constructors)
 │   ├── logging/                  # sdk_logger.dart
 │   └── security/                 # keychain_manager.dart + secure_storage_keys.dart
-├── generated/                    # 104 protobuf-generated files (DO NOT EDIT)
+├── generated/                    # 116 protobuf-generated files (DO NOT EDIT)
 ├── internal/                     # sdk_init.dart, sdk_state.dart
 ├── native/                       # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
     ├── runanywhere.dart          # RunAnywhereSDK singleton (~513 LOC)
-    ├── capabilities/             # 20 capability classes (flat layout)
+    ├── capabilities/             # 18 capability classes (flat layout)
     ├── configuration/            # sdk_environment.dart
     ├── events/                   # event_bus.dart (dart:async)
     └── extensions/               # rag_module, runanywhere_logging, _storage, _structured_output, _thinking_utils
@@ -173,7 +172,7 @@ packages/runanywhere/lib/
 
 ### 33 DartBridge Slices (`lib/native/`)
 
-`dart_bridge.dart` (coordinator) + slices for: **auth, dev_config, device, diffusion, download, embeddings, environment, events, file_manager, hardware, http, llm, lora, model_assignment, model_format, model_lifecycle, model_paths, model_registry, platform, platform_services, plugin_loader, proto_utils, rag, solutions, state, storage, stt, telemetry, tool_calling, tts, vad, vlm, voice_agent**.
+33 files total: 32 bridge slices + 1 coordinator (`dart_bridge.dart`). Slices for: **auth, device, diffusion, download, embeddings, environment, events, file_manager, hardware, http, llm, lora, model_assignment, model_lifecycle, model_paths, model_registry, platform, plugin_loader, proto_utils, rag, sdk_init, solutions, state, storage, stt, structured_output, telemetry, tool_calling, tts, vad, vlm, voice_agent**.
 
 Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.dart` (per-platform `DynamicLibrary`), `types/` (8 struct/typedef bundles imported directly), `type_conversions/` (proto ↔ C struct mappers).
 
@@ -194,7 +193,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 |---|---|
 | `src/main/kotlin/ai/runanywhere/sdk/RunAnywherePlugin.kt` | Flutter plugin; static `init {}` registers OkHttp transport via JNI before FFI HTTP fires |
 | `src/main/kotlin/com/runanywhere/sdk/native/bridge/RunAnywhereBridge.kt` | JNI shim; `System.loadLibrary("runanywhere_jni")` |
-| `src/main/kotlin/com/runanywhere/sdk/foundation/http/OkHttpTransport.kt` | OkHttp 4.12 vtable backing `rac_http_request_*`; 30s/120s/60s timeouts, 32 KB streaming chunks |
+| `src/main/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt` | OkHttp 4.12 vtable backing `rac_http_request_send`/`_stream`/`_resume` — canonical Kotlin-SDK-aligned FQN required by JNI shim (`okhttp_transport_adapter.cpp:557` `FindClass`); 30s/24h/60s timeouts on streams, 32 KB chunks, range-honored 206 disclosure, in-flight registry for `cancelAllStreams()` |
 | `build.gradle` | NDK `27.0.12077973`, AGP 8.1.0, Kotlin 1.9.10, ABIs: arm64-v8a, armeabi-v7a, x86_64 |
 | `binary_config.gradle` | `testLocal` toggle + GitHub-release URL + checksum |
 
@@ -227,11 +226,9 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 ## Generated Code
 
-`packages/runanywhere/lib/generated/` contains **104 `.pb*.dart` files** generated by `protoc` + `protoc-gen-dart` from `idl/*.proto`. Excluded from analyzer. Do not hand-edit.
+`packages/runanywhere/lib/generated/` contains **116 `.pb*.dart` files** generated by `protoc` + `protoc-gen-dart` from `idl/*.proto`. Excluded from analyzer. Do not hand-edit.
 
-26 proto schemas with full codegen (4 files each — `.pb.dart`, `.pbenum.dart`, `.pbjson.dart`, `.pbserver.dart`): `chat`, `component_types`, `diffusion_options`, `download_service`, `embeddings_options`, `errors`, `hardware_profile`, `lifecycle_service`, `llm_options`, `llm_service`, `lora_options`, `model_types`, `pipeline`, `rag`, `sdk_events`, `solutions`, `storage_types`, `structured_output`, `stt_options`, `thinking_tag_pattern`, `tool_calling`, `tts_options`, `vad_options`, `vlm_options`, `voice_agent_service`, `voice_events`.
-
-**Missing Dart codegen** (drift items as of 2026-05-11): `idl/sdk_init.proto`, `idl/rac_options.proto`, `idl/router.proto` — no `.pb*.dart` outputs yet.
+29 proto schemas with full codegen (4 files each — `.pb.dart`, `.pbenum.dart`, `.pbjson.dart`, `.pbserver.dart`): `chat`, `component_types`, `diffusion_options`, `download_service`, `embeddings_options`, `errors`, `hardware_profile`, `lifecycle_service`, `llm_options`, `llm_service`, `lora_options`, `model_types`, `pipeline`, `rac_options`, `rag`, `router`, `sdk_events`, `sdk_init`, `solutions`, `storage_types`, `structured_output`, `stt_options`, `thinking_tag_pattern`, `tool_calling`, `tts_options`, `vad_options`, `vlm_options`, `voice_agent_service`, `voice_events`.
 
 ## Data Flows
 

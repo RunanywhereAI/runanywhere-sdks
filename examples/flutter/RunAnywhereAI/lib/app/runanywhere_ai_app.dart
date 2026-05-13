@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -476,17 +477,23 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 65000000,
     );
 
-    // System TTS pseudo-model (matches iOS / Android registration).
-    // No download URL — the platform's built-in TTS engine (AVSpeechSynthesizer
-    // on iOS, android.speech.tts.TextToSpeech on Android) is used at runtime.
-    RunAnywhereSDK.instance.models.register(
-      id: 'system-tts',
-      name: 'System TTS',
-      url: Uri.parse('about:blank'),
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
-      modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      memoryRequirement: 0,
-    );
+    // System TTS pseudo-model — Apple-only. The commons `platform` engine
+    // plugin (AVSpeechSynthesizer-backed) is gated behind
+    // `if(APPLE AND RAC_BUILD_PLATFORM)` in
+    // sdk/runanywhere-commons/CMakeLists.txt:732, so on Android there is
+    // no native route for `framework=platform`. Mirrors the Swift SDK and
+    // the Kotlin SDK (which only registers SystemTTSModule on Apple via
+    // the platform plugin path).
+    if (Platform.isIOS || Platform.isMacOS) {
+      RunAnywhereSDK.instance.models.register(
+        id: 'system-tts',
+        name: 'System TTS',
+        url: Uri.parse('about:blank'),
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        memoryRequirement: 0,
+      );
+    }
     // VAD (Silero) — registered here so the voice-agent pipeline has a
     // default detector available alongside STT/TTS.
     RunAnywhereSDK.instance.models.register(

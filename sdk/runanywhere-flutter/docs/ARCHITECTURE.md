@@ -158,10 +158,9 @@ dart_bridge_http.dart             # HTTP transport (Dart side)
 dart_bridge_llm.dart              # LLM generate / generateStream
 dart_bridge_lora.dart             # LoRA adapter ops
 dart_bridge_model_assignment.dart # model-assignment proto
-dart_bridge_model_format.dart     # format inference
 dart_bridge_model_lifecycle.dart  # load / unload / current
 dart_bridge_model_paths.dart      # storage roots, model dirs
-dart_bridge_model_registry.dart   # registry CRUD
+dart_bridge_model_registry.dart   # registry CRUD + URL → format/artifact inference
 dart_bridge_platform.dart         # platform adapter + services registration
 dart_bridge_plugin_loader.dart    # dynamic plugin loading
 dart_bridge_proto_utils.dart      # proto helpers

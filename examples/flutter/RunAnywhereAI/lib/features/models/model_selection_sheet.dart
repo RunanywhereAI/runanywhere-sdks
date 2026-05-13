@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -240,8 +241,18 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         if (_availableModels.isEmpty)
           _buildEmptyModelsMessage(context)
         else ...[
-          // System TTS option for TTS context
-          if (widget.context == ModelSelectionContext.tts)
+          // System TTS option for TTS context.
+          //
+          // Apple-only — commons' `platform` engine plugin
+          // (AVSpeechSynthesizer-backed) is gated behind
+          // `if(APPLE AND RAC_BUILD_PLATFORM)` in
+          // sdk/runanywhere-commons/CMakeLists.txt:732. On Android there is
+          // no native route for `framework=platform`, so hide the row to
+          // avoid the "no backend route" error the router would otherwise
+          // raise. Mirrors Swift SDK behavior (System TTS only exists on
+          // Apple platforms).
+          if (widget.context == ModelSelectionContext.tts &&
+              (Platform.isIOS || Platform.isMacOS))
             _buildSystemTTSRow(context),
 
           // All models in a flat list

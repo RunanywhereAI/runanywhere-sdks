@@ -8,7 +8,6 @@ import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
-import 'package:runanywhere/native/dart_bridge_model_format.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -536,6 +535,147 @@ class DartBridgeModelRegistry {
       includeUserImports: true,
       query: model_pb.ModelQuery(downloadedOnly: true),
     );
+  }
+}
+
+// =============================================================================
+// Model Format Bridge (folded from former dart_bridge_model_format.dart)
+// =============================================================================
+
+/// Thin proto-byte bridge for URL → ModelFormat / ModelArtifactType inference.
+/// Delegates to the commons Wave D-3 APIs
+/// (`rac_model_format_from_url_proto`, `rac_artifact_infer_from_url_proto`).
+///
+/// Flutter does NOT own URL-suffix heuristics; commons is authoritative.
+class DartBridgeModelFormat {
+  DartBridgeModelFormat._();
+
+  static final DartBridgeModelFormat shared = DartBridgeModelFormat._();
+
+  static final _formatLogger = SDKLogger('DartBridge.ModelFormat');
+
+  /// URL → ModelFormat via commons. Returns
+  /// [model_pb.ModelFormat.MODEL_FORMAT_UNKNOWN] when the native proto ABI is
+  /// unavailable (e.g. pre-init, unit tests).
+  model_pb.ModelFormat formatFromUrl(String url) {
+    final fn = RacNative.bindings.rac_model_format_from_url_proto;
+    if (fn == null) {
+      _formatLogger.warning(
+          'rac_model_format_from_url_proto unavailable; returning UNKNOWN');
+      return model_pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
+    }
+    final result =
+        DartBridgeProtoUtils.callRequest<model_pb.ModelFormatFromUrlResult>(
+      request: model_pb.ModelFormatFromUrlRequest(url: url),
+      invoke: fn,
+      decode: model_pb.ModelFormatFromUrlResult.fromBuffer,
+      symbol: 'rac_model_format_from_url_proto',
+    );
+    // Commons returns the archive-wrapper format for archive URLs; the inner
+    // format (e.g. ONNX inside .tar.gz) is in result.innerFormat. For the
+    // "what format is this model?" question the SDK asks, the inner format is
+    // the authoritative answer when non-unspecified.
+    if (result.innerFormat != model_pb.ModelFormat.MODEL_FORMAT_UNSPECIFIED &&
+        result.innerFormat != model_pb.ModelFormat.MODEL_FORMAT_UNKNOWN) {
+      return result.innerFormat;
+    }
+    return result.format;
+  }
+
+  /// URL → ArtifactInferFromUrlResult via commons. Returns `null` when the
+  /// native proto ABI is unavailable.
+  model_pb.ArtifactInferFromUrlResult? inferArtifact(
+    String url, {
+    String modelId = '',
+  }) {
+    final fn = RacNative.bindings.rac_artifact_infer_from_url_proto;
+    if (fn == null) {
+      _formatLogger.warning(
+          'rac_artifact_infer_from_url_proto unavailable; returning null');
+      return null;
+    }
+    return DartBridgeProtoUtils.callRequest<model_pb.ArtifactInferFromUrlResult>(
+      request: model_pb.ArtifactInferFromUrlRequest(url: url, modelId: modelId),
+      invoke: fn,
+      decode: model_pb.ArtifactInferFromUrlResult.fromBuffer,
+      symbol: 'rac_artifact_infer_from_url_proto',
+    );
+  }
+
+  /// Populate the artifact-classification fields on a copy of [model] based on
+  /// its `downloadUrl` via commons. Preserves caller-supplied artifact fields
+  /// when already set, handles the built-in short-circuit (DIRECTORY), and
+  /// falls back to [model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE]
+  /// when the native ABI is unavailable. Mirrors Kotlin
+  /// `CppBridgeModelFormat.applyInferredArtifact`.
+  model_pb.ModelInfo applyInferredArtifact(
+    model_pb.ModelInfo model, [
+    String? url,
+  ]) {
+    if (model.hasArtifactType() ||
+        model.hasSingleFile() ||
+        model.hasArchive() ||
+        model.hasMultiFile() ||
+        model.hasBuiltIn() ||
+        model.hasCustomStrategyId()) {
+      return model;
+    }
+
+    if (_isBuiltIn(model)) {
+      return model.deepCopy()
+        ..artifactType = model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
+        ..builtIn = true;
+    }
+
+    final effectiveUrl = url ?? model.downloadUrl;
+    if (effectiveUrl.isEmpty) return _asSingleFile(model);
+
+    final inference = inferArtifact(effectiveUrl, modelId: model.id);
+    if (inference == null) return _asSingleFile(model);
+
+    final copy = model.deepCopy()..artifactType = inference.artifactType;
+    switch (inference.artifactType) {
+      case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
+      case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE:
+        copy.archive = model_pb.ArchiveArtifact(
+          type: inference.archiveType ==
+                  model_pb.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED
+              ? (inference.artifactType ==
+                      model_pb.ModelArtifactType
+                          .MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+                  ? model_pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ
+                  : model_pb.ArchiveType.ARCHIVE_TYPE_ZIP)
+              : inference.archiveType,
+          structure: inference.archiveStructure,
+        );
+        break;
+      case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY:
+        copy.multiFile = model_pb.MultiFileArtifact();
+        break;
+      case model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE:
+      default:
+        copy.singleFile = model_pb.SingleFileArtifact();
+    }
+    return copy;
+  }
+
+  model_pb.ModelInfo _asSingleFile(model_pb.ModelInfo model) {
+    return model.deepCopy()
+      ..artifactType = model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
+      ..singleFile = model_pb.SingleFileArtifact();
+  }
+
+  /// Mirrors the `ProtoModelInfoHelpers.isBuiltIn` extension in
+  /// `model_types_cpp_bridge.dart` without introducing a circular import.
+  static bool _isBuiltIn(model_pb.ModelInfo model) {
+    if (model.hasBuiltIn() && model.builtIn) return true;
+    if (model.localPath.startsWith('builtin:')) return true;
+    return model.framework ==
+            model_pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+        model.framework ==
+            model_pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
+        model.framework ==
+            model_pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN;
   }
 }
 

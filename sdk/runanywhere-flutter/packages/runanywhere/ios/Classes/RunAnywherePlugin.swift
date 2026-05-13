@@ -20,6 +20,12 @@ public class RunAnywherePlugin: NSObject, FlutterPlugin {
         // of libcurl. Idempotent.
         URLSessionHttpTransport.register()
 
+        // Register the AVSpeechSynthesizer-backed System TTS plugin so
+        // `tts.loadVoice("system-tts")` resolves through the commons
+        // router on iOS. Mirrors Swift SDK's
+        // `CppBridge.Platform.register()`. Idempotent.
+        PlatformPluginBridge.register()
+
         let channel = FlutterMethodChannel(
             name: "runanywhere",
             binaryMessenger: registrar.messenger()

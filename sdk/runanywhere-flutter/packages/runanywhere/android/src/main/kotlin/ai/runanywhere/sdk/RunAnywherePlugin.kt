@@ -2,7 +2,7 @@ package ai.runanywhere.sdk
 
 import android.os.Build
 import android.util.Log
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -25,28 +25,24 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
         private const val COMMONS_VERSION = "0.19.13"
 
         init {
-            // Installing the OkHttp transport is the one-time wire-up for the
-            // RunAnywhere HTTP stack on Android. Routes `rac_http_request_*`
-            // through OkHttp so consumers get the system CA trust store,
-            // HTTP/2, proxies, and NetworkSecurityConfig instead of libcurl
-            // (which was deleted in Stage 5). Idempotent on the C++ side.
+            // Install the OkHttp transport via the canonical Kotlin-SDK-aligned
+            // adapter at `com.runanywhere.sdk.httptransport.OkHttpHttpTransport`.
+            // The JNI shim (sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp:557)
+            // does FindClass against that exact FQN — if this fails with
+            // ClassNotFound, every rac_http_request_* call returns -801.
+            //
+            // `OkHttpHttpTransport.register()` is idempotent and matches the
+            // Swift `URLSessionHttpTransport.register()` contract.
             //
             // `RunAnywhereBridge`'s static initializer also runs
             // `System.loadLibrary("runanywhere_jni")`, which pulls in
             // `librac_commons.so` transitively.
             try {
-                val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
-                if (rc == RunAnywhereBridge.RAC_SUCCESS) {
-                    Log.i(TAG, "OkHttp HTTP transport registered")
-                } else {
-                    Log.w(TAG, "OkHttp HTTP transport registration returned rc=$rc")
+                val ok = OkHttpHttpTransport.register()
+                if (!ok) {
+                    Log.w(TAG, "OkHttp HTTP transport registration failed; HTTP will error out")
                 }
             } catch (t: Throwable) {
-                // Link / load errors here indicate the bundled
-                // librunanywhere_jni.so or librac_commons.so is missing or
-                // predates rac_http_transport_register. The SDK can no
-                // longer fall back to libcurl (Stage 5 deleted it), so HTTP
-                // will error out until the native bundle is rebuilt.
                 Log.e(TAG, "OkHttp HTTP transport unavailable: ${t.message}", t)
             }
         }

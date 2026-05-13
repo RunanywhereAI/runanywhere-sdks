@@ -18,7 +18,8 @@
  *   android/src/main/jniLibs/<abi>/librunanywhere_jni.so
  * which also dynamically depends on `librac_commons.so` (the transport
  * registry). Calling [racHttpTransportRegisterOkHttp] installs a vtable
- * that routes `rac_http_request_*` through [OkHttpTransport] — subsequent
+ * that routes `rac_http_request_*` through
+ * [com.runanywhere.sdk.httptransport.OkHttpHttpTransport] — subsequent
  * HTTP traffic from the SDK flows through OkHttp instead of libcurl.
  */
 

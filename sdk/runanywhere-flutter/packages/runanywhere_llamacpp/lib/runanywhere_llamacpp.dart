@@ -38,4 +38,3 @@
 library runanywhere_llamacpp;
 
 export 'llamacpp.dart';
-export 'llamacpp_error.dart';

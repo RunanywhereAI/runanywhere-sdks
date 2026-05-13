@@ -37,9 +37,6 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
-// Re-export for backward compatibility
-export 'llamacpp_error.dart';
-
 /// LlamaCPP module for LLM text generation.
 ///
 /// Provides large language model capabilities using llama.cpp

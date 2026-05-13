@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
@@ -284,7 +285,13 @@ class ModelRequiredOverlay extends StatelessWidget {
       case ModelSelectionContext.stt:
         return 'Select a speech recognition model to transcribe audio. Choose from WhisperKit or ONNX Runtime.';
       case ModelSelectionContext.tts:
-        return 'Select a text-to-speech model to generate audio. Choose from Piper TTS or System TTS.';
+        // System TTS is Apple-only — the commons `platform` engine plugin
+        // is gated behind `if(APPLE AND RAC_BUILD_PLATFORM)`. Tailor the
+        // helper text accordingly so Android users aren't pointed at an
+        // unsupported option.
+        return (Platform.isIOS || Platform.isMacOS)
+            ? 'Select a text-to-speech model to generate audio. Choose from Piper TTS or System TTS.'
+            : 'Select a text-to-speech model to generate audio. Choose from Piper TTS.';
       case ModelSelectionContext.voice:
         return 'Voice assistant requires multiple models. Let\'s set them up together.';
       case ModelSelectionContext.vlm:

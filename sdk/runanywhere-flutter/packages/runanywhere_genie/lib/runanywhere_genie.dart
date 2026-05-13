@@ -42,4 +42,3 @@
 library runanywhere_genie;
 
 export 'genie.dart';
-export 'genie_error.dart';
