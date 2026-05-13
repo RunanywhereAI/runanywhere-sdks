@@ -103,7 +103,7 @@ export function resolveVLMArtifactsFromLifecycleResult(
   return { primaryModelPath, visionProjectorPath };
 }
 
-export async function loadModelLifecycle(
+export async function loadModel(
   request: ModelLoadRequestMessage
 ): Promise<ModelLoadResultMessage> {
   if (!isNativeModuleAvailable()) {
@@ -129,7 +129,7 @@ export async function loadModelLifecycle(
   );
 }
 
-export async function unloadModelLifecycle(
+export async function unloadModel(
   request: ModelUnloadRequestMessage
 ): Promise<ModelUnloadResultMessage> {
   if (!isNativeModuleAvailable()) {
@@ -153,7 +153,7 @@ export async function unloadModelLifecycle(
   );
 }
 
-export async function getCurrentModel(
+export async function currentModel(
   request: CurrentModelRequestMessage = CurrentModelRequest.fromPartial({})
 ): Promise<CurrentModelResultMessage | null> {
   if (!isNativeModuleAvailable()) {
@@ -168,7 +168,7 @@ export async function getCurrentModel(
   return bytes.byteLength === 0 ? null : CurrentModelResult.decode(bytes);
 }
 
-export async function getComponentLifecycleSnapshot(
+export async function componentLifecycleSnapshot(
   component: SDKComponent
 ): Promise<ComponentLifecycleSnapshotMessage | null> {
   if (!isNativeModuleAvailable()) {
@@ -182,3 +182,7 @@ export async function getComponentLifecycleSnapshot(
     ? null
     : ComponentLifecycleSnapshot.decode(bytes);
 }
+
+/**
+ * Internal compatibility alias. Prefer `loadModel`.
+ */

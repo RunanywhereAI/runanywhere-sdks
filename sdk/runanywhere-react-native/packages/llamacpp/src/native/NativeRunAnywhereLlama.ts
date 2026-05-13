@@ -6,7 +6,7 @@
  */
 
 import type { RunAnywhereLlama } from '../specs/RunAnywhereLlama.nitro';
-import { getNitroModulesProxySync, type NitroProxy } from '@runanywhere/core';
+import { getNitroModulesProxySync, type NitroProxy } from '@runanywhere/core/internal';
 
 // Use the global NitroModules initialization
 function getNitroModulesProxy(): NitroProxy | null {

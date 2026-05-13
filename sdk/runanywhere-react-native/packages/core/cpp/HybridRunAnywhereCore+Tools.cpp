@@ -106,6 +106,22 @@ std::shared_ptr<ArrayBuffer> callCommonsBufferProto(const std::vector<uint8_t>& 
     return copyRequiredToolsProtoBuffer(out, operation);
 }
 
+void toolsProtoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* userData) {
+    if (!protoBytes || protoSize == 0 || !userData) {
+        return;
+    }
+    auto* callback =
+        static_cast<std::function<void(const std::shared_ptr<ArrayBuffer>&)>*>(userData);
+    if (!callback || !(*callback)) {
+        return;
+    }
+    try {
+        (*callback)(ArrayBuffer::copy(protoBytes, protoSize));
+    } catch (...) {
+        LOGE("tools proto callback dispatch failed");
+    }
+}
+
 std::shared_ptr<ArrayBuffer> callRagBufferProto(const std::vector<uint8_t>& bytes,
                                                 const char* symbolName,
                                                 const char* operation) {
@@ -240,6 +256,50 @@ HybridRunAnywhereCore::structuredOutputValidateProto(
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callCommonsBufferProto(
             bytes, "rac_structured_output_validate_proto", "structuredOutputValidateProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::structuredOutputGenerateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes, "rac_structured_output_generate_proto", "structuredOutputGenerateProto");
+    });
+}
+
+std::shared_ptr<Promise<void>>
+HybridRunAnywhereCore::structuredOutputGenerateStreamProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
+        auto fn = proto_compat::symbol<proto_compat::StructuredOutputStreamProtoFn>(
+            "rac_structured_output_generate_stream_proto");
+        if (!fn) {
+            LOGE("structuredOutputGenerateStreamProto: lifecycle stream ABI unavailable");
+            return;
+        }
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = fn(data, bytes.size(), toolsProtoBytesCallback, callback.get());
+        if (rc != RAC_SUCCESS) {
+            LOGE("structuredOutputGenerateStreamProto: rc=%d", rc);
+        }
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::structuredOutputSchemaToJsonProto(
+    const std::shared_ptr<ArrayBuffer>& schemaBytes) {
+    auto bytes = copyToolsArrayBufferBytes(schemaBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes,
+            "rac_structured_output_schema_to_json_proto",
+            "structuredOutputSchemaToJsonProto");
     });
 }
 

@@ -4,7 +4,7 @@
  * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/
  */
 
-import { RoutingPolicy } from '@runanywhere/core';
+import { RoutingPolicy } from '@runanywhere/proto-ts/model_types';
 
 export { RoutingPolicy };
 

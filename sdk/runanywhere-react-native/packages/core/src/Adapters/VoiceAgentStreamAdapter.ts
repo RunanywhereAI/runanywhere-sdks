@@ -17,7 +17,7 @@
  * callback on the C++ handle.
  */
 
-import { VoiceAgent as NitroVoiceAgent } from '../generated/NitroVoiceAgentSpec';
+import { VoiceAgent as NitroVoiceAgent } from '../Internal/Nitro/NitroVoiceAgentSpec';
 import { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
 import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {

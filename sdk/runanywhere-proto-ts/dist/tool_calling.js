@@ -580,6 +580,56 @@ export const ToolValueObject_FieldsEntry = {
         return message;
     },
 };
+function createBaseToolValueJSON() {
+    return { json: "" };
+}
+export const ToolValueJSON = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.json !== "") {
+            writer.uint32(10).string(message.json);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolValueJSON();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.json = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { json: isSet(object.json) ? globalThis.String(object.json) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.json !== "") {
+            obj.json = message.json;
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolValueJSON.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolValueJSON();
+        message.json = object.json ?? "";
+        return message;
+    },
+};
 function createBaseToolParameter() {
     return {
         name: "",

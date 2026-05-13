@@ -34,7 +34,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
@@ -47,7 +50,7 @@ import {
 } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
-import type { Message, Conversation, ToolCallInfo } from '../types/chat';
+import type { Message, Conversation } from '../types/chat';
 import { MessageRole } from '../types/chat';
 import { useConversationStore } from '../stores/conversationStore';
 import {
@@ -61,21 +64,25 @@ import {
 } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
-  RunAnywhere,
   InferenceFramework,
   ModelCategory,
-  ToolParameterType,
+  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
-} from '@runanywhere/core';
-import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
-import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
-import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
+} from '@runanywhere/proto-ts/model_types';
+import {
+  ToolDefinition,
+  ToolParameterType,
+} from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from '../utils/mathParser';
 import { logDiagnostic } from '../utils/diagnostics';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
@@ -345,7 +352,8 @@ export const ChatScreen: React.FC = () => {
     try {
       const allModels = await listModels();
       const llmModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
       setAvailableModels(llmModels);
       logDiagnostic(
@@ -370,7 +378,9 @@ export const ChatScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const isLoaded = await RunAnywhere.isModelLoaded();
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_LANGUAGE
+      );
       logDiagnostic('[ChatScreen] Text model loaded:', isLoaded);
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
@@ -453,7 +463,9 @@ export const ChatScreen: React.FC = () => {
         setRegisteredToolCount(tools.length);
         logDiagnostic('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {
-        const lastError = result.errorMessage || await RunAnywhere.getLastError();
+        const lastError =
+          result.errorMessage ||
+          'Native model lifecycle returned an unsuccessful load result';
         Alert.alert(
           'Error',
           `Failed to load model: ${lastError || 'Unknown error'}`
@@ -505,7 +517,7 @@ export const ChatScreen: React.FC = () => {
         '[ChatScreen] Starting streaming generation for:',
         prompt,
         'model:',
-        currentModel?.id,
+        currentModel?.id
       );
 
       let accumulatedText = '';
@@ -692,7 +704,9 @@ export const ChatScreen: React.FC = () => {
    * Render header with actions
    */
   const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+    >
       {/* Conversations list button */}
       <TouchableOpacity
         style={styles.headerButton}

@@ -159,8 +159,8 @@ export function useVLMCamera(
       // Strip file:// prefix if present (VisionCamera may return a URI)
       const cleanPath = photo.path.replace('file://', '');
 
-      // Use the service to describe with a callback for streaming
-      await vlmService.describeImage(
+      // Use the service to process the image with a callback for streaming
+      await vlmService.processImage(
         cleanPath,
         SINGLE_CAPTURE_PROMPT,
         SINGLE_CAPTURE_MAX_TOKENS,
@@ -193,7 +193,7 @@ export function useVLMCamera(
       // Strip file prefix if needed
       const cleanPath = photoUri.replace('file://', '');
 
-      await vlmService.describeImage(
+      await vlmService.processImage(
         cleanPath,
         GALLERY_PROMPT,
         GALLERY_MAX_TOKENS,
@@ -225,7 +225,7 @@ export function useVLMCamera(
       const cleanPath = photo.path.replace('file://', '');
 
       let accumulatedText = '';
-      await vlmService.describeImage(
+      await vlmService.processImage(
         cleanPath,
         AUTO_STREAM_PROMPT,
         AUTO_STREAM_MAX_TOKENS,

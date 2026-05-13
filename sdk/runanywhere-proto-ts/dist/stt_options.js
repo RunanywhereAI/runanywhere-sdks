@@ -21,6 +21,10 @@ export const protobufPackage = "runanywhere.v1";
  * AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
  * back to the backend default (typically "en").
  * ---------------------------------------------------------------------------
+ * `rac_wire_string` annotations expose the BCP-47 base code for each value via
+ * the codegen-generated `wireString` accessor (see idl/rac_options.proto and
+ * idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
+ * from this annotation; the unspecified case falls back to "" by default.
  */
 export var STTLanguage;
 (function (STTLanguage) {

@@ -4,14 +4,15 @@ ONNX backend registration package for the RunAnywhere React Native SDK.
 
 This package does not own public model catalog, download, lifecycle, STT, TTS,
 VAD, or voice-agent APIs. Those surfaces live in `@runanywhere/core` over the
-generated proto/Nitro/commons bridge. `@runanywhere/onnx` only installs or
-removes the native ONNX backend providers.
+generated proto/Nitro/commons bridge, mirroring the Swift architecture source
+of truth. `@runanywhere/onnx` only installs or removes native backend providers
+and ships the `RABackendONNX` plus `RABackendSherpa` native binaries.
 
 ## Requirements
 
 - `@runanywhere/core` peer dependency
 - React Native 0.74+
-- iOS 15.1+ / Android API 24+
+- iOS 17.0+ / Android API 24+
 - Microphone permission in the host app for live audio capture
 
 ## Installation
@@ -63,8 +64,11 @@ await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
 ## Public API
 
 ```typescript
-import { ONNX, ONNXProvider } from '@runanywhere/onnx';
+import { ONNX } from '@runanywhere/onnx';
 ```
+
+`ONNXProvider` remains exported for lower-level compatibility, but app code
+should use `ONNX`. Neither surface owns model lifecycle or inference APIs.
 
 ### `ONNX.register()`
 
@@ -128,7 +132,10 @@ packages/onnx/
 |   |-- HybridRunAnywhereONNX.cpp
 |   `-- HybridRunAnywhereONNX.hpp
 |-- ios/
-|   `-- ONNXBackend.podspec
+|   `-- Binaries/
+|       |-- RABackendONNX.xcframework
+|       `-- RABackendSherpa.xcframework
+|-- RunAnywhereONNX.podspec
 |-- android/
 |   |-- build.gradle
 |   `-- CMakeLists.txt

@@ -303,6 +303,14 @@ export interface TTSVoiceInfo {
     sampleRate: number;
     supportedStyles: string[];
 }
+/**
+ * Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
+ * per-voice callback pattern used by the legacy handle-based ABI so the
+ * lifecycle-driven listing call returns a single serialized message.
+ */
+export interface TTSVoiceList {
+    voices: TTSVoiceInfo[];
+}
 export interface TTSStreamEvent {
     seq: number;
     timestampUs: number;
@@ -402,6 +410,14 @@ export declare const TTSVoiceInfo: {
     toJSON(message: TTSVoiceInfo): unknown;
     create<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(base?: I): TTSVoiceInfo;
     fromPartial<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(object: I): TTSVoiceInfo;
+};
+export declare const TTSVoiceList: {
+    encode(message: TTSVoiceList, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TTSVoiceList;
+    fromJSON(object: any): TTSVoiceList;
+    toJSON(message: TTSVoiceList): unknown;
+    create<I extends Exact<DeepPartial<TTSVoiceList>, I>>(base?: I): TTSVoiceList;
+    fromPartial<I extends Exact<DeepPartial<TTSVoiceList>, I>>(object: I): TTSVoiceList;
 };
 export declare const TTSStreamEvent: {
     encode(message: TTSStreamEvent, writer?: _m0.Writer): _m0.Writer;

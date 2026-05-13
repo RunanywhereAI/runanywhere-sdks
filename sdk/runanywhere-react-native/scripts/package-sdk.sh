@@ -3,8 +3,8 @@
 # sdk/runanywhere-react-native/scripts/package-sdk.sh
 # =============================================================================
 # Unified SDK packaging contract for the React Native SDK. Consumes pre-built
-# iOS XCFrameworks + Android .so files, stages them into each RN package's
-# native directories, and produces npm tarballs with checksums.
+# iOS XCFrameworks + Android .so files, stages each native binary only into the
+# RN package that owns it, and produces npm tarballs with checksums.
 #
 # USAGE:
 #   package-sdk.sh [--mode local|ci] [--natives-from PATH]
@@ -12,7 +12,9 @@
 # OPTIONS:
 #   --mode local|ci      Build mode (default: auto-detect from $CI)
 #   --natives-from PATH  Directory with iOS xcframeworks + Android .so files.
-#                        Same layout contract as the Flutter script.
+#                        iOS uses the Swift-shaped binary names:
+#                        core=RACommons, llamacpp=RABackendLLAMACPP,
+#                        onnx=RABackendONNX+RABackendSherpa.
 #
 # OUTPUTS:
 #   dist/sdk-rn/*.tgz     + .sha256    (one per npm workspace)
@@ -41,22 +43,57 @@ echo ">> React Native SDK packaging (mode=${RAC_BUILD_MODE})"
 
 if [ -n "$NATIVES_FROM" ]; then
     [ -d "$NATIVES_FROM" ] || { echo "ERROR: --natives-from not found: $NATIVES_FROM" >&2; exit 1; }
-    echo ">> Staging natives from $NATIVES_FROM into each RN package"
-    for pkg_dir in "$RN_ROOT/packages"/*/; do
-        pkg=$(basename "$pkg_dir")
-        android_jni="$pkg_dir/android/src/main/jniLibs"
-        rm -rf "$android_jni" "$pkg_dir/ios/Frameworks"
+    echo ">> Staging natives from $NATIVES_FROM with explicit package ownership"
+
+    stage_ios() {
+        local pkg_dir="$1"
+        shift
+        local ios_bin="$pkg_dir/ios/Binaries"
+        rm -rf "$ios_bin" "$pkg_dir/ios/Frameworks"
+        mkdir -p "$ios_bin"
+        for framework in "$@"; do
+            local src="$NATIVES_FROM/${framework}.xcframework"
+            if [ -d "$src" ]; then
+                cp -R "$src" "$ios_bin/"
+            else
+                echo "::warning::missing iOS framework for $(basename "$pkg_dir"): ${framework}.xcframework"
+            fi
+        done
+    }
+
+    stage_android() {
+        local pkg_dir="$1"
+        shift
+        local android_jni="$pkg_dir/android/src/main/jniLibs"
+        rm -rf "$android_jni"
         for abi in arm64-v8a armeabi-v7a x86_64 x86; do
             if [ -d "$NATIVES_FROM/$abi" ]; then
                 mkdir -p "$android_jni/$abi"
-                cp -f "$NATIVES_FROM/$abi"/*.so "$android_jni/$abi/" 2>/dev/null || true
+                for lib in "$@"; do
+                    if [ -f "$NATIVES_FROM/$abi/$lib" ]; then
+                        cp -f "$NATIVES_FROM/$abi/$lib" "$android_jni/$abi/"
+                    fi
+                done
             fi
         done
-        if ls "$NATIVES_FROM"/*.xcframework >/dev/null 2>&1; then
-            mkdir -p "$pkg_dir/ios/Frameworks"
-            cp -R "$NATIVES_FROM"/*.xcframework "$pkg_dir/ios/Frameworks/" 2>/dev/null || true
-        fi
-    done
+    }
+
+    if ls "$NATIVES_FROM"/*.xcframework >/dev/null 2>&1; then
+        stage_ios "$RN_ROOT/packages/core" RACommons
+        stage_ios "$RN_ROOT/packages/llamacpp" RABackendLLAMACPP
+        stage_ios "$RN_ROOT/packages/onnx" RABackendONNX RABackendSherpa
+    fi
+
+    if find "$NATIVES_FROM" -maxdepth 1 -type d \( -name "arm64-v8a" -o -name "armeabi-v7a" -o -name "x86_64" -o -name "x86" \) -print -quit | grep -q .; then
+        stage_android "$RN_ROOT/packages/core" \
+            librac_commons.so librunanywhere_jni.so libomp.so libc++_shared.so
+        stage_android "$RN_ROOT/packages/llamacpp" \
+            librac_backend_llamacpp.so librac_backend_llamacpp_jni.so libc++_shared.so
+        stage_android "$RN_ROOT/packages/onnx" \
+            librac_backend_onnx.so librac_backend_onnx_jni.so librac_backend_sherpa.so \
+            libonnxruntime.so libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so \
+            libsherpa-onnx-jni.so libc++_shared.so
+    fi
 fi
 
 cd "$RN_ROOT"

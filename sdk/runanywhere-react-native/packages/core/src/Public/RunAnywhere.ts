@@ -8,7 +8,8 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
-import { SDKEnvironment } from '../types';
+import { initializeNitroModulesGlobally } from '../native/NitroModulesGlobalInit';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
 import {
@@ -28,7 +29,7 @@ import {
   markInitializationFailed,
   resetState,
 } from '../Foundation/Initialization';
-import type { SDKInitOptions } from '../types';
+import type { SDKInitOptions } from '../types/models';
 import {
   EventDestination,
   InitializationStage,
@@ -44,23 +45,20 @@ import * as STT from './Extensions/STT/RunAnywhere+STT';
 import * as TTS from './Extensions/TTS/RunAnywhere+TTS';
 import * as VAD from './Extensions/VAD/RunAnywhere+VAD';
 import * as Storage from './Extensions/Storage/RunAnywhere+Storage';
-import * as SDKEvents from './Events/RunAnywhere+SDKEvents';
+import * as SDKEvents from './Extensions/Events/RunAnywhere+SDKEvents';
 import * as Lifecycle from './Extensions/Models/RunAnywhere+ModelLifecycle';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import { pluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import * as VoiceAgent from './Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
-// v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
 import * as StructuredOutput from './Extensions/LLM/RunAnywhere+StructuredOutput';
-import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/LLM/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RAG/RunAnywhere+RAG';
 import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
 import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
 import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
-import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
-import * as VLMModels from './Extensions/VLM/RunAnywhere+VLMModels';
 import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
 import { Hardware as HardwareNamespace } from './Extensions/RunAnywhere+Hardware';
+import { EventBus } from './Events/EventBus';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -73,16 +71,6 @@ let servicesInitPromise: Promise<void> | null = null;
 
 type NativePhase2Module = {
   completeServicesInitialization?: () => Promise<unknown>;
-  initializeServices?: () => Promise<unknown>;
-  sdkInitPhase2?: () => Promise<unknown>;
-  sdkInitPhase2Proto?: () => Promise<unknown>;
-};
-
-const sdkEventSurface = {
-  subscribe: SDKEvents.subscribeSDKEvents,
-  publish: SDKEvents.publishSDKEvent,
-  poll: SDKEvents.pollSDKEvent,
-  publishFailure: SDKEvents.publishSDKFailure,
 };
 
 function publishInitializationEvent(
@@ -123,7 +111,7 @@ export const RunAnywhere = {
   // Event Access
   // ============================================================================
 
-  events: sdkEventSurface,
+  events: EventBus.shared,
 
   // ============================================================================
   // SDK State
@@ -164,6 +152,12 @@ export const RunAnywhere = {
 
     publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
     logger.info('SDK initialization starting...');
+
+    try {
+      await initializeNitroModulesGlobally();
+    } catch (error) {
+      logger.warning('NitroModules global initialization failed', { error });
+    }
 
     if (!isNativeModuleAvailable()) {
       logger.warning('Native module not available');
@@ -223,17 +217,13 @@ export const RunAnywhere = {
     }
   },
 
-  async destroy(): Promise<void> {
+  async reset(): Promise<void> {
     if (isNativeModuleAvailable()) {
       const native = requireNativeModule();
       await native.destroy();
     }
     initState = resetState();
     servicesInitPromise = null;
-  },
-
-  async reset(): Promise<void> {
-    await this.destroy();
   },
 
   /**
@@ -280,12 +270,6 @@ export const RunAnywhere = {
       let phase2Result: unknown = undefined;
       if (typeof nativePhase2.completeServicesInitialization === 'function') {
         phase2Result = await nativePhase2.completeServicesInitialization.call(native);
-      } else if (typeof nativePhase2.sdkInitPhase2Proto === 'function') {
-        phase2Result = await nativePhase2.sdkInitPhase2Proto.call(native);
-      } else if (typeof nativePhase2.sdkInitPhase2 === 'function') {
-        phase2Result = await nativePhase2.sdkInitPhase2.call(native);
-      } else if (typeof nativePhase2.initializeServices === 'function') {
-        phase2Result = await nativePhase2.initializeServices.call(native);
       } else {
         const initialized = await native.isInitialized();
         if (!initialized) {
@@ -400,111 +384,60 @@ export const RunAnywhere = {
   pluginLoader: PluginLoaderCapability,
 
   // ============================================================================
-  // Text Generation - LLM (Delegated to Extension)
-  //
-  // Loading is lifecycle-driven (`loadModelLifecycle(modelId)`); these
-  // surfaces only expose state introspection + inference + cancel.
+  // Text Generation - LLM (Swift-shaped public extension)
   // ============================================================================
 
-  isModelLoaded: TextGeneration.isModelLoaded,
-  unloadModel: TextGeneration.unloadModel,
-  // Canonical spec names (§3)
-  unloadLLMModel: TextGeneration.unloadModel,
-  isLLMModelLoaded: TextGeneration.isModelLoaded,
-  chat: TextGeneration.chat,
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
-  // Introspection — canonical: `currentLLMModel()` only.
-  currentLLMModel: TextGeneration.currentLLMModel,
 
   // ============================================================================
-  // Speech-to-Text (Delegated to Extension)
+  // Speech-to-Text (Swift-shaped public extension)
   // ============================================================================
 
-  isSTTModelLoaded: STT.isSTTModelLoaded,
-  unloadSTTModel: STT.unloadSTTModel,
   transcribe: STT.transcribe,
-  transcribeSimple: STT.transcribeSimple,
-  transcribeBuffer: STT.transcribeBuffer,
   transcribeStream: STT.transcribeStream,
-  transcribeFile: STT.transcribeFile,
-  // Introspection (matches Swift: currentSTTModel)
-  currentSTTModel: STT.currentSTTModel,
-  // Live transcription session (matches Swift: startLiveTranscription)
-  startLiveTranscription,
 
   // ============================================================================
-  // Text-to-Speech (Delegated to Extension)
+  // Text-to-Speech (Swift-shaped public extension)
   // ============================================================================
 
-  isTTSModelLoaded: TTS.isTTSModelLoaded,
-  isTTSVoiceLoaded: TTS.isTTSVoiceLoaded,
-  unloadTTSModel: TTS.unloadTTSModel,
   synthesize: TTS.synthesize,
   synthesizeStream: TTS.synthesizeStream,
-  synthesizeStreamAsync: TTS.synthesizeStreamAsync,
-  speak: TTS.speak,
-  isSpeaking: TTS.isSpeaking,
-  stopSpeaking: TTS.stopSpeaking,
-  availableTTSVoices: TTS.availableTTSVoices,
   stopSynthesis: TTS.stopSynthesis,
-  // Introspection (matches Swift: currentTTSModel / currentTTSVoiceId)
-  currentTTSModel: TTS.currentTTSModel,
+  speak: TTS.speak,
+  stopSpeaking: TTS.stopSpeaking,
 
   // ============================================================================
-  // Voice Activity Detection (Delegated to Extension)
+  // Voice Activity Detection (Swift-shaped public extension)
   // ============================================================================
 
-  isVADModelLoaded: VAD.isVADModelLoaded,
-  unloadVADModel: VAD.unloadVADModel,
-  detectSpeech: VAD.detectSpeech,
   detectVoiceActivity: VAD.detectVoiceActivity,
-  processVAD: VAD.processVAD,
-  resetVAD: VAD.resetVAD,
-  // VAD activity stream (§6) — proto-byte canonical
-  streamVADActivity: VAD.streamVADActivity,
-  // VAD statistics (§6)
-  getVADStatistics: VAD.getVADStatistics,
-  // VAD streaming (§6)
   streamVAD: VAD.streamVAD,
+  resetVAD: VAD.resetVAD,
 
   // ============================================================================
-  // Voice Agent (Delegated to Extension)
+  // Voice Agent (Swift-shaped public extension)
   // ============================================================================
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
-  isVoiceAgentReady: VoiceAgent.isVoiceAgentReady,
   getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
-  areAllVoiceComponentsReady: VoiceAgent.areAllVoiceComponentsReady,
   processVoiceTurn: VoiceAgent.processVoiceTurn,
-  voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
-  voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
-  // Phase 1 / B4 fix: forwarder for the v3.1 Nitro `getVoiceAgentHandle()`
-  // method. The sample VoiceAssistantScreen calls `RunAnywhere.getVoiceAgentHandle()`
-  // to feed VoiceAgentStreamAdapter; previously missing from this facade.
-  getVoiceAgentHandle: VoiceAgent.getVoiceAgentHandle,
-  cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
-  // Canonical public streaming surface — callers never need to import the adapter.
   streamVoiceAgent: VoiceAgent.streamVoiceAgent,
-
-  // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter
-  // for streaming; compose STT/LLM/TTS directly for one-shot turns.
+  cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
 
   // ============================================================================
-  // Structured Output (Delegated to Extension)
+  // Structured Output (Swift-shaped public extension)
   // ============================================================================
 
   generateStructured: StructuredOutput.generateStructured,
   generateStructuredStream: StructuredOutput.generateStructuredStream,
-  // Extract structured data from existing text (§3)
+  generateWithStructuredOutput: StructuredOutput.generateWithStructuredOutput,
   extractStructuredOutput: StructuredOutput.extractStructuredOutput,
-  extractEntities: StructuredOutput.extractEntities,
-  classify: StructuredOutput.classify,
 
   // ============================================================================
-  // Tool Calling (Delegated to Extension)
+  // Tool Calling (Swift-shaped public extension)
   // ============================================================================
 
   registerTool: ToolCalling.registerTool,
@@ -512,21 +445,12 @@ export const RunAnywhere = {
   getRegisteredTools: ToolCalling.getRegisteredTools,
   clearTools: ToolCalling.clearTools,
   executeTool: ToolCalling.executeTool,
-  formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
-  continueWithToolResult: ToolCalling.continueWithToolResult,
 
   // ============================================================================
-  // Vision Language Model (Delegated to Extension)
+  // Vision Language Model (Swift-shaped public extension)
   // ============================================================================
 
-  registerVLMBackend: VLM.registerVLMBackend,
-  loadVLMModel: VLM.loadVLMModel,
-  loadVLMModelById: VLM.loadVLMModelById,
-  isVLMModelLoaded: VLM.isVLMModelLoaded,
-  unloadVLMModel: VLM.unloadVLMModel,
-  describeImage: VLM.describeImage,
-  askAboutImage: VLM.askAboutImage,
   processImage: VLM.processImage,
   processImageStream: VLM.processImageStream,
   cancelVLMGeneration: VLM.cancelVLMGeneration,
@@ -572,9 +496,6 @@ export const RunAnywhere = {
   downloadedModels: ModelManagement.downloadedModels,
   importModel: ModelManagement.importModel,
   downloadModel: ModelManagement.downloadModel,
-  cancelDownload: ModelManagement.cancelDownload,
-  deleteModel: ModelManagement.deleteModel,
-  loadModel: ModelManagement.loadModel,
 
   // ============================================================================
   // Hardware namespace (CANONICAL_API §14)
@@ -600,64 +521,9 @@ export const RunAnywhere = {
   publishSDKEvent: SDKEvents.publishSDKEvent,
   pollSDKEvent: SDKEvents.pollSDKEvent,
   publishSDKFailure: SDKEvents.publishSDKFailure,
-  loadModelLifecycle: Lifecycle.loadModelLifecycle,
-  unloadModelLifecycle: Lifecycle.unloadModelLifecycle,
-  getCurrentModel: Lifecycle.getCurrentModel,
-  getComponentLifecycleSnapshot: Lifecycle.getComponentLifecycleSnapshot,
-
-  // ============================================================================
-  // Utilities
-  // ============================================================================
-
-  async getLastError(): Promise<string> {
-    if (!isNativeModuleAvailable()) return '';
-    const native = requireNativeModule();
-    return native.getLastError();
-  },
-
-  async getBackendInfo(): Promise<Record<string, unknown>> {
-    if (!isNativeModuleAvailable()) return {};
-    const native = requireNativeModule();
-    const infoJson = await native.getBackendInfo();
-    try {
-      return JSON.parse(infoJson);
-    } catch {
-      return {};
-    }
-  },
-
-  // ============================================================================
-  // Audio Utilities (Delegated to Extension)
-  // ============================================================================
-
-  /** Audio recording and playback utilities */
-  Audio: {
-    requestPermission: Audio.requestAudioPermission,
-    startRecording: Audio.startRecording,
-    stopRecording: Audio.stopRecording,
-    cancelRecording: Audio.cancelRecording,
-    playAudio: Audio.playAudio,
-    stopPlayback: Audio.stopPlayback,
-    pausePlayback: Audio.pausePlayback,
-    resumePlayback: Audio.resumePlayback,
-    createWavFromPCMFloat32: Audio.createWavFromPCMFloat32,
-    cleanup: Audio.cleanup,
-    formatDuration: Audio.formatDuration,
-    SAMPLE_RATE: Audio.AUDIO_SAMPLE_RATE,
-    TTS_SAMPLE_RATE: Audio.TTS_SAMPLE_RATE,
-  },
-
-  // ============================================================================
-  // VLM Model Overloads (mirrors Swift +VLMModels)
-  // ============================================================================
-
-  loadVLMModelByInfo: VLMModels.loadVLMModel,
+  loadModel: Lifecycle.loadModel,
+  unloadModel: Lifecycle.unloadModel,
+  currentModel: Lifecycle.currentModel,
+  componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
 
 };
-
-// ============================================================================
-// Type Exports
-// ============================================================================
-
-export type { ModelInfo } from '@runanywhere/proto-ts/model_types';
-export type { DownloadProgress } from '@runanywhere/proto-ts/download_service';

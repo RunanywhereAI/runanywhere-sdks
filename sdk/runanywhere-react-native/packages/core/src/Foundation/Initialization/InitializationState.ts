@@ -8,7 +8,7 @@
  */
 
 import { InitializationPhase } from './InitializationPhase';
-import type { SDKEnvironment } from '../../types';
+import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 /**
  * Parameters passed to SDK initialization

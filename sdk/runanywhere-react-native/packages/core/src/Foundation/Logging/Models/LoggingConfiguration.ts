@@ -8,7 +8,7 @@
  */
 
 import { LogLevel } from './LogLevel';
-import { SDKEnvironment } from '../../../types/enums';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 // ============================================================================
 // Logging Configuration

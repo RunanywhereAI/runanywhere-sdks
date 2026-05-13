@@ -5,8 +5,8 @@
  * Matches Swift: RunAnywhere+PluginLoader.swift.
  */
 
-import { ErrorCode as ErrorCodeProto } from '@runanywhere/proto-ts/errors';
 import { SDKException } from '../../Foundation/Errors/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 
 /**
  * Information about a loaded plugin.
@@ -22,8 +22,8 @@ export interface PluginInfo {
  * Access via RunAnywhere.pluginLoader.
  */
 export interface PluginLoaderCapability {
-  readonly apiVersion: number;
-  readonly registeredCount: number;
+  readonly apiVersion: Promise<number>;
+  readonly registeredCount: Promise<number>;
   registeredNames(): Promise<string[]>;
   listLoaded(): Promise<PluginInfo[]>;
   load(path: string): Promise<PluginInfo>;
@@ -31,40 +31,55 @@ export interface PluginLoaderCapability {
 }
 
 export const pluginLoader: PluginLoaderCapability = {
-  get apiVersion(): number {
-    throw pluginLoaderUnavailable('apiVersion');
+  get apiVersion(): Promise<number> {
+    return requirePluginLoaderNative().pluginLoaderApiVersion();
   },
 
-  get registeredCount(): number {
-    throw pluginLoaderUnavailable('registeredCount');
+  get registeredCount(): Promise<number> {
+    return requirePluginLoaderNative().pluginLoaderRegisteredCount();
   },
 
   async registeredNames(): Promise<string[]> {
-    throw pluginLoaderUnavailable('registeredNames');
+    return JSON.parse(
+      await requirePluginLoaderNative().pluginLoaderRegisteredNames()
+    ) as string[];
   },
 
   async listLoaded(): Promise<PluginInfo[]> {
-    throw pluginLoaderUnavailable('listLoaded');
+    return JSON.parse(
+      await requirePluginLoaderNative().pluginLoaderListLoaded()
+    ) as PluginInfo[];
   },
 
   async load(path: string): Promise<PluginInfo> {
     if (!path.trim()) {
       throw SDKException.invalidInput('Plugin path is required');
     }
-    throw pluginLoaderUnavailable('load');
+    return JSON.parse(
+      await requirePluginLoaderNative().pluginLoaderLoad(path)
+    ) as PluginInfo;
   },
 
   async unload(name: string): Promise<void> {
     if (!name.trim()) {
       throw SDKException.invalidInput('Plugin name is required');
     }
-    throw pluginLoaderUnavailable('unload');
+    await requirePluginLoaderNative().pluginLoaderUnload(name);
   },
 };
 
-function pluginLoaderUnavailable(operation: string): SDKException {
-  return SDKException.of(
-    ErrorCodeProto.ERROR_CODE_FEATURE_NOT_AVAILABLE,
-    `PluginLoader.${operation} unavailable on React Native: native plugin loading is not implemented`
-  );
+type NativePluginLoader = {
+  pluginLoaderApiVersion(): Promise<number>;
+  pluginLoaderRegisteredCount(): Promise<number>;
+  pluginLoaderRegisteredNames(): Promise<string>;
+  pluginLoaderListLoaded(): Promise<string>;
+  pluginLoaderLoad(path: string): Promise<string>;
+  pluginLoaderUnload(name: string): Promise<void>;
+};
+
+function requirePluginLoaderNative(): NativePluginLoader {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  return requireNativeModule() as unknown as NativePluginLoader;
 }

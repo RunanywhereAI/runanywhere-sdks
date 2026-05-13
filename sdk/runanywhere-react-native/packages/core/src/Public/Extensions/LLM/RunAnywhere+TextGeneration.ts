@@ -86,47 +86,6 @@ function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
   return LLMGenerationResultMessage.decode(bytes);
 }
 
-// ============================================================================
-// Text Generation (LLM) Extension - Backend Agnostic
-// ============================================================================
-
-/**
- * Check if an LLM model is loaded
- * Matches iOS: `RunAnywhere.isModelLoaded`
- *
- * Loading models is handled by `loadModelLifecycle` in
- * `Models/RunAnywhere+ModelLifecycle.ts`, which resolves a `modelId` through the
- * native commons registry and then drives the LLM component lifecycle.
- */
-export async function isModelLoaded(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.isTextModelLoaded();
-}
-
-/**
- * Unload the currently loaded LLM model
- * Matches iOS: `RunAnywhere.unloadModel()`
- */
-export async function unloadModel(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.unloadTextModel();
-}
-
-/**
- * Simple chat - returns just the text response
- * Matches Swift SDK: RunAnywhere.chat(_:)
- */
-export async function chat(prompt: string): Promise<string> {
-  const result = await generate(prompt);
-  return result.text;
-}
-
 /**
  * Text generation with options and full metrics.
  * Matches Swift SDK: RunAnywhere.generate(_:options:)
@@ -262,38 +221,4 @@ export function cancelGeneration(): void {
   }
   const native = requireNativeModule();
   void native.llmCancelProto();
-}
-
-// ============================================================================
-// Introspection
-// ============================================================================
-
-/**
- * Native dispatch surface for LLM introspection. Each method is optional —
- * older bridges may not implement it.
- */
-interface LLMIntrospectionNativeModule {
-  getCurrentLLMModelId?: () => Promise<string>;
-  currentLLMModel?: () => Promise<string>;
-}
-
-// ============================================================================
-// Introspection
-// ============================================================================
-
-/**
- * Get the currently loaded LLM model ID, or `null` if none is loaded.
- *
- * Matches Swift: `RunAnywhere.currentLLMModel`. RN/Web/Flutter: returns
- * `Promise<string | null>` (async getter idiom).
- */
-export async function currentLLMModel(): Promise<string | null> {
-  if (!isNativeModuleAvailable()) return null;
-  const native = requireNativeModule() as unknown as LLMIntrospectionNativeModule;
-  // Prefer the getter name used elsewhere in the bridge; fall back to the
-  // alternate name for older native module shapes.
-  const fn = native.currentLLMModel ?? native.getCurrentLLMModelId;
-  if (!fn) return null;
-  const id = await fn.call(native);
-  return id && id.length > 0 ? id : null;
 }

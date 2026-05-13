@@ -183,7 +183,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       0
     );
     const totalTPS = analyticsMessages.reduce(
-      (sum, { analytics }) => sum + analytics.performance.throughputTokensPerSec,
+      (sum, { analytics }) =>
+        sum + analytics.performance.throughputTokensPerSec,
       0
     );
     const totalTokens = analyticsMessages.reduce(

@@ -63,10 +63,17 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   isInitialized(): Promise<boolean>;
 
-  /**
-   * Get backend info as JSON string
-   */
-  getBackendInfo(): Promise<string>;
+  // ============================================================================
+  // Plugin Loader
+  // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.
+  // ============================================================================
+
+  pluginLoaderApiVersion(): Promise<number>;
+  pluginLoaderRegisteredCount(): Promise<number>;
+  pluginLoaderRegisteredNames(): Promise<string>;
+  pluginLoaderListLoaded(): Promise<string>;
+  pluginLoaderLoad(path: string): Promise<string>;
+  pluginLoaderUnload(name: string): Promise<void>;
 
   // ============================================================================
   // Authentication
@@ -422,11 +429,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Get the last error message
-   */
-  getLastError(): Promise<string>;
-
-  /**
    * Extract an archive (tar.bz2, tar.gz, zip)
    * @param archivePath Path to the archive
    * @param destPath Destination directory
@@ -485,8 +487,8 @@ export interface RunAnywhereCore extends HybridObject<{
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+STT.swift - calls rac_stt_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+STT.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
 
   /**
@@ -499,20 +501,16 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   unloadSTTModel(): Promise<boolean>;
 
-  sttTranscribeProto(
-    audioBytes: ArrayBuffer,
-    optionsBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
+  sttTranscribeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   sttTranscribeStreamProto(
-    audioBytes: ArrayBuffer,
-    optionsBytes: ArrayBuffer,
-    onPartialBytes: (partialBytes: ArrayBuffer) => void
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
 
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+TTS.swift - calls rac_tts_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+TTS.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
 
   /**
@@ -525,23 +523,18 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   unloadTTSModel(): Promise<boolean>;
 
-  ttsListVoicesProto(
-    onVoiceBytes: (voiceBytes: ArrayBuffer) => void
-  ): Promise<boolean>;
-  ttsSynthesizeProto(
-    text: string,
-    optionsBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
+  ttsListVoicesProto(): Promise<ArrayBuffer>;
+  ttsSynthesizeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   ttsSynthesizeStreamProto(
-    text: string,
-    optionsBytes: ArrayBuffer,
-    onChunkBytes: (chunkBytes: ArrayBuffer) => void
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
+  ttsStopProto(): Promise<ArrayBuffer>;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+VAD.swift - calls rac_vad_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+VAD.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
 
   /**
@@ -559,11 +552,8 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   resetVAD(): Promise<void>;
 
-  vadConfigureProto(configBytes: ArrayBuffer): Promise<boolean>;
-  vadProcessProto(
-    samplesBytes: ArrayBuffer,
-    optionsBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
+  vadConfigureProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  vadProcessProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   vadGetStatisticsProto(): Promise<ArrayBuffer>;
   vadSetActivityCallbackProto(
     onActivityBytes: (activityBytes: ArrayBuffer) => void
@@ -576,48 +566,24 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Load a VLM model from lifecycle-resolved role artifacts.
+   * Process one image from serialized runanywhere.v1.VLMGenerationRequest
+   * bytes. Returns serialized runanywhere.v1.VLMResult bytes.
    */
-  loadVLMModelFromArtifacts(
-    primaryModelPath: string,
-    visionProjectorPath: string,
-    modelId: string
-  ): Promise<boolean>;
+  vlmProcessProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Check whether the process-wide VLM service handle is loaded.
-   */
-  isVLMModelLoaded(): Promise<boolean>;
-
-  /**
-   * Unload and destroy the process-wide VLM service handle.
-   */
-  unloadVLMModel(): Promise<boolean>;
-
-  /**
-   * Process one image from serialized runanywhere.v1.VLMImage bytes plus
-   * serialized runanywhere.v1.VLMGenerationOptions bytes. Returns serialized
-   * runanywhere.v1.VLMResult bytes.
-   */
-  vlmProcessProto(
-    imageBytes: ArrayBuffer,
-    optionsBytes: ArrayBuffer
-  ): Promise<ArrayBuffer>;
-
-  /**
-   * Stream VLM SDKEvent proto bytes while returning the final serialized
-   * runanywhere.v1.VLMResult bytes.
+   * Stream VLMStreamEvent proto bytes from serialized
+   * runanywhere.v1.VLMGenerationRequest bytes.
    */
   vlmProcessStreamProto(
-    imageBytes: ArrayBuffer,
-    optionsBytes: ArrayBuffer,
+    requestBytes: ArrayBuffer,
     onEventBytes: (eventBytes: ArrayBuffer) => void
-  ): Promise<ArrayBuffer>;
+  ): Promise<void>;
 
   /**
    * Cancel ongoing VLM generation through commons cancellation ABI.
    */
-  vlmCancelProto(): Promise<boolean>;
+  vlmCancelProto(): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Secure Storage
@@ -820,6 +786,16 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   structuredOutputValidateProto(
     requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  structuredOutputGenerateProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  structuredOutputGenerateStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  structuredOutputSchemaToJsonProto(
+    schemaBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
 
   // ===========================================================================

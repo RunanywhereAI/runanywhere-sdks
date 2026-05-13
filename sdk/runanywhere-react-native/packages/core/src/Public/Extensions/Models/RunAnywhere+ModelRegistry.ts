@@ -1,7 +1,7 @@
 /**
  * RunAnywhere+ModelRegistry.ts
  *
- * Canonical model registration / discovery / download / delete / load surface,
+ * Canonical model registration / discovery / download surface,
  * matching the Swift SDK.
  *
  * Wraps the proto-byte ABI on the core Nitro HybridObject:
@@ -11,10 +11,6 @@
  *   - downloadPlanProto               - downloadModel (plan)
  *   - downloadStartProto              - downloadModel (start)
  *   - setDownloadProgressCallbackProto - downloadModel (stream)
- *   - downloadCancelProto             - cancelDownload
- *   - storageDeleteProto              - deleteModel
- *   - modelLifecycleUnloadProto       - deleteModel (release handles first)
- *   - modelLifecycleLoadProto         - loadModel
  *
  * Hermes constraint: download streaming returns an `AsyncIterable<DownloadProgress>`
  * that callers MUST drive with manual `iterator.next()` loops (see CLAUDE.md).
@@ -36,21 +32,11 @@ import {
   ModelImportResult,
   ModelListRequest,
   ModelListResult,
-  ModelLoadRequest,
-  ModelLoadResult,
   ModelQuery,
-  ModelUnloadRequest,
   type InferenceFramework,
-  type ModelLoadRequest as ModelLoadRequestMessage,
-  type ModelLoadResult as ModelLoadResultMessage,
 } from '@runanywhere/proto-ts/model_types';
 import {
-  StorageDeleteRequest,
-  StorageDeleteResult,
-} from '@runanywhere/proto-ts/storage_types';
-import {
   DownloadCancelRequest,
-  DownloadCancelResult,
   DownloadPlanRequest,
   DownloadPlanResult,
   DownloadStage,
@@ -571,100 +557,4 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
       };
     },
   };
-}
-
-/** Cancel an in-flight download by model id. */
-export async function cancelDownload(modelId: string): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  const request = DownloadCancelRequest.fromPartial({
-    taskId: '',
-    modelId,
-    deletePartialBytes: false,
-  });
-  const buffer = await native.downloadCancelProto(
-    bytesToArrayBuffer(DownloadCancelRequest.encode(request).finish())
-  );
-  const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) return false;
-  const result = DownloadCancelResult.decode(bytes);
-  return result.success;
-}
-
-// ---------------------------------------------------------------------------
-// Deletion
-// ---------------------------------------------------------------------------
-
-/**
- * Delete a downloaded model's files. Releases any in-flight handles first
- * via `modelLifecycleUnloadProto` then removes the artifact bytes via
- * `storageDeleteProto`. Registry entry is retained so the model can be
- * re-downloaded.
- */
-export async function deleteModel(modelId: string): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  // Release any in-flight handles first.
-  await native
-    .modelLifecycleUnloadProto(
-      bytesToArrayBuffer(
-        ModelUnloadRequest.encode(
-          ModelUnloadRequest.fromPartial({
-            modelId,
-            unloadAll: false,
-          })
-        ).finish()
-      )
-    )
-    .catch(() => new ArrayBuffer(0));
-
-  const request = StorageDeleteRequest.fromPartial({
-    modelIds: [modelId],
-    deleteFiles: true,
-    clearRegistryPaths: true,
-    unloadIfLoaded: true,
-    allowPlatformDelete: true,
-  });
-  const buffer = await native
-    .storageDeleteProto(
-      bytesToArrayBuffer(StorageDeleteRequest.encode(request).finish())
-    )
-    .catch(() => new ArrayBuffer(0));
-  const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) return false;
-  const result = StorageDeleteResult.decode(bytes);
-  return result.success;
-}
-
-// ---------------------------------------------------------------------------
-// Model lifecycle entrypoint (mirrors Swift `RunAnywhere.loadModel(_:)`).
-// ---------------------------------------------------------------------------
-
-export async function loadModel(
-  request: ModelLoadRequestMessage
-): Promise<ModelLoadResultMessage> {
-  if (!isNativeModuleAvailable()) {
-    return ModelLoadResult.fromPartial({
-      success: false,
-      modelId: request.modelId,
-      category: request.category,
-      framework: request.framework,
-      errorMessage: 'Native module not available',
-    });
-  }
-  const native = requireNativeModule();
-  const buffer = await native.modelLifecycleLoadProto(
-    bytesToArrayBuffer(ModelLoadRequest.encode(request).finish())
-  );
-  const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) {
-    return ModelLoadResult.fromPartial({
-      success: false,
-      modelId: request.modelId,
-      category: request.category,
-      framework: request.framework,
-      errorMessage: 'modelLifecycleLoadProto returned an empty result',
-    });
-  }
-  return ModelLoadResult.decode(bytes);
 }

@@ -13,10 +13,8 @@
 
 import { ONNXProvider } from './ONNXProvider';
 import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import {
-  SDKComponent,
-  SDKLogger,
-} from '@runanywhere/core';
+import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 const logger = new SDKLogger('ONNX');
 
@@ -32,7 +30,8 @@ const logger = new SDKLogger('ONNX');
  *
  * ```typescript
  * import { ONNX } from '@runanywhere/onnx';
- * import { RunAnywhere, ModelCategory, InferenceFramework } from '@runanywhere/core';
+ * import { RunAnywhere } from '@runanywhere/core';
+ * import { ModelCategory, InferenceFramework } from '@runanywhere/proto-ts/model_types';
  *
  * // Register ONNX backend providers
  * await ONNX.register();

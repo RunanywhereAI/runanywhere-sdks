@@ -1,8 +1,7 @@
 /**
- * RunAnywhere+Audio.ts
+ * AudioUtilities.ts
  *
- * Audio recording and playback utilities for the SDK.
- * Provides a simple static API for common audio operations.
+ * Internal audio recording and playback utilities for React Native examples.
  *
  * Platform support:
  * - iOS: NativeAudioModule (AVFoundation)

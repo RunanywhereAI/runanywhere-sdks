@@ -25,7 +25,7 @@
  * callback on the C++ handle.
  */
 
-import { LLM as NitroLLM } from '../generated/NitroLLMSpec';
+import { LLM as NitroLLM } from '../Internal/Nitro/NitroLLMSpec';
 import { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 import {
   generateLLM,

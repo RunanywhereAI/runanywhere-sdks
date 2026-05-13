@@ -295,6 +295,30 @@ export interface VLMServiceState {
     errorMessage?: string | undefined;
     errorCode: number;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * VLM load-resolved-artifacts request / response.
+ *
+ * Replaces the legacy trio `rac_vlm_create` + `rac_vlm_initialize` +
+ * `rac_vlm_destroy` (on error) with a single proto-backed call. Consumers
+ * pass the already-resolved model paths (primary model + optional mmproj
+ * vision projector) together with an optional model_id for telemetry. The
+ * response carries the resulting native handle as an opaque uint64; callers
+ * store the handle and use it for subsequent process/cancel/destroy calls.
+ * ---------------------------------------------------------------------------
+ */
+export interface VLMLoadResolvedArtifactsRequest {
+    modelId: string;
+    primaryModelPath: string;
+    mmprojPath?: string | undefined;
+}
+export interface VLMLoadResolvedArtifactsResponse {
+    /** opaque native handle (0 on failure) */
+    handle: number;
+    /** RAC_SUCCESS or error code */
+    resultCode: number;
+    errorMessage?: string | undefined;
+}
 export declare const VLMChatTemplate: {
     encode(message: VLMChatTemplate, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VLMChatTemplate;
@@ -374,6 +398,22 @@ export declare const VLMServiceState: {
     toJSON(message: VLMServiceState): unknown;
     create<I extends Exact<DeepPartial<VLMServiceState>, I>>(base?: I): VLMServiceState;
     fromPartial<I extends Exact<DeepPartial<VLMServiceState>, I>>(object: I): VLMServiceState;
+};
+export declare const VLMLoadResolvedArtifactsRequest: {
+    encode(message: VLMLoadResolvedArtifactsRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsRequest;
+    fromJSON(object: any): VLMLoadResolvedArtifactsRequest;
+    toJSON(message: VLMLoadResolvedArtifactsRequest): unknown;
+    create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(base?: I): VLMLoadResolvedArtifactsRequest;
+    fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(object: I): VLMLoadResolvedArtifactsRequest;
+};
+export declare const VLMLoadResolvedArtifactsResponse: {
+    encode(message: VLMLoadResolvedArtifactsResponse, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsResponse;
+    fromJSON(object: any): VLMLoadResolvedArtifactsResponse;
+    toJSON(message: VLMLoadResolvedArtifactsResponse): unknown;
+    create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(base?: I): VLMLoadResolvedArtifactsResponse;
+    fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(object: I): VLMLoadResolvedArtifactsResponse;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

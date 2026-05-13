@@ -63,7 +63,14 @@ public:
   std::shared_ptr<Promise<bool>> completeServicesInitialization() override;
   std::shared_ptr<Promise<void>> destroy() override;
   std::shared_ptr<Promise<bool>> isInitialized() override;
-  std::shared_ptr<Promise<std::string>> getBackendInfo() override;
+
+  // Plugin Loader
+  std::shared_ptr<Promise<double>> pluginLoaderApiVersion() override;
+  std::shared_ptr<Promise<double>> pluginLoaderRegisteredCount() override;
+  std::shared_ptr<Promise<std::string>> pluginLoaderRegisteredNames() override;
+  std::shared_ptr<Promise<std::string>> pluginLoaderListLoaded() override;
+  std::shared_ptr<Promise<std::string>> pluginLoaderLoad(const std::string& path) override;
+  std::shared_ptr<Promise<void>> pluginLoaderUnload(const std::string& name) override;
 
   // ============================================================================
   // Authentication - Delegates to AuthBridge
@@ -207,7 +214,6 @@ public:
   // Utility Functions
   // ============================================================================
 
-  std::shared_ptr<Promise<std::string>> getLastError() override;
   std::shared_ptr<Promise<bool>> extractArchive(
     const std::string& archivePath,
     const std::string& destPath) override;
@@ -232,49 +238,44 @@ public:
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)
-  // Delegates to rac_stt_component_* APIs via STTBridge
+  // Delegates to lifecycle proto APIs via commons.
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> isSTTModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadSTTModel() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<void>> sttTranscribeStreamProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onPartialBytes) override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
 
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
-  // Delegates to rac_tts_component_* APIs via TTSBridge
+  // Delegates to lifecycle proto APIs via commons.
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> isTTSModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTTSModel() override;
-  std::shared_ptr<Promise<bool>> ttsListVoicesProto(
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onVoiceBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsListVoicesProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsSynthesizeProto(
-    const std::string& text,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<void>> ttsSynthesizeStreamProto(
-    const std::string& text,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onChunkBytes) override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsStopProto() override;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
-  // Delegates to rac_vad_component_* APIs via VADBridge
+  // Delegates to lifecycle proto APIs via commons.
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> isVADModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadVADModel() override;
   std::shared_ptr<Promise<void>> resetVAD() override;
-  std::shared_ptr<Promise<bool>> vadConfigureProto(
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadConfigureProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadProcessProto(
-    const std::shared_ptr<ArrayBuffer>& samplesBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadGetStatisticsProto() override;
   std::shared_ptr<Promise<bool>> vadSetActivityCallbackProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onActivityBytes) override;
@@ -284,20 +285,12 @@ public:
   // Uses commons VLM service lifecycle plus rac_vlm_*_proto ABI.
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> loadVLMModelFromArtifacts(
-    const std::string& primaryModelPath,
-    const std::string& visionProjectorPath,
-    const std::string& modelId) override;
-  std::shared_ptr<Promise<bool>> isVLMModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadVLMModel() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessProto(
-    const std::shared_ptr<ArrayBuffer>& imageBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessStreamProto(
-    const std::shared_ptr<ArrayBuffer>& imageBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<void>> vlmProcessStreamProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
-  std::shared_ptr<Promise<bool>> vlmCancelProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmCancelProto() override;
 
   // ============================================================================
   // Secure Storage
@@ -367,6 +360,13 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputValidateProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputGenerateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<void>> structuredOutputGenerateStreamProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputSchemaToJsonProto(
+    const std::shared_ptr<ArrayBuffer>& schemaBytes) override;
 
   // ============================================================================
   // RAG Pipeline - Proto ABI via rac_rag_*_proto symbols (see +Tools.cpp)

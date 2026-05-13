@@ -85,27 +85,6 @@ void protoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* userD
     }
 }
 
-std::vector<float> copyVADSamples(const std::vector<uint8_t>& bytes) {
-    std::vector<float> samples;
-    if (bytes.empty()) {
-        return samples;
-    }
-    if (bytes.size() % sizeof(float) == 0) {
-        samples.resize(bytes.size() / sizeof(float));
-        std::memcpy(samples.data(), bytes.data(), bytes.size());
-        return samples;
-    }
-    if (bytes.size() % sizeof(int16_t) == 0) {
-        size_t count = bytes.size() / sizeof(int16_t);
-        samples.resize(count);
-        const auto* pcm = reinterpret_cast<const int16_t*>(bytes.data());
-        for (size_t i = 0; i < count; ++i) {
-            samples[i] = static_cast<float>(pcm[i]) / 32768.0f;
-        }
-    }
-    return samples;
-}
-
 std::mutex g_vadActivityCallbackMutex;
 std::function<void(const std::shared_ptr<ArrayBuffer>&)> g_vadActivityCallback;
 
@@ -486,30 +465,20 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadSTTModel() {
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::sttTranscribeProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
-    auto audio = copyVoiceArrayBufferBytes(audioBytes);
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [audio = std::move(audio), options = std::move(options)]() {
-        rac_handle_t handle = getGlobalSTTHandle();
-        auto fn = proto_compat::symbol<proto_compat::STTTranscribeProtoFn>(
-            "rac_stt_component_transcribe_proto");
-        if (!handle || !fn) {
-            LOGE("sttTranscribeProto: STT handle or proto ABI unavailable");
+        [request = std::move(request)]() {
+        auto fn = proto_compat::symbol<proto_compat::STTLifecycleProtoFn>(
+            "rac_stt_transcribe_lifecycle_proto");
+        if (!fn) {
+            LOGE("sttTranscribeProto: lifecycle proto ABI unavailable");
             return emptyVoiceProtoBuffer();
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        const void* audioData = audio.empty() ? nullptr : audio.data();
-        rac_result_t rc = fn(
-            handle,
-            audioData,
-            audio.size(),
-            optionsData,
-            options.size(),
-            &out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("sttTranscribeProto: rc=%d", rc);
             proto_compat::freeBuffer(&out);
@@ -521,34 +490,23 @@ HybridRunAnywhereCore::sttTranscribeProto(
 
 std::shared_ptr<Promise<void>>
 HybridRunAnywhereCore::sttTranscribeStreamProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onPartialBytes) {
-    auto audio = copyVoiceArrayBufferBytes(audioBytes);
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<void>::async(
-        [audio = std::move(audio), options = std::move(options), onPartialBytes]() {
-        rac_handle_t handle = getGlobalSTTHandle();
-        auto fn = proto_compat::symbol<proto_compat::STTTranscribeStreamProtoFn>(
-            "rac_stt_component_transcribe_stream_proto");
-        if (!handle || !fn) {
-            LOGE("sttTranscribeStreamProto: STT handle or proto ABI unavailable");
+        [request = std::move(request), onEventBytes]() {
+        auto fn = proto_compat::symbol<proto_compat::STTLifecycleStreamProtoFn>(
+            "rac_stt_transcribe_stream_lifecycle_proto");
+        if (!fn) {
+            LOGE("sttTranscribeStreamProto: lifecycle stream ABI unavailable");
             return;
         }
         // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
         // user_data pointer is stable for the duration of the C call.
         auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onPartialBytes);
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        const void* audioData = audio.empty() ? nullptr : audio.data();
-        rac_result_t rc = fn(
-            handle,
-            audioData,
-            audio.size(),
-            optionsData,
-            options.size(),
-            protoBytesCallback,
-            callback.get());
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("sttTranscribeStreamProto: rc=%d", rc);
         }
@@ -604,47 +562,43 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadTTSModel() {
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ttsListVoicesProto(
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onVoiceBytes) {
-    return Promise<bool>::async([onVoiceBytes]() -> bool {
-        rac_handle_t handle = getGlobalTTSHandle();
-        auto fn = proto_compat::symbol<proto_compat::TTSListVoicesProtoFn>(
-            "rac_tts_component_list_voices_proto");
-        if (!handle || !fn) {
-            LOGE("ttsListVoicesProto: TTS handle or proto ABI unavailable");
-            return false;
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ttsListVoicesProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        auto fn = proto_compat::symbol<proto_compat::TTSBufferProtoFn>(
+            "rac_tts_list_voices_lifecycle_proto");
+        if (!fn) {
+            LOGE("ttsListVoicesProto: lifecycle list voices ABI unavailable");
+            return emptyVoiceProtoBuffer();
         }
-        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
-        // user_data pointer is stable for the duration of the C call.
-        auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onVoiceBytes);
-        rac_result_t rc = fn(handle, protoBytesCallback, callback.get());
-        if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("ttsListVoicesProto: rc=%d", rc);
-            return false;
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
         }
-        return true;
+        return copyVoiceProtoBuffer(out, "ttsListVoicesProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::ttsSynthesizeProto(
-    const std::string& text,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [text, options = std::move(options)]() {
-        rac_handle_t handle = getGlobalTTSHandle();
-        auto fn = proto_compat::symbol<proto_compat::TTSSynthesizeProtoFn>(
-            "rac_tts_component_synthesize_proto");
-        if (!handle || !fn) {
-            LOGE("ttsSynthesizeProto: TTS handle or proto ABI unavailable");
+        [request = std::move(request)]() {
+        auto fn = proto_compat::symbol<proto_compat::TTSLifecycleProtoFn>(
+            "rac_tts_synthesize_lifecycle_proto");
+        if (!fn) {
+            LOGE("ttsSynthesizeProto: lifecycle synthesize ABI unavailable");
             return emptyVoiceProtoBuffer();
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        rac_result_t rc = fn(handle, text.c_str(), optionsData, options.size(), &out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("ttsSynthesizeProto: rc=%d", rc);
             proto_compat::freeBuffer(&out);
@@ -656,33 +610,46 @@ HybridRunAnywhereCore::ttsSynthesizeProto(
 
 std::shared_ptr<Promise<void>>
 HybridRunAnywhereCore::ttsSynthesizeStreamProto(
-    const std::string& text,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
-    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onChunkBytes) {
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
-    return Promise<void>::async([text, options = std::move(options), onChunkBytes]() {
-        rac_handle_t handle = getGlobalTTSHandle();
-        auto fn = proto_compat::symbol<proto_compat::TTSSynthesizeStreamProtoFn>(
-            "rac_tts_component_synthesize_stream_proto");
-        if (!handle || !fn) {
-            LOGE("ttsSynthesizeStreamProto: TTS handle or proto ABI unavailable");
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<void>::async([request = std::move(request), onEventBytes]() {
+        auto fn = proto_compat::symbol<proto_compat::TTSLifecycleStreamProtoFn>(
+            "rac_tts_synthesize_stream_lifecycle_proto");
+        if (!fn) {
+            LOGE("ttsSynthesizeStreamProto: lifecycle stream ABI unavailable");
             return;
         }
         // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
         // user_data pointer is stable for the duration of the C call.
         auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onChunkBytes);
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        rac_result_t rc = fn(
-            handle,
-            text.c_str(),
-            optionsData,
-            options.size(),
-            protoBytesCallback,
-            callback.get());
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("ttsSynthesizeStreamProto: rc=%d", rc);
         }
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ttsStopProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        auto fn = proto_compat::symbol<proto_compat::TTSBufferProtoFn>(
+            "rac_tts_stop_lifecycle_proto");
+        if (!fn) {
+            LOGE("ttsStopProto: lifecycle stop ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("ttsStopProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "ttsStopProto");
     });
 }
 
@@ -737,64 +704,61 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadVADModel() {
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::resetVAD() {
     return Promise<void>::async([]() -> void {
-        rac_handle_t handle = getGlobalVADHandle();
-        if (handle) {
-            rac_vad_component_reset(handle);
+        auto fn = proto_compat::symbol<proto_compat::TTSBufferProtoFn>(
+            "rac_vad_reset_lifecycle_proto");
+        if (!fn) {
+            LOGE("resetVAD: lifecycle reset ABI unavailable");
+            return;
         }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(&out);
+        if (rc != RAC_SUCCESS) {
+            LOGE("resetVAD: rc=%d", rc);
+        }
+        proto_compat::freeBuffer(&out);
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadConfigureProto(
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> HybridRunAnywhereCore::vadConfigureProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) {
     auto bytes = copyVoiceArrayBufferBytes(configBytes);
-    return Promise<bool>::async([bytes = std::move(bytes)]() -> bool {
-        rac_handle_t handle = getGlobalVADHandle();
-        auto fn = proto_compat::symbol<proto_compat::VADConfigureProtoFn>(
-            "rac_vad_component_configure_proto");
-        if (!handle || !fn) {
-            LOGE("vadConfigureProto: VAD handle or proto ABI unavailable");
-            return false;
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        auto fn = proto_compat::symbol<proto_compat::VADLifecycleProtoFn>(
+            "rac_vad_configure_lifecycle_proto");
+        if (!fn) {
+            LOGE("vadConfigureProto: lifecycle configure ABI unavailable");
+            return emptyVoiceProtoBuffer();
         }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        rac_result_t rc = fn(handle, data, bytes.size());
-        if (rc != RAC_SUCCESS) {
+        rac_result_t rc = fn(data, bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("vadConfigureProto: rc=%d", rc);
-            return false;
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
         }
-        return true;
+        return copyVoiceProtoBuffer(out, "vadConfigureProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::vadProcessProto(
-    const std::shared_ptr<ArrayBuffer>& samplesBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
-    auto sampleBytes = copyVoiceArrayBufferBytes(samplesBytes);
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [sampleBytes = std::move(sampleBytes), options = std::move(options)]() {
-        rac_handle_t handle = getGlobalVADHandle();
-        auto fn = proto_compat::symbol<proto_compat::VADProcessProtoFn>(
-            "rac_vad_component_process_proto");
-        if (!handle || !fn) {
-            LOGE("vadProcessProto: VAD handle or proto ABI unavailable");
-            return emptyVoiceProtoBuffer();
-        }
-        auto samples = copyVADSamples(sampleBytes);
-        if (samples.empty()) {
-            LOGE("vadProcessProto: empty or unsupported audio buffer");
+        [request = std::move(request)]() {
+        auto fn = proto_compat::symbol<proto_compat::VADLifecycleProtoFn>(
+            "rac_vad_process_lifecycle_proto");
+        if (!fn) {
+            LOGE("vadProcessProto: lifecycle process ABI unavailable");
             return emptyVoiceProtoBuffer();
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        rac_result_t rc = fn(
-            handle,
-            samples.data(),
-            samples.size(),
-            optionsData,
-            options.size(),
-            &out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("vadProcessProto: rc=%d", rc);
             proto_compat::freeBuffer(&out);
@@ -851,12 +815,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadSetActivityCallbackProt
 
 // ============================================================================
 // VLM Capability (Backend-Agnostic)
-// Uses commons VLM service lifecycle plus rac_vlm_*_proto APIs.
+// Uses commons lifecycle-owned VLM proto APIs.
 // ============================================================================
-
-static rac_handle_t g_vlm_service_handle = nullptr;
-static std::mutex g_vlm_mutex;
-static std::string g_vlm_model_id;
 
 static rac_bool_t vlmProtoBytesCallback(const uint8_t* protoBytes,
                                         size_t protoSize,
@@ -865,122 +825,22 @@ static rac_bool_t vlmProtoBytesCallback(const uint8_t* protoBytes,
     return RAC_TRUE;
 }
 
-static void destroyGlobalVLMServiceLocked() {
-    if (!g_vlm_service_handle) {
-        return;
-    }
-
-    if (auto cleanup = proto_compat::symbol<proto_compat::VLMCleanupFn>("rac_vlm_cleanup")) {
-        (void)cleanup(g_vlm_service_handle);
-    }
-    if (auto destroy = proto_compat::symbol<proto_compat::VLMDestroyFn>("rac_vlm_destroy")) {
-        destroy(g_vlm_service_handle);
-    } else {
-        LOGE("destroyGlobalVLMServiceLocked: rac_vlm_destroy unavailable");
-    }
-    g_vlm_service_handle = nullptr;
-    g_vlm_model_id.clear();
-}
-
-static bool loadGlobalVLMService(const std::string& primaryModelPath,
-                                 const std::string& visionProjectorPath,
-                                 const std::string& modelId) {
-    auto create = proto_compat::symbol<proto_compat::VLMCreateFn>("rac_vlm_create");
-    auto initialize =
-        proto_compat::symbol<proto_compat::VLMInitializeFn>("rac_vlm_initialize");
-    if (!create || !initialize) {
-        LOGE("loadVLMModelFromArtifacts: rac_vlm_create/rac_vlm_initialize unavailable");
-        return false;
-    }
-
-    std::lock_guard<std::mutex> lock(g_vlm_mutex);
-    destroyGlobalVLMServiceLocked();
-
-    rac_handle_t handle = nullptr;
-    const std::string createKey = modelId.empty() ? primaryModelPath : modelId;
-    rac_result_t rc = create(createKey.c_str(), &handle);
-    if (rc != RAC_SUCCESS || !handle) {
-        LOGE("loadVLMModelFromArtifacts: rac_vlm_create failed: %d", rc);
-        return false;
-    }
-
-    rc = initialize(handle, primaryModelPath.c_str(), visionProjectorPath.c_str());
-    if (rc != RAC_SUCCESS) {
-        LOGE("loadVLMModelFromArtifacts: rac_vlm_initialize failed: %d", rc);
-        if (auto destroy = proto_compat::symbol<proto_compat::VLMDestroyFn>("rac_vlm_destroy")) {
-            destroy(handle);
-        }
-        return false;
-    }
-
-    g_vlm_service_handle = handle;
-    g_vlm_model_id = createKey;
-    return true;
-}
-
-static rac_handle_t getGlobalVLMServiceHandle() {
-    std::lock_guard<std::mutex> lock(g_vlm_mutex);
-    return g_vlm_service_handle;
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadVLMModelFromArtifacts(
-    const std::string& primaryModelPath,
-    const std::string& visionProjectorPath,
-    const std::string& modelId) {
-    return Promise<bool>::async([primaryModelPath, visionProjectorPath, modelId]() -> bool {
-        if (primaryModelPath.empty()) {
-            LOGE("loadVLMModelFromArtifacts: primaryModelPath is empty");
-            return false;
-        }
-        if (visionProjectorPath.empty()) {
-            LOGE("loadVLMModelFromArtifacts: visionProjectorPath is empty");
-            return false;
-        }
-        return loadGlobalVLMService(primaryModelPath, visionProjectorPath, modelId);
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isVLMModelLoaded() {
-    return Promise<bool>::async([]() -> bool {
-        return getGlobalVLMServiceHandle() != nullptr;
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadVLMModel() {
-    return Promise<bool>::async([]() -> bool {
-        std::lock_guard<std::mutex> lock(g_vlm_mutex);
-        const bool hadHandle = g_vlm_service_handle != nullptr;
-        destroyGlobalVLMServiceLocked();
-        return hadHandle;
-    });
-}
-
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::vlmProcessProto(
-    const std::shared_ptr<ArrayBuffer>& imageBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
-    auto image = copyVoiceArrayBufferBytes(imageBytes);
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [image = std::move(image), options = std::move(options)]() {
-        rac_handle_t handle = getGlobalVLMServiceHandle();
+        [request = std::move(request)]() {
         auto fn = proto_compat::symbol<proto_compat::VLMProcessProtoFn>(
-            "rac_vlm_process_proto");
-        if (!handle || !fn) {
-            LOGE("vlmProcessProto: VLM handle or proto ABI unavailable");
+            "rac_vlm_generate_proto");
+        if (!fn) {
+            LOGE("vlmProcessProto: lifecycle generate ABI unavailable");
             return emptyVoiceProtoBuffer();
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
-        const uint8_t* imageData = image.empty() ? nullptr : image.data();
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
-        rac_result_t rc = fn(
-            handle,
-            imageData,
-            image.size(),
-            optionsData,
-            options.size(),
-            &out);
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
+        rac_result_t rc = fn(requestData, request.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("vlmProcessProto: rc=%d", rc);
             proto_compat::freeBuffer(&out);
@@ -990,63 +850,53 @@ HybridRunAnywhereCore::vlmProcessProto(
     });
 }
 
-std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+std::shared_ptr<Promise<void>>
 HybridRunAnywhereCore::vlmProcessStreamProto(
-    const std::shared_ptr<ArrayBuffer>& imageBytes,
-    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
-    auto image = copyVoiceArrayBufferBytes(imageBytes);
-    auto options = copyVoiceArrayBufferBytes(optionsBytes);
-    return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [image = std::move(image), options = std::move(options), onEventBytes]() {
-        rac_handle_t handle = getGlobalVLMServiceHandle();
+    auto request = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<void>::async(
+        [request = std::move(request), onEventBytes]() {
         auto fn = proto_compat::symbol<proto_compat::VLMProcessStreamProtoFn>(
-            "rac_vlm_process_stream_proto");
-        if (!handle || !fn) {
-            LOGE("vlmProcessStreamProto: VLM handle or proto stream ABI unavailable");
-            return emptyVoiceProtoBuffer();
+            "rac_vlm_stream_proto");
+        if (!fn) {
+            LOGE("vlmProcessStreamProto: lifecycle stream ABI unavailable");
+            return;
         }
-        rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
         // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
         // user_data pointer is stable for the duration of the C call.
         auto callback = std::make_unique<
             std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
-        const uint8_t* imageData = image.empty() ? nullptr : image.data();
-        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        const uint8_t* requestData = request.empty() ? nullptr : request.data();
         rac_result_t rc = fn(
-            handle,
-            imageData,
-            image.size(),
-            optionsData,
-            options.size(),
+            requestData,
+            request.size(),
             vlmProtoBytesCallback,
-            callback.get(),
-            &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            callback.get());
+        if (rc != RAC_SUCCESS) {
             LOGE("vlmProcessStreamProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
-            return emptyVoiceProtoBuffer();
         }
-        return copyVoiceProtoBuffer(out, "vlmProcessStreamProto");
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vlmCancelProto() {
-    return Promise<bool>::async([]() -> bool {
-        rac_handle_t handle = getGlobalVLMServiceHandle();
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::vlmCancelProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
         auto fn = proto_compat::symbol<proto_compat::VLMCancelProtoFn>(
-            "rac_vlm_cancel_proto");
-        if (!handle || !fn) {
-            LOGE("vlmCancelProto: VLM handle or cancel ABI unavailable");
-            return false;
+            "rac_vlm_cancel_lifecycle_proto");
+        if (!fn) {
+            LOGE("vlmCancelProto: lifecycle cancel ABI unavailable");
+            return emptyVoiceProtoBuffer();
         }
-        rac_result_t rc = fn(handle);
-        if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = fn(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("vlmCancelProto: rc=%d", rc);
-            return false;
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
         }
-        return true;
+        return copyVoiceProtoBuffer(out, "vlmCancelProto");
     });
 }
 

@@ -46,6 +46,8 @@ public:
 
 private:
   bool isRegistered_ = false;
+  bool isSherpaModuleRegistered_ = false;
+  bool isSherpaRegistered_ = false;
 };
 
 } // namespace margelo::nitro::runanywhere::onnx

@@ -8,8 +8,8 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-# RunAnywhere SDK requires iOS 14.0 minimum
-platform :ios, '15.1'
+# RunAnywhere SDK follows the Swift source-of-truth minimum.
+platform :ios, '17.0'
 prepare_react_native_project!
 
 # react-native-permissions setup
@@ -66,10 +66,10 @@ target 'RunAnywhereAI' do
       # :ccache_enabled => true
     )
 
-    # Force all pods to use iOS 15.1 (required for react-native-audio-api)
+    # Force all pods to use the Swift source-of-truth deployment target.
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
       end
     end

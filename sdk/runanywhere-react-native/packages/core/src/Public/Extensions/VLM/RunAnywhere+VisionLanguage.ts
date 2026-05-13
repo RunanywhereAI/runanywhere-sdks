@@ -22,31 +22,20 @@ import {
 } from '../../../services/ProtoBytes';
 import {
   VLMGenerationOptions as VLMGenerationOptionsMessage,
+  VLMGenerationRequest,
   VLMImage as VLMImageMessage,
   VLMResult as VLMResultMessage,
+  VLMStreamEvent as VLMStreamEventMessage,
+  VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
 } from '@runanywhere/proto-ts/vlm_options';
-import {
-  GenerationEventKind,
-  SDKEvent as SDKEventMessage,
-} from '@runanywhere/proto-ts/sdk_events';
-import {
-  CurrentModelRequest,
-  ModelCategory,
-  ModelLoadRequest,
-} from '@runanywhere/proto-ts/model_types';
-import {
-  getCurrentModel,
-  loadModelLifecycle,
-  resolveVLMArtifactsFromLifecycleResult,
-  type VLMResolvedLifecycleArtifacts,
-} from '../Models/RunAnywhere+ModelLifecycle';
 
 const logger = new SDKLogger('RunAnywhere.VisionLanguage');
+let requestCounter = 0;
 
 /**
  * RN-local streaming wrapper. The proto `VLMResult` carries final metrics; the
@@ -58,23 +47,11 @@ export interface VLMStreamingResult {
   cancel: () => void;
 }
 
-/**
- * Optional backend provider-registration hook. It is intentionally limited to
- * registration; load/process/cancel always route through RN core.
- */
-export interface VLMBackendProvider {
-  registerVLMBackend: () => boolean | Promise<boolean>;
-}
-
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
   return requireNativeModule();
-}
-
-function encodeVLMImage(image: VLMImage): ArrayBuffer {
-  return bytesToArrayBuffer(VLMImageMessage.encode(image).finish());
 }
 
 function buildVLMOptions(
@@ -107,15 +84,25 @@ function buildVLMOptions(
   });
 }
 
-function encodeVLMOptions(
+function nextVLMRequestId(): string {
+  requestCounter += 1;
+  return `rn-vlm-${Date.now()}-${requestCounter}`;
+}
+
+function encodeVLMRequest(
+  image: VLMImage,
   prompt: string,
   options: Partial<VLMGenerationOptions> | undefined,
   streamingEnabled: boolean
 ): ArrayBuffer {
+  const request = VLMGenerationRequest.fromPartial({
+    requestId: nextVLMRequestId(),
+    images: [VLMImageMessage.fromPartial(image)],
+    options: buildVLMOptions(prompt, options, streamingEnabled),
+    metadata: {},
+  });
   return bytesToArrayBuffer(
-    VLMGenerationOptionsMessage.encode(
-      buildVLMOptions(prompt, options, streamingEnabled)
-    ).finish()
+    VLMGenerationRequest.encode(request).finish()
   );
 }
 
@@ -125,137 +112,6 @@ function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {
     throw SDKException.protoDecodeFailed(operation);
   }
   return VLMResultMessage.decode(bytes);
-}
-
-async function resolveVLMArtifacts(
-  modelId: string
-): Promise<VLMResolvedLifecycleArtifacts | null> {
-  const loadResult = await loadModelLifecycle(
-    ModelLoadRequest.fromPartial({
-      modelId,
-      validateAvailability: true,
-    })
-  );
-
-  if (!loadResult.success) {
-    logger.warning('VLM lifecycle load failed', {
-      modelId,
-      error: loadResult.errorMessage,
-      warnings: loadResult.warnings,
-    });
-    return null;
-  }
-
-  const loadArtifacts = resolveVLMArtifactsFromLifecycleResult(loadResult);
-  if (loadArtifacts) {
-    return loadArtifacts;
-  }
-
-  const currentRequest = CurrentModelRequest.fromPartial({
-    includeModelMetadata: true,
-    ...(loadResult.category !== ModelCategory.MODEL_CATEGORY_UNSPECIFIED
-      ? { category: loadResult.category }
-      : {}),
-  });
-  const currentModel = await getCurrentModel(currentRequest);
-  if (currentModel?.found && currentModel.modelId === modelId) {
-    const currentArtifacts = resolveVLMArtifactsFromLifecycleResult(currentModel);
-    if (currentArtifacts) {
-      return currentArtifacts;
-    }
-  }
-
-  logger.warning('VLM lifecycle did not resolve required artifacts', {
-    modelId,
-    resolvedArtifactCount: loadResult.resolvedArtifacts.length,
-  });
-  return null;
-}
-
-/**
- * Register a VLM backend provider. Calling without a provider is a no-op for
- * apps that already registered backends through package-level `register()`.
- */
-export async function registerVLMBackend(
-  provider?: VLMBackendProvider
-): Promise<boolean> {
-  if (!provider) {
-    return true;
-  }
-  return !!(await provider.registerVLMBackend());
-}
-
-/**
- * Load a VLM model by registry ID. Model paths are resolved by commons
- * lifecycle and consumed through role-tagged resolved artifacts.
- */
-export async function loadVLMModel(modelId: string): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for loadVLMModel');
-    return false;
-  }
-
-  const artifacts = await resolveVLMArtifacts(modelId);
-  if (!artifacts) {
-    return false;
-  }
-
-  return requireNativeModule().loadVLMModelFromArtifacts(
-    artifacts.primaryModelPath,
-    artifacts.visionProjectorPath,
-    modelId
-  );
-}
-
-/**
- * Load a VLM model by its registered model ID.
- *
- * Matches iOS: `RunAnywhere.loadVLMModelById(_:)`.
- */
-export async function loadVLMModelById(modelId: string): Promise<boolean> {
-  return loadVLMModel(modelId);
-}
-
-/** Whether a VLM model is loaded. */
-export async function isVLMModelLoaded(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  return requireNativeModule().isVLMModelLoaded();
-}
-
-/** Unload the currently loaded VLM model. */
-export async function unloadVLMModel(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  return requireNativeModule().unloadVLMModel();
-}
-
-/**
- * Describe an image with an optional prompt.
- *
- * Matches iOS: `RunAnywhere.describeImage(_:prompt:)`.
- */
-export async function describeImage(
-  image: VLMImage,
-  prompt?: string
-): Promise<string> {
-  const result = await processImage(image, prompt ?? "What's in this image?");
-  return result.text;
-}
-
-/**
- * Ask a question about an image.
- *
- * Matches iOS: `RunAnywhere.askAboutImage(_:image:)`.
- */
-export async function askAboutImage(
-  question: string,
-  image: VLMImage
-): Promise<string> {
-  const result = await processImage(image, question);
-  return result.text;
 }
 
 /**
@@ -270,8 +126,7 @@ export async function processImage(
 ): Promise<VLMResult> {
   const native = ensureNative();
   const resultBytes = await native.vlmProcessProto(
-    encodeVLMImage(image),
-    encodeVLMOptions(prompt, options, false)
+    encodeVLMRequest(image, prompt, options, false)
   );
   return decodeVLMResult(resultBytes, 'vlmProcessProto');
 }
@@ -288,12 +143,12 @@ export async function processImageStream(
   options?: Partial<VLMGenerationOptions>
 ): Promise<VLMStreamingResult> {
   const native = ensureNative();
-  const imageBytes = encodeVLMImage(image);
-  const optionsBytes = encodeVLMOptions(prompt, options, true);
+  const requestBytes = encodeVLMRequest(image, prompt, options, true);
   const queue: string[] = [];
   let done = false;
   let streamError: Error | null = null;
   let resolver: ((value: IteratorResult<string>) => void) | null = null;
+  let finalResult: VLMResult | null = null;
 
   const finish = (): void => {
     done = true;
@@ -317,19 +172,18 @@ export async function processImageStream(
 
   const resultPromise = native
     .vlmProcessStreamProto(
-      imageBytes,
-      optionsBytes,
+      requestBytes,
       (eventBytes: ArrayBuffer) => {
         try {
-          const event = SDKEventMessage.decode(arrayBufferToBytes(eventBytes));
-          if (event.generation?.error) {
-            streamError = new Error(event.generation.error);
+          const event = VLMStreamEventMessage.decode(arrayBufferToBytes(eventBytes));
+          if (event.errorMessage) {
+            streamError = new Error(event.errorMessage);
           }
-          if (
-            event.generation?.kind ===
-            GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED
-          ) {
-            push(event.generation.token);
+          if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN) {
+            push(event.token);
+          }
+          if (event.result) {
+            finalResult = event.result;
           }
         } catch (error) {
           streamError =
@@ -338,7 +192,12 @@ export async function processImageStream(
         }
       }
     )
-    .then((resultBytes) => decodeVLMResult(resultBytes, 'vlmProcessStreamProto'))
+    .then(() => {
+      if (!finalResult) {
+        throw SDKException.protoDecodeFailed('vlmProcessStreamProto');
+      }
+      return finalResult;
+    })
     .catch((error: Error) => {
       streamError = error;
       throw error;

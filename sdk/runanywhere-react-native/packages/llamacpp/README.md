@@ -4,15 +4,16 @@ Llama.cpp backend registration package for the RunAnywhere React Native SDK.
 
 This package does not own public model catalog, download, lifecycle,
 generation, VLM, LoRA, tool-calling, or structured-output APIs. Those surfaces
-live in `@runanywhere/core` over the generated proto/Nitro/commons bridge.
+live in `@runanywhere/core` over the generated proto/Nitro/commons bridge,
+mirroring the Swift architecture source of truth.
 `@runanywhere/llamacpp` only installs or removes the native llama.cpp backend
-providers.
+providers and ships the `RABackendLLAMACPP` native binary.
 
 ## Requirements
 
 - `@runanywhere/core` peer dependency
 - React Native 0.74+
-- iOS 15.1+ / Android API 24+
+- iOS 17.0+ / Android API 24+
 
 ## Installation
 
@@ -63,8 +64,11 @@ console.log(result.text);
 ## Public API
 
 ```typescript
-import { LlamaCPP, LlamaCppProvider } from '@runanywhere/llamacpp';
+import { LlamaCPP } from '@runanywhere/llamacpp';
 ```
+
+`LlamaCppProvider` remains exported for lower-level compatibility, but app code
+should use `LlamaCPP`. Neither surface owns model lifecycle or inference APIs.
 
 ### `LlamaCPP.register()`
 
@@ -132,7 +136,9 @@ packages/llamacpp/
 |   |-- HybridRunAnywhereLlama.cpp
 |   `-- HybridRunAnywhereLlama.hpp
 |-- ios/
-|   `-- LlamaCPPBackend.podspec
+|   `-- Binaries/
+|       `-- RABackendLLAMACPP.xcframework
+|-- RunAnywhereLlama.podspec
 |-- android/
 |   |-- build.gradle
 |   `-- CMakeLists.txt

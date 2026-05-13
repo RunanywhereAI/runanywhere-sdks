@@ -10,6 +10,11 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./internal": {
+      "source": "./src/internal.ts",
+      "types": "./src/internal.ts",
+      "default": "./src/internal.ts"
+    },
     "./package.json": "./package.json"
   },
   "react-native": "src/index",

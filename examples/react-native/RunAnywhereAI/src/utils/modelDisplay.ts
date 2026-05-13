@@ -1,7 +1,7 @@
 import { Colors } from '../theme/colors';
+import type { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   InferenceFramework,
-  ModelCategory,
   ModelFormat,
   ModelInfo as ModelInfoMessage,
   ModelSource,
@@ -174,9 +174,7 @@ export const isModelCompatibleWithFramework = (
 export const getModelDownloadSizeBytes = (model: ModelInfo): number =>
   model.downloadSizeBytes || 0;
 
-export const getModelFormatLabel = (
-  format?: ModelFormat | null
-): string => {
+export const getModelFormatLabel = (format?: ModelFormat | null): string => {
   switch (format) {
     case ModelFormat.MODEL_FORMAT_GGUF:
       return 'GGUF';

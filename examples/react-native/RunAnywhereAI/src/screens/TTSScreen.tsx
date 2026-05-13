@@ -34,13 +34,66 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
 // Native iOS Audio Module
 const NativeAudioModule =
   Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary);
+}
+
+async function createWavFromPCMFloat32(
+  pcmBase64: string,
+  sampleRate: number
+): Promise<string> {
+  const binary = atob(pcmBase64);
+  const pcmBytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    pcmBytes[i] = binary.charCodeAt(i);
+  }
+
+  const dataSize = pcmBytes.byteLength;
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const writeAscii = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 3, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 4, true);
+  view.setUint16(32, 4, true);
+  view.setUint16(34, 32, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  const wavBytes = new Uint8Array(44 + dataSize);
+  wavBytes.set(new Uint8Array(header), 0);
+  wavBytes.set(pcmBytes, 44);
+
+  const filePath = `${RNFS.CachesDirectoryPath}/tts_${Date.now()}.wav`;
+  await RNFS.writeFile(filePath, bytesToBase64(wavBytes), 'base64');
+  return filePath;
+}
 
 // Audio playback using react-native-sound (Android only - iOS uses NativeAudioModule)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,16 +158,23 @@ import {
 } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
 import {
+  AudioFormat,
   InferenceFramework,
   ModelCategory,
-  RunAnywhere,
+  ModelFormat,
+  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
-} from '@runanywhere/core';
-import { AudioFormat, ModelFormat, ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
+} from '@runanywhere/proto-ts/model_types';
+import {
+  isModelLoadedForCategory,
+  unloadModelsForCategory,
+} from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 export const TTSScreen: React.FC = () => {
@@ -230,8 +290,10 @@ export const TTSScreen: React.FC = () => {
       );
 
       // Check if model is already loaded
-      const isLoaded = await RunAnywhere.isTTSModelLoaded();
-      console.debug('[TTSScreen] isTTSModelLoaded:', isLoaded);
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+      );
+      console.debug('[TTSScreen] TTS model loaded:', isLoaded);
       if (isLoaded && !currentModel) {
         // Try to find which model is loaded from downloaded models
         const downloadedTts = ttsModels.filter((m) => m.isDownloaded);
@@ -249,12 +311,14 @@ export const TTSScreen: React.FC = () => {
             );
           }
         } else {
-          setCurrentModel(createModelInfoSummary({
-            id: 'tts-model',
-            name: 'TTS Model (Loaded)',
-            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-            framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-          }));
+          setCurrentModel(
+            createModelInfoSummary({
+              id: 'tts-model',
+              name: 'TTS Model (Loaded)',
+              category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+              framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+            })
+          );
           console.warn('[TTSScreen] Set currentModel as generic TTS Model');
         }
       }
@@ -307,14 +371,16 @@ export const TTSScreen: React.FC = () => {
             `[TTSScreen] Using System TTS - no model loading required`
           );
           // System TTS doesn't need to load a model, just mark it as ready
-          setCurrentModel(createModelInfoSummary({
-            id: 'system-tts',
-            name: 'System TTS',
-            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-            framework: SYSTEM_TTS_FRAMEWORK,
-            format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
-            localPath: 'builtin://system-tts',
-          }));
+          setCurrentModel(
+            createModelInfoSummary({
+              id: 'system-tts',
+              name: 'System TTS',
+              category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+              framework: SYSTEM_TTS_FRAMEWORK,
+              format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
+              localPath: 'builtin://system-tts',
+            })
+          );
           return;
         }
 
@@ -328,10 +394,14 @@ export const TTSScreen: React.FC = () => {
 
         // Unload any existing TTS model first
         try {
-          const wasLoaded = await RunAnywhere.isTTSModelLoaded();
+          const wasLoaded = await isModelLoadedForCategory(
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+          );
           if (wasLoaded) {
             console.warn('[TTSScreen] Unloading previous TTS model...');
-            await RunAnywhere.unloadTTSModel();
+            await unloadModelsForCategory(
+              ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            );
           }
         } catch (unloadError) {
           console.warn(
@@ -355,7 +425,9 @@ export const TTSScreen: React.FC = () => {
         );
 
         if (result.success) {
-          const isLoaded = await RunAnywhere.isTTSModelLoaded();
+          const isLoaded = await isModelLoadedForCategory(
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+          );
           if (isLoaded) {
             // Set model with framework so ModelStatusBanner shows it properly
             // Use ONNX since TTS uses Sherpa-ONNX (ONNX Runtime)
@@ -368,7 +440,7 @@ export const TTSScreen: React.FC = () => {
             );
           } else {
             console.warn(
-              `[TTSScreen] Model reported success but isTTSModelLoaded() returned false`
+              '[TTSScreen] Model reported success but lifecycle currentModel() returned no TTS model'
             );
             Alert.alert(
               'Warning',
@@ -376,7 +448,9 @@ export const TTSScreen: React.FC = () => {
             );
           }
         } else {
-          const error = result.errorMessage || await RunAnywhere.getLastError();
+          const error =
+            result.errorMessage ||
+            'Native model lifecycle returned an unsuccessful load result';
           console.error(
             '[TTSScreen] RunAnywhere.loadModel returned failure:',
             error
@@ -540,7 +614,9 @@ export const TTSScreen: React.FC = () => {
       }
 
       // For ONNX models, check if model is loaded
-      const isLoaded = await RunAnywhere.isTTSModelLoaded();
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+      );
       if (!isLoaded) {
         Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
         setIsGenerating(false);
@@ -576,9 +652,7 @@ export const TTSScreen: React.FC = () => {
           audioBytes.byteOffset,
           audioBytes.byteLength
         );
-        let binary = '';
-        for (let i = 0; i < u8.length; i++) binary += String.fromCharCode(u8[i]!);
-        audioBase64 = btoa(binary);
+        audioBase64 = bytesToBase64(u8);
       }
 
       console.warn('[TTSScreen] Synthesis result:', {
@@ -588,7 +662,8 @@ export const TTSScreen: React.FC = () => {
         audioBytes: audioBytes.byteLength,
       });
 
-      const audioDuration = (result.durationMs ?? 0) / 1000 ||
+      const audioDuration =
+        (result.durationMs ?? 0) / 1000 ||
         numSamples / (result.sampleRate || 22050) ||
         text.length * 0.05;
       setDuration(audioDuration);
@@ -603,7 +678,7 @@ export const TTSScreen: React.FC = () => {
             await RNFS.unlink(audioFilePath).catch(() => {});
           }
 
-          const wavPath = await RunAnywhere.Audio.createWavFromPCMFloat32(
+          const wavPath = await createWavFromPCMFloat32(
             audioBase64,
             result.sampleRate || 22050
           );
@@ -978,7 +1053,9 @@ export const TTSScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+    >
       <Text style={styles.title}>Text to Speech</Text>
       {text && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>

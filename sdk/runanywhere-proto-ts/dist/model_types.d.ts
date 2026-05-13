@@ -518,16 +518,6 @@ export interface ModelQuery {
     sortOrder?: ModelQuerySortOrder | undefined;
     registryStatus?: ModelRegistryStatus | undefined;
 }
-export interface ModelCompatibilityResult {
-    isCompatible: boolean;
-    canRun: boolean;
-    canFit: boolean;
-    requiredMemoryBytes: number;
-    availableMemoryBytes: number;
-    requiredStorageBytes: number;
-    availableStorageBytes: number;
-    reasons: string[];
-}
 export interface ModelRegistryRefreshRequest {
     /** Fetch or merge a remote catalog through the platform/network adapter. */
     includeRemoteCatalog: boolean;
@@ -745,7 +735,7 @@ export interface ModelCompatibilityRequest {
     acceleratorPreference?: AccelerationPreference | undefined;
     preferredFramework?: InferenceFramework | undefined;
 }
-export interface ModelCompatibilityCheckResult {
+export interface ModelCompatibilityResult {
     /**
      * Mirrors the existing struct fields so SDKs can keep using the same
      * field names; populated from rac_model_compatibility_result_t.
@@ -884,6 +874,71 @@ export interface ModelRegistryFetchAssignmentsResult {
     errorCode: number;
     errorMessage: string;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+ * `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+ * logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+ * (id, name, category/format/framework defaults, context-length defaults,
+ * thinking gating + default pattern, artifact inference, source mark,
+ * timestamps, and is_downloaded probe).
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelInfoMakeRequest {
+    /**
+     * Required. Download URL or file path. Used both as the metadata field
+     * and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+     * anything else → single_file).
+     */
+    url: string;
+    /**
+     * Optional human-readable name. When empty commons derives it from the
+     * URL via rac_model_generate_name() (replaces underscores/dashes with
+     * spaces).
+     */
+    name: string;
+    /**
+     * Optional inference framework. UNSPECIFIED triggers detection from the
+     * URL extension; commons looks up the format and maps to a default
+     * framework via rac_model_detect_framework_from_format().
+     */
+    framework?: InferenceFramework | undefined;
+    /**
+     * Optional category. UNSPECIFIED falls back to the framework default
+     * (rac_model_category_from_framework()).
+     */
+    category?: ModelCategory | undefined;
+    /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
+    source?: ModelSource | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Inputs for the canonical "register a model from a URL" entry point (P2-T6).
+ * Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+ * so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+ * Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+ * shape).
+ * ---------------------------------------------------------------------------
+ */
+export interface RegisterModelFromUrlRequest {
+    /**
+     * Required. Download URL or file path. Routed straight into
+     * ModelInfoMakeRequest.url; format/artifact inference and id/name
+     * generation reuse the same factory semantics.
+     */
+    url: string;
+    /** Optional human-readable name. Empty → derived from URL. */
+    name: string;
+    /**
+     * Optional inference framework. UNSPECIFIED triggers detection from the
+     * URL extension (rac_model_detect_framework_from_format).
+     */
+    framework?: InferenceFramework | undefined;
+    /** Optional category. UNSPECIFIED falls back to the framework default. */
+    category?: ModelCategory | undefined;
+    /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
+    source?: ModelSource | undefined;
+}
 export declare const ModelInfoMetadata: {
     encode(message: ModelInfoMetadata, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMetadata;
@@ -963,14 +1018,6 @@ export declare const ModelQuery: {
     toJSON(message: ModelQuery): unknown;
     create<I extends Exact<DeepPartial<ModelQuery>, I>>(base?: I): ModelQuery;
     fromPartial<I extends Exact<DeepPartial<ModelQuery>, I>>(object: I): ModelQuery;
-};
-export declare const ModelCompatibilityResult: {
-    encode(message: ModelCompatibilityResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult;
-    fromJSON(object: any): ModelCompatibilityResult;
-    toJSON(message: ModelCompatibilityResult): unknown;
-    create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult;
-    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult;
 };
 export declare const ModelRegistryRefreshRequest: {
     encode(message: ModelRegistryRefreshRequest, writer?: _m0.Writer): _m0.Writer;
@@ -1132,13 +1179,13 @@ export declare const ModelCompatibilityRequest: {
     create<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(base?: I): ModelCompatibilityRequest;
     fromPartial<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(object: I): ModelCompatibilityRequest;
 };
-export declare const ModelCompatibilityCheckResult: {
-    encode(message: ModelCompatibilityCheckResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityCheckResult;
-    fromJSON(object: any): ModelCompatibilityCheckResult;
-    toJSON(message: ModelCompatibilityCheckResult): unknown;
-    create<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(base?: I): ModelCompatibilityCheckResult;
-    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(object: I): ModelCompatibilityCheckResult;
+export declare const ModelCompatibilityResult: {
+    encode(message: ModelCompatibilityResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult;
+    fromJSON(object: any): ModelCompatibilityResult;
+    toJSON(message: ModelCompatibilityResult): unknown;
+    create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult;
+    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult;
 };
 export declare const ModelFormatFromUrlRequest: {
     encode(message: ModelFormatFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
@@ -1187,6 +1234,22 @@ export declare const ModelRegistryFetchAssignmentsResult: {
     toJSON(message: ModelRegistryFetchAssignmentsResult): unknown;
     create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(base?: I): ModelRegistryFetchAssignmentsResult;
     fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(object: I): ModelRegistryFetchAssignmentsResult;
+};
+export declare const ModelInfoMakeRequest: {
+    encode(message: ModelInfoMakeRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMakeRequest;
+    fromJSON(object: any): ModelInfoMakeRequest;
+    toJSON(message: ModelInfoMakeRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(base?: I): ModelInfoMakeRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(object: I): ModelInfoMakeRequest;
+};
+export declare const RegisterModelFromUrlRequest: {
+    encode(message: RegisterModelFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RegisterModelFromUrlRequest;
+    fromJSON(object: any): RegisterModelFromUrlRequest;
+    toJSON(message: RegisterModelFromUrlRequest): unknown;
+    create<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(base?: I): RegisterModelFromUrlRequest;
+    fromPartial<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(object: I): RegisterModelFromUrlRequest;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

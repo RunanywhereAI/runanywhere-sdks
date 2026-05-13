@@ -1494,6 +1494,58 @@ export const TTSVoiceInfo = {
         return message;
     },
 };
+function createBaseTTSVoiceList() {
+    return { voices: [] };
+}
+export const TTSVoiceList = {
+    encode(message, writer = _m0.Writer.create()) {
+        for (const v of message.voices) {
+            TTSVoiceInfo.encode(v, writer.uint32(10).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseTTSVoiceList();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.voices.push(TTSVoiceInfo.decode(reader, reader.uint32()));
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            voices: globalThis.Array.isArray(object?.voices) ? object.voices.map((e) => TTSVoiceInfo.fromJSON(e)) : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.voices?.length) {
+            obj.voices = message.voices.map((e) => TTSVoiceInfo.toJSON(e));
+        }
+        return obj;
+    },
+    create(base) {
+        return TTSVoiceList.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseTTSVoiceList();
+        message.voices = object.voices?.map((e) => TTSVoiceInfo.fromPartial(e)) || [];
+        return message;
+    },
+};
 function createBaseTTSStreamEvent() {
     return {
         seq: 0,

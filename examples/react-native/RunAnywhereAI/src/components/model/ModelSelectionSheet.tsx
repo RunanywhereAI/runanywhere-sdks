@@ -42,19 +42,19 @@ import {
 
 // Import SDK types and values
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
-  RunAnywhere,
+  ModelFormat,
   type ModelInfo as SDKModelInfo,
-  Hardware,
-} from '@runanywhere/core';
-import { ModelFormat } from '@runanywhere/proto-ts/model_types';
+} from '@runanywhere/proto-ts/model_types';
 import type { HardwareProfile } from '@runanywhere/proto-ts/hardware_profile';
 
 // Canonical SDK methods (Swift parity).
 const downloadModelHelper = RunAnywhere.downloadModel;
-const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
@@ -99,7 +99,10 @@ const _getRelevantCategories = (
 ): Set<ModelCategory> => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE, ModelCategory.MODEL_CATEGORY_MULTIMODAL]);
+      return new Set([
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      ]);
     case ModelSelectionContext.STT:
       return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION]);
     case ModelSelectionContext.TTS:
@@ -112,7 +115,10 @@ const _getRelevantCategories = (
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       ]);
     case ModelSelectionContext.VLM:
-      return new Set([ModelCategory.MODEL_CATEGORY_MULTIMODAL, ModelCategory.MODEL_CATEGORY_VISION]);
+      return new Set([
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        ModelCategory.MODEL_CATEGORY_VISION,
+      ]);
     case ModelSelectionContext.RagEmbedding:
       return new Set([ModelCategory.MODEL_CATEGORY_EMBEDDING]);
     case ModelSelectionContext.RagLLM:
@@ -326,7 +332,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
       // Load canonical hardware profile via the SDK (proto-backed).
       try {
-        const result = await Hardware.getProfile();
+        const result = await RunAnywhere.hardware.getProfile();
         setDeviceInfo(result.profile ?? null);
       } catch (error) {
         console.warn(
@@ -355,7 +361,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [visible, loadData]);
 
-
   // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
   // briefly render the previous tab's models while loadData is in flight.
   useEffect(() => {
@@ -371,10 +376,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     const frameworkCounts = new Map<InferenceFramework, number>();
 
     availableModels.forEach((model: SDKModelInfo, _index: number) => {
-      const framework = getPrimaryFramework(
-        model,
-        DEFAULT_INFERENCE_FRAMEWORK
-      );
+      const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
 
       const count = frameworkCounts.get(framework) || 0;
       frameworkCounts.set(framework, count + 1);
@@ -432,11 +434,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    (globalThis as any).__testModels = availableModels;
-    (globalThis as any).__testOnModelSelected = onModelSelected;
-  }, [availableModels]);
+    const testGlobal = globalThis as typeof globalThis & {
+      __testModels?: SDKModelInfo[];
+      __testOnModelSelected?: (model: SDKModelInfo) => Promise<void>;
+    };
+    testGlobal.__testModels = availableModels;
+    testGlobal.__testOnModelSelected = onModelSelected;
+  }, [availableModels, onModelSelected]);
 
   /**
    * Handle model download with real-time progress
@@ -765,9 +770,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 size={14}
                 color={Colors.statusGreen}
               />
-              <Text
-                style={[styles.statusText, { color: Colors.statusGreen }]}
-              >
+              <Text style={[styles.statusText, { color: Colors.statusGreen }]}>
                 Downloaded
               </Text>
             </>

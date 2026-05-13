@@ -1,33 +1,26 @@
 /**
  * @runanywhere/llamacpp - LlamaCPP Provider
  *
- * LlamaCPP module registration for React Native SDK.
- * Thin wrapper that triggers C++ backend registration.
+ * Internal LlamaCPP module registration for React Native SDK.
+ * Thin wrapper that triggers C++ backend registration behind the LlamaCPP facade.
  *
  * Reference: sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPP.swift
  */
 
 import { requireNativeLlamaModule, isNativeLlamaModuleAvailable } from './native/NativeRunAnywhereLlama';
-import { SDKLogger } from '@runanywhere/core';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('LLM.LlamaCppProvider');
 const vlmLog = new SDKLogger('VLM.LlamaCppProvider');
 
 /**
- * LlamaCPP Module
+ * Internal LlamaCPP provider implementation.
  *
  * Registers llama.cpp LLM and VLM providers. Core owns public model lifecycle
  * and inference surfaces.
  *
- * ## Registration
- *
- * ```typescript
- * import { LlamaCppProvider } from '@runanywhere/llamacpp';
- *
- * // Register the backend
- * await LlamaCppProvider.register();
- * ```
+ * @internal
  */
 export class LlamaCppProvider {
   static readonly moduleId = 'llamacpp';

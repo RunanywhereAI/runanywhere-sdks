@@ -1,9 +1,8 @@
 /**
  * Security Module
  *
- * Secure storage and credential management
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/
+ * Thin public adapters for native secure storage and device identity.
+ * Native commons owns credential, auth token, and device registration state.
  */
 
 export { SecureStorageService } from './SecureStorageService';

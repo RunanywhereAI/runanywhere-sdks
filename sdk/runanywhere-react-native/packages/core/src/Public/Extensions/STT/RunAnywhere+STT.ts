@@ -5,7 +5,7 @@
  * (`@runanywhere/proto-ts/stt_options`). All ad-hoc local result/output
  * shapes have been deleted; we work directly off the proto-generated
  * interfaces. Path-first loading and EventBus fallback streaming have
- * been removed — model loading goes through `loadModelLifecycle` and
+ * been removed — model loading goes through `loadModel` and
  * streaming is driven by the native `sttTranscribeStreamProto` callback.
  *
  * Matches Swift: `Public/Extensions/STT/RunAnywhere+STT.swift`.
@@ -16,23 +16,28 @@ import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   STTLanguage,
+  STTAudioEncoding,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
 } from '@runanywhere/proto-ts/stt_options';
 import {
+  STTAudioSource,
   STTOptions as STTOptionsCtor,
   STTOutput as STTOutputMessage,
   STTPartialResult as STTPartialResultMessage,
+  STTStreamEvent,
+  STTStreamEventKind,
+  STTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
 } from '../../../services/ProtoBytes';
-import { readAudioFileAsBuffer } from '../../../Internal/AudioFileReader';
 
 const logger = new SDKLogger('RunAnywhere.STT');
+let requestCounter = 0;
 
 /** Build a default proto `STTOptions` for callers that pass no options. */
 function defaultSTTOptions(): STTOptions {
@@ -59,28 +64,6 @@ export interface STTStreamingResult {
   partials: AsyncIterable<STTPartialResult>;
   result: Promise<STTOutput>;
   cancel: () => void;
-}
-
-// ============================================================================
-// Speech-to-Text (STT) Extension
-// ============================================================================
-
-/** Check if an STT model is loaded. */
-export async function isSTTModelLoaded(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.isSTTModelLoaded();
-}
-
-/** Unload the current STT model. */
-export async function unloadSTTModel(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.unloadSTTModel();
 }
 
 /** Convert Uint8Array / ArrayBuffer / base64 string audio input to ArrayBuffer. */
@@ -120,6 +103,32 @@ function decodeSTTOutput(buffer: ArrayBuffer): STTOutput {
   return STTOutputMessage.decode(bytes);
 }
 
+function nextSTTRequestId(): string {
+  requestCounter += 1;
+  return `rn-stt-${Date.now()}-${requestCounter}`;
+}
+
+function buildSTTRequestBytes(
+  audio: ArrayBuffer,
+  options?: Partial<STTOptions>
+): ArrayBuffer {
+  const audioBytes = arrayBufferToBytes(audio);
+  const request = STTTranscriptionRequest.fromPartial({
+    requestId: nextSTTRequestId(),
+    audio: STTAudioSource.fromPartial({
+      audioData: audioBytes,
+      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
+      sampleRate: options?.sampleRate ?? 16000,
+      channels: 1,
+      bitsPerSample: 16,
+    }),
+    options: buildSTTOptions(options),
+    metadata: {},
+  });
+  return bytesToArrayBuffer(STTTranscriptionRequest.encode(request).finish());
+}
+
 /**
  * Transcribe audio data.
  *
@@ -137,37 +146,9 @@ export async function transcribe(
   }
   const native = requireNativeModule();
   const audioBytes = audioToArrayBuffer(audio);
-  const optionBytes = bytesToArrayBuffer(
-    STTOptionsCtor.encode(buildSTTOptions(options)).finish()
+  return decodeSTTOutput(
+    await native.sttTranscribeProto(buildSTTRequestBytes(audioBytes, options))
   );
-  return decodeSTTOutput(await native.sttTranscribeProto(audioBytes, optionBytes));
-}
-
-/**
- * Simple voice transcription — returns just the text.
- *
- * Matches Swift SDK: `RunAnywhere.transcribe(_:)`.
- */
-export async function transcribeSimple(
-  audio: string | ArrayBuffer
-): Promise<string> {
-  const result = await transcribe(audio);
-  return result.text;
-}
-
-/**
- * Transcribe an audio buffer.
- *
- * Matches Swift SDK: `RunAnywhere.transcribeBuffer(_:options:)`.
- */
-export async function transcribeBuffer(
-  samples: Float32Array,
-  options?: Partial<STTOptions>
-): Promise<STTOutput> {
-  if (!isNativeModuleAvailable()) {
-    throw SDKException.nativeModuleUnavailable();
-  }
-  return transcribe(samples.buffer as ArrayBuffer, options);
 }
 
 /**
@@ -187,9 +168,7 @@ export function transcribeStream(
 
   const native = requireNativeModule();
   const audioBytes = audioToArrayBuffer(audio);
-  const optionBytes = bytesToArrayBuffer(
-    STTOptionsCtor.encode(buildSTTOptions(options)).finish()
-  );
+  const requestBytes = buildSTTRequestBytes(audioBytes, options);
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<STTPartialResult> {
@@ -211,16 +190,41 @@ export function transcribeStream(
         if (started) return;
         started = true;
         native
-          .sttTranscribeStreamProto(audioBytes, optionBytes, (partialBytes: ArrayBuffer) => {
+          .sttTranscribeStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
             try {
-              const partial = STTPartialResultMessage.decode(arrayBufferToBytes(partialBytes));
+              const event = STTStreamEvent.decode(arrayBufferToBytes(eventBytes));
+              const partial =
+                event.partial ??
+                (event.finalOutput
+                  ? STTPartialResultMessage.fromPartial({
+                      text: event.finalOutput.text,
+                      isFinal: true,
+                      confidence: event.finalOutput.confidence,
+                      language: event.finalOutput.language,
+                      timestampMs: event.finalOutput.timestampMs,
+                      requestId: event.requestId,
+                    })
+                  : null);
+              if (!partial) {
+                if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+                  throw SDKException.generationFailedWith(
+                    event.errorMessage ?? 'STT stream failed'
+                  );
+                }
+                return;
+              }
               if (resolver) {
                 resolver({ value: partial, done: false });
                 resolver = null;
               } else {
                 queue.push(partial);
               }
-              if (partial.isFinal) finish();
+              if (
+                partial.isFinal ||
+                event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
+              ) {
+                finish();
+              }
             } catch (error) {
               streamError = error instanceof Error ? error : new Error(String(error));
               finish();
@@ -260,49 +264,4 @@ export function transcribeStream(
       };
     },
   };
-}
-
-/**
- * Transcribe audio from a file path.
- *
- * Reads the file in JS (via `react-native-fs` or `fetch()`) and routes
- * through the canonical proto-byte `sttTranscribeProto` surface — the
- * legacy JSON-returning `native.transcribeFile` path was removed (RN-05,
- * RN-10). Cross-SDK parity: Swift/Kotlin/Flutter/Web all feed in-memory
- * audio bytes into the same proto transcribe call.
- *
- * Matches Swift SDK: `RunAnywhere.transcribeFile(_:options:)`.
- */
-export async function transcribeFile(
-  filePath: string,
-  options?: Partial<STTOptions>
-): Promise<STTOutput> {
-  if (!isNativeModuleAvailable()) {
-    throw SDKException.nativeModuleUnavailable();
-  }
-  const audioBytes = await readAudioFileAsBuffer(filePath);
-  return transcribe(audioBytes, options);
-}
-
-// ============================================================================
-// Introspection
-// ============================================================================
-
-interface STTIntrospectionNativeModule {
-  currentSTTModel?: () => Promise<string>;
-  getCurrentSTTModelId?: () => Promise<string>;
-}
-
-/**
- * Get the currently loaded STT model ID, or `null` if none.
- *
- * Matches Swift: `RunAnywhere.currentSTTModel`.
- */
-export async function currentSTTModel(): Promise<string | null> {
-  if (!isNativeModuleAvailable()) return null;
-  const native = requireNativeModule() as unknown as STTIntrospectionNativeModule;
-  const fn = native.currentSTTModel ?? native.getCurrentSTTModelId;
-  if (!fn) return null;
-  const id = await fn.call(native);
-  return id && id.length > 0 ? id : null;
 }

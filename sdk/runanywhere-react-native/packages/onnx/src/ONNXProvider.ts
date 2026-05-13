@@ -1,32 +1,25 @@
 /**
  * @runanywhere/onnx - ONNX Provider
  *
- * ONNX Runtime module registration for React Native SDK.
+ * Internal ONNX Runtime module registration for React Native SDK.
  * Thin wrapper that triggers C++ backend registration for STT/TTS/VAD.
  *
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
 import { requireNativeONNXModule, isNativeONNXModuleAvailable } from './native/NativeRunAnywhereONNX';
-import { SDKLogger } from '@runanywhere/core';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 // Use SDKLogger with ONNX.Provider category
 const logger = new SDKLogger('ONNX.Provider');
 
 /**
- * ONNX Module
+ * Internal ONNX provider implementation.
  *
  * Registers ONNX STT/TTS/VAD providers. Core owns public model lifecycle and
  * inference surfaces.
  *
- * ## Registration
- *
- * ```typescript
- * import { ONNXProvider } from '@runanywhere/onnx';
- *
- * // Register the backend
- * await ONNXProvider.register();
- * ```
+ * @internal
  */
 export class ONNXProvider {
   static readonly moduleId = 'onnx';

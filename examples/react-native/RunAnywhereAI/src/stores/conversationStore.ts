@@ -227,7 +227,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       };
     });
 
-    logDiagnostic(`[ConversationStore] Deleted conversation: ${conversationId}`);
+    logDiagnostic(
+      `[ConversationStore] Deleted conversation: ${conversationId}`
+    );
   },
 
   /**

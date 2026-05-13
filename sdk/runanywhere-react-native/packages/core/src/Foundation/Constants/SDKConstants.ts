@@ -18,7 +18,7 @@ export const SDKConstants = {
    * SDK version - must match the VERSION file in the repository root
    * Update this when bumping the SDK version
    */
-  version: '0.2.0',
+  version: '0.19.13',
 
   /**
    * SDK name
@@ -44,4 +44,3 @@ export const SDKConstants = {
    */
   productionLogLevel: 'error',
 } as const;
-

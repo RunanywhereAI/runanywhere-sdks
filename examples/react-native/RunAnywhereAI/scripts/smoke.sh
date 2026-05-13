@@ -8,10 +8,10 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking React Native SDK call coverage"
-grep -R -E "RunAnywhere\.(initialize|listModels|downloadedModels|downloadModel|importModel|loadModel|generateStream|generate\(|transcribeFile|synthesize|deleteModel|cleanTempFiles|getStorageInfo)" \
+grep -R -E "RunAnywhere\.(initialize|listModels|downloadedModels|downloadModel|importModel|loadModel|currentModel|generateStream|generate\(|transcribe\(|synthesize|deleteStorage|cleanTempFiles|getStorageInfo)" \
     App.tsx src >/dev/null
 
-grep -R -E "VoiceAgentStreamAdapter|initializeVoiceAgentWithLoadedModels|getVoiceAgentHandle" src >/dev/null
+grep -R -E "initializeVoiceAgentWithLoadedModels|streamVoiceAgent" src >/dev/null
 
 echo "==> Checking TypeScript build gate"
 yarn typecheck

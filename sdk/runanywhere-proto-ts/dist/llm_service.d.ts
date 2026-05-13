@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {
     LLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -13,15 +14,6 @@ export declare enum LLMStreamEventKind {
 }
 export declare function lLMStreamEventKindFromJSON(object: any): LLMStreamEventKind;
 export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string;
-export declare enum LLMTokenKind {
-    LLM_TOKEN_KIND_UNSPECIFIED = 0,
-    LLM_TOKEN_KIND_ANSWER = 1,
-    LLM_TOKEN_KIND_THOUGHT = 2,
-    LLM_TOKEN_KIND_TOOL_CALL = 3,
-    UNRECOGNIZED = -1
-}
-export declare function lLMTokenKindFromJSON(object: any): LLMTokenKind;
-export declare function lLMTokenKindToJSON(object: LLMTokenKind): string;
 export interface LLMGenerateRequest {
     prompt: string;
     maxTokens: number;
@@ -106,8 +98,11 @@ export interface LLMStreamEvent {
     token: string;
     /** True on the last event of a generation. */
     isFinal: boolean;
-    /** Token semantic category (answer / thought / tool-call). */
-    kind: LLMTokenKind;
+    /**
+     * Token semantic category (answer / thought / tool-call). IDL-06:
+     * canonical TokenKind from voice_events.proto.
+     */
+    kind: TokenKind;
     /**
      * Backend-provided token id when the engine exposes it; 0 = unset
      * (proto3 scalar default).

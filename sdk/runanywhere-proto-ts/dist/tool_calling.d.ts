@@ -100,6 +100,18 @@ export interface ToolValueObject_FieldsEntry {
 }
 /**
  * ---------------------------------------------------------------------------
+ * String wrapper used by the rac_tool_value_to_json_proto /
+ * rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+ * from a ToolValue, or the JSON text that should be parsed back into a
+ * ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+ * tool-calling round-trip stays self-contained in this proto.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolValueJSON {
+    json: string;
+}
+/**
+ * ---------------------------------------------------------------------------
  * A single parameter definition for a tool.
  * ---------------------------------------------------------------------------
  */
@@ -407,6 +419,14 @@ export declare const ToolValueObject_FieldsEntry: {
     toJSON(message: ToolValueObject_FieldsEntry): unknown;
     create<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(base?: I): ToolValueObject_FieldsEntry;
     fromPartial<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(object: I): ToolValueObject_FieldsEntry;
+};
+export declare const ToolValueJSON: {
+    encode(message: ToolValueJSON, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueJSON;
+    fromJSON(object: any): ToolValueJSON;
+    toJSON(message: ToolValueJSON): unknown;
+    create<I extends Exact<DeepPartial<ToolValueJSON>, I>>(base?: I): ToolValueJSON;
+    fromPartial<I extends Exact<DeepPartial<ToolValueJSON>, I>>(object: I): ToolValueJSON;
 };
 export declare const ToolParameter: {
     encode(message: ToolParameter, writer?: _m0.Writer): _m0.Writer;

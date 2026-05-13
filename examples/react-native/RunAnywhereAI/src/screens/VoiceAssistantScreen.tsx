@@ -21,7 +21,10 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -33,22 +36,22 @@ import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
 import { createModelInfoSummary } from '../utils/modelDisplay';
 
-// Import RunAnywhere SDK. Voice uses the proto-stream adapter with a handle
-// obtained via RunAnywhereCore.getVoiceAgentHandle().
+// Import RunAnywhere SDK. Voice uses the Swift-shaped public stream facade.
+import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
-  RunAnywhere,
+  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
-  VoiceAgentStreamAdapter,
-} from '@runanywhere/core';
-import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
+} from '@runanywhere/proto-ts/model_types';
 import { PipelineState as VoiceEventPipelineState } from '@runanywhere/proto-ts/voice_events';
 import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
@@ -118,33 +121,45 @@ export const VoiceAssistantScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const sttLoaded = await RunAnywhere.isSTTModelLoaded();
-      const llmLoaded = await RunAnywhere.isModelLoaded();
-      const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
+      const sttLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+      );
+      const llmLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_LANGUAGE
+      );
+      const ttsLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+      );
 
       if (sttLoaded) {
-        setSTTModel(createModelInfoSummary({
-          id: 'stt-loaded',
-          name: 'STT Model (Loaded)',
-          category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-          framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-        }));
+        setSTTModel(
+          createModelInfoSummary({
+            id: 'stt-loaded',
+            name: 'STT Model (Loaded)',
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          })
+        );
       }
       if (llmLoaded) {
-        setLLMModel(createModelInfoSummary({
-          id: 'llm-loaded',
-          name: 'LLM Model (Loaded)',
-          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        }));
+        setLLMModel(
+          createModelInfoSummary({
+            id: 'llm-loaded',
+            name: 'LLM Model (Loaded)',
+            category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+          })
+        );
       }
       if (ttsLoaded) {
-        setTTSModel(createModelInfoSummary({
-          id: 'tts-loaded',
-          name: 'TTS Model (Loaded)',
-          category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-          framework: InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
-        }));
+        setTTSModel(
+          createModelInfoSummary({
+            id: 'tts-loaded',
+            name: 'TTS Model (Loaded)',
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            framework: InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
+          })
+        );
       }
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
@@ -185,7 +200,8 @@ export const VoiceAssistantScreen: React.FC = () => {
       // IDL-18: VADEvent.type is VADStreamEventKind; start/end ride
       // SPEECH_ACTIVITY with direction on the is_speech bool.
       if (
-        event.vad.type === VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
+        event.vad.type ===
+        VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
       ) {
         if (event.vad.isSpeech) {
           console.warn('[VoiceAssistant] Speech started');
@@ -277,15 +293,8 @@ export const VoiceAssistantScreen: React.FC = () => {
         // v3.1: initialize voice agent against loaded models + subscribe
         // to the proto event stream.
         await RunAnywhere.initializeVoiceAgentWithLoadedModels();
-        const handle = await RunAnywhere.getVoiceAgentHandle();
-        if (handle === 0) {
-          throw new Error(
-            'Voice agent handle is 0 — initializeVoiceAgentWithLoadedModels did not allocate.'
-          );
-        }
-
-        const adapter = new VoiceAgentStreamAdapter(handle);
-        const eventIterator = adapter.stream()[Symbol.asyncIterator]();
+        const eventStream = await RunAnywhere.streamVoiceAgent();
+        const eventIterator = eventStream[Symbol.asyncIterator]();
 
         // Spin a background consumer. The async iterator throws
         // AbortError on unsubscribe; we treat that as a normal stop.
@@ -307,9 +316,6 @@ export const VoiceAssistantScreen: React.FC = () => {
         })();
 
         unsubscribeRef.current = () => {
-          // VoiceAgentStreamAdapter exposes cancel via AsyncIterable
-          // termination; calling .return() on the iterator triggers
-          // onCancel → Nitro unsubscribe.
           void eventIterator.return?.();
         };
 
@@ -361,7 +367,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         if (!model.isDownloaded && !model.localPath) {
           Alert.alert(
             'Error',
-            'Model has not been downloaded. Open the model picker to download it first.',
+            'Model has not been downloaded. Open the model picker to download it first.'
           );
           return;
         }
@@ -381,7 +387,10 @@ export const VoiceAssistantScreen: React.FC = () => {
                 preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
               });
             } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
+              Alert.alert(
+                'Error',
+                `Failed to load model: ${result.errorMessage || 'Unknown error'}`
+              );
             }
             break;
           }
@@ -401,7 +410,10 @@ export const VoiceAssistantScreen: React.FC = () => {
                   InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
               });
             } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
+              Alert.alert(
+                'Error',
+                `Failed to load model: ${result.errorMessage || 'Unknown error'}`
+              );
             }
             break;
           }
@@ -421,7 +433,10 @@ export const VoiceAssistantScreen: React.FC = () => {
                   InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
               });
             } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
+              Alert.alert(
+                'Error',
+                `Failed to load model: ${result.errorMessage || 'Unknown error'}`
+              );
             }
             break;
           }
@@ -578,7 +593,9 @@ export const VoiceAssistantScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
+      <View
+        style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+      >
         <Text style={styles.title}>Voice Assistant</Text>
         <View style={styles.headerActions}>
           {allModelsLoaded && (

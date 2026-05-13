@@ -32,7 +32,7 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
-import { type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { type ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';

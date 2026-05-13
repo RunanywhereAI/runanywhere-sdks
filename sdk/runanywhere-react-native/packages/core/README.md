@@ -6,15 +6,14 @@ Core SDK for RunAnywhere React Native. Foundation package providing the public A
 
 ## Overview
 
-`@runanywhere/core` is the foundation package of the RunAnywhere React Native SDK. It provides:
+`@runanywhere/core` is the foundation package of the RunAnywhere React Native SDK. It mirrors the Swift SDK's generated proto-byte/native ownership model from `sdk/runanywhere-swift/ARCHITECTURE.md` while exposing a TypeScript facade. It provides:
 
 - **RunAnywhere API** — Main SDK singleton with all public methods
 - **Tool Calling** — Register tools and let LLMs call them during generation
 - **Structured Output** — Generate type-safe JSON responses with schema validation
-- **EventBus** — Event subscription system for SDK events
-- **ModelRegistry** — Model metadata management and discovery
-- **DownloadService** — Model downloads with progress and resume
-- **FileSystem** — Cross-platform file operations
+- **SDK Events** — Native proto-byte event stream decoded into generated event types
+- **Model Lifecycle** — Registry, download, import, delete, and load methods owned by native commons
+- **Storage** — Cache and storage management through native `RunAnywhere` calls
 - **Native Bridge** — Nitrogen/Nitro JSI bindings to C++ core
 - **Error Handling** — Structured SDK errors with recovery suggestions
 - **Logging** — Configurable logging with multiple levels
@@ -35,10 +34,12 @@ yarn add @runanywhere/core
 
 ### Peer Dependencies
 
-The following peer dependencies are optional but recommended:
+Install the Nitro runtime with the package. Other optional peers remain in
+package metadata for host-app compatibility, but SDK model download/storage does
+not route through JavaScript file or blob-util helpers.
 
 ```bash
-npm install react-native-nitro-modules react-native-fs react-native-blob-util react-native-device-info react-native-zip-archive
+npm install react-native-nitro-modules
 ```
 
 ### iOS Setup
@@ -127,7 +128,7 @@ await RunAnywhere.initialize({
 
 // Check status
 const isInit = RunAnywhere.isInitialized;
-const isActive = RunAnywhere.isSDKInitialized;
+const isActive = RunAnywhere.isActive;
 
 // Reset SDK
 await RunAnywhere.reset();
@@ -137,12 +138,13 @@ await RunAnywhere.reset();
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `isSDKInitialized` | `boolean` | Whether SDK is initialized |
+| `isInitialized` | `boolean` | Whether SDK core initialization has completed |
+| `isActive` | `boolean` | Whether SDK core is active |
 | `areServicesReady` | `boolean` | Whether services are ready |
-| `currentEnvironment` | `SDKEnvironment` | Current environment |
+| `environment` | `SDKEnvironment \| null` | Current environment |
 | `version` | `string` | SDK version |
-| `deviceId` | `string` | Persistent device ID |
-| `events` | `EventBus` | Event subscription system |
+| `deviceId` | `Promise<string>` | Persistent device ID |
+| `events` | SDK event helpers | Subscribe to the native proto-byte event stream |
 
 #### Model Management
 
@@ -165,8 +167,12 @@ while (!next.done) {
   next = await iterator.next();
 }
 
-// Delete model
-await RunAnywhere.deleteModel('model-id');
+import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
+
+// Remove SDK-owned files through storage APIs when needed.
+await RunAnywhere.deleteStorage(StorageDeleteRequest.fromPartial({
+  modelId: 'model-id',
+}));
 ```
 
 #### Storage Management
@@ -174,8 +180,8 @@ await RunAnywhere.deleteModel('model-id');
 ```typescript
 // Get storage info
 const storage = await RunAnywhere.getStorageInfo();
-console.log('Free:', storage.freeSpace);
-console.log('Used:', storage.usedSpace);
+console.log('Free:', storage?.device?.freeBytes ?? 0);
+console.log('Used:', storage?.device?.usedBytes ?? 0);
 
 // Clear cache
 await RunAnywhere.clearCache();
@@ -229,10 +235,10 @@ const result = await RunAnywhere.generateWithTools(
   'What is the weather in San Francisco?',
   {
     autoExecute: true,         // Automatically execute tool calls
-    maxToolCalls: 3,           // Max tool invocations per turn
+    maxIterations: 3,          // Max tool invocations per turn
     temperature: 0.7,
     maxTokens: 512,
-    format: 'default',         // 'default' or 'lfm2' for Liquid AI models
+    formatHint: 'default',     // 'default' or 'lfm2' for Liquid AI models
     keepToolsAvailable: false, // Remove tools after first call
   }
 );
@@ -253,38 +259,28 @@ const result = await RunAnywhere.generateWithTools(prompt, {
 // Check if the LLM wants to call a tool
 if (result.toolCalls.length > 0) {
   const toolCall = result.toolCalls[0];
-  console.log(`LLM wants to call: ${toolCall.toolName}`);
-  console.log('Arguments:', toolCall.arguments);
+  console.log(`LLM wants to call: ${toolCall.name}`);
+  console.log('Arguments:', toolCall.argumentsJson);
 
-  // Execute manually
-  const toolResult = await RunAnywhere.executeTool(
-    toolCall.toolName,
-    toolCall.arguments
-  );
-
-  // Continue generation with the tool result
-  const finalResult = await RunAnywhere.continueWithToolResult(
-    prompt,
-    toolCall.toolName,
-    toolResult
-  );
-  console.log('Final response:', finalResult.text);
+  // Execute manually. JS owns only the executor callback; parsing and
+  // validation stay in native commons.
+  const toolResult = await RunAnywhere.executeTool(toolCall);
+  console.log('Tool result:', toolResult.resultJson || toolResult.error);
 }
 ```
 
 #### Tool Calling Types
 
 ```typescript
+import type { ToolExecutor } from '@runanywhere/core';
 import type {
   ToolDefinition,
   ToolParameter,
   ToolCall,
   ToolResult,
-  ToolExecutor,
-  RegisteredTool,
   ToolCallingOptions,
   ToolCallingResult,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/tool_calling';
 ```
 
 ---
@@ -300,6 +296,7 @@ import { RunAnywhere } from '@runanywhere/core';
 
 // Generate JSON matching a schema
 const result = await RunAnywhere.generateStructured(
+  'Extract the product info: The new Widget Pro costs $29.99 and is available now',
   {
     type: 'object',
     properties: {
@@ -309,17 +306,16 @@ const result = await RunAnywhere.generateStructured(
     },
     required: ['name', 'price'],
   },
-  'Extract the product info: The new Widget Pro costs $29.99 and is available now',
   { temperature: 0.3, maxTokens: 256 }
 );
 
-console.log(result.data); // { name: "Widget Pro", price: 29.99, inStock: true }
+console.log(result.rawText);
 ```
 
-#### Extract Entities
+#### Parse Existing Text
 
 ```typescript
-const entities = await RunAnywhere.extractEntities(
+const parsed = await RunAnywhere.extractStructuredOutput(
   'John Smith from Acme Corp called about order #12345',
   {
     type: 'object',
@@ -330,17 +326,7 @@ const entities = await RunAnywhere.extractEntities(
     },
   }
 );
-// { entities: { person: "John Smith", company: "Acme Corp", orderId: "12345" }, confidence: 0.95 }
-```
-
-#### Classify Text
-
-```typescript
-const classification = await RunAnywhere.classify(
-  'I love this product! Best purchase ever.',
-  ['positive', 'negative', 'neutral']
-);
-// { category: "positive", confidence: 0.97 }
+console.log(parsed.rawText);
 ```
 
 #### Structured Output Types
@@ -350,9 +336,7 @@ import type {
   JSONSchema,
   StructuredOutputOptions,
   StructuredOutputResult,
-  EntityExtractionResult,
-  ClassificationResult,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/structured_output';
 ```
 
 ---
@@ -379,9 +363,8 @@ const unsubscribe = await RunAnywhere.subscribeSDKEvents((event) => {
 await unsubscribe();
 ```
 
-The in-process `EventBus` export is a publish-only façade used internally
-by the audio managers — it has no `on*` subscribers. Consumers must use
-`RunAnywhere.subscribeSDKEvents(...)` for all event observation.
+Audio-session internals may publish local events, but consumers must use
+`RunAnywhere.subscribeSDKEvents(...)` for SDK event observation.
 
 ---
 
@@ -389,8 +372,10 @@ by the audio managers — it has no `on*` subscribers. Consumers must use
 
 The public registry surface lives on `RunAnywhere` and mirrors Swift naming:
 `registerModel`, `listModels`, `queryModels`, `getModel`, `downloadedModels`,
-`importModel`, `downloadModel`, `cancelDownload`, `deleteModel`, and
-`loadModel(ModelLoadRequest)`.
+`importModel`, `downloadModel`, `loadModel(ModelLoadRequest)`,
+`unloadModel(ModelUnloadRequest)`, and `currentModel(CurrentModelRequest)`.
+The registry and download state live in native
+commons; React Native encodes requests and decodes generated proto responses.
 
 ```typescript
 await RunAnywhere.registerModel({
@@ -414,28 +399,15 @@ while (!next.done) {
 
 ---
 
-### FileSystem
+### Storage
 
-Cross-platform file operations.
+Use the `RunAnywhere` storage and model lifecycle methods for SDK-owned data.
+Direct host-app file helpers are separate from model management.
 
 ```typescript
-import { FileSystem } from '@runanywhere/core';
-
-// Check availability
-if (FileSystem.isAvailable()) {
-  // Get directories
-  const docs = FileSystem.getDocumentsDirectory();
-  const cache = FileSystem.getCacheDirectory();
-
-  // Model operations
-  const exists = await FileSystem.modelExists('model-id', 'LlamaCpp');
-  const path = await FileSystem.getModelPath('model-id', 'LlamaCpp');
-
-  // File operations
-  const fileExists = await FileSystem.exists('/path/to/file');
-  const size = await FileSystem.getFileSize('/path/to/file');
-  await FileSystem.deleteFile('/path/to/file');
-}
+const storage = await RunAnywhere.getStorageInfo();
+await RunAnywhere.clearCache();
+await RunAnywhere.cleanTempFiles();
 ```
 
 ---
@@ -561,7 +533,7 @@ packages/core/
 │   ├── Public/
 │   │   ├── RunAnywhere.ts          # Main API singleton
 │   │   ├── Events/
-│   │   │   └── EventBus.ts         # Event pub/sub
+│   │   │   └── RunAnywhere+SDKEvents.ts
 │   │   └── Extensions/             # API method implementations
 │   │       ├── LLM/RunAnywhere+TextGeneration.ts
 │   │       ├── LLM/RunAnywhere+ToolCalling.ts
@@ -582,10 +554,8 @@ packages/core/
 │   ├── Features/
 │   │   └── VoiceSession/           # Voice session
 │   ├── services/
-│   │   ├── ModelRegistry.ts        # Model metadata
-│   │   ├── DownloadService.ts      # Downloads
-│   │   ├── FileSystem.ts           # File ops
-│   │   └── Network/                # HTTP, telemetry
+│   │   ├── ProtoBytes.ts           # ArrayBuffer/protobuf conversion
+│   │   └── Network/                # Telemetry/config wrappers
 │   ├── types/                      # TypeScript types
 │   │   ├── enums.ts                # RN-only enums + proto re-exports
 │   │   ├── LLMTypes.ts             # RN-local LLM streaming primitives
@@ -595,7 +565,7 @@ packages/core/
 │   └── native/                     # Native module access
 ├── cpp/                            # C++ HybridObject bridges
 │   ├── HybridRunAnywhereCore.cpp   # Core native bridge
-│   └── bridges/                    # Platform adapters and legacy JSON RAG bridge
+│   └── bridges/                    # Platform adapters and native ABI bridges
 ├── ios/                            # iOS native module
 ├── android/                        # Android native module
 └── nitrogen/                       # Generated Nitro specs
@@ -615,11 +585,13 @@ This package includes native bindings via Nitrogen/Nitro for:
 
 ### iOS
 
-The package uses `RACommons.xcframework` which is automatically downloaded during `pod install`.
+The package uses the bundled `ios/Binaries/RACommons.xcframework` staged from
+the Swift-shaped native binary layout.
 
 ### Android
 
-Native libraries (`librac_commons.so`, `librunanywhere_jni.so`) are automatically downloaded during Gradle build.
+Native libraries (`librac_commons.so`, `librunanywhere_jni.so`) are staged into
+`android/src/main/jniLibs/`.
 
 ---
 

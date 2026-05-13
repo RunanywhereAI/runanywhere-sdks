@@ -83,11 +83,10 @@ This pattern appears in: `ChatScreen.tsx`, `SettingsScreen.tsx`, `ModelSelection
 
 Three-state machine: `loading → ready | error`.
 
-1. `initializeNitroModulesGlobally()` — sets up Nitrogen JSI bridge
-2. Reads stored API key + base URL from AsyncStorage (set in Settings screen)
-3. `RunAnywhere.initialize()` with config (dev or prod based on stored credentials)
-4. `registerModulesAndModels()` — registers backends (LlamaCPP, Genie, ONNX) and all model URLs
-5. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
+1. Reads stored API key + base URL from AsyncStorage (set in Settings screen)
+2. `RunAnywhere.initialize()` with config (dev or prod based on stored credentials)
+3. `registerModulesAndModels()` — registers backends (LlamaCPP, Genie, ONNX) and all model URLs
+4. Renders `<NavigationContainer><TabNavigator /></NavigationContainer>`
 
 Backend registration uses dynamic `require()` with try/catch — `LlamaCPP` and `Genie` are optional.
 
@@ -183,7 +182,9 @@ Defined in `tsconfig.json`:
 
 ## Key SDK API Imports
 
-From `@runanywhere/core`: `RunAnywhere`, `SDKEnvironment`, generated `ModelCategory`, generated `InferenceFramework`, generated `ModelArtifactType`, `initializeNitroModulesGlobally`, current hardware helpers, RAG/VoiceAgent facades, `FileSystem`, `Hardware`, `STTLanguage`, `VLMImageFormat`, and `ToolParameterType`.
+From `@runanywhere/core`: `RunAnywhere` and `SDKEnvironment`.
+
+Generated DTOs/enums come directly from `@runanywhere/proto-ts/*`: `ModelCategory`, `InferenceFramework`, `ModelArtifactType`, `ModelLoadRequest`, `CurrentModelRequest`, `StorageDeleteRequest`, `STTLanguage`, `VLMImageFormat`, `ToolParameterType`, and related modality options.
 
 Backend packages are optional registration adapters. Do not add new example code that imports deleted local framework/modality DTOs or backend-specific model-registration APIs. Register example models through `RunAnywhere.registerModel()` / `RunAnywhere.registerMultiFileModel()` using generated proto enum values.
 
@@ -200,7 +201,7 @@ From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKin
 - **iOS TTS**: Uses `NativeModules.NativeAudioModule` (AVSpeechSynthesizer) for system TTS, and ONNX synthesis + WAV file creation for model TTS
 - **Android TTS**: Uses lazy-loaded `react-native-tts` for system TTS, lazy-loaded `react-native-sound` for ONNX WAV playback
 - **iOS STT recording**: `NativeAudioModule.startRecording()` via AVFoundation
-- **Android STT recording**: `RunAnywhere.Audio.startRecording()` from SDK
+- **Android STT recording**: native/example audio recorder plus `RunAnywhere.transcribe()`
 - **iOS streaming generation**: Manual async iteration of `RunAnywhere.generateStream()`
 - **Android streaming generation**: Falls back to non-streaming `RunAnywhere.generate()` in ChatScreen
 - **Genie NPU backend**: Android-only (no iOS Podfile entry); models filtered per Qualcomm chip ID (`8elite`, `8elite-gen5`)

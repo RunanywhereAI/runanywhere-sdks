@@ -13,10 +13,8 @@
 
 import { LlamaCppProvider } from './LlamaCppProvider';
 import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import {
-  SDKComponent,
-  SDKLogger,
-} from '@runanywhere/core';
+import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 const log = new SDKLogger('LLM.LlamaCpp');
 
@@ -32,7 +30,8 @@ const log = new SDKLogger('LLM.LlamaCpp');
  *
  * ```typescript
  * import { LlamaCPP } from '@runanywhere/llamacpp';
- * import { RunAnywhere, InferenceFramework } from '@runanywhere/core';
+ * import { RunAnywhere } from '@runanywhere/core';
+ * import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
  *
  * // Register LlamaCPP backend
  * await LlamaCPP.register();

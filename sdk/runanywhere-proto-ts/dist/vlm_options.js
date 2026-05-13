@@ -1889,6 +1889,166 @@ export const VLMServiceState = {
         return message;
     },
 };
+function createBaseVLMLoadResolvedArtifactsRequest() {
+    return { modelId: "", primaryModelPath: "", mmprojPath: undefined };
+}
+export const VLMLoadResolvedArtifactsRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.modelId !== "") {
+            writer.uint32(10).string(message.modelId);
+        }
+        if (message.primaryModelPath !== "") {
+            writer.uint32(18).string(message.primaryModelPath);
+        }
+        if (message.mmprojPath !== undefined) {
+            writer.uint32(26).string(message.mmprojPath);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVLMLoadResolvedArtifactsRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.primaryModelPath = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.mmprojPath = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            primaryModelPath: isSet(object.primaryModelPath) ? globalThis.String(object.primaryModelPath) : "",
+            mmprojPath: isSet(object.mmprojPath) ? globalThis.String(object.mmprojPath) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.primaryModelPath !== "") {
+            obj.primaryModelPath = message.primaryModelPath;
+        }
+        if (message.mmprojPath !== undefined) {
+            obj.mmprojPath = message.mmprojPath;
+        }
+        return obj;
+    },
+    create(base) {
+        return VLMLoadResolvedArtifactsRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVLMLoadResolvedArtifactsRequest();
+        message.modelId = object.modelId ?? "";
+        message.primaryModelPath = object.primaryModelPath ?? "";
+        message.mmprojPath = object.mmprojPath ?? undefined;
+        return message;
+    },
+};
+function createBaseVLMLoadResolvedArtifactsResponse() {
+    return { handle: 0, resultCode: 0, errorMessage: undefined };
+}
+export const VLMLoadResolvedArtifactsResponse = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handle !== 0) {
+            writer.uint32(8).uint64(message.handle);
+        }
+        if (message.resultCode !== 0) {
+            writer.uint32(16).int32(message.resultCode);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVLMLoadResolvedArtifactsResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.handle = longToNumber(reader.uint64());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.resultCode = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            handle: isSet(object.handle) ? globalThis.Number(object.handle) : 0,
+            resultCode: isSet(object.resultCode) ? globalThis.Number(object.resultCode) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handle !== 0) {
+            obj.handle = Math.round(message.handle);
+        }
+        if (message.resultCode !== 0) {
+            obj.resultCode = Math.round(message.resultCode);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return VLMLoadResolvedArtifactsResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVLMLoadResolvedArtifactsResponse();
+        message.handle = object.handle ?? 0;
+        message.resultCode = object.resultCode ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        return message;
+    },
+};
 function bytesFromBase64(b64) {
     const bin = globalThis.atob(b64);
     const arr = new Uint8Array(bin.length);

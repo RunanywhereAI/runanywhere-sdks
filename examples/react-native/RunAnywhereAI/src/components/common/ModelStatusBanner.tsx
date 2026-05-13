@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
-import type { InferenceFramework } from '@runanywhere/core';
+import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import {
   getFrameworkColor,
   getFrameworkDisplayName,

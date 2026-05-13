@@ -37,14 +37,12 @@ import {
   ButtonHeight,
 } from './src/theme/spacing';
 
+import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
 import {
-  RunAnywhere,
-  SDKEnvironment,
   ModelCategory,
   InferenceFramework,
   ModelArtifactType,
-  initializeNitroModulesGlobally,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/model_types';
 
 // Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
@@ -75,7 +73,9 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP as OptionalBackend;
 } catch {
-  logDiagnostic('[App] LlamaCPP backend not available - some features disabled');
+  logDiagnostic(
+    '[App] LlamaCPP backend not available - some features disabled'
+  );
 }
 
 // Make Genie optional (Android/Snapdragon only)
@@ -327,8 +327,9 @@ async function registerModulesAndModels(): Promise<void> {
   // =========================================================================
   // Genie NPU backend (Android/Snapdragon only)
   //
-  // Per-chip model registration was previously driven by the SDK helpers
-  // `getChip()` / `getNPUDownloadUrl()`. Those helpers were deleted in the
+  // Per-chip model registration was previously driven by legacy chip-specific
+  // URL helpers. That selection now belongs in the public hardware namespace /
+  // registry flow, so the example avoids registering ad-hoc NPU variants.
   // V2 dead-code purge — the canonical SDK now exposes only `getChip(): string`
   // (returning a chip name, not the structured chip identifier object the
   // Genie URL builder needed). Until the proto-canonical Genie catalog
@@ -339,7 +340,7 @@ async function registerModulesAndModels(): Promise<void> {
     Genie.register();
     // eslint-disable-next-line no-console -- demo app bootstrap diagnostic
     console.log(
-      'ℹ️ Genie NPU backend registered (model catalog disabled — pending proto-canonical chip helper)',
+      'ℹ️ Genie NPU backend registered (model catalog disabled — pending proto-canonical chip helper)'
     );
   }
 
@@ -435,10 +436,6 @@ const App: React.FC = () => {
       const startTime = Date.now();
 
       /* eslint-disable no-console -- demo app bootstrap diagnostics */
-      console.log('[App] Initializing global NitroModules...');
-      await initializeNitroModulesGlobally();
-      console.log('[App] Global NitroModules initialized successfully');
-
       const customApiKey = await getStoredApiKey();
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
@@ -472,10 +469,13 @@ const App: React.FC = () => {
       const initTime = Date.now() - startTime;
       const isInit = await RunAnywhere.isInitialized;
       const version = RunAnywhere.version;
-      const backendInfo = await RunAnywhere.getBackendInfo();
+      const sdkState = {
+        environment: RunAnywhere.environment,
+        servicesReady: RunAnywhere.areServicesReady,
+      };
 
       console.log(
-        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, env: ${JSON.stringify(backendInfo)}`
+        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, state: ${JSON.stringify(sdkState)}`
       );
       /* eslint-enable no-console */
 

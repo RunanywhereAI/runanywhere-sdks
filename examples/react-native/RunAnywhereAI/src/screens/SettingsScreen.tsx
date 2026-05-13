@@ -21,7 +21,7 @@
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/CombinedSettingsView.swift
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -54,21 +57,29 @@ import {
 } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
 import {
-  RunAnywhere,
-  ToolParameterType,
-  Hardware,
+  ModelCategory,
   type ModelInfo,
-  type HardwareProfileResult,
-} from '@runanywhere/core';
-import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
+} from '@runanywhere/proto-ts/model_types';
+import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
+import type { HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
+import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
+import {
+  ToolDefinition,
+  ToolParameterType,
+} from '@runanywhere/proto-ts/tool_calling';
+import {
+  isModelLoadedForCategory,
+  unloadModelsForCategory,
+} from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const cancelDownloadHelper = RunAnywhere.cancelDownload;
-const deleteModelHelper = RunAnywhere.deleteModel;
 const downloadModelHelper = RunAnywhere.downloadModel;
-const listModels = async (): Promise<ModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
-const listDownloadedModels = async (): Promise<ModelInfo[]> => (await RunAnywhere.downloadedModels()).models?.models ?? [];
+const listModels = async (): Promise<ModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
+const listDownloadedModels = async (): Promise<ModelInfo[]> =>
+  (await RunAnywhere.downloadedModels()).models?.models ?? [];
 
 // Storage keys for API configuration
 const STORAGE_KEYS = {
@@ -193,6 +204,9 @@ export const SettingsScreen: React.FC = () => {
     Record<string, number>
   >({});
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]); // Tool calling state
+  const downloadIteratorsRef = useRef<
+    Record<string, AsyncIterator<DownloadProgress>>
+  >({});
 
   const [toolCallingEnabled, setToolCallingEnabled] = useState(false);
   const [registeredTools, setRegisteredTools] = useState<
@@ -529,7 +543,10 @@ export const SettingsScreen: React.FC = () => {
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] SDK isInitialized:', isInit); // Get backend info for storage data
 
-      const backendInfo = await RunAnywhere.getBackendInfo();
+      const backendInfo = {
+        environment: RunAnywhere.environment,
+        servicesReady: RunAnywhere.areServicesReady,
+      };
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Backend info:', backendInfo); // Override name with actual init status
 
@@ -541,10 +558,18 @@ export const SettingsScreen: React.FC = () => {
       };
       setBackendInfoData(updatedBackendInfo);
 
-      const sttLoaded = await RunAnywhere.isSTTModelLoaded();
-      const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
-      const textLoaded = await RunAnywhere.isModelLoaded();
-      const vadLoaded = await RunAnywhere.isVADModelLoaded();
+      const sttLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+      );
+      const ttsLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+      );
+      const textLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_LANGUAGE
+      );
+      const vadLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+      );
 
       setIsSTTLoaded(sttLoaded);
       setIsTTSLoaded(ttsLoaded);
@@ -595,7 +620,7 @@ export const SettingsScreen: React.FC = () => {
       }
 
       try {
-        const profile = await Hardware.getProfile();
+        const profile = await RunAnywhere.hardware.getProfile();
         console.warn('[Settings] Hardware profile:', profile);
         setHardwareProfile(profile);
         setTotalRAMBytes(profile.profile?.totalMemoryBytes ?? 0);
@@ -674,7 +699,8 @@ export const SettingsScreen: React.FC = () => {
       if (downloadingModels[model.id] !== undefined) {
         // Already downloading, cancel it
         try {
-          await cancelDownloadHelper(model.id);
+          await downloadIteratorsRef.current[model.id]?.return?.();
+          delete downloadIteratorsRef.current[model.id];
           setDownloadingModels((prev) => {
             const updated = { ...prev };
             delete updated[model.id];
@@ -691,6 +717,7 @@ export const SettingsScreen: React.FC = () => {
       try {
         // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
         const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
+        downloadIteratorsRef.current[model.id] = dlIter;
         let dlResult = await dlIter.next();
         while (!dlResult.done) {
           const progress = dlResult.value;
@@ -709,6 +736,7 @@ export const SettingsScreen: React.FC = () => {
           delete updated[model.id];
           return updated;
         });
+        delete downloadIteratorsRef.current[model.id];
 
         Alert.alert('Success', `${model.name} downloaded successfully!`);
         loadData(); // Refresh to show downloaded model
@@ -718,6 +746,7 @@ export const SettingsScreen: React.FC = () => {
           delete updated[model.id];
           return updated;
         });
+        delete downloadIteratorsRef.current[model.id];
         Alert.alert(
           'Download Failed',
           `Failed to download ${model.name}: ${err}`
@@ -734,8 +763,7 @@ export const SettingsScreen: React.FC = () => {
       const downloadedModel = downloadedModels.find((m) => m.id === model.id);
       // Prefer the downloaded model's size (reported by the SDK after download)
       // over the catalog's expected downloadSize.
-      const freedSize =
-        getModelDownloadSizeBytes(downloadedModel ?? model);
+      const freedSize = getModelDownloadSizeBytes(downloadedModel ?? model);
 
       Alert.alert(
         'Delete Model',
@@ -747,7 +775,20 @@ export const SettingsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                await deleteModelHelper(model.id);
+                const result = await RunAnywhere.deleteStorage(
+                  StorageDeleteRequest.fromPartial({
+                    modelIds: [model.id],
+                    deleteFiles: true,
+                    clearRegistryPaths: true,
+                    unloadIfLoaded: true,
+                    allowPlatformDelete: true,
+                  })
+                );
+                if (!result.success) {
+                  throw new Error(
+                    result.errorMessage || 'Storage delete failed'
+                  );
+                }
                 Alert.alert('Deleted', `${model.name} has been deleted.`);
                 loadData(); // Refresh list
               } catch (err) {
@@ -775,10 +816,16 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               // Unload all models
-              await RunAnywhere.unloadModel();
-              await RunAnywhere.unloadSTTModel();
-              await RunAnywhere.unloadTTSModel(); // Destroy SDK
-              await RunAnywhere.destroy();
+              await unloadModelsForCategory(
+                ModelCategory.MODEL_CATEGORY_LANGUAGE
+              );
+              await unloadModelsForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+              );
+              await unloadModelsForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+              );
+              await RunAnywhere.reset();
               Alert.alert('Success', 'All data cleared');
             } catch (error) {
               Alert.alert('Error', `Failed to clear data: ${error}`);
@@ -813,11 +860,11 @@ export const SettingsScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <View style={styles.settingRowLeft}>
-                <Icon name={icon} size={20} color={Colors.primaryBlue} />
+        <Icon name={icon} size={20} color={Colors.primaryBlue} />
         <Text style={styles.settingLabel}>{title}</Text>
       </View>
       <View style={styles.settingRowRight}>
-                <Text style={styles.settingValue}>{value}</Text>
+        <Text style={styles.settingValue}>{value}</Text>
         {showChevron && onPress && (
           <Icon name="chevron-forward" size={18} color={Colors.textTertiary} />
         )}
@@ -838,7 +885,7 @@ export const SettingsScreen: React.FC = () => {
   ) => (
     <View style={styles.sliderSetting}>
       <View style={styles.sliderHeader}>
-                <Text style={styles.settingLabel}>{title}</Text>
+        <Text style={styles.settingLabel}>{title}</Text>
         <Text style={styles.sliderValue}>{formatValue(value)}</Text>
       </View>
       <View style={styles.sliderControls}>
@@ -846,7 +893,7 @@ export const SettingsScreen: React.FC = () => {
           style={styles.sliderButton}
           onPress={() => onChange(Math.max(min, value - step))}
         >
-                    <Icon name="remove" size={20} color={Colors.primaryBlue} />
+          <Icon name="remove" size={20} color={Colors.primaryBlue} />
         </TouchableOpacity>
         <View style={styles.sliderTrack}>
           <View
@@ -860,7 +907,7 @@ export const SettingsScreen: React.FC = () => {
           style={styles.sliderButton}
           onPress={() => onChange(Math.min(max, value + step))}
         >
-                    <Icon name="add" size={20} color={Colors.primaryBlue} />
+          <Icon name="add" size={20} color={Colors.primaryBlue} />
         </TouchableOpacity>
       </View>
     </View>
@@ -901,8 +948,7 @@ export const SettingsScreen: React.FC = () => {
     const frameworkName = getFrameworkDisplayName(getPrimaryFramework(model));
 
     const downloadedModel = downloadedModels.find((m) => m.id === model.id);
-    const modelSize =
-      getModelDownloadSizeBytes(downloadedModel ?? model);
+    const modelSize = getModelDownloadSizeBytes(downloadedModel ?? model);
     return (
       <View key={model.id} style={styles.catalogModelRow}>
         <View style={styles.catalogModelInfo}>
@@ -976,7 +1022,9 @@ export const SettingsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
+      <View
+        style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+      >
         <Text style={styles.title}>Settings</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={loadData}>
           <Icon name="refresh" size={22} color={Colors.primaryBlue} />
@@ -984,7 +1032,7 @@ export const SettingsScreen: React.FC = () => {
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Generation Settings - Matches iOS CombinedSettingsView order */}
-            {renderSectionHeader('Generation Settings')}
+        {renderSectionHeader('Generation Settings')}
         <View style={styles.section}>
           {renderSliderSetting(
             'Temperature',
@@ -1004,7 +1052,7 @@ export const SettingsScreen: React.FC = () => {
             SETTINGS_CONSTRAINTS.maxTokens.step,
             (v) => v.toLocaleString()
           )}
-                    {/* System Prompt Input */}
+          {/* System Prompt Input */}
           <View style={styles.systemPromptContainer}>
             <Text style={styles.systemPromptLabel}>System Prompt</Text>
             <TextInput
@@ -1018,7 +1066,7 @@ export const SettingsScreen: React.FC = () => {
               textAlignVertical="top"
             />
           </View>
-                    {/* Save Settings Button */}
+          {/* Save Settings Button */}
           <TouchableOpacity
             style={styles.saveSettingsButton}
             onPress={saveGenerationSettings}
@@ -1031,11 +1079,11 @@ export const SettingsScreen: React.FC = () => {
             <Text style={styles.saveSettingsButtonText}>Save Settings</Text>
           </TouchableOpacity>
         </View>
-                {/* API Configuration (Testing) */}
+        {/* API Configuration (Testing) */}
         {renderSectionHeader('API Configuration (Testing)')}
         <View style={styles.section}>
           <View style={styles.apiConfigRow}>
-                        <Text style={styles.apiConfigLabel}>API Key</Text>
+            <Text style={styles.apiConfigLabel}>API Key</Text>
             <Text
               style={[
                 styles.apiConfigValue,
@@ -1049,9 +1097,9 @@ export const SettingsScreen: React.FC = () => {
                             {apiKeyConfigured ? 'Configured' : 'Not Set'}       
             </Text>
           </View>
-                    <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigDivider} />
           <View style={styles.apiConfigRow}>
-                        <Text style={styles.apiConfigLabel}>Base URL</Text>
+            <Text style={styles.apiConfigLabel}>Base URL</Text>
             <Text
               style={[
                 styles.apiConfigValue,
@@ -1065,7 +1113,7 @@ export const SettingsScreen: React.FC = () => {
                             {isBaseURLConfigured ? 'Configured' : 'Not Set'}   
             </Text>
           </View>
-                    <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigDivider} />
           <View style={styles.apiConfigButtons}>
             <TouchableOpacity
               style={styles.apiConfigButton}
@@ -1094,10 +1142,10 @@ export const SettingsScreen: React.FC = () => {
             Requires app restart.          {' '}
           </Text>
         </View>
-                {/* Tool Settings - Matches iOS ToolSettingsView */}
+        {/* Tool Settings - Matches iOS ToolSettingsView */}
         {renderSectionHeader('Tool Settings')}
         <View style={styles.section}>
-                    {/* Enable Tool Calling Toggle */}
+          {/* Enable Tool Calling Toggle */}
           <View style={styles.toolSettingRow}>
             <View style={styles.toolSettingInfo}>
               <Text style={styles.toolSettingLabel}>Enable Tool Calling</Text>
@@ -1122,8 +1170,8 @@ export const SettingsScreen: React.FC = () => {
           </View>
           {toolCallingEnabled && (
             <>
-                            <View style={styles.apiConfigDivider} />
-                               {/* Registered Tools Count */}
+              <View style={styles.apiConfigDivider} />
+              {/* Registered Tools Count */}
               <View style={styles.toolSettingRow}>
                 <Text style={styles.toolSettingLabel}>Registered Tools</Text>
                 <Text
@@ -1141,10 +1189,10 @@ export const SettingsScreen: React.FC = () => {
                   {registeredTools.length === 1 ? 'tool' : 'tools'}             
                 </Text>
               </View>
-                            {/* Demo Tools Button */}
+              {/* Demo Tools Button */}
               {registeredTools.length === 0 && (
                 <>
-                                    <View style={styles.apiConfigDivider} />
+                  <View style={styles.apiConfigDivider} />
                   <TouchableOpacity
                     style={styles.demoToolsButton}
                     onPress={registerDemoTools}
@@ -1160,10 +1208,10 @@ export const SettingsScreen: React.FC = () => {
                   </TouchableOpacity>
                 </>
               )}
-                            {/* Registered Tools List */}
+              {/* Registered Tools List */}
               {registeredTools.length > 0 && (
                 <>
-                                    <View style={styles.apiConfigDivider} />
+                  <View style={styles.apiConfigDivider} />
                   {registeredTools.map((tool, index) => (
                     <View key={tool.name} style={styles.toolRow}>
                       <Icon
@@ -1193,8 +1241,8 @@ export const SettingsScreen: React.FC = () => {
                       )}
                     </View>
                   ))}
-                                    {/* Clear All Tools Button */}
-                                    <View style={styles.apiConfigDivider} />
+                  {/* Clear All Tools Button */}
+                  <View style={styles.apiConfigDivider} />
                   <TouchableOpacity
                     style={styles.clearToolsButton}
                     onPress={clearAllTools}
@@ -1217,7 +1265,7 @@ export const SettingsScreen: React.FC = () => {
             to get real-time data.          {' '}
           </Text>
         </View>
-                {/* Hardware Info */}
+        {/* Hardware Info */}
         {renderSectionHeader('Hardware')}
         <View style={styles.section}>
           <View style={styles.apiConfigRow}>
@@ -1275,33 +1323,33 @@ export const SettingsScreen: React.FC = () => {
             </Text>
           </View>
         </View>
-                {/* Storage Overview - Matches iOS CombinedSettingsView */}
-          {renderSectionHeader('Storage Overview')}
+        {/* Storage Overview - Matches iOS CombinedSettingsView */}
+        {renderSectionHeader('Storage Overview')}
         <View style={styles.section}>
-                    {renderStorageBar()}
+          {renderStorageBar()}
           <View style={styles.storageDetails}>
-                        {/* Total Storage - App's total storage usage */}
+            {/* Total Storage - App's total storage usage */}
             <View style={styles.storageDetailRow}>
               <Text style={styles.storageDetailLabel}>Total Storage</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.appStorage)}           
               </Text>
             </View>
-                        {/* Models Storage - Downloaded models size */}
+            {/* Models Storage - Downloaded models size */}
             <View style={styles.storageDetailRow}>
               <Text style={styles.storageDetailLabel}>Models</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.modelsStorage)}       
               </Text>
             </View>
-                        {/* Cache Size */}
+            {/* Cache Size */}
             <View style={styles.storageDetailRow}>
-                            <Text style={styles.storageDetailLabel}>Cache</Text>
+              <Text style={styles.storageDetailLabel}>Cache</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.cacheSize)}           
               </Text>
             </View>
-                        {/* Available - Device free space */}
+            {/* Available - Device free space */}
             <View style={styles.storageDetailRow}>
               <Text style={styles.storageDetailLabel}>Available</Text>
               <Text style={styles.storageDetailValue}>
@@ -1310,7 +1358,7 @@ export const SettingsScreen: React.FC = () => {
             </View>
           </View>
         </View>
-                {/* Model Catalog */}
+        {/* Model Catalog */}
         {renderSectionHeader('Model Catalog')}
         <View style={styles.section}>
           {availableModels.length === 0 ? (
@@ -1319,7 +1367,7 @@ export const SettingsScreen: React.FC = () => {
             availableModels.map(renderCatalogModelRow)
           )}
         </View>
-                {/* Storage Management */}
+        {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
         <View style={styles.section}>
           <TouchableOpacity
@@ -1327,7 +1375,7 @@ export const SettingsScreen: React.FC = () => {
             onPress={handleClearCache}
           >
             <Icon name="trash-outline" size={20} color={Colors.primaryOrange} />
-                        <Text style={styles.dangerButtonText}>Clear Cache</Text>
+            <Text style={styles.dangerButtonText}>Clear Cache</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.dangerButton, styles.dangerButtonRed]}
@@ -1339,13 +1387,13 @@ export const SettingsScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
-                {/* Version Info */}
+        {/* Version Info */}
         <View style={styles.versionContainer}>
-                    <Text style={styles.versionText}>RunAnywhere AI</Text>
-              <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
+          <Text style={styles.versionText}>RunAnywhere AI</Text>
+          <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
         </View>
       </ScrollView>
-            {/* API Configuration Modal */}
+      {/* API Configuration Modal */}
       <Modal
         visible={showApiConfigModal}
         animationType="slide"
@@ -1354,10 +1402,10 @@ export const SettingsScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>API Configuration</Text>
-                        {/* API Key Input */}
+            <Text style={styles.modalTitle}>API Configuration</Text>
+            {/* API Key Input */}
             <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>API Key</Text>
+              <Text style={styles.inputLabel}>API Key</Text>
               <View style={styles.passwordInputContainer}>
                 <TextInput
                   style={styles.passwordInput}
@@ -1384,9 +1432,9 @@ export const SettingsScreen: React.FC = () => {
                                 Your API key for authenticating with the backend
               </Text>
             </View>
-                        {/* Base URL Input */}
+            {/* Base URL Input */}
             <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Base URL</Text>
+              <Text style={styles.inputLabel}>Base URL</Text>
               <TextInput
                 style={styles.input}
                 value={baseURL}
@@ -1402,7 +1450,7 @@ export const SettingsScreen: React.FC = () => {
                 automatically if missing)              {' '}
               </Text>
             </View>
-                        {/* Warning */}
+            {/* Warning */}
             <View style={styles.warningBox}>
               <Icon
                 name="warning-outline"
@@ -1415,7 +1463,7 @@ export const SettingsScreen: React.FC = () => {
                 custom configuration.              {' '}
               </Text>
             </View>
-                        {/* Buttons */}
+            {/* Buttons */}
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonCancel]}

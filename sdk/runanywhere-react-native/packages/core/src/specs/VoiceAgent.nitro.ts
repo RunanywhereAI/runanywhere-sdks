@@ -3,7 +3,7 @@
  *
  * Closes the RN half of GAP 09 #6 (v3-readiness Phase A3). The existing
  * VoiceAgentStreamAdapter.ts imports
- * `'../generated/NitroVoiceAgentSpec'` as `NitroVoiceAgent` and calls
+ * `'../Internal/Nitro/NitroVoiceAgentSpec'` as `NitroVoiceAgent` and calls
  * `NitroVoiceAgent.subscribeProtoEvents(handle, onBytes, onDone, onError)`.
  * Before this file, that import resolved nowhere and the adapter did
  * not compile.

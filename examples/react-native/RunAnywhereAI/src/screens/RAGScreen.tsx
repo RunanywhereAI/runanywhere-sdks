@@ -37,15 +37,8 @@ import {
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
 
-import {
-  type ModelInfo as SDKModelInfo,
-  initializeNitroModulesGlobally,
-  ragCreatePipeline,
-  ragDestroyPipeline,
-  ragIngest,
-  ragQuery,
-  helpers,
-} from '@runanywhere/core';
+import { RunAnywhere } from '@runanywhere/core';
+import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { RAGConfiguration, RAGQueryOptions } from '@runanywhere/proto-ts/rag';
 
 // MARK: - Types
@@ -114,21 +107,10 @@ export const RAGScreen: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
-    const timer = setTimeout(async () => {
-      try {
-        await initializeNitroModulesGlobally();
-        if (mounted) {
-          setIsNitroReady(true);
-          setNitroError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          setNitroError(
-            err instanceof Error
-              ? err.message
-              : 'Failed to initialize NitroModules'
-          );
-        }
+    const timer = setTimeout(() => {
+      if (mounted) {
+        setIsNitroReady(true);
+        setNitroError(null);
       }
     }, 500);
 
@@ -142,7 +124,7 @@ export const RAGScreen: React.FC = () => {
   useEffect(() => {
     return () => {
       if (isDocumentLoaded) {
-        ragDestroyPipeline().catch(console.error);
+        RunAnywhere.ragDestroyPipeline().catch(console.error);
       }
     };
   }, [isDocumentLoaded]);
@@ -186,8 +168,8 @@ export const RAGScreen: React.FC = () => {
       });
 
       // Create pipeline and ingest document (same as iOS loadDocument)
-      await ragCreatePipeline(config);
-      await ragIngest(text);
+      await RunAnywhere.ragCreatePipeline(config);
+      await RunAnywhere.ragIngest(text);
 
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
@@ -211,7 +193,7 @@ export const RAGScreen: React.FC = () => {
   }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel]);
 
   const handleChangeDocument = useCallback(async () => {
-    await ragDestroyPipeline();
+    await RunAnywhere.ragDestroyPipeline();
     setDocumentName(null);
     setIsDocumentLoaded(false);
     setMessages([]);
@@ -234,15 +216,18 @@ export const RAGScreen: React.FC = () => {
     setError(null);
 
     try {
-      const result = await ragQuery(question, RAGQueryOptions.fromPartial({
-        maxTokens: 256,
-        temperature: 0.7,
-        topP: 0.9,
-        topK: 40,
-        retrievalTopK: 3,
-        similarityThreshold: 0.12,
-        stream: false,
-      }));
+      const result = await RunAnywhere.ragQuery(
+        question,
+        RAGQueryOptions.fromPartial({
+          maxTokens: 256,
+          temperature: 0.7,
+          topP: 0.9,
+          topK: 40,
+          retrievalTopK: 3,
+          similarityThreshold: 0.12,
+          stream: false,
+        })
+      );
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },

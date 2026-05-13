@@ -4,7 +4,7 @@
  * Text-to-Speech extension for RunAnywhere SDK. Aligned to proto-canonical
  * TTS shapes (`@runanywhere/proto-ts/tts_options`). Path-first loading and
  * registry path probing have been removed — voice loading goes through
- * `loadModelLifecycle` in `Models/RunAnywhere+ModelLifecycle.ts`.
+ * `loadModel` in `Models/RunAnywhere+ModelLifecycle.ts`.
  *
  * Matches Swift: `Public/Extensions/TTS/RunAnywhere+TTS.swift`.
  */
@@ -17,13 +17,14 @@ import {
   type TTSOptions,
   type TTSOutput,
   type TTSSpeakResult,
-  type TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
 import {
   TTSOptions as TTSOptionsMessage,
   TTSOutput as TTSOutputMessage,
   TTSSpeakResult as TTSSpeakResultMessage,
-  TTSVoiceInfo as TTSVoiceInfoMessage,
+  TTSSynthesisRequest,
+  TTSStreamEvent,
+  TTSStreamEventKind,
 } from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
@@ -32,6 +33,7 @@ import {
 } from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.TTS');
+let requestCounter = 0;
 
 // Internal audio playback manager for speak() functionality.
 let ttsAudioPlayback: AudioPlaybackManager | null = null;
@@ -66,8 +68,22 @@ function buildTTSOptions(options?: Partial<TTSOptions>): TTSOptions {
   });
 }
 
-function encodeTTSOptions(options?: Partial<TTSOptions>): ArrayBuffer {
-  return bytesToArrayBuffer(TTSOptionsMessage.encode(buildTTSOptions(options)).finish());
+function nextTTSRequestId(): string {
+  requestCounter += 1;
+  return `rn-tts-${Date.now()}-${requestCounter}`;
+}
+
+function encodeTTSSynthesisRequest(
+  text: string,
+  options?: Partial<TTSOptions>
+): ArrayBuffer {
+  const request = TTSSynthesisRequest.fromPartial({
+    requestId: nextTTSRequestId(),
+    text,
+    options: buildTTSOptions(options),
+    metadata: {},
+  });
+  return bytesToArrayBuffer(TTSSynthesisRequest.encode(request).finish());
 }
 
 function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
@@ -77,58 +93,6 @@ function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
   }
   return TTSOutputMessage.decode(bytes);
 }
-
-// ============================================================================
-// Voice / Model Loading
-// ============================================================================
-
-/** Check if a TTS model is loaded. */
-export async function isTTSModelLoaded(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  return native.isTTSModelLoaded();
-}
-
-/** Check if a TTS voice is loaded. */
-export async function isTTSVoiceLoaded(): Promise<boolean> {
-  return isTTSModelLoaded();
-}
-
-/** Unload the current TTS model. */
-export async function unloadTTSModel(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  return native.unloadTTSModel();
-}
-
-// ============================================================================
-// Voice Management
-// ============================================================================
-
-/**
- * Get available TTS voices (IDs only).
- *
- * Matches Swift SDK: `RunAnywhere.availableTTSVoices`.
- */
-export async function availableTTSVoices(): Promise<string[]> {
-  const voices = await getTTSVoiceInfo();
-  return voices.map((voice) => voice.id);
-}
-
-/** Get detailed voice information. */
-export async function getTTSVoiceInfo(): Promise<TTSVoiceInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
-  const native = requireNativeModule();
-  const voices: TTSVoiceInfo[] = [];
-  const ok = await native.ttsListVoicesProto((voiceBytes: ArrayBuffer) => {
-    voices.push(TTSVoiceInfoMessage.decode(arrayBufferToBytes(voiceBytes)));
-  });
-  return ok ? voices : [];
-}
-
-// ============================================================================
-// Synthesis
-// ============================================================================
 
 /**
  * Synthesize text to speech.
@@ -143,16 +107,9 @@ export async function synthesize(
     throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
-  return decodeTTSOutput(await native.ttsSynthesizeProto(text, encodeTTSOptions(options)));
-}
-
-/**
- * Streaming TTS handle (mirrors LLM/VLM streaming primitive).
- */
-export interface TTSStreamingResult {
-  chunks: AsyncIterable<ArrayBuffer>;
-  result: Promise<TTSOutput>;
-  cancel: () => void;
+  return decodeTTSOutput(
+    await native.ttsSynthesizeProto(encodeTTSSynthesisRequest(text, options))
+  );
 }
 
 /**
@@ -171,10 +128,16 @@ export async function synthesizeStream(
   const native = requireNativeModule();
   let lastOutput: TTSOutput | null = null;
   await native.ttsSynthesizeStreamProto(
-    text,
-    encodeTTSOptions(options),
-    (chunkBytes: ArrayBuffer) => {
-      const output = decodeTTSOutput(chunkBytes);
+    encodeTTSSynthesisRequest(text, options),
+    (eventBytes: ArrayBuffer) => {
+      const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
+      if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
+        throw SDKException.generationFailedWith(
+          event.errorMessage ?? 'TTS stream failed'
+        );
+      }
+      const output = event.output;
+      if (!output) return;
       lastOutput = output;
       if (output.audioData.byteLength > 0) {
         onAudioChunk(bytesToArrayBuffer(output.audioData));
@@ -182,85 +145,6 @@ export async function synthesizeStream(
     }
   );
   return lastOutput ?? synthesize(text, options);
-}
-
-/** AsyncIterable variant of `synthesizeStream`. */
-export async function synthesizeStreamAsync(
-  text: string,
-  options?: Partial<TTSOptions>
-): Promise<TTSStreamingResult> {
-  const queue: ArrayBuffer[] = [];
-  let resolver: ((value: IteratorResult<ArrayBuffer>) => void) | null = null;
-  let done = false;
-  let streamError: Error | null = null;
-  let cancelled = false;
-
-  let resolveResult!: (value: TTSOutput) => void;
-  let rejectResult!: (err: Error) => void;
-  const resultPromise = new Promise<TTSOutput>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
-  });
-
-  const pushChunk = (chunk: ArrayBuffer): void => {
-    if (cancelled) return;
-    if (resolver) {
-      resolver({ value: chunk, done: false });
-      resolver = null;
-    } else {
-      queue.push(chunk);
-    }
-  };
-
-  synthesizeStream(text, options, pushChunk)
-    .then((output) => {
-      done = true;
-      resolveResult(output);
-      if (resolver) {
-        resolver({ value: undefined as unknown as ArrayBuffer, done: true });
-        resolver = null;
-      }
-    })
-    .catch((err: Error) => {
-      streamError = err;
-      done = true;
-      rejectResult(err);
-      if (resolver) {
-        resolver({ value: undefined as unknown as ArrayBuffer, done: true });
-        resolver = null;
-      }
-    });
-
-  async function* chunkGenerator(): AsyncGenerator<ArrayBuffer> {
-    while (!done || queue.length > 0) {
-      if (queue.length > 0) {
-        yield queue.shift()!;
-      } else if (!done) {
-        const next = await new Promise<IteratorResult<ArrayBuffer>>((resolve) => {
-          resolver = resolve;
-        });
-        if (next.done) break;
-        yield next.value;
-      }
-    }
-    if (streamError) throw streamError;
-  }
-
-  const cancel = (): void => {
-    cancelled = true;
-    cancelTTS();
-    if (resolver) {
-      done = true;
-      resolver({ value: undefined as unknown as ArrayBuffer, done: true });
-      resolver = null;
-    }
-  };
-
-  return {
-    chunks: chunkGenerator(),
-    result: resultPromise,
-    cancel,
-  };
 }
 
 /**
@@ -311,12 +195,6 @@ export async function speak(
   });
 }
 
-/** Whether speech is currently playing. */
-export function isSpeaking(): boolean {
-  const playback = getAudioPlayback();
-  return playback.isPlaying;
-}
-
 /** Stop current speech playback. */
 export async function stopSpeaking(): Promise<void> {
   const playback = getAudioPlayback();
@@ -326,46 +204,10 @@ export async function stopSpeaking(): Promise<void> {
 }
 
 /** Cancel ongoing TTS synthesis. */
-export function cancelTTS(): void {
+function cancelTTS(): void {
   if (!isNativeModuleAvailable()) return;
   logger.debug('TTS cancellation requested');
-}
-
-// ============================================================================
-// Cleanup
-// ============================================================================
-
-/** Cleanup TTS resources. */
-export function cleanupTTS(): void {
-  if (ttsAudioPlayback) {
-    ttsAudioPlayback.cleanup();
-    ttsAudioPlayback = null;
-  }
-}
-
-// ============================================================================
-// Introspection
-// ============================================================================
-
-interface TTSIntrospectionNativeModule {
-  currentTTSModel?: () => Promise<string>;
-  getCurrentTTSVoiceId?: () => Promise<string>;
-  currentTTSVoiceId?: () => Promise<string>;
-}
-
-/**
- * Get the currently loaded TTS model/voice ID, or `null` if none.
- *
- * Matches Swift: `RunAnywhere.currentTTSModel`.
- */
-export async function currentTTSModel(): Promise<string | null> {
-  if (!isNativeModuleAvailable()) return null;
-  const native = requireNativeModule() as unknown as TTSIntrospectionNativeModule;
-  const fn =
-    native.currentTTSModel ??
-    native.currentTTSVoiceId ??
-    native.getCurrentTTSVoiceId;
-  if (!fn) return null;
-  const id = await fn.call(native);
-  return id && id.length > 0 ? id : null;
+  requireNativeModule().ttsStopProto().catch((error: Error) => {
+    logger.warning(`ttsStopProto failed: ${error.message}`);
+  });
 }

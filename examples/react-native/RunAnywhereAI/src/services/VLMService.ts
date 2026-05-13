@@ -1,15 +1,15 @@
+import { RunAnywhere } from '@runanywhere/core';
 import {
-  processImageStream,
-  loadVLMModel as sdkLoadModel,
-  isVLMModelLoaded as sdkCheckLoaded,
-  cancelVLMGeneration,
-} from '@runanywhere/core';
+  ModelCategory,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import {
   VLMGenerationOptions,
   VLMImage,
   VLMImageFormat,
   VLMModelFamily,
 } from '@runanywhere/proto-ts/vlm_options';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 export class VLMService {
   private _isLoaded: boolean = false;
@@ -22,7 +22,15 @@ export class VLMService {
       // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
       console.log(`[VLMService] Loading model: ${modelName ?? modelId}`);
 
-      const success = await sdkLoadModel(modelId);
+      const result = await RunAnywhere.loadModel(
+        ModelLoadRequest.fromPartial({
+          modelId,
+          category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+          forceReload: false,
+          validateAvailability: true,
+        })
+      );
+      const success = result.success;
 
       if (success) {
         this._isLoaded = true;
@@ -40,21 +48,23 @@ export class VLMService {
   }
 
   /**
-   * Check if model is loaded (checks both internal flag and SDK)
+   * Check if model is loaded through the SDK lifecycle state.
    */
   async isModelLoaded(): Promise<boolean> {
     if (!this._isLoaded) return false;
     try {
-      return await sdkCheckLoaded();
+      return await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL
+      );
     } catch {
       return false;
     }
   }
 
   /**
-   * Describe an image with streaming results
+   * Process an image with streaming results.
    */
-  async describeImage(
+  async processImage(
     imagePath: string,
     prompt: string,
     maxTokens: number,
@@ -77,23 +87,27 @@ export class VLMService {
     console.log(`[VLMService] Processing image: ${imagePath}`);
 
     try {
-      const response = await processImageStream(image, prompt, VLMGenerationOptions.fromPartial({
+      const response = await RunAnywhere.processImageStream(
+        image,
         prompt,
-        maxTokens,
-        temperature: 0.7,
-        topP: 0.9,
-        topK: 0,
-        stopSequences: [],
-        streamingEnabled: true,
-        maxImageSize: 0,
-        nThreads: 0,
-        useGpu: true,
-        modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
-        seed: 0,
-        repetitionPenalty: 1,
-        minP: 0,
-        emitImageEmbeddings: false,
-      }));
+        VLMGenerationOptions.fromPartial({
+          prompt,
+          maxTokens,
+          temperature: 0.7,
+          topP: 0.9,
+          topK: 0,
+          stopSequences: [],
+          streamingEnabled: true,
+          maxImageSize: 0,
+          nThreads: 0,
+          useGpu: true,
+          modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
+          seed: 0,
+          repetitionPenalty: 1,
+          minP: 0,
+          emitImageEmbeddings: false,
+        })
+      );
 
       // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
       const iter = response.stream[Symbol.asyncIterator]();
@@ -103,13 +117,13 @@ export class VLMService {
         result = await iter.next();
       }
     } catch (error) {
-      console.error('[VLMService] Description error:', error);
+      console.error('[VLMService] Processing error:', error);
       throw error;
     }
   }
 
   cancel(): void {
-    cancelVLMGeneration();
+    RunAnywhere.cancelVLMGeneration();
   }
 
   release(): void {

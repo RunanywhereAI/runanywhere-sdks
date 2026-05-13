@@ -8,7 +8,8 @@
  * ## Usage
  *
  * ```typescript
- * import { RunAnywhere, InferenceFramework, ModelCategory } from '@runanywhere/core';
+ * import { RunAnywhere } from '@runanywhere/core';
+ * import { InferenceFramework, ModelCategory } from '@runanywhere/proto-ts/model_types';
  * import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
  * import { LlamaCPP } from '@runanywhere/llamacpp';
  *
@@ -45,7 +46,6 @@
 // =============================================================================
 
 export { LlamaCPP } from './LlamaCPP';
-export { LlamaCppProvider } from './LlamaCppProvider';
 
 // =============================================================================
 // Nitrogen Spec Types

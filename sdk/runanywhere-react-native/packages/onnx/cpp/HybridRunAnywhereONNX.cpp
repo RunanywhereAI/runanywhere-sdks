@@ -13,6 +13,15 @@ extern "C" {
 #include "rac_vad_onnx.h"
 }
 
+#include "rac/core/rac_error.h"
+
+#if __has_include("rac/plugin/rac_plugin_entry_sherpa.h")
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
+#define RAC_RN_HAS_SHERPA_REGISTRATION 1
+#else
+#define RAC_RN_HAS_SHERPA_REGISTRATION 0
+#endif
+
 // RACommons logger - unified logging across platforms
 #include "rac_logger.h"
 
@@ -23,6 +32,24 @@ extern "C" {
 static const char* LOG_CATEGORY = "ONNX";
 
 namespace margelo::nitro::runanywhere::onnx {
+
+namespace {
+
+bool isRegistrationSuccess(rac_result_t result) {
+  return result == RAC_SUCCESS ||
+         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
+         result == RAC_ERROR_PLUGIN_DUPLICATE;
+}
+
+std::string describeError(rac_result_t result) {
+  const char* message = rac_error_message(result);
+  if (message != nullptr) {
+    return std::string(message) + " (" + std::to_string(result) + ")";
+  }
+  return std::to_string(result);
+}
+
+} // namespace
 
 // ============================================================================
 // Constructor / Destructor
@@ -45,15 +72,48 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     RAC_LOG_INFO(LOG_CATEGORY, "Registering ONNX backend with C++ registry...");
 
     rac_result_t result = rac_backend_onnx_register();
-    // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
-    if (result == RAC_SUCCESS || result == -4) {
-      RAC_LOG_INFO(LOG_CATEGORY, "ONNX backend registered successfully (STT + TTS + VAD)");
-      isRegistered_ = true;
-      return true;
-    } else {
+    if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "ONNX registration failed with code: %d", result);
-      throw std::runtime_error("ONNX registration failed with error: " + std::to_string(result));
+      throw std::runtime_error("ONNX registration failed with error: " + describeError(result));
     }
+
+    isRegistered_ = true;
+
+#if RAC_RN_HAS_SHERPA_REGISTRATION
+    rac_result_t sherpaResult = rac_backend_sherpa_register();
+    if (isRegistrationSuccess(sherpaResult)) {
+      isSherpaModuleRegistered_ = true;
+
+      const rac_engine_vtable_t* sherpaVtable = rac_plugin_entry_sherpa();
+      if (sherpaVtable == nullptr) {
+        RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa plugin entry returned null; Sherpa STT/TTS/VAD will not route");
+      } else {
+        rac_result_t pluginResult = rac_plugin_register(sherpaVtable);
+        if (isRegistrationSuccess(pluginResult)) {
+          isSherpaRegistered_ = true;
+          RAC_LOG_INFO(LOG_CATEGORY, "Sherpa engine plugin registered explicitly (STT + TTS + VAD)");
+        } else {
+          RAC_LOG_WARNING(
+            LOG_CATEGORY,
+            "Sherpa plugin registration failed with code: %d; Sherpa STT/TTS/VAD will not route",
+            pluginResult);
+        }
+      }
+    } else {
+      RAC_LOG_WARNING(
+        LOG_CATEGORY,
+        "Sherpa backend registration failed with code: %d; Sherpa STT/TTS/VAD may not route",
+        sherpaResult);
+    }
+#else
+    RAC_LOG_WARNING(
+      LOG_CATEGORY,
+      "Sherpa registration header rac/plugin/rac_plugin_entry_sherpa.h is unavailable; "
+      "Sherpa STT/TTS/VAD will rely on platform loader behavior");
+#endif
+
+    RAC_LOG_INFO(LOG_CATEGORY, "ONNX backend registered successfully");
+    return true;
   });
 }
 
@@ -61,11 +121,24 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::unregisterBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_INFO(LOG_CATEGORY, "Unregistering ONNX backend...");
 
+#if RAC_RN_HAS_SHERPA_REGISTRATION
+    if (isSherpaModuleRegistered_ || isSherpaRegistered_) {
+      rac_result_t sherpaResult = rac_backend_sherpa_unregister();
+      if (sherpaResult == RAC_SUCCESS || sherpaResult == RAC_ERROR_MODULE_NOT_FOUND) {
+        isSherpaModuleRegistered_ = false;
+        isSherpaRegistered_ = false;
+        RAC_LOG_INFO(LOG_CATEGORY, "Sherpa backend unregistered");
+      } else {
+        RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa unregistration failed with code: %d", sherpaResult);
+      }
+    }
+#endif
+
     rac_result_t result = rac_backend_onnx_unregister();
     isRegistered_ = false;
     if (result != RAC_SUCCESS) {
       RAC_LOG_ERROR(LOG_CATEGORY, "ONNX unregistration failed with code: %d", result);
-      throw std::runtime_error("ONNX unregistration failed with error: " + std::to_string(result));
+      throw std::runtime_error("ONNX unregistration failed with error: " + describeError(result));
     }
     return true;
   });

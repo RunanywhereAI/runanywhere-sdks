@@ -6,11 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Yarn Berry (3.6.1) workspaces monorepo containing three npm packages for on-device AI in React Native. Version `0.19.13`, React Native `0.83.1`. The SDK bridges pre-built C++ inference engines (`runanywhere-commons`) into React Native via **NitroModules** (Nitrogen/Nitro) — a JSI-based zero-serialization bridge, NOT the classic React Native bridge or TurboModules.
 
+Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especially §4 folder layout, §12 generated proto code, and §15 build/deployment. React Native follows that iOS 17.0+ minimum and native/proto-byte ownership model; JavaScript is the facade, not the owner of model registry, downloads, storage paths, or native HTTP routing.
+
 ### Packages
 
 | Package | npm Name | Purpose |
 |---------|----------|---------|
-| `packages/core` | `@runanywhere/core` | SDK lifecycle, auth, events, model registry, all AI capability proxies |
+| `packages/core` | `@runanywhere/core` | SDK lifecycle, auth, native event/model/storage facades, all AI capability proxies |
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM inference) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
 
@@ -34,17 +36,17 @@ yarn core:nitrogen              # Core + fix-nitrogen-output.js post-patch
 yarn llamacpp:nitrogen          # LlamaCPP
 yarn onnx:nitrogen              # ONNX
 
-# Download pre-built native binaries (from GitHub Releases)
-yarn core:download-ios          # pod install for core
+# Consume or refresh staged native binaries
+yarn core:download-ios          # pod install for core staged binaries
 yarn core:download-android      # Gradle downloadNativeLibs for core
 yarn llamacpp:download-ios      # pod install for llamacpp
 yarn llamacpp:download-android
 yarn onnx:download-ios
 yarn onnx:download-android
 
-# Local vs remote native binaries
+# Local native flag helpers
 yarn native:local               # Sets RA_TEST_LOCAL=1 (use bundled libs)
-yarn native:remote              # Unsets RA_TEST_LOCAL (download from GitHub)
+yarn native:remote              # Unsets RA_TEST_LOCAL
 
 # Release
 yarn release                    # lerna publish (npm, main branch only)
@@ -75,7 +77,7 @@ RN SDK currently has no unit tests; a streaming-parity harness was removed and w
 ```
 Layer 1: TypeScript API
   RunAnywhere singleton + Extension modules (TextGeneration, STT, TTS, VAD, VoiceAgent, VLM, RAG, Solutions, ToolCalling)
-  EventBus, ModelRegistry, ServiceContainer, SDKLogger
+  Proto adapters, SDK event subscriptions, ServiceContainer, SDKLogger
 
 Layer 2: Nitro Bridge (JSI — no serialization)
   HybridRunAnywhereCore (C++)     — ~60 methods covering all SDK capabilities
@@ -93,16 +95,17 @@ Layer 4: Platform Native Code
   Android: PlatformAdapterBridge.kt (JNI ↔ Kotlin), okhttp_transport_adapter.cpp, SecureStorageManager.kt (EncryptedSharedPreferences), SDKLogger.kt, OkHttpTransport.kt
 
 Layer 5: Pre-built C++ Libraries (runanywhere-commons)
-  RACommons.xcframework / librac_commons.so  — Core infrastructure
-  RABackendLLAMACPP.xcframework / .so        — llama.cpp inference
-  RABackendONNX.xcframework / .so            — sherpa-onnx inference
+  RACommons.xcframework / librac_commons.so       — Core infrastructure, registry, storage, events, proto ABI
+  RABackendLLAMACPP.xcframework / .so             — llama.cpp backend
+  RABackendONNX.xcframework / .so                 — generic ONNX backend
+  RABackendSherpa.xcframework / .so               — Sherpa-ONNX speech backend
 ```
 
 ### Key Design Decisions
 
 **NitroModules, not TurboModules**: All native bridging uses Nitrogen-generated `HybridObject` classes registered in `HybridObjectRegistry` at dylib load time (`+load` on iOS, `JNI_OnLoad` on Android). JavaScript calls `NitroModules.createHybridObject("RunAnywhereCore")` to get a JSI handle. There are no `RCT_EXPORT_MODULE` or `RCTBridgeModule` registrations in the SDK itself.
 
-**No dependency on Swift SDK or Kotlin SDK**: The RN SDK directly links `RACommons` (pre-built C/C++ binary) and replicates necessary platform code (KeychainManager, OkHttpTransport, PlatformAdapter) with identical package paths so JNI/C ABI symbol resolution works.
+**Swift source of truth, no Swift package dependency**: The RN SDK directly links the same pre-built RACommons/backend binaries described by the Swift architecture doc, but it does not depend on the Swift package product. RN owns only its Nitro bridge and platform adapters.
 
 **Backend registration is explicit**: Apps must call `LlamaCPP.register()` and `ONNX.register()` separately from `RunAnywhere.initialize()`. These register C++ backend vtables so `RunAnywhereCore`'s backend-agnostic methods know where to route inference calls.
 
@@ -133,7 +136,7 @@ while (!result.done) {
 2. Check native module availability
 3. `native.configureHttp(baseURL, apiKey)`
 4. `native.initialize(configJson)` → C++ initialization
-5. `ModelRegistry.initialize()` → hydrate JS model cache from native
+5. Native services finish initialization through the C++/proto bridge
 6. `native.getPersistentDeviceUUID()` → cache device ID
 7. `TelemetryService.configure()`
 8. `_authenticateWithBackend()` → JWT tokens stored in secure storage
@@ -154,7 +157,7 @@ Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/Ru
 
 ### Event System
 
-`EventBus` (`Public/Events/EventBus.ts`) wraps `NativeEventEmitter` from `NativeModules.RunAnywhereModule`. Native events arrive on 12 topics (`RunAnywhere_SDK{Category}`) and fan out to JS-side typed subscribers. Subscription methods: `onAllEvents`, `onInitialization`, `onGeneration`, `onModel`, `onVoice`, `onPerformance`, etc. — all return `UnsubscribeFunction`.
+`RunAnywhere.subscribeSDKEvents(...)` is the consumer event surface. Native events flow through `subscribeSDKEventsProto`, arrive as proto bytes, and are decoded into generated `SDKEvent` messages. Audio-session internals may publish local events, but SDK event observation should stay on the native proto-byte stream.
 
 ### Logging
 
@@ -182,10 +185,10 @@ Core package has a post-generation fixup: `scripts/fix-nitrogen-output.js` remov
 ### iOS Native Build
 
 CocoaPods reads podspecs. Each podspec:
-- Bundles pre-built XCFrameworks (`ios/Binaries/` for core, `ios/Frameworks/` for llamacpp/onnx)
+- Bundles package-owned pre-built XCFrameworks under `ios/Binaries/`
 - Compiles hand-written Swift/ObjC/ObjC++ (`ios/**/*`) and C++ bridge code (`cpp/**/*`)
 - Loads `nitrogen/generated/ios/*+autolinking.rb` which adds NitroModules dep, generated source globs, and sets C++20/`objcxx` xcconfig
-- `llamacpp` and `onnx` have dual-mode podspecs: local (`.testlocal` file or `RA_TEST_LOCAL=1`) vs. remote (downloads XCFramework zips from GitHub Releases)
+- Native package map mirrors Swift binary names: core gets `RACommons`, llamacpp gets `RABackendLLAMACPP`, and onnx gets `RABackendONNX` plus `RABackendSherpa`
 
 ### Android Native Build
 
@@ -196,9 +199,9 @@ Gradle + CMake:
 - `RunAnywhereCorePackage.kt` companion `init` block calls `System.loadLibrary("runanywherecore")` then registers OkHttp transport
 - `cpp-adapter.cpp` `JNI_OnLoad` caches `PlatformAdapterBridge` method IDs for platform callbacks from C++
 
-### Local vs Remote Native Binaries
+### Native Binary Staging
 
-Set `RA_TEST_LOCAL=1` env var (or create `.testlocal` file in package dir) to skip downloading from GitHub Releases and use locally-staged `.so`/`.xcframework` files. This is for development against local C++ builds.
+`scripts/package-sdk.sh --natives-from PATH` stages native binaries by package ownership instead of copying every binary into every package. iOS uses `ios/Binaries/`; Android uses package-specific `android/src/main/jniLibs/` contents.
 
 ## Monorepo Integration
 
@@ -226,8 +229,8 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 | `packages/core/src/Public/RunAnywhere.ts` | Main SDK facade (~100+ methods) |
 | `packages/core/src/specs/RunAnywhereCore.nitro.ts` | Complete native C++ interface contract (~60 methods) |
 | `packages/core/src/native/NitroModulesGlobalInit.ts` | NitroModules singleton installation guard |
-| `packages/core/src/native/NativeRunAnywhereCore.ts` | Native module singleton + device info + filesystem adapters |
-| `packages/core/src/Public/Events/EventBus.ts` | Event system with NativeEventEmitter integration |
+| `packages/core/src/native/NativeRunAnywhereCore.ts` | Native module singleton + device info and platform adapters |
+| `packages/core/src/Public/Events/RunAnywhere+SDKEvents.ts` | Native proto-byte SDK event subscription |
 | `packages/core/src/Adapters/LLMStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for LLM tokens |
 | `packages/core/src/Adapters/VoiceAgentStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for voice events |
 | `packages/core/src/Foundation/Errors/SDKException.ts` | Sole throwable type with static factories |
@@ -236,7 +239,7 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 | `packages/core/ios/URLSessionHttpTransport.mm` | iOS HTTP transport vtable implementation |
 | `packages/core/android/src/main/cpp/okhttp_transport_adapter.cpp` | Android HTTP transport vtable via JNI → OkHttp |
 | `packages/core/android/src/main/java/.../PlatformAdapterBridge.kt` | Android JNI ↔ Kotlin for platform ops + download callbacks |
-| `Docs/ARCHITECTURE.md` | Detailed 5-layer architecture with data flow diagrams |
+| `../runanywhere-swift/ARCHITECTURE.md` | iOS layout, generated proto code, and build/deployment source of truth |
 | `Docs/Documentation.md` | Public API reference |
 
 ## Conventions

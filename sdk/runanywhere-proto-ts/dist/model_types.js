@@ -2741,165 +2741,6 @@ export const ModelQuery = {
         return message;
     },
 };
-function createBaseModelCompatibilityResult() {
-    return {
-        isCompatible: false,
-        canRun: false,
-        canFit: false,
-        requiredMemoryBytes: 0,
-        availableMemoryBytes: 0,
-        requiredStorageBytes: 0,
-        availableStorageBytes: 0,
-        reasons: [],
-    };
-}
-export const ModelCompatibilityResult = {
-    encode(message, writer = _m0.Writer.create()) {
-        if (message.isCompatible !== false) {
-            writer.uint32(8).bool(message.isCompatible);
-        }
-        if (message.canRun !== false) {
-            writer.uint32(16).bool(message.canRun);
-        }
-        if (message.canFit !== false) {
-            writer.uint32(24).bool(message.canFit);
-        }
-        if (message.requiredMemoryBytes !== 0) {
-            writer.uint32(32).int64(message.requiredMemoryBytes);
-        }
-        if (message.availableMemoryBytes !== 0) {
-            writer.uint32(40).int64(message.availableMemoryBytes);
-        }
-        if (message.requiredStorageBytes !== 0) {
-            writer.uint32(48).int64(message.requiredStorageBytes);
-        }
-        if (message.availableStorageBytes !== 0) {
-            writer.uint32(56).int64(message.availableStorageBytes);
-        }
-        for (const v of message.reasons) {
-            writer.uint32(66).string(v);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-        let end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseModelCompatibilityResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1:
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.isCompatible = reader.bool();
-                    continue;
-                case 2:
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.canRun = reader.bool();
-                    continue;
-                case 3:
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.canFit = reader.bool();
-                    continue;
-                case 4:
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.requiredMemoryBytes = longToNumber(reader.int64());
-                    continue;
-                case 5:
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.availableMemoryBytes = longToNumber(reader.int64());
-                    continue;
-                case 6:
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.requiredStorageBytes = longToNumber(reader.int64());
-                    continue;
-                case 7:
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.availableStorageBytes = longToNumber(reader.int64());
-                    continue;
-                case 8:
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.reasons.push(reader.string());
-                    continue;
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skipType(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
-            canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
-            canFit: isSet(object.canFit) ? globalThis.Boolean(object.canFit) : false,
-            requiredMemoryBytes: isSet(object.requiredMemoryBytes) ? globalThis.Number(object.requiredMemoryBytes) : 0,
-            availableMemoryBytes: isSet(object.availableMemoryBytes) ? globalThis.Number(object.availableMemoryBytes) : 0,
-            requiredStorageBytes: isSet(object.requiredStorageBytes) ? globalThis.Number(object.requiredStorageBytes) : 0,
-            availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
-            reasons: globalThis.Array.isArray(object?.reasons) ? object.reasons.map((e) => globalThis.String(e)) : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.isCompatible !== false) {
-            obj.isCompatible = message.isCompatible;
-        }
-        if (message.canRun !== false) {
-            obj.canRun = message.canRun;
-        }
-        if (message.canFit !== false) {
-            obj.canFit = message.canFit;
-        }
-        if (message.requiredMemoryBytes !== 0) {
-            obj.requiredMemoryBytes = Math.round(message.requiredMemoryBytes);
-        }
-        if (message.availableMemoryBytes !== 0) {
-            obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
-        }
-        if (message.requiredStorageBytes !== 0) {
-            obj.requiredStorageBytes = Math.round(message.requiredStorageBytes);
-        }
-        if (message.availableStorageBytes !== 0) {
-            obj.availableStorageBytes = Math.round(message.availableStorageBytes);
-        }
-        if (message.reasons?.length) {
-            obj.reasons = message.reasons;
-        }
-        return obj;
-    },
-    create(base) {
-        return ModelCompatibilityResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseModelCompatibilityResult();
-        message.isCompatible = object.isCompatible ?? false;
-        message.canRun = object.canRun ?? false;
-        message.canFit = object.canFit ?? false;
-        message.requiredMemoryBytes = object.requiredMemoryBytes ?? 0;
-        message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
-        message.requiredStorageBytes = object.requiredStorageBytes ?? 0;
-        message.availableStorageBytes = object.availableStorageBytes ?? 0;
-        message.reasons = object.reasons?.map((e) => e) || [];
-        return message;
-    },
-};
 function createBaseModelRegistryRefreshRequest() {
     return {
         includeRemoteCatalog: false,
@@ -5503,7 +5344,7 @@ export const ModelCompatibilityRequest = {
         return message;
     },
 };
-function createBaseModelCompatibilityCheckResult() {
+function createBaseModelCompatibilityResult() {
     return {
         isCompatible: false,
         canRun: false,
@@ -5519,7 +5360,7 @@ function createBaseModelCompatibilityCheckResult() {
         errorMessage: "",
     };
 }
-export const ModelCompatibilityCheckResult = {
+export const ModelCompatibilityResult = {
     encode(message, writer = _m0.Writer.create()) {
         if (message.isCompatible !== false) {
             writer.uint32(8).bool(message.isCompatible);
@@ -5562,7 +5403,7 @@ export const ModelCompatibilityCheckResult = {
     decode(input, length) {
         const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
         let end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseModelCompatibilityCheckResult();
+        const message = createBaseModelCompatibilityResult();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -5705,10 +5546,10 @@ export const ModelCompatibilityCheckResult = {
         return obj;
     },
     create(base) {
-        return ModelCompatibilityCheckResult.fromPartial(base ?? {});
+        return ModelCompatibilityResult.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseModelCompatibilityCheckResult();
+        const message = createBaseModelCompatibilityResult();
         message.isCompatible = object.isCompatible ?? false;
         message.canRun = object.canRun ?? false;
         message.canFit = object.canFit ?? false;
@@ -6215,6 +6056,222 @@ export const ModelRegistryFetchAssignmentsResult = {
         message.fetchedAtUnixMs = object.fetchedAtUnixMs ?? 0;
         message.errorCode = object.errorCode ?? 0;
         message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseModelInfoMakeRequest() {
+    return { url: "", name: "", framework: undefined, category: undefined, source: undefined };
+}
+export const ModelInfoMakeRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.url !== "") {
+            writer.uint32(10).string(message.url);
+        }
+        if (message.name !== "") {
+            writer.uint32(18).string(message.name);
+        }
+        if (message.framework !== undefined) {
+            writer.uint32(24).int32(message.framework);
+        }
+        if (message.category !== undefined) {
+            writer.uint32(32).int32(message.category);
+        }
+        if (message.source !== undefined) {
+            writer.uint32(40).int32(message.source);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelInfoMakeRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.url = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.name = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.source = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            url: isSet(object.url) ? globalThis.String(object.url) : "",
+            name: isSet(object.name) ? globalThis.String(object.name) : "",
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+            category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+            source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.url !== "") {
+            obj.url = message.url;
+        }
+        if (message.name !== "") {
+            obj.name = message.name;
+        }
+        if (message.framework !== undefined) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.category !== undefined) {
+            obj.category = modelCategoryToJSON(message.category);
+        }
+        if (message.source !== undefined) {
+            obj.source = modelSourceToJSON(message.source);
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelInfoMakeRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelInfoMakeRequest();
+        message.url = object.url ?? "";
+        message.name = object.name ?? "";
+        message.framework = object.framework ?? undefined;
+        message.category = object.category ?? undefined;
+        message.source = object.source ?? undefined;
+        return message;
+    },
+};
+function createBaseRegisterModelFromUrlRequest() {
+    return { url: "", name: "", framework: undefined, category: undefined, source: undefined };
+}
+export const RegisterModelFromUrlRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.url !== "") {
+            writer.uint32(10).string(message.url);
+        }
+        if (message.name !== "") {
+            writer.uint32(18).string(message.name);
+        }
+        if (message.framework !== undefined) {
+            writer.uint32(24).int32(message.framework);
+        }
+        if (message.category !== undefined) {
+            writer.uint32(32).int32(message.category);
+        }
+        if (message.source !== undefined) {
+            writer.uint32(40).int32(message.source);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRegisterModelFromUrlRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.url = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.name = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.source = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            url: isSet(object.url) ? globalThis.String(object.url) : "",
+            name: isSet(object.name) ? globalThis.String(object.name) : "",
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+            category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+            source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.url !== "") {
+            obj.url = message.url;
+        }
+        if (message.name !== "") {
+            obj.name = message.name;
+        }
+        if (message.framework !== undefined) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.category !== undefined) {
+            obj.category = modelCategoryToJSON(message.category);
+        }
+        if (message.source !== undefined) {
+            obj.source = modelSourceToJSON(message.source);
+        }
+        return obj;
+    },
+    create(base) {
+        return RegisterModelFromUrlRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRegisterModelFromUrlRequest();
+        message.url = object.url ?? "";
+        message.name = object.name ?? "";
+        message.framework = object.framework ?? undefined;
+        message.category = object.category ?? undefined;
+        message.source = object.source ?? undefined;
         return message;
     },
 };

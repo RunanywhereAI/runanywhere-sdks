@@ -15,7 +15,7 @@
  */
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream, generate } from './RunAnywhere+TextGeneration';
+import { generateStream } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -38,7 +38,6 @@ import {
 } from '@runanywhere/proto-ts/tool_calling';
 import {
   LLMGenerationOptions,
-  type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import {
   arrayBufferToBytes,
@@ -202,7 +201,7 @@ export function clearTools(): void {
  * and generated result semantics are implemented in native C++ over the
  * commons `rac_tool_call_*` C ABI.
  */
-export async function parseToolCallFromOutput(
+async function parseToolCallFromOutput(
   llmOutput: string,
   options?: Partial<ToolCallingOptions>
 ): Promise<ToolParseResult> {
@@ -255,7 +254,7 @@ async function formatToolPromptViaCpp(
  * @param tools - Tool definitions (defaults to registered tools)
  * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
  */
-export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format?: string): Promise<string> {
+async function formatToolsForPromptAsync(tools?: ToolDefinition[], format?: string): Promise<string> {
   const toolsToFormat = tools || getRegisteredTools();
   const toolFormat = format?.toLowerCase() || 'default';
 
@@ -279,7 +278,7 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
  * registered tool definitions. Commons owns validation and argument
  * normalization semantics.
  */
-export async function validateToolCall(
+async function validateToolCall(
   toolCall: ToolCall,
   options?: Partial<ToolCallingOptions>
 ): Promise<ToolCallValidationResult> {
@@ -536,24 +535,4 @@ export async function generateWithTools(
     iterationsUsed: iterations,
     rawText: finalText,
   });
-}
-
-/**
- * Continue generation after a tool result has been produced externally.
- *
- * Canonical cross-SDK signature (§3):
- *   `continueWithToolResult(toolCallId: string, result: string) → LLMGenerationResult`
- *
- * The tool call ID and result string are appended to the current conversation
- * context held by the LLM component, then generation is resumed. The returned
- * `LLMGenerationResult` carries the model's response text and token metrics.
- */
-export async function continueWithToolResult(
-  toolCallId: string,
-  result: string
-): Promise<LLMGenerationResult> {
-  // Build a follow-up prompt that injects the tool result.
-  const continuedPrompt =
-    `Tool call ID: ${toolCallId}\nTool result: ${result}\n\nBased on the tool result, please provide your response:`;
-  return generate(continuedPrompt);
 }

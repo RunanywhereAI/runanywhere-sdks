@@ -19,18 +19,12 @@ import type {
 import {
   VoiceAgentComposeConfig,
   VoiceAgentResult as VoiceAgentResultMessage,
-  VoiceAgentTranscribeProtoRequest,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
 import {
   VoiceAgentComponentStates as VoiceAgentComponentStatesMessage,
 } from '@runanywhere/proto-ts/voice_events';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
-import {
-  STTOutput as STTOutputMessage,
-  type STTOutput as STTOutputType,
-} from '@runanywhere/proto-ts/stt_options';
-import { TTSOutput } from '@runanywhere/proto-ts/tts_options';
 import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
 import {
   arrayBufferToBytes,
@@ -83,12 +77,6 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
   }
 }
 
-/** Whether all voice components are ready. */
-export async function areAllVoiceComponentsReady(): Promise<boolean> {
-  const states = await getVoiceAgentComponentStates();
-  return states.ready;
-}
-
 /** Initialize voice agent with configuration. */
 export async function initializeVoiceAgent(
   config: VoiceSessionConfig
@@ -132,13 +120,6 @@ export async function initializeVoiceAgentWithLoadedModels(): Promise<boolean> {
   }
 }
 
-/** Whether the voice agent is ready. */
-export async function isVoiceAgentReady(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  return native.isVoiceAgentReady();
-}
-
 /**
  * Process a complete voice turn: audio -> transcription -> response -> speech.
  *
@@ -165,60 +146,11 @@ export async function processVoiceTurn(
 }
 
 /**
- * Transcribe audio using the voice agent's STT component via the native
- * `rac_voice_agent_transcribe_proto` ABI (Wave D-7).
- *
- * Matches Swift SDK: `RunAnywhere.voiceAgentTranscribe(_:) → STTOutput` (§10).
- */
-export async function voiceAgentTranscribe(
-  audioData: ArrayBuffer | Uint8Array
-): Promise<STTOutputType> {
-  const native = ensureNative();
-  const audioBytes =
-    audioData instanceof Uint8Array ? audioData : new Uint8Array(audioData);
-  const request = VoiceAgentTranscribeProtoRequest.create({
-    audioData: audioBytes,
-    sessionId: '',
-    sampleRate: 16000,
-    languageHint: '',
-    channels: 1,
-    encoding: 0,
-  });
-  const requestBytes = VoiceAgentTranscribeProtoRequest.encode(request).finish();
-  const resultBytes = await native.voiceAgentTranscribeProto(
-    bytesToArrayBuffer(requestBytes)
-  );
-  const bytes = arrayBufferToBytes(resultBytes);
-  if (bytes.byteLength === 0) {
-    throw SDKException.protoDecodeFailed('voiceAgentTranscribeProto');
-  }
-  return STTOutputMessage.decode(bytes);
-}
-
-/**
- * Synthesize speech using the voice-agent TTS component via the native
- * `rac_voice_agent_synthesize_speech_proto` ABI (Wave D-7).
- *
- * Matches Swift SDK: `RunAnywhere.voiceAgentSynthesizeSpeech(_:) → TTSOutput` (§10).
- */
-export async function voiceAgentSynthesizeSpeech(
-  text: string
-): Promise<TTSOutput> {
-  const native = ensureNative();
-  const resultBytes = await native.voiceAgentSynthesizeSpeechProto(text);
-  const bytes = arrayBufferToBytes(resultBytes);
-  if (bytes.byteLength === 0) {
-    throw SDKException.protoDecodeFailed('voiceAgentSynthesizeSpeechProto');
-  }
-  return TTSOutput.decode(bytes);
-}
-
-/**
  * Get the native voice-agent handle.
  *
- * Matches Swift: `RunAnywhere.voiceAgentHandle()`.
+ * Internal bridge detail for `streamVoiceAgent()`.
  */
-export async function getVoiceAgentHandle(): Promise<number> {
+async function getVoiceAgentHandle(): Promise<number> {
   const native = ensureNative();
   return native.getVoiceAgentHandle();
 }

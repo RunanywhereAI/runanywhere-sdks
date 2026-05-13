@@ -1,132 +1,126 @@
 /**
  * SecureStorageError.ts
  *
- * Errors for secure storage operations
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/KeychainManager.swift
+ * Secure storage failures are represented by the canonical SDKException
+ * throwable. This module keeps the legacy public factory names as thin
+ * adapters so the JS layer does not own a second error model.
  */
 
-/**
- * Error codes for secure storage operations
- */
-export enum SecureStorageErrorCode {
-  EncodingError = 'SECURE_STORAGE_ENCODING_ERROR',
-  DecodingError = 'SECURE_STORAGE_DECODING_ERROR',
-  ItemNotFound = 'SECURE_STORAGE_ITEM_NOT_FOUND',
-  StorageError = 'SECURE_STORAGE_STORAGE_ERROR',
-  RetrievalError = 'SECURE_STORAGE_RETRIEVAL_ERROR',
-  DeletionError = 'SECURE_STORAGE_DELETION_ERROR',
-  UnavailableError = 'SECURE_STORAGE_UNAVAILABLE',
+import {
+  SDKException,
+  isSDKException,
+} from '../Errors';
+
+export const SecureStorageErrorCode = {
+  EncodingError: 'SECURE_STORAGE_ENCODING_ERROR',
+  DecodingError: 'SECURE_STORAGE_DECODING_ERROR',
+  ItemNotFound: 'SECURE_STORAGE_ITEM_NOT_FOUND',
+  StorageError: 'SECURE_STORAGE_STORAGE_ERROR',
+  RetrievalError: 'SECURE_STORAGE_RETRIEVAL_ERROR',
+  DeletionError: 'SECURE_STORAGE_DELETION_ERROR',
+  UnavailableError: 'SECURE_STORAGE_UNAVAILABLE',
+} as const;
+
+export type SecureStorageErrorCode =
+  (typeof SecureStorageErrorCode)[keyof typeof SecureStorageErrorCode];
+
+export type SecureStorageError = SDKException;
+
+function defaultMessage(code: SecureStorageErrorCode): string {
+  switch (code) {
+    case SecureStorageErrorCode.EncodingError:
+      return 'Failed to encode data for secure storage';
+    case SecureStorageErrorCode.DecodingError:
+      return 'Failed to decode data from secure storage';
+    case SecureStorageErrorCode.ItemNotFound:
+      return 'Item not found in secure storage';
+    case SecureStorageErrorCode.StorageError:
+      return 'Failed to store item in secure storage';
+    case SecureStorageErrorCode.RetrievalError:
+      return 'Failed to retrieve item from secure storage';
+    case SecureStorageErrorCode.DeletionError:
+      return 'Failed to delete item from secure storage';
+    case SecureStorageErrorCode.UnavailableError:
+      return 'Secure storage is not available';
+  }
 }
 
-/**
- * Secure storage error
- *
- * Matches iOS KeychainError enum.
- */
-export class SecureStorageError extends Error {
-  readonly code: SecureStorageErrorCode;
-  readonly underlyingError?: Error;
+function makeSecureStorageError(
+  code: SecureStorageErrorCode,
+  message?: string,
+  underlyingError?: Error
+): SDKException {
+  return SDKException.storageError(
+    `[secure-storage:${code}] ${message ?? defaultMessage(code)}`,
+    underlyingError
+  );
+}
 
-  constructor(
-    code: SecureStorageErrorCode,
-    message?: string,
-    underlyingError?: Error
-  ) {
-    const msg = message ?? SecureStorageError.defaultMessage(code);
-    super(msg);
-    this.name = 'SecureStorageError';
-    this.code = code;
-    this.underlyingError = underlyingError;
-  }
-
-  private static defaultMessage(code: SecureStorageErrorCode): string {
-    switch (code) {
-      case SecureStorageErrorCode.EncodingError:
-        return 'Failed to encode data for secure storage';
-      case SecureStorageErrorCode.DecodingError:
-        return 'Failed to decode data from secure storage';
-      case SecureStorageErrorCode.ItemNotFound:
-        return 'Item not found in secure storage';
-      case SecureStorageErrorCode.StorageError:
-        return 'Failed to store item in secure storage';
-      case SecureStorageErrorCode.RetrievalError:
-        return 'Failed to retrieve item from secure storage';
-      case SecureStorageErrorCode.DeletionError:
-        return 'Failed to delete item from secure storage';
-      case SecureStorageErrorCode.UnavailableError:
-        return 'Secure storage is not available';
-    }
-  }
-
-  // Factory methods
-  static encodingError(underlyingError?: Error): SecureStorageError {
-    return new SecureStorageError(
+export const SecureStorageError = {
+  encodingError(underlyingError?: Error): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.EncodingError,
       undefined,
       underlyingError
     );
-  }
+  },
 
-  static decodingError(underlyingError?: Error): SecureStorageError {
-    return new SecureStorageError(
+  decodingError(underlyingError?: Error): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.DecodingError,
       undefined,
       underlyingError
     );
-  }
+  },
 
-  static itemNotFound(key: string): SecureStorageError {
-    return new SecureStorageError(
+  itemNotFound(key: string): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.ItemNotFound,
       `Item not found in secure storage: ${key}`
     );
-  }
+  },
 
-  static storageError(underlyingError?: Error): SecureStorageError {
-    return new SecureStorageError(
+  storageError(underlyingError?: Error): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.StorageError,
       undefined,
       underlyingError
     );
-  }
+  },
 
-  static retrievalError(underlyingError?: Error): SecureStorageError {
-    return new SecureStorageError(
+  retrievalError(underlyingError?: Error): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.RetrievalError,
       undefined,
       underlyingError
     );
-  }
+  },
 
-  static deletionError(underlyingError?: Error): SecureStorageError {
-    return new SecureStorageError(
+  deletionError(underlyingError?: Error): SDKException {
+    return makeSecureStorageError(
       SecureStorageErrorCode.DeletionError,
       undefined,
       underlyingError
     );
-  }
+  },
 
-  static unavailable(): SecureStorageError {
-    return new SecureStorageError(SecureStorageErrorCode.UnavailableError);
-  }
+  unavailable(): SDKException {
+    return makeSecureStorageError(SecureStorageErrorCode.UnavailableError);
+  },
+} as const;
+
+export function isSecureStorageError(error: unknown): error is SDKException {
+  return (
+    isSDKException(error) &&
+    error.message.startsWith('[secure-storage:')
+  );
 }
 
-/**
- * Type guard to check if an error is a SecureStorageError
- */
-export function isSecureStorageError(
-  error: unknown
-): error is SecureStorageError {
-  return error instanceof SecureStorageError;
-}
-
-/**
- * Type guard to check if error is "item not found" specifically
- */
 export function isItemNotFoundError(error: unknown): boolean {
   return (
     isSecureStorageError(error) &&
-    error.code === SecureStorageErrorCode.ItemNotFound
+    error.message.startsWith(
+      `[secure-storage:${SecureStorageErrorCode.ItemNotFound}]`
+    )
   );
 }

@@ -7,7 +7,8 @@
  * ## Usage
  *
  * ```typescript
- * import { RunAnywhere, ModelCategory, InferenceFramework, ModelArtifactType } from '@runanywhere/core';
+ * import { RunAnywhere } from '@runanywhere/core';
+ * import { ModelCategory, InferenceFramework, ModelArtifactType } from '@runanywhere/proto-ts/model_types';
  * import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
  * import { ONNX } from '@runanywhere/onnx';
  *
@@ -35,7 +36,8 @@
  *   modelId: 'sherpa-onnx-whisper-tiny.en',
  *   category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
  * }));
- * const result = await RunAnywhere.transcribeFile('/path/to/audio.wav');
+ * const audioBytes = await readAudioFileAsBytes('/path/to/audio.wav');
+ * const result = await RunAnywhere.transcribe(audioBytes);
  * ```
  *
  * @packageDocumentation
@@ -46,7 +48,6 @@
 // =============================================================================
 
 export { ONNX } from './ONNX';
-export { ONNXProvider } from './ONNXProvider';
 
 // =============================================================================
 // Nitrogen Spec Types

@@ -6,6 +6,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
 export var LLMStreamEventKind;
 (function (LLMStreamEventKind) {
@@ -70,49 +71,6 @@ export function lLMStreamEventKindToJSON(object) {
         case LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR:
             return "LLM_STREAM_EVENT_KIND_ERROR";
         case LLMStreamEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-export var LLMTokenKind;
-(function (LLMTokenKind) {
-    LLMTokenKind[LLMTokenKind["LLM_TOKEN_KIND_UNSPECIFIED"] = 0] = "LLM_TOKEN_KIND_UNSPECIFIED";
-    LLMTokenKind[LLMTokenKind["LLM_TOKEN_KIND_ANSWER"] = 1] = "LLM_TOKEN_KIND_ANSWER";
-    LLMTokenKind[LLMTokenKind["LLM_TOKEN_KIND_THOUGHT"] = 2] = "LLM_TOKEN_KIND_THOUGHT";
-    LLMTokenKind[LLMTokenKind["LLM_TOKEN_KIND_TOOL_CALL"] = 3] = "LLM_TOKEN_KIND_TOOL_CALL";
-    LLMTokenKind[LLMTokenKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(LLMTokenKind || (LLMTokenKind = {}));
-export function lLMTokenKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "LLM_TOKEN_KIND_UNSPECIFIED":
-            return LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED;
-        case 1:
-        case "LLM_TOKEN_KIND_ANSWER":
-            return LLMTokenKind.LLM_TOKEN_KIND_ANSWER;
-        case 2:
-        case "LLM_TOKEN_KIND_THOUGHT":
-            return LLMTokenKind.LLM_TOKEN_KIND_THOUGHT;
-        case 3:
-        case "LLM_TOKEN_KIND_TOOL_CALL":
-            return LLMTokenKind.LLM_TOKEN_KIND_TOOL_CALL;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return LLMTokenKind.UNRECOGNIZED;
-    }
-}
-export function lLMTokenKindToJSON(object) {
-    switch (object) {
-        case LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED:
-            return "LLM_TOKEN_KIND_UNSPECIFIED";
-        case LLMTokenKind.LLM_TOKEN_KIND_ANSWER:
-            return "LLM_TOKEN_KIND_ANSWER";
-        case LLMTokenKind.LLM_TOKEN_KIND_THOUGHT:
-            return "LLM_TOKEN_KIND_THOUGHT";
-        case LLMTokenKind.LLM_TOKEN_KIND_TOOL_CALL:
-            return "LLM_TOKEN_KIND_TOOL_CALL";
-        case LLMTokenKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1051,7 +1009,7 @@ export const LLMStreamEvent = {
             timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
             token: isSet(object.token) ? globalThis.String(object.token) : "",
             isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
-            kind: isSet(object.kind) ? lLMTokenKindFromJSON(object.kind) : 0,
+            kind: isSet(object.kind) ? tokenKindFromJSON(object.kind) : 0,
             tokenId: isSet(object.tokenId) ? globalThis.Number(object.tokenId) : 0,
             logprob: isSet(object.logprob) ? globalThis.Number(object.logprob) : 0,
             finishReason: isSet(object.finishReason) ? globalThis.String(object.finishReason) : "",
@@ -1083,7 +1041,7 @@ export const LLMStreamEvent = {
             obj.isFinal = message.isFinal;
         }
         if (message.kind !== 0) {
-            obj.kind = lLMTokenKindToJSON(message.kind);
+            obj.kind = tokenKindToJSON(message.kind);
         }
         if (message.tokenId !== 0) {
             obj.tokenId = Math.round(message.tokenId);

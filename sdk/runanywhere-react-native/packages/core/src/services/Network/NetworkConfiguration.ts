@@ -6,7 +6,7 @@
  * configuration shape consumed by the SDK facade.
  */
 
-import { SDKEnvironment } from '../../types';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 export { SDKEnvironment };
 

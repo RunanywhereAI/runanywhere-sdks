@@ -186,10 +186,7 @@ using LoraCatalogProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
-using STTTranscribeProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const void*,
-    size_t,
+using STTLifecycleProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
@@ -197,10 +194,7 @@ using STTPartialProtoCallbackFn = void (*)(
     const uint8_t*,
     size_t,
     void*);
-using STTTranscribeStreamProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const void*,
-    size_t,
+using STTLifecycleStreamProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     STTPartialProtoCallbackFn,
@@ -214,32 +208,19 @@ using TTSChunkProtoCallbackFn = void (*)(
     const uint8_t*,
     size_t,
     void*);
-using TTSListVoicesProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    TTSVoiceProtoCallbackFn,
-    void*);
-using TTSSynthesizeProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const char*,
+using TTSBufferProtoFn = rac_result_t (*)(
+    rac_proto_buffer_t*);
+using TTSLifecycleProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
-using TTSSynthesizeStreamProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const char*,
+using TTSLifecycleStreamProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     TTSChunkProtoCallbackFn,
     void*);
 
-using VADConfigureProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const uint8_t*,
-    size_t);
-using VADProcessProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const float*,
-    size_t,
+using VADLifecycleProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
@@ -255,21 +236,7 @@ using VADSetActivityProtoCallbackFn = rac_result_t (*)(
     VADActivityProtoCallbackFn,
     void*);
 
-using VLMCreateFn = rac_result_t (*)(
-    const char*,
-    rac_handle_t*);
-using VLMInitializeFn = rac_result_t (*)(
-    rac_handle_t,
-    const char*,
-    const char*);
-using VLMCleanupFn = rac_result_t (*)(
-    rac_handle_t);
-using VLMDestroyFn = void (*)(
-    rac_handle_t);
 using VLMProcessProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const uint8_t*,
-    size_t,
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
@@ -278,16 +245,12 @@ using VLMStreamProtoCallbackFn = rac_bool_t (*)(
     size_t,
     void*);
 using VLMProcessStreamProtoFn = rac_result_t (*)(
-    rac_handle_t,
-    const uint8_t*,
-    size_t,
     const uint8_t*,
     size_t,
     VLMStreamProtoCallbackFn,
-    void*,
-    rac_proto_buffer_t*);
+    void*);
 using VLMCancelProtoFn = rac_result_t (*)(
-    rac_handle_t);
+    rac_proto_buffer_t*);
 
 using VoiceAgentInitProtoFn = rac_result_t (*)(
     void*,
@@ -334,6 +297,15 @@ using StructuredOutputParseProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);
+using ProtoBytesCallbackFn = void (*)(
+    const uint8_t*,
+    size_t,
+    void*);
+using StructuredOutputStreamProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    ProtoBytesCallbackFn,
+    void*);
 
 using EmbeddingsCreateFn = rac_result_t (*)(
     const char*,

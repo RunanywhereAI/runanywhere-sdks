@@ -157,7 +157,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             message.analytics.performance.throughputTokensPerSec > 0 && (
               <View style={styles.analytics}>
                 <Text style={styles.analyticsText}>
-                  {formatTPS(message.analytics.performance.throughputTokensPerSec)}
+                  {formatTPS(
+                    message.analytics.performance.throughputTokensPerSec
+                  )}
                 </Text>
               </View>
             )}

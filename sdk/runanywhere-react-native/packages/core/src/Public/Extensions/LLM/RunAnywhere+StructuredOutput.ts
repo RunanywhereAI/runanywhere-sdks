@@ -14,28 +14,28 @@ import {
 } from '../../../native';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import type {
+  LLMGenerationOptions,
+  LLMGenerationResult,
+} from '@runanywhere/proto-ts/llm_options';
 import {
-  generate as generateText,
-  generateStream,
-} from './RunAnywhere+TextGeneration';
+  LLMGenerationOptions as LLMGenerationOptionsMessage,
+} from '@runanywhere/proto-ts/llm_options';
 import {
   type JSONSchema,
   StructuredOutputOptions,
   StructuredOutputResult,
-  StructuredOutputValidation,
   StructuredOutputParseRequest,
   StructuredOutputRequest,
   StructuredOutputPromptResult,
-  StructuredOutputValidationRequest,
-  JSONSchema as JSONSchemaMessage,
-  JSONSchemaProperty,
-  JSONSchemaType,
+  StructuredOutputStreamEvent,
+  StructuredOutputStreamEventKind,
 } from '@runanywhere/proto-ts/structured_output';
-import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
 } from '../../../services/ProtoBytes';
+import { generate as generateText } from './RunAnywhere+TextGeneration';
 
 // ============================================================================
 // Types re-exported for callers
@@ -45,6 +45,7 @@ import {
 // local duplicates per §15 Iron Rule 2).
 
 const logger = new SDKLogger('RunAnywhere.StructuredOutput');
+let requestCounter = 0;
 
 type ProtoBridgeMethod = (requestBytes: ArrayBuffer) => Promise<ArrayBuffer>;
 
@@ -110,47 +111,6 @@ function stringToBytes(text: string): Uint8Array {
   return view;
 }
 
-/** UTF-8 encoder for serializing parsed JSON to `Uint8Array`. */
-function jsonToBytes(value: unknown): Uint8Array {
-  return stringToBytes(JSON.stringify(value));
-}
-
-/** UTF-8 decoder for the proto `parsedJson: Uint8Array`. */
-function bytesToString(bytes: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]!);
-  return s;
-}
-
-function llmOptionsForStructuredOutput(
-  schema: JSONSchema,
-  options?: StructuredOutputOptions,
-  streamingEnabled: boolean = false
-): LLMGenerationOptions {
-  const jsonSchema =
-    options?.jsonSchema ?? schema.rawJson ?? JSON.stringify(schema);
-  const structuredOutput = StructuredOutputOptions.fromPartial({
-    ...options,
-    schema: options?.schema ?? schema,
-    includeSchemaInPrompt: options?.includeSchemaInPrompt ?? true,
-    jsonSchema,
-  });
-  return LLMGenerationOptions.fromPartial({
-    maxTokens: 1500,
-    temperature: 0.7,
-    topP: 1.0,
-    topK: 0,
-    repetitionPenalty: 1.0,
-    stopSequences: [],
-    streamingEnabled,
-    preferredFramework: 0,
-    systemPrompt: '',
-    jsonSchema,
-    structuredOutput,
-    enableRealTimeTracking: false,
-  });
-}
-
 function structuredOutputOptionsForSchema(
   schema: JSONSchema,
   options?: StructuredOutputOptions
@@ -164,6 +124,28 @@ function structuredOutputOptionsForSchema(
   });
 }
 
+function nextStructuredOutputRequestId(): string {
+  requestCounter += 1;
+  return `rn-structured-${Date.now()}-${requestCounter}`;
+}
+
+function encodeStructuredOutputRequest(
+  prompt: string,
+  schema: JSONSchema,
+  options?: StructuredOutputOptions
+): ArrayBuffer {
+  return bytesToArrayBuffer(
+    StructuredOutputRequest.encode(
+      StructuredOutputRequest.fromPartial({
+        requestId: nextStructuredOutputRequestId(),
+        prompt,
+        options: structuredOutputOptionsForSchema(schema, options),
+        metadata: {},
+      })
+    ).finish()
+  );
+}
+
 /**
  * Generate structured output following a JSON schema.
  *
@@ -175,23 +157,50 @@ export async function generateStructured<T = unknown>(
   options?: StructuredOutputOptions
 ): Promise<StructuredOutputResult> {
   logger.debug('Generating structured output...');
-  const promptResult = await prepareStructuredOutputPrompt(
-    prompt,
-    schema,
-    options
+  const responseBytes = await callNativeProto(
+    'structuredOutputGenerateProto',
+    encodeStructuredOutputRequest(prompt, schema, options),
+    'structuredOutputGenerate'
   );
-  const generationPrompt = promptResult.preparedPrompt || prompt;
-  const result = await generateText(
-    generationPrompt,
-    llmOptionsForStructuredOutput(schema, options, false)
-  );
-  const resultJson = result.jsonOutput ?? result.text;
-  const validation = await validateStructuredOutput(resultJson, schema, options);
-  return StructuredOutputResult.fromPartial({
-    parsedJson: stringToBytes(validation.extractedJson ?? resultJson),
-    validation,
-    rawText: result.text,
+  return StructuredOutputResult.decode(responseBytes);
+}
+
+/**
+ * Generate raw text with structured-output options attached to the LLM request.
+ *
+ * Matches Swift SDK: `RunAnywhere.generateWithStructuredOutput(...)`.
+ */
+export async function generateWithStructuredOutput(
+  prompt: string,
+  structuredOutput: StructuredOutputOptions,
+  options?: LLMGenerationOptions
+): Promise<LLMGenerationResult> {
+  let generationOptions: LLMGenerationOptions = LLMGenerationOptionsMessage.fromPartial({
+    ...options,
+    structuredOutput,
+    jsonSchema: options?.jsonSchema ?? structuredOutput.jsonSchema ?? '',
   });
+
+  if (structuredOutput.includeSchemaInPrompt) {
+    const prepared = await prepareStructuredOutputPrompt(prompt, structuredOutput);
+    if (prepared.errorMessage) {
+      throw SDKException.generationFailedWith(prepared.errorMessage);
+    }
+    if (prepared.systemPrompt) {
+      generationOptions = LLMGenerationOptionsMessage.fromPartial({
+        ...generationOptions,
+        systemPrompt: prepared.systemPrompt,
+      });
+    }
+    if (prepared.jsonSchema && !generationOptions.jsonSchema) {
+      generationOptions = LLMGenerationOptionsMessage.fromPartial({
+        ...generationOptions,
+        jsonSchema: prepared.jsonSchema,
+      });
+    }
+  }
+
+  return generateText(prompt, generationOptions);
 }
 
 /**
@@ -209,63 +218,96 @@ export function generateStructuredStream(
   schema: JSONSchema,
   options?: StructuredOutputOptions
 ): AsyncIterable<StructuredOutputResult> {
-  async function* resultGenerator(): AsyncGenerator<StructuredOutputResult> {
-    let fullText = '';
-    try {
-      const promptResult = await prepareStructuredOutputPrompt(
-        prompt,
-        schema,
-        options
-      );
-      const generationPrompt = promptResult.preparedPrompt || prompt;
-      for await (const event of generateStream(
-        generationPrompt,
-        llmOptionsForStructuredOutput(schema, options, true)
-      )) {
-        if (event.token) {
-          fullText += event.token;
-          const partialValidation: StructuredOutputValidation =
-            StructuredOutputValidation.fromPartial({
-              isValid: false,
-              containsJson: fullText.includes('{'),
-              rawOutput: fullText,
-            });
-          yield StructuredOutputResult.fromPartial({
-            parsedJson: jsonToBytes({}),
-            validation: partialValidation,
-            rawText: fullText,
-          });
-        }
-        if (event.isFinal) break;
-      }
+  const requestBytes = encodeStructuredOutputRequest(prompt, schema, options);
 
-      const finalValidation = await validateStructuredOutput(
-        fullText,
-        schema,
-        options
-      );
-      yield StructuredOutputResult.fromPartial({
-        parsedJson: stringToBytes(finalValidation.extractedJson ?? ''),
-        validation: finalValidation,
-        rawText: fullText,
-      });
-    } catch (error) {
-      if (error instanceof SDKException) {
-        throw error;
-      }
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`Structured stream failed: ${msg}`);
-      const errorValidation: StructuredOutputValidation =
-        StructuredOutputValidation.fromPartial({
-          isValid: false,
-          containsJson: false,
-          errorMessage: msg,
-        });
-      yield StructuredOutputResult.fromPartial({
-        parsedJson: new Uint8Array(0),
-        validation: errorValidation,
-      });
+  async function* resultGenerator(): AsyncGenerator<StructuredOutputResult> {
+    if (!isNativeModuleAvailable()) {
+      throw SDKException.nativeModuleUnavailable();
     }
+    const native = requireNativeModule();
+    const method = (native as unknown as Record<string, unknown>)
+      .structuredOutputGenerateStreamProto;
+    if (typeof method !== 'function') {
+      throw SDKException.notImplemented(
+        'structuredOutputGenerateStream: native method unavailable'
+      );
+    }
+
+    const queue: StructuredOutputResult[] = [];
+    let done = false;
+    let streamError: Error | null = null;
+    let resolver: ((value: IteratorResult<StructuredOutputResult>) => void) | null = null;
+
+    const finish = (): void => {
+      done = true;
+      if (resolver) {
+        resolver({ value: undefined as unknown as StructuredOutputResult, done: true });
+        resolver = null;
+      }
+    };
+
+    const push = (result: StructuredOutputResult): void => {
+      if (resolver) {
+        resolver({ value: result, done: false });
+        resolver = null;
+      } else {
+        queue.push(result);
+      }
+    };
+
+    (method as (
+      requestBytes: ArrayBuffer,
+      onEventBytes: (eventBytes: ArrayBuffer) => void
+    ) => Promise<void>).call(native, requestBytes, (eventBytes: ArrayBuffer) => {
+      try {
+        const event = StructuredOutputStreamEvent.decode(arrayBufferToBytes(eventBytes));
+        if (event.errorMessage) {
+          streamError = SDKException.generationFailedWith(event.errorMessage);
+        }
+        if (event.result) {
+          push(event.result);
+        } else if (
+          event.kind ===
+          StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON
+        ) {
+          push(
+            StructuredOutputResult.fromPartial({
+              parsedJson: stringToBytes(event.partialJson ?? ''),
+              validation: event.validation,
+              rawText: event.partialJson ?? '',
+            })
+          );
+        }
+        if (
+          event.kind ===
+            StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED ||
+          event.kind ===
+            StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR
+        ) {
+          finish();
+        }
+      } catch (error) {
+        streamError = error instanceof Error ? error : new Error(String(error));
+        finish();
+      }
+    })
+      .catch((error: Error) => {
+        streamError = error;
+      })
+      .finally(finish);
+
+    while (!done || queue.length > 0) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+      } else if (!done) {
+        const next = await new Promise<IteratorResult<StructuredOutputResult>>((resolve) => {
+          resolver = resolve;
+        });
+        if (next.done) break;
+        yield next.value;
+      }
+    }
+    if (streamError) throw streamError;
   }
 
   return resultGenerator();
@@ -297,17 +339,13 @@ export async function extractStructuredOutput(
   return StructuredOutputResult.decode(responseBytes);
 }
 
-/**
- * Prepare a structured-output prompt using commons generated-proto semantics.
- */
-export async function prepareStructuredOutputPrompt(
+async function prepareStructuredOutputPrompt(
   prompt: string,
-  schema: JSONSchema,
-  options?: StructuredOutputOptions
+  options: StructuredOutputOptions
 ): Promise<StructuredOutputPromptResult> {
   const request = StructuredOutputRequest.fromPartial({
     prompt,
-    options: structuredOutputOptionsForSchema(schema, options),
+    options,
   });
   const responseBytes = await callNativeProto(
     'structuredOutputPreparePromptProto',
@@ -319,85 +357,4 @@ export async function prepareStructuredOutputPrompt(
     throw SDKException.unknown(result.errorMessage);
   }
   return result;
-}
-
-/**
- * Validate structured output text using commons generated-proto semantics.
- */
-export async function validateStructuredOutput(
-  text: string,
-  schema: JSONSchema,
-  options?: StructuredOutputOptions
-): Promise<StructuredOutputValidation> {
-  const request = StructuredOutputValidationRequest.fromPartial({
-    text,
-    options: structuredOutputOptionsForSchema(schema, options),
-  });
-  const responseBytes = await callNativeProto(
-    'structuredOutputValidateProto',
-    bytesToArrayBuffer(
-      StructuredOutputValidationRequest.encode(request).finish()
-    ),
-    'structuredOutputValidate'
-  );
-  return StructuredOutputValidation.decode(responseBytes);
-}
-
-/**
- * Generate structured output with automatic type inference (returns parsed value).
- */
-export async function generate<T = unknown>(
-  prompt: string,
-  schema: JSONSchema
-): Promise<T> {
-  const result = await generateStructured<T>(prompt, schema);
-  if (!result.validation || !result.validation.isValid) {
-    throw SDKException.generationFailed(
-      result.validation?.errorMessage ?? 'Structured generation failed'
-    );
-  }
-  return JSON.parse(bytesToString(result.parsedJson)) as T;
-}
-
-/** Extract entities from text using structured output. */
-export async function extractEntities<T = unknown>(
-  text: string,
-  entitySchema: JSONSchema
-): Promise<T> {
-  const prompt = `Extract the following information from this text:
-
-${text}
-
-Return the extracted data as JSON matching the provided schema.`;
-  return generate<T>(prompt, entitySchema);
-}
-
-/** Classify text into categories using structured output. */
-export async function classify(
-  text: string,
-  categories: string[]
-): Promise<{ category: string; confidence: number }> {
-  const schema: JSONSchema = {
-    ...JSONSchemaMessage.create(),
-    type: JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT,
-    properties: {
-      category: JSONSchemaProperty.create({
-        type: JSONSchemaType.JSON_SCHEMA_TYPE_STRING,
-        enumValues: categories,
-        description: 'The category that best matches the text',
-      }),
-      confidence: JSONSchemaProperty.create({
-        type: JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER,
-        enumValues: [],
-        description: 'Confidence score between 0 and 1',
-      }),
-    },
-    required: ['category', 'confidence'],
-  };
-  const prompt = `Classify the following text into one of these categories: ${categories.join(', ')}
-
-Text: ${text}
-
-Respond with the category and your confidence level.`;
-  return generate<{ category: string; confidence: number }>(prompt, schema);
 }

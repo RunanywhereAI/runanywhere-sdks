@@ -8,13 +8,7 @@
  * lifecycle transition is appended to a simple scrolling log.
  */
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Button, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
 
@@ -83,14 +77,14 @@ export const SolutionsScreen: React.FC = () => {
         setIsRunning(false);
       }
     },
-    [isRunning, append],
+    [isRunning, append]
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.intro}>
-        Run a prepackaged pipeline (voice agent or RAG) by handing a YAML
-        config to RunAnywhere.solutions.run.
+        Run a prepackaged pipeline (voice agent or RAG) by handing a YAML config
+        to RunAnywhere.solutions.run.
       </Text>
       <View style={styles.buttonRow}>
         <View style={styles.buttonWrap}>
@@ -108,7 +102,10 @@ export const SolutionsScreen: React.FC = () => {
           />
         </View>
       </View>
-      <ScrollView style={styles.logBox} contentContainerStyle={styles.logContent}>
+      <ScrollView
+        style={styles.logBox}
+        contentContainerStyle={styles.logContent}
+      >
         {log.map((line, i) => (
           <Text key={i} style={styles.logLine}>
             {line}
