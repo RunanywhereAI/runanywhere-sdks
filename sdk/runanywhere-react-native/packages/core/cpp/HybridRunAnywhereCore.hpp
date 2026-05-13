@@ -52,6 +52,10 @@ namespace margelo::nitro::runanywhere {
  */
 class HybridRunAnywhereCore : public HybridRunAnywhereCoreSpec {
 public:
+  using ToolRunLoopExecuteCallback = std::function<
+      std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(
+          const std::shared_ptr<ArrayBuffer>&)>;
+
   HybridRunAnywhereCore();
   ~HybridRunAnywhereCore();
 
@@ -354,6 +358,9 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolRunLoopProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const ToolRunLoopExecuteCallback& onExecuteToolBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputParseProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputPreparePromptProto(

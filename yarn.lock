@@ -2081,7 +2081,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/core@workspace:sdk/runanywhere-react-native/packages/core"
   dependencies:
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": ^0.21.0
     "@types/react": ~19.1.0
     long: ^5.2.3
     nitrogen: ^0.33.9
@@ -2121,7 +2121,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:sdk/runanywhere-react-native/packages/llamacpp"
   dependencies:
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": ^0.21.0
     nitrogen: ^0.33.9
     react-native-nitro-modules: ^0.33.9
     typescript: ~5.9.2
@@ -2137,7 +2137,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx"
   dependencies:
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": ^0.21.0
     nitrogen: ^0.33.9
     react-native-nitro-modules: ^0.33.9
     typescript: ~5.9.2
@@ -2149,9 +2149,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:sdk/runanywhere-proto-ts":
+"@runanywhere/proto-ts@^0.21.0, @runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:sdk/shared/proto-ts":
   version: 0.0.0-use.local
-  resolution: "@runanywhere/proto-ts@workspace:sdk/runanywhere-proto-ts"
+  resolution: "@runanywhere/proto-ts@workspace:sdk/shared/proto-ts"
   dependencies:
     long: ^5.2.3
     protobufjs: ^7.2.6

@@ -32,20 +32,11 @@ import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
+  VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 
 const logger = new SDKLogger('RunAnywhere.VisionLanguage');
 let requestCounter = 0;
-
-/**
- * RN-local streaming wrapper. The proto `VLMResult` carries final metrics; the
- * streaming surface adds `stream` (token AsyncIterable) and `cancel`.
- */
-export interface VLMStreamingResult {
-  stream: AsyncIterable<string>;
-  result: Promise<VLMResult>;
-  cancel: () => void;
-}
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
@@ -132,117 +123,111 @@ export async function processImage(
 }
 
 /**
- * Stream image processing with real-time token text.
+ * Stream image processing with canonical proto stream events.
  *
- * Commons emits canonical `SDKEvent` proto bytes for token deltas and returns
- * a final `VLMResult` proto at stream completion.
+ * Matches Swift: `RunAnywhere.processImageStream(...) async throws
+ * -> AsyncStream<RASDKEvent>`; RN exposes the native VLM stream event proto as
+ * AsyncIterable.
  */
 export async function processImageStream(
   image: VLMImage,
   prompt: string,
   options?: Partial<VLMGenerationOptions>
-): Promise<VLMStreamingResult> {
+): Promise<AsyncIterable<VLMStreamEvent>> {
   const native = ensureNative();
   const requestBytes = encodeVLMRequest(image, prompt, options, true);
-  const queue: string[] = [];
-  let done = false;
-  let streamError: Error | null = null;
-  let resolver: ((value: IteratorResult<string>) => void) | null = null;
-  let finalResult: VLMResult | null = null;
-
-  const finish = (): void => {
-    done = true;
-    if (resolver) {
-      resolver({ value: undefined as unknown as string, done: true });
-      resolver = null;
-    }
-  };
-
-  const push = (token: string): void => {
-    if (!token) {
-      return;
-    }
-    if (resolver) {
-      resolver({ value: token, done: false });
-      resolver = null;
-    } else {
-      queue.push(token);
-    }
-  };
-
-  const resultPromise = native
-    .vlmProcessStreamProto(
-      requestBytes,
-      (eventBytes: ArrayBuffer) => {
-        try {
-          const event = VLMStreamEventMessage.decode(arrayBufferToBytes(eventBytes));
-          if (event.errorMessage) {
-            streamError = new Error(event.errorMessage);
-          }
-          if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN) {
-            push(event.token);
-          }
-          if (event.result) {
-            finalResult = event.result;
-          }
-        } catch (error) {
-          streamError =
-            error instanceof Error ? error : new Error(String(error));
-          finish();
-        }
-      }
-    )
-    .then(() => {
-      if (!finalResult) {
-        throw SDKException.protoDecodeFailed('vlmProcessStreamProto');
-      }
-      return finalResult;
-    })
-    .catch((error: Error) => {
-      streamError = error;
-      throw error;
-    })
-    .finally(finish);
-
-  const cancel = (): void => {
-    native.vlmCancelProto().catch((error: Error) => {
-      logger.warning(`vlmCancelProto failed: ${error.message}`);
-    });
-    finish();
-  };
 
   return {
-    stream: {
-      [Symbol.asyncIterator](): AsyncIterator<string> {
-        return {
-          async next(): Promise<IteratorResult<string>> {
-            if (queue.length > 0) {
-              return { value: queue.shift()!, done: false };
+    [Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {
+      const queue: VLMStreamEvent[] = [];
+      let resolver: ((value: IteratorResult<VLMStreamEvent>) => void) | null = null;
+      let done = false;
+      let started = false;
+      let streamError: Error | null = null;
+
+      const finish = (): void => {
+        done = true;
+        if (resolver) {
+          resolver({ value: undefined as unknown as VLMStreamEvent, done: true });
+          resolver = null;
+        }
+      };
+
+      const push = (event: VLMStreamEvent): void => {
+        if (resolver) {
+          resolver({ value: event, done: false });
+          resolver = null;
+        } else {
+          queue.push(event);
+        }
+      };
+
+      const start = (): void => {
+        if (started) return;
+        started = true;
+        native
+          .vlmProcessStreamProto(
+            requestBytes,
+            (eventBytes: ArrayBuffer) => {
+              try {
+                const event = VLMStreamEventMessage.decode(arrayBufferToBytes(eventBytes));
+                if (event.errorMessage) {
+                  streamError = new Error(event.errorMessage);
+                }
+                push(event);
+                if (
+                  event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED ||
+                  event.result
+                ) {
+                  finish();
+                }
+              } catch (error) {
+                streamError =
+                  error instanceof Error ? error : new Error(String(error));
+                finish();
+              }
             }
+          )
+          .then(() => {
+            if (!done) finish();
+          })
+          .catch((err: Error) => {
+            streamError = err;
+            logger.warning(`vlmProcessStreamProto rejected: ${err.message}`);
+            finish();
+          });
+      };
+
+      return {
+        async next(): Promise<IteratorResult<VLMStreamEvent>> {
+          start();
+          if (queue.length > 0) {
+            return { value: queue.shift()!, done: false };
+          }
+          if (streamError) {
+            throw streamError;
+          }
+          if (done) {
+            return { value: undefined as unknown as VLMStreamEvent, done: true };
+          }
+          return new Promise<IteratorResult<VLMStreamEvent>>((resolve) => {
+            resolver = resolve;
+          }).then((result) => {
             if (streamError) {
               throw streamError;
             }
-            if (done) {
-              return { value: undefined as unknown as string, done: true };
-            }
-            return new Promise<IteratorResult<string>>((resolve) => {
-              resolver = resolve;
-            }).then((result) => {
-              if (streamError) {
-                throw streamError;
-              }
-              return result;
-            });
-          },
-          async return(): Promise<IteratorResult<string>> {
-            cancel();
-            return { value: undefined as unknown as string, done: true };
-          },
-        };
-      },
+            return result;
+          });
+        },
+        async return(): Promise<IteratorResult<VLMStreamEvent>> {
+          await native.vlmCancelProto().catch((error: Error) => {
+            logger.warning(`vlmCancelProto failed: ${error.message}`);
+          });
+          finish();
+          return { value: undefined as unknown as VLMStreamEvent, done: true };
+        },
+      };
     },
-    result: resultPromise,
-    cancel,
   };
 }
 
@@ -251,11 +236,11 @@ export async function processImageStream(
  *
  * Matches iOS: `RunAnywhere.cancelVLMGeneration()`.
  */
-export function cancelVLMGeneration(): void {
+export async function cancelVLMGeneration(): Promise<void> {
   if (!isNativeModuleAvailable()) {
     return;
   }
-  requireNativeModule().vlmCancelProto().catch((error: Error) => {
+  await requireNativeModule().vlmCancelProto().catch((error: Error) => {
     logger.warning(`vlmCancelProto failed: ${error.message}`);
   });
 }

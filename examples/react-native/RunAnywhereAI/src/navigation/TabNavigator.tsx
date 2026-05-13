@@ -7,6 +7,7 @@
  * - TTS (Text-to-Speech)
  * - Voice (Voice Assistant - STT + LLM + TTS)
  * - Vision (VLM only; image generation is Swift sample app only)
+ * - Validation (deterministic evidence harness)
  * - Settings (includes Tool Settings)
  */
 
@@ -27,6 +28,7 @@ import RAGScreen from '../screens/RAGScreen';
 import SolutionsScreen from '../screens/SolutionsScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
+import ValidationHarnessScreen from '../screens/ValidationHarnessScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -46,6 +48,7 @@ const tabIcons: Record<
   RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
   Vision: { focused: 'eye', unfocused: 'eye-outline' }, // eye for vision/VLM
   Solutions: { focused: 'layers', unfocused: 'layers-outline' }, // YAML pipeline runner
+  Validation: { focused: 'flask', unfocused: 'flask-outline' },
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
@@ -61,6 +64,7 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   RAG: 'RAG',
   Vision: 'Vision',
   Solutions: 'Solutions',
+  Validation: 'Validation',
   Settings: 'Settings',
 };
 
@@ -139,7 +143,13 @@ export const TabNavigator: React.FC = () => {
         component={SolutionsScreen}
         options={{ tabBarLabel: tabLabels.Solutions }}
       />
-      {/* Tab 7: Settings */}
+      {/* Tab 7: Validation evidence harness */}
+      <Tab.Screen
+        name="Validation"
+        component={ValidationHarnessScreen}
+        options={{ tabBarLabel: tabLabels.Validation }}
+      />
+      {/* Tab 8: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

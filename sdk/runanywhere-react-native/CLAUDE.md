@@ -16,7 +16,7 @@ Swift alignment source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`, especi
 | `packages/llamacpp` | `@runanywhere/llamacpp` | LlamaCPP backend registration (GGUF LLM + VLM inference) |
 | `packages/onnx` | `@runanywhere/onnx` | ONNX/Sherpa backend registration (STT, TTS, VAD) |
 
-Additional workspace dependency: `../runanywhere-proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
+Additional workspace dependency: `../shared/proto-ts` (`@runanywhere/proto-ts`) provides protobuf-generated TypeScript types.
 
 ## Common Commands
 
@@ -211,10 +211,10 @@ sdk/runanywhere-react-native/packages/core
 sdk/runanywhere-react-native/packages/llamacpp
 sdk/runanywhere-react-native/packages/onnx
 examples/react-native/RunAnywhereAI
-sdk/runanywhere-proto-ts
+sdk/shared/proto-ts
 ```
 
-The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (`packages/*` + `../runanywhere-proto-ts`) for standalone operation.
+The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (`packages/*` + `../shared/proto-ts`) for standalone operation.
 
 ## CI/CD
 

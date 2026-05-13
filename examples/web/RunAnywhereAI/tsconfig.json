@@ -16,8 +16,8 @@
       "@runanywhere/web": ["../../../sdk/runanywhere-web/packages/core/src/index.ts"],
       "@runanywhere/web-llamacpp": ["../../../sdk/runanywhere-web/packages/llamacpp/src/index.ts"],
       "@runanywhere/web-onnx": ["../../../sdk/runanywhere-web/packages/onnx/src/index.ts"],
-      "@runanywhere/proto-ts": ["../../../sdk/runanywhere-proto-ts/src/index.ts"],
-      "@runanywhere/proto-ts/*": ["../../../sdk/runanywhere-proto-ts/src/*.ts"]
+      "@runanywhere/proto-ts": ["../../../sdk/shared/proto-ts/src/index.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/shared/proto-ts/src/*.ts"]
     }
   },
   "include": ["src"]

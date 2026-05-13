@@ -8,9 +8,7 @@
 import type { SDKEvent as SDKEventMessage } from '@runanywhere/proto-ts/sdk_events';
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
-  pollSDKEvent,
   publishSDKEvent,
-  publishSDKFailure,
   subscribeSDKEvents,
 } from '../Extensions/Events/RunAnywhere+SDKEvents';
 
@@ -92,33 +90,6 @@ export class EventBus {
         this.categoryListeners.delete(category);
       }
     };
-  }
-
-  /**
-   * Compatibility helper for the previous `RunAnywhere.events.subscribe(...)`.
-   */
-  subscribe(callback: SDKEventHandler): Promise<NativeUnsubscribe> {
-    return subscribeSDKEvents(callback);
-  }
-
-  /**
-   * Compatibility helper for the SDK event extension.
-   */
-  poll(): Promise<SDKEventMessage | null> {
-    return pollSDKEvent();
-  }
-
-  /**
-   * Compatibility helper for native failure event publishing.
-   */
-  publishFailure(options: {
-    errorCode: number;
-    message: string;
-    component: string;
-    operation: string;
-    recoverable: boolean;
-  }): Promise<boolean> {
-    return publishSDKFailure(options);
   }
 
   private ensureNativeSubscription(): void {

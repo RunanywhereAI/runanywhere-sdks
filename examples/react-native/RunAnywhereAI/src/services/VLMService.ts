@@ -87,7 +87,7 @@ export class VLMService {
     console.log(`[VLMService] Processing image: ${imagePath}`);
 
     try {
-      const response = await RunAnywhere.processImageStream(
+      const stream = await RunAnywhere.processImageStream(
         image,
         prompt,
         VLMGenerationOptions.fromPartial({
@@ -110,10 +110,16 @@ export class VLMService {
       );
 
       // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-      const iter = response.stream[Symbol.asyncIterator]();
+      const iter = stream[Symbol.asyncIterator]();
       let result = await iter.next();
       while (!result.done) {
-        onToken(result.value);
+        const event = result.value;
+        if (event.token) {
+          onToken(event.token);
+        }
+        if (event.result) {
+          break;
+        }
         result = await iter.next();
       }
     } catch (error) {

@@ -38,8 +38,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
-    "prepare": "which nitrogen >/dev/null 2>&1 && npm run nitrogen || true",
-    "prepublishOnly": "node scripts/fix-nitrogen-output.js"
+    "prepublishOnly": "npm run typecheck && npm run lint && node scripts/fix-nitrogen-output.js"
   },
   "keywords": [
     "react-native",
@@ -52,7 +51,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@runanywhere/proto-ts": "workspace:*",
+    "@runanywhere/proto-ts": "^0.21.0",
     "long": "^5.2.3",
     "protobufjs": "^7.2.6"
   },

@@ -147,6 +147,7 @@ This sample app demonstrates the full power of the RunAnywhere React Native SDK:
 | **Voice Assistant** | Full STT → LLM → TTS pipeline | Voice pipeline orchestration |
 | **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.downloadModel()` |
 | **Storage Management** | View storage usage and delete models | `RunAnywhere.getStorageInfo()` |
+| **Validation Harness** | Deterministic evidence for structured output, tool calls, VAD, LoRA, and PluginLoader | `RunAnywhere.extractStructuredOutput()`, `RunAnywhere.executeTool()`, `RunAnywhere.detectVoiceActivity()`, `RunAnywhere.lora.*`, `RunAnywhere.pluginLoader.*` |
 | **Offline Support** | All features work without internet | On-device inference |
 | **Cross-Platform** | Single codebase for iOS and Android | React Native + Nitrogen/Nitro |
 
@@ -214,6 +215,7 @@ RunAnywhereAI/
 │   │   ├── STTScreen.tsx             # Speech-to-text with batch/live modes
 │   │   ├── TTSScreen.tsx             # Text-to-speech synthesis & playback
 │   │   ├── VoiceAssistantScreen.tsx  # Full STT → LLM → TTS pipeline
+│   │   ├── ValidationHarnessScreen.tsx # Deterministic validation evidence
 │   │   └── SettingsScreen.tsx        # Model & storage management
 │   │
 │   ├── components/
@@ -231,7 +233,7 @@ RunAnywhereAI/
 │   │       └── index.ts
 │   │
 │   ├── navigation/
-│   │   └── TabNavigator.tsx          # Bottom tab navigation (5 tabs)
+│   │   └── TabNavigator.tsx          # Bottom tab navigation
 │   │
 │   ├── stores/
 │   │   └── conversationStore.ts      # Zustand store for chat persistence
@@ -643,6 +645,23 @@ await RunAnywhere.cleanTempFiles();
 - `RunAnywhere.deleteStorage(StorageDeleteRequest)` — Remove model files and registry paths
 - `RunAnywhere.getStorageInfo()` — Storage metrics
 - V2 storage-plan bridge — Temporary storage cleanup
+
+### 6. Validation Harness Screen (`ValidationHarnessScreen.tsx`)
+
+**What it demonstrates:**
+- Deterministic structured-output parse and model-backed generation entrypoints
+- Deterministic `get_device_label` tool registration and execution
+- Standalone VAD evidence with synthetic silence and tone fixtures
+- LoRA list, compatibility, apply, and remove calls with a fixed fixture config
+- PluginLoader snapshot and expected-error coverage
+- Artifact-friendly action capture through `[RN_VALIDATION_ACTION]` Metro JSONL
+
+**Key SDK APIs:**
+- `RunAnywhere.extractStructuredOutput()` / `RunAnywhere.generateStructured()`
+- `RunAnywhere.registerTool()` / `RunAnywhere.executeTool()`
+- `RunAnywhere.detectVoiceActivity()`
+- `RunAnywhere.lora.list()` / `checkCompatibility()` / `apply()` / `remove()`
+- `RunAnywhere.pluginLoader.apiVersion` / `registeredNames()` / `listLoaded()` / `load()`
 
 ---
 

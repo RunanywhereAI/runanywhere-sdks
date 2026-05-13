@@ -113,38 +113,110 @@ export async function synthesize(
 }
 
 /**
- * Synthesize with streaming (chunked audio output) — callback variant.
+ * Synthesize with streaming chunked audio output.
  *
- * Matches Swift SDK: `RunAnywhere.synthesizeStream(_:options:onAudioChunk:)`.
+ * Matches Swift SDK: `RunAnywhere.synthesizeStream(_:options:)`.
  */
-export async function synthesizeStream(
+export function synthesizeStream(
   text: string,
-  options: Partial<TTSOptions> | undefined,
-  onAudioChunk: (chunk: ArrayBuffer) => void
-): Promise<TTSOutput> {
+  options?: Partial<TTSOptions>
+): AsyncIterable<TTSOutput> {
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+
   const native = requireNativeModule();
-  let lastOutput: TTSOutput | null = null;
-  await native.ttsSynthesizeStreamProto(
-    encodeTTSSynthesisRequest(text, options),
-    (eventBytes: ArrayBuffer) => {
-      const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
-      if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
-        throw SDKException.generationFailedWith(
-          event.errorMessage ?? 'TTS stream failed'
-        );
-      }
-      const output = event.output;
-      if (!output) return;
-      lastOutput = output;
-      if (output.audioData.byteLength > 0) {
-        onAudioChunk(bytesToArrayBuffer(output.audioData));
-      }
-    }
-  );
-  return lastOutput ?? synthesize(text, options);
+  const requestBytes = encodeTTSSynthesisRequest(text, options);
+
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<TTSOutput> {
+      const queue: TTSOutput[] = [];
+      let resolver: ((value: IteratorResult<TTSOutput>) => void) | null = null;
+      let done = false;
+      let started = false;
+      let streamError: Error | null = null;
+
+      const finish = (): void => {
+        done = true;
+        if (resolver) {
+          resolver({ value: undefined as unknown as TTSOutput, done: true });
+          resolver = null;
+        }
+      };
+
+      const push = (output: TTSOutput): void => {
+        if (resolver) {
+          resolver({ value: output, done: false });
+          resolver = null;
+        } else {
+          queue.push(output);
+        }
+      };
+
+      const start = (): void => {
+        if (started) return;
+        started = true;
+        native
+          .ttsSynthesizeStreamProto(
+            requestBytes,
+            (eventBytes: ArrayBuffer) => {
+              try {
+                const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
+                if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
+                  throw SDKException.generationFailedWith(
+                    event.errorMessage ?? 'TTS stream failed'
+                  );
+                }
+                if (event.output) {
+                  push(event.output);
+                }
+                if (
+                  event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED
+                ) {
+                  finish();
+                }
+              } catch (error) {
+                streamError =
+                  error instanceof Error ? error : new Error(String(error));
+                finish();
+              }
+            }
+          )
+          .then(() => {
+            if (!done) finish();
+          })
+          .catch((err: Error) => {
+            streamError = err;
+            logger.warning(`ttsSynthesizeStreamProto rejected: ${err.message}`);
+            finish();
+          });
+      };
+
+      return {
+        async next(): Promise<IteratorResult<TTSOutput>> {
+          start();
+          if (queue.length > 0) {
+            return { value: queue.shift()!, done: false };
+          }
+          if (streamError) throw streamError;
+          if (done) {
+            return { value: undefined as unknown as TTSOutput, done: true };
+          }
+          return new Promise<IteratorResult<TTSOutput>>((resolve) => {
+            resolver = resolve;
+          }).then((result) => {
+            if (streamError) throw streamError;
+            return result;
+          });
+        },
+        async return(): Promise<IteratorResult<TTSOutput>> {
+          await cancelTTS();
+          finish();
+          return { value: undefined as unknown as TTSOutput, done: true };
+        },
+      };
+    },
+  };
 }
 
 /**
@@ -153,7 +225,7 @@ export async function synthesizeStream(
  * Matches Swift SDK: `RunAnywhere.stopSynthesis()`.
  */
 export async function stopSynthesis(): Promise<void> {
-  cancelTTS();
+  await cancelTTS();
   const playback = getAudioPlayback();
   playback.stop();
 }
@@ -204,10 +276,10 @@ export async function stopSpeaking(): Promise<void> {
 }
 
 /** Cancel ongoing TTS synthesis. */
-function cancelTTS(): void {
+async function cancelTTS(): Promise<void> {
   if (!isNativeModuleAvailable()) return;
   logger.debug('TTS cancellation requested');
-  requireNativeModule().ttsStopProto().catch((error: Error) => {
+  await requireNativeModule().ttsStopProto().catch((error: Error) => {
     logger.warning(`ttsStopProto failed: ${error.message}`);
   });
 }

@@ -7,13 +7,13 @@
 #   npm install -g ts-proto@1.181.1 protobufjs
 #
 # Output:
-#   sdk/runanywhere-proto-ts/src/
+#   sdk/shared/proto-ts/src/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-TS_OUT_DIR="${REPO_ROOT}/sdk/runanywhere-proto-ts/src"
+TS_OUT_DIR="${REPO_ROOT}/sdk/shared/proto-ts/src"
 
 mkdir -p "${TS_OUT_DIR}"
 

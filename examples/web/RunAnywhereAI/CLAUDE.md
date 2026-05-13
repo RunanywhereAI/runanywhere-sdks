@@ -30,7 +30,7 @@ The app does **not** use npm packages for the SDK. Instead, Vite aliases in `vit
 - `@runanywhere/web` → `sdk/runanywhere-web/packages/core/src/index.ts`
 - `@runanywhere/web-llamacpp` → `sdk/runanywhere-web/packages/llamacpp/src/index.ts`
 - `@runanywhere/web-onnx` → `sdk/runanywhere-web/packages/onnx/src/index.ts`
-- `@runanywhere/proto-ts` → `sdk/runanywhere-proto-ts/src/`
+- `@runanywhere/proto-ts` → `sdk/shared/proto-ts/src/`
 
 App code imports those package roots directly. The `server.fs.allow` setting expands Vite's file server to the entire workspace root.
 

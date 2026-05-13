@@ -118,6 +118,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("toolParseProto", &HybridRunAnywhereCoreSpec::toolParseProto);
       prototype.registerHybridMethod("toolFormatPromptProto", &HybridRunAnywhereCoreSpec::toolFormatPromptProto);
       prototype.registerHybridMethod("toolValidateProto", &HybridRunAnywhereCoreSpec::toolValidateProto);
+      prototype.registerHybridMethod("toolRunLoopProto", &HybridRunAnywhereCoreSpec::toolRunLoopProto);
       prototype.registerHybridMethod("structuredOutputParseProto", &HybridRunAnywhereCoreSpec::structuredOutputParseProto);
       prototype.registerHybridMethod("structuredOutputPreparePromptProto", &HybridRunAnywhereCoreSpec::structuredOutputPreparePromptProto);
       prototype.registerHybridMethod("structuredOutputValidateProto", &HybridRunAnywhereCoreSpec::structuredOutputValidateProto);

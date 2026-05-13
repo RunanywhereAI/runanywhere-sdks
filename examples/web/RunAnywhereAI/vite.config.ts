@@ -18,7 +18,7 @@ const vlmWorkerSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/l
 
 // Local source alias for proto-ts keeps the example on package-root import
 // paths while avoiding direct `dist/*` imports in application code/config.
-const protoTsSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-proto-ts/src');
+const protoTsSrc = path.resolve(workspaceRoot, 'sdk/shared/proto-ts/src');
 
 /**
  * Vite plugin to copy WASM binaries into the build output.

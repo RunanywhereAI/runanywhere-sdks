@@ -102,12 +102,12 @@ interface GenerationSettings {
  * Register tools for the chat. This enables the LLM to call external APIs.
  * Users just chat normally - tool calls happen transparently.
  */
-const registerChatTools = () => {
+const registerChatTools = async () => {
   // Clear any existing tools
-  RunAnywhere.clearTools();
+  await RunAnywhere.clearTools();
 
   // Weather tool - Real API (wttr.in - no key needed)
-  RunAnywhere.registerTool(
+  await RunAnywhere.registerTool(
     ToolDefinition.fromPartial({
       name: 'get_weather',
       description: 'Gets the current weather for a city or location',
@@ -160,7 +160,7 @@ const registerChatTools = () => {
   );
 
   // Current time tool
-  RunAnywhere.registerTool(
+  await RunAnywhere.registerTool(
     ToolDefinition.fromPartial({
       name: 'get_current_time',
       description: 'Gets the current date and time',
@@ -179,7 +179,7 @@ const registerChatTools = () => {
   );
 
   // Calculator tool - Math evaluation
-  RunAnywhere.registerTool(
+  await RunAnywhere.registerTool(
     ToolDefinition.fromPartial({
       name: 'calculate',
       description:
@@ -458,8 +458,8 @@ export const ChatScreen: React.FC = () => {
         );
 
         // Register tools when model loads
-        registerChatTools();
-        const tools = RunAnywhere.getRegisteredTools();
+        await registerChatTools();
+        const tools = await RunAnywhere.getRegisteredTools();
         setRegisteredToolCount(tools.length);
         logDiagnostic('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {

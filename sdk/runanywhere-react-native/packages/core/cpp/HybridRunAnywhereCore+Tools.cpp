@@ -18,6 +18,9 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
+#include <cstdlib>
+#include <cstring>
+#include <future>
 #include <stdexcept>
 
 namespace margelo::nitro::runanywhere {
@@ -28,6 +31,11 @@ namespace {
 
 std::mutex g_ragProtoMutex;
 rac_handle_t g_ragProtoSession = nullptr;
+constexpr auto kToolExecutorTimeout = std::chrono::seconds(30);
+
+struct ToolRunLoopExecutorState {
+    HybridRunAnywhereCore::ToolRunLoopExecuteCallback onExecuteToolBytes;
+};
 
 std::vector<uint8_t> copyToolsArrayBufferBytes(const std::shared_ptr<ArrayBuffer>& buffer) {
     std::vector<uint8_t> bytes;
@@ -63,6 +71,121 @@ std::shared_ptr<ArrayBuffer> copyToolsProtoBuffer(rac_proto_buffer_t& protoBuffe
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
     proto_compat::freeBuffer(&protoBuffer);
     return buffer;
+}
+
+void setToolRunLoopError(rac_proto_buffer_t* out,
+                         rac_result_t status,
+                         const std::string& message) {
+    if (!out) {
+        return;
+    }
+    proto_compat::initBuffer(out);
+    out->status = status;
+    out->error_message = ::strdup(message.c_str());
+}
+
+bool waitForToolExecutorOuterPromise(
+    const std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>& promise,
+    std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>* outInnerPromise) {
+    if (!promise || !outInnerPromise) {
+        return false;
+    }
+    auto future = promise->await();
+    if (future.wait_for(kToolExecutorTimeout) != std::future_status::ready) {
+        return false;
+    }
+    *outInnerPromise = future.get();
+    return *outInnerPromise != nullptr;
+}
+
+bool waitForToolExecutorResult(
+    const std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>& promise,
+    std::shared_ptr<ArrayBuffer>* outResult) {
+    if (!promise || !outResult) {
+        return false;
+    }
+    auto future = promise->await();
+    if (future.wait_for(kToolExecutorTimeout) != std::future_status::ready) {
+        return false;
+    }
+    *outResult = future.get();
+    return *outResult != nullptr;
+}
+
+rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
+                                        size_t inSize,
+                                        rac_proto_buffer_t* outToolResultBytes,
+                                        void* userData) {
+    auto* state = static_cast<ToolRunLoopExecutorState*>(userData);
+    if (!state || !outToolResultBytes || !state->onExecuteToolBytes) {
+        setToolRunLoopError(
+            outToolResultBytes,
+            RAC_ERROR_INVALID_ARGUMENT,
+            "toolRunLoopProto executor callback is not available");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    try {
+        std::shared_ptr<ArrayBuffer> toolCallBuffer = nullptr;
+        if (inToolCallBytes && inSize > 0) {
+            toolCallBuffer = ArrayBuffer::copy(inToolCallBytes, inSize);
+        } else {
+            toolCallBuffer = emptyToolsProtoBuffer();
+        }
+
+        auto outerPromise = state->onExecuteToolBytes(toolCallBuffer);
+        std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> innerPromise;
+        if (!waitForToolExecutorOuterPromise(outerPromise, &innerPromise)) {
+            setToolRunLoopError(
+                outToolResultBytes,
+                RAC_ERROR_TIMEOUT,
+                "toolRunLoopProto executor did not return a ToolResult promise in time");
+            return RAC_ERROR_TIMEOUT;
+        }
+
+        std::shared_ptr<ArrayBuffer> toolResultBuffer;
+        if (!waitForToolExecutorResult(innerPromise, &toolResultBuffer)) {
+            setToolRunLoopError(
+                outToolResultBytes,
+                RAC_ERROR_TIMEOUT,
+                "toolRunLoopProto executor did not resolve ToolResult bytes in time");
+            return RAC_ERROR_TIMEOUT;
+        }
+
+        uint8_t* resultData = toolResultBuffer->data();
+        size_t resultSize = toolResultBuffer->size();
+        if (!resultData || resultSize == 0) {
+            setToolRunLoopError(
+                outToolResultBytes,
+                RAC_ERROR_INVALID_ARGUMENT,
+                "toolRunLoopProto executor returned empty ToolResult bytes");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        proto_compat::initBuffer(outToolResultBytes);
+        outToolResultBytes->data = static_cast<uint8_t*>(std::malloc(resultSize));
+        if (!outToolResultBytes->data) {
+            setToolRunLoopError(
+                outToolResultBytes,
+                RAC_ERROR_INTERNAL,
+                "toolRunLoopProto failed to allocate ToolResult buffer");
+            return RAC_ERROR_INTERNAL;
+        }
+        std::memcpy(outToolResultBytes->data, resultData, resultSize);
+        outToolResultBytes->size = resultSize;
+        outToolResultBytes->status = RAC_SUCCESS;
+        outToolResultBytes->error_message = nullptr;
+        return RAC_SUCCESS;
+    } catch (const std::exception& error) {
+        setToolRunLoopError(outToolResultBytes, RAC_ERROR_INTERNAL, error.what());
+        return RAC_ERROR_INTERNAL;
+    } catch (...) {
+        setToolRunLoopError(
+            outToolResultBytes,
+            RAC_ERROR_INTERNAL,
+            "toolRunLoopProto executor failed with an unknown error");
+        return RAC_ERROR_INTERNAL;
+    }
 }
 
 std::shared_ptr<ArrayBuffer> copyRequiredToolsProtoBuffer(rac_proto_buffer_t& protoBuffer,
@@ -225,6 +348,44 @@ HybridRunAnywhereCore::toolValidateProto(const std::shared_ptr<ArrayBuffer>& req
         return callCommonsBufferProto(
             bytes, "rac_tool_call_validate_proto", "toolValidateProto");
     });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::toolRunLoopProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const ToolRunLoopExecuteCallback& onExecuteToolBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [bytes = std::move(bytes), onExecuteToolBytes]() {
+            auto runLoopFn = proto_compat::symbol<proto_compat::ToolRunLoopProtoFn>(
+                "rac_tool_calling_run_loop_proto");
+            if (!runLoopFn) {
+                LOGE("toolRunLoopProto: rac_tool_calling_run_loop_proto unavailable");
+                throw std::runtime_error(
+                    "toolRunLoopProto: commons export rac_tool_calling_run_loop_proto unavailable");
+            }
+
+            ToolRunLoopExecutorState state{onExecuteToolBytes};
+            rac_proto_buffer_t out;
+            proto_compat::initBuffer(&out);
+
+            const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+            rac_result_t rc = runLoopFn(
+                data,
+                bytes.size(),
+                toolRunLoopExecuteCallback,
+                &state,
+                &out);
+
+            if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+                LOGE("toolRunLoopProto: rc=%d", rc);
+                proto_compat::freeBuffer(&out);
+                throw std::runtime_error(
+                    "toolRunLoopProto: commons call failed rc=" + std::to_string(rc));
+            }
+
+            return copyRequiredToolsProtoBuffer(out, "toolRunLoopProto");
+        });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>

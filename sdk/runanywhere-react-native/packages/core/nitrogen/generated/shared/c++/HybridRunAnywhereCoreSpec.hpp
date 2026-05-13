@@ -158,6 +158,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolRunLoopProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(const std::shared_ptr<ArrayBuffer>& /* toolCallBytes */)>& onExecuteToolBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputPreparePromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

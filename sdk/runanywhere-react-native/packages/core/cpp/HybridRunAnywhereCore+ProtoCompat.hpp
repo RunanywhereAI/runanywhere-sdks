@@ -307,6 +307,18 @@ using StructuredOutputStreamProtoFn = rac_result_t (*)(
     ProtoBytesCallbackFn,
     void*);
 
+using ToolExecuteCallbackFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*,
+    void*);
+using ToolRunLoopProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    ToolExecuteCallbackFn,
+    void*,
+    rac_proto_buffer_t*);
+
 using EmbeddingsCreateFn = rac_result_t (*)(
     const char*,
     rac_handle_t*);

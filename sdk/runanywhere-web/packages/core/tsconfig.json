@@ -7,9 +7,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@runanywhere/proto-ts": ["../../../runanywhere-proto-ts/dist/index.d.ts"],
-      "@runanywhere/proto-ts/*": ["../../../runanywhere-proto-ts/dist/*.d.ts"],
-      "@runanywhere/proto-ts/streams/*": ["../../../runanywhere-proto-ts/dist/streams/*.d.ts"]
+      "@runanywhere/proto-ts": ["../../../shared/proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../shared/proto-ts/dist/*.d.ts"],
+      "@runanywhere/proto-ts/streams/*": ["../../../shared/proto-ts/dist/streams/*.d.ts"]
     }
   },
   "include": ["src/**/*.ts"],

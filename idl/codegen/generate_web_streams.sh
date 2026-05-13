@@ -9,12 +9,12 @@
 # but the consumer signature (AsyncIterable<T>) is the same.
 #
 # Output:
-#   sdk/runanywhere-proto-ts/src/streams/
+#   sdk/shared/proto-ts/src/streams/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-proto-ts/src/streams"
+OUT_DIR="${REPO_ROOT}/sdk/shared/proto-ts/src/streams"
 TEMPLATE="${SCRIPT_DIR}/templates/ts_async_iterable.njk"
 
 mkdir -p "${OUT_DIR}"

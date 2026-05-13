@@ -74,7 +74,7 @@ function buildLLMGenerateRequest(
   });
 }
 
-function encodeLLMGenerateRequest(request: ReturnType<typeof buildLLMGenerateRequest>): ArrayBuffer {
+function encodeLLMGenerateRequest(request: LLMGenerateRequest): ArrayBuffer {
   return bytesToArrayBuffer(LLMGenerateRequest.encode(request).finish());
 }
 
@@ -86,12 +86,33 @@ function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
   return LLMGenerationResultMessage.decode(bytes);
 }
 
+function normalizeLLMGenerateRequest(
+  requestOrPrompt: LLMGenerateRequest | string,
+  options: LLMGenerationOptions | undefined,
+  streamingEnabled: boolean
+): LLMGenerateRequest {
+  if (typeof requestOrPrompt === 'string') {
+    return buildLLMGenerateRequest(requestOrPrompt, options, streamingEnabled);
+  }
+  return LLMGenerateRequest.fromPartial({
+    ...requestOrPrompt,
+    streamingEnabled,
+  });
+}
+
 /**
- * Text generation with options and full metrics.
- * Matches Swift SDK: RunAnywhere.generate(_:options:)
+ * Text generation with full proto request/result metrics.
+ * Matches Swift SDK: `RunAnywhere.generate(_ request: RALLMGenerateRequest)`.
  */
 export async function generate(
+  request: LLMGenerateRequest
+): Promise<LLMGenerationResult>;
+export async function generate(
   prompt: string,
+  options?: LLMGenerationOptions
+): Promise<LLMGenerationResult>;
+export async function generate(
+  requestOrPrompt: LLMGenerateRequest | string,
   options?: LLMGenerationOptions
 ): Promise<LLMGenerationResult> {
   if (!isNativeModuleAvailable()) {
@@ -99,7 +120,7 @@ export async function generate(
   }
   const native = requireNativeModule();
   const requestBytes = encodeLLMGenerateRequest(
-    buildLLMGenerateRequest(prompt, options, false)
+    normalizeLLMGenerateRequest(requestOrPrompt, options, false)
   );
   const resultBytes = await native.llmGenerateProto(requestBytes);
   return decodeLLMGenerationResult(resultBytes);
@@ -112,9 +133,8 @@ export async function generate(
  * `seq`, `timestampUs`, `token`, `isFinal`, `kind`, `tokenId`, `logprob`,
  * `finishReason`, and `errorMessage` (proto `LLMStreamEvent` shape).
  *
- * Matches Swift SDK: RunAnywhere.generateStream(_:options:) and Web SDK's
- * RunAnywhere.generateStream — all 5 SDKs converge on
- * `AsyncIterable<LLMStreamEvent>` (or language-idiomatic equivalent).
+ * Matches Swift SDK:
+ * `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`.
  *
  * Wire-up: events are pushed by C++ via the proto-byte callback registered
  * by `LLMStreamAdapter` against the LLM handle returned by
@@ -125,7 +145,14 @@ export async function generate(
  * `iterator.return()` → adapter unsubscribe → `cancelGeneration()`.
  */
 export function generateStream(
+  request: LLMGenerateRequest,
+): AsyncIterable<LLMStreamEventType>;
+export function generateStream(
   prompt: string,
+  options?: LLMGenerationOptions,
+): AsyncIterable<LLMStreamEventType>;
+export function generateStream(
+  requestOrPrompt: LLMGenerateRequest | string,
   options?: LLMGenerationOptions,
 ): AsyncIterable<LLMStreamEventType> {
   if (!isNativeModuleAvailable()) {
@@ -134,7 +161,7 @@ export function generateStream(
 
   const native = requireNativeModule();
   const requestBytes = encodeLLMGenerateRequest(
-    buildLLMGenerateRequest(prompt, options, true)
+    normalizeLLMGenerateRequest(requestOrPrompt, options, true)
   );
 
   return {
@@ -213,12 +240,14 @@ export function generateStream(
 }
 
 /**
- * Cancel ongoing text generation
+ * Cancel ongoing text generation.
+ *
+ * Matches Swift SDK: `RunAnywhere.cancelGeneration() async`.
  */
-export function cancelGeneration(): void {
+export async function cancelGeneration(): Promise<void> {
   if (!isNativeModuleAvailable()) {
     return;
   }
   const native = requireNativeModule();
-  void native.llmCancelProto();
+  await native.llmCancelProto();
 }

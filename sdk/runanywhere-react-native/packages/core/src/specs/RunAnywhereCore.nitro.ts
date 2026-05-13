@@ -761,6 +761,25 @@ export interface RunAnywhereCore extends HybridObject<{
   toolValidateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
+   * Run the complete native tool-calling loop from serialized
+   * runanywhere.v1.ToolCallingSessionCreateRequest bytes.
+   *
+   * The callback receives serialized runanywhere.v1.ToolCall bytes and must
+   * return serialized runanywhere.v1.ToolResult bytes. C++ owns prompt
+   * formatting, generation, parsing, validation, follow-up prompts, and loop
+   * termination; React Native owns only the JS executor registry.
+   *
+   * Implemented by HybridRunAnywhereCore+Tools.cpp with
+   * rac_tool_calling_run_loop_proto. The native bridge waits on the Nitro
+   * promise returned by the JS executor callback so commons can keep the
+   * canonical synchronous run-loop ABI.
+   */
+  toolRunLoopProto(
+    requestBytes: ArrayBuffer,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
+  ): Promise<ArrayBuffer>;
+
+  /**
    * Parse/extract structured output from serialized
    * runanywhere.v1.StructuredOutputParseRequest bytes.
    *

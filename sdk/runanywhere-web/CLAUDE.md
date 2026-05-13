@@ -103,7 +103,7 @@ sdk/runanywhere-web/
 
 Pure TypeScript. Entry point: `src/index.ts` (308-line barrel export). ESM-only (`type: "module"`), tree-shakeable (`sideEffects: false`).
 
-**Dependencies:** `@runanywhere/proto-ts` (local file ref), `long`, `protobufjs`
+**Dependencies:** `@runanywhere/proto-ts` (workspace-linked from `sdk/shared/proto-ts`, published as a semver dependency), `long`, `protobufjs`
 **Dev deps:** `vitest`, `tsd`, `typescript`, `eslint`
 
 ```
@@ -443,7 +443,7 @@ Run: `cd packages/core && npm test`
 ## Dependency Graph
 
 ```
-@runanywhere/proto-ts  (file:../../../runanywhere-proto-ts, v0.21.0)
+@runanywhere/proto-ts  (^0.21.0, linked locally from sdk/shared/proto-ts)
          │
          └── @runanywhere/web (peer dep)
                   │

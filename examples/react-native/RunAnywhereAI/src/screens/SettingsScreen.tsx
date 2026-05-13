@@ -322,7 +322,7 @@ export const SettingsScreen: React.FC = () => {
         STORAGE_KEYS.TOOL_CALLING_ENABLED
       );
       setToolCallingEnabled(enabled === 'true');
-      refreshRegisteredTools();
+      void refreshRegisteredTools();
     } catch (error) {
       console.error('[Settings] Failed to load tool calling settings:', error);
     }
@@ -330,8 +330,8 @@ export const SettingsScreen: React.FC = () => {
    * Refresh the list of registered tools from SDK
    */
 
-  const refreshRegisteredTools = () => {
-    const tools = RunAnywhere.getRegisteredTools();
+  const refreshRegisteredTools = async () => {
+    const tools = await RunAnywhere.getRegisteredTools();
     setRegisteredTools(
       tools.map((t) => ({
         name: t.name,
@@ -357,11 +357,11 @@ export const SettingsScreen: React.FC = () => {
    * Register demo tools (weather, time, calculator)
    */
 
-  const registerDemoTools = () => {
+  const registerDemoTools = async () => {
     // Clear existing tools
-    RunAnywhere.clearTools(); // Weather tool - Real API (wttr.in - no key needed)
+    await RunAnywhere.clearTools(); // Weather tool - Real API (wttr.in - no key needed)
 
-    RunAnywhere.registerTool(
+    await RunAnywhere.registerTool(
       ToolDefinition.fromPartial({
         name: 'get_weather',
         description: 'Gets the current weather for a city or location',
@@ -399,7 +399,7 @@ export const SettingsScreen: React.FC = () => {
       }
     ); // Time tool - Real system time
 
-    RunAnywhere.registerTool(
+    await RunAnywhere.registerTool(
       ToolDefinition.fromPartial({
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
@@ -416,7 +416,7 @@ export const SettingsScreen: React.FC = () => {
       }
     ); // Calculator tool - Math evaluation
 
-    RunAnywhere.registerTool(
+    await RunAnywhere.registerTool(
       ToolDefinition.fromPartial({
         name: 'calculate',
         description:
@@ -446,7 +446,7 @@ export const SettingsScreen: React.FC = () => {
       }
     );
 
-    refreshRegisteredTools();
+    await refreshRegisteredTools();
     Alert.alert(
       'Demo Tools Added',
       '3 demo tools have been registered: get_weather, get_current_time, calculate'
@@ -465,8 +465,10 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear',
           style: 'destructive',
           onPress: () => {
-            RunAnywhere.clearTools();
-            refreshRegisteredTools();
+            void (async () => {
+              await RunAnywhere.clearTools();
+              await refreshRegisteredTools();
+            })();
           },
         },
       ]

@@ -15,7 +15,6 @@
  */
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -33,12 +32,10 @@ import {
   ToolPromptFormatResult,
   ToolCallValidationRequest,
   ToolCallValidationResult,
+  ToolCallingSessionCreateRequest,
   type ToolDefinition,
   type ToolParameter,
 } from '@runanywhere/proto-ts/tool_calling';
-import {
-  LLMGenerationOptions,
-} from '@runanywhere/proto-ts/llm_options';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
@@ -77,6 +74,7 @@ export type {
   ToolResult,
   ToolCallingOptions,
   ToolCallingResult,
+  ToolCallingSessionCreateRequest,
   ToolParseRequest,
   ToolParseResult,
   ToolPromptFormatRequest,
@@ -164,30 +162,35 @@ async function callNativeProto(
 export function registerTool(
   definition: ToolDefinition,
   executor: ToolExecutor
-): void {
+): Promise<void> {
   logger.debug(`Registering tool: ${definition.name}`);
   registeredTools.set(definition.name, { definition, executor });
+  return Promise.resolve();
 }
 
 /**
  * Unregister a tool
  */
-export function unregisterTool(toolName: string): void {
+export function unregisterTool(toolName: string): Promise<void> {
   registeredTools.delete(toolName);
+  return Promise.resolve();
 }
 
 /**
  * Get all registered tool definitions
  */
-export function getRegisteredTools(): ToolDefinition[] {
-  return Array.from(registeredTools.values()).map((t) => t.definition);
+export function getRegisteredTools(): Promise<ToolDefinition[]> {
+  return Promise.resolve(
+    Array.from(registeredTools.values()).map((t) => t.definition)
+  );
 }
 
 /**
  * Clear all registered tools
  */
-export function clearTools(): void {
+export function clearTools(): Promise<void> {
   registeredTools.clear();
+  return Promise.resolve();
 }
 
 // =============================================================================
@@ -255,7 +258,7 @@ async function formatToolPromptViaCpp(
  * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
  */
 async function formatToolsForPromptAsync(tools?: ToolDefinition[], format?: string): Promise<string> {
-  const toolsToFormat = tools || getRegisteredTools();
+  const toolsToFormat = tools || await getRegisteredTools();
   const toolFormat = format?.toLowerCase() || 'default';
 
   if (toolsToFormat.length === 0) {
@@ -282,7 +285,7 @@ async function validateToolCall(
   toolCall: ToolCall,
   options?: Partial<ToolCallingOptions>
 ): Promise<ToolCallValidationResult> {
-  const tools = options?.tools ?? getRegisteredTools();
+  const tools = options?.tools ?? await getRegisteredTools();
   const request = ToolCallValidationRequest.fromPartial({
     toolCall,
     options: ToolCallingOptions.fromPartial({
@@ -425,114 +428,63 @@ async function buildFollowupPromptViaCpp(
 /**
  * Generate a response with tool calling support.
  *
- * Uses C++ for parsing AND prompt building (single source of truth).
- *
- * ARCHITECTURE:
- * - Parsing & Prompts: C++ commons via proto-byte bridge
- * - Registry & Execution: TypeScript (needs JS APIs like fetch)
- * - Orchestration: This function manages the generate-parse-execute loop
+ * C++ owns the run loop through `rac_tool_calling_run_loop_proto`.
+ * React Native only supplies the current registry snapshot and a JS executor
+ * callback for host-owned side effects.
  */
 export async function generateWithTools(
   prompt: string,
   options?: Partial<ToolCallingOptions>
 ): Promise<ToolCallingResult> {
-  const tools = options?.tools ?? getRegisteredTools();
-  const maxIterations = options?.maxIterations ?? 5;
-  const autoExecute = options?.autoExecute ?? true;
-  const keepToolsAvailable = options?.keepToolsAvailable ?? false;
-  const formatHint = (options?.formatHint || 'default').toLowerCase();
-
-  logger.debug(`[ToolCalling] Starting with format: ${formatHint}, tools: ${tools.length}`);
-
-  // Build initial prompt using C++ single source of truth
-  let fullPrompt = await buildInitialPromptViaCpp(prompt, tools, options);
-  logger.debug(`[ToolCalling] Initial prompt built (${fullPrompt.length} chars)`);
-
-  const allToolCalls: ToolCall[] = [];
-  const allToolResults: ToolResult[] = [];
-  let finalText = '';
-  let iterations = 0;
-
-  while (iterations < maxIterations) {
-    iterations++;
-    logger.debug(`[ToolCalling] === Iteration ${iterations} ===`);
-
-    // Generate response
-    let responseText = '';
-    for await (const event of generateStream(fullPrompt, LLMGenerationOptions.fromPartial({
-      maxTokens: options?.maxTokens ?? 1000,
-      temperature: options?.temperature ?? 0.7,
-      topP: 1.0,
-      topK: 0,
-      repetitionPenalty: 1.0,
-      stopSequences: [],
-      streamingEnabled: true,
-      preferredFramework: 0,
-      enableRealTimeTracking: false,
-    }))) {
-      if (event.token) responseText += event.token;
-      if (event.isFinal) break;
-    }
-
-    logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
-
-    // Parse for tool calls using C++ (single source of truth)
-    const { text, toolCall } = await parseToolCallViaCpp(responseText);
-    finalText = text;
-    logger.debug(`[ToolCalling] Parsed - hasToolCall: ${!!toolCall}, cleanText (${finalText.length} chars): "${finalText.substring(0, 150)}"`);
-
-    if (!toolCall) {
-      // No tool call, we're done - LLM provided a natural response
-      logger.debug('[ToolCalling] No tool call found, breaking loop with finalText');
-      break;
-    }
-
-    logger.debug(`[ToolCalling] Tool call: ${toolCall.name}(${toolCall.argumentsJson})`);
-    allToolCalls.push(toolCall);
-
-    if (!autoExecute) {
-      // Return tool calls for manual execution
-      return ToolCallingResult.fromPartial({
-        text: finalText,
-        toolCalls: allToolCalls,
-        toolResults: [],
-        isComplete: false,
-        iterationsUsed: iterations,
-      });
-    }
-
-    // Execute the tool (in TypeScript - needs JS APIs)
-    logger.debug(`[ToolCalling] Executing tool: ${toolCall.name}...`);
-    const result = await executeTool(toolCall);
-    allToolResults.push(result);
-    const succeeded = !result.error;
-    logger.debug(`[ToolCalling] Tool result success: ${succeeded}`);
-    if (succeeded) {
-      logger.debug(`[ToolCalling] Tool data: ${result.resultJson}`);
-    } else {
-      logger.debug(`[ToolCalling] Tool error: ${result.error}`);
-    }
-
-    fullPrompt = await buildFollowupPromptViaCpp(
-      prompt,
-      tools,
-      result,
-      keepToolsAvailable,
-      formatHint
-    );
-
-    logger.debug(`[ToolCalling] Continuing to iteration ${iterations + 1} with tool result...`);
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
   }
 
-  logger.debug(`[ToolCalling] === DONE === finalText (${finalText.length} chars): "${finalText.substring(0, 200)}"`);
-  logger.debug(`[ToolCalling] toolCalls: ${allToolCalls.length}, toolResults: ${allToolResults.length}`);
+  const native = requireNativeModule();
+  const bridge = native as unknown as {
+    toolRunLoopProto?: (
+      requestBytes: ArrayBuffer,
+      onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
+    ) => Promise<ArrayBuffer>;
+  };
 
-  return ToolCallingResult.fromPartial({
-    text: finalText,
-    toolCalls: allToolCalls,
-    toolResults: allToolResults,
-    isComplete: true,
-    iterationsUsed: iterations,
-    rawText: finalText,
+  if (typeof bridge.toolRunLoopProto !== 'function') {
+    throw SDKException.notImplemented(
+      'generateWithTools requires native toolRunLoopProto backed by rac_tool_calling_run_loop_proto'
+    );
+  }
+
+  const tools = options?.tools ?? await getRegisteredTools();
+  const formatHint = (options?.formatHint || 'default').toLowerCase();
+  const request = ToolCallingSessionCreateRequest.fromPartial({
+    prompt,
+    maxTokens: options?.maxTokens ?? 1024,
+    temperature: options?.temperature ?? 0.7,
+    topP: 1.0,
+    systemPrompt: options?.systemPrompt ?? '',
+    tools,
+    formatHint,
+    maxIterations: options?.maxIterations ?? options?.maxToolCalls ?? 5,
+    keepToolsAvailable: options?.keepToolsAvailable ?? false,
+    validateCalls: true,
   });
+
+  logger.debug(
+    `[ToolCalling] Delegating native run loop: format=${formatHint}, tools=${tools.length}`
+  );
+
+  const resultBytes = await bridge.toolRunLoopProto(
+    bytesToArrayBuffer(ToolCallingSessionCreateRequest.encode(request).finish()),
+    async (toolCallBytes: ArrayBuffer) => {
+      const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
+      const result = await executeTool(toolCall);
+      return bytesToArrayBuffer(ToolResult.encode(result).finish());
+    }
+  );
+
+  const bytes = arrayBufferToBytes(resultBytes);
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('toolRunLoopProto');
+  }
+  return ToolCallingResult.decode(bytes);
 }
