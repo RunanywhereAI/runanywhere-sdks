@@ -78,7 +78,7 @@ If native binaries are missing (fresh clone), they must be staged first — see 
 App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback`:
 
 1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
-2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhereSDK.instance.initialize(...)` with or without credentials
+2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
 3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), Genie NPU (Android/Snapdragon only, chip-conditional models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
 4. **Model refresh** — `ModelManager.shared.refresh()` notifies all listeners
 
@@ -114,7 +114,7 @@ iOS: `AppDelegate.swift`. Android: `PlatformChannelHandler.kt`.
 
 ### SDK API Surface Used
 
-All AI calls go through `RunAnywhereSDK.instance`:
+All AI calls go through `RunAnywhere`:
 - `.llm.generate()` / `.llm.generateStream()` / `.llm.load()` / `.llm.unload()`
 - `.stt.transcribe()` / `.stt.load()`
 - `.tts.synthesize()` / `.tts.loadVoice()`

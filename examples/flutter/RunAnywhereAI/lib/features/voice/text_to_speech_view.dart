@@ -137,7 +137,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       debugPrint('🔄 Loading TTS voice: ${model.name}');
 
       // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhereSDK.instance.tts.loadVoice(model.id);
+      await sdk.RunAnywhere.tts.loadVoice(model.id);
 
       setState(() {
         _selectedFramework = model.preferredFramework;
@@ -186,12 +186,12 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      if (!sdk.RunAnywhereSDK.instance.tts.isLoaded) {
+      if (!sdk.RunAnywhere.tts.isLoaded) {
         throw Exception(
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      final result = await sdk.RunAnywhereSDK.instance.tts.synthesize(
+      final result = await sdk.RunAnywhere.tts.synthesize(
         _textController.text,
         sdk.TTSOptions(
           speakingRate: _speechRate,

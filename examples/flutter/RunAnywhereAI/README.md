@@ -112,14 +112,14 @@ This sample app demonstrates the full power of the RunAnywhere Flutter SDK:
 
 | Feature | Description | SDK Integration |
 |---------|-------------|-----------------|
-| **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhereSDK.instance.llm.generateStream()` |
+| **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhere.llm.generateStream()` |
 | **Thinking Mode** | Support for models with `<think>...</think>` reasoning | Thinking tag parsing |
 | **Real-time Analytics** | Token speed, generation time, inference metrics | `MessageAnalytics` |
-| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhereSDK.instance.stt.transcribe()` |
-| **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhereSDK.instance.tts.synthesize()` |
-| **Voice Assistant** | Full STT to LLM to TTS pipeline with auto-detection | `RunAnywhereSDK.instance.voice` |
+| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.stt.transcribe()` |
+| **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.tts.synthesize()` |
+| **Voice Assistant** | Full STT to LLM to TTS pipeline with auto-detection | `RunAnywhere.voice` |
 | **Model Management** | Download, load, and manage multiple AI models | `ModelManager` |
-| **Storage Management** | View storage usage and delete models | `RunAnywhereSDK.instance.downloads.getStorageInfo()` |
+| **Storage Management** | View storage usage and delete models | `RunAnywhere.downloads.getStorageInfo()` |
 | **Offline Support** | All features work without internet | On-device inference |
 
 ---
@@ -292,11 +292,11 @@ import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 // 1. Initialize SDK in development mode
-await RunAnywhereSDK.instance.initialize();
+await RunAnywhere.initialize();
 
 // 2. Register LlamaCpp module for LLM models (GGUF)
 await LlamaCpp.register();
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: Uri.parse('https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf'),
@@ -306,7 +306,7 @@ RunAnywhereSDK.instance.models.register(
 
 // 3. Register ONNX module for STT/TTS models
 await Onnx.register();
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
@@ -320,23 +320,23 @@ RunAnywhereSDK.instance.models.register(
 
 ```dart
 // Download with progress tracking
-final progressStream = RunAnywhereSDK.instance.downloads.start('smollm2-360m-q8_0');
+final progressStream = RunAnywhere.downloads.start('smollm2-360m-q8_0');
 await for (final p in progressStream) {
   if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
 
 // Load LLM model
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
 
 // Check if model is loaded
-final isLoaded = RunAnywhereSDK.instance.isLLMModelLoaded;
+final isLoaded = RunAnywhere.isLLMModelLoaded;
 ```
 
 ### Stream Text Generation
 
 ```dart
 // Generate with streaming (real-time tokens)
-final stream = RunAnywhereSDK.instance.llm.generateStream(prompt, options);
+final stream = RunAnywhere.llm.generateStream(prompt, options);
 
 await for (final event in stream) {
   if (event.isFinal) break;
@@ -348,7 +348,7 @@ await for (final event in stream) {
 }
 
 // Or non-streaming
-final result = await RunAnywhereSDK.instance.llm.generate(prompt, options);
+final result = await RunAnywhere.llm.generate(prompt, options);
 print('Response: ${result.text}');
 print('Speed: ${result.tokensPerSecond} tok/s');
 ```
@@ -357,10 +357,10 @@ print('Speed: ${result.tokensPerSecond} tok/s');
 
 ```dart
 // Load STT model
-await RunAnywhereSDK.instance.stt.load('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
 
 // Transcribe audio bytes
-final result = await RunAnywhereSDK.instance.stt.transcribe(audioBytes);
+final result = await RunAnywhere.stt.transcribe(audioBytes);
 print('Transcription: ${result.text}');
 ```
 
@@ -368,10 +368,10 @@ print('Transcription: ${result.text}');
 
 ```dart
 // Load TTS voice
-await RunAnywhereSDK.instance.tts.loadVoice('vits-piper-en_US-lessac-medium');
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
 
 // Synthesize speech with options
-final result = await RunAnywhereSDK.instance.tts.synthesize(
+final result = await RunAnywhere.tts.synthesize(
   text,
   TTSOptions(rate: 1.0, pitch: 1.0, volume: 1.0),
 );
@@ -384,7 +384,7 @@ await audioPlayer.play(result.audio, result.sampleRate);
 
 ```dart
 // Subscribe to the voice agent event stream
-final sub = RunAnywhereSDK.instance.voice.eventStream().listen((event) {
+final sub = RunAnywhere.voice.eventStream().listen((event) {
   if (event.hasUserSaid()) {
     print('User said: ${event.userSaid.text}');
   } else if (event.hasAssistantToken()) {
@@ -393,7 +393,7 @@ final sub = RunAnywhereSDK.instance.voice.eventStream().listen((event) {
 });
 
 // Initialize pipeline with loaded models
-await RunAnywhereSDK.instance.voice.initializeWithLoadedModels();
+await RunAnywhere.voice.initializeWithLoadedModels();
 
 // Cancel when done
 await sub.cancel();
@@ -413,9 +413,9 @@ await sub.cancel();
 - Model selection bottom sheet integration
 
 **Key SDK APIs:**
-- `RunAnywhereSDK.instance.llm.generateStream()` — Streaming generation
-- `RunAnywhereSDK.instance.llm.generate()` — Non-streaming generation
-- `RunAnywhereSDK.instance.currentLLMModel` — Get loaded model info
+- `RunAnywhere.llm.generateStream()` — Streaming generation
+- `RunAnywhere.llm.generate()` — Non-streaming generation
+- `RunAnywhere.currentLLMModel` — Get loaded model info
 
 ### 2. Speech-to-Text Screen (`speech_to_text_view.dart`)
 
@@ -426,9 +426,9 @@ await sub.cancel();
 - Mode selection (batch vs. live)
 
 **Key SDK APIs:**
-- `RunAnywhereSDK.instance.stt.load()` — Load Whisper model
-- `RunAnywhereSDK.instance.stt.transcribe()` — Batch transcription
-- `RunAnywhereSDK.instance.isSTTModelLoaded` — Check model status
+- `RunAnywhere.stt.load()` — Load Whisper model
+- `RunAnywhere.stt.transcribe()` — Batch transcription
+- `RunAnywhere.isSTTModelLoaded` — Check model status
 
 ### 3. Text-to-Speech Screen (`text_to_speech_view.dart`)
 
@@ -439,9 +439,9 @@ await sub.cancel();
 - Audio metadata display (duration, sample rate, size)
 
 **Key SDK APIs:**
-- `RunAnywhereSDK.instance.tts.loadVoice()` — Load TTS model
-- `RunAnywhereSDK.instance.tts.synthesize()` — Generate speech audio
-- `RunAnywhereSDK.instance.isTTSVoiceLoaded` — Check voice status
+- `RunAnywhere.tts.loadVoice()` — Load TTS model
+- `RunAnywhere.tts.synthesize()` — Generate speech audio
+- `RunAnywhere.isTTSVoiceLoaded` — Check voice status
 
 ### 4. Voice Assistant Screen (`voice_assistant_view.dart`)
 
@@ -453,8 +453,8 @@ await sub.cancel();
 - Session state machine (connecting, listening, processing, speaking)
 
 **Key SDK APIs:**
-- `RunAnywhereSDK.instance.voice.eventStream()` — Voice agent event stream
-- `RunAnywhereSDK.instance.voice.initializeWithLoadedModels()` — Initialize pipeline
+- `RunAnywhere.voice.eventStream()` — Voice agent event stream
+- `RunAnywhere.voice.initializeWithLoadedModels()` — Initialize pipeline
 - `VoiceEvent` — Proto-typed voice session events
 
 ### 5. Settings Screen (`combined_settings_view.dart`)
@@ -466,9 +466,9 @@ await sub.cancel();
 - Analytics logging toggle
 
 **Key SDK APIs:**
-- `RunAnywhereSDK.instance.downloads.getStorageInfo()` — Get storage details
-- `RunAnywhereSDK.instance.downloads.list()` — List models
-- `RunAnywhereSDK.instance.downloads.delete()` — Remove model
+- `RunAnywhere.downloads.getStorageInfo()` — Get storage details
+- `RunAnywhere.downloads.list()` — List models
+- `RunAnywhere.downloads.delete()` — Remove model
 
 ---
 
@@ -572,12 +572,12 @@ The SDK automatically detects the environment:
 ```dart
 // Development mode (default)
 if (kDebugMode) {
-  await RunAnywhereSDK.instance.initialize();
+  await RunAnywhere.initialize();
 }
 
 // Production mode
 else {
-  await RunAnywhereSDK.instance.initialize(
+  await RunAnywhere.initialize(
     apiKey: 'your-api-key',
     baseURL: 'https://api.runanywhere.ai',
     environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,

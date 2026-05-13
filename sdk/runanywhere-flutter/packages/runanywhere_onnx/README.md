@@ -94,7 +94,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize SDK
-  await RunAnywhereSDK.instance.initialize();
+  await RunAnywhere.initialize();
 
   // Register ONNX backend (auto-registers STT/TTS/VAD via Sherpa)
   await Onnx.register();
@@ -109,7 +109,7 @@ Models are registered through the core SDK registry (backends do not own catalog
 
 ```dart
 // STT Model (Whisper)
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'whisper-tiny-en',
   name: 'Whisper Tiny English',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
@@ -119,7 +119,7 @@ RunAnywhereSDK.instance.models.register(
 );
 
 // TTS Model (Piper)
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'piper-amy-medium',
   name: 'Piper Amy (English)',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-amy-medium.tar.gz'),
@@ -133,14 +133,14 @@ RunAnywhereSDK.instance.models.register(
 
 ```dart
 // Download and load STT model
-final stream = RunAnywhereSDK.instance.downloads.start('whisper-tiny-en');
+final stream = RunAnywhere.downloads.start('whisper-tiny-en');
 await for (final p in stream) {
   if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
-await RunAnywhereSDK.instance.stt.load('whisper-tiny-en');
+await RunAnywhere.stt.load('whisper-tiny-en');
 
 // Transcribe audio (PCM16 @ 16 kHz mono)
-final result = await RunAnywhereSDK.instance.stt.transcribe(audioData);
+final result = await RunAnywhere.stt.transcribe(audioData);
 print('Text: ${result.text}');
 print('Confidence: ${result.confidence}');
 print('Detected language: ${result.detectedLanguage}');
@@ -150,14 +150,14 @@ print('Detected language: ${result.detectedLanguage}');
 
 ```dart
 // Download and load TTS voice
-final stream = RunAnywhereSDK.instance.downloads.start('piper-amy-medium');
+final stream = RunAnywhere.downloads.start('piper-amy-medium');
 await for (final p in stream) {
   if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
-await RunAnywhereSDK.instance.tts.loadVoice('piper-amy-medium');
+await RunAnywhere.tts.loadVoice('piper-amy-medium');
 
 // Synthesize speech
-final result = await RunAnywhereSDK.instance.tts.synthesize(
+final result = await RunAnywhere.tts.synthesize(
   'Hello! Welcome to RunAnywhere.',
   TTSOptions(rate: 1.0, pitch: 1.0),
 );
@@ -191,7 +191,7 @@ The `Onnx` module does not own a model catalog. Register Sherpa/ONNX/Piper
 models through the core SDK registry after calling `Onnx.register()`:
 
 ```dart
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'my-stt-model',
   name: 'My STT Model',
   url: Uri.parse('https://.../whisper.tar.gz'),
@@ -242,27 +242,27 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 
 // Initialize all backends
-await RunAnywhereSDK.instance.initialize();
+await RunAnywhere.initialize();
 await Onnx.register();
 await LlamaCpp.register();
 
 // Load all models
-await RunAnywhereSDK.instance.stt.load('whisper-tiny-en');
-await RunAnywhereSDK.instance.llm.load('smollm2-360m');
-await RunAnywhereSDK.instance.tts.loadVoice('piper-amy-medium');
+await RunAnywhere.stt.load('whisper-tiny-en');
+await RunAnywhere.llm.load('smollm2-360m');
+await RunAnywhere.tts.loadVoice('piper-amy-medium');
 
 // Initialize the voice pipeline with currently loaded models
-await RunAnywhereSDK.instance.voice.initializeWithLoadedModels();
+await RunAnywhere.voice.initializeWithLoadedModels();
 
 // Subscribe to voice events (proto-typed VoiceEvent stream)
-final sub = RunAnywhereSDK.instance.voice.eventStream().listen((event) {
+final sub = RunAnywhere.voice.eventStream().listen((event) {
   if (event.hasUserSaid())       print('User: ${event.userSaid.text}');
   if (event.hasAssistantToken()) stdout.write(event.assistantToken.text);
 });
 
-await RunAnywhereSDK.instance.voice.start();
+await RunAnywhere.voice.start();
 // ... later
-await RunAnywhereSDK.instance.voice.stop();
+await RunAnywhere.voice.stop();
 await sub.cancel();
 ```
 
@@ -333,14 +333,14 @@ await sub.cancel();
 
 ```dart
 // Unload STT model to free memory
-await RunAnywhereSDK.instance.stt.unload();
+await RunAnywhere.stt.unload();
 
 // Unload TTS voice
-await RunAnywhereSDK.instance.tts.unloadVoice();
+await RunAnywhere.tts.unloadVoice();
 
 // Check current loaded models
-print('STT loaded: ${RunAnywhereSDK.instance.isSTTModelLoaded}');
-print('TTS loaded: ${RunAnywhereSDK.instance.isTTSVoiceLoaded}');
+print('STT loaded: ${RunAnywhere.isSTTModelLoaded}');
+print('TTS loaded: ${RunAnywhere.isTTSVoiceLoaded}');
 ```
 
 ---

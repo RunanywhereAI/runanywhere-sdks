@@ -22,7 +22,7 @@
 /// // Register the module (matches Swift: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
-/// // Register models through RunAnywhereSDK.instance.models.
+/// // Register models through RunAnywhere.models.
 /// // The commons registry/router owns framework selection and routing.
 /// ```
 library runanywhere_llamacpp;

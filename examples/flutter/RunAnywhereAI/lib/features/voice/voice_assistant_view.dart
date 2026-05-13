@@ -106,9 +106,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      final currentModelId = sdk.RunAnywhereSDK.instance.llm.currentModelId;
-      final sttModelId = sdk.RunAnywhereSDK.instance.stt.currentModelId;
-      final ttsVoiceId = sdk.RunAnywhereSDK.instance.tts.currentVoiceId;
+      final currentModelId = sdk.RunAnywhere.llm.currentModelId;
+      final sttModelId = sdk.RunAnywhere.stt.currentModelId;
+      final ttsVoiceId = sdk.RunAnywhere.tts.currentVoiceId;
 
       if (!mounted) return;
       setState(() {
@@ -149,7 +149,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     });
 
     try {
-      if (!sdk.RunAnywhereSDK.instance.voice.isReady) {
+      if (!sdk.RunAnywhere.voice.isReady) {
         setState(() {
           _sessionState = VoiceSessionState.error;
           _errorMessage = 'Please load STT, LLM, and TTS models first';
@@ -160,7 +160,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       // v4: voice capability owns adapter construction. Initialize
       // against loaded models then subscribe to the proto VoiceEvent
       // stream — symmetric with `instance.llm.generateStream(...)`.
-      final voice = sdk.RunAnywhereSDK.instance.voice;
+      final voice = sdk.RunAnywhere.voice;
       await voice.initializeWithLoadedModels();
 
       _eventSubscription = voice.eventStream().listen(
@@ -507,7 +507,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               onChanged: (enabled) async {
                 if (enabled) {
                   try {
-                    await sdk.RunAnywhereSDK.instance.tts
+                    await sdk.RunAnywhere.tts
                         .loadVoice('system-tts');
                     await _refreshComponentStates();
                   } catch (e) {

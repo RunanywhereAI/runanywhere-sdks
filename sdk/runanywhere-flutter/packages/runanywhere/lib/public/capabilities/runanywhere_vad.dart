@@ -32,7 +32,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// Voice Activity Detection (VAD) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.vad`. Model load/current/unload state is
+/// Access via `RunAnywhere.vad`. Model load/current/unload state is
 /// owned by commons lifecycle; one-shot frame processing uses the
 /// lifecycle-owned generated-proto commons ABI.
 class RunAnywhereVAD {
@@ -246,7 +246,7 @@ class RunAnywhereVAD {
     }
   }
 
-  /// Internal: tear down all controllers. Used by `RunAnywhereSDK.reset()`.
+  /// Internal: tear down all controllers. Used by `RunAnywhere.reset()`.
   Future<void> dispose() async {
     await _activityController.close();
   }

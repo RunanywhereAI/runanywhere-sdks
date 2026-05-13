@@ -45,6 +45,7 @@ class EventBus {
 
   /// Generic event publisher - dispatches to appropriate stream
   void publish(SDKEvent event) {
+    if (_allEventsController.isClosed) return;
     _allEventsController.add(event);
   }
 

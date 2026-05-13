@@ -9,6 +9,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as event_pb;
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
 
 /// Native bridge for the stable SDKEvent proto-byte stream.
 class DartBridgeEvents {
@@ -22,6 +23,7 @@ class DartBridgeEvents {
 
   static bool _isRegistered = false;
   static int _subscriptionId = 0;
+  static NativeCallable<RacSdkEventCallbackNative>? _eventCallback;
 
   static Stream<event_pb.SDKEvent> get eventStream => _eventController.stream;
 
@@ -29,6 +31,7 @@ class DartBridgeEvents {
   static void register() {
     if (_isRegistered) return;
 
+    NativeCallable<RacSdkEventCallbackNative>? callback;
     try {
       final subscribe = RacNative.bindings.rac_sdk_event_subscribe;
       if (subscribe == null) {
@@ -37,13 +40,24 @@ class DartBridgeEvents {
         return;
       }
 
-      final callback = Pointer.fromFunction<RacSdkEventCallbackNative>(
+      callback = NativeCallable<RacSdkEventCallbackNative>.listener(
         _sdkEventCallback,
       );
-      _subscriptionId = subscribe(callback, nullptr);
+      final subscriptionId = subscribe(callback.nativeFunction, nullptr);
+      if (subscriptionId == 0) {
+        callback.close();
+        _logger.warning('SDKEvent proto subscription returned no handle');
+        _isRegistered = true;
+        return;
+      }
+
+      _eventCallback = callback;
+      callback = null;
+      _subscriptionId = subscriptionId;
       _isRegistered = true;
       _logger.debug('SDKEvent proto callback registered');
     } catch (e) {
+      callback?.close();
       _logger.warning('SDKEvent proto registration failed: $e');
       _isRegistered = true;
     }
@@ -60,6 +74,8 @@ class DartBridgeEvents {
     } catch (e) {
       _logger.debug('SDKEvent proto unregistration failed: $e');
     } finally {
+      _eventCallback?.close();
+      _eventCallback = null;
       _subscriptionId = 0;
       _isRegistered = false;
     }
@@ -75,6 +91,7 @@ class DartBridgeEvents {
 
   void emit(event_pb.SDKEvent event) {
     _eventController.add(event);
+    EventBus.shared.publish(event);
   }
 
   Future<bool> publish(event_pb.SDKEvent event) async {

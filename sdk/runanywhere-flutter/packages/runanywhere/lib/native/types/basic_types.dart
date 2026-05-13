@@ -277,8 +277,6 @@ abstract class RacResultCode {
 }
 
 /// Alias for backward compatibility
-typedef RaResultCode = RacResultCode;
-
 // =============================================================================
 // Capability Types (from rac_types.h)
 // =============================================================================

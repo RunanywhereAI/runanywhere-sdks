@@ -18,7 +18,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// Embeddings capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.embeddings`. Model load/current/unload
+/// Access via `RunAnywhere.embeddings`. Model load/current/unload
 /// state is owned by commons lifecycle; embed calls use the lifecycle-owned
 /// generated-proto commons ABI.
 class RunAnywhereEmbeddings {

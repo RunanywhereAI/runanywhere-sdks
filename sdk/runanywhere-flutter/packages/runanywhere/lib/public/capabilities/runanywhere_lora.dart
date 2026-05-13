@@ -16,7 +16,7 @@ import 'package:runanywhere/native/dart_bridge_lora.dart';
 
 /// LoRA (Low-Rank Adaptation) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.lora`. Mirrors Swift
+/// Access via `RunAnywhere.lora`. Mirrors Swift
 /// `RunAnywhere.LoRA` and Kotlin `RunAnywhere.lora`.
 class RunAnywhereLoRACapability {
   RunAnywhereLoRACapability._();

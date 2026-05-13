@@ -103,8 +103,8 @@ class RAGViewModel extends ChangeNotifier {
     try {
       final extractedText = await DocumentService.extractText(filePath);
 
-      await RunAnywhereSDK.instance.rag.createPipeline(config);
-      await RunAnywhereSDK.instance.rag.ingest(extractedText);
+      await RunAnywhere.rag.createPipeline(config);
+      await RunAnywhere.rag.ingest(extractedText);
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
@@ -135,7 +135,7 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await RunAnywhereSDK.instance.rag.query(question);
+      final result = await RunAnywhere.rag.query(question);
 
       _messages = [
         ..._messages,
@@ -161,7 +161,7 @@ class RAGViewModel extends ChangeNotifier {
   ///
   /// Resets all document and conversation state.
   Future<void> clearDocument() async {
-    await RunAnywhereSDK.instance.rag.destroyPipeline();
+    await RunAnywhere.rag.destroyPipeline();
 
     _documentName = null;
     _isDocumentLoaded = false;

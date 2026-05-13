@@ -14,7 +14,7 @@
 //
 // Usage:
 //
-//   final handle = await RunAnywhereSDK.instance.solutions.run(
+//   final handle = await RunAnywhere.solutions.run(
 //     config: SolutionConfig()..voiceAgent = VoiceAgentConfig()...,
 //   );
 //   handle.start();
@@ -94,7 +94,7 @@ class SolutionHandle {
   }
 }
 
-/// Solutions capability surface — `RunAnywhereSDK.instance.solutions`.
+/// Solutions capability surface — `RunAnywhere.solutions`.
 ///
 /// Stateless. Each `run(...)` call allocates a fresh native handle;
 /// callers own the returned [SolutionHandle].

@@ -8,7 +8,7 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking Flutter SDK call coverage"
-grep -R -E "RunAnywhere|RunAnywhereSDK|generateStream|generate\(|downloadModel|loadLLMModel|loadSTTModel|transcribe|loadTTSVoice|synthesize|deleteStoredModel|getStorageInfo|startVoiceSession|voice\.initializeWithLoadedModels" \
+grep -R -E "RunAnywhere|RunAnywhere|generateStream|generate\(|downloadModel|loadLLMModel|loadSTTModel|transcribe|loadTTSVoice|synthesize|deleteStoredModel|getStorageInfo|startVoiceSession|voice\.initializeWithLoadedModels" \
     lib >/dev/null
 
 grep -R -E "RAG|rag|file_picker|syncfusion_flutter_pdf" lib pubspec.yaml >/dev/null

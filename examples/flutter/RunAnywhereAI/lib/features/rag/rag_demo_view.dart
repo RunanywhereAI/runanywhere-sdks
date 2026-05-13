@@ -84,9 +84,9 @@ class _RagDemoViewState extends State<RagDemoView> {
     }
 
     // Ensure model files resolve (they may not exist for registry-only models)
-    await sdk.RunAnywhereSDK.instance.models
+    await sdk.RunAnywhere.models
         .resolveModelFilePath(embeddingModel);
-    await sdk.RunAnywhereSDK.instance.models.resolveModelFilePath(llmModel);
+    await sdk.RunAnywhere.models.resolveModelFilePath(llmModel);
 
     // RAGConfiguration now carries model ids — commons resolves paths via the
     // canonical model registry (see rag.proto D-6 Wave D comment).

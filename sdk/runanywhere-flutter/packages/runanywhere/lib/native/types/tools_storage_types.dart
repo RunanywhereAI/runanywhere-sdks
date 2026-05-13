@@ -4,7 +4,6 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/memory_platform_types.dart';
 
 // =============================================================================
@@ -183,9 +182,6 @@ final class RacStorageAvailabilityStruct extends Struct {
 // =============================================================================
 
 /// Backward compatibility: old ra_* types map to new rac_* types
-typedef RaBackendHandle = RacHandle;
-typedef RaStreamHandle = RacHandle;
-
 // =============================================================================
 // Convenient Type Alias
 // =============================================================================

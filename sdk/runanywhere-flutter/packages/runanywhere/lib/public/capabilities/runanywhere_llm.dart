@@ -11,7 +11,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
+import 'package:runanywhere/generated/component_types.pbenum.dart'
+    show ComponentLifecycleState;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -31,7 +32,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// LLM (text generation) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.llm`.
+/// Access via `RunAnywhere.llm`.
 class RunAnywhereLLM {
   RunAnywhereLLM._();
   static final RunAnywhereLLM _instance = RunAnywhereLLM._();
@@ -144,11 +145,18 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) async {
+    return generateRequest(_toGenerateRequest(prompt, options));
+  }
+
+  /// Generated-proto text generation. Mirrors Swift
+  /// `RunAnywhere.generate(_ request: RALLMGenerateRequest)`.
+  Future<LLMGenerationResult> generateRequest(
+    LLMGenerateRequest request,
+  ) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
 
-    final opts = options ?? LLMGenerationOptions();
     final startTime = DateTime.now();
 
     final modelId = currentModelId;
@@ -159,8 +167,10 @@ class RunAnywhereLLM {
     }
 
     try {
-      final request = _toGenerateRequest(prompt, opts);
-      final result = _generateProto(request);
+      final effectiveRequest = LLMGenerateRequest()
+        ..mergeFromMessage(request)
+        ..streamingEnabled = false;
+      final result = _generateProto(effectiveRequest);
 
       final endTime = DateTime.now();
       final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
@@ -173,6 +183,7 @@ class RunAnywhereLLM {
 
       return result;
     } catch (e) {
+      if (e is SDKException) rethrow;
       throw SDKException.generationFailed('$e');
     }
   }
@@ -184,11 +195,17 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) {
+    return generateStreamRequest(
+      _toGenerateRequest(prompt, options, streaming: true),
+    );
+  }
+
+  /// Generated-proto streaming text generation. Mirrors Swift
+  /// `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`.
+  Stream<LLMStreamEvent> generateStreamRequest(LLMGenerateRequest request) {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-
-    final opts = options ?? LLMGenerationOptions();
 
     if (currentModelId == null) {
       throw SDKException.componentNotReady(
@@ -196,9 +213,10 @@ class RunAnywhereLLM {
       );
     }
 
-    return _generateStreamProto(
-      _toGenerateRequest(prompt, opts, streaming: true),
-    );
+    final effectiveRequest = LLMGenerateRequest()
+      ..mergeFromMessage(request)
+      ..streamingEnabled = true;
+    return _generateStreamProto(effectiveRequest);
   }
 
   // ---------------------------------------------------------------------------
@@ -225,10 +243,32 @@ class RunAnywhereLLM {
       streamingEnabled: streaming,
       preferredFramework:
           opts.hasPreferredFramework() ? opts.preferredFramework.name : null,
-      jsonSchema: opts.hasJsonSchema() ? opts.jsonSchema : null,
+      jsonSchema: _jsonSchemaForOptions(opts),
       executionTarget:
           opts.hasExecutionTarget() ? opts.executionTarget.name : null,
+      seed: opts.hasSeed() ? opts.seed : null,
+      frequencyPenalty:
+          opts.hasFrequencyPenalty() ? opts.frequencyPenalty : null,
+      presencePenalty: opts.hasPresencePenalty() ? opts.presencePenalty : null,
+      minP: opts.hasMinP() ? opts.minP : null,
+      grammar: opts.hasGrammar() ? opts.grammar : null,
+      responseFormat: opts.hasResponseFormat() ? opts.responseFormat : null,
+      echoPrompt: opts.hasEchoPrompt() ? opts.echoPrompt : null,
+      nThreads: opts.hasNThreads() ? opts.nThreads : null,
     );
+  }
+
+  String? _jsonSchemaForOptions(LLMGenerationOptions opts) {
+    if (opts.hasStructuredOutput()) {
+      final structured = opts.structuredOutput;
+      if (structured.hasJsonSchema() && structured.jsonSchema.isNotEmpty) {
+        return structured.jsonSchema;
+      }
+      if (structured.hasSchema() && structured.schema.rawJson.isNotEmpty) {
+        return structured.schema.rawJson;
+      }
+    }
+    return opts.hasJsonSchema() ? opts.jsonSchema : null;
   }
 
   /// Cancel any in-flight LLM generation.

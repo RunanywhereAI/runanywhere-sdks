@@ -31,7 +31,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 
 /// Voice Agent capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.voice`.
+/// Access via `RunAnywhere.voice`.
 class RunAnywhereVoice {
   RunAnywhereVoice._();
   static final RunAnywhereVoice _instance = RunAnywhereVoice._();
@@ -149,7 +149,7 @@ class RunAnywhereVoice {
 
   /// Subscribe to canonical voice-agent events.
   ///
-  /// Symmetric with `RunAnywhereSDK.instance.llm.generateStream(...)`:
+  /// Symmetric with `RunAnywhere.llm.generateStream(...)`:
   /// the capability owns adapter construction so callers never touch
   /// `VoiceAgentStreamAdapter` directly. The handle is fetched from
   /// the internal `DartBridgeVoiceAgent` singleton — call

@@ -2,7 +2,7 @@
 //
 // runanywhere_thinking_utils.dart — Pure Dart utilities for thinking-token
 // extraction. Structured-output parsing now lives on
-// `RunAnywhereSDK.instance.llm.extractStructuredOutput(...)` to mirror
+// `RunAnywhere.llm.extractStructuredOutput(...)` to mirror
 // Swift's `RunAnywhere.extractStructuredOutput(text:schema:)`.
 
 /// Canonical result of `extractThinkingTokens` (§3).

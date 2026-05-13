@@ -102,9 +102,9 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Check if VLM model is loaded
   Future<void> checkModelStatus() async {
-    _isModelLoaded = sdk.RunAnywhereSDK.instance.vlm.isLoaded;
+    _isModelLoaded = sdk.RunAnywhere.vlm.isLoaded;
     if (_isModelLoaded) {
-      _loadedModelName = sdk.RunAnywhereSDK.instance.vlm.currentModelId;
+      _loadedModelName = sdk.RunAnywhere.vlm.currentModelId;
     } else {
       _loadedModelName = null;
     }
@@ -117,7 +117,7 @@ class VLMViewModel extends ChangeNotifier {
       String modelId, String modelName, BuildContext context) async {
     try {
       debugPrint('🎯 Loading VLM model: $modelId');
-      await sdk.RunAnywhereSDK.instance.vlm.load(modelId);
+      await sdk.RunAnywhere.vlm.load(modelId);
       _isModelLoaded = true;
       _loadedModelName = modelName;
       notifyListeners();
@@ -160,7 +160,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: xFile.path);
 
-      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
         options: sdk.VLMGenerationOptions(maxTokens: 200),
@@ -201,7 +201,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: imagePath);
 
-      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
         options: sdk.VLMGenerationOptions(maxTokens: 300),
@@ -287,7 +287,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: xFile.path);
 
-      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
         options: sdk.VLMGenerationOptions(maxTokens: 100),
@@ -319,7 +319,7 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Cancel ongoing VLM generation
   Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhereSDK.instance.vlm.cancelVLMGeneration());
+    unawaited(sdk.RunAnywhere.vlm.cancelVLMGeneration());
     debugPrint('🛑 VLM generation cancelled');
   }
 

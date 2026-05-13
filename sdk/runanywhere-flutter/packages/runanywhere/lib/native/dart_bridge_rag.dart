@@ -2,6 +2,7 @@
 //
 // Generated-proto RAG session bridge.
 
+import 'dart:convert';
 import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart';
@@ -116,7 +117,8 @@ class DartBridgeRAG {
   }) async {
     // IDL-13: `metadata_json` proto field was deleted. Best-effort parse of
     // the legacy JSON into the typed `metadata` map before ingestion.
-    return ingestDocument(RAGDocument(text: text, metadata: _parseMetadata(metadataJson)));
+    return ingestDocument(
+        RAGDocument(text: text, metadata: _parseMetadata(metadataJson)));
   }
 
   Future<RAGStatistics> addDocumentsBatchAsync(
@@ -134,20 +136,15 @@ class DartBridgeRAG {
 
   Map<String, String> _parseMetadata(String? json) {
     if (json == null || json.isEmpty) return const <String, String>{};
-    final trimmed = json.trim();
-    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is! Map) return const <String, String>{};
+      return decoded.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      );
+    } catch (_) {
       return const <String, String>{};
     }
-    final inner = trimmed.substring(1, trimmed.length - 1);
-    final result = <String, String>{};
-    for (final pair in inner.split(',')) {
-      final parts = pair.split(':');
-      if (parts.length != 2) continue;
-      final k = parts[0].trim().replaceAll('"', '');
-      final v = parts[1].trim().replaceAll('"', '');
-      if (k.isNotEmpty) result[k] = v;
-    }
-    return result;
   }
 
   RAGStatistics clearDocuments() {

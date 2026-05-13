@@ -75,7 +75,7 @@ flutter build apk | ios        # Build per-platform artifacts
 ```
 Flutter Application
     ↓
-RunAnywhereSDK.instance              (Public singleton; 18 capability accessors)
+RunAnywhere              (Public static namespace; capability accessors)
     ↓
 public/capabilities/* (18 classes)   (RunAnywhereLLM, RunAnywhereSTT, etc.)
     ↓
@@ -91,7 +91,7 @@ LlamaCpp | Sherpa/ONNX | Genie NPU   (Backend engines registered via vtable v3)
 ### Key Architectural Patterns
 
 1. **Proto-driven public surface.** All public API types (LLM/STT/TTS/VAD/VLM/voice/RAG/tools/etc.) are protobuf-generated. 116 `.pb*.dart` files live under `lib/generated/`. Never hand-edit.
-2. **Isolate-per-FFI-call for blocking ops.** Capability layer + bridge slices wrap blocking C calls in `Isolate.run` (LLM generate, TTS synthesize, VLM process, voice agent turns, tool calls, downloads, HTTP, platform probes). Streaming uses **`NativeCallable.listener`** with a broadcast `StreamController` for fan-out (`dart:async`, never rxdart).
+2. **FFI scheduling discipline.** Blocking calls stay on the main isolate unless their C++ path is known not to publish back through a Dart callback, or unless the callback path is proven safe with `NativeCallable.listener`. Streaming and SDK event fan-out use **`NativeCallable.listener`** with broadcast `StreamController`s (`dart:async`, never rxdart).
 3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2. **Wave-H INIT-001** made this truly fire-and-forget — Phase 2 is now assigned to `_servicesInitFuture` without awaiting (Swift `Task.detached` parity); previously the implementation eagerly awaited despite the doc claim.
 4. **Platform HTTP transport injection.** iOS registers a URLSession-backed `rac_http_transport_ops_t` vtable from ObjC++; Android registers an OkHttp-backed vtable via JNI. C++ uses the installed transport for all HTTP.
 5. **EventBus = pure `dart:async`.** `lib/public/events/event_bus.dart` is a `StreamController.broadcast()` singleton. rxdart is **not** a dependency.
@@ -113,31 +113,31 @@ iOS requires `use_frameworks! :linkage => :static` in the Podfile and `-all_load
 ### Entry Point
 
 ```dart
-// lib/public/runanywhere.dart  (singleton)
-await RunAnywhereSDK.instance.initialize(
+// lib/public/runanywhere.dart  (static entry point)
+await RunAnywhere.initialize(
   apiKey: 'optional',
   baseURL: 'optional',
   environment: SDKEnvironment.development, // or staging, production
 );
 
-// 18 capability accessors (lazy singletons)
-RunAnywhereSDK.instance.llm       // RunAnywhereLLM
-RunAnywhereSDK.instance.stt       // RunAnywhereSTT
-RunAnywhereSDK.instance.tts       // RunAnywhereTTS
-RunAnywhereSDK.instance.vad       // RunAnywhereVAD
-RunAnywhereSDK.instance.vlm       // RunAnywhereVLM
-RunAnywhereSDK.instance.voice     // RunAnywhereVoice
-RunAnywhereSDK.instance.voiceAgent // RunAnywhereVoiceAgent
-RunAnywhereSDK.instance.models    // RunAnywhereModels
-RunAnywhereSDK.instance.modelLifecycle // RunAnywhereModelLifecycle
-RunAnywhereSDK.instance.downloads // RunAnywhereDownloads
-RunAnywhereSDK.instance.tools     // RunAnywhereTools
-RunAnywhereSDK.instance.rag       // RunAnywhereRAG
-RunAnywhereSDK.instance.solutions // RunAnywhereSolutions
-RunAnywhereSDK.instance.diffusion // RunAnywhereDiffusion
-RunAnywhereSDK.instance.embeddings // RunAnywhereEmbeddings
-RunAnywhereSDK.instance.lora      // RunAnywhereLoRACapability
-RunAnywhereSDK.instance.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Wave-H HW-001 Swift parity; was previously returning an empty fallback)
+// Capability accessors (shared capability instances)
+RunAnywhere.llm       // RunAnywhereLLM
+RunAnywhere.stt       // RunAnywhereSTT
+RunAnywhere.tts       // RunAnywhereTTS
+RunAnywhere.vad       // RunAnywhereVAD
+RunAnywhere.vlm       // RunAnywhereVLM
+RunAnywhere.voice     // RunAnywhereVoice
+RunAnywhere.visionLanguage // RunAnywhereVLM
+RunAnywhere.models    // RunAnywhereModels
+RunAnywhere.modelLifecycle // RunAnywhereModelLifecycle
+RunAnywhere.downloads // RunAnywhereDownloads
+RunAnywhere.tools     // RunAnywhereTools
+RunAnywhere.rag       // RunAnywhereRAG
+RunAnywhere.solutions // RunAnywhereSolutions
+RunAnywhere.diffusion // RunAnywhereDiffusion
+RunAnywhere.embeddings // RunAnywhereEmbeddings
+RunAnywhere.lora      // RunAnywhereLoRACapability
+RunAnywhere.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Wave-H HW-001 Swift parity; was previously returning an empty fallback)
 // + RunAnywherePluginLoader
 ```
 
@@ -147,7 +147,7 @@ RunAnywhereSDK.instance.hardware  // RunAnywhereHardware — getProfile() throws
 packages/runanywhere/lib/
 ├── runanywhere.dart              # Barrel (271 LOC, ~150 re-exports)
 ├── runanywhere_protos.dart       # Proto re-export hub
-├── adapters/                     # http_client_adapter, model_download_adapter, voice_agent_stream_adapter
+├── adapters/                     # http_client_adapter, voice_agent_stream_adapter
 ├── core/
 │   ├── module/runanywhere_module.dart  # Module interface implemented by backends
 │   └── native/rac_native.dart    # Hand-written FFI bindings (~2.1K LOC)
@@ -165,7 +165,7 @@ packages/runanywhere/lib/
 ├── internal/                     # sdk_init.dart, sdk_state.dart
 ├── native/                       # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
-    ├── runanywhere.dart          # RunAnywhereSDK singleton (~513 LOC)
+    ├── runanywhere.dart          # RunAnywhere static entry point
     ├── capabilities/             # 18 capability classes (flat layout)
     ├── configuration/            # sdk_environment.dart
     ├── events/                   # event_bus.dart (dart:async)
@@ -237,24 +237,24 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 ## Data Flows
 
 ### LLM Generation
-1. `RunAnywhereSDK.instance.llm.generate(prompt, options)` → `RunAnywhereLLM.shared.generate()`
+1. `RunAnywhere.llm.generate(prompt, options)` → `RunAnywhereLLM.shared.generate()`
 2. Validates `SdkState.isInitialized`, `DartBridge.llm.isLoaded`
-3. `DartBridge.llm.generate()` runs the blocking C call inside `Isolate.run()`; handle address passed as `int`
+3. `RunAnywhereLLM.generateRequest()` calls the generated `rac_llm_generate_proto` ABI; heavy isolate wrapping must remain gated on callback/event-publish safety.
 4. Returns `LLMGenerationResult` proto
 
 ### LLM Streaming
-1. `RunAnywhereSDK.instance.llm.generateStream(prompt, options)` registers a `NativeCallable.listener` for C++ token callbacks
+1. `RunAnywhere.llm.generateStream(prompt, options)` registers a `NativeCallable.listener` for C++ token callbacks
 2. Tokens land in a broadcast `StreamController` emitting `LLMStreamEvent` protos
 3. Multiple subscribers share one C-callback registration (fan-out)
 
 ### Model Download
-1. `RunAnywhereSDK.instance.downloads.start(modelId)` → `ModelDownloadService.downloadModel()`
+1. `RunAnywhere.downloads.start(modelId)` → `RunAnywhere.downloads.start()`
 2. `DartBridgeDownload.orchestrateDownload()` returns a `taskId`
 3. Polls `DartBridgeDownload.getProgress(taskId)` every 250 ms
 4. On completion: resolves model path via `rac_model_paths_get_model_folder`; updates registry
 
 ### SDK Initialization
-1. `RunAnywhereSDK.instance.initialize()` runs Phase 1 synchronously: load native lib → register platform adapter → configure logging → `rac_sdk_init` → register events / device / file-manager / telemetry callbacks
+1. `RunAnywhere.initialize()` runs Phase 1 synchronously: load native lib → register platform adapter → configure logging → `rac_sdk_init` → register events / device / file-manager / telemetry callbacks
 2. Phase 2 (async): model assignment → platform services → telemetry flush
 3. `DartBridge.modelPaths.setBaseDirectory()` sets the model storage root
 4. Background fire-and-forget: device registration + authentication

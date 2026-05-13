@@ -182,4 +182,3 @@ typedef RacLlmComponentDestroyNative = Void Function(RacHandle handle);
 typedef RacLlmComponentDestroyDart = void Function(RacHandle handle);
 
 // Legacy aliases for backward compatibility (unused - remove after migration)
-typedef RacLlmStreamCallbackNative = RacLlmComponentTokenCallbackNative;

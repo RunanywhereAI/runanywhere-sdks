@@ -67,7 +67,7 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
+    final model = await sdk.RunAnywhere.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -77,10 +77,10 @@ class _ToolsViewState extends State<ToolsView> {
 
   /// Register demo tools matching iOS/Android examples
   void _registerDemoTools() {
-    sdk.RunAnywhereSDK.instance.tools.clearTools();
+    sdk.RunAnywhere.tools.clearTools();
 
     // 1. Weather tool
-    sdk.RunAnywhereSDK.instance.tools.registerTool(
+    sdk.RunAnywhere.tools.registerTool(
       ToolDefinition(
         name: 'get_weather',
         description: 'Get current weather for a location',
@@ -96,7 +96,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 2. Calculator tool
-    sdk.RunAnywhereSDK.instance.tools.registerTool(
+    sdk.RunAnywhere.tools.registerTool(
       ToolDefinition(
         name: 'calculate',
         description: 'Perform basic arithmetic calculations',
@@ -112,7 +112,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 3. Time tool
-    sdk.RunAnywhereSDK.instance.tools.registerTool(
+    sdk.RunAnywhere.tools.registerTool(
       ToolDefinition(
         name: 'get_current_time',
         description: 'Get the current date and time',
@@ -122,7 +122,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     setState(() {
-      _registeredTools = sdk.RunAnywhereSDK.instance.tools.getRegisteredTools();
+      _registeredTools = sdk.RunAnywhere.tools.getRegisteredTools();
     });
   }
 
@@ -377,7 +377,7 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   Future<void> _runToolCalling() async {
-    if (!sdk.RunAnywhereSDK.instance.llm.isLoaded) {
+    if (!sdk.RunAnywhere.llm.isLoaded) {
       setState(() {
         _errorMessage = 'Please load an LLM model first';
       });
@@ -402,7 +402,7 @@ class _ToolsViewState extends State<ToolsView> {
     try {
       _addToLog('Starting generation with tools...');
 
-      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
+      final result = await sdk.RunAnywhere.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
           maxIterations: 3,

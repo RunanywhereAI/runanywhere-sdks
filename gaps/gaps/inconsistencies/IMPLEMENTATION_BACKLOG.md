@@ -1,59 +1,60 @@
-# Implementation Backlog — Round 2 (Post-2026-05-05 Seven-Lane E2E)
+# Implementation Backlog — Current Open Items
 
-Source of this round: `test_workflows/logs/20260505-232326-seven-lane-validation/failure_summary.tsv`.
-Commit at run time: `bb63158d6861c9c298d271f2946ed5193e3da643` on `feat/v2-architecture`.
-All previous waves (F-0 through F-7) DONE and removed from this doc.
+> Updated: 2026-05-13
+> State: current execution backlog only. Historical Wave/R2 rows that are closed or intentionally deferred are removed from active tracking.
 
 ## Deferred backends policy
 
-- Genie, MetalRT, WhisperKit, WhisperKit CoreML, WhisperCPP, Diffusion (CoreML), whisperkit_coreml are all **deferred**.
+- Genie, MetalRT, WhisperKit, WhisperKit CoreML, WhisperCPP, Diffusion (CoreML), and whisperkit_coreml are all deferred.
 - They can be excluded from builds, deleted, or left as compile-time stubs.
 - Goal is only that the 5 SDKs + 5 example apps compile.
-- NO bug rows will be filed about these backends being unimplemented, broken, or missing.
-- If a bug row only makes sense because one of these backends is "needed," it should be deleted.
+- No bug rows should be filed only because these deferred backends are unimplemented, broken, or missing.
+- If a bug row only makes sense because one of these backends is "needed," delete it from the active backlog.
 
-## Open BUG rows (15)
+## Open BUG rows
 
-### HIGH — cross-platform root-cause (4)
+### HIGH — cross-platform root cause
+
 #### BUG-KOT-E2E-R2-001 — Kotlin example crashes on Genie module reference
-- Lane: 01_android_kotlin — blocks example app launch
+- Lane: 01_android_kotlin — blocks example app launch.
 - Evidence: `test_workflows/logs/20260505-232326-seven-lane-validation/01_android_kotlin/agent_report.md`
-- Fix: exclude/remove/stub Genie module from Kotlin example app. Genie is deferred (see policy above); example must compile and launch without it. Options: drop the Genie dependency from `examples/android/RunAnywhereAI/app/build.gradle.kts`, delete any Genie source references, or replace with a compile-time stub.
+- Fix: exclude/remove/stub Genie module from Kotlin example app. Genie is deferred; the example must compile and launch without it.
 
 #### BUG-RN-E2E-R2-001 — rac_model_paths_get_model_folder fails on every download
-- Lane: 03_react_native_android — blocks LLM/STT/TTS/VAD/Voice/VLM/RAG/ToolCalling/StructuredOutput downloads
+- Lane: 03_react_native_android — blocks LLM/STT/TTS/VAD/Voice/VLM/RAG/ToolCalling/StructuredOutput downloads.
 - Evidence: `test_workflows/logs/20260505-232326-seven-lane-validation/03_react_native_android/agent_report.md`
-- Root-cause: RN Nitro platform adapter not wiring `base_dir` into commons OR proto framework UNKNOWN. Possibly same class as BUG-WEB-E2E-R2-001.
+- Root cause: Nitro platform adapter is not wiring `base_dir` into commons or proto framework is UNKNOWN.
 
-#### BUG-FLT-E2E-R2-002 — DownloadProgress proto wire-format drift (Flutter Android)
-- Lane: 05_flutter_android — 7783 decode errors during one download; UI stalls at 91%
-- Evidence: `test_workflows/logs/20260505-232326-seven-lane-validation/05_flutter_android/logs/android_snapshot_during_download.log`
-- Fix: regenerate Dart `DownloadProgress` proto bindings; verify vs C++ rac_download_progress_proto.
-
-#### BUG-FLT-E2E-R2-003 — xcframework missing rac_model_format_from_url_proto + rac_artifact_infer_from_url_proto
-- Lane: 06_flutter_ios — every catalog entry warns; downloads blocked
-- Evidence: `test_workflows/logs/20260505-232326-seven-lane-validation/06_flutter_ios/logs/ios_live.log`
-- Fix: audit `scripts/build-core-xcframework.sh` strip workaround scope.
+#### BUG-FLT-COMMONS-EVENT-001 — Flutter-safe commons event publish
+- Lane: 05_flutter_android + 06_flutter_ios — blocks safe worker-isolate model lifecycle calls.
+- Evidence: Flutter lifecycle loads can publish commons events from worker execution paths while Dart callbacks are isolate-bound.
+- Status: Flutter-side listener registration landed with `NativeCallable.listener`; keep open as validation-gated until real model-load event traffic proves clean.
+- Fallback fix if validation fails: add a commons event queue drained on the originating Dart isolate boundary.
+- Close criteria: Flutter Android and iOS can download, load, and run real inference with event publication enabled and no Dart VM cross-isolate callback abort.
 
 #### BUG-WEB-E2E-R2-001 — WASM missing _rac_model_paths_set_base_dir export
-- Lane: 07_web — every download fails; size-independent
+- Lane: 07_web — every download fails; size-independent.
 - Evidence: `test_workflows/logs/20260505-232326-seven-lane-validation/07_web/agent_report.md`
 - Fix: re-add to `EXPORTED_FUNCTIONS` in `sdk/runanywhere-web/wasm/scripts/build.sh`; rebuild.
 
-### HIGH — lane-specific (3)
-#### BUG-FLT-E2E-R2-001 — Flutter Android 16 KB page-size dialog (NDK 25 vs 27)
-- Fix: align Flutter NDK pin with Commons NDK 27 in `scripts/build-core-android.sh`.
+### HIGH — lane-specific
 
 #### BUG-WEB-E2E-R2-003 — ONNX+RAG backends disabled on Web
 - Fix: enable `RAC_WASM_ONNX=ON` + `RAC_BACKEND_RAG=ON` in WASM CMake preset; ship artifacts.
 
 #### BUG-BUILD-EXCLUSION-001 — SDKs + example apps must compile with deferred backends excluded/stubbed
-- Scope: all 5 SDKs (Swift, Kotlin, Flutter, React Native, Web) + all 5 example apps
-- Policy: Genie, MetalRT, WhisperKit, WhisperKit CoreML, WhisperCPP, Diffusion (CoreML), whisperkit_coreml are deferred and must not block compilation
-- Current known failures: Kotlin example (Genie AAR reference — see BUG-KOT-E2E-R2-001)
-- Next-action: audit each SDK + example for hard references to deferred backends (imports, Gradle deps, CocoaPods specs, npm deps, CMake targets, xcframework stripping rules) and replace with stubs or remove.
+- Scope: all 5 SDKs + all 5 example apps.
+- Policy: deferred backends must not block compilation.
+- Current known failure: Kotlin example Genie AAR reference.
+- Next action: audit each SDK + example for hard references to deferred backends and replace with stubs or remove.
 
-### MEDIUM (3)
+#### BUG-FLT-SWIFT-PARITY-001 — Flutter exact Swift parity cleanup
+- Scope: Flutter SDK public API, bridge slices, and Flutter docs.
+- Status: implementation pass landed: static `RunAnywhere`, generated-proto LLM request helpers, structured-output helpers, typed `ToolValue` C++ JSON helpers, RAG helpers, artifact accessors, deletion of stale wrappers, and Flutter doc cleanup.
+- Close criteria: Flutter analyze is clean, Swift/Flutter public surface audit has no unplanned drift, and docs list only current open items.
+
+### MEDIUM
+
 #### BUG-SWIFT-E2E-R2-001 — Swift STT "Use" button does not commit
 - Inspect `VoiceAgentViewModel.swift` STT commit path.
 
@@ -63,14 +64,34 @@ All previous waves (F-0 through F-7) DONE and removed from this doc.
 #### BUG-RN-E2E-R2-002 — RN iOS LLM Get button never transitions + a11y
 - Add model name+state to accessibility labels; instrument Nitro download progress callback on iOS sim.
 
-### LOW (4)
+#### BUG-FLT-REGISTRY-001 — Flutter download success does not refresh model registry
+- Lane: 05_flutter_android + 06_flutter_ios.
+- Status: implementation landed: download completion refreshes the registry, resolves local paths, and emits a generated model download-completed event.
+- Close criteria: after a fresh download, the model appears in the registry immediately and can be loaded in the same app session.
+
+### LOW
+
 #### BUG-WEB-E2E-R2-002 — racommons-llamacpp-webgpu.wasm not shipped
+
 #### BUG-WEB-E2E-R2-004 — Web chat hangs on "..." when no model loaded
+
 #### BUG-RN-E2E-R2-003 — RN iOS bundle-ID doc drift in test_workflows
-#### BUG-FLT-E2E-R2-004 — Flutter iOS rac_http_request_send -151 silent auth fail
+
+#### BUG-FLT-IOS-KEYCHAIN-001 — residual iOS secure-storage entitlement warning
+- Lane: 06_flutter_ios.
+- Fix: investigate remaining `-34018` keychain/entitlement warnings if they persist after the Flutter parity pass.
+- Close criteria: graceful fallback remains confirmed, and auth/device-registration behavior is not masked by fallback.
+
+## Removed from active tracking
+
+- Flutter Wave/R2 rows that are already closed: HTTP transport FQN, proto flood, closed plugin-routing symptoms, NDK/page-size alignment, stale xcframework symbol rows, and reverted Dart isolate experiments.
+- Deferred-backend gaps whose only failure is deferred backend incompleteness.
+- Historical wave plans. Git history and validation logs remain the audit trail.
 
 ## Convergence criteria
 
-- All 15 BUG rows drained (one commit each) → re-run seven-lane E2E → zero FAIL modalities in failure_summary.tsv.
-- All 5 SDKs + all 5 example apps compile green (with deferred backends excluded/stubbed per policy).
-- Existing per-layer gap docs (cpp-layer.md, idl.md, engines.md, runtimes.md, swift.md, kotlin.md, flutter.md, react-native.md, web.md) reflect only currently-open items.
+- All current BUG rows drained, with one commit per code fix where practical.
+- Seven-lane E2E re-run shows zero FAIL modalities in `failure_summary.tsv`.
+- All 5 SDKs + all 5 example apps compile green with deferred backends excluded or stubbed.
+- Existing per-layer gap docs reflect only currently open items.
+- Flutter-specific success is not reported until both Flutter lanes complete fresh install, continuous logs, model download, model load, real inference, screenshots, and log review.

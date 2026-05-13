@@ -200,7 +200,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
       return;
     }
 
-    if (!sdk.RunAnywhereSDK.instance.llm.isLoaded) {
+    if (!sdk.RunAnywhere.llm.isLoaded) {
       setState(() {
         _errorMessage = 'LLM model not loaded. Please load a model first.';
       });
@@ -234,7 +234,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   }
 
   Future<void> _generateNonStream(StructuredOutputExample example) async {
-    final result = await sdk.RunAnywhereSDK.instance.llm.generate(
+    final result = await sdk.RunAnywhere.llm.generate(
       _promptController.text,
       sdk.LLMGenerationOptions(
         maxTokens: 1000,
@@ -254,7 +254,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   Future<void> _generateStream(StructuredOutputExample example) async {
     // Wave 2: streaming returns Stream<LLMStreamEvent>; structured-output
     // parsing happens on the accumulated text after the terminal event.
-    final eventStream = sdk.RunAnywhereSDK.instance.llm.generateStream(
+    final eventStream = sdk.RunAnywhere.llm.generateStream(
       _promptController.text,
       sdk.LLMGenerationOptions(
         maxTokens: 1000,

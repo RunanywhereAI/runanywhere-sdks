@@ -96,7 +96,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize SDK and register backends
-  await RunAnywhereSDK.instance.initialize();
+  await RunAnywhere.initialize();
   await Onnx.register();
   await LlamaCpp.register();
 
@@ -107,7 +107,7 @@ void main() async {
 ### Text Generation (LLM)
 
 ```dart
-final stream = RunAnywhereSDK.instance.llm
+final stream = RunAnywhere.llm
     .generateStream('Tell me a joke', LLMGenerationOptions(maxTokens: 128));
 await for (final event in stream) {
   if (event.isFinal) break;
@@ -118,7 +118,7 @@ await for (final event in stream) {
 ### Speech-to-Text
 
 ```dart
-final result = await RunAnywhereSDK.instance.stt.transcribe(audioData);
+final result = await RunAnywhere.stt.transcribe(audioData);
 print(result.text);
 ```
 

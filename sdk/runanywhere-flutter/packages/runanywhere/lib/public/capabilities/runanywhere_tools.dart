@@ -27,7 +27,10 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolDefinition,
         ToolParseRequest,
         ToolPromptFormatRequest,
-        ToolResult;
+        ToolResult,
+        ToolValue,
+        ToolValueArray,
+        ToolValueObject;
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 
 /// Executor signature for a tool call.
@@ -39,9 +42,15 @@ import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 typedef ToolExecutor = Future<Map<String, dynamic>> Function(
     Map<String, dynamic> args);
 
+/// Executor signature for callers that want generated-proto tool values
+/// instead of untyped JSON maps.
+typedef TypedToolExecutor = Future<Map<String, ToolValue>> Function(
+  Map<String, ToolValue> args,
+);
+
 /// Tools (function calling) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.tools`.
+/// Access via `RunAnywhere.tools`.
 class RunAnywhereTools {
   RunAnywhereTools._();
   static final RunAnywhereTools _instance = RunAnywhereTools._();
@@ -61,6 +70,26 @@ class RunAnywhereTools {
     _toolDefinitions[definition.name] = definition;
     _toolExecutors[definition.name] = executor;
     _logger.info('Registered tool: ${definition.name}');
+  }
+
+  /// Register a tool using generated [ToolValue] arguments and results.
+  ///
+  /// Mirrors Swift's `ToolExecutor = ([String: RAToolValue]) async throws ->
+  /// [String: RAToolValue]`. JSON conversion is delegated to commons via
+  /// `rac_tool_value_*_proto`.
+  void registerTypedTool(
+    ToolDefinition definition,
+    TypedToolExecutor executor,
+  ) {
+    registerTool(definition, (args) async {
+      final typedArgs = ToolValues.parseObjectJSON(jsonEncode(args));
+      final typedResult = await executor(typedArgs);
+      final resultJson = ToolValues.jsonStringFromObject(typedResult);
+      final decoded = jsonDecode(resultJson);
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : <String, dynamic>{'value': decoded};
+    });
   }
 
   /// Unregister a tool by name.
@@ -281,11 +310,82 @@ class RunAnywhereTools {
 
   /// Parse a single tool call out of raw LLM output (no auto-execution).
   ToolCall? parseToolCall(String llmOutput) {
-    final result = DartBridgeToolCalling.shared
-        .parse(ToolParseRequest(text: llmOutput));
+    final result =
+        DartBridgeToolCalling.shared.parse(ToolParseRequest(text: llmOutput));
     if (!result.hasToolCall || result.toolCalls.isEmpty) return null;
     return result.toolCalls.first;
   }
 }
 
 Int64 _toFixnum(int value) => Int64(value);
+
+/// Generated-proto [ToolValue] helpers. Recursive JSON conversion lives in
+/// commons; this class only exposes ergonomic Dart entrypoints.
+abstract final class ToolValues {
+  static ToolValue string(String value) => ToolValue(stringValue: value);
+
+  static ToolValue intValue(int value) =>
+      ToolValue(numberValue: value.toDouble());
+
+  static ToolValue number(num value) =>
+      ToolValue(numberValue: value.toDouble());
+
+  static ToolValue boolean(bool value) => ToolValue(boolValue: value);
+
+  static ToolValue nullValue() => ToolValue(nullValue: true);
+
+  static ToolValue array(Iterable<ToolValue> values) =>
+      ToolValue(arrayValue: ToolValueArray(values: values));
+
+  static ToolValue object(Map<String, ToolValue> fields) =>
+      ToolValue(objectValue: ToolValueObject(fields: fields));
+
+  static String toJSONString(ToolValue value) =>
+      DartBridgeToolCalling.shared.toolValueToJson(value);
+
+  static ToolValue fromJSONString(String json) =>
+      DartBridgeToolCalling.shared.toolValueFromJson(json);
+
+  static Map<String, ToolValue> parseObjectJSON(String json) {
+    final value = fromJSONString(json);
+    return value.hasObjectValue()
+        ? Map.unmodifiable(value.objectValue.fields)
+        : const <String, ToolValue>{};
+  }
+
+  static String jsonStringFromObject(Map<String, ToolValue> object) =>
+      toJSONString(ToolValue(objectValue: ToolValueObject(fields: object)));
+}
+
+extension ToolValueAccessors on ToolValue {
+  String? get string {
+    return hasStringValue() ? stringValue : null;
+  }
+
+  double? get number {
+    return hasNumberValue() ? numberValue : null;
+  }
+
+  int? get intValue {
+    final value = number;
+    return value?.toInt();
+  }
+
+  bool? get boolean {
+    return hasBoolValue() ? boolValue : null;
+  }
+
+  List<ToolValue>? get array {
+    return hasArrayValue() ? List.unmodifiable(arrayValue.values) : null;
+  }
+
+  Map<String, ToolValue>? get object {
+    return hasObjectValue() ? Map.unmodifiable(objectValue.fields) : null;
+  }
+
+  bool get isNull => hasNullValue() && nullValue;
+
+  String? toJSONString() {
+    return ToolValues.toJSONString(this);
+  }
+}

@@ -1,10 +1,14 @@
 # RunAnywhere Flutter SDK – API Reference
 
+> Updated: 2026-05-13. This API reference is being kept aligned with the
+> current Flutter implementation plan while code is in progress. It should not
+> be read as a final validation report until Flutter Android and iOS E2E pass.
+
 Public API documentation for the RunAnywhere Flutter SDK.
 
-All entry points hang off the `RunAnywhereSDK.instance` singleton. Each capability
-is a property on that singleton (lazy-initialized), so usage looks like
-`RunAnywhereSDK.instance.<capability>.<method>(...)`.
+All entry points hang off the `RunAnywhere` static namespace. Each capability
+is a static property on that namespace, so usage looks like
+`RunAnywhere.<capability>.<method>(...)`.
 
 ```dart
 import 'package:runanywhere/runanywhere.dart';
@@ -14,7 +18,7 @@ import 'package:runanywhere/runanywhere.dart';
 
 ## Table of Contents
 
-1. [Entry Point — `RunAnywhereSDK`](#entry-point--runanywheresdk)
+1. [Entry Point — `RunAnywhere`](#entry-point--runanywhere)
 2. [Capabilities](#capabilities)
    - [`llm` — Language Model](#llm--language-model)
    - [`stt` — Speech-to-Text](#stt--speech-to-text)
@@ -36,63 +40,60 @@ import 'package:runanywhere/runanywhere.dart';
 
 ---
 
-## Entry Point — `RunAnywhereSDK`
+## Entry Point — `RunAnywhere`
 
 ```dart
-class RunAnywhereSDK {
-  static RunAnywhereSDK get instance;
-
+abstract final class RunAnywhere {
   // Lifecycle
-  bool get isInitialized;
-  bool get isActive;
-  bool get areServicesReady;
-  String get version;
-  SDKEnvironment? get environment;
+  static bool get isInitialized;
+  static bool get isActive;
+  static bool get areServicesReady;
+  static String get version;
+  static SDKEnvironment? get environment;
 
   // Identity (set after authentication)
-  String get deviceId;
-  String? get userId;
-  String? get organizationId;
-  bool get isAuthenticated;
+  static String get deviceId;
+  static String? get userId;
+  static String? get organizationId;
+  static bool get isAuthenticated;
 
   // Capability accessors
-  RunAnywhereLLM            get llm;
-  RunAnywhereSTT            get stt;
-  RunAnywhereTTS            get tts;
-  RunAnywhereVAD            get vad;
-  RunAnywhereVLM            get vlm;
-  RunAnywhereVLMModels      get vlmModels;
-  RunAnywhereVoice          get voice;
-  RunAnywhereVoiceAgent     get voiceAgent;
-  RunAnywhereModels         get models;
-  RunAnywhereModelLifecycle get modelLifecycle;
-  RunAnywhereDownloads      get downloads;
-  RunAnywhereTools          get tools;
-  RunAnywhereRAG            get rag;
-  RunAnywhereSolutions      get solutions;
-  RunAnywhereDiffusion      get diffusion;
-  RunAnywhereEmbeddings     get embeddings;
-  RunAnywhereLoRACapability get lora;
-  RunAnywhereHardware       get hardware;
-  RunAnywhereVLM            get visionLanguage;
-  RunAnywherePluginLoader   get pluginLoader;
+  static RunAnywhereLLM            get llm;
+  static RunAnywhereSTT            get stt;
+  static RunAnywhereTTS            get tts;
+  static RunAnywhereVAD            get vad;
+  static RunAnywhereVLM            get vlm;
+  static RunAnywhereVLM            get visionLanguage;
+  static RunAnywhereVoice          get voice;
+  static RunAnywhereModels         get models;
+  static RunAnywhereModelLifecycle get modelLifecycle;
+  static RunAnywhereDownloads      get downloads;
+  static RunAnywhereTools          get tools;
+  static RunAnywhereRAG            get rag;
+  static RunAnywhereSolutions      get solutions;
+  static RunAnywhereDiffusion      get diffusion;
+  static RunAnywhereEmbeddings     get embeddings;
+  static RunAnywhereLoRACapability get lora;
+  static RunAnywhereHardware       get hardware;
+  static RunAnywherePluginLoader   get pluginLoader;
 
   // Convenience model-state accessors
-  bool get isLLMModelLoaded;
-  bool get isSTTModelLoaded;
-  bool get isTTSVoiceLoaded;
-  bool get isVADModelLoaded;
-  Future<ModelInfo?> get currentLLMModel;
+  static bool get isLLMModelLoaded;
+  static bool get isSTTModelLoaded;
+  static bool get isTTSVoiceLoaded;
+  static bool get isVADModelLoaded;
+  static Future<ModelInfo?> get currentLLMModel;
 
   // SDK event stream (proto-typed)
-  Stream<SDKEvent> get sdkEvents;
+  static EventBus get events;
 }
 ```
 
 ### `initialize`
 
-Two-phase init: Phase 1 (sync — load lib, register adapter, configure logging, `rac_sdk_init`)
-runs immediately; Phase 2 (async — device registration + auth) runs in the background.
+Two-phase init: Phase 1 (sync — load lib, register adapter, configure logging,
+`rac_sdk_init_phase1_proto`) runs immediately; Phase 2 (`rac_sdk_init_phase2_proto`,
+device registration + auth) runs in the background.
 
 ```dart
 Future<void> initialize({
@@ -106,9 +107,9 @@ Offline inference works without Phase 2 completing. Call `completeServicesInitia
 to wait for Phase 2 if you need authentication or device registration to be done.
 
 ```dart
-await RunAnywhereSDK.instance.initialize();  // development mode
+await RunAnywhere.initialize();  // development mode
 
-await RunAnywhereSDK.instance.initialize(
+await RunAnywhere.initialize(
   apiKey: '<YOUR_API_KEY>',
   baseURL: 'https://api.runanywhere.ai',
   environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
@@ -137,16 +138,16 @@ class RunAnywhereLLM {
 ```
 
 ```dart
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
 
 // Non-streaming
-final result = await RunAnywhereSDK.instance.llm.generate(
+final result = await RunAnywhere.llm.generate(
   'Explain quantum computing.',
   LLMGenerationOptions(maxTokens: 200, temperature: 0.7),
 );
 
 // Streaming
-final stream = RunAnywhereSDK.instance.llm.generateStream(
+final stream = RunAnywhere.llm.generateStream(
   'Tell me a story.',
   LLMGenerationOptions(maxTokens: 150),
 );
@@ -174,8 +175,8 @@ Audio: PCM16, 16 kHz mono. `STTOutput` is proto-typed (`text`, `confidence`, `se
 `detectedLanguage`).
 
 ```dart
-await RunAnywhereSDK.instance.stt.load('sherpa-onnx-whisper-tiny.en');
-final result = await RunAnywhereSDK.instance.stt.transcribe(audioBytes);
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
+final result = await RunAnywhere.stt.transcribe(audioBytes);
 print(result.text);
 ```
 
@@ -195,8 +196,8 @@ class RunAnywhereTTS {
 ```
 
 ```dart
-await RunAnywhereSDK.instance.tts.loadVoice('vits-piper-en_US-lessac-medium');
-final result = await RunAnywhereSDK.instance.tts.synthesize(
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
+final result = await RunAnywhere.tts.synthesize(
   'Hello world.',
   TTSOptions(rate: 1.0, pitch: 1.0),
 );
@@ -245,19 +246,19 @@ class RunAnywhereVoice {
 `VoiceEvent` has oneof payload: `state`, `vad`, `userSaid`, `assistantToken`, `audio`, `error`.
 
 ```dart
-await RunAnywhereSDK.instance.stt.load('sherpa-onnx-whisper-tiny.en');
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
-await RunAnywhereSDK.instance.tts.loadVoice('vits-piper-en_US-lessac-medium');
-await RunAnywhereSDK.instance.voice.initializeWithLoadedModels();
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
+await RunAnywhere.voice.initializeWithLoadedModels();
 
-final sub = RunAnywhereSDK.instance.voice.eventStream().listen((e) {
+final sub = RunAnywhere.voice.eventStream().listen((e) {
   if (e.hasUserSaid())        print('User: ${e.userSaid.text}');
   if (e.hasAssistantToken())  stdout.write(e.assistantToken.text);
 });
 
-await RunAnywhereSDK.instance.voice.start();
+await RunAnywhere.voice.start();
 // ... later
-await RunAnywhereSDK.instance.voice.stop();
+await RunAnywhere.voice.stop();
 await sub.cancel();
 ```
 
@@ -292,7 +293,7 @@ class RunAnywhereModels {
 Single-file:
 
 ```dart
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: Uri.parse('https://huggingface.co/.../SmolLM2-360M.Q8_0.gguf'),
@@ -304,7 +305,7 @@ RunAnywhereSDK.instance.models.register(
 Multi-file (VLM with `mmproj` companion, RAG embeddings with vocab.txt, etc.):
 
 ```dart
-RunAnywhereSDK.instance.models.registerMultiFile(
+RunAnywhere.models.registerMultiFile(
   id: 'qwen2-vl-2b-instruct-q4_k_m',
   name: 'Qwen2-VL 2B Instruct',
   files: [
@@ -330,7 +331,7 @@ class RunAnywhereDownloads {
 ```
 
 ```dart
-final stream = RunAnywhereSDK.instance.downloads.start('smollm2-360m-q8_0');
+final stream = RunAnywhere.downloads.start('smollm2-360m-q8_0');
 await for (final p in stream) {
   final pct = (p.stageProgress * 100).clamp(0.0, 100.0);
   print('${p.stage}: ${pct.toStringAsFixed(1)}%');
@@ -400,12 +401,11 @@ await Onnx.register();
 
 ### `Genie` — `package:runanywhere_genie/runanywhere_genie.dart`
 
-Qualcomm Genie NPU LLM. Android + Snapdragon only.
+Qualcomm Genie NPU LLM is currently deferred. Do not treat missing Genie
+coverage as an active Flutter gap unless the deferred-backends policy changes.
 
 ```dart
-if (Genie.isAvailable) {
-  await Genie.register(priority: 200);
-}
+// Deferred backend; registration is out of scope for the current Flutter pass.
 ```
 
 ### `RAGModule`
@@ -442,7 +442,7 @@ All SDK errors surface as `SDKException` — a proto-backed unified error type w
 
 ```dart
 try {
-  await RunAnywhereSDK.instance.llm.load('nonexistent');
+  await RunAnywhere.llm.load('nonexistent');
 } on SDKException catch (e) {
   print('Error [${e.errorCode}]: ${e.message}');
 }
@@ -458,7 +458,7 @@ of string-matching messages.
 Subscribe to SDK-level lifecycle events:
 
 ```dart
-RunAnywhereSDK.instance.sdkEvents.listen((event) {
+RunAnywhere.events.allEvents.listen((event) {
   // event is proto-typed SDKEvent with oneof payload (init/model/download/...)
   print(event);
 });
@@ -516,14 +516,13 @@ Backend modules each export their own `register()`:
 ```dart
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
-import 'package:runanywhere_genie/runanywhere_genie.dart';
 ```
 
 ---
 
 ## Versioning
 
-- Canonical SDK version: `RunAnywhereSDK.instance.version` (currently `0.19.13`).
+- Canonical SDK version: `RunAnywhere.version` (currently `0.19.13`).
 - Native commons version: vendored `RACommons` build (`0.1.6`).
 - llama.cpp engine: `b7199`.
 - ONNX Runtime: `1.23.2`.

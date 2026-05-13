@@ -15,7 +15,7 @@ import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
 /// Plugin Loader capability surface (canonical §12 namespace).
 ///
-/// Access via `RunAnywhereSDK.instance.pluginLoader`.
+/// Access via `RunAnywhere.pluginLoader`.
 class RunAnywherePluginLoaderCapability {
   RunAnywherePluginLoaderCapability._();
   static final RunAnywherePluginLoaderCapability _instance =

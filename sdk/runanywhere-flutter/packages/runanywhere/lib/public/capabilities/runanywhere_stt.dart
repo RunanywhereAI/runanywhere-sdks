@@ -27,7 +27,7 @@ import 'package:runanywhere/public/extensions/stt/stt_options_helpers.dart';
 
 /// STT (speech-to-text) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.stt`. Load/current/unload state is owned
+/// Access via `RunAnywhere.stt`. Load/current/unload state is owned
 /// by commons lifecycle; one-shot transcription uses the lifecycle-owned
 /// generated-proto commons ABI.
 class RunAnywhereSTT {

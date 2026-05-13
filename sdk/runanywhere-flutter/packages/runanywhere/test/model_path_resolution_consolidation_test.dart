@@ -252,9 +252,11 @@ void main() {
       final source = File(
         'lib/public/capabilities/runanywhere_tts.dart',
       ).readAsStringSync();
+      final bridge = File('lib/native/dart_bridge_tts.dart').readAsStringSync();
 
       expect(source, contains('Stream<TTSOutput> synthesizeStream'));
-      expect(source, contains('rac_tts_synthesize_stream_lifecycle_proto'));
+      expect(source, contains('synthesizeStreamLifecycleProto'));
+      expect(bridge, contains('rac_tts_synthesize_stream_lifecycle_proto'));
       expect(source, isNot(contains('DartBridge.tts.synthesizeStreamProto')));
       expect(source, isNot(contains('Stream<Uint8List> synthesizeStream')));
       expect(source, isNot(contains('onAudioChunk')));

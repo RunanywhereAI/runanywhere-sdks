@@ -874,7 +874,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      final sdkModels = await sdk.RunAnywhereSDK.instance.models.available();
+      final sdkModels = await sdk.RunAnywhere.models.available();
       final sdkModel = sdkModels.firstWhere(
         (sdk.ModelInfo m) => m.id == widget.model.id,
         orElse: () =>
@@ -882,7 +882,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
       );
 
       final downloadProgress =
-          sdk.RunAnywhereSDK.instance.downloads.start(sdkModel.id);
+          sdk.RunAnywhere.downloads.start(sdkModel.id);
 
       // Listen to real download progress
       await for (final progress in downloadProgress) {

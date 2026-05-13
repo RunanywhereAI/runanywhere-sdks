@@ -18,7 +18,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// VLM (vision-language model) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.vlm`.
+/// Access via `RunAnywhere.vlm`.
 class RunAnywhereVLM {
   RunAnywhereVLM._();
   static final RunAnywhereVLM _instance = RunAnywhereVLM._();

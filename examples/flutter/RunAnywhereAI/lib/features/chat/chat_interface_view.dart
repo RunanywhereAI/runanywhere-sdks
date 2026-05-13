@@ -79,7 +79,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   /// Sync model state from SDK (v4.0 API).
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
+    final model = await sdk.RunAnywhere.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -91,7 +91,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool get _canSend =>
       _controller.text.isNotEmpty &&
       !_isGenerating &&
-      sdk.RunAnywhereSDK.instance.llm.isLoaded;
+      sdk.RunAnywhere.llm.isLoaded;
 
   Future<void> _sendMessage() async {
     if (!_canSend) return;
@@ -211,7 +211,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final messageIndex = _messages.length - 1;
 
     try {
-      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
+      final result = await sdk.RunAnywhere.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
           maxIterations: 3,
@@ -306,7 +306,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
       // collect token text off each non-terminal event.
       final eventStream =
-          sdk.RunAnywhereSDK.instance.llm.generateStream(prompt, options);
+          sdk.RunAnywhere.llm.generateStream(prompt, options);
 
       await for (final event in eventStream) {
         if (event.isFinal) {
@@ -381,7 +381,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
     try {
       final result =
-          await sdk.RunAnywhereSDK.instance.llm.generate(prompt, options);
+          await sdk.RunAnywhere.llm.generate(prompt, options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -553,7 +553,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)
     LLMFramework? framework;
-    if (sdk.RunAnywhereSDK.instance.llm.isLoaded && _loadedFramework != null) {
+    if (sdk.RunAnywhere.llm.isLoaded && _loadedFramework != null) {
       framework = _mapInferenceFramework(_loadedFramework);
     }
 

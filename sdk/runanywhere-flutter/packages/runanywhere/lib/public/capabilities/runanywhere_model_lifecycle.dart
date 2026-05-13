@@ -76,10 +76,20 @@ class ModelLifecycleResolvedArtifactPaths {
   const ModelLifecycleResolvedArtifactPaths({
     required this.primaryModelPath,
     this.visionProjectorPath,
+    this.tokenizerPath,
+    this.configPath,
+    this.vocabularyPath,
+    this.mergesPath,
+    this.labelsPath,
   });
 
   final String primaryModelPath;
   final String? visionProjectorPath;
+  final String? tokenizerPath;
+  final String? configPath;
+  final String? vocabularyPath;
+  final String? mergesPath;
+  final String? labelsPath;
 }
 
 extension ModelLoadResultResolvedArtifacts on ModelLoadResult {
@@ -90,6 +100,23 @@ extension ModelLoadResultResolvedArtifacts on ModelLoadResult {
 
   String? get resolvedVisionProjectorPath =>
       resolvedArtifacts.visionProjectorPath;
+
+  String? get resolvedTokenizerPath => resolvedArtifacts.tokenizerPath;
+
+  String? get resolvedConfigPath => resolvedArtifacts.configPath;
+
+  String? get resolvedVocabularyPath => resolvedArtifacts.vocabularyPath;
+
+  String? get resolvedMergesPath => resolvedArtifacts.mergesPath;
+
+  String? get resolvedLabelsPath => resolvedArtifacts.labelsPath;
+
+  String? get lifecyclePrimaryArtifactPath {
+    final primary = resolvedPrimaryModelPath;
+    if (primary != null) return primary;
+    final path = resolvedPath.trim();
+    return path.isEmpty ? null : path;
+  }
 
   ModelLifecycleResolvedArtifactPaths requireResolvedArtifactPaths() =>
       resolvedArtifacts.requireModelLifecycleResolvedArtifactPaths(
@@ -105,6 +132,23 @@ extension CurrentModelResultResolvedArtifacts on CurrentModelResult {
 
   String? get resolvedVisionProjectorPath =>
       resolvedArtifacts.visionProjectorPath;
+
+  String? get resolvedTokenizerPath => resolvedArtifacts.tokenizerPath;
+
+  String? get resolvedConfigPath => resolvedArtifacts.configPath;
+
+  String? get resolvedVocabularyPath => resolvedArtifacts.vocabularyPath;
+
+  String? get resolvedMergesPath => resolvedArtifacts.mergesPath;
+
+  String? get resolvedLabelsPath => resolvedArtifacts.labelsPath;
+
+  String? get lifecyclePrimaryArtifactPath {
+    final primary = resolvedPrimaryModelPath;
+    if (primary != null) return primary;
+    final path = resolvedPath.trim();
+    return path.isEmpty ? null : path;
+  }
 
   ModelLifecycleResolvedArtifactPaths requireResolvedArtifactPaths() =>
       resolvedArtifacts.requireModelLifecycleResolvedArtifactPaths(
@@ -137,6 +181,26 @@ extension ModelFileDescriptorRoleLookup on Iterable<ModelFileDescriptor> {
         ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
       );
 
+  String? get tokenizerPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_TOKENIZER,
+      );
+
+  String? get configPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_CONFIG,
+      );
+
+  String? get vocabularyPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_VOCABULARY,
+      );
+
+  String? get mergesPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_MERGES,
+      );
+
+  String? get labelsPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_LABELS,
+      );
+
   ModelLifecycleResolvedArtifactPaths
       requireModelLifecycleResolvedArtifactPaths({
     required String context,
@@ -151,6 +215,11 @@ extension ModelFileDescriptorRoleLookup on Iterable<ModelFileDescriptor> {
     return ModelLifecycleResolvedArtifactPaths(
       primaryModelPath: primary,
       visionProjectorPath: visionProjectorPath,
+      tokenizerPath: tokenizerPath,
+      configPath: configPath,
+      vocabularyPath: vocabularyPath,
+      mergesPath: mergesPath,
+      labelsPath: labelsPath,
     );
   }
 }

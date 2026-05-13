@@ -1,3 +1,4 @@
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
@@ -136,7 +137,18 @@ class SDKInitParams {
     required this.apiKey,
     required this.baseURL,
     this.environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-  });
+  }) {
+    final result = DartBridgeEnvironment.instance.validateConfig(
+      environment: environment,
+      apiKey: apiKey,
+      baseURL: baseURL.toString(),
+    );
+    if (!result.isValid) {
+      throw SDKException.validationFailed(
+        DartBridgeEnvironment.instance.getValidationErrorMessage(result),
+      );
+    }
+  }
 
   factory SDKInitParams.fromString({
     required String apiKey,
@@ -160,7 +172,8 @@ class SDKInitParams {
     );
     return SDKInitParams(
       apiKey: apiKey,
-      baseURL: supabaseConfig?.projectURL ?? Uri.parse('http://localhost'),
+      baseURL: supabaseConfig?.projectURL ??
+          Uri.parse('https://dev.runanywhere.local'),
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     );
   }

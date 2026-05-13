@@ -62,7 +62,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize SDK
-  await RunAnywhereSDK.instance.initialize();
+  await RunAnywhere.initialize();
 
   // Register LlamaCpp backend
   await LlamaCpp.register();
@@ -76,7 +76,7 @@ void main() async {
 Use the core SDK registry — backends do not own model catalogs.
 
 ```dart
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: Uri.parse('https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf'),
@@ -89,22 +89,22 @@ RunAnywhereSDK.instance.models.register(
 
 ```dart
 // Download the model
-final progress = RunAnywhereSDK.instance.downloads.start('smollm2-360m-q8_0');
+final progress = RunAnywhere.downloads.start('smollm2-360m-q8_0');
 await for (final p in progress) {
   print('${p.stage}: ${(p.stageProgress * 100).toStringAsFixed(1)}%');
   if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
 
 // Load the model
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
-print('Model loaded: ${RunAnywhereSDK.instance.isLLMModelLoaded}');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
+print('Model loaded: ${RunAnywhere.isLLMModelLoaded}');
 ```
 
 ### 4. Generate Text
 
 ```dart
 // Streaming generation
-final stream = RunAnywhereSDK.instance.llm.generateStream(
+final stream = RunAnywhere.llm.generateStream(
   'Write a short poem about Flutter',
   LLMGenerationOptions(maxTokens: 100, temperature: 0.7),
 );
@@ -115,7 +115,7 @@ await for (final event in stream) {
 }
 
 // Non-streaming with metrics
-final result = await RunAnywhereSDK.instance.llm.generate(
+final result = await RunAnywhere.llm.generate(
   'Tell me a fact.',
   LLMGenerationOptions(maxTokens: 64),
 );
@@ -145,7 +145,7 @@ The `LlamaCpp` module does not own a model catalog. Register your GGUF models
 through the core SDK after calling `LlamaCpp.register()`:
 
 ```dart
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'my-model',
   name: 'My Model',
   url: Uri.parse('https://.../my-model.gguf'),
@@ -156,7 +156,7 @@ RunAnywhereSDK.instance.models.register(
 ```
 
 Multi-file VLM models (main GGUF + `mmproj`) use
-`RunAnywhereSDK.instance.models.registerMultiFile(...)`.
+`RunAnywhere.models.registerMultiFile(...)`.
 
 ---
 
@@ -195,7 +195,7 @@ Any GGUF model compatible with llama.cpp:
 
 ```dart
 // Get available models with their memory requirements
-final models = await RunAnywhereSDK.instance.models.available();
+final models = await RunAnywhere.models.available();
 for (final model in models) {
   if (model.downloadSize != null) {
     print('${model.name}: ${(model.downloadSize! / 1e9).toStringAsFixed(1)} GB');
@@ -207,7 +207,7 @@ for (final model in models) {
 
 ```dart
 // Unload to free memory
-await RunAnywhereSDK.instance.llm.unload();
+await RunAnywhere.llm.unload();
 ```
 
 ---
@@ -215,7 +215,7 @@ await RunAnywhereSDK.instance.llm.unload();
 ## Generation Options
 
 ```dart
-final result = await RunAnywhereSDK.instance.llm.generate(
+final result = await RunAnywhere.llm.generate(
   'Your prompt here',
   LLMGenerationOptions(
     maxTokens: 200,           // Maximum tokens to generate

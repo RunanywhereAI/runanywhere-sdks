@@ -11,7 +11,7 @@ import 'package:runanywhere/native/dart_bridge_hardware.dart';
 
 /// Hardware profile capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.hardware`.
+/// Access via `RunAnywhere.hardware`.
 class RunAnywhereHardware {
   RunAnywhereHardware._();
   static final RunAnywhereHardware _instance = RunAnywhereHardware._();

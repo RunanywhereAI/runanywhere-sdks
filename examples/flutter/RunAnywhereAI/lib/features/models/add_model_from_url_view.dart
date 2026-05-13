@@ -388,7 +388,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
       final sizeText = _sizeController.text.trim();
       final estimatedSize = sizeText.isNotEmpty ? int.tryParse(sizeText) : null;
 
-      sdk.RunAnywhereSDK.instance.models.register(
+      sdk.RunAnywhere.models.register(
         name: name,
         url: Uri.parse(url),
         framework: _selectedFramework,

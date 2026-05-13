@@ -1,5 +1,5 @@
 // solutions_view.dart — Wave 3 Step 3.3 (G-E6) demo for
-// `RunAnywhereSDK.instance.solutions.run(yaml: ...)`.
+// `RunAnywhere.solutions.run(yaml: ...)`.
 //
 // Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
 // shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are
@@ -71,7 +71,7 @@ class _SolutionsViewState extends State<SolutionsView> {
     setState(() => _isRunning = true);
     _append('→ $name: creating solution from YAML…');
     try {
-      final handle = await RunAnywhereSDK.instance.solutions.run(yaml: yaml);
+      final handle = await RunAnywhere.solutions.run(yaml: yaml);
       _append('✓ $name: handle created. Calling start()…');
       handle.start();
       _append('✓ $name: started. Tearing down (demo).');

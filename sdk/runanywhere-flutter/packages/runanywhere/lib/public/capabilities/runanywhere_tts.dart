@@ -23,7 +23,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
 /// TTS (text-to-speech) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.tts`. Load/current/unload state is owned
+/// Access via `RunAnywhere.tts`. Load/current/unload state is owned
 /// by commons lifecycle; one-shot synthesis uses the lifecycle-owned
 /// generated-proto commons ABI.
 class RunAnywhereTTS {

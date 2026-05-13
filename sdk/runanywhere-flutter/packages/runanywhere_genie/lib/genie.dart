@@ -24,7 +24,7 @@
 /// // Register the module (matches Swift: Genie.register())
 /// await Genie.register();
 ///
-/// // Register models through RunAnywhereSDK.instance.models after register()
+/// // Register models through RunAnywhere.models after register()
 /// // succeeds. The commons registry/router owns framework selection and routing.
 /// ```
 library runanywhere_genie;

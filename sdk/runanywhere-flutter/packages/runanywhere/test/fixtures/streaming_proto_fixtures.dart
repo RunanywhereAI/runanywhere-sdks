@@ -86,8 +86,8 @@ List<pb.VoiceEvent> voiceParityEvents() => <pb.VoiceEvent>[
     ];
 
 List<String> expectedVoiceParityLines() => <String>[
-      'vad:type=1',
-      'vad:type=2',
+      'vad:type=3,is_speech=true',
+      'vad:type=3,is_speech=false',
       'user_said:text=what is the weather today,is_final=true',
       'assistant_token:text=the weather is sunny and 72 degrees,is_final=true,kind=1',
       'audio:bytes=16,sample_rate=24000,channels=1,encoding=1',
@@ -113,7 +113,7 @@ String formatVoiceEvent(pb.VoiceEvent event) {
         'encoding=${audio.encoding.value}';
   }
   if (event.hasVad()) {
-    return 'vad:type=${event.vad.type.value}';
+    return 'vad:type=${event.vad.type.value},is_speech=${event.vad.isSpeech}';
   }
   if (event.hasState()) {
     return 'state:previous=${event.state.previous.value},'

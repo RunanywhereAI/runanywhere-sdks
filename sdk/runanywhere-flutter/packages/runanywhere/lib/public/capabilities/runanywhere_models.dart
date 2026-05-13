@@ -17,7 +17,7 @@ import 'package:runanywhere/public/runanywhere.dart';
 
 /// Model registry capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.models`.
+/// Access via `RunAnywhere.models`.
 class RunAnywhereModels {
   RunAnywhereModels._();
   static final RunAnywhereModels _instance = RunAnywhereModels._();
@@ -33,7 +33,7 @@ class RunAnywhereModels {
       throw SDKException.notInitialized();
     }
 
-    await RunAnywhereSDK.instance.runDiscoveryIfNeeded();
+    await RunAnywhere.runDiscoveryIfNeeded();
 
     final cppModels =
         await DartBridgeModelRegistry.instance.getAllProtoModels();
@@ -193,7 +193,7 @@ class RunAnywhereModels {
   }
 
   /// Update the download status / local path for a model in the C++
-  /// registry. Called by `ModelDownloadService` after a successful
+  /// registry. Called after a successful generated-proto download completes.
   /// download.
   Future<void> updateDownloadStatus(String modelId, String? localPath) =>
       DartBridgeModelRegistry.instance.updateDownloadStatus(modelId, localPath);

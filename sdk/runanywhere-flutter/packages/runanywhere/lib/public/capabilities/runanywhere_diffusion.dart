@@ -24,7 +24,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// Diffusion (image generation) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.diffusion`. Load/current/unload state is
+/// Access via `RunAnywhere.diffusion`. Load/current/unload state is
 /// owned by commons lifecycle; one-shot generation uses the lifecycle-owned
 /// generated-proto commons ABI.
 class RunAnywhereDiffusion {

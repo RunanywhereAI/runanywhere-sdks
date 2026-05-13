@@ -199,13 +199,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 1. Initialize SDK (development mode - no API key needed)
-  await RunAnywhereSDK.instance.initialize();
+  await RunAnywhere.initialize();
 
   // 2. Register backend modules
   await LlamaCpp.register();  // LLM backend (GGUF models)
   await Onnx.register();      // STT/TTS backend (Whisper, Piper)
 
-  print('RunAnywhere SDK initialized: v${RunAnywhereSDK.instance.version}');
+  print('RunAnywhere SDK initialized: v${RunAnywhere.version}');
 
   runApp(const MyApp());
 }
@@ -215,7 +215,7 @@ void main() async {
 
 ```dart
 // Register an LLM model
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: Uri.parse('https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf'),
@@ -224,7 +224,7 @@ RunAnywhereSDK.instance.models.register(
 );
 
 // Register an STT model
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Whisper Tiny English',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
@@ -233,7 +233,7 @@ RunAnywhereSDK.instance.models.register(
 );
 
 // Register a TTS voice
-RunAnywhereSDK.instance.models.register(
+RunAnywhere.models.register(
   id: 'vits-piper-en_US-lessac-medium',
   name: 'Piper US English',
   url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
@@ -246,22 +246,22 @@ RunAnywhereSDK.instance.models.register(
 
 ```dart
 // Download with progress
-final progressStream = RunAnywhereSDK.instance.downloads.start('smollm2-360m-q8_0');
+final progressStream = RunAnywhere.downloads.start('smollm2-360m-q8_0');
 await for (final p in progressStream) {
   print('Stage: ${p.stage}, progress: ${(p.stageProgress * 100).toStringAsFixed(1)}%');
   if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
 
 // Load the model
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
-print('Model loaded: ${RunAnywhereSDK.instance.isLLMModelLoaded}');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
+print('Model loaded: ${RunAnywhere.isLLMModelLoaded}');
 ```
 
 ### 4. Generate Text
 
 ```dart
 // Non-streaming with full metrics
-final result = await RunAnywhereSDK.instance.llm.generate(
+final result = await RunAnywhere.llm.generate(
   'Explain quantum computing in simple terms',
   LLMGenerationOptions(
     maxTokens: 200,
@@ -275,7 +275,7 @@ print('Speed: ${result.tokensPerSecond.toStringAsFixed(1)} tok/s');
 ### 5. Streaming Generation
 
 ```dart
-final stream = RunAnywhereSDK.instance.llm.generateStream(
+final stream = RunAnywhere.llm.generateStream(
   'Write a short poem about AI',
   LLMGenerationOptions(maxTokens: 150),
 );
@@ -293,10 +293,10 @@ await for (final event in stream) {
 
 ```dart
 // Load STT model
-await RunAnywhereSDK.instance.stt.load('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
 
 // Transcribe audio data (PCM16 at 16kHz mono)
-final result = await RunAnywhereSDK.instance.stt.transcribe(audioBytes);
+final result = await RunAnywhere.stt.transcribe(audioBytes);
 print('Text: ${result.text}');
 print('Confidence: ${result.confidence}');
 ```
@@ -305,10 +305,10 @@ print('Confidence: ${result.confidence}');
 
 ```dart
 // Load TTS voice
-await RunAnywhereSDK.instance.tts.loadVoice('vits-piper-en_US-lessac-medium');
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
 
 // Synthesize speech
-final ttsResult = await RunAnywhereSDK.instance.tts.synthesize(
+final ttsResult = await RunAnywhere.tts.synthesize(
   'Hello! Welcome to RunAnywhere.',
   TTSOptions(rate: 1.0, pitch: 1.0),
 );
@@ -320,15 +320,15 @@ final ttsResult = await RunAnywhereSDK.instance.tts.synthesize(
 
 ```dart
 // Ensure all components are loaded
-await RunAnywhereSDK.instance.stt.load('sherpa-onnx-whisper-tiny.en');
-await RunAnywhereSDK.instance.llm.load('smollm2-360m-q8_0');
-await RunAnywhereSDK.instance.tts.loadVoice('vits-piper-en_US-lessac-medium');
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
 
 // Initialize voice pipeline with the loaded models
-await RunAnywhereSDK.instance.voice.initializeWithLoadedModels();
+await RunAnywhere.voice.initializeWithLoadedModels();
 
 // Subscribe to the voice event stream
-final sub = RunAnywhereSDK.instance.voice.eventStream().listen((event) {
+final sub = RunAnywhere.voice.eventStream().listen((event) {
   if (event.hasUserSaid()) {
     print('User: ${event.userSaid.text}');
   } else if (event.hasAssistantToken()) {
@@ -370,7 +370,7 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 
 | Component | Description |
 |-----------|-------------|
-| **RunAnywhereSDK.instance** | Singleton entry point providing 20 capability accessors (llm, stt, tts, vad, vlm, voice, voiceAgent, models, downloads, tools, rag, ...) |
+| **RunAnywhere** | Singleton entry point providing 20 capability accessors (llm, stt, tts, vad, vlm, voice, voice, models, downloads, tools, rag, ...) |
 | **EventBus** | Pure `dart:async` broadcast stream for SDK events (no `rxdart` dependency) |
 | **DartBridge** | FFI bridge slices to the C++ commons library (33 `dart_bridge_*.dart` files) |
 | **ModelRegistry** | Model discovery, registration, and persistence via the C++ registry |
@@ -392,10 +392,10 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 
 ```dart
 // Development mode (default) - no API key needed
-await RunAnywhereSDK.instance.initialize();
+await RunAnywhere.initialize();
 
 // Production mode - requires API key and backend URL
-await RunAnywhereSDK.instance.initialize(
+await RunAnywhere.initialize(
   apiKey: '<YOUR_API_KEY>',
   baseURL: 'https://api.runanywhere.ai',
   environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
@@ -430,7 +430,7 @@ The SDK provides comprehensive error handling through `SDKError`:
 
 ```dart
 try {
-  final result = await RunAnywhereSDK.instance.llm.generate(
+  final result = await RunAnywhere.llm.generate(
     'Hello!',
     LLMGenerationOptions(maxTokens: 64),
   );
@@ -449,7 +449,7 @@ try {
 | `llm` | LLM generation errors |
 | `stt` | Speech-to-text errors |
 | `tts` | Text-to-speech errors |
-| `voiceAgent` | Voice pipeline errors |
+| `voice` | Voice pipeline errors |
 | `download` | Model download errors |
 | `validation` | Input validation errors |
 
@@ -461,7 +461,7 @@ try {
 
 ```dart
 // Subscribe to all SDK events
-RunAnywhereSDK.instance.sdkEvents.listen((event) {
+RunAnywhere.events.allEvents.listen((event) {
   print('Event: $event');
 });
 ```
@@ -492,16 +492,16 @@ RunAnywhereSDK.instance.sdkEvents.listen((event) {
 
 ```dart
 // Unload models when not in use
-await RunAnywhereSDK.instance.llm.unload();
-await RunAnywhereSDK.instance.stt.unload();
-await RunAnywhereSDK.instance.tts.unloadVoice();
+await RunAnywhere.llm.unload();
+await RunAnywhere.stt.unload();
+await RunAnywhere.tts.unloadVoice();
 
 // Check storage before downloading
-final storageInfo = await RunAnywhereSDK.instance.downloads.getStorageInfo();
+final storageInfo = await RunAnywhere.downloads.getStorageInfo();
 print('Available: ${storageInfo.freeBytes} bytes');
 
 // Delete unused models
-await RunAnywhereSDK.instance.downloads.delete('old-model-id');
+await RunAnywhere.downloads.delete('old-model-id');
 ```
 
 ### Best Practices
@@ -560,7 +560,7 @@ await RunAnywhereSDK.instance.downloads.delete('old-model-id');
 **Symptoms:** `modelNotFound` error even though download completed
 
 **Solutions:**
-1. Call `await RunAnywhereSDK.instance.refreshModelRegistry()` to refresh the registry
+1. Call `await RunAnywhere.refreshModelRegistry()` to refresh the registry
 2. Check the model path under the SDK model directory
 3. Delete and re-download the model
 
@@ -718,7 +718,7 @@ dart fix --apply
 ### Reporting Issues
 
 Open an issue on GitHub with:
-- SDK version: `RunAnywhereSDK.instance.version`
+- SDK version: `RunAnywhere.version`
 - Flutter version: `flutter --version`
 - Platform and OS version
 - Device model

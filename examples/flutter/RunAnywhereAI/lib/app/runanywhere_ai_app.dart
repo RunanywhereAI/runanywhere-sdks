@@ -66,14 +66,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('🔧 Found custom API configuration');
         debugPrint('   Base URL: $normalizedURL');
 
-        await RunAnywhereSDK.instance.initialize(
+        await RunAnywhere.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
           environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
       } else {
-        await RunAnywhereSDK.instance.initialize();
+        await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
       }
 
@@ -83,9 +83,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint(
           '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms');
       debugPrint(
-          '🎯 SDK Status: ${RunAnywhereSDK.instance.isActive ? "Active" : "Inactive"}');
+          '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}');
       debugPrint(
-          '🔧 Environment: ${RunAnywhereSDK.instance.environment?.description ?? "Unknown"}');
+          '🔧 Environment: ${RunAnywhere.environment?.description ?? "Unknown"}');
 
       await ModelManager.shared.refresh();
 
@@ -124,7 +124,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('▶ Step 1: downloading $testModelId …');
       final sw = Stopwatch()..start();
       final progressStream =
-          RunAnywhereSDK.instance.downloads.start(testModelId);
+          RunAnywhere.downloads.start(testModelId);
 
       double lastPct = 0;
       await for (final p in progressStream) {
@@ -147,7 +147,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       await ModelManager.shared.refresh();
 
       // Re-run discovery so the SDK sees the downloaded file
-      final models = await RunAnywhereSDK.instance.models.available();
+      final models = await RunAnywhere.models.available();
       final dlModel = models.where((m) => m.id == testModelId).firstOrNull;
       debugPrint('   model localPath after download: ${dlModel?.localPath}');
 
@@ -156,7 +156,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       sw
         ..reset()
         ..start();
-      await RunAnywhereSDK.instance.llm.load(testModelId);
+      await RunAnywhere.llm.load(testModelId);
       sw.stop();
       debugPrint('✅ Model loaded in ${sw.elapsedMilliseconds}ms');
 
@@ -171,7 +171,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         systemPrompt: 'You are a helpful assistant.',
       );
       final result =
-          await RunAnywhereSDK.instance.llm.generate('Hello!', genOpts);
+          await RunAnywhere.llm.generate('Hello!', genOpts);
       sw.stop();
       debugPrint(
           '✅ generate() => "${result.text.substring(0, result.text.length.clamp(0, 120))}"');
@@ -188,7 +188,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
       );
-      final stream = RunAnywhereSDK.instance.llm
+      final stream = RunAnywhere.llm
           .generateStream('What is 2+2?', streamOpts);
       final buf = StringBuffer();
       int tokenCount = 0;
@@ -235,7 +235,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     required int memoryRequirement,
     bool supportsThinking = false,
   }) {
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: id,
       name: name,
       url: Uri.parse(url),
@@ -374,7 +374,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await Future<void>.delayed(Duration.zero);
 
     // --- VLM MODULE ---
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'smolvlm-500m-instruct-q8_0',
       name: 'SmolVLM 500M Instruct',
       url: Uri.parse(
@@ -388,7 +388,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 600000000,
     );
     // Qwen2-VL 2B — multi-file (main GGUF + mmproj companion).
-    RunAnywhereSDK.instance.models.registerMultiFile(
+    RunAnywhere.models.registerMultiFile(
       id: 'qwen2-vl-2b-instruct-q4_k_m',
       name: 'Qwen2-VL 2B Instruct',
       files: [
@@ -410,7 +410,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 1800000000,
     );
     // LFM2-VL 450M — multi-file (LiquidAI compact VLM).
-    RunAnywhereSDK.instance.models.registerMultiFile(
+    RunAnywhere.models.registerMultiFile(
       id: 'lfm2-vl-450m-q8_0',
       name: 'LFM2-VL 450M',
       files: [
@@ -436,7 +436,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
     // --- SHERPA-ONNX MODULE (STT/TTS via Core SDK) ---
     // STT Models (Sherpa-ONNX Whisper) — served by the Sherpa-ONNX engine plugin
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
       url: Uri.parse(
@@ -446,7 +446,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 75000000,
     );
 
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
       url: Uri.parse(
@@ -457,7 +457,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     );
 
     // TTS Models (Piper VITS) — served by the Sherpa-ONNX engine plugin
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
       url: Uri.parse(
@@ -467,7 +467,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 65000000,
     );
 
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
       url: Uri.parse(
@@ -485,7 +485,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // the Kotlin SDK (which only registers SystemTTSModule on Apple via
     // the platform plugin path).
     if (Platform.isIOS || Platform.isMacOS) {
-      RunAnywhereSDK.instance.models.register(
+      RunAnywhere.models.register(
         id: 'system-tts',
         name: 'System TTS',
         url: Uri.parse('about:blank'),
@@ -496,7 +496,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
     // VAD (Silero) — registered here so the voice-agent pipeline has a
     // default detector available alongside STT/TTS.
-    RunAnywhereSDK.instance.models.register(
+    RunAnywhere.models.register(
       id: 'silero-vad',
       name: 'Silero VAD',
       url: Uri.parse(
@@ -509,7 +509,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
-    RunAnywhereSDK.instance.models.registerMultiFile(
+    RunAnywhere.models.registerMultiFile(
       id: 'all-minilm-l6-v2',
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [

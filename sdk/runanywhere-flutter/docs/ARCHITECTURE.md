@@ -1,5 +1,10 @@
 # RunAnywhere Flutter SDK – Architecture
 
+> Updated: 2026-05-13. This document reflects the current Flutter implementation
+> plan while code is still in progress: exact Swift parity, deletion-forward
+> cleanup, and pending runtime validation. Do not treat it as a final success
+> report until both Flutter lanes pass full E2E.
+
 ## 1. Overview
 
 The RunAnywhere Flutter SDK is a production-grade, on-device AI SDK for iOS and
@@ -8,11 +13,12 @@ Android. It is a thin Dart FFI bridge over the shared C++ core
 
 Design goals:
 
-- **Modular backends**: separate Flutter plugin packages per backend (LlamaCPP,
-  ONNX/Sherpa, Genie). Apps include only what they need.
+- **Modular backends**: separate Flutter plugin packages per backend. LlamaCPP
+  and ONNX/Sherpa are in scope for the current validation pass; Genie is a
+  deferred backend and should not create active gap rows by itself.
 - **C++ commons does the work**: registries, event publisher, plugin router, HTTP,
   download orchestration, and all inference live in the C ABI (`rac_*`).
-- **Dart orchestration**: the SDK exposes a singleton + capability accessors and
+- **Dart orchestration**: the SDK exposes a static namespace + capability accessors and
   ferries proto messages between C++ and the app.
 - **No platform channels for AI**: all inference calls go through `dart:ffi`.
 - **Two-phase initialization**: Phase 1 (sync) wires the C ABI and is sufficient
@@ -52,9 +58,9 @@ XCFramework + `.so` files.
 ┌─────────────────────────────────────────────────────────────────────┐
 │                       Flutter Application                            │
 ├─────────────────────────────────────────────────────────────────────┤
-│              RunAnywhereSDK.instance (singleton)                     │
-│   20 capability accessors: .llm .stt .tts .vad .vlm .voice .models  │
-│                  .downloads .tools .rag .solutions .voiceAgent ...   │
+│              RunAnywhere (static namespace)                         │
+│   capability accessors: .llm .stt .tts .vad .vlm .voice .models     │
+│      .modelLifecycle .downloads .tools .rag .solutions .hardware    │
 ├─────────────────────────────────────────────────────────────────────┤
 │        public/capabilities/* (RunAnywhereLLM, RunAnywhereSTT, ...)   │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -80,7 +86,7 @@ XCFramework + `.so` files.
 | `runanywhere` | ~5 MB | ~3 MB | Core SDK, registries, events, FFI bridge |
 | `runanywhere_llamacpp` | ~15–25 MB | ~10–15 MB | LLM + VLM (GGUF) |
 | `runanywhere_onnx` | ~50–70 MB | ~40–60 MB | STT, TTS, VAD (Sherpa-ONNX + Piper) |
-| `runanywhere_genie` | n/a | varies | Genie NPU LLM (Snapdragon only) |
+| `runanywhere_genie` | n/a | varies | Deferred Genie NPU package |
 
 ---
 
@@ -90,26 +96,25 @@ XCFramework + `.so` files.
 lib/
 ├── runanywhere.dart                  # Barrel (≈150 re-exports)
 ├── runanywhere_protos.dart           # Proto re-export hub
-├── adapters/                         # http_client_adapter, model_download_adapter, voice_agent_stream_adapter
+├── adapters/                         # http_client_adapter, voice_agent_stream_adapter
 ├── core/
 │   ├── module/runanywhere_module.dart  # Backend module contract
 │   └── native/rac_native.dart         # Hand-written FFI bindings (~2.1K LOC)
-├── data/network/                      # Network config struct + barrel
+├── transport/                         # Network config + HTTP transport helpers
 ├── features/
 │   ├── stt/services/audio_capture_manager.dart   # 16 kHz mono Int16 via `record`
 │   └── tts/services/audio_playback_manager.dart  # PCM playback via `audioplayers`
 ├── foundation/
 │   ├── constants/                     # sdk_constants.dart
-│   ├── dependency_injection/          # service_container.dart
 │   ├── errors/                        # sdk_exception.dart (40+ factory constructors)
 │   ├── logging/                       # sdk_logger.dart
 │   └── security/                      # keychain_manager.dart + secure_storage_keys.dart
-├── generated/                         # 104 protobuf-generated files (DO NOT EDIT)
-├── internal/                          # sdk_init.dart, sdk_state.dart
+├── generated/                         # 116 protobuf-generated files (DO NOT EDIT)
+├── internal/                          # small internal helpers; stale SDK mirror state is deletion scope
 ├── native/                            # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
-    ├── runanywhere.dart               # RunAnywhereSDK singleton (~513 LOC)
-    ├── capabilities/                  # 20 capability classes (flat)
+    ├── runanywhere.dart               # RunAnywhere static entry point
+    ├── capabilities/                  # 18 capability classes (flat)
     ├── configuration/                 # sdk_environment.dart
     ├── events/                        # event_bus.dart  (pure `dart:async`)
     └── extensions/                    # rag_module, runanywhere_logging, _storage,
@@ -121,22 +126,22 @@ There is **no** top-level `lib/capabilities/`, **no** `lib/infrastructure/`,
 
 ### 3.1 Public API Surface (`lib/public/`)
 
-`RunAnywhereSDK` is the lifecycle singleton + capability dispatcher. Each
+`RunAnywhere` is the lifecycle static namespace + capability dispatcher. Each
 capability (LLM/STT/TTS/VLM/voice/models/downloads/tools/RAG/solutions/…) is a
 separate class in `lib/public/capabilities/` and is exposed as a lazy property
-on the singleton.
+on the namespace.
 
 ```dart
-await RunAnywhereSDK.instance.initialize(/* … */);
-final result = await RunAnywhereSDK.instance.llm.generate(prompt, options);
+await RunAnywhere.initialize(/* … */);
+final result = await RunAnywhere.llm.generate(prompt, options);
 ```
 
-The 20 capability accessors:
+The current 18 capability accessors:
 
 ```
-.llm  .stt  .tts  .vad  .vlm  .vlmModels  .voice  .voiceAgent
+.llm  .stt  .tts  .vad  .vlm  .voice  .visionLanguage
 .models  .modelLifecycle  .downloads  .tools  .rag  .solutions
-.diffusion  .embeddings  .lora  .hardware  .visionLanguage  .pluginLoader
+.diffusion  .embeddings  .lora  .hardware  .pluginLoader
 ```
 
 ### 3.2 FFI Bridge (`lib/native/`)
@@ -190,22 +195,24 @@ Plus supporting modules:
 ## 4. Key Architectural Patterns
 
 1. **Proto-driven public surface.** All public types are protobuf-generated.
-   104 `.pb*.dart` files under `lib/generated/`. Never hand-edit; modify the
+   116 `.pb*.dart` files under `lib/generated/`. Never hand-edit; modify the
    `.proto` and regenerate.
 
-2. **`Isolate.run` for blocking FFI ops.** LLM generate, TTS synthesize, VLM
-   process, voice agent turns, tool calls, downloads, HTTP, and platform probes
-   all wrap their blocking C calls in `Isolate.run`. Native handle addresses
-   pass between isolates as `int`.
+2. **Worker-isolate usage is gated by event-publish safety.** Blocking FFI ops
+   may use `Isolate.run` only when the C++ path cannot publish back through an
+   isolate-local Dart callback. Heavy model lifecycle calls remain pending the
+   commons event-publish fix.
 
 3. **`NativeCallable.listener` for streaming.** LLM streaming, voice agent
    events, and download progress use `NativeCallable.listener` so C++
-   background threads can post events into a broadcast `StreamController`. Multiple
-   subscribers share one C-callback registration via fan-out.
+   background threads can post events into a broadcast `StreamController`.
+   Commons SDK event publishing must follow the same cross-isolate-safe rule
+   before heavy load paths can move back to worker isolates.
 
 4. **Two-phase SDK init.** Phase 1 (sync, ~15 steps): load lib → register
-   `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register
-   event / device / file-manager / telemetry callbacks. Phase 2 (async, fire-and-forget):
+   `rac_platform_adapter_t` → `rac_sdk_init_phase1_proto` → configure logging
+   → register event / device / file-manager / telemetry callbacks. Phase 2
+   (async, fire-and-forget) uses `rac_sdk_init_phase2_proto` for
    device registration + authentication + model assignment + telemetry flush.
    Offline inference works without Phase 2 completing.
 
@@ -243,17 +250,18 @@ iOS requires `use_frameworks! :linkage => :static` in the Podfile and
 ### 6.1 LLM Generation
 
 ```
-App → RunAnywhereSDK.instance.llm.generate(prompt, options)
+App → RunAnywhere.llm.generate(prompt, options)
     → RunAnywhereLLM.shared.generate()
     → validates SdkState.isInitialized + isLoaded
-    → DartBridge.llm.generate() runs the blocking C call inside Isolate.run()
+    → DartBridge.llm.generate() calls the C ABI directly or through a worker
+      isolate only when that path has no isolate-local callback hazard
     → returns LLMGenerationResult proto
 ```
 
 ### 6.2 LLM Streaming
 
 ```
-App → RunAnywhereSDK.instance.llm.generateStream(prompt, options)
+App → RunAnywhere.llm.generateStream(prompt, options)
     → registers a NativeCallable.listener for C++ token callbacks
     → tokens land in a broadcast StreamController as LLMStreamEvent protos
     → multiple subscribers share one C-callback registration (fan-out)
@@ -262,8 +270,8 @@ App → RunAnywhereSDK.instance.llm.generateStream(prompt, options)
 ### 6.3 Model Download
 
 ```
-App → RunAnywhereSDK.instance.downloads.start(modelId)
-    → ModelDownloadService.downloadModel()
+App → RunAnywhere.downloads.start(modelId)
+    → DownloadManager.downloadModel()
     → DartBridgeDownload.orchestrateDownload() returns a taskId
     → Dart polls DartBridgeDownload.getProgress(taskId) every 250 ms
     → on completion: resolves model path via rac_model_paths_get_model_folder
@@ -275,11 +283,11 @@ App → RunAnywhereSDK.instance.downloads.start(modelId)
 ```
 Phase 1 (sync):
   load native lib → register platform adapter → configure logging
-  → rac_sdk_init → register events / device / file-manager / telemetry callbacks
+  → rac_sdk_init_phase1_proto → register events / device / file-manager / telemetry callbacks
   → setBaseDirectory()
 
 Phase 2 (background, fire-and-forget):
-  model assignment → platform services → device registration → authentication
+  rac_sdk_init_phase2_proto → model assignment → platform services → device registration → authentication
   → telemetry flush
 ```
 
@@ -296,7 +304,7 @@ runtime + format compatibility on inference.
 |--------|---------|--------------|----------|
 | `LlamaCpp` | `runanywhere_llamacpp` | LLM, VLM | 100 |
 | `Onnx` | `runanywhere_onnx` | STT, TTS, VAD | 90 |
-| `Genie` | `runanywhere_genie` | LLM (Android NPU) | 200 (when registered) |
+| `Genie` | `runanywhere_genie` | Deferred LLM backend | 200 (when registered) |
 | `RAGModule` | core extension | RAG pipelines | — |
 
 ---
@@ -307,7 +315,7 @@ runtime + format compatibility on inference.
 |---------|-------|
 | `async / await` | All public API methods |
 | `Stream` (broadcast) | Streaming generation, download progress, voice agent events |
-| `Isolate.run` | Blocking FFI ops (generate, transcribe, synthesize, process) |
+| `Isolate.run` | Blocking FFI ops only after callback/event-publish safety is confirmed |
 | `NativeCallable.listener` | Thread-safe C++ → Dart callbacks for streaming |
 | `Completer` | Bridging callbacks to futures |
 
@@ -359,12 +367,12 @@ melos version          # bump versions + generate workspace CHANGELOG
 4. Expose Dart FFI bindings + a `register()` entry point that calls
    `rac_backend_<name>_register()`.
 5. Optionally add convenience `addModel(...)` helpers that delegate to
-   `RunAnywhereSDK.instance.models.register(...)`.
+   `RunAnywhere.models.register(...)`.
 
 ### 10.2 Custom Event Subscribers
 
 ```dart
-RunAnywhereSDK.instance.sdkEvents.listen((event) {
+RunAnywhere.events.allEvents.listen((event) {
   // proto-typed SDKEvent — branch on oneof payload
 });
 ```
@@ -373,11 +381,12 @@ RunAnywhereSDK.instance.sdkEvents.listen((event) {
 
 ## 11. Trade-offs
 
-### Singleton vs Multiple Instances
+### Static Namespace vs Multiple Instances
 
-`RunAnywhereSDK` is a singleton. Trade-off: simple, discoverable API
-(`RunAnywhereSDK.instance.llm.generate(...)`) vs. harder multi-instance testing.
-Global state is encapsulated in `lib/internal/sdk_state.dart`.
+`RunAnywhere` is a static namespace. Trade-off: simple, discoverable API
+(`RunAnywhere.llm.generate(...)`) vs. harder multi-instance testing.
+Global state is intentionally kept small and should continue moving toward the
+Swift source-of-truth shape rather than growing Flutter-only mirror state.
 
 ### FFI vs MethodChannel
 
@@ -392,7 +401,7 @@ Direct FFI to C++ instead of MethodChannel:
 Backend Flutter packages are thin Dart shims; all model loading + inference
 lives in the bundled C++ backend library.
 
-- **Advantages**: logic shared with Swift/Kotlin/RN/Web; consistent behavior
+- **Advantages**: logic shared with the other SDKs; consistent behavior
   cross-platform.
 - **Trade-offs**: debugging requires native tooling (lldb / Android Studio NDK
   debugger).

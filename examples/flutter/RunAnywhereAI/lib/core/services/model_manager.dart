@@ -27,7 +27,7 @@ class ModelManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await RunAnywhereSDK.instance.llm.load(modelInfo.id);
+      await RunAnywhere.llm.load(modelInfo.id);
     } catch (e) {
       _error = e;
       rethrow;
@@ -43,7 +43,7 @@ class ModelManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await RunAnywhereSDK.instance.llm.unload();
+      await RunAnywhere.llm.unload();
     } catch (e) {
       _error = e;
       debugPrint('Failed to unload model: $e');
@@ -56,7 +56,7 @@ class ModelManager extends ChangeNotifier {
   /// Get available models from SDK (v4.0 API).
   Future<List<ModelInfo>> getAvailableModels() async {
     try {
-      return await RunAnywhereSDK.instance.models.available();
+      return await RunAnywhere.models.available();
     } catch (e) {
       debugPrint('Failed to get available models: $e');
       return [];
@@ -65,7 +65,7 @@ class ModelManager extends ChangeNotifier {
 
   /// Get current LLM model (v4.0 API).
   Future<ModelInfo?> getCurrentModel() async {
-    return RunAnywhereSDK.instance.llm.currentModel();
+    return RunAnywhere.llm.currentModel();
   }
 
   /// Refresh state (for UI notification purposes)
