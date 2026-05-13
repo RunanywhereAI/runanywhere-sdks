@@ -9,16 +9,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadProgress
-import ai.runanywhere.proto.v1.DownloadStartRequest
-import ai.runanywhere.proto.v1.DownloadState
-import ai.runanywhere.proto.v1.DownloadSubscribeRequest
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flow
 
 /**
  * Download a model to local storage.

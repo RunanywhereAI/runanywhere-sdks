@@ -72,6 +72,22 @@ No Genie or WhisperCPP Swift bindings exist.
 
 ---
 
+# Part 3 — Cross-SDK API surface gaps
+
+## HIGH
+
+### SWIFT-DIFF-001 / SWIFT-EMBD-001 — Missing public `RunAnywhere.diffusion` and `RunAnywhere.embeddings` namespaces
+
+- **Severity**: HIGH
+- **Summary**: Flutter exposes `RunAnywhereSDK.instance.diffusion.generate(prompt, options)` (`sdk/runanywhere-flutter/packages/runanywhere/lib/public/capabilities/runanywhere_diffusion.dart`, ~202 LOC) and `.embeddings.embed(text, modelId)` (`sdk/runanywhere-flutter/packages/runanywhere/lib/public/capabilities/runanywhere_embeddings.dart`, ~144 LOC) as first-class capability classes. Swift accesses both via `RunAnywhere.modelLifecycle.load(category: .imageGeneration / .embedding)` without dedicated public namespaces.
+- **Action**: Add `Sources/RunAnywhere/Public/Extensions/Diffusion/RunAnywhere+Diffusion.swift` and `Sources/RunAnywhere/Public/Extensions/Embeddings/RunAnywhere+Embeddings.swift` to the Swift SDK to expose public namespaces matching the Flutter ergonomics.
+- **Owner**: swift-sdk
+- **References**:
+  - Flutter (canonical for these capabilities): `sdk/runanywhere-flutter/packages/runanywhere/lib/public/capabilities/runanywhere_diffusion.dart`, `sdk/runanywhere-flutter/packages/runanywhere/lib/public/capabilities/runanywhere_embeddings.dart`
+  - Swift (target): `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Diffusion/RunAnywhere+Diffusion.swift`, `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Embeddings/RunAnywhere+Embeddings.swift`
+
+---
+
 ## Summary
 
 Wave 6 + Wave 7 (commits `200db1548` → `b4f99ee19`, 11 wave commits) closed 22 items from the previous open list:

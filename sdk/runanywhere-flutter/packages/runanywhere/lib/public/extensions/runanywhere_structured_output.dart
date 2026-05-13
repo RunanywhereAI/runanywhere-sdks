@@ -42,4 +42,38 @@ class RunAnywhereStructuredOutput {
     );
     return DartBridgeStructuredOutput.shared.generate(request);
   }
+
+  /// Two-step prompt preparation: ask commons to format [prompt] with the
+  /// supplied [jsonSchema] BEFORE invoking the LLM. Returns the schema-
+  /// augmented system prompt. Mirrors Swift's
+  /// `RunAnywhere+StructuredOutput.swift` `preparePrompt(prompt:options:)`
+  /// helper used inside `generateWithStructuredOutput`.
+  ///
+  /// Falls back to [prompt] verbatim when commons returns an empty system
+  /// prompt or the ABI is unavailable. Throws [SDKException.notInitialized]
+  /// if SDK is not initialized; throws [SDKException.generationFailed] on
+  /// non-zero commons error.
+  static String preparePromptForStructuredOutput({
+    required String prompt,
+    required String jsonSchema,
+  }) {
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
+
+    final options = StructuredOutputOptions(
+      schema: JSONSchema(rawJson: jsonSchema),
+      jsonSchema: jsonSchema,
+      includeSchemaInPrompt: true,
+    );
+    final result = DartBridgeStructuredOutput.shared.preparePrompt(
+      prompt: prompt,
+      options: options,
+    );
+    if (result.errorCode != 0) {
+      throw SDKException.generationFailed(
+        'preparePromptForStructuredOutput failed (rc=${result.errorCode})',
+      );
+    }
+    final systemPrompt = result.systemPrompt;
+    return systemPrompt.isNotEmpty ? systemPrompt : prompt;
+  }
 }

@@ -11,18 +11,20 @@ package com.runanywhere.sdk.foundation.bridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.infrastructure.logging.SentryDestination
@@ -55,18 +57,6 @@ object CppBridge {
     @Volatile
     private var _environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
 
-    @Volatile
-    private var _isInitialized: Boolean = false
-
-    @Volatile
-    private var _servicesInitialized: Boolean = false
-
-    @Volatile
-    private var _servicesInitializing: Boolean = false
-
-    @Volatile
-    private var _nativeLibraryLoaded: Boolean = false
-
     private val lock = Any()
 
     /** Coroutine scope for async SDK operations, cancelled on shutdown */
@@ -80,22 +70,31 @@ object CppBridge {
 
     /**
      * Whether Phase 1 initialization is complete.
+     *
+     * Delegates to [CppBridgeState] which is the canonical owner of the
+     * runtime gate flags.
      */
     val isInitialized: Boolean
-        get() = _isInitialized
+        get() = CppBridgeState.isInitialized
 
     /**
      * Whether Phase 2 services initialization is complete.
+     *
+     * Delegates to [CppBridgeState] which is the canonical owner of the
+     * runtime gate flags.
      */
     val servicesInitialized: Boolean
-        get() = _servicesInitialized
+        get() = CppBridgeState.servicesInitialized
 
     /**
      * Whether the native commons library is loaded.
      * This only indicates the core library - backend availability is separate.
+     *
+     * Delegates to [CppBridgeState] which is the canonical owner of the
+     * runtime gate flags.
      */
     val isNativeLibraryLoaded: Boolean
-        get() = _nativeLibraryLoaded
+        get() = CppBridgeState.nativeLibraryLoaded
 
     /**
      * Phase 1: Core Initialization (Synchronous, ~1-5ms, NO network calls)
@@ -129,7 +128,7 @@ object CppBridge {
         baseURL: String? = null,
     ) {
         synchronized(lock) {
-            if (_isInitialized) {
+            if (CppBridgeState.isInitialized) {
                 return
             }
 
@@ -173,7 +172,7 @@ object CppBridge {
 
             // CRITICAL: Set environment early so CppBridgeDevice.isDeviceRegisteredCallback()
             // can determine correct behavior for production/staging modes
-            CppBridgeTelemetry.setEnvironment(environment.cEnvironment)
+            CppBridgeTelemetry.setEnvironment(environment)
 
             // Configure telemetry base URL and API key ONLY for production/staging mode
             // In development mode, we use Supabase URL from C++ dev config
@@ -237,7 +236,7 @@ object CppBridge {
                 logger.warn("Failed to materialize model storage base dir: ${t.message}")
             }
 
-            _isInitialized = true
+            CppBridgeState.isInitialized = true
 
             // Emit SDK init completed event with duration
             val initDurationMs = System.currentTimeMillis() - initStartTime
@@ -279,7 +278,7 @@ object CppBridge {
 
             // Initialize telemetry manager with C++ via JNI
             CppBridgeTelemetry.initialize(
-                environment = environment.cEnvironment,
+                environment = environment,
                 deviceId = deviceId,
                 deviceModel = deviceModel,
                 osVersion = osVersion,
@@ -307,7 +306,7 @@ object CppBridge {
     private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
         try {
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
-            val platform = "android"
+            val platform = SDKConstants.SDK_PLATFORM
             val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION
 
             logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=$environment")
@@ -376,7 +375,7 @@ object CppBridge {
      * boot (without inference) for non-networking use cases.
      */
     private fun registerOkHttpTransport() {
-        if (!_nativeLibraryLoaded) {
+        if (!CppBridgeState.nativeLibraryLoaded) {
             logger.debug("Skipping OkHttp transport registration: native lib not loaded")
             return
         }
@@ -399,7 +398,7 @@ object CppBridge {
      * failure is logged but does not block shutdown.
      */
     private fun unregisterOkHttpTransport() {
-        if (!_nativeLibraryLoaded) return
+        if (!CppBridgeState.nativeLibraryLoaded) return
         try {
             RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
         } catch (e: Throwable) {
@@ -418,9 +417,9 @@ object CppBridge {
     private fun tryLoadNativeLibrary() {
         logger.info("Starting native library loading sequence...")
 
-        _nativeLibraryLoaded = RunAnywhereBridge.ensureNativeLibraryLoaded()
+        CppBridgeState.nativeLibraryLoaded = RunAnywhereBridge.ensureNativeLibraryLoaded()
 
-        if (_nativeLibraryLoaded) {
+        if (CppBridgeState.nativeLibraryLoaded) {
             logger.info("✅ Native commons library loaded successfully")
             logger.info("AI inference features are AVAILABLE")
         } else {
@@ -445,13 +444,13 @@ object CppBridge {
     suspend fun initializeServices() {
         // Guard: check and set initializing flag under lock, then release lock for I/O
         synchronized(lock) {
-            if (!_isInitialized) {
+            if (!CppBridgeState.isInitialized) {
                 throw IllegalStateException("CppBridge.initialize() must be called before initializeServices()")
             }
-            if (_servicesInitialized || _servicesInitializing) {
+            if (CppBridgeState.servicesInitialized || CppBridgeState.servicesInitializing) {
                 return
             }
-            _servicesInitializing = true
+            CppBridgeState.servicesInitializing = true
         }
 
         try {
@@ -471,7 +470,8 @@ object CppBridge {
                     apiKey = CppBridgeTelemetry.getApiKey()
                 }
                 if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
-                    com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter.configure(baseUrl, apiKey)
+                    com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
+                        .configure(baseUrl, apiKey)
                 }
             }
 
@@ -490,7 +490,7 @@ object CppBridge {
                             apiKey = apiKey,
                             baseUrl = baseUrl,
                             deviceId = deviceId,
-                            platform = "android",
+                            platform = SDKConstants.SDK_PLATFORM,
                             sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION,
                         )
                         logger.info("Authentication successful")
@@ -524,8 +524,8 @@ object CppBridge {
                 if (!CppBridgeTelemetry.hasUsableNetworkConfig()) {
                     logger.debug("Skipping device registration: no usable external config")
                     synchronized(lock) {
-                        _servicesInitialized = true
-                        _servicesInitializing = false
+                        CppBridgeState.servicesInitialized = true
+                        CppBridgeState.servicesInitializing = false
                     }
                     logger.info("✅ Phase 2 services initialization complete")
                     return
@@ -556,7 +556,7 @@ object CppBridge {
 
                 val success =
                     CppBridgeDevice.triggerRegistration(
-                        environment = _environment.cEnvironment,
+                        environment = _environment,
                         buildToken = buildToken,
                     )
                 if (success) {
@@ -574,13 +574,13 @@ object CppBridge {
             }
 
             synchronized(lock) {
-                _servicesInitialized = true
-                _servicesInitializing = false
+                CppBridgeState.servicesInitialized = true
+                CppBridgeState.servicesInitializing = false
             }
             logger.info("✅ Phase 2 services initialization complete")
         } catch (e: Exception) {
             synchronized(lock) {
-                _servicesInitializing = false
+                CppBridgeState.servicesInitializing = false
             }
             throw e
         }
@@ -618,7 +618,7 @@ object CppBridge {
         // across the suspend destroy calls below.
         val wasInitialized =
             synchronized(lock) {
-                if (!_isInitialized) {
+                if (!CppBridgeState.isInitialized) {
                     return
                 }
                 true
@@ -662,7 +662,7 @@ object CppBridge {
 
         synchronized(lock) {
             // Re-check in case a concurrent shutdown already tore things down
-            if (!_isInitialized) {
+            if (!CppBridgeState.isInitialized) {
                 return
             }
 
@@ -670,7 +670,7 @@ object CppBridge {
             sdkScope.cancel()
 
             // Unregister Phase 2 services (reverse order)
-            if (_servicesInitialized) {
+            if (CppBridgeState.servicesInitialized) {
                 CppBridgePlatform.unregister()
             }
 
@@ -693,9 +693,9 @@ object CppBridge {
             Logging.sentrySetupHook = null
             Logging.sentryTeardownHook = null
 
-            _servicesInitialized = false
-            _servicesInitializing = false
-            _isInitialized = false
+            CppBridgeState.servicesInitialized = false
+            CppBridgeState.servicesInitializing = false
+            CppBridgeState.isInitialized = false
         }
     }
 
@@ -705,7 +705,7 @@ object CppBridge {
      * @return true if rac_is_initialized() returns true
      */
     fun isNativeInitialized(): Boolean {
-        if (!_isInitialized || !isNativeLibraryLoaded) return false
+        if (!CppBridgeState.isInitialized || !isNativeLibraryLoaded) return false
         return RunAnywhereBridge.racIsInitialized()
     }
 

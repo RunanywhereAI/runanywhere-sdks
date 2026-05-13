@@ -78,47 +78,57 @@ actual class AudioCaptureManager actual constructor() {
         val channels = AudioCaptureConstants.CHANNEL_COUNT
 
         // signed = true, bigEndian = false → standard 16-bit PCM little-endian.
-        val format = AudioFormat(
-            /* sampleRate    = */ sampleRate,
-            /* sampleSizeInBits = */ sampleSizeBits,
-            /* channels      = */ channels,
-            /* signed        = */ true,
-            /* bigEndian     = */ false,
-        )
+        val format =
+            AudioFormat(
+                // sampleRate    =
+                sampleRate,
+                // sampleSizeInBits =
+                sampleSizeBits,
+                // channels      =
+                channels,
+                // signed        =
+                true,
+                // bigEndian     =
+                false,
+            )
 
         val info = DataLine.Info(TargetDataLine::class.java, format)
         if (!AudioSystem.isLineSupported(info)) {
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                message = AudioCaptureError.NoInputDevice.description +
-                    " (PCM 16 kHz mono 16-bit not supported by AudioSystem)",
+                message =
+                    AudioCaptureError.NoInputDevice.description +
+                        " (PCM 16 kHz mono 16-bit not supported by AudioSystem)",
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
             )
         }
 
-        val line = try {
-            AudioSystem.getLine(info) as TargetDataLine
-        } catch (e: LineUnavailableException) {
-            throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                message = AudioCaptureError.NoInputDevice.description + ": ${e.message}",
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                cause = e,
-            )
-        } catch (t: Throwable) {
-            throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                message = AudioCaptureError.EngineStartFailed(t.message).description,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                cause = t,
-            )
-        }
+        val line =
+            try {
+                AudioSystem.getLine(info) as TargetDataLine
+            } catch (e: LineUnavailableException) {
+                throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
+                    message = AudioCaptureError.NoInputDevice.description + ": ${e.message}",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    cause = e,
+                )
+            } catch (t: Throwable) {
+                throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
+                    message = AudioCaptureError.EngineStartFailed(t.message).description,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    cause = t,
+                )
+            }
 
         // ~100 ms buffer: 16000 * 2 bytes * 0.1 s = 3200 bytes.
         val chunkBytes =
-            (AudioCaptureConstants.TARGET_SAMPLE_RATE *
-                AudioCaptureConstants.BYTES_PER_SAMPLE *
-                AudioCaptureConstants.CHUNK_DURATION_MS) / 1000
+            (
+                AudioCaptureConstants.TARGET_SAMPLE_RATE *
+                    AudioCaptureConstants.BYTES_PER_SAMPLE *
+                    AudioCaptureConstants.CHUNK_DURATION_MS
+            ) / 1000
         // Open with a buffer of ~2x the chunk so the producer never blocks the consumer.
         val openBufferBytes = chunkBytes * 4
 
@@ -156,33 +166,35 @@ actual class AudioCaptureManager actual constructor() {
 
         val scope = CoroutineScope(Dispatchers.IO)
         captureScope = scope
-        captureJob = scope.launch {
-            val buffer = ByteArray(chunkBytes)
-            try {
-                while (isActive && recordingFlag.get()) {
-                    val bytesRead = try {
-                        line.read(buffer, 0, chunkBytes)
-                    } catch (t: Throwable) {
-                        logger.error("TargetDataLine.read threw: ${t.message}", throwable = t)
-                        break
-                    }
-                    if (bytesRead > 0) {
-                        val chunk = buffer.copyOf(bytesRead)
-                        currentAudioLevel = computeNormalizedLevel(chunk)
-                        try {
-                            onAudioData(chunk)
-                        } catch (t: Throwable) {
-                            logger.error("onAudioData callback threw: ${t.message}", throwable = t)
+        captureJob =
+            scope.launch {
+                val buffer = ByteArray(chunkBytes)
+                try {
+                    while (isActive && recordingFlag.get()) {
+                        val bytesRead =
+                            try {
+                                line.read(buffer, 0, chunkBytes)
+                            } catch (t: Throwable) {
+                                logger.error("TargetDataLine.read threw: ${t.message}", throwable = t)
+                                break
+                            }
+                        if (bytesRead > 0) {
+                            val chunk = buffer.copyOf(bytesRead)
+                            currentAudioLevel = computeNormalizedLevel(chunk)
+                            try {
+                                onAudioData(chunk)
+                            } catch (t: Throwable) {
+                                logger.error("onAudioData callback threw: ${t.message}", throwable = t)
+                            }
+                        } else if (bytesRead < 0) {
+                            logger.warning("TargetDataLine.read returned $bytesRead — stopping capture")
+                            break
                         }
-                    } else if (bytesRead < 0) {
-                        logger.warning("TargetDataLine.read returned $bytesRead — stopping capture")
-                        break
                     }
+                } finally {
+                    currentAudioLevel = 0f
                 }
-            } finally {
-                currentAudioLevel = 0f
             }
-        }
 
         logger.info("Recording started (sampleRate=${sampleRate.toInt()}, chunkBytes=$chunkBytes)")
     }

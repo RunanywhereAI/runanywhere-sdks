@@ -231,59 +231,70 @@ val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
 
 // MARK: JSON bridge ------------------------------------------------------------
 
-private val toolValueJson: Json = Json {
-    prettyPrint = false
-    encodeDefaults = false
-    isLenient = true
-    ignoreUnknownKeys = true
-}
-
-private val toolValueJsonPretty: Json = Json(from = toolValueJson) {
-    prettyPrint = true
-}
-
-private fun RAToolValue.toJsonElement(): JsonElement = when {
-    string_value != null -> JsonPrimitive(string_value)
-    number_value != null -> JsonPrimitive(number_value)
-    bool_value != null -> JsonPrimitive(bool_value)
-    array_value != null -> buildJsonArray {
-        for (v in array_value.values) add(v.toJsonElement())
+private val toolValueJson: Json =
+    Json {
+        prettyPrint = false
+        encodeDefaults = false
+        isLenient = true
+        ignoreUnknownKeys = true
     }
-    object_value != null -> buildJsonObject {
-        for ((k, v) in object_value.fields) put(k, v.toJsonElement())
-    }
-    null_value == true -> JsonNull
-    else -> JsonNull
-}
 
-private fun JsonElement.toRAToolValue(): RAToolValue = when (this) {
-    is JsonNull -> RAToolValue(null_value = true)
-    is JsonPrimitive -> when {
-        this.isString -> RAToolValue(string_value = contentOrNull ?: "")
-        booleanOrNull != null -> RAToolValue(bool_value = booleanOrNull)
-        longOrNull != null -> RAToolValue(number_value = longOrNull!!.toDouble())
-        intOrNull != null -> RAToolValue(number_value = intOrNull!!.toDouble())
-        doubleOrNull != null -> RAToolValue(number_value = doubleOrNull)
-        else -> RAToolValue(string_value = contentOrNull ?: "")
+private val toolValueJsonPretty: Json =
+    Json(from = toolValueJson) {
+        prettyPrint = true
     }
-    is JsonArray -> RAToolValue(
-        array_value = RAToolValueArray(values = this.map { it.toRAToolValue() }),
-    )
-    is JsonObject -> RAToolValue(
-        object_value = RAToolValueObject(
-            fields = this.mapValues { (_, v) -> v.toRAToolValue() },
-        ),
-    )
-}
+
+private fun RAToolValue.toJsonElement(): JsonElement =
+    when {
+        string_value != null -> JsonPrimitive(string_value)
+        number_value != null -> JsonPrimitive(number_value)
+        bool_value != null -> JsonPrimitive(bool_value)
+        array_value != null ->
+            buildJsonArray {
+                for (v in array_value.values) add(v.toJsonElement())
+            }
+        object_value != null ->
+            buildJsonObject {
+                for ((k, v) in object_value.fields) put(k, v.toJsonElement())
+            }
+        null_value == true -> JsonNull
+        else -> JsonNull
+    }
+
+private fun JsonElement.toRAToolValue(): RAToolValue =
+    when (this) {
+        is JsonNull -> RAToolValue(null_value = true)
+        is JsonPrimitive ->
+            when {
+                this.isString -> RAToolValue(string_value = contentOrNull ?: "")
+                booleanOrNull != null -> RAToolValue(bool_value = booleanOrNull)
+                longOrNull != null -> RAToolValue(number_value = longOrNull!!.toDouble())
+                intOrNull != null -> RAToolValue(number_value = intOrNull!!.toDouble())
+                doubleOrNull != null -> RAToolValue(number_value = doubleOrNull)
+                else -> RAToolValue(string_value = contentOrNull ?: "")
+            }
+        is JsonArray ->
+            RAToolValue(
+                array_value = RAToolValueArray(values = this.map { it.toRAToolValue() }),
+            )
+        is JsonObject ->
+            RAToolValue(
+                object_value =
+                    RAToolValueObject(
+                        fields = this.mapValues { (_, v) -> v.toRAToolValue() },
+                    ),
+            )
+    }
 
 /**
  * Render this value as a JSON string. Mirrors Swift
  * `RAToolValue.toJSONString(pretty:)`.
  */
-fun RAToolValue.toJSONString(pretty: Boolean = false): String? = runCatching {
-    val encoder = if (pretty) toolValueJsonPretty else toolValueJson
-    encoder.encodeToString(JsonElement.serializer(), toJsonElement())
-}.getOrNull()
+fun RAToolValue.toJSONString(pretty: Boolean = false): String? =
+    runCatching {
+        val encoder = if (pretty) toolValueJsonPretty else toolValueJson
+        encoder.encodeToString(JsonElement.serializer(), toJsonElement())
+    }.getOrNull()
 
 /**
  * Parse a JSON object string into a `[String: RAToolValue]` map. Returns an
@@ -296,8 +307,11 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
     if (json.isBlank()) return emptyMap()
     return runCatching {
         val element = toolValueJson.parseToJsonElement(json)
-        if (element !is JsonObject) emptyMap()
-        else element.mapValues { (_, v) -> v.toRAToolValue() }
+        if (element !is JsonObject) {
+            emptyMap()
+        } else {
+            element.mapValues { (_, v) -> v.toRAToolValue() }
+        }
     }.getOrDefault(emptyMap())
 }
 

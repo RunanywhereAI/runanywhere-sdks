@@ -18,8 +18,8 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.AccelerationPreference
+import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHardware
 import com.runanywhere.sdk.foundation.errors.SDKException

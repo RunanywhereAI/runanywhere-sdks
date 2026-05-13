@@ -236,7 +236,7 @@ kotlin {
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)
                 // org.json - available on Android via SDK, needed explicitly for JVM
-                implementation("org.json:json:20240303")
+                implementation(libs.json)
 
                 // v2 close-out H4: OkHttp powers the platform HTTP transport
                 // adapter (`foundation/bridge/extensions/CppBridgeHTTP.kt`), so that the
@@ -259,7 +259,7 @@ kotlin {
                 // testRuns uses useJUnitPlatform(); to run classic JUnit 4
                 // test classes (org.junit.Test) under JUnit Platform we
                 // need the Vintage engine on the test runtime classpath.
-                runtimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
+                runtimeOnly(libs.junit.vintage.engine)
             }
         }
 
@@ -291,7 +291,7 @@ kotlin {
 
 android {
     namespace = "com.runanywhere.sdk.kotlin"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24
@@ -365,18 +365,18 @@ tasks.register<Exec>("buildLocalJniLibs") {
         val allLibsExist = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs
 
         if (allLibsExist && !rebuildCommons) {
-            logger.lifecycle("✅ JNI libraries already exist - skipping build")
+            logger.lifecycle("[OK] JNI libraries already exist - skipping build")
             logger.lifecycle("   (use -Prunanywhere.rebuildCommons=true to force rebuild)")
             logger.lifecycle("")
             // Skip the exec by setting a dummy command
             commandLine("echo", "JNI libs up to date")
         } else if (!allLibsExist) {
-            logger.lifecycle("🆕 First-time setup: Running build-core-android.sh")
+            logger.lifecycle("[NEW] First-time setup: Running build-core-android.sh")
             logger.lifecycle("   This will build all Android ABIs and stage them into the Kotlin modules...")
             logger.lifecycle("")
             commandLine("bash", buildCoreAndroidScript.absolutePath)
         } else if (rebuildCommons) {
-            logger.lifecycle("🔄 Rebuild requested: Running build-core-android.sh")
+            logger.lifecycle("[REBUILD] Rebuild requested: Running build-core-android.sh")
             logger.lifecycle("")
             commandLine("bash", buildCoreAndroidScript.absolutePath)
         }
@@ -389,7 +389,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
             val soFiles = dir.walkTopDown().filter { it.extension == "so" }.toList()
             if (soFiles.isNotEmpty()) {
                 logger.lifecycle("")
-                logger.lifecycle("✓ $moduleName: ${soFiles.size} .so files")
+                logger.lifecycle("[done] $moduleName: ${soFiles.size} .so files")
                 soFiles.groupBy { it.parentFile.name }.forEach { (abi, files) ->
                     logger.lifecycle("  $abi: ${files.map { it.name }.joinToString(", ")}")
                 }
@@ -454,7 +454,7 @@ tasks.register<Exec>("setupLocalDevelopment") {
 
     doLast {
         logger.lifecycle("")
-        logger.lifecycle("✅ Setup complete! You can now build with:")
+        logger.lifecycle("[OK] Setup complete! You can now build with:")
         logger.lifecycle("   ./gradlew assembleDebug")
         logger.lifecycle("")
     }
@@ -562,7 +562,7 @@ tasks.register("downloadJniLibs") {
             val zipUrl = "$releaseBaseUrl/$packageName"
             val tempZip = file("$tempDir/$packageName")
 
-            logger.lifecycle("▶ Downloading: $packageName")
+            logger.lifecycle("[>>] Downloading: $packageName")
 
             try {
                 ant.withGroovyBuilder {
@@ -582,13 +582,13 @@ tasks.register("downloadJniLibs") {
                     .forEach { soFile ->
                         val targetFile = file("$abiOutputDir/${soFile.name}")
                         soFile.copyTo(targetFile, overwrite = true)
-                        logger.lifecycle("  ✓ ${soFile.name}")
+                        logger.lifecycle("  [done] ${soFile.name}")
                         totalDownloaded++
                     }
 
                 tempZip.delete()
             } catch (e: Exception) {
-                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+                logger.warn("  [WARN] Failed to download $packageName: ${e.message}")
             }
 
             logger.lifecycle("")
@@ -600,7 +600,7 @@ tasks.register("downloadJniLibs") {
         val abiDirs = outputDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
 
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle("✓ Commons JNI libraries ready: $totalLibs .so files")
+        logger.lifecycle("[done] Commons JNI libraries ready: $totalLibs .so files")
         logger.lifecycle("  ABIs: ${abiDirs.joinToString(", ")}")
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")

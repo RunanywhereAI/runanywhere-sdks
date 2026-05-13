@@ -9,11 +9,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
@@ -24,6 +23,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val vlmLogger = SDKLogger("VLM")
 
@@ -41,9 +41,10 @@ private fun isVLMModelLoaded(): Boolean {
         ProtoModelCategory.MODEL_CATEGORY_MULTIMODAL,
         ProtoModelCategory.MODEL_CATEGORY_VISION,
     )) {
-        val result = CppBridgeModelLifecycle.currentModel(
-            CurrentModelRequest(category = category),
-        )
+        val result =
+            CppBridgeModelLifecycle.currentModel(
+                CurrentModelRequest(category = category),
+            )
         if (result?.found == true) {
             return true
         }

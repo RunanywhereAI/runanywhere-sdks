@@ -51,11 +51,12 @@ fun DeviceStorageInfo.Companion.create(
  * `used_percent` but returned as `Double` to match the Swift API.
  */
 val DeviceStorageInfo.usagePercentage: Double
-    get() = if (total_bytes > 0L) {
-        used_bytes.toDouble() / total_bytes.toDouble() * 100.0
-    } else {
-        0.0
-    }
+    get() =
+        if (total_bytes > 0L) {
+            used_bytes.toDouble() / total_bytes.toDouble() * 100.0
+        } else {
+            0.0
+        }
 
 // MARK: - AppStorageInfo
 

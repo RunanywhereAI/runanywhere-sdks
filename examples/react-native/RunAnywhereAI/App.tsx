@@ -44,7 +44,6 @@ import {
   InferenceFramework,
   ModelArtifactType,
   initializeNitroModulesGlobally,
-  hasUsableBackendConfig,
 } from '@runanywhere/core';
 
 // Canonical SDK methods (Swift parity).
@@ -59,6 +58,16 @@ type OptionalBackend = {
   register: () => void | Promise<void | boolean>;
   isAvailable?: boolean;
 };
+
+function hasUsableBackendConfig(options: {
+  apiKey?: string | null;
+  baseURL?: string | null;
+}): boolean {
+  const apiKey = options.apiKey?.trim() ?? '';
+  const baseURL = options.baseURL?.trim() ?? '';
+  if (!apiKey || apiKey.length < 8 || !baseURL) return false;
+  return baseURL.startsWith('http://') || baseURL.startsWith('https://');
+}
 
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: OptionalBackend | null = null;
@@ -324,7 +333,7 @@ async function registerModulesAndModels(): Promise<void> {
   // (returning a chip name, not the structured chip identifier object the
   // Genie URL builder needed). Until the proto-canonical Genie catalog
   // replacement lands, the example app simply registers the backend so
-  // `getCapabilities()` reports it without enumerating NPU models here.
+  // native backend availability exists without enumerating NPU models here.
   // =========================================================================
   if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
     Genie.register();

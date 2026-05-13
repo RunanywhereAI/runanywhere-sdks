@@ -1,52 +1,96 @@
 /**
- * helpers/stt — ergonomic helpers for proto-encoded STT types.
+ * helpers/stt
  *
- * Re-exports the canonical proto types from
- * `@runanywhere/proto-ts/stt_options` and adds free-function defaults +
- * predicates so call sites don't have to call `STTConfiguration.create({...})`
- * with every field by hand.
+ * Swift-parity conveniences for generated STT proto types.
  */
 
 import {
-  STTConfiguration,
-  STTOptions,
   STTLanguage,
   type STTOutput,
 } from '@runanywhere/proto-ts/stt_options';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 export {
   STTConfiguration,
   STTOptions,
   STTLanguage,
   type STTOutput,
+  type STTPartialResult,
+  type STTLanguageDetectionResult,
+  type STTServiceState,
+  type STTStreamEvent,
+  type STTTranscriptionRequest,
+  type TranscriptionAlternative,
+  type TranscriptionMetadata,
+  type WordTimestamp,
 } from '@runanywhere/proto-ts/stt_options';
 
-/** Returns a sensible default `STTConfiguration` for streaming transcription. */
-export function defaultSTTConfig(modelId = ''): STTConfiguration {
-  return STTConfiguration.create({
-    modelId,
-    language: STTLanguage.STT_LANGUAGE_AUTO,
-    sampleRate: 16000,
-    enableVad: true,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-  });
+export function sttLanguageFromBcp47(raw: string): STTLanguage {
+  const base = (raw.split('-')[0] ?? raw).toLowerCase();
+  switch (base) {
+    case 'auto':
+      return STTLanguage.STT_LANGUAGE_AUTO;
+    case 'en':
+      return STTLanguage.STT_LANGUAGE_EN;
+    case 'es':
+      return STTLanguage.STT_LANGUAGE_ES;
+    case 'fr':
+      return STTLanguage.STT_LANGUAGE_FR;
+    case 'de':
+      return STTLanguage.STT_LANGUAGE_DE;
+    case 'zh':
+      return STTLanguage.STT_LANGUAGE_ZH;
+    case 'ja':
+      return STTLanguage.STT_LANGUAGE_JA;
+    case 'ko':
+      return STTLanguage.STT_LANGUAGE_KO;
+    case 'it':
+      return STTLanguage.STT_LANGUAGE_IT;
+    case 'pt':
+      return STTLanguage.STT_LANGUAGE_PT;
+    case 'ar':
+      return STTLanguage.STT_LANGUAGE_AR;
+    case 'ru':
+      return STTLanguage.STT_LANGUAGE_RU;
+    case 'hi':
+      return STTLanguage.STT_LANGUAGE_HI;
+    default:
+      return STTLanguage.STT_LANGUAGE_UNSPECIFIED;
+  }
 }
 
-/** Returns a sensible default `STTOptions` for runtime transcription overrides. */
-export function defaultSTTOptions(): STTOptions {
-  return STTOptions.create({
-    language: STTLanguage.STT_LANGUAGE_AUTO,
-    enablePunctuation: true,
-    enableDiarization: false,
-    maxSpeakers: 0,
-    vocabularyList: [],
-    enableWordTimestamps: false,
-    beamSize: 0,
-  });
+export function sttLanguageBcp47Code(language: STTLanguage): string {
+  switch (language) {
+    case STTLanguage.STT_LANGUAGE_AUTO:
+      return 'auto';
+    case STTLanguage.STT_LANGUAGE_EN:
+      return 'en';
+    case STTLanguage.STT_LANGUAGE_ES:
+      return 'es';
+    case STTLanguage.STT_LANGUAGE_FR:
+      return 'fr';
+    case STTLanguage.STT_LANGUAGE_DE:
+      return 'de';
+    case STTLanguage.STT_LANGUAGE_ZH:
+      return 'zh';
+    case STTLanguage.STT_LANGUAGE_JA:
+      return 'ja';
+    case STTLanguage.STT_LANGUAGE_KO:
+      return 'ko';
+    case STTLanguage.STT_LANGUAGE_IT:
+      return 'it';
+    case STTLanguage.STT_LANGUAGE_PT:
+      return 'pt';
+    case STTLanguage.STT_LANGUAGE_AR:
+      return 'ar';
+    case STTLanguage.STT_LANGUAGE_RU:
+      return 'ru';
+    case STTLanguage.STT_LANGUAGE_HI:
+      return 'hi';
+    default:
+      return '';
+  }
 }
 
-/** True when the configuration carries enough info to run transcription. */
-export function isSTTConfigValid(config: STTConfiguration): boolean {
-  return config.modelId.length > 0 && config.sampleRate > 0;
+export function sttOutputDetectedLanguageCode(output: STTOutput): STTLanguage {
+  return output.language;
 }

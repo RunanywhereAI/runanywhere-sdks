@@ -19,7 +19,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSSynthesisRequest
 import ai.runanywhere.proto.v1.TTSVoiceInfo
@@ -111,8 +110,9 @@ object CppBridgeTTS {
      * the lifecycle is the source of truth, no handle is threaded.
      */
     suspend fun voices(): List<TTSVoiceInfo> {
-        val bytes = RunAnywhereBridge.racTtsListVoicesLifecycleProto()
-            ?: throw SDKException.operation("racTtsListVoicesLifecycleProto returned null")
+        val bytes =
+            RunAnywhereBridge.racTtsListVoicesLifecycleProto()
+                ?: throw SDKException.operation("racTtsListVoicesLifecycleProto returned null")
         return TTSVoiceList.ADAPTER.decode(bytes).voices
     }
 

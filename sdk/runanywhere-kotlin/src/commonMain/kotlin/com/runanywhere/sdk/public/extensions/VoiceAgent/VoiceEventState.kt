@@ -14,6 +14,7 @@ import ai.runanywhere.proto.v1.SpeechTurnDetectionEventKind
 import ai.runanywhere.proto.v1.TurnLifecycleEventKind
 import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.public.types.RAVoiceEvent
+
 fun RAVoiceEvent.pipelineStateOrNull(): PipelineState? {
     state?.current?.takeUnless { it == PipelineState.PIPELINE_STATE_UNSPECIFIED }?.let { return it }
 

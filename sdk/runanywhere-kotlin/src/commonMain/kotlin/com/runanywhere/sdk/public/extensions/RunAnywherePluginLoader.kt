@@ -79,6 +79,17 @@ expect class PluginLoader {
      * @return List of plugin name strings (without path or extension)
      */
     suspend fun registeredNames(): List<String>
+
+    /**
+     * Snapshot of all currently-loaded plugins.
+     *
+     * Returned [PluginInfo] contains the plugin name only; the original
+     * load path is not persisted by the C registry. Use [registeredNames]
+     * if only names are needed.
+     *
+     * @return List of [PluginInfo] for each registered plugin, with empty paths
+     */
+    suspend fun listLoaded(): List<PluginInfo>
 }
 
 // ---------------------------------------------------------------------------

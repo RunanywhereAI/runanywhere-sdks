@@ -135,7 +135,6 @@ internal expect suspend fun platformResolveAuthToken(): String?
  * surface symmetrical across SDKs).
  */
 public object HTTPClientAdapter {
-
     private const val DEFAULT_TIMEOUT_MS: Int = 30_000
 
     /**
@@ -239,15 +238,16 @@ public object HTTPClientAdapter {
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): ByteArray {
         val headers = buildHeaders(apiKey = null, authToken = null, upsert = false)
-        val result = platformExecuteHttp(
-            method = "GET",
-            url = url,
-            headerKeys = headers.keys.toTypedArray(),
-            headerValues = headers.values.toTypedArray(),
-            body = null,
-            timeoutMs = timeoutMs,
-            followRedirects = true,
-        )
+        val result =
+            platformExecuteHttp(
+                method = "GET",
+                url = url,
+                headerKeys = headers.keys.toTypedArray(),
+                headerValues = headers.values.toTypedArray(),
+                body = null,
+                timeoutMs = timeoutMs,
+                followRedirects = true,
+            )
         return interpretResult(result, method = "GET", url = url)
     }
 
@@ -266,39 +266,41 @@ public object HTTPClientAdapter {
         val token = resolveToken(requiresAuth = requiresAuth)
         val isUpsert = path.contains(DEV_DEVICE_REGISTER_MARKER)
 
-        val headers = buildHeaders(
-            apiKey = apiKey,
-            authToken = token.ifEmpty { null },
-            upsert = isUpsert,
-        )
+        val headers =
+            buildHeaders(
+                apiKey = apiKey,
+                authToken = token.ifEmpty { null },
+                upsert = isUpsert,
+            )
 
         val headerKeys = headers.keys.toTypedArray()
         val headerValues = headers.values.toTypedArray()
 
-        val result = if (isUpsert) {
-            // Supabase upsert path — defer URL + Prefer header rewrite
-            // to commons via `rac_http_request_set_upsert_mode`.
-            platformExecuteHttpUpsert(
-                method = method,
-                url = url,
-                headerKeys = headerKeys,
-                headerValues = headerValues,
-                body = body,
-                timeoutMs = DEFAULT_TIMEOUT_MS,
-                followRedirects = true,
-                onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
-            )
-        } else {
-            platformExecuteHttp(
-                method = method,
-                url = url,
-                headerKeys = headerKeys,
-                headerValues = headerValues,
-                body = body,
-                timeoutMs = DEFAULT_TIMEOUT_MS,
-                followRedirects = true,
-            )
-        }
+        val result =
+            if (isUpsert) {
+                // Supabase upsert path — defer URL + Prefer header rewrite
+                // to commons via `rac_http_request_set_upsert_mode`.
+                platformExecuteHttpUpsert(
+                    method = method,
+                    url = url,
+                    headerKeys = headerKeys,
+                    headerValues = headerValues,
+                    body = body,
+                    timeoutMs = DEFAULT_TIMEOUT_MS,
+                    followRedirects = true,
+                    onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
+                )
+            } else {
+                platformExecuteHttp(
+                    method = method,
+                    url = url,
+                    headerKeys = headerKeys,
+                    headerValues = headerValues,
+                    body = body,
+                    timeoutMs = DEFAULT_TIMEOUT_MS,
+                    followRedirects = true,
+                )
+            }
         return interpretResult(result, method = method, url = url)
     }
 
@@ -358,8 +360,9 @@ public object HTTPClientAdapter {
     ): SDKException {
         val bodyString = if (body.isEmpty()) "" else body.decodeToString()
         val parsed = platformParseAPIError(statusCode = statusCode, body = bodyString, url = url)
-        val message = parsed?.message?.takeIf { it.isNotEmpty() }
-            ?: "HTTP error $statusCode"
+        val message =
+            parsed?.message?.takeIf { it.isNotEmpty() }
+                ?: "HTTP error $statusCode"
 
         return when (statusCode) {
             401 -> SDKException.authenticationFailed(reason = message)

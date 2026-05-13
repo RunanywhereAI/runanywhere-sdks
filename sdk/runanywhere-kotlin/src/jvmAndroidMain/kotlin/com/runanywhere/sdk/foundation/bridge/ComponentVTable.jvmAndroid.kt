@@ -52,7 +52,7 @@ public actual class ComponentVTable internal constructor(
 ) {
     public actual fun create(): Long = createFn()
 
-    public actual fun destroy(handle: Long): Unit = destroyFn(handle)
+    public actual fun destroy(handle: Long) = destroyFn(handle)
 
     /**
      * Proto-canonical readiness check. Returns true iff the lifecycle
@@ -79,45 +79,50 @@ public actual class ComponentVTable internal constructor(
     }
 
     public actual companion object {
-        public actual val llm: ComponentVTable = ComponentVTable(
-            component = SDKComponent.SDK_COMPONENT_LLM,
-            createFn = { RunAnywhereBridge.racLlmComponentCreate() },
-            destroyFn = { handle -> RunAnywhereBridge.racLlmComponentDestroy(handle) },
-            loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
-        )
+        public actual val llm: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_LLM,
+                createFn = { RunAnywhereBridge.racLlmComponentCreate() },
+                destroyFn = { handle -> RunAnywhereBridge.racLlmComponentDestroy(handle) },
+                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+            )
 
-        public actual val stt: ComponentVTable = ComponentVTable(
-            component = SDKComponent.SDK_COMPONENT_STT,
-            createFn = { RunAnywhereBridge.racSttComponentCreate() },
-            destroyFn = { handle -> RunAnywhereBridge.racSttComponentDestroy(handle) },
-            loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
-        )
+        public actual val stt: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_STT,
+                createFn = { RunAnywhereBridge.racSttComponentCreate() },
+                destroyFn = { handle -> RunAnywhereBridge.racSttComponentDestroy(handle) },
+                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+            )
 
-        public actual val tts: ComponentVTable = ComponentVTable(
-            component = SDKComponent.SDK_COMPONENT_TTS,
-            createFn = { RunAnywhereBridge.racTtsComponentCreate() },
-            destroyFn = { handle -> RunAnywhereBridge.racTtsComponentDestroy(handle) },
-            loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
-        )
+        public actual val tts: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_TTS,
+                createFn = { RunAnywhereBridge.racTtsComponentCreate() },
+                destroyFn = { handle -> RunAnywhereBridge.racTtsComponentDestroy(handle) },
+                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+            )
 
-        public actual val vad: ComponentVTable = ComponentVTable(
-            component = SDKComponent.SDK_COMPONENT_VAD,
-            createFn = { RunAnywhereBridge.racVadComponentCreate() },
-            destroyFn = { handle -> RunAnywhereBridge.racVadComponentDestroy(handle) },
-            loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
-        )
+        public actual val vad: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_VAD,
+                createFn = { RunAnywhereBridge.racVadComponentCreate() },
+                destroyFn = { handle -> RunAnywhereBridge.racVadComponentDestroy(handle) },
+                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+            )
 
-        public actual val vlm: ComponentVTable = ComponentVTable(
-            component = SDKComponent.SDK_COMPONENT_VLM,
-            // VLM in the Kotlin SDK never owns a bare component handle
-            // (load+create are fused at the proto service layer).
-            // Mirrors Swift Wave 7 / T23 note: the slot is kept for
-            // shape uniformity but is dead in practice.
-            createFn = { 0L },
-            destroyFn = { handle -> RunAnywhereBridge.racVlmDestroy(handle) },
-            // Slot kept for shape uniformity.
-            loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
-        )
+        public actual val vlm: ComponentVTable =
+            ComponentVTable(
+                component = SDKComponent.SDK_COMPONENT_VLM,
+                // VLM in the Kotlin SDK never owns a bare component handle
+                // (load+create are fused at the proto service layer).
+                // Mirrors Swift Wave 7 / T23 note: the slot is kept for
+                // shape uniformity but is dead in practice.
+                createFn = { 0L },
+                destroyFn = { handle -> RunAnywhereBridge.racVlmDestroy(handle) },
+                // Slot kept for shape uniformity.
+                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+            )
 
         /**
          * Shared helper that funnels every modality's `loadModel` slot
@@ -128,9 +133,10 @@ public actual class ComponentVTable internal constructor(
          * otherwise.
          */
         private fun loadViaLifecycle(modelId: String): Int {
-            val result = CppBridgeModelLifecycle.load(
-                ModelLoadRequest(model_id = modelId),
-            ) ?: return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+            val result =
+                CppBridgeModelLifecycle.load(
+                    ModelLoadRequest(model_id = modelId),
+                ) ?: return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
             return if (result.success) {
                 RunAnywhereBridge.RAC_SUCCESS
             } else {

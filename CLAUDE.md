@@ -211,23 +211,25 @@ swiftlint
 cd sdk/runanywhere-kotlin/
 
 # Build all (JVM + Android)
-./scripts/sdk.sh build
+./gradlew build
 
 # Individual targets
-./scripts/sdk.sh jvm           # JVM JAR
-./scripts/sdk.sh android       # Android AAR
+./gradlew jvmJar               # JVM JAR
+./gradlew assembleDebug        # Android Debug AAR
+./gradlew assembleRelease      # Android Release AAR
 
 # Test
-./scripts/sdk.sh test          # All tests
-./scripts/sdk.sh test-jvm      # JVM only
+./gradlew allTests             # All tests
+./gradlew jvmTest              # JVM only
+./gradlew testDebugUnitTest    # Android unit tests only
 
 # Publish to Maven Local
-./scripts/sdk.sh publish
-
-# Direct Gradle
-./gradlew assembleDebug        # Android debug AAR
-./gradlew jvmJar               # JVM JAR
 ./gradlew publishToMavenLocal
+
+# Native library management (C++ JNI)
+./gradlew setupLocalDevelopment   # First-time: builds C++ JNI libs (runs scripts/build-core-android.sh)
+./gradlew rebuildCommons          # Rebuild C++ after source changes
+./gradlew downloadJniLibs         # Download pre-built .so from GitHub Releases
 ```
 
 Build outputs: `build/libs/RunAnywhereKotlinSDK-jvm-*.jar`, `build/outputs/aar/RunAnywhereKotlinSDK-*.aar`

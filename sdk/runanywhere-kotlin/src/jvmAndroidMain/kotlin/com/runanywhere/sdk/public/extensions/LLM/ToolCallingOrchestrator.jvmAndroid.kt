@@ -168,16 +168,17 @@ internal object ToolCallingOrchestrator {
         toolCallId: String,
         startedAtMs: Long,
         completedAtMs: Long,
-    ): ToolResult = ToolResult(
-        tool_call_id = toolCallId,
-        name = name,
-        result_json = RAToolValue.jsonString(from = result),
-        error = error,
-        success = success,
-        call_id = toolCallId.takeIf { it.isNotEmpty() },
-        started_at_ms = startedAtMs,
-        completed_at_ms = completedAtMs,
-    )
+    ): ToolResult =
+        ToolResult(
+            tool_call_id = toolCallId,
+            name = name,
+            result_json = RAToolValue.jsonString(from = result),
+            error = error,
+            success = success,
+            call_id = toolCallId.takeIf { it.isNotEmpty() },
+            started_at_ms = startedAtMs,
+            completed_at_ms = completedAtMs,
+        )
 
     // ========================================================================
     // GENERATE WITH TOOLS

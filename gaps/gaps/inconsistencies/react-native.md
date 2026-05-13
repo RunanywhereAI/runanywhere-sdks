@@ -1,129 +1,75 @@
 # React Native SDK - Swift Alignment Inconsistencies
 
-Updated: 2026-05-11
+Updated: 2026-05-13
 Scope: `sdk/runanywhere-react-native/`
-Source of truth: `sdk/runanywhere-swift/Sources/RunAnywhere/`
+Source of truth: `sdk/runanywhere-swift/ARCHITECTURE.md`
 
-This is the current React Native backlog for matching Swift end to end. Each item is intended to be small enough for one implementation agent. Agents may split their item further, but must not touch Kotlin, Flutter, or unrelated work from other agents.
+React Native must align to Swift as the canonical SDK implementation. This backlog is deletion-forward: replace stale RN-specific JS ownership with Swift-shaped native commons ownership, and do not preserve backwards-compatible aliases unless they are explicitly documented as thin convenience wrappers.
 
-## Baseline
+Do not touch Kotlin, Flutter, or unrelated platform work in this stream.
 
-Current React Native TypeScript baseline before this alignment work:
+## Current Decisions
 
-| Package | Command | Status |
-|---|---|---|
-| `@runanywhere/core` | `yarn workspace @runanywhere/core typecheck` | PASS |
-| `@runanywhere/llamacpp` | `yarn workspace @runanywhere/llamacpp typecheck` | PASS |
-| `@runanywhere/onnx` | `yarn workspace @runanywhere/onnx typecheck` | PASS |
-| RN example | `yarn workspace runanywhere-ai-example typecheck` | PASS |
+- Public API, folder organization, bridge slices, initialization, and service ownership follow Swift.
+- Nitro/JSI bridge calls for SDK-owned flows should pass proto bytes and return proto bytes.
+- TypeScript owns ergonomic facades, generated proto encode/decode, subscriptions, and UI-friendly adapters only.
+- Native owns auth, device, HTTP setup, downloads, model registry, model paths, storage, telemetry, logging, lifecycle, and orchestration.
+- No JS `DownloadService`, JS `ModelRegistry`, or `react-native-blob-util` path should remain documented as SDK-owned model management.
+- No backwards-compatibility requirement exists for old RN-only API names.
 
-Run workspace commands from the monorepo root. Running `yarn typecheck` inside `sdk/runanywhere-react-native/` is not the canonical check because the root workspace owns the Yarn project.
+## High-Priority Backlog
 
-## High-Priority Inconsistencies
+### RN-SWIFT-001: File organization must mirror Swift
 
-### RN-SWIFT-001: Gap docs are stale
+Move React Native public extensions and foundation folders toward Swift's `Public`, `Foundation`, `Generated`, `Adapters`, `Infrastructure`, `Features`, and bridge-slice concepts. Backend packages stay thin.
 
-The RN gap docs still describe PR-review state and point fixes. Update file organization, inconsistencies, and PR review docs before code changes. Verify by direct file reads because `gaps/` is gitignored.
+### RN-SWIFT-002: Initialization must be native two-phase init
 
-### RN-SWIFT-002: Public folder layout does not mirror Swift
+Expose native Phase 1 and Phase 2 bridge calls that map to commons init proto entry points. Serialize Phase 2, expose `isInitialized` and `areServicesReady`, and require readiness for flows that need discovered models or online setup.
 
-React Native still uses a flat `Public/Extensions/RunAnywhere+*.ts` layout. Move capability files into Swift-mirrored folders and update barrels/imports.
+### RN-SWIFT-003: Platform adapter ownership is incomplete
 
-### RN-SWIFT-003: Environment default differs from Swift
+React Native native code must provide the Swift-equivalent platform adapter slots for file I/O, secure storage, logging, device identity, HTTP/download, archive extraction, memory, clock, and directory enumeration.
 
-React Native initialization defaults to production-like behavior in places where Swift defaults to development. Align `SDKEnvironment` and initialization defaults to Swift.
+### RN-SWIFT-004: Auth and device state are duplicated in JS
 
-### RN-SWIFT-004: Initialization is not Swift two-phase SDK init
+Delete JS-owned token/device registration persistence. Native commons-backed auth/device state is the source of truth; TypeScript exposes status and typed errors only.
 
-Swift uses native phase 1 and phase 2 initialization through `rac_sdk_init_*`. RN still performs too much JS orchestration. Add native phase methods, serialize phase 2 readiness, and require services-ready for model/inference paths.
+### RN-SWIFT-005: Downloads and registry remain too JS-owned
 
-### RN-SWIFT-005: Model storage base directory is not reliably set
+Replace SDK-owned JS download/registry behavior with native plan/start/progress/poll/cancel/import/discover flows. Remove `react-native-blob-util` as the SDK model artifact engine.
 
-RN model downloads can fail when `documentsPath` is absent and `rac_model_paths_set_base_dir` is skipped. Add native document-directory resolution and set model paths before registry/discovery.
+### RN-SWIFT-006: Model storage/delete/import must use native proto requests
 
-### RN-SWIFT-006: Auth state is duplicated in JS and native
+Set the native model base directory before registry/download use. Use Swift-equivalent import, lifecycle, storage analysis, and delete request/result types; delete paths must actually remove native files.
 
-Swift routes auth through native commons-backed auth state. RN still has duplicate JS token persistence and stale bridge behavior. Native should own token/auth state, with TS exposing typed status methods only.
+### RN-SWIFT-007: Bridge APIs must be proto-byte based
 
-### RN-SWIFT-007: Device registration is JS-fire-and-forget
+Replace JSON and per-field bridge calls for lifecycle, registry, download, storage, inference, and modality orchestration with encoded generated proto requests/results.
 
-Move registration into native phase 2, use platform device callbacks, and match Swift build-token/dev-mode semantics.
+### RN-SWIFT-008: Public model API names must be Swift-canonical
 
-### RN-SWIFT-008: Model registry names are RN-specific
+Keep `listModels`, `queryModels`, `getModel`, `downloadedModels`, `registerModel`, `importModel`, and `loadModel(ModelLoadRequest)`. Delete old RN names such as `getAvailableModels` and `getDownloadedModels`.
 
-Current RN work is deleting the old `getAvailableModels` / `getDownloadedModels` surface and keeping the Swift-canonical `listModels`, `queryModels`, `getModel`, `downloadedModels`, `registerModel`, `importModel`, and `loadModel(ModelLoadRequest)` names.
+### RN-SWIFT-009: Events, logging, and errors must match Swift ownership
 
-### RN-SWIFT-009: Download completion does not mirror Swift import flow
+Route native SDK events/logs/errors through RN facades. Map native result/proto errors to typed JS `SDKException` equivalents. Unsupported hardware/platform features must surface typed unavailable errors, not silent fallbacks.
 
-RN should plan/start/poll/cancel like Swift and explicitly import completed artifacts with the same managed-storage flags. Remove implicit registry update assumptions.
+### RN-SWIFT-010: LLM helpers duplicate native result fields
 
-### RN-SWIFT-010: `deleteModel` encodes the wrong proto requests
+Delete old thinking helper RPCs and JS parsers. Read thinking content/tokens, response tokens, text, metrics, and streaming events from native proto results/events.
 
-`deleteModel` must encode `ModelUnloadRequest` for unload and `StorageDeleteRequest` for storage delete. Add native delete-path support so files are actually removed.
+### RN-SWIFT-011: Structured output and tool calling are over-orchestrated in JS
 
-### RN-SWIFT-011: Hardware fallback behavior hides native failures
+Keep JS tool executors, but move parse/format/validate/follow-up orchestration and structured-output handling to native commons-backed proto flows.
 
-Swift surfaces typed errors for unavailable hardware paths. RN should remove silent fallback behavior unless Swift has the same fallback.
+### RN-SWIFT-012: Modalities need Swift readiness and failure semantics
 
-### RN-SWIFT-012: Events do not match Swift naming or ownership
-
-Rename RN event extension toward `SDKEvents`/`EventBus` vocabulary and delete dormant legacy event bridge code once the proto SDK event path owns the surface.
-
-### RN-SWIFT-013: Logging surface is incomplete and has a method mismatch
-
-RN facade calls `setLogLevel`, while the manager exposes `setMinLogLevel`. Expose Swift-equivalent logging controls and route native logs through the RN logging bridge.
-
-### RN-SWIFT-014: Error folder and mapping do not match Swift
-
-Rename `Foundation/ErrorTypes` to `Foundation/Errors`. Map native `rac_result_t`/proto errors into `SDKException` instead of boolean/last-error flows.
-
-### RN-SWIFT-015: LLM API still exposes old thinking helpers
-
-Delete `LlmThinking.ts`, Nitro thinking helper RPCs, and C++ helper methods. Read `thinkingContent`, `thinkingTokens`, `responseTokens`, and `text` from proto generation results/events.
-
-### RN-SWIFT-016: Structured output orchestration still lives in JS
-
-Swift delegates structured-output orchestration to native commons. RN should expose native proto methods and keep JS as encode/decode only.
-
-### RN-SWIFT-017: Tool-calling run loop still lives in JS
-
-Swift uses native run-loop orchestration. RN should keep JS tool executors but move parse/format/validate/follow-up orchestration to native.
-
-### RN-SWIFT-018: RAG lacks Swift resolved-configuration parity
-
-Add resolved configuration helpers and model-info/model-id overloads. Remove duplicated helper defaults where generated proto defaults exist.
-
-### RN-SWIFT-019: TTS playback/cancellation does not match Swift
-
-TTS `speak` should use generated synthesis output, convert/play WAV with returned format, and wire cancellation/stop to native where available.
-
-### RN-SWIFT-020: STT/VAD/VLM readiness and streaming differ from Swift
-
-Align readiness with lifecycle current model/category, use Swift-like streaming semantics, and surface invalid/unavailable states as typed errors.
-
-### RN-SWIFT-021: VoiceAgent accepts a higher-level RN config instead of Swift compose config
-
-Expose full Swift-equivalent compose config as canonical. Convenience config may remain only as a thin wrapper.
-
-### RN-SWIFT-022: LoRA public API is nested and RN-specific
-
-Flatten LoRA to Swift names for apply/remove/list/state/compatibility/catalog/import/download completion APIs.
-
-### RN-SWIFT-023: Solutions overloads are not Swift-shaped
-
-Add Swift-style `run(configBytes)`, `run(config)`, and `run(yaml)` overloads while keeping handle cleanup idempotent.
-
-### RN-SWIFT-024: Plugin loader is missing
-
-Add `RunAnywhere+PluginLoader.ts`. If dynamic loading is not supported on mobile RN, throw the same typed unavailable error Swift uses.
-
-### RN-SWIFT-025: Docs and workflows are stale after API movement
-
-Update RN `CLAUDE.md`, SDK docs, architecture docs, example docs, and React Native workflow instructions after code moves. Fix the iOS bundle id in workflow docs.
+STT, TTS, VAD, VLM, RAG, VoiceAgent, LoRA, Solutions, and PluginLoader should expose Swift-shaped request/result APIs, readiness checks, cancellation behavior, and typed unsupported errors.
 
 ## Verification Requirements
 
-Minimum static gates:
+Minimum static gates for code PRs:
 
 ```bash
 yarn workspace @runanywhere/core typecheck
@@ -132,4 +78,4 @@ yarn workspace @runanywhere/onnx typecheck
 yarn workspace runanywhere-ai-example typecheck
 ```
 
-Full pass requires clean install, logs, model download, model load, real inference, screenshots, and log review for React Native Android and iOS. Build/install/launch alone is smoke validation only.
+Full pass requires clean install, continuous logs, model download, model load, real inference for the changed RN modality set, screenshots, and reviewed logs on Android and iOS. Build/install/launch alone is smoke validation.

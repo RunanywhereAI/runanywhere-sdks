@@ -857,6 +857,35 @@ typedef RacModelRegistryProtoFreeDart = void Function(
   ffi.Pointer<ffi.Uint8>,
 );
 
+/// Matches `rac_register_model_from_url_proto(in_bytes, in_size, out_proto)`.
+/// Shape is identical to `RacLifecycleRequestProtoDart` (no handle) — see
+/// `runanywhere-commons/src/infrastructure/model_management/register_model_from_url.cpp`.
+typedef RacRegisterModelFromUrlProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacRegisterModelFromUrlProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
+/// Matches `rac_model_registry_import_proto(handle, in_bytes, in_size,
+/// out_proto)`. Same shape as `RacHandleBytesToProtoDart`.
+typedef RacModelRegistryImportProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacModelRegistryImportProtoDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
 // ============================================================================
 // Model lifecycle proto-byte API (rac_model_lifecycle.h)
 // ============================================================================
@@ -1512,6 +1541,20 @@ class RacBindings {
             'rac_model_registry_proto_free',
           ),
         ),
+        rac_register_model_from_url_proto =
+            _lookupOptional<RacRegisterModelFromUrlProtoDart>(
+          () => lib.lookupFunction<RacRegisterModelFromUrlProtoNative,
+              RacRegisterModelFromUrlProtoDart>(
+            'rac_register_model_from_url_proto',
+          ),
+        ),
+        rac_model_registry_import_proto =
+            _lookupOptional<RacModelRegistryImportProtoDart>(
+          () => lib.lookupFunction<RacModelRegistryImportProtoNative,
+              RacModelRegistryImportProtoDart>(
+            'rac_model_registry_import_proto',
+          ),
+        ),
         rac_model_registry_discover_proto =
             _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
@@ -1955,6 +1998,16 @@ class RacBindings {
   final RacModelRegistryRemoveProtoDart? rac_model_registry_remove_proto;
 
   final RacModelRegistryProtoFreeDart? rac_model_registry_proto_free;
+
+  /// `rac_register_model_from_url_proto` — Swift-parity URL-form
+  /// `registerModel(...)` entry point. Builds and persists a ModelInfo from a
+  /// `RegisterModelFromUrlRequest`.
+  final RacRegisterModelFromUrlProtoDart? rac_register_model_from_url_proto;
+
+  /// `rac_model_registry_import_proto` — local-import entry point used by
+  /// file-picker / bookmark flows after the platform has handled sandbox
+  /// access.
+  final RacModelRegistryImportProtoDart? rac_model_registry_import_proto;
 
   final RacHandleBytesToProtoDart? rac_model_registry_discover_proto;
 

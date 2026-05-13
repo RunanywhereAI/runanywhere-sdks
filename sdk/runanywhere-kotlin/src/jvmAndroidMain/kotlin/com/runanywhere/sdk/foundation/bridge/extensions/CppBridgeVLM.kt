@@ -39,10 +39,10 @@ import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsRequest
 import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsResponse
 import ai.runanywhere.proto.v1.VLMResult
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RASDKEvent

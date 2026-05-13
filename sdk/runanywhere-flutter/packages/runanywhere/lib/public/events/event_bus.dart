@@ -38,6 +38,11 @@ class EventBus {
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
+  /// Subscribe to events filtered by [category]. Mirrors Swift's
+  /// `EventBus.events(for:)` API surface — useful when callers want
+  /// dynamic category selection instead of using a named getter.
+  Stream<SDKEvent> onCategory(EventCategory category) => _where(category);
+
   /// Generic event publisher - dispatches to appropriate stream
   void publish(SDKEvent event) {
     _allEventsController.add(event);

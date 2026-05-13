@@ -30,4 +30,7 @@ object SDKConstants {
 
     /** Minimum log level in production. Mirrors Swift's `SDKConstants.productionLogLevel`. */
     const val PRODUCTION_LOG_LEVEL = "error"
+
+    /** Platform identifier hoisted from formerly hardcoded sites in CppBridge/CppBridgeAuth/CppBridgeTelemetry/CppBridgeState. */
+    const val SDK_PLATFORM: String = "android"
 }

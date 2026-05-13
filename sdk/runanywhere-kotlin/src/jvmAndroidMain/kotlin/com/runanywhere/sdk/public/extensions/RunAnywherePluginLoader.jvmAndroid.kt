@@ -47,6 +47,9 @@ actual class PluginLoader {
         withContext(Dispatchers.IO) {
             RunAnywhereBridge.racRegistryGetRegisteredNames()?.toList() ?: emptyList()
         }
+
+    actual suspend fun listLoaded(): List<PluginInfo> =
+        registeredNames().map { PluginInfo(name = it, path = "") }
 }
 
 // Singleton instance — one per SDK singleton.

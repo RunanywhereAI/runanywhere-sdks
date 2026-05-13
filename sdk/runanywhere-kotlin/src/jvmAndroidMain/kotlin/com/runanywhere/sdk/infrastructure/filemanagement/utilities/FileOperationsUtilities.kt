@@ -10,7 +10,6 @@ import java.io.File
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/FileManagement/Utilities/FileOperationsUtilities.swift`.
  */
 public object FileOperationsUtilities {
-
     // MARK: - File Existence
 
     /**

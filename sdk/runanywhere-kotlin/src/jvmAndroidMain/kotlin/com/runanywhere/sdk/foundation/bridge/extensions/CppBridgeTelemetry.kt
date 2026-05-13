@@ -28,6 +28,9 @@ import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.cEnvironment
+import com.runanywhere.sdk.public.configuration.description
 import com.runanywhere.sdk.public.types.RASDKEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +47,6 @@ import java.util.UUID
  * `Dispatchers.IO`.
  */
 object CppBridgeTelemetry {
-
     private const val TAG = "CppBridgeTelemetry"
 
     @Volatile private var isRegistered: Boolean = false
@@ -56,13 +58,14 @@ object CppBridgeTelemetry {
     @Volatile private var _apiKey: String? = null
 
     /**
-     * Current SDK environment (0=DEV, 1=STAGING, 2=PRODUCTION). Mirrors
-     * Swift's `Telemetry.activeEnvironment`. Set by [setEnvironment] from
-     * `CppBridge.initialize` so `CppBridgeDevice.isDeviceRegisteredCallback`
-     * can branch on it.
+     * Current SDK environment. Mirrors Swift's
+     * `Telemetry.activeEnvironment: OSAllocatedUnfairLock<SDKEnvironment?>`.
+     * Set by [setEnvironment] from `CppBridge.initialize` so
+     * `CppBridgeDevice.isDeviceRegisteredCallback` can branch on it. `null`
+     * before initialization and after [unregister] / shutdown.
      */
     @Volatile
-    var currentEnvironment: Int = 0
+    var currentEnvironment: SDKEnvironment? = null
         private set
 
     private val lock = Any()
@@ -89,7 +92,7 @@ object CppBridgeTelemetry {
      * Mirrors Swift's `Telemetry.initialize(environment:)`.
      */
     fun initialize(
-        environment: Int,
+        environment: SDKEnvironment,
         deviceId: String,
         deviceModel: String,
         osVersion: String,
@@ -99,7 +102,12 @@ object CppBridgeTelemetry {
             currentEnvironment = environment
 
             telemetryManagerHandle =
-                RunAnywhereBridge.racTelemetryManagerCreate(environment, deviceId, "android", sdkVersion)
+                RunAnywhereBridge.racTelemetryManagerCreate(
+                    environment.cEnvironment,
+                    deviceId,
+                    SDKConstants.SDK_PLATFORM,
+                    sdkVersion,
+                )
 
             if (telemetryManagerHandle == 0L) {
                 log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to create telemetry manager")
@@ -142,7 +150,7 @@ object CppBridgeTelemetry {
 
             log(
                 CppBridgePlatformAdapter.LogLevel.INFO,
-                "Telemetry manager initialized (handle=$telemetryManagerHandle, env=$environment)",
+                "Telemetry manager initialized (handle=$telemetryManagerHandle, env=${environment.description})",
             )
         }
     }
@@ -179,6 +187,9 @@ object CppBridgeTelemetry {
                 RunAnywhereBridge.racTelemetryManagerDestroy(telemetryManagerHandle)
                 telemetryManagerHandle = 0
             }
+            // Mirrors Swift's `activeEnvironment.withLock { $0 = nil }` in
+            // `CppBridge.Telemetry.shutdown()`.
+            currentEnvironment = null
             isRegistered = false
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Telemetry unregistered")
         }
@@ -206,24 +217,25 @@ object CppBridgeTelemetry {
     fun getApiKey(): String? = _apiKey
 
     /** Set the active environment so callbacks can branch on prod vs dev. */
-    fun setEnvironment(environment: Int) {
+    fun setEnvironment(environment: SDKEnvironment) {
         currentEnvironment = environment
-        val label =
-            when (environment) {
-                0 -> "DEVELOPMENT"
-                1 -> "STAGING"
-                else -> "PRODUCTION"
-            }
-        log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Environment set to: $environment ($label)")
+        log(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            "Environment set to: ${environment.cEnvironment} (${environment.description})",
+        )
     }
 
     /**
      * Whether the current configuration is usable for outbound HTTP.
      * Mirrors Swift's `CppBridge.DevConfig.hasUsableSupabaseConfig` (dev)
      * + `HTTPClientAdapter.hasUsableConfiguration` (prod) gating.
+     *
+     * A `null` [environment] (typically before Phase 1 init completes)
+     * defers to the development branch, mirroring Swift's `environment
+     * == .development` check on an unset `activeEnvironment`.
      */
-    fun hasUsableNetworkConfig(environment: Int = currentEnvironment): Boolean =
-        if (environment == 0) {
+    fun hasUsableNetworkConfig(environment: SDKEnvironment? = currentEnvironment): Boolean =
+        if (environment == null || environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
             CppBridgeDevConfig.hasUsableSupabaseConfig
         } else {
             CppBridgeDevConfig.isUsableHTTPURL(_baseUrl) &&
@@ -243,7 +255,10 @@ object CppBridgeTelemetry {
      * preflight.
      */
     private suspend fun performTelemetryHttp(path: String, json: String, requiresAuth: Boolean) {
-        if (currentEnvironment == 0 && !CppBridgeDevConfig.hasUsableSupabaseConfig) {
+        val env = currentEnvironment
+        if ((env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) &&
+            !CppBridgeDevConfig.hasUsableSupabaseConfig
+        ) {
             log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry: no usable dev config")
             return
         }

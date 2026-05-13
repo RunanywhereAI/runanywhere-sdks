@@ -252,40 +252,77 @@ object CppBridgeVAD {
      * Initialize VAD — binds to the commons lifecycle VAD service.
      * Returns the post-configure service state. Mirrors Swift's
      * `initialize(_:RAVADConfiguration)`.
+     *
+     * If the lifecycle JNI export is missing (commons-side work pending),
+     * falls back to the handle-based `rac_vad_component_configure_proto`
+     * path so callers don't crash with [UnsatisfiedLinkError].
      */
     suspend fun initialize(config: VADConfiguration = VADConfiguration()): VADServiceState {
-        val state = decodeOrThrow(
-            VADServiceState.ADAPTER,
-            RunAnywhereBridge.racVadConfigureLifecycleProto(
-                VADConfiguration.ADAPTER.encode(config),
-            ),
-            "racVadConfigureLifecycleProto",
-        )
-        logger.info("VAD initialized (lifecycle)")
-        return state
+        return try {
+            val state =
+                decodeOrThrow(
+                    VADServiceState.ADAPTER,
+                    RunAnywhereBridge.racVadConfigureLifecycleProto(
+                        VADConfiguration.ADAPTER.encode(config),
+                    ),
+                    "racVadConfigureLifecycleProto",
+                )
+            logger.info("VAD initialized (lifecycle)")
+            state
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn(
+                "VAD lifecycle JNI not available; falling back to handle-based configure: ${e.message}",
+            )
+            configure(config)
+            VADServiceState(is_ready = true)
+        }
     }
 
     /**
      * Start VAD processing on the lifecycle-loaded service. Returns the
      * post-start service state. Mirrors Swift's `start()`.
+     *
+     * If the lifecycle JNI export is missing, returns a default
+     * [VADServiceState] with `is_ready = true` rather than crashing.
+     * Handle-based VAD has no separate start step — the component is
+     * implicitly ready after [configure] / [loadModel].
      */
     suspend fun start(): VADServiceState =
-        decodeOrThrow(
-            VADServiceState.ADAPTER,
-            RunAnywhereBridge.racVadStartLifecycleProto(),
-            "racVadStartLifecycleProto",
-        )
+        try {
+            decodeOrThrow(
+                VADServiceState.ADAPTER,
+                RunAnywhereBridge.racVadStartLifecycleProto(),
+                "racVadStartLifecycleProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn(
+                "VAD lifecycle JNI not available; start is a no-op on handle-based path: ${e.message}",
+            )
+            VADServiceState(is_ready = true)
+        }
 
     /**
      * Stop VAD processing on the lifecycle-loaded service. Returns the
      * post-stop service state. Mirrors Swift's `stop()`.
+     *
+     * If the lifecycle JNI export is missing, falls back to a [cancel] on
+     * the handle-based path and returns a default [VADServiceState] rather
+     * than crashing.
      */
     suspend fun stop(): VADServiceState =
-        decodeOrThrow(
-            VADServiceState.ADAPTER,
-            RunAnywhereBridge.racVadStopLifecycleProto(),
-            "racVadStopLifecycleProto",
-        )
+        try {
+            decodeOrThrow(
+                VADServiceState.ADAPTER,
+                RunAnywhereBridge.racVadStopLifecycleProto(),
+                "racVadStopLifecycleProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn(
+                "VAD lifecycle JNI not available; falling back to handle-based cancel: ${e.message}",
+            )
+            cancel()
+            VADServiceState(is_ready = false)
+        }
 
     /**
      * Reset VAD internal state on the lifecycle-loaded service (adaptive
@@ -295,14 +332,27 @@ object CppBridgeVAD {
      *
      * Distinct from [reset], which uses the handle-based
      * `rac_vad_component_reset` path.
+     *
+     * If the lifecycle JNI export is missing, falls back to the
+     * handle-based [reset] so callers don't crash with
+     * [UnsatisfiedLinkError].
      */
     suspend fun resetLifecycle(): VADServiceState {
-        val state = decodeOrThrow(
-            VADServiceState.ADAPTER,
-            RunAnywhereBridge.racVadResetLifecycleProto(),
-            "racVadResetLifecycleProto",
-        )
-        logger.info("VAD state reset (lifecycle)")
-        return state
+        return try {
+            val state =
+                decodeOrThrow(
+                    VADServiceState.ADAPTER,
+                    RunAnywhereBridge.racVadResetLifecycleProto(),
+                    "racVadResetLifecycleProto",
+                )
+            logger.info("VAD state reset (lifecycle)")
+            state
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warn(
+                "VAD lifecycle JNI not available; falling back to handle-based reset: ${e.message}",
+            )
+            reset()
+            VADServiceState(is_ready = true)
+        }
     }
 }

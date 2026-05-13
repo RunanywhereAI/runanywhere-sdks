@@ -84,14 +84,16 @@ actual class AudioCaptureManager actual constructor() {
     }
 
     actual suspend fun requestPermission(): Boolean {
-        val ctx = appContextOrNull() ?: run {
-            logger.warning("AndroidPlatformContext not initialized — cannot check RECORD_AUDIO permission")
-            return false
-        }
-        val granted = ContextCompat.checkSelfPermission(
-            ctx,
-            Manifest.permission.RECORD_AUDIO,
-        ) == PackageManager.PERMISSION_GRANTED
+        val ctx =
+            appContextOrNull() ?: run {
+                logger.warning("AndroidPlatformContext not initialized — cannot check RECORD_AUDIO permission")
+                return false
+            }
+        val granted =
+            ContextCompat.checkSelfPermission(
+                ctx,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             logger.warning(
                 "RECORD_AUDIO permission not granted. Host app must call " +
@@ -107,17 +109,19 @@ actual class AudioCaptureManager actual constructor() {
             return
         }
 
-        val ctx = appContextOrNull()
-            ?: throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
-                message = "AndroidPlatformContext not initialized — cannot start audio capture",
-                category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
-            )
+        val ctx =
+            appContextOrNull()
+                ?: throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
+                    message = "AndroidPlatformContext not initialized — cannot start audio capture",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+                )
 
-        val granted = ContextCompat.checkSelfPermission(
-            ctx,
-            Manifest.permission.RECORD_AUDIO,
-        ) == PackageManager.PERMISSION_GRANTED
+        val granted =
+            ContextCompat.checkSelfPermission(
+                ctx,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_MICROPHONE_PERMISSION_DENIED,
@@ -137,8 +141,9 @@ actual class AudioCaptureManager actual constructor() {
         if (minBufferBytes == AudioRecord.ERROR || minBufferBytes == AudioRecord.ERROR_BAD_VALUE) {
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_CONFIGURATION,
-                message = AudioCaptureError.FormatConversionFailed.description +
-                    " (AudioRecord.getMinBufferSize returned $minBufferBytes)",
+                message =
+                    AudioCaptureError.FormatConversionFailed.description +
+                        " (AudioRecord.getMinBufferSize returned $minBufferBytes)",
                 category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
             )
         }
@@ -148,23 +153,24 @@ actual class AudioCaptureManager actual constructor() {
             (sampleRate * AudioCaptureConstants.BYTES_PER_SAMPLE * AudioCaptureConstants.CHUNK_DURATION_MS) / 1000
         val recordBufferBytes = maxOf(minBufferBytes, chunkBytes * 2)
 
-        val record = try {
-            AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                channelConfig,
-                audioEncoding,
-                recordBufferBytes,
-            )
-        } catch (t: Throwable) {
-            abandonAudioFocus(ctx)
-            throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                message = AudioCaptureError.EngineStartFailed(t.message).description,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                cause = t,
-            )
-        }
+        val record =
+            try {
+                AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    channelConfig,
+                    audioEncoding,
+                    recordBufferBytes,
+                )
+            } catch (t: Throwable) {
+                abandonAudioFocus(ctx)
+                throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
+                    message = AudioCaptureError.EngineStartFailed(t.message).description,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                    cause = t,
+                )
+            }
 
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             try {
@@ -175,8 +181,9 @@ actual class AudioCaptureManager actual constructor() {
             abandonAudioFocus(ctx)
             throw SDKException.make(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
-                message = AudioCaptureError.NoInputDevice.description +
-                    " (AudioRecord state=${record.state})",
+                message =
+                    AudioCaptureError.NoInputDevice.description +
+                        " (AudioRecord state=${record.state})",
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
             )
         }
@@ -222,28 +229,29 @@ actual class AudioCaptureManager actual constructor() {
 
         val scope = CoroutineScope(Dispatchers.IO)
         captureScope = scope
-        captureJob = scope.launch {
-            val buffer = ByteArray(chunkBytes)
-            try {
-                while (isActive && recordingFlag.get()) {
-                    val bytesRead = record.read(buffer, 0, chunkBytes)
-                    if (bytesRead > 0) {
-                        val chunk = buffer.copyOf(bytesRead)
-                        currentAudioLevel = computeNormalizedLevel(chunk)
-                        try {
-                            onAudioData(chunk)
-                        } catch (t: Throwable) {
-                            logger.error("onAudioData callback threw: ${t.message}", throwable = t)
+        captureJob =
+            scope.launch {
+                val buffer = ByteArray(chunkBytes)
+                try {
+                    while (isActive && recordingFlag.get()) {
+                        val bytesRead = record.read(buffer, 0, chunkBytes)
+                        if (bytesRead > 0) {
+                            val chunk = buffer.copyOf(bytesRead)
+                            currentAudioLevel = computeNormalizedLevel(chunk)
+                            try {
+                                onAudioData(chunk)
+                            } catch (t: Throwable) {
+                                logger.error("onAudioData callback threw: ${t.message}", throwable = t)
+                            }
+                        } else if (bytesRead < 0) {
+                            logger.warning("AudioRecord.read error: $bytesRead — stopping capture")
+                            break
                         }
-                    } else if (bytesRead < 0) {
-                        logger.warning("AudioRecord.read error: $bytesRead — stopping capture")
-                        break
                     }
+                } finally {
+                    currentAudioLevel = 0f
                 }
-            } finally {
-                currentAudioLevel = 0f
             }
-        }
 
         logger.info("Recording started (sampleRate=$sampleRate, chunkBytes=$chunkBytes)")
     }
@@ -337,14 +345,18 @@ actual class AudioCaptureManager actual constructor() {
         val manager = ctx.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (focusRequest != null) return
-            val attributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(attributes)
-                .setOnAudioFocusChangeListener { /* no-op */ }
-                .build()
+            val attributes =
+                AudioAttributes
+                    .Builder()
+                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            val request =
+                AudioFocusRequest
+                    .Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(attributes)
+                    .setOnAudioFocusChangeListener { /* no-op */ }
+                    .build()
             val result = manager.requestAudioFocus(request)
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 focusRequest = request
@@ -354,11 +366,12 @@ actual class AudioCaptureManager actual constructor() {
         } else {
             if (legacyFocusListener != null) return
             val listener = AudioManager.OnAudioFocusChangeListener { /* no-op */ }
-            val result = manager.requestAudioFocus(
-                listener,
-                AudioManager.STREAM_VOICE_CALL,
-                AudioManager.AUDIOFOCUS_GAIN,
-            )
+            val result =
+                manager.requestAudioFocus(
+                    listener,
+                    AudioManager.STREAM_VOICE_CALL,
+                    AudioManager.AUDIOFOCUS_GAIN,
+                )
             if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 legacyFocusListener = listener
             } else {

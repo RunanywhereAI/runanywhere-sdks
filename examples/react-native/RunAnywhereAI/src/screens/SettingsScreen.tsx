@@ -58,8 +58,6 @@ import {
   RunAnywhere,
   ToolParameterType,
   Hardware,
-  requireDeviceInfoModule,
-  hasUsableBackendConfig,
   type ModelInfo,
   type HardwareProfileResult,
 } from '@runanywhere/core';
@@ -79,6 +77,16 @@ const STORAGE_KEYS = {
   DEVICE_REGISTERED: '@runanywhere_device_registered',
   TOOL_CALLING_ENABLED: '@runanywhere_tool_calling_enabled',
 };
+
+function hasUsableBackendConfig(options: {
+  apiKey?: string | null;
+  baseURL?: string | null;
+}): boolean {
+  const apiKey = options.apiKey?.trim() ?? '';
+  const baseURL = options.baseURL?.trim() ?? '';
+  if (!apiKey || apiKey.length < 8 || !baseURL) return false;
+  return baseURL.startsWith('http://') || baseURL.startsWith('https://');
+}
 
 /**
  * Get stored API key (for use at app launch)
@@ -531,12 +539,7 @@ export const SettingsScreen: React.FC = () => {
         version: version,
         initialized: isInit,
       };
-      setBackendInfoData(updatedBackendInfo); // Get capabilities (returns string[], not number[])
-
-      const caps = await RunAnywhere.getCapabilities();
-      console.warn('[Settings] Capabilities:', caps); // Convert string capabilities to numbers for display mapping
-      const capNumbers = caps.map((cap, index) => index);
-      setCapabilities(capNumbers); // Check loaded models
+      setBackendInfoData(updatedBackendInfo);
 
       const sttLoaded = await RunAnywhere.isSTTModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
@@ -595,18 +598,8 @@ export const SettingsScreen: React.FC = () => {
         const profile = await Hardware.getProfile();
         console.warn('[Settings] Hardware profile:', profile);
         setHardwareProfile(profile);
-
-        try {
-          const deviceInfo = requireDeviceInfoModule();
-          const [ram, cores] = await Promise.all([
-            deviceInfo.getTotalRAM().catch(() => 0),
-            deviceInfo.getCPUCores().catch(() => 0),
-          ]);
-          setTotalRAMBytes(ram);
-          setCpuCores(cores);
-        } catch (err) {
-          console.warn('[Settings] Failed to read device RAM/cores:', err);
-        }
+        setTotalRAMBytes(profile.profile?.totalMemoryBytes ?? 0);
+        setCpuCores(profile.profile?.coreCount ?? 0);
       } catch (err) {
         console.warn('[Settings] Failed to get hardware profile:', err);
       }

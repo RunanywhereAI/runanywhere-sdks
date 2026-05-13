@@ -19,10 +19,11 @@ class RunAnywhereHardware {
 
   /// Aggregate generated hardware profile from commons.
   ///
-  /// Mirrors Swift `RunAnywhere.hardware.getProfile()`.
+  /// Mirrors Swift `try RunAnywhere.hardware.getProfile()` — throws
+  /// `SDKException` when the hardware ABI is unavailable or commons returns
+  /// a non-success result. No silent fallback (Wave H Swift parity).
   Future<HardwareProfileResult> getProfile() async {
-    final nativeProfile = DartBridgeHardware.getProfile();
-    return nativeProfile ?? HardwareProfileResult();
+    return DartBridgeHardware.getProfile();
   }
 
   /// Get available accelerators as generated proto data.

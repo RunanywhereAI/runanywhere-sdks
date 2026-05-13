@@ -1,13 +1,14 @@
 /**
- * helpers/tts — ergonomic helpers for proto-encoded TTS types.
+ * helpers/tts
+ *
+ * Swift-parity conveniences for generated TTS proto types.
  */
 
 import {
-  TTSConfiguration,
-  TTSOptions,
-  TTSVoiceGender,
+  TTSSpeakResult,
+  type TTSOutput,
+  type TTSSpeakResult as TTSSpeakResultType,
 } from '@runanywhere/proto-ts/tts_options';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 export {
   TTSConfiguration,
@@ -16,38 +17,31 @@ export {
   type TTSOutput,
   type TTSSpeakResult,
   type TTSVoiceInfo,
+  type TTSPhonemeTimestamp,
+  type TTSSynthesisMetadata,
+  type TTSSynthesisRequest,
+  type TTSServiceState,
+  type TTSStreamEvent,
 } from '@runanywhere/proto-ts/tts_options';
 
-/** Default `TTSConfiguration` for synthesis. */
-export function defaultTTSConfig(modelId = ''): TTSConfiguration {
-  return TTSConfiguration.create({
-    modelId,
-    voice: '',
-    languageCode: '',
-    speakingRate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 22050,
-    enableNeuralVoice: false,
-    enableSsml: false,
+export function ttsOutputDuration(output: TTSOutput): number {
+  return output.durationMs / 1000;
+}
+
+export function ttsSpeakResultFromOutput(output: TTSOutput): TTSSpeakResultType {
+  return TTSSpeakResult.create({
+    audioFormat: output.audioFormat,
+    sampleRate: output.sampleRate,
+    durationMs: output.durationMs,
+    audioSizeBytes:
+      output.audioSizeBytes > 0 ? output.audioSizeBytes : output.audioData.byteLength,
+    metadata: output.metadata,
+    timestampMs: output.timestampMs,
+    errorMessage: output.errorMessage,
+    errorCode: output.errorCode,
   });
 }
 
-/** Default `TTSOptions` for per-call overrides. */
-export function defaultTTSOptions(): TTSOptions {
-  return TTSOptions.create({
-    voice: '',
-    languageCode: '',
-    speakingRate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    enableSsml: false,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-  });
-}
-
-/** True when the configuration is plausibly synthesizable. */
-export function isTTSConfigValid(config: TTSConfiguration): boolean {
-  return config.modelId.length > 0;
+export function ttsSpeakResultDuration(result: TTSSpeakResultType): number {
+  return result.durationMs / 1000;
 }

@@ -21,8 +21,8 @@ import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelListResult
 import ai.runanywhere.proto.v1.ModelQuery
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 

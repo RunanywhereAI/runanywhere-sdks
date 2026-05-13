@@ -26,8 +26,8 @@
 package com.runanywhere.sdk.foundation.bridge
 
 import ai.runanywhere.proto.v1.SDKComponent
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -85,23 +85,24 @@ public class ComponentActor(
      * Throws [SDKException] if the actor is already shut down or if the
      * native create call fails.
      */
-    public suspend fun getHandle(): Long = mutex.withLock {
-        if (handle != 0L) {
-            return@withLock handle
+    public suspend fun getHandle(): Long =
+        mutex.withLock {
+            if (handle != 0L) {
+                return@withLock handle
+            }
+            if (closed) {
+                throw SDKException.notInitialized("${vtable.component.label} component is shut down")
+            }
+            val newHandle = vtable.create()
+            if (newHandle == 0L) {
+                throw SDKException.notInitialized(
+                    "Failed to create ${vtable.component.label} component",
+                )
+            }
+            handle = newHandle
+            logger.debug("${vtable.component.label} component created")
+            newHandle
         }
-        if (closed) {
-            throw SDKException.notInitialized("${vtable.component.label} component is shut down")
-        }
-        val newHandle = vtable.create()
-        if (newHandle == 0L) {
-            throw SDKException.notInitialized(
-                "Failed to create ${vtable.component.label} component",
-            )
-        }
-        handle = newHandle
-        logger.debug("${vtable.component.label} component created")
-        newHandle
-    }
 
     // MARK: - State queries
 
@@ -151,10 +152,11 @@ public class ComponentActor(
         id: String,
         name: String,
     ) {
-        val load = vtable.loadModel
-            ?: throw SDKException.notImplemented(
-                "${vtable.component.label} does not support generic loadModel",
-            )
+        val load =
+            vtable.loadModel
+                ?: throw SDKException.notImplemented(
+                    "${vtable.component.label} does not support generic loadModel",
+                )
         val h = getHandle()
         val status = load(h, path, id, name)
         if (status != 0) {
@@ -182,28 +184,30 @@ public class ComponentActor(
      * Unload the currently-loaded model/voice. Safe to call when
      * nothing is loaded or the handle hasn't been created.
      */
-    public suspend fun unload(): Unit = mutex.withLock {
-        val h = handle
-        if (h == 0L) return@withLock
-        vtable.cleanup(h)
-        loadedAssetId = null
-        logger.info("${vtable.component.label} model unloaded")
-    }
+    public suspend fun unload() =
+        mutex.withLock {
+            val h = handle
+            if (h == 0L) return@withLock
+            vtable.cleanup(h)
+            loadedAssetId = null
+            logger.info("${vtable.component.label} model unloaded")
+        }
 
     /**
      * Destroy the component, releasing C resources and marking the
      * actor closed. Subsequent [getHandle] calls throw.
      */
-    public suspend fun destroy(): Unit = mutex.withLock {
-        val h = handle
-        if (h != 0L) {
-            vtable.destroy(h)
-            logger.debug("${vtable.component.label} component destroyed")
+    public suspend fun destroy() =
+        mutex.withLock {
+            val h = handle
+            if (h != 0L) {
+                vtable.destroy(h)
+                logger.debug("${vtable.component.label} component destroyed")
+            }
+            handle = 0L
+            loadedAssetId = null
+            closed = true
         }
-        handle = 0L
-        loadedAssetId = null
-        closed = true
-    }
 }
 
 // MARK: - Label helper
@@ -215,17 +219,18 @@ public class ComponentActor(
  * verbose `SDK_COMPONENT_*` prefix.
  */
 private val SDKComponent.label: String
-    get() = when (this) {
-        SDKComponent.SDK_COMPONENT_LLM -> "LLM"
-        SDKComponent.SDK_COMPONENT_STT -> "STT"
-        SDKComponent.SDK_COMPONENT_TTS -> "TTS"
-        SDKComponent.SDK_COMPONENT_VAD -> "VAD"
-        SDKComponent.SDK_COMPONENT_VLM -> "VLM"
-        SDKComponent.SDK_COMPONENT_VOICE_AGENT -> "VoiceAgent"
-        SDKComponent.SDK_COMPONENT_DIFFUSION -> "Diffusion"
-        SDKComponent.SDK_COMPONENT_RAG -> "RAG"
-        SDKComponent.SDK_COMPONENT_EMBEDDINGS -> "Embeddings"
-        SDKComponent.SDK_COMPONENT_WAKEWORD -> "Wakeword"
-        SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION -> "SpeakerDiarization"
-        SDKComponent.SDK_COMPONENT_UNSPECIFIED -> "UnknownComponent"
-    }
+    get() =
+        when (this) {
+            SDKComponent.SDK_COMPONENT_LLM -> "LLM"
+            SDKComponent.SDK_COMPONENT_STT -> "STT"
+            SDKComponent.SDK_COMPONENT_TTS -> "TTS"
+            SDKComponent.SDK_COMPONENT_VAD -> "VAD"
+            SDKComponent.SDK_COMPONENT_VLM -> "VLM"
+            SDKComponent.SDK_COMPONENT_VOICE_AGENT -> "VoiceAgent"
+            SDKComponent.SDK_COMPONENT_DIFFUSION -> "Diffusion"
+            SDKComponent.SDK_COMPONENT_RAG -> "RAG"
+            SDKComponent.SDK_COMPONENT_EMBEDDINGS -> "Embeddings"
+            SDKComponent.SDK_COMPONENT_WAKEWORD -> "Wakeword"
+            SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION -> "SpeakerDiarization"
+            SDKComponent.SDK_COMPONENT_UNSPECIFIED -> "UnknownComponent"
+        }

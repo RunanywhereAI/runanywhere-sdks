@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.VoiceAgentConfig
+import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 
@@ -60,6 +61,25 @@ expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
  * Mirrors Swift's `RunAnywhere.cleanupVoiceAgent()`.
  */
 expect suspend fun RunAnywhere.cleanupVoiceAgent()
+
+/**
+ * Process a complete voice turn end-to-end (VAD → STT → LLM → TTS) over the
+ * composite voice-agent handle.
+ *
+ * Mirrors Swift's `RunAnywhere.processVoiceTurn(_:)`:
+ *  - Lazily completes Phase 2 (`ensureServicesReady`).
+ *  - Verifies the SDK is initialized and the voice-agent handle is ready.
+ *  - Forwards to `CppBridgeVoiceAgent.processVoiceTurnProto(audioData)` which
+ *    wraps `rac_voice_agent_process_voice_turn_proto`.
+ *
+ * @param audioData raw audio bytes for the turn (PCM16 mono unless the
+ *   component was configured otherwise via [initializeVoiceAgent]).
+ * @return the canonical [VoiceAgentResult] proto carrying transcript,
+ *   response text, synthesized audio, and per-stage timings.
+ * @throws SDKException if the SDK is not initialized, the voice agent is
+ *   not ready, or the C ABI returns null / decoding fails.
+ */
+expect suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Round 1 KOTLIN (Task 7 / G-E4): canonical streaming voice-agent entry-point.

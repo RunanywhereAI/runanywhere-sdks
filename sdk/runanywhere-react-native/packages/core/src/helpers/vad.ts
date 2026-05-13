@@ -1,33 +1,52 @@
 /**
- * helpers/vad — ergonomic helpers for proto-encoded VAD types.
+ * helpers/vad
+ *
+ * Swift-parity conveniences for generated VAD proto types.
  */
 
-import { VADConfiguration, VADOptions } from '@runanywhere/proto-ts/vad_options';
+import {
+  SpeechActivityKind,
+  type SpeechActivityEvent,
+  type VADConfiguration,
+  type VADResult,
+} from '@runanywhere/proto-ts/vad_options';
 
 export {
   VADConfiguration,
   VADOptions,
+  SpeechActivityKind,
   type VADResult,
   type SpeechActivityEvent,
-  SpeechActivityKind,
+  type VADStatistics,
+  type VADAudioSource,
+  type VADProcessRequest,
+  type VADServiceState,
+  type VADStreamEvent,
 } from '@runanywhere/proto-ts/vad_options';
 
-/** Default `VADConfiguration` matching the Swift / Kotlin defaults. */
-export function defaultVADConfig(): VADConfiguration {
-  return VADConfiguration.create({
-    modelId: '',
-    sampleRate: 16000,
-    frameLengthMs: 100,
-    threshold: 0.015,
-    enableAutoCalibration: false,
-  });
+export function vadConfigurationFrameLengthSeconds(
+  config: VADConfiguration
+): number {
+  return config.frameLengthMs / 1000;
 }
 
-/** Default `VADOptions`. */
-export function defaultVADOptions(): VADOptions {
-  return VADOptions.create({
-    threshold: 0,
-    minSpeechDurationMs: 100,
-    minSilenceDurationMs: 300,
-  });
+export function vadResultDuration(result: VADResult): number {
+  return result.durationMs / 1000;
+}
+
+export function speechActivityEventTimestamp(event: SpeechActivityEvent): Date {
+  return new Date(event.timestampMs);
+}
+
+export function speechActivityEventDuration(event: SpeechActivityEvent): number {
+  return event.durationMs / 1000;
+}
+
+export function speechActivityKindIsTransition(
+  kind: SpeechActivityKind
+): boolean {
+  return (
+    kind === SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED ||
+    kind === SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED
+  );
 }

@@ -44,7 +44,6 @@ import com.runanywhere.sdk.public.configuration.cEnvironment
  * relevant environment.
  */
 object CppBridgeEnvironment {
-
     /**
      * Convert a Kotlin [SDKEnvironment] to the `rac_environment_t`
      * integer used by the C ABI. Delegates to the existing
@@ -140,7 +139,6 @@ object CppBridgeEnvironment {
  * read-only after build time; no Kotlin-side locking is required.
  */
 object CppBridgeDevConfig {
-
     private val placeholderPattern: Regex =
         Regex("YOUR_|<your|REPLACE_ME|PLACEHOLDER", RegexOption.IGNORE_CASE)
 
@@ -262,7 +260,6 @@ object CppBridgeDevConfig {
  * `idl/endpoints.proto`.
  */
 object CppBridgeEndpoints {
-
     /** Fallback constants used when the native binding is unreachable.
      *  Mirror the canonical values in `rac_endpoints.h`. */
     private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/devices"
@@ -289,12 +286,13 @@ object CppBridgeEndpoints {
      * `rac_endpoint_device_registration` via JNI.
      */
     fun deviceRegistration(env: SDKEnvironment): String {
-        val fallback = when (env) {
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-            -> FALLBACK_PROD_DEVICE_REGISTRATION
-            else -> FALLBACK_DEV_DEVICE_REGISTRATION
-        }
+        val fallback =
+            when (env) {
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+                -> FALLBACK_PROD_DEVICE_REGISTRATION
+                else -> FALLBACK_DEV_DEVICE_REGISTRATION
+            }
         return jniOrFallback(fallback) {
             RunAnywhereBridge.racEndpointDeviceRegistration(CppBridgeEnvironment.toC(env))
         }
@@ -306,12 +304,13 @@ object CppBridgeEndpoints {
      * `rac_endpoint_telemetry` via JNI.
      */
     fun telemetry(env: SDKEnvironment): String {
-        val fallback = when (env) {
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-            -> FALLBACK_PROD_TELEMETRY
-            else -> FALLBACK_DEV_TELEMETRY
-        }
+        val fallback =
+            when (env) {
+                SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+                -> FALLBACK_PROD_TELEMETRY
+                else -> FALLBACK_DEV_TELEMETRY
+            }
         return jniOrFallback(fallback) {
             RunAnywhereBridge.racEndpointTelemetry(CppBridgeEnvironment.toC(env))
         }
@@ -326,12 +325,16 @@ object CppBridgeEndpoints {
      * and returns a non-null/non-blank string; otherwise fall back to
      * the hard-coded constant. The fallback layer keeps the SDK
      * usable in unit tests and during early bring-up where the native
-     * library may not be loaded.
+     * library may not be loaded (in which case `external fun` calls
+     * raise [UnsatisfiedLinkError]). All `Java_*` exports for these
+     * thunks are wired in `sdk/runanywhere-commons/src/jni/
+     * runanywhere_commons_jni.cpp` as pure constant-string returns, so
+     * no other failure mode is reachable on the happy path.
      */
     private inline fun jniOrFallback(fallback: String, block: () -> String?): String =
         try {
             block()?.takeIf { it.isNotBlank() } ?: fallback
-        } catch (_: Throwable) {
+        } catch (_: UnsatisfiedLinkError) {
             fallback
         }
 }

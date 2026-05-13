@@ -24,12 +24,13 @@ import com.runanywhere.sdk.public.types.RAVADResult
  * Default VAD configuration: 16 kHz, 100 ms frames, 0.015 energy threshold,
  * auto-calibration disabled. Mirrors Swift `RAVADConfiguration.defaults()`.
  */
-fun VADConfiguration.Companion.defaults(): VADConfiguration = VADConfiguration(
-    sample_rate = 16_000,
-    frame_length_ms = 100,
-    threshold = 0.015f,
-    enable_auto_calibration = false,
-)
+fun VADConfiguration.Companion.defaults(): VADConfiguration =
+    VADConfiguration(
+        sample_rate = 16_000,
+        frame_length_ms = 100,
+        threshold = 0.015f,
+        enable_auto_calibration = false,
+    )
 
 /**
  * Validate this configuration. Throws [SDKException] on out-of-range values.
@@ -81,5 +82,6 @@ val SpeechActivityEvent.duration: Double
  * Mirrors Swift `RASpeechActivityKind.isTransition`.
  */
 val SpeechActivityKind.isTransition: Boolean
-    get() = this == SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED ||
-        this == SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED
+    get() =
+        this == SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED ||
+            this == SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED

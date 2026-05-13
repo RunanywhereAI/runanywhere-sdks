@@ -328,12 +328,13 @@ class SDKException(
  * `ERROR_CODE_CANCELLED` and `ERROR_CODE_STREAM_CANCELLED`.
  */
 val ProtoErrorCode.isExpected: Boolean
-    get() = when (this) {
-        ProtoErrorCode.ERROR_CODE_CANCELLED,
-        ProtoErrorCode.ERROR_CODE_STREAM_CANCELLED,
-        -> true
-        else -> false
-    }
+    get() =
+        when (this) {
+            ProtoErrorCode.ERROR_CODE_CANCELLED,
+            ProtoErrorCode.ERROR_CODE_STREAM_CANCELLED,
+            -> true
+            else -> false
+        }
 
 // ============================================================================
 // SDKException CONVENIENCE EXTENSIONS (Swift parity)
@@ -367,15 +368,16 @@ fun SDKException.log(
     val level: LogLevel = if (this.code == ProtoErrorCode.ERROR_CODE_CANCELLED) LogLevel.INFO else LogLevel.ERROR
     val fileName = file.substringAfterLast('/')
 
-    val metadata = buildMap<String, Any?> {
-        put("error_code", this@log.code.name)
-        put("error_category", this@log.category.name)
-        if (fileName.isNotEmpty()) put("source_file", fileName)
-        if (line > 0) put("source_line", line)
-        if (function.isNotEmpty()) put("source_function", function)
-        this@log.cause?.let { put("underlying_error", it.toString()) }
-        put("failure_reason", this@log.failureReason)
-    }
+    val metadata =
+        buildMap<String, Any?> {
+            put("error_code", this@log.code.name)
+            put("error_category", this@log.category.name)
+            if (fileName.isNotEmpty()) put("source_file", fileName)
+            if (line > 0) put("source_line", line)
+            if (function.isNotEmpty()) put("source_function", function)
+            this@log.cause?.let { put("underlying_error", it.toString()) }
+            put("failure_reason", this@log.failureReason)
+        }
 
     Logging.log(
         level = level,

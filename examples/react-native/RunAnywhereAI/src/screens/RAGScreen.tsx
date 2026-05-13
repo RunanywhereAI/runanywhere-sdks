@@ -174,7 +174,13 @@ export const RAGScreen: React.FC = () => {
       // Build RAG configuration using model IDs. commons (via D-6) owns
       // id → path resolution inside rac_rag_session_create_proto.
       const config = RAGConfiguration.fromPartial({
-        ...helpers.ragHelpers.defaultRAGConfig(),
+        embeddingDimension: 384,
+        topK: 5,
+        similarityThreshold: 0.7,
+        chunkSize: 512,
+        chunkOverlap: 64,
+        maxContextTokens: 2048,
+        persistIndex: false,
         embeddingModelId,
         llmModelId,
       });

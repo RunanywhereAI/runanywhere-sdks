@@ -7,14 +7,51 @@
  */
 
 #include "InitBridge.hpp"
+#include "AuthBridge.hpp"
+#include "DeviceBridge.hpp"
+#include "ExternalConfigGuard.hpp"
 #include "PlatformDownloadBridge.h"
+#include "rac_dev_config.h"
 #include "rac_model_paths.h"
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include "rac/infrastructure/http/rac_http_client.h"
+
+#include <cstddef>
+
+#if __has_include("rac/lifecycle/rac_sdk_init.h")
+#include "rac/lifecycle/rac_sdk_init.h"
+#define RN_HAS_RAC_SDK_INIT_HEADER 1
+#elif __has_include("rac_sdk_init.h")
+#include "rac_sdk_init.h"
+#define RN_HAS_RAC_SDK_INIT_HEADER 1
+#else
+#define RN_HAS_RAC_SDK_INIT_HEADER 0
+#endif
+
+#if __has_include("rac/foundation/rac_proto_buffer.h")
+#include "rac/foundation/rac_proto_buffer.h"
+#define RN_HAS_RAC_PROTO_BUFFER_HEADER 1
+#elif __has_include("rac_proto_buffer.h")
+#include "rac_proto_buffer.h"
+#define RN_HAS_RAC_PROTO_BUFFER_HEADER 1
+#else
+#define RN_HAS_RAC_PROTO_BUFFER_HEADER 0
+extern "C" {
+typedef struct rac_proto_buffer {
+    uint8_t* data;
+    size_t size;
+    rac_result_t status;
+    char* error_message;
+} rac_proto_buffer_t;
+}
+#endif
+
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
 #include <atomic>
+#include <cstdint>
+#include <dlfcn.h>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -582,6 +619,259 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
 }
 
 // =============================================================================
+// SDK init proto helpers
+// =============================================================================
+
+struct SdkInitResultSummary {
+    bool hasSuccess = false;
+    bool success = false;
+    bool httpConfigured = false;
+    bool deviceRegistered = false;
+    uint32_t linkedModelsCount = 0;
+    std::string warning;
+};
+
+using ProtoBufferInitFn = void (*)(rac_proto_buffer_t*);
+using ProtoBufferFreeFn = void (*)(rac_proto_buffer_t*);
+using SdkInitProtoFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
+
+template <typename Fn>
+Fn loadOptionalSymbol(const char* name) {
+    return reinterpret_cast<Fn>(dlsym(RTLD_DEFAULT, name));
+}
+
+static void initProtoBuffer(rac_proto_buffer_t* buffer) {
+    if (!buffer) {
+        return;
+    }
+#if defined(__APPLE__) && RN_HAS_RAC_PROTO_BUFFER_HEADER
+    rac_proto_buffer_init(buffer);
+    return;
+#endif
+    if (auto fn = loadOptionalSymbol<ProtoBufferInitFn>("rac_proto_buffer_init")) {
+        fn(buffer);
+        return;
+    }
+    buffer->data = nullptr;
+    buffer->size = 0;
+    buffer->status = RAC_SUCCESS;
+    buffer->error_message = nullptr;
+}
+
+static void freeProtoBuffer(rac_proto_buffer_t* buffer) {
+    if (!buffer) {
+        return;
+    }
+#if defined(__APPLE__) && RN_HAS_RAC_PROTO_BUFFER_HEADER
+    rac_proto_buffer_free(buffer);
+    return;
+#endif
+    if (auto fn = loadOptionalSymbol<ProtoBufferFreeFn>("rac_proto_buffer_free")) {
+        fn(buffer);
+        return;
+    }
+    std::free(buffer->data);
+    std::free(buffer->error_message);
+    initProtoBuffer(buffer);
+}
+
+static void appendVarint(std::vector<uint8_t>& out, uint64_t value) {
+    while (value >= 0x80) {
+        out.push_back(static_cast<uint8_t>(value | 0x80));
+        value >>= 7;
+    }
+    out.push_back(static_cast<uint8_t>(value));
+}
+
+static void appendStringField(std::vector<uint8_t>& out,
+                              uint32_t fieldNumber,
+                              const std::string& value) {
+    if (value.empty()) {
+        return;
+    }
+    appendVarint(out, (static_cast<uint64_t>(fieldNumber) << 3) | 2U);
+    appendVarint(out, value.size());
+    out.insert(out.end(), value.begin(), value.end());
+}
+
+static std::vector<uint8_t> makePhase1RequestBytes(SDKEnvironment environment,
+                                                   const std::string& apiKey,
+                                                   const std::string& baseURL,
+                                                   const std::string& deviceId) {
+    std::vector<uint8_t> bytes;
+    appendVarint(bytes, 0x08);  // field 1: environment
+    appendVarint(bytes, static_cast<uint64_t>(InitBridge::toRacEnvironment(environment)));
+    appendStringField(bytes, 2, apiKey);
+    appendStringField(bytes, 3, baseURL);
+    appendStringField(bytes, 4, deviceId);
+    return bytes;
+}
+
+static bool readVarint(const uint8_t*& cursor,
+                       const uint8_t* end,
+                       uint64_t& value) {
+    value = 0;
+    uint32_t shift = 0;
+    while (cursor < end && shift <= 63) {
+        uint8_t byte = *cursor++;
+        value |= static_cast<uint64_t>(byte & 0x7F) << shift;
+        if ((byte & 0x80) == 0) {
+            return true;
+        }
+        shift += 7;
+    }
+    return false;
+}
+
+static bool skipProtoField(uint32_t wireType,
+                           const uint8_t*& cursor,
+                           const uint8_t* end) {
+    uint64_t length = 0;
+    switch (wireType) {
+        case 0:
+            return readVarint(cursor, end, length);
+        case 1:
+            if (end - cursor < 8) return false;
+            cursor += 8;
+            return true;
+        case 2:
+            if (!readVarint(cursor, end, length)) return false;
+            if (static_cast<uint64_t>(end - cursor) < length) return false;
+            cursor += length;
+            return true;
+        case 5:
+            if (end - cursor < 4) return false;
+            cursor += 4;
+            return true;
+        default:
+            return false;
+    }
+}
+
+static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer) {
+    SdkInitResultSummary summary;
+    if (!buffer.data || buffer.size == 0) {
+        return summary;
+    }
+
+    const uint8_t* cursor = buffer.data;
+    const uint8_t* end = buffer.data + buffer.size;
+    while (cursor < end) {
+        uint64_t tag = 0;
+        if (!readVarint(cursor, end, tag)) {
+            break;
+        }
+        const uint32_t fieldNumber = static_cast<uint32_t>(tag >> 3);
+        const uint32_t wireType = static_cast<uint32_t>(tag & 0x07);
+
+        if (wireType == 0) {
+            uint64_t value = 0;
+            if (!readVarint(cursor, end, value)) {
+                break;
+            }
+            switch (fieldNumber) {
+                case 2:
+                    summary.hasSuccess = true;
+                    summary.success = value != 0;
+                    break;
+                case 4:
+                    summary.httpConfigured = value != 0;
+                    break;
+                case 5:
+                    summary.deviceRegistered = value != 0;
+                    break;
+                case 6:
+                    summary.linkedModelsCount = static_cast<uint32_t>(value);
+                    break;
+                default:
+                    break;
+            }
+            continue;
+        }
+
+        if (fieldNumber == 8 && wireType == 2) {
+            uint64_t length = 0;
+            if (!readVarint(cursor, end, length) ||
+                static_cast<uint64_t>(end - cursor) < length) {
+                break;
+            }
+            summary.warning.assign(reinterpret_cast<const char*>(cursor), length);
+            cursor += length;
+            continue;
+        }
+
+        if (!skipProtoField(wireType, cursor, end)) {
+            break;
+        }
+    }
+    return summary;
+}
+
+static rac_result_t callSdkInitProto(const char* symbolName,
+                                     const std::vector<uint8_t>& requestBytes,
+                                     SdkInitResultSummary* outSummary) {
+#if RN_HAS_RAC_SDK_INIT_HEADER
+    SdkInitProtoFn fn = nullptr;
+#if defined(__APPLE__)
+    if (std::strcmp(symbolName, "rac_sdk_init_phase1_proto") == 0) {
+        fn = rac_sdk_init_phase1_proto;
+    } else if (std::strcmp(symbolName, "rac_sdk_init_phase2_proto") == 0) {
+        fn = rac_sdk_init_phase2_proto;
+    }
+#else
+    fn = loadOptionalSymbol<SdkInitProtoFn>(symbolName);
+#endif
+    if (!fn) {
+        LOGW("%s unavailable in bundled RACommons; using legacy RN init path", symbolName);
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+
+    rac_proto_buffer_t out;
+    initProtoBuffer(&out);
+    const uint8_t* data = requestBytes.empty() ? nullptr : requestBytes.data();
+    rac_result_t rc = fn(data, requestBytes.size(), &out);
+    SdkInitResultSummary summary = parseSdkInitResult(out);
+    if (outSummary) {
+        *outSummary = summary;
+    }
+
+    if (rc != RAC_SUCCESS) {
+        if (out.error_message) {
+            LOGE("%s failed: %s", symbolName, out.error_message);
+        } else {
+            LOGE("%s failed: %d", symbolName, rc);
+        }
+        freeProtoBuffer(&out);
+        return rc;
+    }
+
+    if (out.status != RAC_SUCCESS) {
+        rac_result_t status = out.status;
+        if (out.error_message) {
+            LOGE("%s returned proto error: %s", symbolName, out.error_message);
+        } else {
+            LOGE("%s returned proto error: %d", symbolName, status);
+        }
+        freeProtoBuffer(&out);
+        return status;
+    }
+
+    freeProtoBuffer(&out);
+    if (summary.hasSuccess && !summary.success) {
+        LOGE("%s completed with success=false", symbolName);
+        return RAC_ERROR_INITIALIZATION_FAILED;
+    }
+    return RAC_SUCCESS;
+#else
+    (void)symbolName;
+    (void)requestBytes;
+    (void)outSummary;
+    LOGW("rac_sdk_init.h unavailable in bundled headers; using legacy RN init path");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
+// =============================================================================
 // C Callback Implementations (called by RACommons)
 // =============================================================================
 
@@ -1091,7 +1381,9 @@ rac_result_t InitBridge::initialize(
     static std::string s_sdkVersion;
     s_sdkVersion = getSdkVersion();
     sdkConfig.sdk_version = s_sdkVersion.c_str();
-    sdkConfig.device_id = getPersistentDeviceUUID().c_str();
+    static std::string s_deviceId;
+    s_deviceId = deviceId_.empty() ? getPersistentDeviceUUID() : deviceId_;
+    sdkConfig.device_id = s_deviceId.c_str();
     
     rac_validation_result_t validResult = rac_sdk_init(&sdkConfig);
     if (validResult != RAC_VALIDATION_OK) {
@@ -1101,9 +1393,170 @@ rac_result_t InitBridge::initialize(
         LOGI("SDK config initialized with version: %s", sdkConfig.sdk_version);
     }
 
+    // Step 5: Phase 1 proto (canonical commons owner for state init) when
+    // bundled headers/native symbols expose rac_sdk_init_phase1_proto. Older
+    // packaged natives continue through the legacy RN init path.
+    {
+        SdkInitResultSummary phase1Summary;
+        std::vector<uint8_t> phase1Bytes = makePhase1RequestBytes(
+            environment,
+            apiKey_,
+            baseURL_,
+            s_deviceId);
+        rac_result_t phase1Result = callSdkInitProto(
+            "rac_sdk_init_phase1_proto",
+            phase1Bytes,
+            &phase1Summary);
+        if (phase1Result != RAC_SUCCESS &&
+            phase1Result != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+            LOGE("SDK Phase 1 proto initialization failed: %d", phase1Result);
+            rac_shutdown();
+            return phase1Result;
+        }
+        if (phase1Result == RAC_SUCCESS) {
+            LOGI("SDK Phase 1 proto initialized");
+        }
+    }
+
     initialized_ = true;
     LOGI("SDK initialized successfully for environment %d", static_cast<int>(environment));
 
+    return RAC_SUCCESS;
+}
+
+rac_result_t InitBridge::registerDeviceCallbacks() {
+    DevicePlatformCallbacks callbacks;
+
+    callbacks.getDeviceInfo = []() -> DeviceInfo {
+        DeviceInfo info;
+        info.deviceId = InitBridge::shared().getPersistentDeviceUUID();
+#if defined(__APPLE__)
+        info.platform = "ios";
+        info.osName = "iOS";
+        info.hasNeuralEngine = true;
+        info.neuralEngineCores = 16;
+#elif defined(ANDROID) || defined(__ANDROID__)
+        info.platform = "android";
+        info.osName = "Android";
+        info.hasNeuralEngine = false;
+        info.neuralEngineCores = 0;
+#else
+        info.platform = "unknown";
+        info.osName = "Unknown";
+        info.hasNeuralEngine = false;
+        info.neuralEngineCores = 0;
+#endif
+        info.sdkVersion = InitBridge::shared().getSdkVersion();
+        info.deviceModel = InitBridge::shared().getDeviceModel();
+        info.deviceName = info.deviceModel;
+        info.osVersion = InitBridge::shared().getOSVersion();
+        info.chipName = InitBridge::shared().getChipName();
+        info.architecture = InitBridge::shared().getArchitecture();
+        info.totalMemory = InitBridge::shared().getTotalMemory();
+        info.availableMemory = InitBridge::shared().getAvailableMemory();
+        info.coreCount = InitBridge::shared().getCoreCount();
+        info.gpuFamily = InitBridge::shared().getGPUFamily();
+        info.formFactor = InitBridge::shared().isTablet() ? "tablet" : "phone";
+        info.batteryLevel = -1.0f;
+        info.batteryState = "";
+        info.isLowPowerMode = false;
+        info.performanceCores = info.coreCount > 4 ? 2 : 1;
+        info.efficiencyCores = info.coreCount - info.performanceCores;
+        return info;
+    };
+
+    callbacks.getDeviceId = []() -> std::string {
+        return InitBridge::shared().getPersistentDeviceUUID();
+    };
+
+    callbacks.isRegistered = []() -> bool {
+        std::string value;
+        if (InitBridge::shared().secureGet("com.runanywhere.sdk.deviceRegistered", value)) {
+            return value == "true";
+        }
+        return false;
+    };
+
+    callbacks.setRegistered = [](bool registered) {
+        InitBridge::shared().secureSet(
+            "com.runanywhere.sdk.deviceRegistered",
+            registered ? "true" : "false");
+    };
+
+    callbacks.httpPost = [](
+        const std::string& endpoint,
+        const std::string& jsonBody,
+        bool requiresAuth
+    ) -> std::tuple<bool, int, std::string, std::string> {
+        (void)requiresAuth;
+
+        rac_environment_t env = InitBridge::toRacEnvironment(
+            InitBridge::shared().getEnvironment());
+        std::string baseURL;
+        std::string token;
+
+        if (env == RAC_ENV_DEVELOPMENT) {
+            auto supabaseConfig = config::makeEndpointConfig(
+                rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
+                rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
+            if (!supabaseConfig.usable) {
+                LOGI("Skipping development device registration: no usable config");
+                return {true, 204, "{}", ""};
+            }
+            baseURL = supabaseConfig.baseURL;
+            token = supabaseConfig.token;
+        } else {
+            baseURL = config::trim(InitBridge::shared().getBaseURL());
+            std::string accessToken = AuthBridge::shared().getAccessToken();
+            token = config::isUsableSecret(accessToken)
+                ? accessToken
+                : config::trim(InitBridge::shared().getApiKey());
+            if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(token)) {
+                LOGI("Skipping device registration: no usable external config");
+                return {true, 204, "{}", ""};
+            }
+        }
+
+        std::string fullURL = config::appendEndpointPath(baseURL, endpoint);
+        return InitBridge::shared().httpPostSync(fullURL, jsonBody, token);
+    };
+
+    DeviceBridge::shared().setPlatformCallbacks(callbacks);
+    return DeviceBridge::shared().registerCallbacks();
+}
+
+rac_result_t InitBridge::completeServicesInitialization() {
+    if (!initialized_) {
+        LOGE("completeServicesInitialization called before initialize");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_result_t callbacksResult = registerDeviceCallbacks();
+    if (callbacksResult != RAC_SUCCESS) {
+        LOGE("Failed to register device callbacks for Phase 2: %d", callbacksResult);
+        return callbacksResult;
+    }
+
+    SdkInitResultSummary phase2Summary;
+    std::vector<uint8_t> emptyPhase2Request;
+    rac_result_t phase2Result = callSdkInitProto(
+        "rac_sdk_init_phase2_proto",
+        emptyPhase2Request,
+        &phase2Summary);
+    if (phase2Result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        return RAC_SUCCESS;
+    }
+    if (phase2Result != RAC_SUCCESS) {
+        return phase2Result;
+    }
+
+    if (!phase2Summary.warning.empty()) {
+        LOGI("SDK Phase 2 warning: %s", phase2Summary.warning.c_str());
+    }
+    LOGI("SDK Phase 2 complete (http=%d, device=%d, linked=%u)",
+         phase2Summary.httpConfigured ? 1 : 0,
+         phase2Summary.deviceRegistered ? 1 : 0,
+         phase2Summary.linkedModelsCount);
     return RAC_SUCCESS;
 }
 

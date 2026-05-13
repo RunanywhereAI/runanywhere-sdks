@@ -22,11 +22,14 @@
  *   sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/
  *     CppBridge+State.swift
  *
- * NOTE (B18): the runtime gate booleans currently also live inside
- * `CppBridge.kt`. Per the task spec the Kotlin coordinator is NOT
- * modified yet, so the fields are intentionally duplicated here. A
- * follow-up will retire the coordinator-side copies and route all reads
- * through this object.
+ * This object is the canonical owner of the four runtime gate flags
+ * (`isInitialized`, `servicesInitialized`, `servicesInitializing`,
+ * `nativeLibraryLoaded`). `CppBridge.kt` no longer holds private
+ * duplicates — its public properties delegate to the volatiles below
+ * and writes inside `CppBridge.initialize()` /
+ * `CppBridge.completeServicesInitialization()` /
+ * `CppBridge.shutdownSuspending()` mutate this object directly under
+ * the coordinator's `synchronized(lock)` guards.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -51,7 +54,6 @@ import com.runanywhere.sdk.public.configuration.cEnvironment
  * shape the Swift coordinator uses around its `OSAllocatedUnfairLock`.
  */
 object CppBridgeState {
-
     private val logger = SDKLogger("CppBridgeState")
 
     // ════════════════════════════════════════════════════════════════════
@@ -119,7 +121,7 @@ object CppBridgeState {
             RunAnywhereBridge.racSdkInit(
                 environment = environment.cEnvironment,
                 deviceId = deviceId.ifEmpty { null },
-                platform = "android",
+                platform = SDKConstants.SDK_PLATFORM,
                 sdkVersion = SDKConstants.SDK_VERSION,
                 apiKey = apiKey.ifEmpty { null },
                 baseUrl = baseURL.ifEmpty { null },

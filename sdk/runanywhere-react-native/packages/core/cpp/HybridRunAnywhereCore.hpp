@@ -60,6 +60,7 @@ public:
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) override;
+  std::shared_ptr<Promise<bool>> completeServicesInitialization() override;
   std::shared_ptr<Promise<void>> destroy() override;
   std::shared_ptr<Promise<bool>> isInitialized() override;
   std::shared_ptr<Promise<std::string>> getBackendInfo() override;

@@ -32,13 +32,14 @@ import com.runanywhere.sdk.public.types.RAThinkingTagPattern
  * Default LLM generation options matching Swift `RALLMGenerationOptions.defaults()`:
  * maxTokens=100, temperature=0.8, topP=1.0, topK=0, repetitionPenalty=1.0.
  */
-fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions = RALLMGenerationOptions(
-    max_tokens = 100,
-    temperature = 0.8f,
-    top_p = 1.0f,
-    top_k = 0,
-    repetition_penalty = 1.0f,
-)
+fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
+    RALLMGenerationOptions(
+        max_tokens = 100,
+        temperature = 0.8f,
+        top_p = 1.0f,
+        top_k = 0,
+        repetition_penalty = 1.0f,
+    )
 
 /**
  * Build a `RALLMGenerateRequest` from these options + a prompt.
@@ -54,15 +55,17 @@ fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions = RALLMGen
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
     val so = structured_output
-    val schema = when {
-        so != null -> so.json_schema.orEmpty()
-        else -> json_schema.orEmpty()
-    }
-    val responseFormat = when (so?.mode) {
-        StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT -> "json_object"
-        StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA -> "json_schema"
-        else -> ""
-    }
+    val schema =
+        when {
+            so != null -> so.json_schema.orEmpty()
+            else -> json_schema.orEmpty()
+        }
+    val responseFormat =
+        when (so?.mode) {
+            StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT -> "json_object"
+            StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA -> "json_schema"
+            else -> ""
+        }
     val grammar = so?.grammar.orEmpty()
     return RALLMGenerateRequest(
         prompt = prompt,
@@ -119,12 +122,13 @@ val ThinkingTagPattern.Companion.defaultPattern: RAThinkingTagPattern
  * `RAExecutionTarget.wireString` ("on-device" / "cloud" / "auto" / "").
  */
 val RAExecutionTarget.wireString: String
-    get() = when (this) {
-        ExecutionTarget.EXECUTION_TARGET_ON_DEVICE -> "on-device"
-        ExecutionTarget.EXECUTION_TARGET_CLOUD -> "cloud"
-        ExecutionTarget.EXECUTION_TARGET_AUTO -> "auto"
-        ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED -> ""
-    }
+    get() =
+        when (this) {
+            ExecutionTarget.EXECUTION_TARGET_ON_DEVICE -> "on-device"
+            ExecutionTarget.EXECUTION_TARGET_CLOUD -> "cloud"
+            ExecutionTarget.EXECUTION_TARGET_AUTO -> "auto"
+            ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED -> ""
+        }
 
 // MARK: - RAInferenceFramework: wire string
 
@@ -136,29 +140,30 @@ val RAExecutionTarget.wireString: String
  * has no equivalent codegen so we maintain the table by hand.
  */
 val InferenceFramework.wireString: String
-    get() = when (this) {
-        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "llamacpp"
-        InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "onnx"
-        InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "metalrt"
-        InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "foundation-models"
-        InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "system-tts"
-        InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> "fluid-audio"
-        InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "coreml"
-        InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "mlx"
-        InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML -> "whisperkit-coreml"
-        InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "genie"
-        InferenceFramework.INFERENCE_FRAMEWORK_TFLITE -> "tflite"
-        InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH -> "executorch"
-        InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE -> "mediapipe"
-        InferenceFramework.INFERENCE_FRAMEWORK_MLC -> "mlc"
-        InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM -> "pico-llm"
-        InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> "piper-tts"
-        InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT -> "whisperkit"
-        InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER -> "openai-whisper"
-        InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS -> "swift-transformers"
-        InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> "built-in"
-        InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "none"
-        InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> "unknown"
-        InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "sherpa"
-        InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> ""
-    }
+    get() =
+        when (this) {
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "llamacpp"
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "onnx"
+            InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "metalrt"
+            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "foundation-models"
+            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "system-tts"
+            InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> "fluid-audio"
+            InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "coreml"
+            InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "mlx"
+            InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML -> "whisperkit-coreml"
+            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "genie"
+            InferenceFramework.INFERENCE_FRAMEWORK_TFLITE -> "tflite"
+            InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH -> "executorch"
+            InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE -> "mediapipe"
+            InferenceFramework.INFERENCE_FRAMEWORK_MLC -> "mlc"
+            InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM -> "pico-llm"
+            InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> "piper-tts"
+            InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT -> "whisperkit"
+            InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER -> "openai-whisper"
+            InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS -> "swift-transformers"
+            InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> "built-in"
+            InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "none"
+            InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> "unknown"
+            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "sherpa"
+            InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> ""
+        }

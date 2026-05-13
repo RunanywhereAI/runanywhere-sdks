@@ -14,14 +14,13 @@
  * Mirrors Swift's `HTTPClientAdapter`'s use of a concurrent
  * `DispatchQueue` for the blocking `rac_http_request_send` call.
  *
- * Pre-thunk fallback: the three Swift-parity helpers
- * (`racHttpDefaultHeaders`, `racHttpRequestExecuteWithUpsert`,
- *  `racApiErrorFromResponse`) are declared on `RunAnywhereBridge` but
- * their `Java_*` C JNI thunks are not yet authored in
- * `runanywhere_commons_jni.cpp`. Each call site below catches
- * `UnsatisfiedLinkError` and falls back to either the inlined Kotlin
- * behavior or the non-upsert request path, so the adapter compiles and
- * runs even before the thunks land.
+ * Upsert and API-error parsing are implemented Kotlin-side: the commons
+ * C API does not expose an `rac_http_request_execute_with_upsert`
+ * variant, and `rac_api_error_from_response` is internal-only
+ * (non-RAC_API) and not exported in `RACommons.exports`. The Prefer-
+ * header upsert rewrite happens here in [rewriteForUpsertFallback], and
+ * 4xx/5xx parsing falls back to the caller's generic `"HTTP {status}"`
+ * formatter.
  */
 
 package com.runanywhere.sdk.foundation.bridge
@@ -40,18 +39,20 @@ internal actual suspend fun platformExecuteHttp(
     body: ByteArray?,
     timeoutMs: Int,
     followRedirects: Boolean,
-): HttpExecutionResult = withContext(Dispatchers.IO) {
-    val resp = RunAnywhereBridge.racHttpRequestExecute(
-        method = method,
-        url = url,
-        headerKeys = headerKeys,
-        headerValues = headerValues,
-        body = body,
-        timeoutMs = timeoutMs,
-        followRedirects = followRedirects,
-    )
-    nativeHttpResponseToResult(resp)
-}
+): HttpExecutionResult =
+    withContext(Dispatchers.IO) {
+        val resp =
+            RunAnywhereBridge.racHttpRequestExecute(
+                method = method,
+                url = url,
+                headerKeys = headerKeys,
+                headerValues = headerValues,
+                body = body,
+                timeoutMs = timeoutMs,
+                followRedirects = followRedirects,
+            )
+        nativeHttpResponseToResult(resp)
+    }
 
 internal actual suspend fun platformExecuteHttpUpsert(
     method: String,
@@ -62,44 +63,28 @@ internal actual suspend fun platformExecuteHttpUpsert(
     timeoutMs: Int,
     followRedirects: Boolean,
     onConflictField: String,
-): HttpExecutionResult = withContext(Dispatchers.IO) {
-    val resp: NativeHttpResponse? = try {
-        RunAnywhereBridge.racHttpRequestExecuteWithUpsert(
-            method = method,
-            url = url,
-            headerKeys = headerKeys,
-            headerValues = headerValues,
-            body = body,
-            timeoutMs = timeoutMs,
-            followRedirects = followRedirects,
-            onConflictField = onConflictField,
-        )
-    } catch (_: UnsatisfiedLinkError) {
-        // JNI thunk not yet bound — degrade gracefully to the non-upsert
-        // path. The Prefer header rewrite happens commonMain-side in
-        // `buildHeaders` until the C thunk lands.
-        null
-    }
-    if (resp != null) {
+): HttpExecutionResult =
+    withContext(Dispatchers.IO) {
+        // The commons C API does not expose an upsert-mode HTTP variant, so
+        // the upsert request is emitted via the standard execute path with
+        // a Kotlin-side Prefer-header rewrite to advertise the Supabase
+        // `resolution=merge-duplicates` policy expected by PostgREST. The
+        // `onConflictField` is informational only at this layer; the
+        // caller is responsible for appending any `?on_conflict={field}`
+        // URL query argument.
+        val (rewrittenKeys, rewrittenValues) = rewriteForUpsertFallback(headerKeys, headerValues)
+        val resp =
+            RunAnywhereBridge.racHttpRequestExecute(
+                method = method,
+                url = url,
+                headerKeys = rewrittenKeys,
+                headerValues = rewrittenValues,
+                body = body,
+                timeoutMs = timeoutMs,
+                followRedirects = followRedirects,
+            )
         nativeHttpResponseToResult(resp)
-    } else {
-        // Fallback: emit the same request without the upsert flag. We
-        // also need to apply Swift's pre-commons header rewrite so
-        // Supabase still sees `resolution=merge-duplicates` on the
-        // Prefer header.
-        val (fbKeys, fbValues) = rewriteForUpsertFallback(headerKeys, headerValues)
-        val fallback = RunAnywhereBridge.racHttpRequestExecute(
-            method = method,
-            url = url,
-            headerKeys = fbKeys,
-            headerValues = fbValues,
-            body = body,
-            timeoutMs = timeoutMs,
-            followRedirects = followRedirects,
-        )
-        nativeHttpResponseToResult(fallback)
     }
-}
 
 internal actual fun platformDefaultHeaders(): List<Pair<String, String>>? {
     return try {
@@ -119,21 +104,15 @@ internal actual fun platformDefaultHeaders(): List<Pair<String, String>>? {
 }
 
 internal actual fun platformParseAPIError(
-    statusCode: Int,
-    body: String,
-    url: String,
+    @Suppress("UNUSED_PARAMETER") statusCode: Int,
+    @Suppress("UNUSED_PARAMETER") body: String,
+    @Suppress("UNUSED_PARAMETER") url: String,
 ): ApiErrorInfo? {
-    return try {
-        val out = RunAnywhereBridge.racApiErrorFromResponse(statusCode, body, url) ?: return null
-        ApiErrorInfo(
-            message = out.getOrElse(0) { "" },
-            code = out.getOrElse(1) { "" },
-            requestUrl = out.getOrElse(2) { "" },
-        )
-    } catch (_: UnsatisfiedLinkError) {
-        // JNI thunk not yet bound — caller falls back to "HTTP {status}".
-        null
-    }
+    // `rac_api_error_from_response` is internal-only in commons (non-RAC_API
+    // and not exported in RACommons.exports), so there is no JNI thunk to
+    // call. Returning null hands control back to the caller, which formats
+    // a generic `"HTTP {status}"` message.
+    return null
 }
 
 internal actual suspend fun platformResolveAuthToken(): String? =
@@ -172,12 +151,11 @@ private fun nativeHttpResponseToResult(resp: NativeHttpResponse?): HttpExecution
 }
 
 /**
- * Pre-thunk Supabase upsert fallback. When the commons-side
- * `rac_http_request_set_upsert_mode` JNI thunk is not yet bound we
- * replicate the Prefer-header rewrite here so the request still wears
- * the `resolution=merge-duplicates` policy expected by PostgREST. The
- * URL `?on_conflict={field}` query argument remains unset — full
- * compliance requires the C-side thunk to land.
+ * Kotlin-side Supabase upsert rewrite. Commons does not expose an
+ * upsert-mode HTTP variant, so the Prefer header is rewritten here to
+ * advertise the `resolution=merge-duplicates` policy expected by
+ * PostgREST. The URL `?on_conflict={field}` query argument is not
+ * appended at this layer — the caller owns URL construction.
  */
 private fun rewriteForUpsertFallback(
     keys: Array<String>,

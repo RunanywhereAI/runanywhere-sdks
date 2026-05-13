@@ -42,7 +42,7 @@ export interface InitializationState {
 
   /**
    * Whether Phase 1 (core) initialization is complete
-   * Equivalent to iOS: isInitialized
+   * Equivalent to iOS: isInitialized. RN reaches this through an async bridge.
    */
   isCoreInitialized: boolean;
 

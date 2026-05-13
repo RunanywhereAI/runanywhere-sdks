@@ -473,6 +473,7 @@ fun ModelInfo.Companion.create(
  * Public on `ModelInfo.Companion` so external callers (and the registry)
  * can re-derive the artifact when only a URL changes.
  */
+@Suppress("UnusedParameter")
 fun ModelInfo.Companion.inferredArtifact(
     url: String?,
     archiveType: ArchiveType? = null,
@@ -481,8 +482,7 @@ fun ModelInfo.Companion.inferredArtifact(
     // flat oneof, so the API surface differs. Single-file is the no-op
     // case (no archive). Archive callers should use
     // [ModelInfo.applyInferredArtifact] which routes to the correct setter.
-    val _unused = url
-    val _unused2 = archiveType
+    // Parameters are retained for API parity with Swift's `inferredArtifact(from:format:)`.
     return SingleFileArtifact()
 }
 

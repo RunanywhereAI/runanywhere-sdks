@@ -7,6 +7,7 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -17,41 +18,52 @@ class DartBridgeHardware {
 
   /// Query commons for the canonical generated hardware profile result.
   ///
-  /// Returns null when the bundled native library does not expose the
-  /// hardware ABI yet, allowing callers to keep a platform fallback during
-  /// the migration.
-  static HardwareProfileResult? getProfile() {
+  /// Throws [SDKException.featureNotAvailable] when the bundled native
+  /// library does not expose the hardware ABI; throws
+  /// [SDKException.internalError] when the commons call returns a non-success
+  /// result. Mirrors Swift `try CppBridge.Hardware.getProfile() throws`.
+  static HardwareProfileResult getProfile() {
+    final DynamicLibrary lib;
     try {
-      final lib = PlatformLoader.loadCommons();
-      final getProfile = lib.lookupFunction<
-          Int32 Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>),
-          int Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>)>(
-        'rac_hardware_profile_get',
+      lib = PlatformLoader.loadCommons();
+    } catch (e) {
+      throw SDKException.featureNotAvailable(
+        'hardware.getProfile: failed to load commons: $e',
       );
-      final freeProfile = lib.lookupFunction<Void Function(Pointer<Uint8>),
-          void Function(Pointer<Uint8>)>(
-        'rac_hardware_profile_free',
-      );
+    }
+    final getProfile = lib.lookupFunction<
+        Int32 Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>),
+        int Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>)>(
+      'rac_hardware_profile_get',
+    );
+    final freeProfile = lib.lookupFunction<Void Function(Pointer<Uint8>),
+        void Function(Pointer<Uint8>)>(
+      'rac_hardware_profile_free',
+    );
 
-      final outBytes = calloc<Pointer<Uint8>>();
-      final outSize = calloc<IntPtr>();
-      try {
-        final result = getProfile(outBytes, outSize);
-        if (result != RAC_SUCCESS || outBytes.value == nullptr) {
-          return null;
-        }
-        final bytes =
-            Uint8List.fromList(outBytes.value.asTypedList(outSize.value));
-        return HardwareProfileResult.fromBuffer(bytes);
-      } finally {
-        if (outBytes.value != nullptr) {
-          freeProfile(outBytes.value);
-        }
-        calloc.free(outBytes);
-        calloc.free(outSize);
+    final outBytes = calloc<Pointer<Uint8>>();
+    final outSize = calloc<IntPtr>();
+    try {
+      final result = getProfile(outBytes, outSize);
+      if (result != RAC_SUCCESS) {
+        throw SDKException.internalError(
+          'rac_hardware_profile_get returned rc=$result',
+        );
       }
-    } catch (_) {
-      return null;
+      if (outBytes.value == nullptr) {
+        throw SDKException.internalError(
+          'rac_hardware_profile_get returned null buffer',
+        );
+      }
+      final bytes =
+          Uint8List.fromList(outBytes.value.asTypedList(outSize.value));
+      return HardwareProfileResult.fromBuffer(bytes);
+    } finally {
+      if (outBytes.value != nullptr) {
+        freeProfile(outBytes.value);
+      }
+      calloc.free(outBytes);
+      calloc.free(outSize);
     }
   }
 

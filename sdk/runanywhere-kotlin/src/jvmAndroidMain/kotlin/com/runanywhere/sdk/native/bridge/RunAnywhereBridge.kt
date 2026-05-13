@@ -1281,25 +1281,23 @@ object RunAnywhereBridge {
     ): NativeHttpResponse?
 
     // ========================================================================
-    // CANONICAL DEFAULT HEADERS + ERROR PARSING (Swift parity)
+    // CANONICAL DEFAULT HEADERS (Swift parity)
     // ========================================================================
     //
-    // Three thunks wrapping commons' shared HTTP policy helpers. Used by
-    // `HTTPClientAdapter` to converge on the same wire shape Swift uses
-    // (canonical header list, structured error parsing, Supabase upsert
-    // semantics) instead of inlining the policy on the Kotlin side.
+    // Thunk wrapping commons' shared HTTP policy helper. Used by
+    // `HTTPClientAdapter` to converge on the same canonical SDK header
+    // list Swift emits, instead of inlining the policy on the Kotlin
+    // side.
     //
-    // TODO: Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_*
-    //       C JNI thunks for these three entrypoints still need to be
-    //       authored in `runanywhere-commons/src/jni/runanywhere_commons_jni.cpp`.
-    //       The Kotlin adapter swallows the resulting UnsatisfiedLinkError
-    //       and falls back to inlined behavior until the thunks land.
+    // Upsert and structured error parsing are implemented Kotlin-side in
+    // `HTTPClientAdapter.jvmAndroid.kt` — commons does not expose an
+    // upsert-mode HTTP variant, and `rac_api_error_from_response` is
+    // internal-only (non-RAC_API, not exported in `RACommons.exports`).
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical
      * SDK header list as a flat alternating key/value array
-     * (`[k0, v0, k1, v1, ...]`). Returns null if the JNI thunk is not yet
-     * wired (graceful fallback during the rollout window).
+     * (`[k0, v0, k1, v1, ...]`).
      *
      * Commons currently emits four entries:
      *   - "X-SDK-Client":  "RunAnywhereSDK"
@@ -1310,47 +1308,11 @@ object RunAnywhereBridge {
      * The "X-Platform" header is intentionally NOT included — its value
      * is platform-specific and must be supplied per-request by the
      * calling SDK.
-     */
-    // TODO: add Java_*_racHttpDefaultHeaders C JNI thunk in runanywhere_commons_jni.cpp.
-    @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
-
-    /**
-     * Wrapper for `rac_http_request_set_upsert_mode` + `rac_http_request_send`.
-     * Reissues the request with the Supabase upsert flag armed (URL gets
-     * `?on_conflict={field}` and Prefer header gets
-     * `resolution=merge-duplicates`). Returns a [NativeHttpResponse] just
-     * like [racHttpRequestExecute]; null when the JNI thunk is not yet
-     * bound.
      *
-     * @param onConflictField Column name used as the conflict key (e.g.
-     *        "device_id"). Empty string disables upsert mode (equivalent
-     *        to plain [racHttpRequestExecute]).
+     * Returns null only if the underlying C call fails (e.g. OOM in the
+     * JNI marshalling path); callers fall back to inlined headers.
      */
-    // TODO: add Java_*_racHttpRequestExecuteWithUpsert C JNI thunk in runanywhere_commons_jni.cpp.
-    @JvmStatic external fun racHttpRequestExecuteWithUpsert(
-        method: String,
-        url: String,
-        headerKeys: Array<String>,
-        headerValues: Array<String>,
-        body: ByteArray?,
-        timeoutMs: Int,
-        followRedirects: Boolean,
-        onConflictField: String,
-    ): NativeHttpResponse?
-
-    /**
-     * Wrapper for `rac_api_error_from_response`. Parses a 4xx/5xx response
-     * body and returns a flat 3-string array `[message, code, requestUrl]`
-     * — any field may be empty if commons could not extract it. Returns
-     * null when the JNI thunk is not yet bound (callers fall back to a
-     * generic `"HTTP {status}"` message).
-     */
-    // TODO: add Java_*_racApiErrorFromResponse C JNI thunk in runanywhere_commons_jni.cpp.
-    @JvmStatic external fun racApiErrorFromResponse(
-        statusCode: Int,
-        body: String,
-        url: String,
-    ): Array<String>?
+    @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
 
     // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)
@@ -1634,9 +1596,6 @@ object RunAnywhereBridge {
     // Mirrors Swift's CppBridge+ModelPaths. racModelPathsSetBaseDir +
     // racModelPathsGetModelFolder already exist above — the rest of the
     // canonical schema is exposed below.
-
-    /** Set the base directory used by model-path computations. Returns 0 on success. */
-    @JvmStatic external fun racModelPathsSetBaseDirectory(path: String): Int
 
     /** Get the canonical models directory ({base}/RunAnywhere/Models). Null on error. */
     @JvmStatic external fun racModelPathsGetModelsDirectory(): String?

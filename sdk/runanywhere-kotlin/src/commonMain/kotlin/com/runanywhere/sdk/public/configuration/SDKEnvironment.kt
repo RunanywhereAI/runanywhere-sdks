@@ -226,12 +226,13 @@ data class SDKInitParams(
             environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
             deviceId: String? = null,
         ): SDKInitParams {
-            val params = SDKInitParams(
-                apiKey = apiKey,
-                baseURL = baseURL,
-                environment = environment,
-                deviceId = deviceId,
-            )
+            val params =
+                SDKInitParams(
+                    apiKey = apiKey,
+                    baseURL = baseURL,
+                    environment = environment,
+                    deviceId = deviceId,
+                )
             params.validate()
             return params
         }
@@ -264,8 +265,9 @@ data class SDKInitParams(
         // Validate API key first so a missing key surfaces as `invalidApiKey`
         // rather than a generic validation failure — matches Swift's ordering.
         if (!sdkInitParamsValidateApiKey(apiKey, environment)) {
-            val message = sdkInitParamsValidationErrorMessage(environment, apiKey, baseURL)
-                ?: "Invalid API key for ${environment.description}"
+            val message =
+                sdkInitParamsValidationErrorMessage(environment, apiKey, baseURL)
+                    ?: "Invalid API key for ${environment.description}"
             throw SDKException.invalidApiKey().let {
                 SDKException(
                     error = it.error.copy(message = message),
@@ -274,8 +276,9 @@ data class SDKInitParams(
         }
 
         if (!sdkInitParamsValidateBaseUrl(baseURL, environment)) {
-            val message = sdkInitParamsValidationErrorMessage(environment, apiKey, baseURL)
-                ?: "Invalid base URL for ${environment.description}: $baseURL"
+            val message =
+                sdkInitParamsValidationErrorMessage(environment, apiKey, baseURL)
+                    ?: "Invalid base URL for ${environment.description}: $baseURL"
             throw SDKException.validationFailed(message)
         }
     }

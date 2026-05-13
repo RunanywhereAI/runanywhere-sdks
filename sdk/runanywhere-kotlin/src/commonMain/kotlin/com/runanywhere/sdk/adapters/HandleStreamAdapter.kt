@@ -102,7 +102,6 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
     private val decodeEvent: (ByteArray) -> Event,
     private val isTerminalEvent: ((Event) -> Boolean)? = null,
 ) {
-
     /**
      * Start a new subscription. The returned [Flow] emits one decoded
      * [Event] per byte payload delivered by the C callback.
@@ -359,5 +358,8 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
      * is value equality, which is what we want for native handles
      * received from C as opaque integer ids.
      */
-    internal data class StoreKey(val streamKey: String, val handle: Any)
+    internal data class StoreKey(
+        val streamKey: String,
+        val handle: Any,
+    )
 }

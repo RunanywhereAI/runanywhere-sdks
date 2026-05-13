@@ -34,6 +34,10 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAInferenceFramework
+import com.runanywhere.sdk.public.types.RAModelCategory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import ai.runanywhere.proto.v1.ModelInfo as ProtoModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
 
@@ -99,13 +103,17 @@ object CppBridgeModelAssignment {
     /**
      * Fetch model assignments from the backend.
      *
-     * Mirrors Swift `CppBridge.ModelAssignment.fetch(forceRefresh:)`.
-     * Commons performs the HTTP GET via the registered transport, parses
-     * the response, caches assignments, and returns the resulting
-     * [ProtoModelInfo] list. After commons completes the fetch the cached
-     * list is read back via [getByFramework] /
-     * [getByCategory] — the fetch thunk itself returns only the
-     * success/failure status code.
+     * Mirrors Swift `CppBridge.ModelAssignment.fetch(forceRefresh:)` —
+     * `async throws -> [RAModelInfo]`. Commons performs an HTTP GET via the
+     * registered transport (OkHttp on Android/JVM), parses the response,
+     * caches assignments, and returns the resulting [ProtoModelInfo] list.
+     * The JNI thunk blocks the calling thread for the duration of the HTTP
+     * request, so the body is wrapped in [withContext] on [Dispatchers.IO]
+     * to keep callers off the main thread.
+     *
+     * After commons completes the fetch the cached list is read back via
+     * the unfiltered framework query — the fetch thunk itself returns only
+     * the success/failure status code.
      *
      * @param forceRefresh Force refresh even if cached.
      * @return The serialized [ProtoModelInfo] records returned by the
@@ -113,41 +121,49 @@ object CppBridgeModelAssignment {
      * @throws SDKException if the fetch transport returns a non-success
      *         status code.
      */
-    fun fetch(forceRefresh: Boolean = false): List<ProtoModelInfo> {
-        val result = RunAnywhereBridge.racModelAssignmentFetch(forceRefresh)
+    suspend fun fetch(forceRefresh: Boolean = false): List<ProtoModelInfo> =
+        withContext(Dispatchers.IO) {
+            val result = RunAnywhereBridge.racModelAssignmentFetch(forceRefresh)
 
-        if (result != RunAnywhereBridge.RAC_SUCCESS) {
-            throw SDKException.networkError("Failed to fetch model assignments: $result")
+            if (result != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.networkError("Failed to fetch model assignments: $result")
+            }
+
+            // Commons does not return the fetched payload through the Fetch
+            // thunk — it caches the assignments internally. Read them back via
+            // the unfiltered framework query (UNSPECIFIED == 0) which the C
+            // side treats as "no framework filter" in commons' assignment
+            // accessor. If commons later tightens that semantic, callers
+            // should switch to the per-framework / per-category accessors.
+            val models =
+                decodeList(
+                    kind = "fetch",
+                    bytes =
+                        RunAnywhereBridge.racModelAssignmentGetByFramework(
+                            RAInferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED.value,
+                        ),
+                )
+            logger.info("Fetched ${models.size} model assignments")
+            models
         }
-
-        // Commons does not return the fetched payload through the Fetch
-        // thunk — it caches the assignments internally. Read them back via
-        // the unfiltered framework query (UNSPECIFIED == 0) which the C
-        // side treats as "no framework filter" in commons' assignment
-        // accessor. If commons later tightens that semantic, callers
-        // should switch to the per-framework / per-category accessors.
-        val models = decodeList(
-            kind = "fetch",
-            bytes = RunAnywhereBridge.racModelAssignmentGetByFramework(0),
-        )
-        logger.info("Fetched ${models.size} model assignments")
-        return models
-    }
 
     /**
      * Get cached models for a specific framework.
      *
      * Mirrors Swift `CppBridge.ModelAssignment.getByFramework(_:)`.
      *
-     * @param framework The framework enum value (matches
-     *                  `RAC_FRAMEWORK_*` / [ai.runanywhere.proto.v1.InferenceFramework]).
+     * @param framework The proto-canonical [RAInferenceFramework] (alias
+     *                  of [ai.runanywhere.proto.v1.InferenceFramework]).
+     *                  Its wire [RAInferenceFramework.value] is forwarded
+     *                  to the JNI thunk (`RAC_FRAMEWORK_*` matches the
+     *                  proto value 1-to-1).
      * @return Cached models registered to the given framework. Empty list
      *         on decode failure or when commons returns null.
      */
-    fun getByFramework(framework: Int): List<ProtoModelInfo> =
+    fun getByFramework(framework: RAInferenceFramework): List<ProtoModelInfo> =
         decodeList(
             kind = "getByFramework",
-            bytes = RunAnywhereBridge.racModelAssignmentGetByFramework(framework),
+            bytes = RunAnywhereBridge.racModelAssignmentGetByFramework(framework.value),
         )
 
     /**
@@ -155,15 +171,18 @@ object CppBridgeModelAssignment {
      *
      * Mirrors Swift `CppBridge.ModelAssignment.getByCategory(_:)`.
      *
-     * @param category The category enum value (matches
-     *                 `RAC_MODEL_CATEGORY_*` / [ai.runanywhere.proto.v1.ModelCategory]).
+     * @param category The proto-canonical [RAModelCategory] (alias of
+     *                 [ai.runanywhere.proto.v1.ModelCategory]). Its wire
+     *                 [RAModelCategory.value] is forwarded to the JNI
+     *                 thunk (`RAC_MODEL_CATEGORY_*` matches the proto
+     *                 value 1-to-1).
      * @return Cached models classified under the given category. Empty
      *         list on decode failure or when commons returns null.
      */
-    fun getByCategory(category: Int): List<ProtoModelInfo> =
+    fun getByCategory(category: RAModelCategory): List<ProtoModelInfo> =
         decodeList(
             kind = "getByCategory",
-            bytes = RunAnywhereBridge.racModelAssignmentGetByCategory(category),
+            bytes = RunAnywhereBridge.racModelAssignmentGetByCategory(category.value),
         )
 
     // ========================================================================

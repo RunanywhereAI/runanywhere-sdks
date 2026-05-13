@@ -5,7 +5,8 @@
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
  *
- * Phase 1 (Core): Synchronous, fast (~1-5ms)
+ * Phase 1 (Core): Native-owned and fast. Swift can expose it synchronously;
+ *   React Native still awaits the async Nitro bridge.
  *   - Validate configuration
  *   - Setup logging
  *   - Store parameters
@@ -28,7 +29,7 @@ export enum InitializationPhase {
   NotInitialized = 'notInitialized',
 
   /**
-   * Phase 1 complete: Core initialized (sync)
+   * Phase 1 complete: Core initialized
    * - Configuration validated
    * - Logging setup
    * - Parameters stored

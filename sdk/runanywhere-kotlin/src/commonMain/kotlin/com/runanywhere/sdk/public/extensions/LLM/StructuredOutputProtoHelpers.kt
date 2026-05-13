@@ -55,10 +55,11 @@ fun StructuredOutputOptions.Companion.defaults(
 
 // MARK: - JSONSchema → JSON string
 
-private val jsonSerializer: Json = Json {
-    prettyPrint = false
-    encodeDefaults = false
-}
+private val jsonSerializer: Json =
+    Json {
+        prettyPrint = false
+        encodeDefaults = false
+    }
 
 /**
  * Canonical JSON Schema text consumed by the commons structured-output
@@ -77,16 +78,17 @@ val RAJSONSchema.jsonSchemaString: String
  * null for the UNSPECIFIED case.
  */
 val JSONSchemaType.jsonSchemaName: String?
-    get() = when (this) {
-        JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT -> "object"
-        JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY -> "array"
-        JSONSchemaType.JSON_SCHEMA_TYPE_STRING -> "string"
-        JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER -> "number"
-        JSONSchemaType.JSON_SCHEMA_TYPE_INTEGER -> "integer"
-        JSONSchemaType.JSON_SCHEMA_TYPE_BOOLEAN -> "boolean"
-        JSONSchemaType.JSON_SCHEMA_TYPE_NULL -> "null"
-        JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED -> null
-    }
+    get() =
+        when (this) {
+            JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT -> "object"
+            JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY -> "array"
+            JSONSchemaType.JSON_SCHEMA_TYPE_STRING -> "string"
+            JSONSchemaType.JSON_SCHEMA_TYPE_NUMBER -> "number"
+            JSONSchemaType.JSON_SCHEMA_TYPE_INTEGER -> "integer"
+            JSONSchemaType.JSON_SCHEMA_TYPE_BOOLEAN -> "boolean"
+            JSONSchemaType.JSON_SCHEMA_TYPE_NULL -> "null"
+            JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED -> null
+        }
 
 private fun jsonElement(schema: RAJSONSchema): JsonObject {
     schema.raw_json?.takeIf { it.isNotBlank() }?.let { raw ->

@@ -18,6 +18,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.serialization.SerialName
@@ -111,7 +112,7 @@ object CppBridgeAuth {
         apiKey: String,
         baseUrl: String,
         deviceId: String,
-        platform: String = "android",
+        platform: String = SDKConstants.SDK_PLATFORM,
         sdkVersion: String = "0.1.0",
         environment: Int = 0, // 0 = DEVELOPMENT
     ): AuthenticationResponse {
@@ -145,17 +146,19 @@ object CppBridgeAuth {
      *   handler rejects the body.
      */
     fun refreshToken() {
-        val baseUrl = activeBaseUrl
-            ?: throw SDKException.invalidConfiguration(
-                "$TAG: Token refresh skipped: no usable external config",
-            )
+        val baseUrl =
+            activeBaseUrl
+                ?: throw SDKException.invalidConfiguration(
+                    "$TAG: Token refresh skipped: no usable external config",
+                )
 
-        val body = RunAnywhereBridge.racAuthBuildRefreshRequest()
-            ?: throw SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_API_KEY,
-                message = "$TAG: No refresh token",
-                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
-            )
+        val body =
+            RunAnywhereBridge.racAuthBuildRefreshRequest()
+                ?: throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_INVALID_API_KEY,
+                    message = "$TAG: No refresh token",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+                )
 
         val response = postJson(baseUrl + ENDPOINT_REFRESH, body)
         if (RunAnywhereBridge.racAuthHandleRefreshResponse(response) != 0) {
@@ -195,46 +198,54 @@ object CppBridgeAuth {
             if (bodyString.isNotEmpty()) "HTTP $statusCode: $bodyString" else "HTTP $statusCode"
 
         return when (statusCode) {
-            401 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_UNAUTHORIZED,
-                message = message,
-                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
-            )
-            403 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_FORBIDDEN,
-                message = message,
-                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
-            )
-            404 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_RESPONSE,
-                message = message,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
-            408, 504 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_TIMEOUT,
-                message = message,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
-            422 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
-                message = message,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
-            in 400..499 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_HTTP_ERROR,
-                message = "Client error $statusCode: $bodyString (url=$url)",
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
-            in 500..599 -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_SERVER_ERROR,
-                message = "Server error $statusCode: $bodyString (url=$url)",
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
-            else -> SDKException.make(
-                code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
-                message = "$message (url=$url)",
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-            )
+            401 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_UNAUTHORIZED,
+                    message = message,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+                )
+            403 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_FORBIDDEN,
+                    message = message,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+                )
+            404 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_INVALID_RESPONSE,
+                    message = message,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
+            408, 504 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_TIMEOUT,
+                    message = message,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
+            422 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
+                    message = message,
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
+            in 400..499 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_HTTP_ERROR,
+                    message = "Client error $statusCode: $bodyString (url=$url)",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
+            in 500..599 ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_SERVER_ERROR,
+                    message = "Server error $statusCode: $bodyString (url=$url)",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
+            else ->
+                SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                    message = "$message (url=$url)",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                )
         }
     }
 

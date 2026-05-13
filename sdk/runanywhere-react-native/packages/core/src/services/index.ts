@@ -10,8 +10,8 @@
 
 export type { ModelFileDescriptor } from '@runanywhere/proto-ts/model_types';
 
-// Network Layer — HTTP transport lives in native C++ (rac_http_client_*).
-// These exports cover configuration helpers, telemetry, and endpoints only.
+// Network Layer — HTTP transport, telemetry, auth, and device registration
+// live in native commons. JS keeps only configuration value helpers.
 export {
   SDKEnvironment,
   createNetworkConfig,
@@ -26,9 +26,4 @@ export {
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
   type NetworkConfig,
-  TelemetryService,
-  TelemetryCategory,
-  APIEndpoints,
-  type APIEndpointKey,
-  type APIEndpointValue,
 } from './Network';

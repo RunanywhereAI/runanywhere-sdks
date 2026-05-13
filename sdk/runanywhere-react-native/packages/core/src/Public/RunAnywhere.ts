@@ -7,16 +7,12 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
  */
 
-import { Platform } from 'react-native';
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKEnvironment } from '../types';
-import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
-import { TelemetryService } from '../services/Network';
 import {
   DEFAULT_BASE_URL,
-  hasUsableSupabaseConfig,
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
 
@@ -27,6 +23,7 @@ import type {
 import {
   createInitialState,
   markCoreInitialized,
+  markServicesInitializing,
   markServicesInitialized,
   markInitializationFailed,
   resetState,
@@ -72,8 +69,14 @@ const logger = new SDKLogger('RunAnywhere');
 // ============================================================================
 
 let initState: InitializationState = createInitialState();
-let cachedDeviceId: string = '';
 let servicesInitPromise: Promise<void> | null = null;
+
+type NativePhase2Module = {
+  completeServicesInitialization?: () => Promise<unknown>;
+  initializeServices?: () => Promise<unknown>;
+  sdkInitPhase2?: () => Promise<unknown>;
+  sdkInitPhase2Proto?: () => Promise<unknown>;
+};
 
 const sdkEventSurface = {
   subscribe: SDKEvents.subscribeSDKEvents,
@@ -106,33 +109,6 @@ function publishInitializationEvent(
       },
     })
   ).catch(() => undefined);
-}
-
-// ============================================================================
-// Conversation Helper
-// ============================================================================
-
-/**
- * Simple conversation manager for multi-turn conversations
- */
-export class Conversation {
-  private messages: string[] = [];
-
-  async send(message: string): Promise<string> {
-    this.messages.push(`User: ${message}`);
-    const contextPrompt = this.messages.join('\n') + '\nAssistant:';
-    const result = await RunAnywhere.generate(contextPrompt);
-    this.messages.push(`Assistant: ${result.text}`);
-    return result.text;
-  }
-
-  get history(): string[] {
-    return [...this.messages];
-  }
-
-  clear(): void {
-    this.messages = [];
-  }
 }
 
 // ============================================================================
@@ -201,86 +177,27 @@ export const RunAnywhere = {
     const native = requireNativeModule();
 
     try {
-      // HTTP transport is owned by native C++ (rac_http_client_*). The JS
-      // layer only needs to stash the base URL / API key with the native
-      // HTTPBridge so downstream native consumers (DeviceBridge, telemetry)
-      // resolve the right endpoint.
       const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
         : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
           : 'production';
 
-      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-        await native.configureHttp(
-          effectiveBaseURL,
-          effectiveApiKey
-        );
-      }
-
-      if (
-        environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
-        hasUsableSupabaseConfig(options)
-      ) {
-        logger.debug('Development mode - Supabase config provided');
-      }
-
-      // Initialize with config
-      // Note: Backend registration (llamacpp, onnx) is done by their respective packages
-      // Document paths are owned by the native platform adapter (sandbox layout).
+      // RN still crosses an async native bridge for Phase 1. The work belongs
+      // to native commons; TypeScript only builds the call-site config.
       const configJson = JSON.stringify({
         apiKey: effectiveApiKey,
         baseURL: effectiveBaseURL,
         environment: envString,
-        sdkVersion: SDKConstants.version, // Centralized version for C++ layer
-        supabaseURL: options.supabaseURL, // For development mode
-        supabaseKey: options.supabaseKey, // For development mode
+        sdkVersion: SDKConstants.version,
+        supabaseURL: options.supabaseURL,
+        supabaseKey: options.supabaseKey,
+        buildToken: options.buildToken,
       });
 
-      await native.initialize(configJson);
-
-      // Cache device ID early (uses secure storage / Keychain)
-      try {
-        cachedDeviceId = await native.getPersistentDeviceUUID();
-        logger.debug(`Device ID cached: ${cachedDeviceId.substring(0, 8)}...`);
-      } catch (e) {
-        logger.warning('Failed to get persistent device UUID');
+      const initialized = await native.initialize(configJson);
+      if (initialized === false) {
+        throw new Error('Native SDK initialization failed');
       }
 
-      // Initialize telemetry with device ID
-      TelemetryService.shared.configure(cachedDeviceId, environment);
-      TelemetryService.shared.trackSDKInit(envString, true);
-
-      // For production/staging mode, authenticate with backend to get JWT tokens
-      // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT && effectiveApiKey) {
-        try {
-          logger.info('Authenticating with backend (production/staging mode)...');
-          const authenticated = await this._authenticateWithBackend(
-            effectiveApiKey,
-            effectiveBaseURL,
-            cachedDeviceId
-          );
-          if (authenticated) {
-            logger.info('Authentication successful - JWT tokens obtained');
-          } else {
-            logger.warning('Authentication failed - API requests may fail');
-          }
-        } catch (authErr) {
-          logger.warning(`Authentication failed (non-fatal): ${authErr instanceof Error ? authErr.message : String(authErr)}`);
-        }
-      }
-
-      // Resolve build token: explicit option wins over RUNANYWHERE_BUILD_TOKEN.
-      // Swift only performs the extra build-token registration retry for
-      // development; production/staging phase 2 is handled by native state.
-      const resolvedBuildToken = this._resolveBuildToken(options.buildToken);
-
-      if (environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-        this._registerDeviceIfNeeded(environment, options.supabaseKey, resolvedBuildToken).catch(err => {
-          logger.warning(`Development device registration failed (non-fatal): ${err.message}`);
-        });
-      }
-
-      ServiceContainer.shared.markInitialized();
       initState = markCoreInitialized(initState, initParams, 'core');
 
       logger.info('SDK initialized successfully');
@@ -306,134 +223,11 @@ export const RunAnywhere = {
     }
   },
 
-  /**
-   * Authenticate with backend to get JWT access/refresh tokens.
-   *
-   * Delegates the full round-trip (request build + HTTP transport via
-   * rac_http_client_* + AuthBridge state update) to native C++. This
-   * mirrors Swift's HTTPClientAdapter and Kotlin's CppBridgeAuth so there
-   * is a single HTTP code path across all SDKs.
-   * @internal
-   */
-  async _authenticateWithBackend(
-    apiKey: string,
-    baseURL: string,
-    deviceId: string
-  ): Promise<boolean> {
-    try {
-      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      const native = requireNativeModule();
-
-      logger.debug(`Auth request to: ${baseURL.replace(/\/$/, '')}/api/v1/auth/sdk/authenticate`);
-
-      const responseJson = await native.authAuthenticate(
-        apiKey,
-        baseURL,
-        deviceId,
-        platform,
-        SDKConstants.version,
-      );
-
-      let authResponse: {
-        access_token: string;
-        refresh_token: string;
-        expires_in: number;
-        device_id: string;
-        organization_id: string;
-        user_id?: string;
-        token_type: string;
-      };
-      try {
-        authResponse = JSON.parse(responseJson);
-      } catch (parseErr) {
-        logger.error(`Auth response parse failed: ${parseErr}`);
-        return false;
-      }
-
-      logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
-      return true;
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`Authentication error: ${msg}`);
-      return false;
-    }
-  },
-
-  /**
-   * Resolve the build token from explicit option or environment variable.
-   * Returns `undefined` when no token is available — callers must decide
-   * whether that is useful. Only development performs the JS-triggered retry.
-   * @internal
-   */
-  _resolveBuildToken(explicit?: string): string | undefined {
-    if (isUsableCredential(explicit)) return explicit!.trim();
-    const fromEnv =
-      typeof process !== 'undefined' && process.env
-        ? process.env.RUNANYWHERE_BUILD_TOKEN
-        : undefined;
-    return isUsableCredential(fromEnv) ? fromEnv!.trim() : undefined;
-  },
-
-  /**
-   * Register device with backend if not already registered.
-   * Uses native C++ DeviceBridge + shared rac_http_client_* transport.
-   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-   * @internal
-   */
-  async _registerDeviceIfNeeded(
-    environment: SDKEnvironment,
-    supabaseKey?: string,
-    buildToken?: string
-  ): Promise<void> {
-    const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
-      : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
-        : 'production';
-
-    if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      logger.debug('Skipping JS device registration: native phase 2 owns non-development registration');
-      return;
-    }
-
-    if (!buildToken) {
-      logger.debug('Skipping telemetry/device registration: no usable config');
-      return;
-    }
-
-    try {
-      const native = requireNativeModule();
-
-      // Call native registerDevice which goes through:
-      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed
-      // → http_post callback → rac_http_client_*.
-      // This exactly mirrors Swift's flow!
-      // Empty `buildToken` is only emitted in development mode so native can
-      // apply its baked-in dev fallback.
-      const success = await native.registerDevice(JSON.stringify({
-        environment: envString,
-        supabaseKey: supabaseKey ?? '',
-        buildToken: buildToken ?? '',
-      }));
-
-      if (success) {
-        logger.debug('Device registration request completed via native');
-      } else {
-        logger.debug('Skipping telemetry/device registration: no usable config');
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.warning(`Device registration error: ${msg}`);
-    }
-  },
-
   async destroy(): Promise<void> {
-    // Telemetry is handled by native layer - no JS-level shutdown needed
-    TelemetryService.shared.setEnabled(false);
-
     if (isNativeModuleAvailable()) {
       const native = requireNativeModule();
       await native.destroy();
     }
-    ServiceContainer.shared.reset();
     initState = resetState();
     servicesInitPromise = null;
   },
@@ -479,17 +273,31 @@ export const RunAnywhere = {
 
     servicesInitPromise = (async () => {
       const native = requireNativeModule();
+      const nativePhase2 = native as NativePhase2Module;
 
-      const env = initState.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-      const buildToken = this._resolveBuildToken();
-      if (env === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-        await this._registerDeviceIfNeeded(env, undefined, buildToken);
+      initState = markServicesInitializing(initState);
+
+      let phase2Result: unknown = undefined;
+      if (typeof nativePhase2.completeServicesInitialization === 'function') {
+        phase2Result = await nativePhase2.completeServicesInitialization.call(native);
+      } else if (typeof nativePhase2.sdkInitPhase2Proto === 'function') {
+        phase2Result = await nativePhase2.sdkInitPhase2Proto.call(native);
+      } else if (typeof nativePhase2.sdkInitPhase2 === 'function') {
+        phase2Result = await nativePhase2.sdkInitPhase2.call(native);
+      } else if (typeof nativePhase2.initializeServices === 'function') {
+        phase2Result = await nativePhase2.initializeServices.call(native);
+      } else {
+        const initialized = await native.isInitialized();
+        if (!initialized) {
+          throw new Error('Native core is not initialized');
+        }
+        logger.debug('Native phase 2 bridge not available; core native init is already complete.');
+      }
+      if (phase2Result === false) {
+        throw new Error('Native services initialization failed');
       }
 
-      ServiceContainer.shared.markInitialized();
       initState = markServicesInitialized(initState);
-      // Touch native to keep the bridge warm; ignore returned bool here.
-      void native.isInitialized();
       logger.info('Services initialisation completed.');
       publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
     })();
@@ -537,11 +345,12 @@ export const RunAnywhere = {
   },
 
   /**
-   * Check if currently authenticated
-   * @returns true if authenticated with valid token
+   * Check if currently authenticated.
+   *
+   * Matches Swift: `RunAnywhere.isAuthenticated`, delegated to native auth state.
    */
-  async isAuthenticated(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
+  get isAuthenticated(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return Promise.resolve(false);
     const native = requireNativeModule();
     return native.isAuthenticated();
   },
@@ -556,22 +365,20 @@ export const RunAnywhere = {
   },
 
   /**
-   * Clear device registration flag (for testing)
-   * Forces re-registration on next SDK init
+   * Get device ID from native device state.
    */
-  async clearDeviceRegistration(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
+  async getDeviceId(): Promise<string> {
+    if (!isNativeModuleAvailable()) return '';
     const native = requireNativeModule();
-    return native.clearDeviceRegistration();
+    return (await native.getDeviceId()) || (await native.getPersistentDeviceUUID()) || '';
   },
 
   /**
-   * Get device ID (Keychain-persisted, survives reinstalls).
-   *
-   * Cached during `initialize()`. Empty string until then.
+   * Device ID (Keychain/Keystore-persisted, survives reinstalls).
+   * RN resolves this through the async native bridge.
    */
-  get deviceId(): string {
-    return cachedDeviceId;
+  get deviceId(): Promise<string> {
+    return this.getDeviceId();
   },
 
   // ============================================================================
@@ -819,24 +626,6 @@ export const RunAnywhere = {
     }
   },
 
-  /**
-   * Get available capabilities
-   * @returns Array of capability strings (llm, stt, tts, vad)
-   */
-  async getCapabilities(): Promise<string[]> {
-    const caps: string[] = ['core'];
-    // Check which backends are available
-    try {
-      if (await this.isModelLoaded()) caps.push('llm');
-      if (await this.isSTTModelLoaded()) caps.push('stt');
-      if (await this.isTTSModelLoaded()) caps.push('tts');
-      if (await this.isVADModelLoaded()) caps.push('vad');
-    } catch {
-      // Ignore errors - these methods may not be available
-    }
-    return caps;
-  },
-
   // ============================================================================
   // Audio Utilities (Delegated to Extension)
   // ============================================================================
@@ -864,13 +653,6 @@ export const RunAnywhere = {
 
   loadVLMModelByInfo: VLMModels.loadVLMModel,
 
-  // ============================================================================
-  // Factory Methods
-  // ============================================================================
-
-  conversation(): Conversation {
-    return new Conversation();
-  },
 };
 
 // ============================================================================

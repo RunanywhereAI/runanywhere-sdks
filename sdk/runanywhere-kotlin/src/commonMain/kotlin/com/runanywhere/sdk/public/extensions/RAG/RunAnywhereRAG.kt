@@ -12,11 +12,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.RAGConfig
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
-import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RARAGConfiguration
@@ -45,35 +43,6 @@ expect suspend fun RunAnywhere.ragResolvedConfiguration(
  * @throws IllegalStateException if pipeline creation fails
  */
 expect suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration)
-
-/**
- * Create the RAG pipeline from a generated solution RAG config.
- *
- * D-6: Commons now owns model-id -> path resolution. This helper simply
- * translates the solution-level [RAGConfig] fields onto [RAGConfiguration]
- * (which also carries model ids) and hands it to the native session ABI.
- */
-suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfig) {
-    val embeddingModelId =
-        config.embed_model_id.takeIf { it.isNotBlank() }
-            ?: throw SDKException.invalidConfiguration("RAGConfig.embed_model_id is required")
-    val llmModelId =
-        config.llm_model_id.takeIf { it.isNotBlank() }
-            ?: throw SDKException.invalidConfiguration("RAGConfig.llm_model_id is required")
-
-    ragCreatePipeline(
-        RARAGConfiguration(
-            embedding_model_id = embeddingModelId,
-            llm_model_id = llmModelId,
-            reranker_model_id = config.rerank_model_id.takeIf { it.isNotBlank() },
-            top_k = config.retrieve_k.takeIf { it > 0 } ?: config.rerank_top.takeIf { it > 0 } ?: 0,
-            prompt_template = config.prompt_template.takeIf { it.isNotBlank() },
-            index_path = config.vector_store_path.takeIf { it.isNotBlank() },
-            persist_index = config.vector_store_path.isNotBlank(),
-            rerank_results = config.rerank_model_id.isNotBlank(),
-        ),
-    )
-}
 
 /**
  * Destroy the RAG pipeline and release all resources.

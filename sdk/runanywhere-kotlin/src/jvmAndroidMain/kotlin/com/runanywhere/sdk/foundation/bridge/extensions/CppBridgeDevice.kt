@@ -33,13 +33,15 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.cEnvironment
+import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import java.util.UUID
-import kotlinx.coroutines.runBlocking
 
 object CppBridgeDevice {
-
     private const val TAG = "CppBridgeDevice"
+
     // Note: device_id persistence now owned by commons via
     // `rac_device_get_or_create_persistent_id` (mirrors Swift). Only the
     // registration-status flag is still persisted Kotlin-side.
@@ -72,27 +74,49 @@ object CppBridgeDevice {
      */
     interface DeviceInfoProvider {
         fun getDeviceModel(): String
+
         fun getDeviceManufacturer(): String
+
         fun getDeviceName(): String = getDeviceModel()
+
         fun getOSVersion(): String
+
         fun getOSBuildId(): String
+
         fun getSDKVersion(): Int
+
         fun getLocale(): String
+
         fun getTimezone(): String
+
         fun isEmulator(): Boolean
+
         fun getFormFactor(): String = "phone"
+
         fun getArchitecture(): String
+
         fun getChipName(): String = "Unknown"
+
         fun getTotalMemory(): Long
+
         fun getAvailableMemory(): Long = getTotalMemory() / 2
+
         fun hasNeuralEngine(): Boolean = false
+
         fun getNeuralEngineCores(): Int = 0
+
         fun getGPUFamily(): String = "unknown"
+
         fun getBatteryLevel(): Double = -1.0
+
         fun getBatteryState(): String? = null
+
         fun isLowPowerMode(): Boolean = false
+
         fun getCoreCount(): Int
+
         fun getPerformanceCores(): Int = getCoreCount() / 2
+
         fun getEfficiencyCores(): Int = getCoreCount() - getPerformanceCores()
     }
 
@@ -113,24 +137,25 @@ object CppBridgeDevice {
             initializeDeviceId()
             loadRegistrationStatus()
 
-            val callbacks = object {
-                @Suppress("unused")
-                fun getDeviceInfo(): String = getDeviceInfoCallback()
+            val callbacks =
+                object {
+                    @Suppress("unused")
+                    fun getDeviceInfo(): String = getDeviceInfoCallback()
 
-                @Suppress("unused")
-                fun getDeviceId(): String = getDeviceIdCallback()
+                    @Suppress("unused")
+                    fun getDeviceId(): String = getDeviceIdCallback()
 
-                @Suppress("unused")
-                fun isRegistered(): Boolean = isDeviceRegisteredCallback()
+                    @Suppress("unused")
+                    fun isRegistered(): Boolean = isDeviceRegisteredCallback()
 
-                @Suppress("unused")
-                fun setRegistered(registered: Boolean) =
-                    setRegisteredCallback(registered)
+                    @Suppress("unused")
+                    fun setRegistered(registered: Boolean) =
+                        setRegisteredCallback(registered)
 
-                @Suppress("unused")
-                fun httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int =
-                    httpPostCallback(endpoint, body, requiresAuth)
-            }
+                    @Suppress("unused")
+                    fun httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int =
+                        httpPostCallback(endpoint, body, requiresAuth)
+                }
 
             val result = RunAnywhereBridge.racDeviceManagerSetCallbacks(callbacks)
             if (result == 0) {
@@ -181,7 +206,7 @@ object CppBridgeDevice {
      *
      * @return `true` when commons reported success (or already-done).
      */
-    fun triggerRegistration(environment: Int, buildToken: String? = null): Boolean {
+    fun triggerRegistration(environment: SDKEnvironment, buildToken: String? = null): Boolean {
         if (!callbacksRegistered) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
@@ -199,7 +224,7 @@ object CppBridgeDevice {
             return false
         }
 
-        val result = RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(environment, buildToken)
+        val result = RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(environment.cEnvironment, buildToken)
         return result == 0
     }
 
@@ -233,7 +258,10 @@ object CppBridgeDevice {
         val androidApiLevel = provider?.getSDKVersion() ?: getDefaultSdkVersion()
         val sdkVersionString = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION
         val locale = provider?.getLocale() ?: Locale.getDefault().toLanguageTag()
-        val timezone = provider?.getTimezone() ?: java.util.TimeZone.getDefault().id
+        val timezone =
+            provider?.getTimezone() ?: java.util.TimeZone
+                .getDefault()
+                .id
         val isEmulator = provider?.isEmulator() ?: false
         val formFactor = provider?.getFormFactor() ?: "phone"
         val architecture = provider?.getArchitecture() ?: CppBridgeHardware.defaultArchitecture()
@@ -299,7 +327,10 @@ object CppBridgeDevice {
      */
     @JvmStatic
     fun isDeviceRegisteredCallback(): Boolean {
-        if (CppBridgeTelemetry.currentEnvironment == 0) return false
+        // Mirrors Swift: development (and pre-init `nil`) always returns false so
+        // commons performs the Supabase UPSERT every launch.
+        val env = CppBridgeTelemetry.currentEnvironment
+        if (env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return false
         return deviceRegistered
     }
 

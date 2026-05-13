@@ -78,6 +78,7 @@
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
@@ -3373,6 +3374,68 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeStreamL
     return static_cast<jint>(rc);
 }
 
+// =============================================================================
+// BEGIN R7.A — Swift-aligned lifecycle-proto thunks for VLM cancel + VAD
+// configure/start/stop/reset. Mirror iOS Swift which uses the lifecycle-only
+// ABI (no handle) — Kotlin SDK is lifecycle-only matching Swift. Underlying
+// C ABI lives in rac_vlm_service.h and rac_vad_service.h.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelLifecycleProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vlm_cancel_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racVlmCancelLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadConfigureLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_configure_lifecycle_proto(req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVadConfigureLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStartLifecycleProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_start_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racVadStartLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStopLifecycleProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_stop_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racVadStopLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadResetLifecycleProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_reset_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racVadResetLifecycleProto");
+}
+
+// END R7.A
+// =============================================================================
+
 // Swift-aligned: rac_tts_component_{list_voices,synthesize,synthesize_stream}
 // _proto JNI thunks deleted — Kotlin SDK uses the lifecycle proto path
 // (rac_tts_{list_voices,synthesize,synthesize_stream}_lifecycle_proto)
@@ -4642,6 +4705,54 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
 
     env->ReleaseStringUTFChars(jMethod, method);
     env->ReleaseStringUTFChars(jUrl, url);
+
+    return result;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - HTTP default headers (R7.C)
+// =============================================================================
+//
+// Thunk for `rac_http_default_headers`. Marshals commons' canonical SDK
+// header list (X-SDK-Client / X-SDK-Version / Content-Type / Accept — the
+// "X-Platform" header is intentionally excluded and must be supplied
+// per-SDK) as a flat alternating String[] (`[k0, v0, k1, v1, ...]`).
+// The Kotlin adapter (HTTPClientAdapter.jvmAndroid.kt) groups consecutive
+// pairs back into `List<Pair<String, String>>`.
+//
+// Returns null on any failure so the Kotlin caller falls back to the
+// pre-thunk inlined header policy.
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDefaultHeaders(
+    JNIEnv* env, jclass /*clazz*/) {
+    const rac_http_header_kv_t* kvs = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_http_default_headers(&kvs, &count);
+    if (rc != RAC_SUCCESS || kvs == nullptr || count == 0) {
+        return nullptr;
+    }
+
+    jclass strCls = env->FindClass("java/lang/String");
+    if (strCls == nullptr) {
+        return nullptr;
+    }
+
+    const jsize flatLen = static_cast<jsize>(count * 2);
+    jobjectArray result = env->NewObjectArray(flatLen, strCls, nullptr);
+    if (result == nullptr) {
+        return nullptr;
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+        const char* name  = kvs[i].name  != nullptr ? kvs[i].name  : "";
+        const char* value = kvs[i].value != nullptr ? kvs[i].value : "";
+        jstring jName  = env->NewStringUTF(name);
+        jstring jValue = env->NewStringUTF(value);
+        env->SetObjectArrayElement(result, static_cast<jsize>(i * 2), jName);
+        env->SetObjectArrayElement(result, static_cast<jsize>(i * 2 + 1), jValue);
+        env->DeleteLocalRef(jName);
+        env->DeleteLocalRef(jValue);
+    }
 
     return result;
 }

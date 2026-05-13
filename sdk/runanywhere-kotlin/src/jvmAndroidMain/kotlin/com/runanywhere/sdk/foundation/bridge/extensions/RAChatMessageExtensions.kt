@@ -28,14 +28,15 @@ import ai.runanywhere.proto.v1.MessageRole
  * keep parity with the Swift sentinel.
  */
 val MessageRole.wireString: String
-    get() = when (this) {
-        MessageRole.MESSAGE_ROLE_USER -> "user"
-        MessageRole.MESSAGE_ROLE_ASSISTANT -> "assistant"
-        MessageRole.MESSAGE_ROLE_SYSTEM -> "system"
-        MessageRole.MESSAGE_ROLE_TOOL -> "tool"
-        MessageRole.MESSAGE_ROLE_DEVELOPER -> "developer"
-        MessageRole.MESSAGE_ROLE_UNSPECIFIED -> "unspecified"
-    }
+    get() =
+        when (this) {
+            MessageRole.MESSAGE_ROLE_USER -> "user"
+            MessageRole.MESSAGE_ROLE_ASSISTANT -> "assistant"
+            MessageRole.MESSAGE_ROLE_SYSTEM -> "system"
+            MessageRole.MESSAGE_ROLE_TOOL -> "tool"
+            MessageRole.MESSAGE_ROLE_DEVELOPER -> "developer"
+            MessageRole.MESSAGE_ROLE_UNSPECIFIED -> "unspecified"
+        }
 
 /**
  * Parse a wire-format chat role string ("user", "assistant", …) into the

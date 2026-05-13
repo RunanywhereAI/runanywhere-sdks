@@ -353,6 +353,72 @@ class DartBridgeModelRegistry {
     }
   }
 
+  /// Register a remote model via `rac_register_model_from_url_proto`.
+  ///
+  /// Mirrors Swift's `RunAnywhere.registerModel(id:name:url:...)` URL form
+  /// — commons owns the build-and-save flow; we only ship the proto request
+  /// bytes and decode the resulting `ModelInfo` proto.
+  Future<model_pb.ModelInfo?> registerModelFromUrl(
+    model_pb.RegisterModelFromUrlRequest request,
+  ) async {
+    final fn = RacNative.bindings.rac_register_model_from_url_proto;
+    if (fn == null) {
+      _logger.debug('rac_register_model_from_url_proto unavailable');
+      return null;
+    }
+    try {
+      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelInfo.fromBuffer,
+        symbol: 'rac_register_model_from_url_proto',
+      );
+    } catch (e) {
+      _logger.debug('rac_register_model_from_url_proto error: $e');
+      return null;
+    }
+  }
+
+  /// Import a local model into the registry via
+  /// `rac_model_registry_import_proto`.
+  ///
+  /// Mirrors Swift's `RunAnywhere.importModel(_:)`. The caller must supply a
+  /// stable, platform-normalized `sourcePath` (no transient file-picker
+  /// handles).
+  Future<model_pb.ModelImportResult> importModel(
+    model_pb.ModelImportRequest request,
+  ) async {
+    final handle = _registryHandle;
+    if (handle == null) {
+      return model_pb.ModelImportResult(
+        success: false,
+        errorMessage: 'Model registry not initialized',
+      );
+    }
+    final fn = RacNative.bindings.rac_model_registry_import_proto;
+    if (fn == null) {
+      return model_pb.ModelImportResult(
+        success: false,
+        errorMessage: 'rac_model_registry_import_proto unavailable',
+      );
+    }
+    try {
+      return DartBridgeProtoUtils.callRequestWithHandle<model_pb.ModelImportResult>(
+        handle: handle,
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelImportResult.fromBuffer,
+        symbol: 'rac_model_registry_import_proto',
+      );
+    } catch (e) {
+      _logger.debug('rac_model_registry_import_proto error: $e');
+      return model_pb.ModelImportResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+
   /// Update download status for a model
   Future<bool> updateDownloadStatus(String modelId, String? localPath) async {
     if (_registryHandle == null) {

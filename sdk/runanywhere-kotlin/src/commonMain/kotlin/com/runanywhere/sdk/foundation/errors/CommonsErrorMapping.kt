@@ -19,20 +19,4 @@ package com.runanywhere.sdk.foundation.errors
 object CommonsErrorCode {
     /** Operation completed successfully. */
     const val RAC_SUCCESS = 0
-
-    /**
-     * Check if an error code indicates success.
-     *
-     * @param code The C++ error code
-     * @return true if the code indicates success (>= 0)
-     */
-    fun isSuccess(code: Int): Boolean = code >= 0
-
-    /**
-     * Check if an error code indicates failure.
-     *
-     * @param code The C++ error code
-     * @return true if the code indicates failure (< 0)
-     */
-    fun isError(code: Int): Boolean = code < 0
 }

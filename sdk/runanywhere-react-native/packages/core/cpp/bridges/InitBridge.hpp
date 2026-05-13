@@ -97,6 +97,25 @@ public:
                            const std::string& deviceId);
 
     /**
+     * @brief Complete deferred services initialization
+     *
+     * Registers native device callbacks and then drives commons Phase 2 through
+     * rac_sdk_init_phase2_proto when bundled commons exposes it.
+     *
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t completeServicesInitialization();
+
+    /**
+     * @brief Register device manager callbacks for commons services init
+     *
+     * Safe to call multiple times; callback storage is refreshed each call.
+     *
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t registerDeviceCallbacks();
+
+    /**
      * @brief Set base directory for model paths
      *
      * Must be called after initialize() and before using model path utilities.

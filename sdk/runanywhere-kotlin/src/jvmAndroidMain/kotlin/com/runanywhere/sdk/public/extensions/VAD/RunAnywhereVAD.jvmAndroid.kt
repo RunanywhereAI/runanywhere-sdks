@@ -10,9 +10,9 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADStreamEvent
 import ai.runanywhere.proto.v1.VADStreamEventKind
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere

@@ -3,7 +3,7 @@
  *
  * Core SDK that includes:
  * - RACommons bindings via Nitrogen HybridObject
- * - Authentication, Device Registration
+ * - Native authentication and device registration state
  * - Lifecycle-driven model loading (registry, download, paths owned by commons)
  * - Storage proto bindings
  * - Events / proto stream
@@ -102,43 +102,6 @@ export { LogLevel } from './Foundation/Logging/Models/LogLevel';
 export { LoggingManager } from './Foundation/Logging/Services/LoggingManager';
 
 // =============================================================================
-// Foundation - DI
-// =============================================================================
-
-export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistry';
-export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
-
-// =============================================================================
-// Network Layer — HTTP transport is owned by native C++ (rac_http_client_*).
-// These exports are for configuration / telemetry / endpoints only.
-// =============================================================================
-
-export {
-  SDKEnvironment,
-  createNetworkConfig,
-  getEnvironmentName,
-  looksLikePlaceholder,
-  isUsableHttpUrl,
-  isUsableCredential,
-  hasUsableBackendConfig,
-  hasUsableSupabaseConfig,
-  isDevelopment,
-  isProduction,
-  DEFAULT_BASE_URL,
-  DEFAULT_TIMEOUT_MS,
-  TelemetryService,
-  TelemetryCategory,
-  APIEndpoints,
-} from './services';
-
-export type {
-  NetworkConfig,
-  APIEndpointKey,
-  APIEndpointValue,
-  ModelFileDescriptor,
-} from './services';
-
-// =============================================================================
 // Features
 // =============================================================================
 
@@ -171,10 +134,6 @@ export {
   getNativeCoreModule,
   requireNativeCoreModule,
   isNativeCoreModuleAvailable,
-  // Backwards compatibility exports (match old @runanywhere/native)
-  requireNativeModule,
-  isNativeModuleAvailable,
-  requireDeviceInfoModule,
 } from './native/NativeRunAnywhereCore';
 export type {
   NativeRunAnywhereCoreModule,

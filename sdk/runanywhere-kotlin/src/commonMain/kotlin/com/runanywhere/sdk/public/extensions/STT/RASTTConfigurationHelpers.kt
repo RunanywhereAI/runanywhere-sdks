@@ -48,22 +48,23 @@ fun STTLanguage.Companion.fromBcp47(raw: String): STTLanguage {
 }
 
 val STTLanguage.bcp47Code: String
-    get() = when (this) {
-        STTLanguage.STT_LANGUAGE_UNSPECIFIED -> ""
-        STTLanguage.STT_LANGUAGE_AUTO -> "auto"
-        STTLanguage.STT_LANGUAGE_EN -> "en"
-        STTLanguage.STT_LANGUAGE_ES -> "es"
-        STTLanguage.STT_LANGUAGE_FR -> "fr"
-        STTLanguage.STT_LANGUAGE_DE -> "de"
-        STTLanguage.STT_LANGUAGE_ZH -> "zh"
-        STTLanguage.STT_LANGUAGE_JA -> "ja"
-        STTLanguage.STT_LANGUAGE_KO -> "ko"
-        STTLanguage.STT_LANGUAGE_IT -> "it"
-        STTLanguage.STT_LANGUAGE_PT -> "pt"
-        STTLanguage.STT_LANGUAGE_AR -> "ar"
-        STTLanguage.STT_LANGUAGE_RU -> "ru"
-        STTLanguage.STT_LANGUAGE_HI -> "hi"
-    }
+    get() =
+        when (this) {
+            STTLanguage.STT_LANGUAGE_UNSPECIFIED -> ""
+            STTLanguage.STT_LANGUAGE_AUTO -> "auto"
+            STTLanguage.STT_LANGUAGE_EN -> "en"
+            STTLanguage.STT_LANGUAGE_ES -> "es"
+            STTLanguage.STT_LANGUAGE_FR -> "fr"
+            STTLanguage.STT_LANGUAGE_DE -> "de"
+            STTLanguage.STT_LANGUAGE_ZH -> "zh"
+            STTLanguage.STT_LANGUAGE_JA -> "ja"
+            STTLanguage.STT_LANGUAGE_KO -> "ko"
+            STTLanguage.STT_LANGUAGE_IT -> "it"
+            STTLanguage.STT_LANGUAGE_PT -> "pt"
+            STTLanguage.STT_LANGUAGE_AR -> "ar"
+            STTLanguage.STT_LANGUAGE_RU -> "ru"
+            STTLanguage.STT_LANGUAGE_HI -> "hi"
+        }
 
 // MARK: - STTConfiguration
 
@@ -75,12 +76,13 @@ fun STTConfiguration.Companion.defaults(
     language: STTLanguage = STTLanguage.STT_LANGUAGE_EN,
     sampleRate: Int = 16_000,
     enableVad: Boolean = false,
-): STTConfiguration = STTConfiguration(
-    model_id = modelId,
-    language = language,
-    sample_rate = sampleRate,
-    enable_vad = enableVad,
-)
+): STTConfiguration =
+    STTConfiguration(
+        model_id = modelId,
+        language = language,
+        sample_rate = sampleRate,
+        enable_vad = enableVad,
+    )
 
 /**
  * Validate this configuration. Throws [SDKException] on invalid fields.
@@ -101,14 +103,15 @@ fun STTConfiguration.validate() {
  */
 fun STTOptions.Companion.defaults(
     language: STTLanguage = STTLanguage.STT_LANGUAGE_EN,
-): RASTTOptions = RASTTOptions(
-    language = language,
-    enable_punctuation = true,
-    enable_diarization = false,
-    enable_word_timestamps = true,
-    max_speakers = 0,
-    beam_size = 0,
-)
+): RASTTOptions =
+    RASTTOptions(
+        language = language,
+        enable_punctuation = true,
+        enable_diarization = false,
+        enable_word_timestamps = true,
+        max_speakers = 0,
+        beam_size = 0,
+    )
 
 // MARK: - STTOutput
 
@@ -130,12 +133,13 @@ fun WordTimestamp.Companion.create(
     startTime: Double,
     endTime: Double,
     confidence: Float,
-): WordTimestamp = WordTimestamp(
-    word = word,
-    start_ms = (startTime * 1000.0).toLong(),
-    end_ms = (endTime * 1000.0).toLong(),
-    confidence = confidence,
-)
+): WordTimestamp =
+    WordTimestamp(
+        word = word,
+        start_ms = (startTime * 1000.0).toLong(),
+        end_ms = (endTime * 1000.0).toLong(),
+        confidence = confidence,
+    )
 
 /** Start time in seconds. */
 val WordTimestamp.startTime: Double
@@ -157,11 +161,12 @@ val WordTimestamp.duration: Double
  * `RATranscriptionMetadata.realTimeFactorComputed`.
  */
 val TranscriptionMetadata.realTimeFactorComputed: Double
-    get() = if (audio_length_ms > 0) {
-        processing_time_ms.toDouble() / audio_length_ms.toDouble()
-    } else {
-        0.0
-    }
+    get() =
+        if (audio_length_ms > 0) {
+            processing_time_ms.toDouble() / audio_length_ms.toDouble()
+        } else {
+            0.0
+        }
 
 /** Processing time in seconds. */
 val TranscriptionMetadata.processingTime: Double
@@ -180,7 +185,8 @@ val TranscriptionMetadata.audioLength: Double
 fun TranscriptionAlternative.Companion.create(
     text: String,
     confidence: Float,
-): TranscriptionAlternative = TranscriptionAlternative(
-    text = text,
-    confidence = confidence,
-)
+): TranscriptionAlternative =
+    TranscriptionAlternative(
+        text = text,
+        confidence = confidence,
+    )

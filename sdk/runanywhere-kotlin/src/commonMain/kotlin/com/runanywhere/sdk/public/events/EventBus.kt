@@ -119,6 +119,7 @@ object EventBus {
     /**
      * Get events of a specific type.
      */
+    @Suppress("UNCHECKED_CAST")
     inline fun <reified T : SDKEvent> eventsOfType(): Flow<T> {
         return events.filter { it is T } as Flow<T>
     }

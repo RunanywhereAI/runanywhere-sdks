@@ -379,6 +379,7 @@ export type {
 } from '@runanywhere/proto-ts/voice_events';
 export type {
   VoiceAgentComposeConfig,
+  VoiceAgentComposeConfig as VoiceAgentConfig,
   VoiceAgentRequest,
   VoiceAgentResult,
   VoiceAgentTurnRequest,

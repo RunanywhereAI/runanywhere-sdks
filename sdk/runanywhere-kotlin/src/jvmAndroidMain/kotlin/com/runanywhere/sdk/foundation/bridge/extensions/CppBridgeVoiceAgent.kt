@@ -26,8 +26,8 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
@@ -104,39 +104,41 @@ object CppBridgeVoiceAgent {
      *         C side maps to `rac_voice_agent_create` failing — typically
      *         because one of the sub-handles is invalid).
      */
-    suspend fun getHandle(): Long = mutex.withLock {
-        val existing = handleRef.get()
-        if (existing != INVALID_HANDLE) return@withLock existing
+    suspend fun getHandle(): Long =
+        mutex.withLock {
+            val existing = handleRef.get()
+            if (existing != INVALID_HANDLE) return@withLock existing
 
-        // Mirror Swift CppBridge+VoiceAgent: pull a handle from each
-        // sub-component actor.
-        val llmHandle = CppBridgeLLM.getHandle()
-        val sttHandle = CppBridgeSTT.getHandle()
-        val ttsHandle = CppBridgeTTS.getHandle()
-        val vadHandle = CppBridgeVAD.getHandle()
-        logger.debug(
-            "Composing voice agent over sub-handles: " +
-                "llm=$llmHandle, stt=$sttHandle, tts=$ttsHandle, vad=$vadHandle",
-        )
-
-        val newHandle = RunAnywhereBridge.racVoiceAgentCreate(
-            llmHandle,
-            sttHandle,
-            ttsHandle,
-            vadHandle,
-        )
-        if (newHandle == INVALID_HANDLE) {
-            throw SDKException.voiceAgent(
-                "rac_voice_agent_create returned 0 — failed to compose voice agent " +
-                    "over sub-handles (llm=$llmHandle, stt=$sttHandle, tts=$ttsHandle, " +
-                    "vad=$vadHandle).",
+            // Mirror Swift CppBridge+VoiceAgent: pull a handle from each
+            // sub-component actor.
+            val llmHandle = CppBridgeLLM.getHandle()
+            val sttHandle = CppBridgeSTT.getHandle()
+            val ttsHandle = CppBridgeTTS.getHandle()
+            val vadHandle = CppBridgeVAD.getHandle()
+            logger.debug(
+                "Composing voice agent over sub-handles: " +
+                    "llm=$llmHandle, stt=$sttHandle, tts=$ttsHandle, vad=$vadHandle",
             )
-        }
 
-        handleRef.set(newHandle)
-        logger.info("Voice agent composed: $newHandle")
-        newHandle
-    }
+            val newHandle =
+                RunAnywhereBridge.racVoiceAgentCreate(
+                    llmHandle,
+                    sttHandle,
+                    ttsHandle,
+                    vadHandle,
+                )
+            if (newHandle == INVALID_HANDLE) {
+                throw SDKException.voiceAgent(
+                    "rac_voice_agent_create returned 0 — failed to compose voice agent " +
+                        "over sub-handles (llm=$llmHandle, stt=$sttHandle, tts=$ttsHandle, " +
+                        "vad=$vadHandle).",
+                )
+            }
+
+            handleRef.set(newHandle)
+            logger.info("Voice agent composed: $newHandle")
+            newHandle
+        }
 
     /** True when a voice-agent handle exists AND the C layer reports ready. */
     fun isReady(): Boolean {
@@ -151,16 +153,17 @@ object CppBridgeVoiceAgent {
      *
      * No-op when no handle has been allocated.
      */
-    suspend fun cleanup() = mutex.withLock {
-        val handle = handleRef.get()
-        if (handle == INVALID_HANDLE) return@withLock
-        val result = RunAnywhereBridge.racVoiceAgentCleanup(handle)
-        if (result != 0) {
-            logger.warn("rac_voice_agent_cleanup returned $result for handle $handle")
-        } else {
-            logger.info("Voice agent cleaned up: $handle")
+    suspend fun cleanup() =
+        mutex.withLock {
+            val handle = handleRef.get()
+            if (handle == INVALID_HANDLE) return@withLock
+            val result = RunAnywhereBridge.racVoiceAgentCleanup(handle)
+            if (result != 0) {
+                logger.warn("rac_voice_agent_cleanup returned $result for handle $handle")
+            } else {
+                logger.info("Voice agent cleaned up: $handle")
+            }
         }
-    }
 
     /**
      * Release the handle + its owned component handles. Safe to call

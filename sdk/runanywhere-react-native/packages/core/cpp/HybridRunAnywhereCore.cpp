@@ -273,6 +273,21 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
     });
 }
 
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::completeServicesInitialization() {
+    return Promise<bool>::async([this]() {
+        std::lock_guard<std::mutex> lock(initMutex_);
+
+        LOGI("Completing native services initialization...");
+        rac_result_t result = InitBridge::shared().completeServicesInitialization();
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to complete services initialization: " + std::to_string(result));
+            return false;
+        }
+
+        return true;
+    });
+}
+
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
     return Promise<void>::async([this]() {
         std::lock_guard<std::mutex> lock(initMutex_);

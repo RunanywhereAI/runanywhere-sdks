@@ -402,10 +402,15 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
- * @brief Create a voice agent instance with external component handles.
+ * @brief Create a voice agent instance with externally-managed component handles.
  *
- * DEPRECATED: Prefer rac_voice_agent_create_standalone().
- * This API is for backward compatibility when you need to share handles.
+ * Use this when you already have LLM/STT/TTS/VAD ComponentActors loaded and want
+ * to compose them into a voice-agent session sharing their handles. The
+ * voice-agent owns the resulting composite but does NOT take ownership of the
+ * child component handles.
+ *
+ * For a fully-managed voice agent that creates its own children, use
+ * `rac_voice_agent_create_standalone()`.
  *
  * @param llm_component_handle Handle to LLM component (rac_llm_component)
  * @param stt_component_handle Handle to STT component (rac_stt_component)

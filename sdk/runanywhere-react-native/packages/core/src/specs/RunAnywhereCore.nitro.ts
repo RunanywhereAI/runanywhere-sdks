@@ -48,6 +48,12 @@ export interface RunAnywhereCore extends HybridObject<{
   initialize(configJson: string): Promise<boolean>;
 
   /**
+   * Complete deferred native service initialization.
+   * Matches Swift: RunAnywhere.completeServicesInitialization().
+   */
+  completeServicesInitialization(): Promise<boolean>;
+
+  /**
    * Destroy the SDK and clean up resources
    */
   destroy(): Promise<void>;

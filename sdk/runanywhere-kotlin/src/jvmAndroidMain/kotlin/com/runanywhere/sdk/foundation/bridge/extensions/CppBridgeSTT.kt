@@ -18,7 +18,6 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.STTAudioSource
-import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTStreamEvent
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
@@ -151,10 +150,11 @@ object CppBridgeSTT {
      * source of truth for "is an STT model loaded".
      */
     suspend fun transcribe(audioData: ByteArray, options: RASTTOptions): RASTTOutput {
-        val request = STTTranscriptionRequest(
-            audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
-            options = options,
-        )
+        val request =
+            STTTranscriptionRequest(
+                audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
+                options = options,
+            )
         return decodeOrThrow(
             STTOutput.ADAPTER,
             RunAnywhereBridge.racSttTranscribeLifecycleProto(
@@ -176,10 +176,11 @@ object CppBridgeSTT {
         options: RASTTOptions,
         onEvent: (STTStreamEvent) -> Boolean,
     ) {
-        val request = STTTranscriptionRequest(
-            audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
-            options = options,
-        )
+        val request =
+            STTTranscriptionRequest(
+                audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
+                options = options,
+            )
         val rc =
             RunAnywhereBridge.racSttTranscribeStreamLifecycleProto(
                 STTTranscriptionRequest.ADAPTER.encode(request),

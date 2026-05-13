@@ -164,7 +164,7 @@ kotlin {
 }
 
 android {
-    namespace = "com.runanywhere.sdk.core.llamacpp"
+    namespace = "com.runanywhere.sdk.llm.llamacpp"
     compileSdk = 36
 
     defaultConfig {
@@ -172,7 +172,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 

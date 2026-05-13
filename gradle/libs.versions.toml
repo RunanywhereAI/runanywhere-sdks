@@ -60,6 +60,8 @@ ktor = "3.0.3"
 # JSON & Serialization
 # ============================================================================
 gson = "2.11.0"
+json = "20240303"
+junit-vintage = "5.10.2"
 
 # ============================================================================
 # Navigation
@@ -213,6 +215,7 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 # JSON
 # ----------------------------------------------------------------------------
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+json = { module = "org.json:json", version.ref = "json" }
 
 # ----------------------------------------------------------------------------
 # PDF
@@ -223,6 +226,7 @@ pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref
 # Testing
 # ----------------------------------------------------------------------------
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit-vintage" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

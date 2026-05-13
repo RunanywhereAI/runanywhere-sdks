@@ -11,8 +11,10 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.extensions.Models.rawValue
 import java.io.File
 
 /**
@@ -144,25 +146,40 @@ object CppBridgeModelPaths {
         if (jniPath != null) return jniPath
 
         // JNI not available (e.g. pure JVM unit tests). Fall back to a local
-        // computation that still uses the canonical schema.
-        val frameworkName =
-            when (framework) {
-                CppBridgeModelRegistry.Framework.ONNX -> "ONNX"
-                CppBridgeModelRegistry.Framework.SHERPA -> "Sherpa"
-                CppBridgeModelRegistry.Framework.LLAMACPP -> "LlamaCpp"
-                CppBridgeModelRegistry.Framework.COREML -> "CoreML"
-                CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> "FoundationModels"
-                CppBridgeModelRegistry.Framework.SYSTEM_TTS -> "SystemTTS"
-                CppBridgeModelRegistry.Framework.FLUID_AUDIO -> "FluidAudio"
-                CppBridgeModelRegistry.Framework.WHISPERKIT_COREML -> "WhisperKitCoreML"
-                CppBridgeModelRegistry.Framework.METALRT -> "MetalRT"
-                CppBridgeModelRegistry.Framework.GENIE -> "Genie"
-                CppBridgeModelRegistry.Framework.BUILTIN -> "BuiltIn"
-                CppBridgeModelRegistry.Framework.NONE -> "None"
-                else -> "Unknown"
-            }
+        // computation that still uses the canonical schema. The string segment
+        // is sourced from the codegen-driven `InferenceFramework.rawValue`
+        // helper (see commonMain/.../Models/ModelTypes.kt) so any future
+        // framework added to the proto picks up its path name automatically.
+        val frameworkName = racFrameworkIntToProto(framework).rawValue
         return File(File(File(base, "RunAnywhere"), "Models"), "$frameworkName${File.separator}$modelId").absolutePath
     }
+
+    /**
+     * Map a C++ `RAC_FRAMEWORK_*` int (the values defined in
+     * [CppBridgeModelRegistry.Framework]) to the corresponding proto
+     * [InferenceFramework] enum. The C++ ABI numbering does NOT match the
+     * proto wire numbering, so a small adapter is required.
+     *
+     * Unknown / unmapped ints fall through to [InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN]
+     * which yields the string "Unknown" via the codegen `rawValue` helper.
+     */
+    private fun racFrameworkIntToProto(framework: Int): InferenceFramework =
+        when (framework) {
+            CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+            CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
+            CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+            CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
+            CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
+            CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.INFERENCE_FRAMEWORK_NONE
+            CppBridgeModelRegistry.Framework.MLX -> InferenceFramework.INFERENCE_FRAMEWORK_MLX
+            CppBridgeModelRegistry.Framework.COREML -> InferenceFramework.INFERENCE_FRAMEWORK_COREML
+            CppBridgeModelRegistry.Framework.WHISPERKIT_COREML -> InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML
+            CppBridgeModelRegistry.Framework.METALRT -> InferenceFramework.INFERENCE_FRAMEWORK_METALRT
+            CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.INFERENCE_FRAMEWORK_GENIE
+            CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.INFERENCE_FRAMEWORK_SHERPA
+            else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }
 
     // ========================================================================
     // SWIFT-PARITY WRAPPERS (mirror CppBridge+ModelPaths.swift)
@@ -181,7 +198,7 @@ object CppBridgeModelPaths {
      * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` on failure.
      */
     fun setBaseDirectory(baseDir: String) {
-        val result = RunAnywhereBridge.racModelPathsSetBaseDirectory(baseDir)
+        val result = RunAnywhereBridge.racModelPathsSetBaseDir(baseDir)
         if (result != 0) {
             throw SDKException.make(
                 code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,

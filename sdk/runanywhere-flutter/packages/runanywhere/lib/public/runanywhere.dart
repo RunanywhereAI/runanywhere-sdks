@@ -84,8 +84,8 @@ class RunAnywhereSDK {
   bool get isActive => DartBridge.isInitialized && _cachedInitParams != null;
 
   /// True once Phase 2 (services) initialization has completed. Mirrors
-  /// Swift's `areServicesReady`. In Flutter, Phase 2 runs eagerly inside
-  /// [initialize] so this returns true alongside [isInitialized] today.
+  /// Swift's `areServicesReady`. Phase 2 is detached from [initialize] —
+  /// callers needing it ready should `await completeServicesInitialization()`.
   bool get areServicesReady =>
       DartBridge.isInitialized && DartBridge.servicesInitialized;
 
@@ -111,14 +111,17 @@ class RunAnywhereSDK {
       DartBridgeDevice.cachedDeviceId!.isNotEmpty;
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
-  /// `completeServicesInitialization()`. In Flutter Phase 2 already
-  /// completes synchronously inside [initialize]; this getter exists
-  /// for API parity and resolves immediately if initialization is done.
-  Future<void> completeServicesInitialization() async {
-    if (areServicesReady) return;
+  /// `completeServicesInitialization()`. [initialize] detaches Phase 2
+  /// (auth, device registration, model-assignment, telemetry/HTTP wiring)
+  /// and stores the resulting Future in [_servicesInitFuture]; concurrent
+  /// callers share that single Future so the work runs at most once.
+  /// Returns immediately once Phase 2 has resolved. Throws
+  /// [SDKException.notInitialized] if Phase 1 never ran.
+  Future<void> completeServicesInitialization() {
     if (!isInitialized) {
       throw SDKException.notInitialized();
     }
+    return _servicesInitFuture ?? Future<void>.value();
   }
 
   /// Initialization params (apiKey, baseURL, environment) — null
@@ -143,6 +146,13 @@ class RunAnywhereSDK {
   // commons and is read through DartBridge. Only Dart scheduling state
   // belongs here.
   bool _hasRunDiscovery = false;
+
+  // Shared Phase-2 future. Mirrors Swift's `_servicesInitTask`. Stored at
+  // detach time inside [initializeWithParams]; replayed by
+  // [completeServicesInitialization]. Dart's single-threaded event loop
+  // makes the check-and-set atomic, so no explicit lock is needed (unlike
+  // Swift which uses `_servicesInitLock: DispatchQueue`).
+  Future<void>? _servicesInitFuture;
 
   /// SDK semver string (e.g. "4.0.0").
   String get version => SDKConstants.version;
@@ -203,12 +213,19 @@ class RunAnywhereSDK {
   /// Initialize with fully-resolved [SDKInitParams].
   ///
   /// Mirrors Swift `RunAnywhere.performCoreInit()` two-phase flow:
-  /// - Phase 1: Core init (sync, ~1-5ms) + local service setup (async,
-  ///   no network) — completes before this method returns.
-  /// - Phase 2: Device registration + authentication — fired in the
-  ///   background (fire-and-forget), matching the iOS `Task.detached`
-  ///   pattern. Network failures are non-critical; offline inference
-  ///   still works.
+  /// - Phase 1 (awaited): synchronous core init (~1–5 ms) — register
+  ///   platform adapter, configure logging, run `rac_state_initialize`,
+  ///   wire events / device / telemetry / file-manager callbacks.
+  ///   Completes before this method returns. Phase 1 failures throw to
+  ///   the caller.
+  /// - Phase 2 (detached): local service setup (HTTP/telemetry/model
+  ///   registry) + background services (device registration + auth).
+  ///   Mirrors Swift's `Task.detached(priority: .userInitiated)`. The
+  ///   resulting Future is stored in [_servicesInitFuture] so concurrent
+  ///   callers of [completeServicesInitialization] share it. Failures
+  ///   are non-critical — they are swallowed at the detach site (logged
+  ///   as warnings) but still observable to anyone awaiting
+  ///   [completeServicesInitialization] directly.
   Future<void> initializeWithParams(SDKInitParams params) async {
     if (DartBridge.isInitialized) return;
 
@@ -219,66 +236,32 @@ class RunAnywhereSDK {
     try {
       _cachedInitParams = params;
 
-      // --- Phase 1: Core init (sync) ---
+      // --- Phase 1: Core init (sync, ~1–5 ms) ---
+      // Phase-1 failures (invalid env, library load) propagate to the
+      // caller via the surrounding try / rethrow.
       DartBridge.initialize(params.environment);
 
-      // --- Local service setup (async, no network) ---
-      await DartBridge.initializeServices(
-        apiKey: params.apiKey,
-        baseURL: params.baseURL.toString(),
-        deviceId: DartBridgeDevice.cachedDeviceId,
+      logger.info(
+        'Phase 1 complete (${params.environment.description}); '
+        'Phase 2 dispatched in background',
       );
 
-      await DartBridge.modelPaths.setBaseDirectory();
-
-      // Configure the shared HTTP client. Mirrors Swift's inlined HTTP
-      // setup inside `RunAnywhere.performCoreInit()` (no DI container).
-      HTTPClientAdapter.shared.configure(
-        baseURL: params.baseURL.toString(),
-        apiKey: params.apiKey,
-        environment: params.environment,
-      );
-      if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-        final supabaseConfig = SupabaseConfig.configuration(params.environment);
-        if (supabaseConfig != null) {
-          HTTPClientAdapter.shared.configureDev(
-            supabaseURL: supabaseConfig.projectURL.toString(),
-            supabaseKey: supabaseConfig.anonKey,
-          );
-        }
-      }
-
-      // Commons-owned telemetry: sync init + async device-info wiring.
-      DartBridgeTelemetry.initializeSync(environment: params.environment);
-      final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
-      await DartBridgeTelemetry.initialize(
-        environment: params.environment,
-        deviceId: telemetryDeviceId,
-        baseURL: HTTPClientAdapter.shared.isConfigured
-            ? params.baseURL.toString()
-            : null,
-      );
-
-      await DartBridgeModelRegistry.instance.initialize();
-
-      logger.info('SDK initialized (${params.environment.description})');
-
-      // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
-      // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
-      // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
-      unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
-        durationMs: 0,
-        environment: params.environment.name,
-      ));
-
-      // --- Phase 2: Background services (network, fire-and-forget) ---
-      // Mirrors iOS `Task.detached { completeServicesInitialization() }`.
-      // Failures are non-critical; offline inference still works.
-      unawaited(_completeBackgroundServices(params, logger));
+      // --- Phase 2: Detached background services ---
+      // Mirrors Swift `Task.detached(priority: .userInitiated) { ... }`.
+      // Store the Future first so concurrent callers of
+      // `completeServicesInitialization()` see it before the detach
+      // wrapper might observe a failure. Phase 2 errors are swallowed
+      // here (non-critical) but still observable to direct awaiters.
+      final phase2 = _runPhase2(params, logger);
+      _servicesInitFuture = phase2;
+      unawaited(phase2.catchError((Object error, StackTrace _) {
+        logger.warning('Phase 2 failed (non-critical): $error');
+      }));
     } catch (e) {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
       _hasRunDiscovery = false;
+      _servicesInitFuture = null;
       // Commons auto-emits INITIALIZATION_STAGE_FAILED via
       // `event_publisher.cpp:557`; failure telemetry flows through
       // structured errors. Dart does not re-emit a duplicate.
@@ -286,20 +269,68 @@ class RunAnywhereSDK {
     }
   }
 
-  /// Phase 2 background services — device registration + authentication.
-  /// Runs after [initializeWithParams] returns. Failures are logged but
-  /// never surface to the caller.
-  Future<void> _completeBackgroundServices(
-    SDKInitParams params,
-    SDKLogger logger,
-  ) async {
-    try {
-      await _registerDeviceIfNeeded(params, logger);
-      await _authenticateWithBackend(params, logger);
-      logger.debug('Background services completed');
-    } catch (e) {
-      logger.warning('Background services failed (non-critical): $e');
+  /// Phase 2 step-list. Runs detached from [initializeWithParams] so the
+  /// caller's `await initialize()` returns after Phase 1 (~1–5 ms).
+  /// Mirrors Swift `_performServicesInitialization()`.
+  Future<void> _runPhase2(SDKInitParams params, SDKLogger logger) async {
+    // Step 1: Local service bridges (HTTP, state, model-assignment,
+    // platform services). Drives `rac_sdk_init_phase2_proto` inside
+    // commons.
+    await DartBridge.initializeServices(
+      apiKey: params.apiKey,
+      baseURL: params.baseURL.toString(),
+      deviceId: DartBridgeDevice.cachedDeviceId,
+    );
+
+    // Step 2: Model-paths base directory.
+    await DartBridge.modelPaths.setBaseDirectory();
+
+    // Step 3: Configure the shared HTTP client. Mirrors Swift's inlined
+    // HTTP setup inside `RunAnywhere.performCoreInit()` (no DI container).
+    HTTPClientAdapter.shared.configure(
+      baseURL: params.baseURL.toString(),
+      apiKey: params.apiKey,
+      environment: params.environment,
+    );
+    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      final supabaseConfig = SupabaseConfig.configuration(params.environment);
+      if (supabaseConfig != null) {
+        HTTPClientAdapter.shared.configureDev(
+          supabaseURL: supabaseConfig.projectURL.toString(),
+          supabaseKey: supabaseConfig.anonKey,
+        );
+      }
     }
+
+    // Step 4: Telemetry sync + async device-info wiring.
+    DartBridgeTelemetry.initializeSync(environment: params.environment);
+    final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
+    await DartBridgeTelemetry.initialize(
+      environment: params.environment,
+      deviceId: telemetryDeviceId,
+      baseURL: HTTPClientAdapter.shared.isConfigured
+          ? params.baseURL.toString()
+          : null,
+    );
+
+    // Step 5: Model registry.
+    await DartBridgeModelRegistry.instance.initialize();
+
+    // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
+    // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
+    // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
+    unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
+      durationMs: 0,
+      environment: params.environment.name,
+    ));
+
+    // Step 6: Background services — device registration + auth. Failures
+    // here are non-critical (offline inference still works), so they are
+    // logged and swallowed individually inside the helpers.
+    await _registerDeviceIfNeeded(params, logger);
+    await _authenticateWithBackend(params, logger);
+
+    logger.info('Phase 2 complete (${params.environment.description})');
   }
 
   /// Register device with backend. Mirrors Swift
@@ -391,6 +422,7 @@ class RunAnywhereSDK {
     DartBridge.modelLifecycle.reset();
     _hasRunDiscovery = false;
     _cachedInitParams = null;
+    _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
     HTTPClientAdapter.shared.resetForTesting();
   }

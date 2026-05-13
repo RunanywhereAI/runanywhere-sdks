@@ -9,14 +9,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RATTSOptions
@@ -24,6 +23,7 @@ import com.runanywhere.sdk.public.types.RATTSOutput
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback
@@ -53,9 +53,10 @@ actual suspend fun RunAnywhere.synthesize(
     // no TTS voice is loaded. Querying the lifecycle (canonical source of
     // truth) is required because `CppBridgeTTS` owns its own handle that is
     // separate from the lifecycle's handle.
-    val current = CppBridgeModelLifecycle.currentModel(
-        CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
-    )
+    val current =
+        CppBridgeModelLifecycle.currentModel(
+            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+        )
     if (current?.found != true) {
         throw SDKException.notInitialized("TTS voice not loaded")
     }
@@ -82,9 +83,10 @@ actual fun RunAnywhere.synthesizeStream(
         // truth) instead of CppBridgeTTS's own handle. Swift's
         // `synthesizeStream` finishes the stream silently when no voice is
         // loaded; we mirror that by closing the Flow without emitting.
-        val current = CppBridgeModelLifecycle.currentModel(
-            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
-        )
+        val current =
+            CppBridgeModelLifecycle.currentModel(
+                CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+            )
         if (current?.found != true) {
             close()
             return@callbackFlow

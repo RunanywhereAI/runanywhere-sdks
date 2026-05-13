@@ -31,18 +31,19 @@ import ai.runanywhere.proto.v1.AudioFormat
  * the proto3 canonical `AUDIO_FORMAT_*` form) is the cross-SDK convention.
  */
 val AudioFormat.wireString: String
-    get() = when (this) {
-        AudioFormat.AUDIO_FORMAT_PCM -> "pcm"
-        AudioFormat.AUDIO_FORMAT_WAV -> "wav"
-        AudioFormat.AUDIO_FORMAT_MP3 -> "mp3"
-        AudioFormat.AUDIO_FORMAT_OPUS -> "opus"
-        AudioFormat.AUDIO_FORMAT_AAC -> "aac"
-        AudioFormat.AUDIO_FORMAT_FLAC -> "flac"
-        AudioFormat.AUDIO_FORMAT_OGG -> "ogg"
-        AudioFormat.AUDIO_FORMAT_M4A -> "m4a"
-        AudioFormat.AUDIO_FORMAT_PCM_S16LE -> "pcm_s16le"
-        AudioFormat.AUDIO_FORMAT_UNSPECIFIED -> "unspecified"
-    }
+    get() =
+        when (this) {
+            AudioFormat.AUDIO_FORMAT_PCM -> "pcm"
+            AudioFormat.AUDIO_FORMAT_WAV -> "wav"
+            AudioFormat.AUDIO_FORMAT_MP3 -> "mp3"
+            AudioFormat.AUDIO_FORMAT_OPUS -> "opus"
+            AudioFormat.AUDIO_FORMAT_AAC -> "aac"
+            AudioFormat.AUDIO_FORMAT_FLAC -> "flac"
+            AudioFormat.AUDIO_FORMAT_OGG -> "ogg"
+            AudioFormat.AUDIO_FORMAT_M4A -> "m4a"
+            AudioFormat.AUDIO_FORMAT_PCM_S16LE -> "pcm_s16le"
+            AudioFormat.AUDIO_FORMAT_UNSPECIFIED -> "unspecified"
+        }
 
 /**
  * Parse a lowercase short-name string back into the proto enum.

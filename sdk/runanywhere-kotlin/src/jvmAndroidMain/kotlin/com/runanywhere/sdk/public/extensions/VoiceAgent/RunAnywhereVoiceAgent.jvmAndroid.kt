@@ -14,10 +14,11 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VoiceAgentConfig
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
@@ -85,6 +86,20 @@ actual suspend fun RunAnywhere.cleanupVoiceAgent() {
     // Match Swift: cleanup voice-agent handle + reset flag.
     voiceAgentInitialized = false
     CppBridgeVoiceAgent.destroy()
+}
+
+actual suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult {
+    // Mirror Swift RunAnywhere+VoiceAgent.processVoiceTurn(_:) one-for-one:
+    //   try await ensureServicesReady()
+    //   guard isInitialized else { throw .notInitialized("voiceagent") }
+    //   guard await CppBridge.VoiceAgent.shared.isReady else { throw .invalidState(...) }
+    //   return try await CppBridge.VoiceAgent.shared.processVoiceTurnProto(audioData)
+    ensureServicesReady()
+    if (!isInitialized) throw SDKException.notInitialized("voiceagent")
+    if (!CppBridgeVoiceAgent.isReady()) {
+        throw SDKException.invalidState("VoiceAgent not initialized")
+    }
+    return CppBridgeVoiceAgent.processVoiceTurnProto(audioData)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

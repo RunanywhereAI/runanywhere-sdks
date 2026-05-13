@@ -32,18 +32,19 @@ fun TTSConfiguration.Companion.defaults(
     modelId: String = "",
     voice: String = "default",
     languageCode: String = "en-US",
-): TTSConfiguration = TTSConfiguration(
-    model_id = modelId,
-    voice = voice,
-    language_code = languageCode,
-    speaking_rate = 1.0f,
-    pitch = 1.0f,
-    volume = 1.0f,
-    audio_format = AudioFormat.AUDIO_FORMAT_PCM,
-    sample_rate = 22_050,
-    enable_neural_voice = true,
-    enable_ssml = false,
-)
+): TTSConfiguration =
+    TTSConfiguration(
+        model_id = modelId,
+        voice = voice,
+        language_code = languageCode,
+        speaking_rate = 1.0f,
+        pitch = 1.0f,
+        volume = 1.0f,
+        audio_format = AudioFormat.AUDIO_FORMAT_PCM,
+        sample_rate = 22_050,
+        enable_neural_voice = true,
+        enable_ssml = false,
+    )
 
 /**
  * Validate this configuration. Throws [SDKException] on out-of-range values.
@@ -74,15 +75,16 @@ fun TTSConfiguration.validate() {
 /**
  * Default TTS runtime options. Mirrors Swift `RATTSOptions.defaults()`.
  */
-fun TTSOptions.Companion.defaults(): RATTSOptions = RATTSOptions(
-    language_code = "en-US",
-    speaking_rate = 1.0f,
-    pitch = 1.0f,
-    volume = 1.0f,
-    enable_ssml = false,
-    audio_format = AudioFormat.AUDIO_FORMAT_PCM,
-    sample_rate = 22_050,
-)
+fun TTSOptions.Companion.defaults(): RATTSOptions =
+    RATTSOptions(
+        language_code = "en-US",
+        speaking_rate = 1.0f,
+        pitch = 1.0f,
+        volume = 1.0f,
+        enable_ssml = false,
+        audio_format = AudioFormat.AUDIO_FORMAT_PCM,
+        sample_rate = 22_050,
+    )
 
 // MARK: - TTSPhonemeTimestamp
 
@@ -94,11 +96,12 @@ fun TTSPhonemeTimestamp.Companion.create(
     phoneme: String,
     startTime: Double,
     endTime: Double,
-): TTSPhonemeTimestamp = TTSPhonemeTimestamp(
-    phoneme = phoneme,
-    start_ms = (startTime * 1000.0).toLong(),
-    end_ms = (endTime * 1000.0).toLong(),
-)
+): TTSPhonemeTimestamp =
+    TTSPhonemeTimestamp(
+        phoneme = phoneme,
+        start_ms = (startTime * 1000.0).toLong(),
+        end_ms = (endTime * 1000.0).toLong(),
+    )
 
 /** Start time in seconds. */
 val TTSPhonemeTimestamp.startTime: Double
@@ -138,18 +141,20 @@ val RATTSOutput.timestampEpochMs: Long
  * Construct a [TTSSpeakResult] copying audio metadata from a [TTSOutput].
  * Mirrors Swift's `RATTSSpeakResult(output:)`.
  */
-fun TTSSpeakResult.Companion.fromOutput(output: RATTSOutput): TTSSpeakResult = TTSSpeakResult(
-    audio_format = output.audio_format,
-    sample_rate = output.sample_rate,
-    duration_ms = output.duration_ms,
-    audio_size_bytes = if (output.audio_size_bytes > 0L) {
-        output.audio_size_bytes
-    } else {
-        output.audio_data.size.toLong()
-    },
-    metadata = output.metadata,
-    timestamp_ms = output.timestamp_ms,
-)
+fun TTSSpeakResult.Companion.fromOutput(output: RATTSOutput): TTSSpeakResult =
+    TTSSpeakResult(
+        audio_format = output.audio_format,
+        sample_rate = output.sample_rate,
+        duration_ms = output.duration_ms,
+        audio_size_bytes =
+            if (output.audio_size_bytes > 0L) {
+                output.audio_size_bytes
+            } else {
+                output.audio_data.size.toLong()
+            },
+        metadata = output.metadata,
+        timestamp_ms = output.timestamp_ms,
+    )
 
 /** Audio duration in seconds. */
 val TTSSpeakResult.duration: Double

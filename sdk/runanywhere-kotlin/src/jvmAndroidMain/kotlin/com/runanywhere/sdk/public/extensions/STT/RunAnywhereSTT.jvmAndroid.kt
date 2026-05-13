@@ -45,9 +45,10 @@ actual suspend fun RunAnywhere.transcribe(
     // Query ModelLifecycle instead of CppBridgeSTT's own handle — those
     // handles are separate, and the one loaded by `RunAnywhere.loadModel()`
     // is the lifecycle's, not the bridge actor's.
-    val current = currentModel(
-        CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
-    )
+    val current =
+        currentModel(
+            CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+        )
     if (!current.found) {
         throw SDKException.modelNotLoaded()
     }
@@ -71,9 +72,10 @@ actual fun RunAnywhere.transcribeStream(
         }
         ensureServicesReady()
 
-        val current = currentModel(
-            CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
-        )
+        val current =
+            currentModel(
+                CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+            )
         if (!current.found) {
             // Mirror Swift's `continuation.finish()` early-exit when no STT
             // model is loaded.
@@ -105,7 +107,9 @@ actual fun RunAnywhere.transcribeStream(
                                     val partial = event.partial
                                     if (partial != null) {
                                         trySend(partial).isSuccess
-                                    } else true
+                                    } else {
+                                        true
+                                    }
                                 }
                                 STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL -> {
                                     val basis = event.partial ?: RASTTPartialResult()

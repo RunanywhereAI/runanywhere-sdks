@@ -55,7 +55,8 @@ actual suspend fun RunAnywhere.generateWithTools(
     val effectiveToolOptions =
         toolOptions
             ?: options?.tool_calling
-            ?: options.toToolCallingOptions()
+            ?: options
+                .toToolCallingOptions()
                 .takeIf { options != null }
             ?: RAToolCallingOptions.defaults()
     return ToolCallingOrchestrator.generateWithTools(prompt, effectiveToolOptions)

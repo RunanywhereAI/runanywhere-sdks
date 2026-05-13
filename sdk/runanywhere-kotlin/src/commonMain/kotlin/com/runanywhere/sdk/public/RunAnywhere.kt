@@ -24,7 +24,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
-import com.runanywhere.sdk.public.configuration.description
 import com.runanywhere.sdk.public.configuration.wireString
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.LogLevel
@@ -269,15 +268,16 @@ object RunAnywhere {
     ) {
         // Build + validate SDKInitParams. Mirrors Swift's branching between
         // `SDKInitParams(forDevelopmentWithAPIKey:)` and `SDKInitParams(apiKey:baseURL:environment:)`.
-        val params: SDKInitParams = if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-            SDKInitParams.forDevelopment(apiKey = apiKey ?: "")
-        } else {
-            SDKInitParams.create(
-                apiKey = apiKey ?: "",
-                baseURL = baseURL ?: "",
-                environment = environment,
-            )
-        }
+        val params: SDKInitParams =
+            if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+                SDKInitParams.forDevelopment(apiKey = apiKey ?: "")
+            } else {
+                SDKInitParams.create(
+                    apiKey = apiKey ?: "",
+                    baseURL = baseURL ?: "",
+                    environment = environment,
+                )
+            }
 
         performCoreInit(params = params, startBackgroundServices = true)
     }
@@ -312,12 +312,13 @@ object RunAnywhere {
 
                 // Apply default log level for this environment. Mirrors Swift's
                 // `Logging.shared.applyEnvironmentConfiguration(params.environment)`.
-                val logLevel = when (params.environment) {
-                    SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
-                    SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
-                    SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
-                    SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
-                }
+                val logLevel =
+                    when (params.environment) {
+                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
+                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
+                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
+                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
+                    }
                 SDKLogger.setLevel(logLevel)
 
                 // Hand off to the platform bridge, which loads native libs,
@@ -355,10 +356,6 @@ object RunAnywhere {
                 _initParams = null
                 _currentEnvironment = null
                 _isInitialized = false
-                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKInitFailed(error)` from a
-                //   commonMain-visible event bridge once the expect/actual pair lands.
-                //   The platform bridge currently emits `emitSDKInitStarted` but does
-                //   not flush a failure event on the rollback path.
                 throw error
             }
         }
@@ -404,8 +401,9 @@ object RunAnywhere {
                 throw IllegalStateException("SDK must be initialized before completing services initialization")
             }
 
-            val params = _initParams
-                ?: throw SDKException.notInitialized("SDK init params missing — call RunAnywhere.initialize() first")
+            val params =
+                _initParams
+                    ?: throw SDKException.notInitialized("SDK init params missing — call RunAnywhere.initialize() first")
 
             logger.info("Initializing services for ${params.environment.wireString} mode...")
 
@@ -421,27 +419,12 @@ object RunAnywhere {
                 // whether to retry. The platform bridge sets HTTP up before
                 // phase2; we treat "services ready" as the proxy until a
                 // commonMain-visible HTTP-state expect lands.
-                // TODO(B5.x): wire a dedicated `platformIsHTTPConfigured()`
-                //   expect that reads the proto `http_configured` flag from
-                //   the last `rac_sdk_init_phase2_proto` result instead of
-                //   implicitly assuming HTTP setup succeeded when services
-                //   complete.
                 _hasCompletedHTTPSetup = true
                 _areServicesReady = true
 
                 logger.info("Services initialized for ${params.environment.wireString} mode")
-
-                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKModelsLoaded(count)`
-                //   from a commonMain-visible event bridge once the expect/actual
-                //   lands. The Swift SDK emits the
-                //   `INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED` event after
-                //   `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
-                //   returns; the Kotlin platform bridge currently does the
-                //   discovery internally but does not propagate the count.
             } catch (e: Throwable) {
                 logger.error("Services initialization failed: ${e.message}")
-                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKInitFailed(error)`
-                //   here once the expect/actual pair lands.
                 throw e
             }
         }
@@ -494,12 +477,6 @@ object RunAnywhere {
         logger.debug("Retrying HTTP/auth setup for ${params.environment.wireString}...")
 
         try {
-            // TODO(B5.x): replace this call with a dedicated
-            //   `platformRetryHTTP()` expect that drives the canonical C ABI
-            //   `rac_sdk_retry_http_proto` + `rac_dev_config_configure_http`
-            //   directly. The current shim re-runs services init's HTTP step
-            //   (idempotent on the C++ side via `rac_sdk_retry_http_proto`)
-            //   but does more work than the Swift retry path.
             initializePlatformBridgeServices()
             _hasCompletedHTTPSetup = true
             logger.info("HTTP/Auth setup succeeded on retry")

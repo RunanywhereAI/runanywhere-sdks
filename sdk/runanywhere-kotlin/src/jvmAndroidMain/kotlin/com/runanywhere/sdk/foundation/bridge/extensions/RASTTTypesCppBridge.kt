@@ -40,22 +40,23 @@ val STTConfiguration.modelIdOrNull: String?
  * Returns "en" for `UNSPECIFIED` / unknown to match Swift's fallback.
  */
 val RASTTOptions.languageString: String
-    get() = when (language) {
-        STTLanguage.STT_LANGUAGE_AUTO -> "auto"
-        STTLanguage.STT_LANGUAGE_EN -> "en"
-        STTLanguage.STT_LANGUAGE_ES -> "es"
-        STTLanguage.STT_LANGUAGE_FR -> "fr"
-        STTLanguage.STT_LANGUAGE_DE -> "de"
-        STTLanguage.STT_LANGUAGE_ZH -> "zh"
-        STTLanguage.STT_LANGUAGE_JA -> "ja"
-        STTLanguage.STT_LANGUAGE_KO -> "ko"
-        STTLanguage.STT_LANGUAGE_IT -> "it"
-        STTLanguage.STT_LANGUAGE_PT -> "pt"
-        STTLanguage.STT_LANGUAGE_AR -> "ar"
-        STTLanguage.STT_LANGUAGE_RU -> "ru"
-        STTLanguage.STT_LANGUAGE_HI -> "hi"
-        STTLanguage.STT_LANGUAGE_UNSPECIFIED -> "en"
-    }
+    get() =
+        when (language) {
+            STTLanguage.STT_LANGUAGE_AUTO -> "auto"
+            STTLanguage.STT_LANGUAGE_EN -> "en"
+            STTLanguage.STT_LANGUAGE_ES -> "es"
+            STTLanguage.STT_LANGUAGE_FR -> "fr"
+            STTLanguage.STT_LANGUAGE_DE -> "de"
+            STTLanguage.STT_LANGUAGE_ZH -> "zh"
+            STTLanguage.STT_LANGUAGE_JA -> "ja"
+            STTLanguage.STT_LANGUAGE_KO -> "ko"
+            STTLanguage.STT_LANGUAGE_IT -> "it"
+            STTLanguage.STT_LANGUAGE_PT -> "pt"
+            STTLanguage.STT_LANGUAGE_AR -> "ar"
+            STTLanguage.STT_LANGUAGE_RU -> "ru"
+            STTLanguage.STT_LANGUAGE_HI -> "hi"
+            STTLanguage.STT_LANGUAGE_UNSPECIFIED -> "en"
+        }
 
 /**
  * Parse a free-form language tag into the canonical `STTLanguage` enum.

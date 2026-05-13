@@ -55,6 +55,7 @@ namespace margelo::nitro::runanywhere {
     public:
       // Methods
       virtual std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> completeServicesInitialization() = 0;
       virtual std::shared_ptr<Promise<void>> destroy() = 0;
       virtual std::shared_ptr<Promise<bool>> isInitialized() = 0;
       virtual std::shared_ptr<Promise<std::string>> getBackendInfo() = 0;

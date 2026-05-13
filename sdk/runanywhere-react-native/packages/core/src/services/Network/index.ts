@@ -1,9 +1,9 @@
 /**
  * Network Services
  *
- * HTTP transport is implemented entirely in native C++ (libcurl via
- * rac_http_client_*). This module only exposes the high-level configuration
- * types and telemetry facade the TypeScript layer still owns.
+ * HTTP transport, telemetry, authentication, and device registration are
+ * implemented in native commons. This module only exposes configuration
+ * value helpers for TypeScript call sites.
  */
 
 export {
@@ -21,8 +21,3 @@ export {
   SDKEnvironment,
 } from './NetworkConfiguration';
 export type { NetworkConfig } from './NetworkConfiguration';
-
-export { APIEndpoints } from './APIEndpoints';
-export type { APIEndpointKey, APIEndpointValue } from './APIEndpoints';
-
-export { TelemetryService, TelemetryCategory } from './TelemetryService';
