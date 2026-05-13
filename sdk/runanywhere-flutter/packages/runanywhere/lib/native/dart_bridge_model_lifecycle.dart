@@ -1,8 +1,6 @@
 // ignore_for_file: avoid_classes_with_only_static_members
 
 import 'dart:ffi';
-import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
@@ -19,6 +17,18 @@ import 'package:runanywhere/native/types/basic_types.dart';
 /// This is the Flutter binding for `rac_model_lifecycle_*_proto` and keeps the
 /// live model lifecycle truth in commons instead of mirroring component state in
 /// Dart maps or DTOs.
+///
+/// **Wave-H note (2026-05-12)**: `load()` runs the C++ call on the main Dart
+/// isolate — earlier Wave-G `Isolate.run` wrap caused universal model-load
+/// SIGABRTs on both Android (FLUTTER-ANDROID-004) and iOS (FLUTTER-IOS-009)
+/// because `model_lifecycle.cpp` publishes events via Dart-side
+/// `NativeCallable` that's registered on the main isolate; calling it from
+/// a worker isolate trips Dart 3.10's `DLRT_GetFfiCallbackMetadata` assert.
+/// The pre-Wave-G `FLUTTER-IOS-003` Piper-on-iOS crash may recur; track
+/// separately. Long-term fix is commons-side: either (a) queue events
+/// instead of publishing synchronously during load, or (b) ensure the Dart
+/// SDK event-publish callback uses `NativeCallable.listener` (cross-isolate
+/// safe) rather than `isolateLocal`.
 class DartBridgeModelLifecycle {
   DartBridgeModelLifecycle._();
 
@@ -50,55 +60,52 @@ class DartBridgeModelLifecycle {
       );
     }
 
-    // Loading a model is a blocking C++ call that may take 100ms-30s
-    // depending on backend (e.g. Sherpa Piper TTS initializes espeak-ng
-    // and large ONNX graphs synchronously). Run it on a helper isolate so
-    // the main isolate stays responsive — matches the Swift SDK's
-    // DispatchQueue.global() and Kotlin's withContext(Dispatchers.IO).
-    // Native pointers are address-stable across isolates in the same
-    // process; we marshal them as integers via _LifecycleLoadSpec.
-    final spec = _LifecycleLoadSpec(
-      registryAddr: registry.address,
-      requestBytes: request.writeToBuffer(),
-    );
-    _LifecycleLoadResult outcome;
+    // Main-isolate FFI call (Wave H — reverts Wave-G `Isolate.run` wrap).
+    // See class-level note: cross-isolate event publish from
+    // `model_lifecycle.cpp` is unsafe with Dart 3.10's stricter callback
+    // metadata checks. We accept the main-isolate cost (≤30s for Piper /
+    // Sherpa init) until commons routes event publishes through
+    // `NativeCallable.listener` instead of `isolateLocal`.
+    final bytes = request.writeToBuffer();
+    final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
     try {
-      outcome = await Isolate.run<_LifecycleLoadResult>(
-        () => _loadBlocking(spec),
-      );
+      if (bytes.isNotEmpty) {
+        requestPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(registry, requestPtr, bytes.length, out);
+      if (code != RacResultCode.success ||
+          out.ref.status != RacResultCode.success) {
+        _logger.debug(
+          'rac_model_lifecycle_load_proto failed: '
+          '${_protoBufferError(out, code)}',
+        );
+        return model_pb.ModelLoadResult(
+          success: false,
+          modelId: request.modelId,
+          category: request.category,
+          framework: request.framework,
+          errorMessage: _protoBufferError(out, code),
+        );
+      }
+      return _decodeBuffer(out, model_pb.ModelLoadResult.fromBuffer);
     } catch (e) {
-      _logger.debug('rac_model_lifecycle_load_proto isolate error: $e');
+      _logger.debug('rac_model_lifecycle_load_proto error: $e');
       return model_pb.ModelLoadResult(
         success: false,
         modelId: request.modelId,
         category: request.category,
         framework: request.framework,
-        errorMessage: 'rac_model_lifecycle_load_proto isolate error: $e',
+        errorMessage: 'rac_model_lifecycle_load_proto threw: $e',
       );
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
     }
-
-    if (outcome.resultBytes != null && outcome.resultBytes!.isNotEmpty) {
-      try {
-        return model_pb.ModelLoadResult.fromBuffer(outcome.resultBytes!);
-      } catch (e) {
-        _logger.debug('rac_model_lifecycle_load_proto decode error: $e');
-      }
-    }
-
-    if (outcome.errorMessage != null) {
-      _logger.debug(
-        'rac_model_lifecycle_load_proto failed: ${outcome.errorMessage}',
-      );
-    }
-
-    return model_pb.ModelLoadResult(
-      success: false,
-      modelId: request.modelId,
-      category: request.category,
-      framework: request.framework,
-      errorMessage:
-          outcome.errorMessage ?? 'Model lifecycle load returned no result',
-    );
   }
 
   Future<model_pb.ModelUnloadResult> unload(
@@ -237,94 +244,3 @@ class DartBridgeModelLifecycle {
   }
 }
 
-// ============================================================================
-// Helper isolate worker for `rac_model_lifecycle_load_proto`.
-//
-// Model load is a blocking C++ call (e.g. Sherpa Piper TTS initializes
-// espeak-ng + large ONNX graphs synchronously, taking hundreds of
-// milliseconds to seconds). Running it on the main Dart isolate freezes
-// the UI and — on iOS — has been observed to trigger silent termination
-// on the iOS simulator when the underlying sherpa-onnx static initializer
-// blows the smaller main-isolate stack. Wrapping the FFI call in
-// `Isolate.run` mirrors the established SDK pattern (HttpClientAdapter,
-// LLM generate, TTS synthesize) and matches Swift's
-// DispatchQueue.global() / Kotlin's withContext(Dispatchers.IO).
-//
-// Native pointers are address-stable across isolates in the same OS
-// process; we marshal them as integers. `RacNative.bindings` is a Meyers
-// singleton — on the worker isolate it re-resolves against the same
-// shared library (DynamicLibrary.process() on iOS,
-// DynamicLibrary.open('librac_commons.so') on Android), which is also
-// safe because the underlying C++ state is process-global.
-// ============================================================================
-
-class _LifecycleLoadSpec {
-  const _LifecycleLoadSpec({
-    required this.registryAddr,
-    required this.requestBytes,
-  });
-
-  final int registryAddr;
-  final Uint8List requestBytes;
-}
-
-class _LifecycleLoadResult {
-  const _LifecycleLoadResult({
-    required this.code,
-    this.resultBytes,
-    this.errorMessage,
-  });
-
-  final int code;
-  final Uint8List? resultBytes;
-  final String? errorMessage;
-}
-
-_LifecycleLoadResult _loadBlocking(_LifecycleLoadSpec spec) {
-  final bindings = RacNative.bindings;
-  final fn = bindings.rac_model_lifecycle_load_proto;
-  if (fn == null) {
-    return const _LifecycleLoadResult(
-      code: RacResultCode.errorFeatureNotAvailable,
-      errorMessage: 'rac_model_lifecycle_load_proto is unavailable',
-    );
-  }
-
-  final RacHandle registry = Pointer<Void>.fromAddress(spec.registryAddr);
-  final bytes = spec.requestBytes;
-  final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
-  final out = calloc<RacProtoBuffer>();
-  try {
-    if (bytes.isNotEmpty) {
-      requestPtr.asTypedList(bytes.length).setAll(0, bytes);
-    }
-    bindings.rac_proto_buffer_init(out);
-    final code = fn(registry, requestPtr, bytes.length, out);
-    final hasBuffer = out.ref.data != nullptr && out.ref.size > 0;
-    final bufferBytes = hasBuffer
-        ? Uint8List.fromList(out.ref.data.asTypedList(out.ref.size))
-        : null;
-    if (code != RacResultCode.success ||
-        out.ref.status != RacResultCode.success) {
-      String? message;
-      if (out.ref.errorMessage != nullptr) {
-        message = out.ref.errorMessage.toDartString();
-      }
-      return _LifecycleLoadResult(
-        code: code,
-        resultBytes: bufferBytes,
-        errorMessage: message ?? 'code=$code status=${out.ref.status}',
-      );
-    }
-    return _LifecycleLoadResult(code: code, resultBytes: bufferBytes);
-  } catch (e) {
-    return _LifecycleLoadResult(
-      code: RacResultCode.errorInternal,
-      errorMessage: 'rac_model_lifecycle_load_proto threw: $e',
-    );
-  } finally {
-    bindings.rac_proto_buffer_free(out);
-    calloc.free(requestPtr);
-    calloc.free(out);
-  }
-}
