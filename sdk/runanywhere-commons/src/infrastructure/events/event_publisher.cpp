@@ -219,12 +219,14 @@ void populate_error(runanywhere::v1::SDKError* error, rac_result_t code, const c
                     bool retryable = false) {
     const int32_t c_code = static_cast<int32_t>(code);
     const int32_t abs_code = c_code < 0 ? -c_code : c_code;
-    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): proto enum range
-    // is validated by the protobuf reflection layer; abs_code is normalized from
-    // rac_result_t and may legitimately exceed declared enum values for forward compat.
+    // proto enum range is validated by the protobuf reflection layer; abs_code is
+    // normalized from rac_result_t and may legitimately exceed declared enum values
+    // for forward compat.
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
     error->set_category(error_category_for_code(code));
-    error->set_message(message != nullptr && message[0] != '\0' ? message : rac_error_message(code));
+    error->set_message(message != nullptr && message[0] != '\0' ? message
+                                                                : rac_error_message(code));
     error->set_c_abi_code(c_code);
     error->set_timestamp_ms(static_cast<int64_t>(current_time_ms()));
     error->set_severity(severity);

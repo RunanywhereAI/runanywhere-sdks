@@ -16,6 +16,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <exception>
 #include <thread>
 #include <vector>
 
@@ -171,12 +172,20 @@ TEST(external_cancel_unblocks_run) {
 }
 
 int main() {
-    run_test_rejects_invalid_input();
-    run_test_rejects_null_agent();
-    run_test_cancel_is_idempotent_when_idle();
-    run_test_error_propagates_through_pipeline();
-    run_test_external_cancel_unblocks_run();
+    try {
+        run_test_rejects_invalid_input();
+        run_test_rejects_null_agent();
+        run_test_cancel_is_idempotent_when_idle();
+        run_test_error_propagates_through_pipeline();
+        run_test_external_cancel_unblocks_run();
 
-    std::fprintf(stderr, "\n%d passed, %d failed\n", g_passed, g_failed);
-    return g_failed == 0 ? 0 : 1;
+        std::fprintf(stderr, "\n%d passed, %d failed\n", g_passed, g_failed);
+        return g_failed == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "FATAL: unknown exception\n");
+        return 1;
+    }
 }

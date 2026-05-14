@@ -42,7 +42,7 @@ static std::string json_escape(const char* value) {
     std::string out;
     if (!value)
         return out;
-    for (const char* p = value; *p; ++p) {
+    for (const char* p = value; *p != '\0'; ++p) {
         switch (*p) {
             case '\\':
                 out += "\\\\";
@@ -123,7 +123,7 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
             }
             if (resolution.mmproj_path) {
                 config_json_owned =
-                    "{\"mmproj_path\":\"" + json_escape(resolution.mmproj_path) + "\"}";
+                    R"({"mmproj_path":")" + json_escape(resolution.mmproj_path) + R"("})";
             }
         }
         rac_model_path_resolution_free(&resolution);

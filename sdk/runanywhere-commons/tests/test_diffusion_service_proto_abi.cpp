@@ -19,11 +19,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -46,7 +46,8 @@ int test_diffusion_generated_service_contract() {
               "Generate accepts DiffusionGenerationRequest");
         CHECK(generate->output_type()->full_name() == "runanywhere.v1.DiffusionResult",
               "Generate returns DiffusionResult");
-        CHECK(!generate->client_streaming() && !generate->server_streaming(), "Generate is unary");
+        CHECK(!(generate->client_streaming() || generate->server_streaming()),
+              "Generate is unary");
     }
 
     const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
@@ -56,8 +57,8 @@ int test_diffusion_generated_service_contract() {
               "Stream accepts DiffusionGenerationRequest");
         CHECK(stream->output_type()->full_name() == "runanywhere.v1.DiffusionStreamEvent",
               "Stream returns DiffusionStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
+        CHECK(!stream->client_streaming(), "Stream is not client-streaming");
+        CHECK(stream->server_streaming(), "Stream is server-streaming");
     }
 
     const google::protobuf::Descriptor* request =

@@ -33,8 +33,7 @@
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"
 
-namespace rac {
-namespace http {
+namespace rac::http {
 
 /**
  * @brief Blocking HTTP request/response.
@@ -95,5 +94,4 @@ rac_http_download_status_t execute_stream(const rac_http_download_request_t& req
                                           rac_http_download_progress_fn progress_cb,
                                           void* progress_user_data, int32_t* out_http_status);
 
-}  // namespace http
-}  // namespace rac
+}  // namespace rac::http

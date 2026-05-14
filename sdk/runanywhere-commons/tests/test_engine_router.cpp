@@ -32,15 +32,15 @@ namespace {
 const int k_sentinel = 0xCAFE;
 
 /* Build a vtable with the given metadata (helper). */
-rac_result_t backend_unavailable_capability_check(void) {
+rac_result_t backend_unavailable_capability_check() {
     return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
-rac_result_t runtime_ok_init(void) {
+rac_result_t runtime_ok_init() {
     return RAC_SUCCESS;
 }
 
-void runtime_noop_destroy(void) {}
+void runtime_noop_destroy() {}
 
 const rac_runtime_vtable_v2_t k_noop_runtime_v2 = {
     /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
@@ -78,7 +78,7 @@ rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name,
 
 rac_engine_vtable_t make_vt(const char* name, int32_t priority, const rac_runtime_id_t* rts,
                             size_t rts_n, const uint32_t* fmts, size_t fmts_n,
-                            rac_result_t (*capability_check)(void) = nullptr) {
+                            rac_result_t (*capability_check)() = nullptr) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
     v.metadata.name = name;

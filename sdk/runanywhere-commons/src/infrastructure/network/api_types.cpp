@@ -63,7 +63,7 @@ void rac_telemetry_response_free(rac_telemetry_response_t* response) {
         for (size_t i = 0; i < response->error_count; i++) {
             free(response->errors[i]);
         }
-        free(response->errors);
+        free(static_cast<void*>(response->errors));
     }
     free(response->storage_version);
     memset(response, 0, sizeof(*response));
@@ -86,7 +86,7 @@ void rac_api_error_free(rac_api_error_t* error) {
 // Escape string for JSON
 static void json_escape_string(const char* src, char* dst, size_t dst_size) {
     size_t di = 0;
-    for (const char* s = src; *s && di < dst_size - 1; s++) {
+    for (const char* s = src; *s != '\0' && di < dst_size - 1; s++) {
         switch (*s) {
             case '"':
                 if (di + 2 < dst_size) {
@@ -136,7 +136,7 @@ static int json_add_string(char* buf, size_t buf_size, size_t* pos, const char* 
     json_escape_string(value, escaped, sizeof(escaped));
 
     int written =
-        snprintf(buf + *pos, buf_size - *pos, "%s\"%s\":\"%s\"", comma ? "," : "", key, escaped);
+        snprintf(buf + *pos, buf_size - *pos, R"(%s"%s":"%s")", comma ? "," : "", key, escaped);
     if (written < 0 || (size_t)written >= buf_size - *pos)
         return -1;
     *pos += written;
@@ -194,7 +194,7 @@ static const char* json_find_value(const char* json, const char* key) {
 
     // Skip past key and colon
     found += strlen(search);
-    while (*found && (*found == ' ' || *found == ':'))
+    while (*found != '\0' && (*found == ' ' || *found == ':'))
         found++;
 
     return found;
@@ -210,8 +210,8 @@ static char* json_extract_string(const char* json, const char* key) {
 
     // Find end quote (simple - doesn't handle all escapes)
     const char* end = value;
-    while (*end && *end != '"') {
-        if (*end == '\\' && *(end + 1))
+    while (*end != '\0' && *end != '"') {
+        if (*end == '\\' && *(end + 1) != '\0')
             end += 2;
         else
             end++;

@@ -1,6 +1,6 @@
 #include "rac/core/rac_error_model.h"
 
-#include <string.h>
+#include <cstring>
 
 #include "rac/core/rac_error.h"
 

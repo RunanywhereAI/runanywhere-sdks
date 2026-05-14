@@ -75,7 +75,7 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t handle,
         g_slots().erase(handle);
     } else {
         // Always start with seq = 0 for a fresh session.
-        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
+        g_slots()[handle] = CallbackSlot{.fn = callback, .user_data = user_data, .seq = 0};
     }
     return RAC_SUCCESS;
 }

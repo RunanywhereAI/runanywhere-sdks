@@ -171,12 +171,14 @@ static jmethodID g_method_now_ms = nullptr;
 // JNI OnLoad/OnUnload
 // =============================================================================
 
+// NOLINTNEXTLINE(misc-unused-parameters): `reserved` is part of the JNI ABI.
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     LOGi("JNI_OnLoad: runanywhere_commons_jni loaded");
     g_jvm = vm;
     return JNI_VERSION_1_6;
 }
 
+// NOLINTNEXTLINE(misc-unused-parameters): `vm`/`reserved` are part of the JNI ABI.
 JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
     LOGi("JNI_OnUnload: runanywhere_commons_jni unloading");
 
@@ -195,6 +197,10 @@ JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
 // Helper Functions
 // =============================================================================
 
+// Helpers below share the same JNI patterns documented at the extern "C"
+// block lower in this file: jboolean -> bool implicit conversion when
+// checking JNI status flags, and jlong <-> opaque pointer round-trips.
+// NOLINTBEGIN(readability-implicit-bool-conversion,performance-no-int-to-ptr)
 static JNIEnv* getJNIEnv() {
     if (g_jvm == nullptr)
         return nullptr;
@@ -544,6 +550,14 @@ static jbyteArray makeFeatureUnavailableResult(JNIEnv* env, const char* operatio
 // Forward declaration of the adapter struct
 static rac_platform_adapter_t g_c_adapter;
 
+// End the helper-region NOLINT before the platform-adapter callbacks reopen it
+// with the misc-unused-parameters check added.
+// NOLINTEND(readability-implicit-bool-conversion,performance-no-int-to-ptr)
+
+// The callback signatures below come from rac_platform_adapter_t. Many of the
+// JNI implementations don't need the user_data hand-off because they retrieve
+// state via JVM globals; the unused parameters are required by the C ABI.
+// NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
@@ -716,11 +730,23 @@ static int64_t jni_now_ms_callback(void* user_data) {
 
     return env->CallLongMethod(g_platform_adapter, g_method_now_ms);
 }
+// NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 
 // =============================================================================
 // JNI FUNCTIONS - Core Initialization
 // =============================================================================
 
+// JNI thunks must accept JNIEnv*, jclass/jobject parameters to satisfy the
+// JNI calling convention. Many thunks ignore one or more of those — that is
+// by design and not a bug. We also intentionally:
+//   * Convert jboolean (unsigned char) to bool implicitly when checking JNI
+//     status flags (e.g., `env->ExceptionCheck() ? nullptr : result`); JNI's
+//     C signatures use jboolean throughout so an explicit cast at every site
+//     would only add noise.
+//   * Cast jlong handles to opaque pointers via reinterpret_cast — that is
+//     the canonical JNI handle-passing idiom and the only way to round-trip
+//     a native handle through the JVM.
+// NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 extern "C" {
 
 JNIEXPORT jint JNICALL
@@ -2459,6 +2485,8 @@ static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
     for (size_t i = 0; i < count; i++) {
         std::free(entries[i]);
     }
+    // free() takes void*; the multilevel cast is intentional.
+    // NOLINTNEXTLINE(bugprone-multi-level-implicit-pointer-conversion)
     std::free(entries);
 }
 
@@ -3265,7 +3293,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmGenerateStreamPro
         return RAC_ERROR_NULL_POINTER;
 
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racLlmGenerateStreamProto"};
+    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racLlmGenerateStreamProto"};
     rac_result_t rc = rac_llm_generate_stream_proto(
         request.u8(), request.size(), globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
@@ -3313,7 +3341,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeStreamL
     if (!req.ok)
         return RAC_ERROR_NULL_POINTER;
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racSttTranscribeStreamLifecycleProto"};
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racSttTranscribeStreamLifecycleProto"};
     rac_result_t rc = rac_stt_transcribe_stream_lifecycle_proto(
         req.u8(), req.size(), globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
@@ -3356,7 +3385,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeStreamL
     if (!req.ok)
         return RAC_ERROR_NULL_POINTER;
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racTtsSynthesizeStreamLifecycleProto"};
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racTtsSynthesizeStreamLifecycleProto"};
     rac_result_t rc = rac_tts_synthesize_stream_lifecycle_proto(
         req.u8(), req.size(), globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
@@ -3681,7 +3711,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessStreamProt
         return nullptr;
 
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racVlmProcessStreamProto"};
+    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racVlmProcessStreamProto"};
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_vlm_process_stream_proto(
@@ -3912,7 +3942,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGenerateWit
     if (handle == 0L || !options.ok)
         return nullptr;
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racDiffusionGenerateWithProgressProto"};
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racDiffusionGenerateWithProgressProto"};
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_diffusion_generate_with_progress_proto(
@@ -4296,7 +4327,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessTur
         return RAC_ERROR_NULL_POINTER;
 
     jobject globalListener = env->NewGlobalRef(listener);
-    ProtoListenerUserData ctx{globalListener, "racVoiceAgentProcessTurnProto"};
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racVoiceAgentProcessTurnProto"};
     rac_result_t rc = rac_voice_agent_process_turn_proto(
         reinterpret_cast<rac_voice_agent_handle_t>(handle), request.u8(), request.size(),
         reinterpret_cast<rac_voice_agent_turn_event_callback_fn>(proto_void_callback), &ctx);
@@ -4362,7 +4394,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCr
     // responsible for calling racToolCallingSessionDestroyProto to release
     // this global ref — see below.
     jobject globalListener = env->NewGlobalRef(listener);
-    auto* ctx = new ProtoListenerUserData{globalListener, "racToolCallingSessionCreateProto"};
+    auto* ctx = new ProtoListenerUserData{.listener = globalListener,
+                                          .operation = "racToolCallingSessionCreateProto"};
 
     uint64_t sessionHandle = 0;
     rac_result_t rc = rac_tool_calling_session_create_proto(
@@ -4979,7 +5012,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
         return RAC_ERROR_NULL_POINTER;
 
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racStructuredOutputGenerateStreamProto"};
+    ProtoListenerUserData ctx{.listener = globalListener,
+                              .operation = "racStructuredOutputGenerateStreamProto"};
     rac_result_t rc = rac_structured_output_generate_stream_proto(
         request.u8(), request.size(), globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
@@ -5485,6 +5519,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsExtractFra
     JNIEnv* env, jclass clazz, jstring path) {
     (void)clazz;
     std::string p = getCString(env, path);
+    // -1 sentinel: the extractor below populates `fw` with a valid value.
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     rac_inference_framework_t fw = static_cast<rac_inference_framework_t>(-1);
     if (rac_model_paths_extract_framework(p.c_str(), &fw) != RAC_SUCCESS) {
         return -1;
@@ -5821,6 +5857,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetBy
 }
 
 }  // extern "C"
+// NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 
 // =============================================================================
 // NOTE: Backend registration functions have been MOVED to their respective

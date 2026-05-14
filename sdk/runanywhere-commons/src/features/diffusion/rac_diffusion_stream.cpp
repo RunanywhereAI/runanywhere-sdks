@@ -88,7 +88,7 @@ rac_result_t rac_diffusion_set_stream_proto_callback(
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
+        g_slots()[handle] = CallbackSlot{.fn = callback, .user_data = user_data, .seq = 0};
     }
     return RAC_SUCCESS;
 }

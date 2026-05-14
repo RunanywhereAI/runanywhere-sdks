@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -37,11 +38,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -332,8 +333,8 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     rac_proto_buffer_init(&out);
     const rac_result_t rc = rac_llm_generate_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::LLMGenerationResult result;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
-          "generate returns parsable LLMGenerationResult");
+    CHECK(rc == RAC_SUCCESS, "generate returns success");
+    CHECK(parse_buffer(out, &result), "generate returns parsable LLMGenerationResult");
     CHECK(result.text() == "final {\"ok\":true}", "generate strips thinking from text");
     CHECK(result.thinking_content() == "plan", "generate extracts thinking content");
     CHECK(result.model_used() == "lifecycle.llm", "generate reports lifecycle model id");
@@ -429,8 +430,8 @@ int test_structured_generate_proto(rac_model_registry_handle_t registry) {
     rac_proto_buffer_init(&out);
     const rac_result_t rc = rac_structured_output_generate_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::StructuredOutputResult result;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
-          "structured generate returns parsable StructuredOutputResult");
+    CHECK(rc == RAC_SUCCESS, "structured generate returns success");
+    CHECK(parse_buffer(out, &result), "structured generate returns parsable StructuredOutputResult");
     CHECK(result.validation().is_valid(), "structured generate validates JSON");
     CHECK(result.parsed_json() == "{\"ok\":true}", "structured generate returns parsed JSON bytes");
     CHECK(result.error_code() == RAC_SUCCESS, "structured generate reports success code");
@@ -515,8 +516,8 @@ int test_cancel_stream(rac_model_registry_handle_t registry) {
     rac_proto_buffer_init(&cancel_event);
     const rac_result_t cancel_rc = rac_llm_cancel_proto(&cancel_event);
     runanywhere::v1::SDKEvent event;
-    CHECK(cancel_rc == RAC_SUCCESS && parse_buffer(cancel_event, &event),
-          "cancel returns parsable SDKEvent");
+    CHECK(cancel_rc == RAC_SUCCESS, "cancel returns success");
+    CHECK(parse_buffer(cancel_event, &event), "cancel returns parsable SDKEvent");
     CHECK(event.has_cancellation(), "cancel event carries CancellationEvent");
     CHECK(event.cancellation().kind() == runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
           "cancel event reports completion");
@@ -538,27 +539,35 @@ int test_cancel_stream(rac_model_registry_handle_t registry) {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_llm_proto_service\n");
+    try {
+        std::fprintf(stdout, "test_llm_proto_service\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: LLM proto service tests (no protobuf)\n");
-    return 0;
+        std::fprintf(stdout, "  skip: LLM proto service tests (no protobuf)\n");
+        return 0;
 #else
-    rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
-          "model registry creates");
+        rac_model_registry_handle_t registry = nullptr;
+        CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS,
+              "model registry create succeeds");
+        CHECK(registry != nullptr, "model registry handle is non-null");
 
-    test_request_parse_error();
-    test_missing_lifecycle_model();
-    test_mocked_generation(registry);
-    test_stream_terminal_once(registry);
-    test_stream_thinking_envelope(registry);
-    test_structured_generate_proto(registry);
-    test_structured_stream_proto(registry);
-    test_cancel_stream(registry);
+        test_request_parse_error();
+        test_missing_lifecycle_model();
+        test_mocked_generation(registry);
+        test_stream_terminal_once(registry);
+        test_stream_thinking_envelope(registry);
+        test_structured_generate_proto(registry);
+        test_structured_stream_proto(registry);
+        test_cancel_stream(registry);
 
-    cleanup_environment();
-    rac_model_registry_destroy(registry);
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        cleanup_environment();
+        rac_model_registry_destroy(registry);
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

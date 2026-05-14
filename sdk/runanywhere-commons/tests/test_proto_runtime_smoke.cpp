@@ -96,8 +96,8 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
 
 int test_registry_list_proto_is_active() {
     rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
-          "registry creates");
+    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS, "registry creates");
+    CHECK(registry != nullptr, "registry handle is non-null");
 
     uint8_t* bytes = nullptr;
     size_t size = 0;
@@ -125,10 +125,11 @@ int test_storage_info_proto_is_active() {
 
     rac_storage_analyzer_handle_t analyzer = nullptr;
     rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_storage_analyzer_create(&callbacks, &analyzer) == RAC_SUCCESS && analyzer != nullptr,
+    CHECK(rac_storage_analyzer_create(&callbacks, &analyzer) == RAC_SUCCESS,
           "storage analyzer creates");
-    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
-          "storage registry creates");
+    CHECK(analyzer != nullptr, "storage analyzer handle is non-null");
+    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS, "storage registry creates");
+    CHECK(registry != nullptr, "storage registry handle is non-null");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -370,20 +371,27 @@ int main() {
         name();                                       \
     } while (0)
 
-    RUN(test_registry_list_proto_is_active);
-    RUN(test_storage_info_proto_is_active);
-    RUN(test_lifecycle_current_model_proto_is_active);
-    RUN(test_llm_no_model_returns_typed_domain_error);
-    RUN(test_embeddings_create_proto_is_active);
-    RUN(test_model_compatibility_check_proto_is_active);
-    RUN(test_model_registry_fetch_assignments_proto_is_active);
-    RUN(test_model_format_from_url_proto_is_active);
-    RUN(test_artifact_infer_from_url_proto_is_active);
-    RUN(test_voice_agent_process_turn_proto_is_active);
-    RUN(test_tool_calling_session_create_proto_is_active);
-    RUN(test_stt_transcribe_stream_lifecycle_proto_is_active);
+    try {
+        RUN(test_registry_list_proto_is_active);
+        RUN(test_storage_info_proto_is_active);
+        RUN(test_lifecycle_current_model_proto_is_active);
+        RUN(test_llm_no_model_returns_typed_domain_error);
+        RUN(test_embeddings_create_proto_is_active);
+        RUN(test_model_compatibility_check_proto_is_active);
+        RUN(test_model_registry_fetch_assignments_proto_is_active);
+        RUN(test_model_format_from_url_proto_is_active);
+        RUN(test_artifact_infer_from_url_proto_is_active);
+        RUN(test_voice_agent_process_turn_proto_is_active);
+        RUN(test_tool_calling_session_create_proto_is_active);
+        RUN(test_stt_transcribe_stream_lifecycle_proto_is_active);
 
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 #endif
 }

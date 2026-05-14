@@ -704,5 +704,7 @@ void rac_download_task_ids_free(char** task_ids, size_t count) {
             free(task_ids[i]);
         }
     }
+    // free() takes void*; the multilevel cast is intentional.
+    // NOLINTNEXTLINE(bugprone-multi-level-implicit-pointer-conversion)
     free(task_ids);
 }

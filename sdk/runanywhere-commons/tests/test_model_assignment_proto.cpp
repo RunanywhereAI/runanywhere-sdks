@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -88,7 +89,7 @@ rac_result_t fake_assignment_http_get(const char* endpoint, rac_bool_t requires_
 
     fake->call_count++;
     fake->saw_requires_auth = requires_auth == RAC_TRUE;
-    fake->endpoints.push_back(endpoint ? endpoint : "");
+    fake->endpoints.emplace_back(endpoint ? endpoint : "");
 
     if (fake->callback_result != RAC_SUCCESS) {
         return fake->callback_result;
@@ -271,26 +272,33 @@ int test_no_config_no_transport_returns_empty_result() {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_model_assignment_proto\n");
+    try {
+        std::fprintf(stdout, "test_model_assignment_proto\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: protobuf runtime is disabled\n");
-    return 0;
+        std::fprintf(stdout, "  skip: protobuf runtime is disabled\n");
+        return 0;
 #else
-#define RUN_TEST(fn)                                \
-    do {                                            \
-        std::fprintf(stdout, "[ RUN  ] %s\n", #fn); \
-        const int rc = fn();                        \
-        if (rc != 0)                                \
-            return rc;                              \
-        std::fprintf(stdout, "[ OK   ] %s\n", #fn); \
+#define RUN_TEST(fn)                                    \
+    do {                                                \
+        std::fprintf(stdout, "[ RUN  ] %s\n", #fn);     \
+        const int rc = fn();                            \
+        if (rc != 0)                                    \
+            return rc;                                  \
+        std::fprintf(stdout, "[ OK   ] %s\n", #fn);     \
     } while (0)
 
-    RUN_TEST(test_cache_refresh_policy);
-    RUN_TEST(test_invalid_request_returns_typed_error);
-    RUN_TEST(test_metadata_normalization_into_model_info);
-    RUN_TEST(test_no_config_no_transport_returns_empty_result);
+        RUN_TEST(test_cache_refresh_policy);
+        RUN_TEST(test_invalid_request_returns_typed_error);
+        RUN_TEST(test_metadata_normalization_into_model_info);
+        RUN_TEST(test_no_config_no_transport_returns_empty_result);
 
-    std::fprintf(stdout, "test_model_assignment_proto: all tests passed\n");
-    return 0;
+        std::fprintf(stdout, "test_model_assignment_proto: all tests passed\n");
+        return 0;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

@@ -20,6 +20,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <memory>
 #include <string>
 #include <thread>
@@ -170,6 +171,7 @@ TEST(split_fanout) {
 
     std::vector<std::vector<int>> per_output(N_OUTS);
     std::vector<std::thread> consumers;
+    consumers.reserve(N_OUTS);
     for (size_t k = 0; k < N_OUTS; ++k) {
         consumers.emplace_back([&, k] {
             auto edge = split.output(k);
@@ -201,6 +203,7 @@ TEST(merge_fanin) {
 
     const int per_producer = 50;
     std::vector<std::thread> producers;
+    producers.reserve(N_INS);
     for (size_t k = 0; k < N_INS; ++k) {
         producers.emplace_back([&, k] {
             auto in = merge.input(k);
@@ -229,7 +232,8 @@ TEST(merge_fanin) {
     std::vector<int> count(N_INS, 0);
     for (int v : received) {
         const int src = v / 1000;
-        CHECK(src >= 0 && src < static_cast<int>(N_INS));
+        CHECK(src >= 0);
+        CHECK(std::cmp_less(src, N_INS));
         count[src]++;
     }
     for (size_t k = 0; k < N_INS; ++k) CHECK(count[k] == per_producer);
@@ -309,14 +313,21 @@ TEST(idempotent_start_stop) {
 // ---------------------------------------------------------------------------
 
 int main() {
-    run_test_linear_pipeline();
-    run_test_primitive_with_pool();
-    run_test_split_fanout();
-    run_test_merge_fanin();
-    run_test_cancel_mid_stream();
-    run_test_idempotent_start_stop();
+    try {
+        run_test_linear_pipeline();
+        run_test_primitive_with_pool();
+        run_test_split_fanout();
+        run_test_merge_fanin();
+        run_test_cancel_mid_stream();
+        run_test_idempotent_start_stop();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
-                 g_passed, g_failed);
-    return g_failed == 0 ? 0 : 1;
+        std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
+                     g_passed, g_failed);
+        return g_failed == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

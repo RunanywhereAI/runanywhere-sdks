@@ -19,6 +19,7 @@
 #include <cstring>
 #include <functional>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -85,9 +86,8 @@ void each_served_primitive(const rac_engine_vtable_t* v,
 
 /** Insert `e` into `bucket` preserving descending priority. */
 void insert_by_priority(std::vector<Entry>& bucket, Entry e) {
-    auto pos =
-        std::lower_bound(bucket.begin(), bucket.end(), e,
-                         [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
+    auto pos = std::ranges::lower_bound(
+        bucket, e, [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
     bucket.insert(pos, std::move(e));
 }
 
@@ -325,9 +325,9 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
         // Evict the existing one from every primitive bucket.
         for (auto& kv : s.by_primitive) {
             auto& vec = kv.second;
-            vec.erase(std::remove_if(vec.begin(), vec.end(),
-                                     [&](const Entry& e) { return e.name == name; }),
-                      vec.end());
+            const auto removed =
+                std::ranges::remove_if(vec, [&](const Entry& e) { return e.name == name; });
+            vec.erase(removed.begin(), removed.end());
         }
     }
 
@@ -339,7 +339,7 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
     }
 
     each_served_primitive(vtable, [&](rac_primitive_t p) {
-        Entry e{name, vtable->metadata.priority, vtable};
+        Entry e{.name = name, .priority = vtable->metadata.priority, .vtable = vtable};
         insert_by_priority(s.by_primitive[p], std::move(e));
     });
 
@@ -370,9 +370,9 @@ rac_result_t rac_plugin_unregister(const char* name) {
     s.manifests_by_vtable.erase(v);
     for (auto& kv : s.by_primitive) {
         auto& vec = kv.second;
-        vec.erase(
-            std::remove_if(vec.begin(), vec.end(), [&](const Entry& e) { return e.name == key; }),
-            vec.end());
+        const auto removed =
+            std::ranges::remove_if(vec, [&](const Entry& e) { return e.name == key; });
+        vec.erase(removed.begin(), removed.end());
     }
     RAC_LOG_DEBUG(LOG_CAT, "rac_plugin_unregister: '%s' ok", name);
     return RAC_SUCCESS;

@@ -434,7 +434,7 @@ static rac_result_t platform_diffusion_vtable_generate_with_progress(
     rac_diffusion_platform_result_t platform_result = {};
 
     // Setup progress wrapper
-    DiffusionProgressWrapper wrapper = {progress_callback, user_data};
+    DiffusionProgressWrapper wrapper = {.callback = progress_callback, .user_data = user_data};
 
     rac_result_t result = rac_diffusion_platform_generate_with_progress(
         handle, &platform_options, platform_diffusion_progress_adapter, &wrapper, &platform_result);

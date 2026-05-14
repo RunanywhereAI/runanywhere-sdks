@@ -23,8 +23,7 @@ static const std::string kSystemPrompt =
     "Answer the question using only the provided context passages. "
     "If the context does not contain enough information, say so.";
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 RAGBackend::RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
                        rac_handle_t embeddings_service, bool owns_services)
@@ -464,5 +463,4 @@ size_t RAGBackend::document_count() const {
     return vector_store_ ? vector_store_->size() : 0;
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

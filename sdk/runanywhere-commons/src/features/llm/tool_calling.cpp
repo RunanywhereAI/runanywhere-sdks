@@ -1987,7 +1987,7 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
         result.set_normalized_arguments_json(validated.normalized_arguments_json);
     }
 
-    if (validated.error_message && validated.error_message[0]) {
+    if (validated.error_message && validated.error_message[0] != '\0') {
         result.set_error_message(validated.error_message);
     } else if (!proto_errors.empty()) {
         result.set_error_message(proto_errors.front());
@@ -2785,7 +2785,8 @@ rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_js
     }
 
     // Add tools prompt (unless replace_system_prompt is true and we already have system_prompt)
-    if (!(options && options->replace_system_prompt != 0 && options->system_prompt)) {
+    if (options == nullptr || options->replace_system_prompt == 0 ||
+        options->system_prompt == nullptr) {
         if (tools_prompt && strlen(tools_prompt) > 0) {
             full_prompt += tools_prompt;
             full_prompt += "\n\n";

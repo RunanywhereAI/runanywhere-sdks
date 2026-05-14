@@ -280,8 +280,8 @@ class YamlParser {
                             }
                             map->mapping.emplace_back(std::move(k2), std::move(child));
                         } else {
-                            map->mapping.emplace_back(
-                                std::move(k2), YamlNode::make_scalar(unquote(v2)));
+                            map->mapping.emplace_back(std::move(k2),
+                                                      YamlNode::make_scalar(unquote(v2)));
                         }
                     }
                     node->sequence.push_back(std::move(map));
@@ -329,8 +329,7 @@ class YamlParser {
             std::string val = strip(trimmed.substr(colon + 1));
             ++idx;
             if (!val.empty()) {
-                node->mapping.emplace_back(std::move(key),
-                                           YamlNode::make_scalar(unquote(val)));
+                node->mapping.emplace_back(std::move(key), YamlNode::make_scalar(unquote(val)));
             } else {
                 // Child block.
                 YamlNodePtr child;

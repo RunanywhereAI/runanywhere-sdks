@@ -160,7 +160,7 @@ class VADGateNode : public rac::graph::PipelineNode<AudioFrame, AudioFrame> {
 
         // Forward frame regardless — STT must still attempt transcription
         // so the legacy ABI's "always emit transcription" contract holds.
-        out.push(std::move(frame), this->cancel_token());
+        out.push(frame, this->cancel_token());
     }
 
    private:
@@ -449,8 +449,8 @@ rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_s
 
     // Single-shot: push one frame, then close the input so each downstream
     // stage observes EOF and the graph drains naturally.
-    AudioFrame frame{audio_data, audio_size};
-    input_edge->push(std::move(frame), scheduler->root_cancel_token().get());
+    AudioFrame frame{.data = audio_data, .size = audio_size};
+    input_edge->push(frame, scheduler->root_cancel_token().get());
     input_edge->close();
 
     scheduler->wait();

@@ -238,7 +238,7 @@ void capture_proto_payload(const uint8_t* proto_bytes, size_t proto_size, void* 
 }
 
 int test_stream_callback_payload_contract_compiles() {
-    CallbackCapture capture = {RAC_ERROR_UNKNOWN, nullptr, 99};
+    CallbackCapture capture = {.validation = RAC_ERROR_UNKNOWN, .parse_data = nullptr, .size = 99};
     rac_proto_bytes_callback_fn callback = capture_proto_payload;
 
     callback(nullptr, 0, &capture);

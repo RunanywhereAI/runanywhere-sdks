@@ -751,12 +751,23 @@ static void ensure_espeak_voice_files(const std::string &espeak_data_dir) {
       if (src_f && dst_f) {
         char buf[4096];
         size_t n;
+        bool io_ok = true;
         while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
-          fwrite(buf, 1, n, dst_f);
+          if (fwrite(buf, 1, n, dst_f) != n) {
+            io_ok = false;
+            break;
+          }
         }
-        copied++;
-        RAC_LOG_DEBUG("Sherpa.TTS", "[ensure_voices] Copied: %s -> %s",
-                      family_path.c_str(), dest.c_str());
+        if (io_ok && ferror(src_f) == 0) {
+          copied++;
+          RAC_LOG_DEBUG("Sherpa.TTS", "[ensure_voices] Copied: %s -> %s",
+                        family_path.c_str(), dest.c_str());
+        } else {
+          errors++;
+          RAC_LOG_ERROR("Sherpa.TTS",
+                        "[ensure_voices] I/O error copying %s -> %s (errno=%d)",
+                        family_path.c_str(), dest.c_str(), errno);
+        }
       } else {
         errors++;
         RAC_LOG_ERROR(
@@ -806,12 +817,23 @@ static void ensure_espeak_voice_files(const std::string &espeak_data_dir) {
       if (src_f && dst_f) {
         char buf[4096];
         size_t n;
+        bool io_ok = true;
         while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
-          fwrite(buf, 1, n, dst_f);
+          if (fwrite(buf, 1, n, dst_f) != n) {
+            io_ok = false;
+            break;
+          }
         }
-        copied++;
-        RAC_LOG_INFO("Sherpa.TTS", "[ensure_voices] Copied: %s -> voices/%s",
-                     voice_entry->d_name, lowercase_name.c_str());
+        if (io_ok && ferror(src_f) == 0) {
+          copied++;
+          RAC_LOG_INFO("Sherpa.TTS", "[ensure_voices] Copied: %s -> voices/%s",
+                       voice_entry->d_name, lowercase_name.c_str());
+        } else {
+          errors++;
+          RAC_LOG_ERROR("Sherpa.TTS",
+                        "[ensure_voices] I/O error: %s -> voices/%s (errno=%d)",
+                        voice_entry->d_name, lowercase_name.c_str(), errno);
+        }
       } else {
         errors++;
         RAC_LOG_ERROR(

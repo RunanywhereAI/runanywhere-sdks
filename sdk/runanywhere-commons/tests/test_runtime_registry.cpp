@@ -38,11 +38,11 @@ int g_fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++g_test_count;                                                                          \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++g_fail_count;                                                                      \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -93,7 +93,7 @@ MAKE_OPS(4)
 
 /* Build a runtime vtable with explicit slot + priority + id. */
 rac_runtime_vtable_t make_vt(int slot, rac_runtime_id_t id, const char* name, int32_t priority,
-                             rac_result_t (*init)(void), void (*destroy)(void)) {
+                             rac_result_t (*init)(), void (*destroy)()) {
     rac_runtime_vtable_t v{};
     v.metadata.abi_version = RAC_RUNTIME_ABI_VERSION;
     v.metadata.id = id;

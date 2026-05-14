@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 
 #include "../../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_error.h"
@@ -78,7 +79,7 @@ rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
 
     // Construct full URL: base_url + "/" + filename
     int written = snprintf(out_url, out_url_size, "%s/%s", base_url, filename);
-    if (written < 0 || static_cast<size_t>(written) >= out_url_size) {
+    if (written < 0 || std::cmp_greater_equal(written, out_url_size)) {
         return RAC_ERROR_BUFFER_TOO_SMALL;
     }
 

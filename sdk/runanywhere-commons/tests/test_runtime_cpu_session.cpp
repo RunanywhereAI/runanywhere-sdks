@@ -12,12 +12,12 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
-#define CHECK(cond, msg)                                                                        \
-    do {                                                                                        \
-        if (!(cond)) {                                                                          \
-            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            return 1;                                                                           \
-        }                                                                                       \
+#define CHECK(cond, msg)                                                                          \
+    do {                                                                                          \
+        if (!(cond)) {                                                                            \
+            std::cerr << "FAIL: " << (msg) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            return 1;                                                                             \
+        }                                                                                         \
     } while (0)
 
 namespace {
@@ -156,7 +156,8 @@ int main() {
     rac_runtime_buffer_mapping_t mapping = {};
     CHECK(cpu_v2->map_buffer(src_buffer, 0, 0, RAC_RUNTIME_MAP_WRITE, &mapping) == RAC_SUCCESS,
           "CPU v2 maps source buffer");
-    CHECK(mapping.data != nullptr && mapping.bytes == 16, "CPU v2 map returns full buffer");
+    CHECK(mapping.data != nullptr, "CPU v2 map returns full buffer");
+    CHECK(mapping.bytes == 16, "CPU v2 map returns full buffer");
     const unsigned char pattern[16] = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     };
@@ -189,14 +190,21 @@ int main() {
     rac_runtime_tensor_t owned_tensor = {};
     owned_tensor.data = std::malloc(sizeof(int));
     owned_tensor.shape = static_cast<int64_t*>(std::malloc(sizeof(int64_t)));
-    CHECK(owned_tensor.data != nullptr && owned_tensor.shape != nullptr,
-          "test allocated owned tensor fields");
+    if (owned_tensor.data == nullptr || owned_tensor.shape == nullptr) {
+        std::free(owned_tensor.data);
+        std::free(owned_tensor.shape);
+        std::cerr << "FAIL: test allocated owned tensor fields at " << __FILE__ << ":" << __LINE__
+                  << std::endl;
+        return 1;
+    }
     owned_tensor.data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
     owned_tensor.shape_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
     cpu_v2->release_tensor(&owned_tensor);
-    CHECK(owned_tensor.data == nullptr && owned_tensor.shape == nullptr &&
-              owned_tensor.data_ownership == RAC_RUNTIME_OWNERSHIP_NONE &&
-              owned_tensor.shape_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
+    CHECK(owned_tensor.data == nullptr, "CPU v2 release_tensor clears runtime-owned fields");
+    CHECK(owned_tensor.shape == nullptr, "CPU v2 release_tensor clears runtime-owned fields");
+    CHECK(owned_tensor.data_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
+          "CPU v2 release_tensor clears runtime-owned fields");
+    CHECK(owned_tensor.shape_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
           "CPU v2 release_tensor clears runtime-owned fields");
 
     cpu->free_buffer(src_buffer);
@@ -220,8 +228,8 @@ int main() {
     CHECK(rac_cpu_runtime_get_provider_session(session, &provider_name, &provider_session) ==
               RAC_SUCCESS,
           "unwrap provider session");
-    CHECK(provider_name != nullptr && std::string(provider_name) == "fake_cpu",
-          "provider name preserved");
+    CHECK(provider_name != nullptr, "provider name preserved");
+    CHECK(std::string(provider_name) == "fake_cpu", "provider name preserved");
     CHECK(provider_session != nullptr, "provider session preserved");
 
     int input = 21;
@@ -338,8 +346,8 @@ int main() {
 
     /* `release_tensor` must free the runtime-owned data. */
     cpu_v2->release_tensor(&v2_outputs[0]);
-    CHECK(v2_outputs[0].data == nullptr &&
-              v2_outputs[0].data_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
+    CHECK(v2_outputs[0].data == nullptr, "release_tensor frees runtime-owned output");
+    CHECK(v2_outputs[0].data_ownership == RAC_RUNTIME_OWNERSHIP_NONE,
           "release_tensor frees runtime-owned output");
 
     cpu->destroy_session(v2_session);

@@ -36,8 +36,6 @@
  * rac_model_registry_discover_proto on its own handle).
  */
 
-#include "rac/lifecycle/rac_sdk_init.h"
-
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -53,6 +51,7 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_environment.h"
+#include "rac/lifecycle/rac_sdk_init.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
@@ -121,8 +120,7 @@ bool environment_requires_external_config(rac_environment_t env) {
 
 extern "C" {
 
-rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
-                                       size_t in_size,
+rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t in_size,
                                        rac_proto_buffer_t* out_RASdkInitResult) {
     if (!out_RASdkInitResult) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -166,8 +164,8 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
 
     // Step 1: Validate inputs. Staging/production require API key + URL.
     if (environment_requires_external_config(env)) {
-        const rac_validation_result_t key_check = rac_validate_api_key(
-            api_key.empty() ? nullptr : api_key.c_str(), env);
+        const rac_validation_result_t key_check =
+            rac_validate_api_key(api_key.empty() ? nullptr : api_key.c_str(), env);
         if (key_check != RAC_VALIDATION_OK) {
             SdkInitResult result;
             result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
@@ -177,8 +175,8 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
             result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
             return serialize_result(result, out_RASdkInitResult);
         }
-        const rac_validation_result_t url_check = rac_validate_base_url(
-            base_url.empty() ? nullptr : base_url.c_str(), env);
+        const rac_validation_result_t url_check =
+            rac_validate_base_url(base_url.empty() ? nullptr : base_url.c_str(), env);
         if (url_check != RAC_VALIDATION_OK) {
             SdkInitResult result;
             result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
@@ -198,11 +196,9 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
     // (Swift's KeychainManager.storeSDKParams) because OS storage policies
     // (kSecAttrAccessible* on Apple, EncryptedSharedPreferences on Android)
     // are platform-specific.
-    const rac_result_t state_rc = rac_state_initialize(
-        env,
-        api_key.empty() ? "" : api_key.c_str(),
-        base_url.empty() ? "" : base_url.c_str(),
-        device_id.empty() ? "" : device_id.c_str());
+    const rac_result_t state_rc = rac_state_initialize(env, api_key.empty() ? "" : api_key.c_str(),
+                                                       base_url.empty() ? "" : base_url.c_str(),
+                                                       device_id.empty() ? "" : device_id.c_str());
     if (state_rc != RAC_SUCCESS) {
         SdkInitResult result;
         result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
@@ -221,8 +217,7 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
 #endif  // RAC_HAVE_PROTOBUF
 }
 
-rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
-                                       size_t in_size,
+rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t in_size,
                                        rac_proto_buffer_t* out_RASdkInitResult) {
     if (!out_RASdkInitResult) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -284,8 +279,8 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
     // warning and continues so local/cached models stay accessible.
     const rac_environment_t env = rac_state_get_environment();
     const rac_result_t dev_rc = rac_device_manager_register_if_needed(env, /*build_token=*/nullptr);
-    const bool device_registered = (dev_rc == RAC_SUCCESS) ||
-                                   (rac_device_manager_is_registered() == RAC_TRUE);
+    const bool device_registered =
+        (dev_rc == RAC_SUCCESS) || (rac_device_manager_is_registered() == RAC_TRUE);
     result.set_device_registered(device_registered);
     if (dev_rc != RAC_SUCCESS && dev_rc != RAC_ERROR_FEATURE_NOT_AVAILABLE) {
         // Surface as a warning rather than aborting — matches Swift's
@@ -299,9 +294,8 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
     // this returns RAC_ERROR_FEATURE_NOT_AVAILABLE; we treat that as offline.
     rac_model_info_t** assigned_models = nullptr;
     size_t assigned_count = 0;
-    const rac_result_t fetch_rc = rac_model_assignment_fetch(/*force_refresh=*/RAC_FALSE,
-                                                             &assigned_models,
-                                                             &assigned_count);
+    const rac_result_t fetch_rc =
+        rac_model_assignment_fetch(/*force_refresh=*/RAC_FALSE, &assigned_models, &assigned_count);
     if (fetch_rc == RAC_SUCCESS && assigned_models != nullptr) {
         result.set_linked_models_count(static_cast<uint32_t>(assigned_count));
         rac_model_info_array_free(assigned_models, assigned_count);
@@ -362,10 +356,9 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     const rac_environment_t env = rac_state_get_environment();
     const char* cached_key = rac_state_get_api_key();
     const char* cached_url = rac_state_get_base_url();
-    const bool has_external_config =
-        environment_requires_external_config(env) &&
-        cached_key != nullptr && *cached_key != '\0' &&
-        cached_url != nullptr && *cached_url != '\0';
+    const bool has_external_config = environment_requires_external_config(env) &&
+                                     cached_key != nullptr && *cached_key != '\0' &&
+                                     cached_url != nullptr && *cached_url != '\0';
 
     if (!has_external_config) {
         // No retry possible — match Swift's "no usable external config" debug

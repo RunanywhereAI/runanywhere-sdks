@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -72,7 +73,7 @@ rac_bool_t mock_path_exists(const char* path, rac_bool_t* is_directory, void* us
     if (is_directory) {
         *is_directory = RAC_TRUE;
     }
-    return storage->existing_paths.count(path ? path : "") ? RAC_TRUE : RAC_FALSE;
+    return storage->existing_paths.count(path ? path : "") != 0 ? RAC_TRUE : RAC_FALSE;
 }
 
 int64_t mock_get_available_space(void* user_data) {
@@ -86,7 +87,7 @@ int64_t mock_get_total_space(void* user_data) {
 rac_result_t mock_delete_path(const char* path, int recursive, void* user_data) {
     (void)recursive;
     auto* storage = static_cast<MockStorage*>(user_data);
-    storage->deleted_paths.push_back(path ? path : "");
+    storage->deleted_paths.emplace_back(path ? path : "");
     storage->existing_paths.erase(path ? path : "");
     return RAC_SUCCESS;
 }
@@ -94,13 +95,14 @@ rac_result_t mock_delete_path(const char* path, int recursive, void* user_data) 
 rac_result_t mock_is_model_loaded(const char* model_id, rac_bool_t* out_is_loaded,
                                   void* user_data) {
     auto* storage = static_cast<MockStorage*>(user_data);
-    *out_is_loaded = storage->loaded_models.count(model_id ? model_id : "") ? RAC_TRUE : RAC_FALSE;
+    *out_is_loaded =
+        storage->loaded_models.count(model_id ? model_id : "") != 0 ? RAC_TRUE : RAC_FALSE;
     return RAC_SUCCESS;
 }
 
 rac_result_t mock_unload_model(const char* model_id, void* user_data) {
     auto* storage = static_cast<MockStorage*>(user_data);
-    storage->unloaded_models.push_back(model_id ? model_id : "");
+    storage->unloaded_models.emplace_back(model_id ? model_id : "");
     storage->loaded_models.erase(model_id ? model_id : "");
     return RAC_SUCCESS;
 }
@@ -580,33 +582,40 @@ int test_invalid_request_publishes_typed_storage_error() {
 }  // namespace
 
 int main() {
+    try {
 #ifndef RAC_HAVE_PROTOBUF
-    std::printf("skip: storage analyzer proto tests require protobuf\n");
-    return 0;
+        std::printf("skip: storage analyzer proto tests require protobuf\n");
+        return 0;
 #else
-    int failures = 0;
+        int failures = 0;
 
-#define RUN(name)                                \
-    do {                                         \
-        std::printf("[ RUN  ] %s\n", #name);     \
-        int rc = name();                         \
-        if (rc == 0)                             \
-            std::printf("[  OK  ] %s\n", #name); \
-        else {                                   \
-            std::printf("[ FAIL ] %s\n", #name); \
-            ++failures;                          \
-        }                                        \
+#define RUN(name)                                    \
+    do {                                             \
+        std::printf("[ RUN  ] %s\n", #name);         \
+        int rc = name();                             \
+        if (rc == 0)                                 \
+            std::printf("[  OK  ] %s\n", #name);     \
+        else {                                       \
+            std::printf("[ FAIL ] %s\n", #name);     \
+            ++failures;                              \
+        }                                            \
     } while (0)
 
-    RUN(test_info_aggregation_and_model_breakdown);
-    RUN(test_availability_offsets_existing_model_bytes);
-    RUN(test_availability_includes_cache_delete_plan);
-    RUN(test_delete_plan_blocks_loaded_missing_and_missing_path);
-    RUN(test_delete_dry_run_vs_execute);
-    RUN(test_empty_storage_info);
-    RUN(test_invalid_request_publishes_typed_storage_error);
+        RUN(test_info_aggregation_and_model_breakdown);
+        RUN(test_availability_offsets_existing_model_bytes);
+        RUN(test_availability_includes_cache_delete_plan);
+        RUN(test_delete_plan_blocks_loaded_missing_and_missing_path);
+        RUN(test_delete_dry_run_vs_execute);
+        RUN(test_empty_storage_info);
+        RUN(test_invalid_request_publishes_typed_storage_error);
 
-    std::printf("\n%d test(s) failed\n", failures);
-    return failures == 0 ? 0 : 1;
+        std::printf("\n%d test(s) failed\n", failures);
+        return failures == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

@@ -124,7 +124,7 @@ rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, r
     std::string csv;
     csv.reserve(256);
 
-    if (header) {
+    if (header == RAC_TRUE) {
         csv =
             "t0_request_start_ms,t2_prefill_start_ms,t3_prefill_end_ms,"
             "t4_first_token_ms,t5_last_token_ms,t6_request_end_ms,"

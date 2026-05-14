@@ -92,6 +92,7 @@ TEST(cancel_token_multithreaded_cancel) {
     auto t = std::make_shared<CancelToken>();
     std::atomic<int> observed{0};
     std::vector<std::thread> threads;
+    threads.reserve(8);
     for (int i = 0; i < 8; ++i) {
         threads.emplace_back([&, i] {
             // Half cancel, half observe.
@@ -122,9 +123,12 @@ TEST(ring_buffer_push_pop) {
     CHECK(rb.full());
     CHECK(!rb.push(99));
     int x;
-    CHECK(rb.pop(x) && x == 1);
-    CHECK(rb.pop(x) && x == 2);
-    CHECK(rb.pop(x) && x == 3);
+    CHECK(rb.pop(x));
+    CHECK(x == 1);
+    CHECK(rb.pop(x));
+    CHECK(x == 2);
+    CHECK(rb.pop(x));
+    CHECK(x == 3);
     CHECK(!rb.pop(x));
     CHECK(rb.empty());
 }
@@ -179,9 +183,11 @@ TEST(stream_edge_drop_newest) {
     CHECK(edge.push(2));
     CHECK(!edge.push(3));  // full; dropped
     auto a = edge.pop();
-    CHECK(a.has_value() && *a == 1);
+    CHECK(a.has_value());
+    CHECK(*a == 1);
     auto b = edge.pop();
-    CHECK(b.has_value() && *b == 2);
+    CHECK(b.has_value());
+    CHECK(*b == 2);
 }
 
 TEST(stream_edge_drop_oldest) {
@@ -191,9 +197,11 @@ TEST(stream_edge_drop_oldest) {
     CHECK(edge.push(3));  // evicts 1
     CHECK(edge.push(4));  // evicts 2
     auto a = edge.pop();
-    CHECK(a.has_value() && *a == 3);
+    CHECK(a.has_value());
+    CHECK(*a == 3);
     auto b = edge.pop();
-    CHECK(b.has_value() && *b == 4);
+    CHECK(b.has_value());
+    CHECK(*b == 4);
 }
 
 TEST(stream_edge_block_producer_cancel) {
@@ -312,24 +320,31 @@ TEST(stream_edge_producer_consumer_parallel) {
 // ---------------------------------------------------------------------------
 
 int main() {
-    run_test_cancel_token_basic();
-    run_test_cancel_token_parent_child();
-    run_test_cancel_token_child_born_cancelled();
-    run_test_cancel_token_cascade_to_grandchild();
-    run_test_cancel_token_multithreaded_cancel();
+    try {
+        run_test_cancel_token_basic();
+        run_test_cancel_token_parent_child();
+        run_test_cancel_token_child_born_cancelled();
+        run_test_cancel_token_cascade_to_grandchild();
+        run_test_cancel_token_multithreaded_cancel();
 
-    run_test_ring_buffer_push_pop();
-    run_test_ring_buffer_wrap_around();
-    run_test_ring_buffer_spsc_concurrent();
+        run_test_ring_buffer_push_pop();
+        run_test_ring_buffer_wrap_around();
+        run_test_ring_buffer_spsc_concurrent();
 
-    run_test_stream_edge_drop_newest();
-    run_test_stream_edge_drop_oldest();
-    run_test_stream_edge_block_producer_cancel();
-    run_test_stream_edge_close_unblocks_blocked_producer();
-    run_test_stream_edge_cancel_unblocks_consumer();
-    run_test_stream_edge_close_unblocks_consumer();
-    run_test_stream_edge_producer_consumer_parallel();
+        run_test_stream_edge_drop_newest();
+        run_test_stream_edge_drop_oldest();
+        run_test_stream_edge_block_producer_cancel();
+        run_test_stream_edge_close_unblocks_blocked_producer();
+        run_test_stream_edge_cancel_unblocks_consumer();
+        run_test_stream_edge_close_unblocks_consumer();
+        run_test_stream_edge_producer_consumer_parallel();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
-    return g_failed == 0 ? 0 : 1;
+        std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
+        return g_failed == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

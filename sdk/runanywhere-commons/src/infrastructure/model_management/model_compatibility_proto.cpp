@@ -138,7 +138,7 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
         const char* msg = rac_error_message(rc);
         proto_result.set_error_code(static_cast<int32_t>(rc));
         proto_result.set_error_message(msg ? msg : "compatibility check failed");
-        if (msg && msg[0])
+        if (msg && msg[0] != '\0')
             proto_result.add_reasons(msg);
         return copy_proto(proto_result, out_result);
     }

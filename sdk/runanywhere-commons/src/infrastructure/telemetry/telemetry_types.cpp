@@ -40,7 +40,7 @@ void rac_telemetry_batch_response_free(rac_telemetry_batch_response_t* response)
         for (size_t i = 0; i < response->errors_count; i++) {
             free((void*)response->errors[i]);
         }
-        free(response->errors);
+        free(static_cast<void*>(response->errors));
     }
 
     if (response->storage_version) {

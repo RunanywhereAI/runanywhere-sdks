@@ -43,8 +43,7 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
 
         // Strip leading punctuation
         size_t tok_start = start;
-        while (tok_start < i &&
-               std::ispunct(static_cast<unsigned char>(text[tok_start])) != 0) {
+        while (tok_start < i && std::ispunct(static_cast<unsigned char>(text[tok_start])) != 0) {
             ++tok_start;
         }
 
@@ -266,8 +265,7 @@ std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& 
     }
 
     // Sort descending by score
-    std::ranges::sort(scored,
-                      [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::ranges::sort(scored, [](const auto& a, const auto& b) { return a.second > b.second; });
 
     // Return top_k
     if (scored.size() > top_k) {

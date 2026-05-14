@@ -1224,8 +1224,8 @@ static std::vector<std::string> json_top_level_objects(const std::string& array_
 
     size_t pos = 1;
     while (pos < array.size()) {
-        while (pos < array.size() && (std::isspace(static_cast<unsigned char>(array[pos])) != 0 ||
-                                      array[pos] == ',')) {
+        while (pos < array.size() &&
+               (std::isspace(static_cast<unsigned char>(array[pos])) != 0 || array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {
@@ -1261,8 +1261,8 @@ static void add_json_string_array_to_metadata(const std::string& object, const c
     }
     size_t pos = 1;
     while (pos < array.size()) {
-        while (pos < array.size() && (std::isspace(static_cast<unsigned char>(array[pos])) != 0 ||
-                                      array[pos] == ',')) {
+        while (pos < array.size() &&
+               (std::isspace(static_cast<unsigned char>(array[pos])) != 0 || array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {

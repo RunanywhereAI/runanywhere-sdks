@@ -18,7 +18,9 @@
 #include <arpa/inet.h>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -49,7 +51,7 @@ std::vector<uint8_t> make_payload(size_t n) {
 }
 // 512 KiB gives the test transport enough chunks for cancel / resume
 // tests to observe mid-stream state deterministically.
-std::vector<uint8_t> g_payload = make_payload(512 * 1024);
+std::vector<uint8_t> g_payload = make_payload(static_cast<size_t>(512) * 1024);
 
 // SHA-256("<deterministic 32 KiB payload>") — expected digest is
 // computed once at runtime before the tests run.
@@ -292,9 +294,11 @@ inline uint32_t rr(uint32_t x, uint32_t n) {
 }
 void tr(ctx* c, const uint8_t* d) {
     uint32_t w[64];
-    for (int i = 0; i < 16; ++i)
-        w[i] = (uint32_t(d[i * 4]) << 24) | (uint32_t(d[i * 4 + 1]) << 16) |
-               (uint32_t(d[i * 4 + 2]) << 8) | d[i * 4 + 3];
+    for (int i = 0; i < 16; ++i) {
+        const size_t base = static_cast<size_t>(i) * 4;
+        w[i] = (uint32_t(d[base]) << 24) | (uint32_t(d[base + 1]) << 16) |
+               (uint32_t(d[base + 2]) << 8) | d[base + 3];
+    }
     for (int i = 16; i < 64; ++i) {
         uint32_t s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >> 3);
         uint32_t s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >> 10);
@@ -361,17 +365,19 @@ std::string hash(const uint8_t* data, size_t len) {
     tr(&c, c.b);
     uint8_t out[32];
     for (int j = 0; j < 8; ++j) {
-        out[j * 4] = uint8_t(c.s[j] >> 24);
-        out[j * 4 + 1] = uint8_t(c.s[j] >> 16);
-        out[j * 4 + 2] = uint8_t(c.s[j] >> 8);
-        out[j * 4 + 3] = uint8_t(c.s[j]);
+        const size_t base = static_cast<size_t>(j) * 4;
+        out[base] = uint8_t(c.s[j] >> 24);
+        out[base + 1] = uint8_t(c.s[j] >> 16);
+        out[base + 2] = uint8_t(c.s[j] >> 8);
+        out[base + 3] = uint8_t(c.s[j]);
     }
     static const char hx[] = "0123456789abcdef";
     std::string s;
     s.resize(64);
     for (int j = 0; j < 32; ++j) {
-        s[j * 2] = hx[(out[j] >> 4) & 0xf];
-        s[j * 2 + 1] = hx[out[j] & 0xf];
+        const size_t base = static_cast<size_t>(j) * 2;
+        s[base] = hx[(out[j] >> 4) & 0xf];
+        s[base + 1] = hx[out[j] & 0xf];
     }
     return s;
 }
@@ -590,30 +596,37 @@ void test_resume_rejects_stale_offset() {
 }  // namespace
 
 int main() {
-    std::cout << "=== rac_http_download tests ===\n";
-    test_no_registered_transport_returns_feature_not_available();
+    try {
+        std::cout << "=== rac_http_download tests ===\n";
+        test_no_registered_transport_returns_feature_not_available();
 
-    if (!start()) {
-        std::cerr << "failed to start loopback server\n";
+        if (!start()) {
+            std::cerr << "failed to start loopback server\n";
+            return 1;
+        }
+        std::cout << "loopback server on 127.0.0.1:" << g_port << "\n";
+
+        g_expected_sha = sha::hash(g_payload.data(), g_payload.size());
+        std::cout << "payload sha256 = " << g_expected_sha << "\n";
+
+        rac_http_transport_register(&g_test_transport_ops, nullptr);
+
+        test_happy_path_with_checksum();
+        test_checksum_mismatch();
+        test_server_error_404();
+        test_invalid_url();
+        test_cancel_via_progress();
+        test_resume_merged_matches_payload();
+        test_resume_rejects_stale_offset();
+
+        rac_http_transport_register(nullptr, nullptr);
+        stop();
+        std::cout << "passes=" << passes << " failures=" << failures << "\n";
+        return failures == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
         return 1;
     }
-    std::cout << "loopback server on 127.0.0.1:" << g_port << "\n";
-
-    g_expected_sha = sha::hash(g_payload.data(), g_payload.size());
-    std::cout << "payload sha256 = " << g_expected_sha << "\n";
-
-    rac_http_transport_register(&g_test_transport_ops, nullptr);
-
-    test_happy_path_with_checksum();
-    test_checksum_mismatch();
-    test_server_error_404();
-    test_invalid_url();
-    test_cancel_via_progress();
-    test_resume_merged_matches_payload();
-    test_resume_rejects_stale_offset();
-
-    rac_http_transport_register(nullptr, nullptr);
-    stop();
-    std::cout << "passes=" << passes << " failures=" << failures << "\n";
-    return failures == 0 ? 0 : 1;
 }

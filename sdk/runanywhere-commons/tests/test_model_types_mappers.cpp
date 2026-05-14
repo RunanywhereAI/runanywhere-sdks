@@ -407,31 +407,37 @@ int test_invalid_proto_values() {
 int test_invalid_c_values() {
     int32_t out = -1;
 
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_inference_framework_to_proto(static_cast<rac_inference_framework_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
     out = -1;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_model_category_to_proto(static_cast<rac_model_category_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
     out = -1;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_model_format_to_proto(static_cast<rac_model_format_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
     out = -1;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_model_source_to_proto(static_cast<rac_model_source_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
     out = -1;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_archive_type_to_proto(static_cast<rac_archive_type_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
     out = -1;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     EXPECT_RC(rac_archive_structure_to_proto(static_cast<rac_archive_structure_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);

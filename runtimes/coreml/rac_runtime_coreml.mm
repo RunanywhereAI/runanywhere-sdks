@@ -166,12 +166,15 @@ const rac_runtime_vtable_t k_coreml_vtable = {
 }  // namespace
 
 MLModelConfiguration* rac_coreml_default_model_configuration(void) {
-    MLModelConfiguration* cfg = [[MLModelConfiguration alloc] init];
+    // Return an autoreleased instance so MRC callers don't leak it on
+    // error paths (clang-analyzer-osx.cocoa.RetainCount).
+    MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
     cfg.computeUnits = MLComputeUnitsAll;
     return cfg;
 }
 
 bool rac_coreml_file_exists(NSString* path) {
+    if (!path) return false;
     return [[NSFileManager defaultManager] fileExistsAtPath:path];
 }
 

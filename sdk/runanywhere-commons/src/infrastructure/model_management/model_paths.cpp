@@ -614,8 +614,7 @@ static void sha256_transform(sha256_ctx* ctx, const uint8_t data[64]) {
         const size_t base = static_cast<size_t>(i) * 4;
         w[i] = (static_cast<uint32_t>(data[base]) << 24) |
                (static_cast<uint32_t>(data[base + 1]) << 16) |
-               (static_cast<uint32_t>(data[base + 2]) << 8) |
-               static_cast<uint32_t>(data[base + 3]);
+               (static_cast<uint32_t>(data[base + 2]) << 8) | static_cast<uint32_t>(data[base + 3]);
     }
     for (int i = 16; i < 64; ++i) {
         uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);

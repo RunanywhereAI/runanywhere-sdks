@@ -20,12 +20,12 @@ namespace {
 
 const int k_ops_sentinel = 0xC0FFEE;
 
-rac_result_t backend_unavailable_capability_check(void) {
+rac_result_t backend_unavailable_capability_check() {
     return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
 rac_engine_vtable_t make_vt(const char* name, int32_t priority, rac_primitive_t primitive,
-                            rac_result_t (*capability_check)(void) = nullptr) {
+                            rac_result_t (*capability_check)() = nullptr) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
     v.metadata.name = name;
@@ -138,9 +138,9 @@ int main() {
     };
 
     const SpeechCase speech_cases[] = {
-        {RAC_PRIMITIVE_TRANSCRIBE, "fallback_stt", "STT"},
-        {RAC_PRIMITIVE_SYNTHESIZE, "fallback_tts", "TTS"},
-        {RAC_PRIMITIVE_DETECT_VOICE, "fallback_vad", "VAD"},
+        {.primitive = RAC_PRIMITIVE_TRANSCRIBE, .fallback_name = "fallback_stt", .label = "STT"},
+        {.primitive = RAC_PRIMITIVE_SYNTHESIZE, .fallback_name = "fallback_tts", .label = "TTS"},
+        {.primitive = RAC_PRIMITIVE_DETECT_VOICE, .fallback_name = "fallback_vad", .label = "VAD"},
     };
 
     for (const auto& c : speech_cases) {

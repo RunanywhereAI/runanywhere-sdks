@@ -33,14 +33,14 @@
 #include <sys/sysctl.h>  // sysctlbyname
 #endif
 
+#include "accelerator_preference_internal.h"
+
+#include <atomic>
+
 #include "rac/core/rac_logger.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/router/rac_hardware_profile.h"
-
-#include "accelerator_preference_internal.h"
-
-#include <atomic>
 
 // ============================================================================
 // Minimal hand-encoded protobuf helpers
@@ -49,8 +49,8 @@
 namespace {
 
 // Wire types
-static constexpr uint8_t WIRE_VARINT   = 0;
-static constexpr uint8_t WIRE_LEN      = 2;
+static constexpr uint8_t WIRE_VARINT = 0;
+static constexpr uint8_t WIRE_LEN = 2;
 
 static void encode_tag(std::vector<uint8_t>& buf, uint32_t field_number, uint8_t wire_type) {
     uint32_t tag = (field_number << 3) | wire_type;
@@ -71,33 +71,38 @@ static void encode_varint(std::vector<uint8_t>& buf, uint64_t v) {
 
 static void encode_string_field(std::vector<uint8_t>& buf, uint32_t field_number,
                                 const std::string& s) {
-    if (s.empty()) return;
+    if (s.empty())
+        return;
     encode_tag(buf, field_number, WIRE_LEN);
     encode_varint(buf, s.size());
     buf.insert(buf.end(), s.begin(), s.end());
 }
 
 static void encode_bool_field(std::vector<uint8_t>& buf, uint32_t field_number, bool v) {
-    if (!v) return;  // default false — omit for compactness
+    if (!v)
+        return;  // default false — omit for compactness
     encode_tag(buf, field_number, WIRE_VARINT);
     encode_varint(buf, v ? 1 : 0);
 }
 
 static void encode_uint64_field(std::vector<uint8_t>& buf, uint32_t field_number, uint64_t v) {
-    if (v == 0) return;
+    if (v == 0)
+        return;
     encode_tag(buf, field_number, WIRE_VARINT);
     encode_varint(buf, v);
 }
 
 static void encode_uint32_field(std::vector<uint8_t>& buf, uint32_t field_number, uint32_t v) {
-    if (v == 0) return;
+    if (v == 0)
+        return;
     encode_tag(buf, field_number, WIRE_VARINT);
     encode_varint(buf, v);
 }
 
 static void encode_bytes_field(std::vector<uint8_t>& buf, uint32_t field_number,
                                const std::vector<uint8_t>& nested) {
-    if (nested.empty()) return;
+    if (nested.empty())
+        return;
     encode_tag(buf, field_number, WIRE_LEN);
     encode_varint(buf, nested.size());
     buf.insert(buf.end(), nested.begin(), nested.end());
@@ -108,7 +113,7 @@ static void encode_bytes_field(std::vector<uint8_t>& buf, uint32_t field_number,
 // ============================================================================
 
 #if defined(__APPLE__)
-  #include <TargetConditionals.h>
+#include <TargetConditionals.h>
 
 static std::string apple_platform_string() {
 #if TARGET_OS_IOS
@@ -126,10 +131,11 @@ static std::string apple_platform_string() {
 #endif
 
 #if defined(__ANDROID__)
-  #include <sys/system_properties.h>
+#include <sys/system_properties.h>
 static std::string android_property(const char* key) {
     char buf[PROP_VALUE_MAX] = {};
-    if (__system_property_get(key, buf) <= 0) return {};
+    if (__system_property_get(key, buf) <= 0)
+        return {};
     return std::string(buf);
 }
 #endif
@@ -138,8 +144,7 @@ static std::string android_property(const char* key) {
 // Build HardwareProfile proto bytes from the cached HardwareProfile struct
 // ============================================================================
 
-static std::vector<uint8_t> build_hardware_profile_bytes(
-    const rac::router::HardwareProfile& hp) {
+static std::vector<uint8_t> build_hardware_profile_bytes(const rac::router::HardwareProfile& hp) {
     std::vector<uint8_t> buf;
 
     // field 1: chip (string)
@@ -147,7 +152,8 @@ static std::vector<uint8_t> build_hardware_profile_bytes(
 #if defined(__ANDROID__)
     if (chip.empty()) {
         chip = android_property("ro.hardware.chipname");
-        if (chip.empty()) chip = android_property("ro.board.platform");
+        if (chip.empty())
+            chip = android_property("ro.board.platform");
     }
 #endif
     encode_string_field(buf, 1, chip);
@@ -231,8 +237,8 @@ static std::vector<uint8_t> build_hardware_profile_bytes(
 // Build AcceleratorInfo proto bytes for a single accelerator entry
 // ============================================================================
 
-static std::vector<uint8_t> build_accelerator_info_bytes(const std::string& name,
-                                                          int32_t type_enum, bool available) {
+static std::vector<uint8_t> build_accelerator_info_bytes(const std::string& name, int32_t type_enum,
+                                                         bool available) {
     std::vector<uint8_t> buf;
     encode_string_field(buf, 1, name);
     if (type_enum != 0) {
@@ -263,7 +269,7 @@ static std::vector<uint8_t> build_hardware_profile_result_bytes(bool include_pro
     // We enumerate available accelerators in priority order.
     struct AccelEntry {
         std::string name;
-        int32_t type_enum; // matches AcceleratorPreference enum in proto
+        int32_t type_enum;  // matches AcceleratorPreference enum in proto
         bool available;
     };
 
@@ -305,17 +311,13 @@ std::atomic<int> g_accelerator_preference{0};
 // Internal accessor used by the engine router to turn the preference into a
 // scoring bonus.  Kept in the `rac::router::internal` namespace so it isn't
 // part of the public C ABI.
-namespace rac {
-namespace router {
-namespace internal {
+namespace rac::router::internal {
 
 int get_accelerator_preference() {
     return g_accelerator_preference.load(std::memory_order_relaxed);
 }
 
-}  // namespace internal
-}  // namespace router
-}  // namespace rac
+}  // namespace rac::router::internal
 
 // ============================================================================
 // Public C ABI
@@ -335,8 +337,8 @@ rac_result_t rac_hardware_profile_get(uint8_t** proto_bytes_out, size_t* proto_s
         return RAC_ERROR_UNKNOWN;
     }
 
-    rac_result_t rc = rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(),
-                                                   proto_bytes_out, proto_size_out);
+    rac_result_t rc =
+        rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(), proto_bytes_out, proto_size_out);
     if (rc == RAC_SUCCESS) {
         rac::events::publish_hardware_profile_completed(bytes.data(), bytes.size());
     }
@@ -359,8 +361,8 @@ rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* pr
         return RAC_ERROR_UNKNOWN;
     }
 
-    rac_result_t rc = rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(),
-                                                   proto_bytes_out, proto_size_out);
+    rac_result_t rc =
+        rac_proto_buffer_copy_to_raw(bytes.data(), bytes.size(), proto_bytes_out, proto_size_out);
     if (rc == RAC_SUCCESS) {
         rac::events::publish_hardware_profile_completed(bytes.data(), bytes.size());
     }

@@ -11,7 +11,9 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -357,21 +359,28 @@ static TestResult test_audio_int16_to_wav() {
 // =============================================================================
 
 int main(int argc, char** argv) {
-    TestSuite suite("core");
+    try {
+        TestSuite suite("core");
 
-    suite.add("init_shutdown", test_init_shutdown);
-    suite.add("double_init", test_double_init);
-    suite.add("get_version", test_get_version);
-    suite.add("error_message_known", test_error_message_known);
-    suite.add("error_message_unknown", test_error_message_unknown);
-    suite.add("error_classification", test_error_classification);
-    suite.add("error_details", test_error_details);
-    suite.add("logger_levels", test_logger_levels);
-    suite.add("logger_no_crash", test_logger_no_crash);
-    suite.add("module_register", test_module_register);
-    suite.add("alloc_free", test_alloc_free);
-    suite.add("audio_float32_to_wav", test_audio_float32_to_wav);
-    suite.add("audio_int16_to_wav", test_audio_int16_to_wav);
+        suite.add("init_shutdown", test_init_shutdown);
+        suite.add("double_init", test_double_init);
+        suite.add("get_version", test_get_version);
+        suite.add("error_message_known", test_error_message_known);
+        suite.add("error_message_unknown", test_error_message_unknown);
+        suite.add("error_classification", test_error_classification);
+        suite.add("error_details", test_error_details);
+        suite.add("logger_levels", test_logger_levels);
+        suite.add("logger_no_crash", test_logger_no_crash);
+        suite.add("module_register", test_module_register);
+        suite.add("alloc_free", test_alloc_free);
+        suite.add("audio_float32_to_wav", test_audio_float32_to_wav);
+        suite.add("audio_int16_to_wav", test_audio_int16_to_wav);
 
-    return suite.run(argc, argv);
+        return suite.run(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

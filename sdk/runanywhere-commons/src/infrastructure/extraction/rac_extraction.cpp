@@ -176,7 +176,7 @@ static bool is_path_safe(const char* pathname) {
 
     // Normalize and check for ".." components (handle both / and \ separators)
     const char* p = pathname;
-    while (*p) {
+    while (*p != '\0') {
         if (p[0] == '.' && p[1] == '.') {
             bool at_start = (p == pathname || *(p - 1) == '/' || *(p - 1) == '\\');
             bool at_end = (p[2] == '/' || p[2] == '\\' || p[2] == '\0');
@@ -196,7 +196,7 @@ static bool should_skip_entry(const char* pathname, rac_bool_t skip_macos) {
     if (!pathname || pathname[0] == '\0')
         return true;
 
-    if (skip_macos) {
+    if (skip_macos == RAC_TRUE) {
         // Skip __MACOSX/ directory and its contents
         if (strstr(pathname, "__MACOSX") != nullptr)
             return true;
@@ -368,7 +368,7 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
         // Handle symbolic links
         unsigned int entry_type = archive_entry_filetype(entry);
         if (entry_type == AE_IFLNK) {
-            if (opts.skip_symlinks) {
+            if (opts.skip_symlinks == RAC_TRUE) {
                 result.entries_skipped++;
                 archive_read_data_skip(a);
                 continue;

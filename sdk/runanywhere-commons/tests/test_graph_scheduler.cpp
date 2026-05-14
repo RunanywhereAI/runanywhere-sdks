@@ -24,6 +24,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -48,7 +49,8 @@ static int g_passed = 0;
 
 #define CHECK(cond)                                                            \
     do {                                                                       \
-        if (!(cond)) {                                                         \
+        const bool _check_ok = static_cast<bool>(cond);                        \
+        if (!_check_ok) {                                                      \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
             g_failed++;                                                        \
             return;                                                            \
@@ -319,13 +321,20 @@ TEST(empty_scheduler) {
 // ---------------------------------------------------------------------------
 
 int main() {
-    run_test_streaming_correctness();
-    run_test_backpressure();
-    run_test_cancel_all_mid_stream();
-    run_test_split_merge_topology();
-    run_test_empty_scheduler();
+    try {
+        run_test_streaming_correctness();
+        run_test_backpressure();
+        run_test_cancel_all_mid_stream();
+        run_test_split_merge_topology();
+        run_test_empty_scheduler();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
-                 g_passed, g_failed);
-    return g_failed == 0 ? 0 : 1;
+        std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
+                     g_passed, g_failed);
+        return g_failed == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

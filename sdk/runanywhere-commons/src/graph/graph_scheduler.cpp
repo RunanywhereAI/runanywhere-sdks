@@ -9,13 +9,20 @@
 
 namespace rac::graph {
 
-GraphScheduler::GraphScheduler(size_t /*thread_pool_size*/) : root_(std::make_shared<CancelToken>()) {}
+GraphScheduler::GraphScheduler(size_t /*thread_pool_size*/)
+    : root_(std::make_shared<CancelToken>()) {}
 
 GraphScheduler::~GraphScheduler() {
     // Best-effort shutdown so a graph that's dropped mid-run doesn't leave
     // worker threads behind. Caller really should have called stop()+wait().
-    cancel_all();
-    wait();
+    // Swallow any node exceptions — propagating from a destructor would
+    // call std::terminate.
+    try {
+        cancel_all();
+        wait();
+    } catch (...) {  // NOLINT(bugprone-empty-catch)
+        // Intentionally swallow: destructors must not throw.
+    }
 }
 
 void GraphScheduler::add_node(std::shared_ptr<IPipelineNode> node) {

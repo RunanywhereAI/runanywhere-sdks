@@ -136,7 +136,7 @@ int test_synthetic_token_schedule() {
         } else {
             ASSERT_EQ(decoded.is_final(), true);
             ASSERT_EQ(decoded.finish_reason(), "stop");
-            ASSERT_EQ(decoded.token(), "");
+            ASSERT_TRUE(decoded.token().empty());
         }
     }
 

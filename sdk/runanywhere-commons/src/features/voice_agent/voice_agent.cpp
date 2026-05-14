@@ -103,7 +103,8 @@ inline void rac_va_emit(rac_voice_agent_handle_t handle, const rac_voice_agent_e
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -1786,10 +1787,18 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
         const char* name;
         const char* message;
     } required[] = {
-        {component_states.stt_state(), "stt", "STT component is not loaded"},
-        {component_states.llm_state(), "llm", "LLM component is not loaded"},
-        {component_states.tts_state(), "tts", "TTS component is not loaded"},
-        {component_states.vad_state(), "vad", "VAD component is not initialized"},
+        {.state = component_states.stt_state(),
+         .name = "stt",
+         .message = "STT component is not loaded"},
+        {.state = component_states.llm_state(),
+         .name = "llm",
+         .message = "LLM component is not loaded"},
+        {.state = component_states.tts_state(),
+         .name = "tts",
+         .message = "TTS component is not loaded"},
+        {.state = component_states.vad_state(),
+         .name = "vad",
+         .message = "VAD component is not initialized"},
     };
     for (const auto& entry : required) {
         if (entry.state != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {

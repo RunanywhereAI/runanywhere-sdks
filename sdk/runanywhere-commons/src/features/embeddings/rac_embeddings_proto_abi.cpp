@@ -3,6 +3,7 @@
  * @brief Proto-byte C ABI for embeddings service operations.
  */
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -74,8 +75,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_EMBEDDINGS);
-    event.set_severity(error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
-                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
+    event.set_severity((error != nullptr && error[0] != '\0')
+                           ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                           : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_EMBEDDINGS);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     event.set_source("cpp");
@@ -95,9 +97,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
 }
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED,
-                       operation, 0.0f, 0, 0,
-                       message && message[0] ? message : rac_error_message(code));
+    publish_capability(
+        runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED, operation, 0.0f, 0, 0,
+        (message != nullptr && message[0] != '\0') ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "embeddings", operation, RAC_TRUE);
 }
 
@@ -189,7 +191,8 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
                                           "failed to encode EmbeddingsResult");
     }
-    for (int i = 0; i < proto.vectors_size() && i < static_cast<int>(texts.size()); ++i) {
+    const int n_vectors_to_label = std::min(proto.vectors_size(), static_cast<int>(texts.size()));
+    for (int i = 0; i < n_vectors_to_label; ++i) {
         proto.mutable_vectors(i)->set_text(texts[static_cast<size_t>(i)]);
     }
     rc = copy_proto(proto, out_result);

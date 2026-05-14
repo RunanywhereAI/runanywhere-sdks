@@ -17,6 +17,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -66,8 +67,8 @@ std::string strip_url_suffix_noise(const std::string& url) {
 
 std::string to_lower(const std::string& s) {
     std::string out(s);
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(out, out.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -115,23 +116,28 @@ ArchiveMatch archive_from_suffix(const std::string& lower_url) {
     using runanywhere::v1::ArchiveType;
     using runanywhere::v1::ModelArtifactType;
     if (ends_with(lower_url, ".tar.gz") || ends_with(lower_url, ".tgz")) {
-        return {true, ArchiveType::ARCHIVE_TYPE_TAR_GZ,
-                ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE};
+        return {.is_archive = true,
+                .archive_type = ArchiveType::ARCHIVE_TYPE_TAR_GZ,
+                .artifact_type = ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE};
     }
     if (ends_with(lower_url, ".tar.bz2") || ends_with(lower_url, ".tbz2")) {
-        return {true, ArchiveType::ARCHIVE_TYPE_TAR_BZ2,
-                ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE};
+        return {.is_archive = true,
+                .archive_type = ArchiveType::ARCHIVE_TYPE_TAR_BZ2,
+                .artifact_type = ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE};
     }
     if (ends_with(lower_url, ".tar.xz") || ends_with(lower_url, ".txz")) {
-        return {true, ArchiveType::ARCHIVE_TYPE_TAR_XZ,
-                ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE};
+        return {.is_archive = true,
+                .archive_type = ArchiveType::ARCHIVE_TYPE_TAR_XZ,
+                .artifact_type = ModelArtifactType::MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE};
     }
     if (ends_with(lower_url, ".zip")) {
-        return {true, ArchiveType::ARCHIVE_TYPE_ZIP,
-                ModelArtifactType::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE};
+        return {.is_archive = true,
+                .archive_type = ArchiveType::ARCHIVE_TYPE_ZIP,
+                .artifact_type = ModelArtifactType::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE};
     }
-    return {false, ArchiveType::ARCHIVE_TYPE_UNSPECIFIED,
-            ModelArtifactType::MODEL_ARTIFACT_TYPE_SINGLE_FILE};
+    return {.is_archive = false,
+            .archive_type = ArchiveType::ARCHIVE_TYPE_UNSPECIFIED,
+            .artifact_type = ModelArtifactType::MODEL_ARTIFACT_TYPE_SINGLE_FILE};
 }
 
 // Some public catalog archives follow well-known naming patterns that let us

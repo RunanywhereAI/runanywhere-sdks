@@ -72,8 +72,11 @@ static rac_inference_framework_t detect_model_format_from_path(const char* path)
                 return RAC_FRAMEWORK_COREML;
             }
         }
-    } catch (const fs::filesystem_error&) {
-        // Ignore
+    } catch (const fs::filesystem_error&) {  // NOLINT(bugprone-empty-catch)
+        // Best-effort detection: a missing/inaccessible directory or
+        // permission error is not actionable here — fall through to
+        // RAC_FRAMEWORK_UNKNOWN so callers can probe other framework
+        // backends.
     }
     return RAC_FRAMEWORK_UNKNOWN;
 }

@@ -11,12 +11,12 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
-#define CHECK(cond, msg)                                                                        \
-    do {                                                                                        \
-        if (!(cond)) {                                                                          \
-            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            return 1;                                                                           \
-        }                                                                                       \
+#define CHECK(cond, msg)                                                                          \
+    do {                                                                                          \
+        if (!(cond)) {                                                                            \
+            std::cerr << "FAIL: " << (msg) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            return 1;                                                                             \
+        }                                                                                         \
     } while (0)
 
 namespace {
@@ -150,8 +150,8 @@ int main() {
     CHECK(rac_plugin_register(&k_probe_engine) == RAC_SUCCESS, "register probe engine");
     const rac_engine_vtable_t* selected = rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT);
     CHECK(selected == &k_probe_engine, "probe engine selected for LLM primitive");
-    CHECK(selected->llm_ops != nullptr && selected->llm_ops->create != nullptr,
-          "probe engine create op present");
+    CHECK(selected->llm_ops != nullptr, "probe engine llm_ops present");
+    CHECK(selected->llm_ops->create != nullptr, "probe engine create op present");
 
     void* impl = nullptr;
     CHECK(selected->llm_ops->create("/tmp/probe.gguf", nullptr, &impl) == RAC_SUCCESS,

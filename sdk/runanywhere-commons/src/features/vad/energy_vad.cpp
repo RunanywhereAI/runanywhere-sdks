@@ -14,6 +14,7 @@
 #include <cstring>
 #include <mutex>
 #include <new>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -209,7 +210,7 @@ static void handle_calibration_frame(rac_energy_vad* vad, const float energy) {
 
         // Calculate statistics (mirrors Swift logic)
         std::vector<float> sorted_samples = vad->calibration_samples;
-        std::sort(sorted_samples.begin(), sorted_samples.end());
+        std::ranges::sort(sorted_samples);
 
         const size_t count = sorted_samples.size();
         const float percentile_90 =

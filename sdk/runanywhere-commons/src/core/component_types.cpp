@@ -109,11 +109,16 @@ rac_capability_resource_type_t rac_component_to_resource_type(rac_sdk_component_
         case RAC_COMPONENT_VAD:
             return RAC_RESOURCE_VAD_MODEL;
         case RAC_COMPONENT_VOICE:
-            // Voice agent doesn't have a direct resource type
+            // Voice agent doesn't have a direct resource type. Sentinel -1
+            // is the documented "no resource" indicator at this public C ABI;
+            // adding a named enumerator would be a layout/source-compat break.
+            // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
             return static_cast<rac_capability_resource_type_t>(-1);
         case RAC_COMPONENT_EMBEDDING:
             return RAC_RESOURCE_LLM_MODEL;  // Embeddings use LLM models
         default:
+            // Unknown component → same -1 sentinel (see comment above).
+            // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
             return static_cast<rac_capability_resource_type_t>(-1);
     }
 }

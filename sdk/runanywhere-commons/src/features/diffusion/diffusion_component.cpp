@@ -121,7 +121,7 @@ static std::string generate_unique_id() {
     std::uniform_int_distribution<uint32_t> dis;
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "diff_%08x%08x", dis(gen), dis(gen));
-    return std::string(buffer);
+    return {buffer};
 }
 
 // =============================================================================
@@ -596,7 +596,7 @@ extern "C" uint32_t rac_diffusion_component_get_capabilities(rac_handle_t handle
     if (!service) {
         // Return default capabilities based on config
         uint32_t caps = RAC_DIFFUSION_CAP_TEXT_TO_IMAGE | RAC_DIFFUSION_CAP_INTERMEDIATE_IMAGES;
-        if (component->config.enable_safety_checker) {
+        if (component->config.enable_safety_checker == RAC_TRUE) {
             caps |= RAC_DIFFUSION_CAP_SAFETY_CHECKER;
         }
         return caps;

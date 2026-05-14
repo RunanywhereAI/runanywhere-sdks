@@ -64,11 +64,11 @@ static std::string generate_uuid_v4() {
     static thread_local std::uniform_int_distribution<> dis(0, 15);
     static const char* hex = "0123456789abcdef";
     std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
-    for (size_t i = 0; i < uuid.size(); i++) {
-        if (uuid[i] == 'x') {
-            uuid[i] = hex[dis(gen)];
-        } else if (uuid[i] == 'y') {
-            uuid[i] = hex[(dis(gen) % 4) + 8];
+    for (char& ch : uuid) {
+        if (ch == 'x') {
+            ch = hex[dis(gen)];
+        } else if (ch == 'y') {
+            ch = hex[(dis(gen) % 4) + 8];
         }
     }
     return uuid;
@@ -79,7 +79,8 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -914,7 +915,11 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
         const char* text;
         const char* voice_id;
         rac_tts_options_t options;
-    } context{callback, user_data, text, voice_id, options};
+    } context{.callback = callback,
+              .user_data = user_data,
+              .text = text,
+              .voice_id = voice_id,
+              .options = options};
 
     auto bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);

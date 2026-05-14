@@ -876,6 +876,7 @@ TEST(edge_capacity_limit_is_enforced) {
 
 TEST(invalid_edge_policy_is_rejected) {
     PipelineSpec spec = make_linear_spec();
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): intentional invalid input
     spec.mutable_edges(0)->set_policy(static_cast<EdgePolicy>(999));
 
     PipelineExecutor exec(spec);

@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -70,7 +71,7 @@ static std::string create_temp_dir(const std::string& suffix) {
         std::cerr << "Failed to create temp dir: " << tmpl << "\n";
         return "";
     }
-    return std::string(result);
+    return {result};
 #endif
 }
 
@@ -95,7 +96,7 @@ static std::string read_file_contents(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f.is_open())
         return "";
-    return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    return {(std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>()};
 }
 
 /** Write bytes to a file. */
@@ -557,7 +558,7 @@ static TestResult test_progress_callback_invoked() {
     std::string archive_path = create_test_tar_gz(archive_dir);
     ASSERT_TRUE(!archive_path.empty(), "Should create archive");
 
-    ProgressData progress = {0, 0, 0};
+    ProgressData progress = {.callback_count = 0, .last_files_extracted = 0, .last_bytes_extracted = 0};
     rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
                                                  test_progress_callback, &progress, nullptr);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction with progress should succeed");
@@ -1330,8 +1331,7 @@ static TestResult test_archive_type_from_path() {
 // Main: register tests and dispatch via CLI args
 // =============================================================================
 
-int main(int argc, char** argv) {
-    // Create shared temp directory for all tests
+int main_impl(int argc, char** argv) {
     g_test_dir = create_temp_dir("extraction");
     if (g_test_dir.empty()) {
         std::cerr << "FATAL: Cannot create temp directory\n";
@@ -1340,12 +1340,10 @@ int main(int argc, char** argv) {
 
     TestSuite suite("extraction");
 
-    // Null/error handling
     suite.add("null_pointer", test_null_pointer);
     suite.add("file_not_found", test_file_not_found);
     suite.add("unsupported_format", test_unsupported_format);
 
-    // Archive type detection (magic bytes)
     suite.add("detect_null", test_detect_null);
     suite.add("detect_nonexistent", test_detect_nonexistent);
     suite.add("detect_zip", test_detect_zip);
@@ -1358,11 +1356,9 @@ int main(int argc, char** argv) {
     suite.add("detect_real_tar_gz", test_detect_real_tar_gz);
     suite.add("detect_real_zip", test_detect_real_zip);
 
-    // Type helper functions
     suite.add("archive_type_extension", test_archive_type_extension);
     suite.add("archive_type_from_path", test_archive_type_from_path);
 
-    // Extraction
     suite.add("extract_tar_gz", test_extract_tar_gz);
     suite.add("extract_plain_tar", test_extract_plain_tar);
     suite.add("extract_zip", test_extract_zip);
@@ -1388,14 +1384,23 @@ int main(int argc, char** argv) {
     suite.add("extraction_result_stats", test_extraction_result_stats);
     suite.add("creates_dest_dir", test_creates_dest_dir);
 
-    // Options
     suite.add("default_options_skip_macos", test_default_options_skip_macos);
     suite.add("custom_options_keep_macos", test_custom_options_keep_macos);
 
     int result = suite.run(argc, argv);
 
-    // Cleanup shared temp directory
     remove_dir(g_test_dir);
 
     return result;
+}
+
+int main(int argc, char** argv) {
+    try {
+        return main_impl(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

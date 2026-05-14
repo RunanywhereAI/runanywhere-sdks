@@ -160,8 +160,7 @@
 // declare with their explicit `: int` underlying type so the compiler knows
 // their size at the function-prototype site.
 
-namespace runanywhere {
-namespace v1 {
+namespace runanywhere::v1 {
 
 // STT
 class STTConfiguration;
@@ -228,8 +227,7 @@ class SDKError;
 enum ErrorCode : int;
 enum ErrorCategory : int;
 
-}  // namespace v1
-}  // namespace runanywhere
+}  // namespace runanywhere::v1
 
 namespace rac::foundation {
 

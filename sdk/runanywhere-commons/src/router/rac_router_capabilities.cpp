@@ -15,6 +15,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -39,8 +40,8 @@ namespace {
 
 std::string to_lower(std::string_view s) {
     std::string out(s);
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(out, out.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -182,7 +183,7 @@ extern "C" rac_result_t rac_router_frameworks_for_capability_proto(const uint8_t
                 if (framework == runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
                     continue;
                 }
-                if (std::find(ordered.begin(), ordered.end(), framework) == ordered.end()) {
+                if (std::ranges::find(ordered, framework) == ordered.end()) {
                     ordered.push_back(framework);
                 }
             }

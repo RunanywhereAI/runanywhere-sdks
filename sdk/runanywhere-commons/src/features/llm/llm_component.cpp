@@ -99,7 +99,7 @@ static std::string generate_unique_id() {
     std::uniform_int_distribution<uint32_t> dis;
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "gen_%08x%08x", dis(gen), dis(gen));
-    return std::string(buffer);
+    return {buffer};
 }
 
 // =============================================================================

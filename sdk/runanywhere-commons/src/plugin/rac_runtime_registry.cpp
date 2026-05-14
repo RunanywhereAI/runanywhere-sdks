@@ -109,13 +109,10 @@ void insert_builtin(const rac_runtime_vtable_t* v, State& s) {
         if (e.id == v->metadata.id)
             return;
     }
-    Entry entry{.id = v->metadata.id,
-                .priority = v->metadata.priority,
-                .vtable = v,
-                .dl_handle = nullptr};
-    auto pos =
-        std::ranges::lower_bound(s.entries, entry,
-                                 [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
+    Entry entry{
+        .id = v->metadata.id, .priority = v->metadata.priority, .vtable = v, .dl_handle = nullptr};
+    auto pos = std::ranges::lower_bound(
+        s.entries, entry, [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
     s.entries.insert(pos, entry);
 }
 
@@ -185,13 +182,10 @@ void close_dynamic_handle(void* handle) {
 /** Remove the entry matching `id` (if any); returns the erased vtable so
  *  the caller can invoke `destroy()` outside the lock. */
 Entry take_entry_locked(State& s, rac_runtime_id_t id) {
-    auto it = std::ranges::find_if(s.entries,
-                                   [&](const Entry& e) { return e.id == id; });
+    auto it = std::ranges::find_if(s.entries, [&](const Entry& e) { return e.id == id; });
     if (it == s.entries.end())
-        return Entry{.id = RAC_RUNTIME_UNSPECIFIED,
-                     .priority = 0,
-                     .vtable = nullptr,
-                     .dl_handle = nullptr};
+        return Entry{
+            .id = RAC_RUNTIME_UNSPECIFIED, .priority = 0, .vtable = nullptr, .dl_handle = nullptr};
     Entry entry = *it;
     s.entries.erase(it);
     return entry;
@@ -199,9 +193,8 @@ Entry take_entry_locked(State& s, rac_runtime_id_t id) {
 
 /** Insert preserving descending priority order. */
 void insert_locked(State& s, Entry e) {
-    auto pos =
-        std::ranges::lower_bound(s.entries, e,
-                                 [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
+    auto pos = std::ranges::lower_bound(
+        s.entries, e, [](const Entry& a, const Entry& b) { return a.priority > b.priority; });
     s.entries.insert(pos, e);
 }
 
@@ -281,8 +274,8 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
     auto& s = state();
     std::unique_lock<std::mutex> lock(s.mu);
 
-    auto existing = std::ranges::find_if(s.entries,
-                                         [&](const Entry& e) { return e.id == vtable->metadata.id; });
+    auto existing = std::ranges::find_if(
+        s.entries, [&](const Entry& e) { return e.id == vtable->metadata.id; });
     if (existing != s.entries.end()) {
         if (vtable->metadata.priority < existing->priority) {
             RAC_LOG_DEBUG(

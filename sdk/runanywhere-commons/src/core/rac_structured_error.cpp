@@ -11,6 +11,7 @@
 #include <cstring>
 #include <ctime>
 #include <mutex>
+#include <utility>
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -226,7 +227,7 @@ int32_t rac_error_capture_stack_trace(rac_error_t* error) {
     if (symbols) {
         // Note: We can't store these strings directly because they're freed
         // For now, we just have addresses. Symbolication happens on the platform side.
-        free(symbols);
+        free(static_cast<void*>(symbols));
     }
 
     return captured;
@@ -637,11 +638,19 @@ char* rac_error_to_json(const rac_error_t* error) {
     // Clamp pos after snprintf to prevent buffer overrun
     // (snprintf returns count that WOULD be written, which can exceed available space)
     auto clamp = [&]() {
-        if (pos >= static_cast<int>(buffer_size))
+        if (std::cmp_greater_equal(pos, buffer_size))
             pos = static_cast<int>(buffer_size) - 1;
     };
 
-    // Write a JSON-escaped string into the buffer
+    // Write a JSON-escaped string into the buffer.
+    //
+    // The clamp() invariants above guarantee `pos` stays in
+    // [0, buffer_size - 1] before this lambda, and the loop guard
+    // `pos < static_cast<int>(buffer_size) - 2` plus per-branch
+    // re-checks ensure we only write within bounds. The static
+    // analyzer can't follow the path through clamp() / snprintf, so
+    // we silence its ArrayBound false positives here.
+    // NOLINTBEGIN(clang-analyzer-security.ArrayBound)
     auto write_escaped = [&](const char* str) {
         for (const char* p = str; *p != '\0' && pos < static_cast<int>(buffer_size) - 2; p++) {
             auto c = static_cast<unsigned char>(*p);
@@ -668,6 +677,7 @@ char* rac_error_to_json(const rac_error_t* error) {
             }
         }
     };
+    // NOLINTEND(clang-analyzer-security.ArrayBound)
 
     pos += snprintf(json + pos, buffer_size - pos, "{");
     clamp();
@@ -730,9 +740,8 @@ char* rac_error_to_json(const rac_error_t* error) {
 
     // Underlying error — escape the message
     if (error->underlying_code != 0) {
-        // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos,
-                        "\"underlying_code\":%d,\"underlying_message\":\"", error->underlying_code);
+                        R"("underlying_code":%d,"underlying_message":")", error->underlying_code);
         clamp();
         write_escaped(error->underlying_message);
         // NOLINTNEXTLINE(modernize-raw-string-literal)
@@ -768,11 +777,15 @@ char* rac_error_to_json(const rac_error_t* error) {
         clamp();
     }
 
-    // Remove trailing comma and close
+    // Remove trailing comma and close. Bounds checks above keep `pos`
+    // within [0, buffer_size - 1]; analyzer can't follow snprintf+clamp.
+    // NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
     if (pos > 0 && json[pos - 1] == ',')
         pos--;
     if (pos < static_cast<int>(buffer_size) - 1)
+        // NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
         json[pos++] = '}';
+    // NOLINTNEXTLINE(clang-analyzer-security.ArrayBound)
     json[pos] = '\0';
 
     return json;
@@ -845,7 +858,7 @@ char* rac_error_to_debug_string(const rac_error_t* error) {
     int pos = 0;
     // Clamp pos after snprintf to prevent buffer overrun
     auto clamp = [&]() {
-        if (pos >= static_cast<int>(size))
+        if (std::cmp_greater_equal(pos, size))
             pos = static_cast<int>(size) - 1;
     };
 

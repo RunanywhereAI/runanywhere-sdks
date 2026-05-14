@@ -380,9 +380,12 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
         return RAC_SUCCESS;
     }
 
-    // Allocate output
+    // Allocate output zero-initialised so any fields a strategy left unset
+    // (e.g., is_recommended) have a defined value (RAC_FALSE == 0). This
+    // also avoids clang-analyzer-core.UndefinedBinaryOperatorResult false
+    // positives in callers that read across the function-pointer boundary.
     auto* result = static_cast<rac_diffusion_model_def_t*>(
-        std::malloc(all_models.size() * sizeof(rac_diffusion_model_def_t)));
+        std::calloc(all_models.size(), sizeof(rac_diffusion_model_def_t)));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -450,9 +453,13 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
         return RAC_ERROR_NOT_FOUND;
     }
 
-    // Find first recommended model
+    // Find first recommended model. Copy the field locally so the static
+    // analyzer can prove the comparison LHS is fully read before the
+    // branch (avoids clang-analyzer-core.UndefinedBinaryOperatorResult
+    // false positive across the function-pointer boundary in list()).
     for (size_t i = 0; i < count; i++) {
-        if (models[i].is_recommended == RAC_TRUE) {
+        const rac_bool_t recommended = models[i].is_recommended;
+        if (recommended == RAC_TRUE) {
             *out_def = models[i];
             std::free(models);
             return RAC_SUCCESS;

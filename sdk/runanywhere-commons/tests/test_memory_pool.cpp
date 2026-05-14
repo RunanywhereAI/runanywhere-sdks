@@ -17,6 +17,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <memory>
 #include <string>
 #include <thread>
@@ -236,14 +237,21 @@ TEST(custom_factory) {
 // ---------------------------------------------------------------------------
 
 int main() {
-    run_test_pool_reuse();
-    run_test_try_acquire_empty();
-    run_test_acquire_timeout();
-    run_test_acquire_cancel();
-    run_test_leak_detection();
-    run_test_concurrent_stress();
-    run_test_custom_factory();
+    try {
+        run_test_pool_reuse();
+        run_test_try_acquire_empty();
+        run_test_acquire_timeout();
+        run_test_acquire_cancel();
+        run_test_leak_detection();
+        run_test_concurrent_stress();
+        run_test_custom_factory();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
-    return g_failed == 0 ? 0 : 1;
+        std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
+        return g_failed == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

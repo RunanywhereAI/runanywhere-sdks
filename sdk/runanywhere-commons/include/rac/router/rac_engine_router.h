@@ -28,8 +28,7 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/rac_hardware_profile.h"
 
-namespace rac {
-namespace router {
+namespace rac::router {
 
 /**
  * @brief Inputs to a single routing decision.
@@ -89,7 +88,6 @@ class EngineRouter {
     const HardwareProfile& profile_;
 };
 
-}  // namespace router
-}  // namespace rac
+}  // namespace rac::router
 
 #endif /* RAC_ROUTER_ENGINE_ROUTER_H */

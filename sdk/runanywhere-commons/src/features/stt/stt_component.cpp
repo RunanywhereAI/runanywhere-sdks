@@ -77,7 +77,7 @@ static std::string generate_unique_id() {
     std::uniform_int_distribution<uint32_t> dis;
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "trans_%08x%08x", dis(gen), dis(gen));
-    return std::string(buffer);
+    return {buffer};
 }
 
 /**
@@ -105,7 +105,8 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -1016,7 +1017,12 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         uint64_t next_seq;
         rac_stt_options_t options;
         size_t audio_size;
-    } context{callback, user_data, request_id, 1, options, audio_size};
+    } context{.callback = callback,
+              .user_data = user_data,
+              .request_id = request_id,
+              .next_seq = 1,
+              .options = options,
+              .audio_size = audio_size};
 
     runanywhere::v1::STTStreamEvent started;
     started.set_seq(context.next_seq++);

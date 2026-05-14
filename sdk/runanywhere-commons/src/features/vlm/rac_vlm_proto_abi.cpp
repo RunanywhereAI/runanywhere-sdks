@@ -94,8 +94,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
                         float progress, int64_t input_count, int64_t output_count,
                         const char* error) {
     runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
-                                                : runanywhere::v1::ERROR_SEVERITY_INFO);
+    populate_envelope(&event, (error != nullptr && error[0] != '\0')
+                                  ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                  : runanywhere::v1::ERROR_SEVERITY_INFO);
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
@@ -112,8 +113,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
 }
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED, operation, 0.0f,
-                       0, 0, message && message[0] ? message : rac_error_message(code));
+    publish_capability(
+        runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED, operation, 0.0f, 0, 0,
+        (message != nullptr && message[0] != '\0') ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "vlm", operation, RAC_TRUE);
 }
 
@@ -294,7 +296,7 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
     event.set_request_id(ctx->request_id);
     event.set_kind(kind);
     event.set_is_final(is_final);
-    if (token && token[0]) {
+    if (token != nullptr && token[0] != '\0') {
         event.set_token(token);
         event.set_token_index(ctx->token_count - 1);
     }
@@ -302,7 +304,7 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
         event.mutable_result()->CopyFrom(*result);
         event.set_tokens_per_second(result->tokens_per_second());
     }
-    if (error_message && error_message[0]) {
+    if (error_message != nullptr && error_message[0] != '\0') {
         event.set_error_message(error_message);
     }
     if (error_code != 0) {
@@ -337,7 +339,7 @@ rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data)
 
     const char* safe_token = token ? token : "";
     ctx->text += safe_token;
-    if (safe_token[0]) {
+    if (safe_token[0] != '\0') {
         ++ctx->token_count;
     }
 
@@ -763,7 +765,10 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                            rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
     if (cancelled) {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{nullptr, nullptr, ctx.text, ctx.token_count},
+        populate_result_from_stream(StreamCtx{.callback = nullptr,
+                                              .user_data = nullptr,
+                                              .text = ctx.text,
+                                              .token_count = ctx.token_count},
                                     elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
@@ -774,7 +779,10 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         publish_failure(rc, "vlm.stream", rac_error_message(rc));
     } else {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{nullptr, nullptr, ctx.text, ctx.token_count},
+        populate_result_from_stream(StreamCtx{.callback = nullptr,
+                                              .user_data = nullptr,
+                                              .text = ctx.text,
+                                              .token_count = ctx.token_count},
                                     elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);

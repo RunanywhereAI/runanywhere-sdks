@@ -83,7 +83,7 @@ namespace {
 
 int g_capability_check_rc = RAC_SUCCESS;
 
-rac_result_t fake_capability_check(void) {
+rac_result_t fake_capability_check() {
     return g_capability_check_rc;
 }
 
@@ -192,11 +192,11 @@ int test_failed = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++test_failed;                                                                       \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -303,7 +303,9 @@ int main() {
         size_t n = 0;
         rac_plugin_list(RAC_PRIMITIVE_GENERATE_TEXT, arr, 4, &n);
         CHECK(n == 3, "priority: list returns 3");
-        CHECK(arr[0] == &b && arr[1] == &c && arr[2] == &a, "priority: sorted desc");
+        CHECK(arr[0] == &b, "priority: sorted desc (highest)");
+        CHECK(arr[1] == &c, "priority: sorted desc (middle)");
+        CHECK(arr[2] == &a, "priority: sorted desc (lowest)");
         rac_plugin_unregister("a");
         rac_plugin_unregister("b");
         rac_plugin_unregister("c");
@@ -328,9 +330,11 @@ int main() {
         CHECK(rac_plugin_register(&k_manifest_vtable) == RAC_SUCCESS, "manifest: register ok");
         const rac_engine_manifest_t* found = rac_engine_manifest_find("manifested");
         CHECK(found == &k_manifest, "manifest: find returns accepted manifest");
-        CHECK(found != nullptr && found->availability == RAC_ENGINE_AVAILABILITY_PUBLIC &&
-                  std::strcmp(found->package_owner, "runanywhere-tests") == 0,
-              "manifest: ownership and availability readable");
+        CHECK(found != nullptr, "manifest: ownership and availability readable (non-null)");
+        CHECK(found->availability == RAC_ENGINE_AVAILABILITY_PUBLIC,
+              "manifest: ownership and availability readable (availability)");
+        CHECK(std::strcmp(found->package_owner, "runanywhere-tests") == 0,
+              "manifest: ownership and availability readable (owner)");
         CHECK(rac_plugin_unregister("manifested") == RAC_SUCCESS, "manifest: unregister ok");
         CHECK(rac_engine_manifest_find("manifested") == nullptr,
               "manifest: unregister removes manifest");

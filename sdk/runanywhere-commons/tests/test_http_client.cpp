@@ -20,7 +20,9 @@
 #include <arpa/inet.h>
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <netinet/in.h>
 #include <sstream>
@@ -59,7 +61,7 @@ std::vector<uint8_t> make_payload(size_t n) {
 
 // 512 KiB gives transport adapters enough chunks for cancellation /
 // resume tests to reliably observe mid-stream state.
-std::vector<uint8_t> g_payload = make_payload(512 * 1024);
+std::vector<uint8_t> g_payload = make_payload(static_cast<size_t>(512) * 1024);
 
 void write_all(int fd, const void* buf, size_t n) {
     const char* p = static_cast<const char*>(buf);
@@ -194,7 +196,7 @@ void handle_client(int client) {
         respond(client, 200, "OK", "slow-ok");
     } else if (g_last_path == "/payload") {
         std::string range = header_value("Range");
-        if (!range.empty() && range.rfind("bytes=", 0) == 0) {
+        if (!range.empty() && range.starts_with("bytes=")) {
             size_t from = 0;
             try {
                 from = std::stoul(range.substr(6));
@@ -454,7 +456,7 @@ struct collect_ctx {
 rac_bool_t collect_chunks(const uint8_t* chunk, size_t len, uint64_t, uint64_t, void* user) {
     auto* ctx = static_cast<collect_ctx*>(user);
     ctx->bytes.insert(ctx->bytes.end(), chunk, chunk + len);
-    if (ctx->stop_after && ctx->bytes.size() >= ctx->stop_after) {
+    if (ctx->stop_after != 0 && ctx->bytes.size() >= ctx->stop_after) {
         return RAC_FALSE;
     }
     return RAC_TRUE;
@@ -546,26 +548,33 @@ void test_invalid_arguments() {
 }  // namespace
 
 int main() {
-    std::cout << "=== rac_http_client tests ===\n";
+    try {
+        std::cout << "=== rac_http_client tests ===\n";
 
-    if (!start_server()) {
-        std::cerr << "failed to start loopback HTTP server\n";
+        if (!start_server()) {
+            std::cerr << "failed to start loopback HTTP server\n";
+            return 1;
+        }
+        std::cout << "loopback server listening on 127.0.0.1:" << g_server_port << "\n";
+
+        test_get_happy_path();
+        test_post_roundtrip();
+        test_put_and_delete();
+        test_custom_headers();
+        test_redirects();
+        test_timeout();
+        test_streaming_cancellation();
+        test_resume_merged_matches();
+        test_invalid_arguments();
+
+        stop_server();
+
+        std::cout << "passes=" << g_passes << " failures=" << g_failures << "\n";
+        return g_failures == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
         return 1;
     }
-    std::cout << "loopback server listening on 127.0.0.1:" << g_server_port << "\n";
-
-    test_get_happy_path();
-    test_post_roundtrip();
-    test_put_and_delete();
-    test_custom_headers();
-    test_redirects();
-    test_timeout();
-    test_streaming_cancellation();
-    test_resume_merged_matches();
-    test_invalid_arguments();
-
-    stop_server();
-
-    std::cout << "passes=" << g_passes << " failures=" << g_failures << "\n";
-    return g_failures == 0 ? 0 : 1;
 }

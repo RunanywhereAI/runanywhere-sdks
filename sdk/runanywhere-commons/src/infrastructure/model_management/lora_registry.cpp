@@ -14,6 +14,7 @@
 #include <map>
 #include <mutex>
 #include <new>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -99,7 +100,7 @@ static void free_lora_entry(rac_lora_entry_t* entry) {
             if (entry->compatible_model_ids[i])
                 free(entry->compatible_model_ids[i]);
         }
-        free(entry->compatible_model_ids);
+        free(static_cast<void*>(entry->compatible_model_ids));
     }
     free(entry);
 }
@@ -147,8 +148,8 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 
 std::string lowercase_ascii(const std::string& value) {
     std::string lowered = value;
-    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(lowered, lowered.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lowered;
 }
 
@@ -184,7 +185,7 @@ void preserve_completion_state(const runanywhere::v1::LoraAdapterCatalogEntry& f
 }
 
 bool parse_snapshot(const std::string& bytes, runanywhere::v1::LoraAdapterCatalogEntry* out) {
-    return out && out->ParseFromArray(bytes.data(), static_cast<int>(bytes.size()));
+    return out != nullptr && out->ParseFromArray(bytes.data(), static_cast<int>(bytes.size()));
 }
 
 rac_result_t store_catalog_snapshot_locked(rac_lora_registry_handle_t handle,
@@ -436,7 +437,7 @@ rac_result_t rac_lora_registry_get_all(rac_lora_registry_handle_t handle,
         if (!(*out_entries)[i]) {
             for (size_t j = 0; j < i; ++j)
                 free_lora_entry((*out_entries)[j]);
-            free(*out_entries);
+            free(static_cast<void*>(*out_entries));
             *out_entries = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -478,7 +479,7 @@ rac_result_t rac_lora_registry_get_for_model(rac_lora_registry_handle_t handle,
         if (!(*out_entries)[i]) {
             for (size_t j = 0; j < i; ++j)
                 free_lora_entry((*out_entries)[j]);
-            free(*out_entries);
+            free(static_cast<void*>(*out_entries));
             *out_entries = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -512,7 +513,7 @@ void rac_lora_entry_array_free(rac_lora_entry_t** entries, size_t count) {
         return;
     for (size_t i = 0; i < count; ++i)
         free_lora_entry(entries[i]);
-    free(entries);
+    free(static_cast<void*>(entries));
 }
 
 rac_lora_entry_t* rac_lora_entry_copy(const rac_lora_entry_t* entry) {

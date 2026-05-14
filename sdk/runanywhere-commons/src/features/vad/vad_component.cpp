@@ -120,7 +120,8 @@ std::unordered_map<rac_handle_t, ProtoStreamSlot>& proto_stream_slots() {
 }
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -263,7 +264,7 @@ void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) 
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
         auto it = proto_stream_slots().find(handle);
-        if (it == proto_stream_slots().end() || !it->second.callback) {
+        if (it == proto_stream_slots().end() || it->second.callback == nullptr) {
             return;
         }
         slot = it->second;
@@ -1046,8 +1047,8 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
     }
 
     const float energy = compute_rms_energy(samples, num_samples);
-    const float confidence =
-        threshold > 0.0f ? std::min(1.0f, energy / threshold) : (is_speech ? 1.0f : 0.0f);
+    const float confidence = threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                              : (is_speech == RAC_TRUE ? 1.0f : 0.0f);
     const int32_t duration_ms = static_cast<int32_t>(
         (static_cast<double>(num_samples) /
          static_cast<double>(sample_rate > 0 ? sample_rate : RAC_VAD_DEFAULT_SAMPLE_RATE)) *
@@ -1115,8 +1116,10 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
 
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
-        proto_stream_slots()[handle] =
-            ProtoStreamSlot{callback, user_data, make_vad_request_id(handle), 1};
+        proto_stream_slots()[handle] = ProtoStreamSlot{.callback = callback,
+                                                       .user_data = user_data,
+                                                       .request_id = make_vad_request_id(handle),
+                                                       .next_seq = 1};
     }
     return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
 #endif

@@ -274,8 +274,9 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
         if (any_runtime_reject && !any_other_reject) {
             return RouteResult{.vtable = nullptr,
                                .score = -1,
-                               .rejection_reason = "no registered runtime satisfies any candidate "
-                                                   "engine's declared runtimes"};
+                               .rejection_reason =
+                                   "no registered runtime satisfies any candidate "
+                                   "engine's declared runtimes"};
         }
         return RouteResult{.vtable = nullptr,
                            .score = -1,
@@ -308,9 +309,8 @@ std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const 
         int s = score(*vt, req);
         out.push_back(RouteResult{.vtable = vt, .score = s, .rejection_reason = {}});
     }
-    std::ranges::sort(out, [](const RouteResult& a, const RouteResult& b) {
-        return a.score > b.score;
-    });
+    std::ranges::sort(out,
+                      [](const RouteResult& a, const RouteResult& b) { return a.score > b.score; });
     return out;
 }
 

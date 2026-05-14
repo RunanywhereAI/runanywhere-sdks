@@ -110,7 +110,7 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Step 1: Check if already registered
     // Production behavior: Skip if already registered (performance, network efficiency)
     // Development behavior: Always update via UPSERT (track active devices, update last_seen_at)
-    rac_bool_t was_registered =
+    const bool was_registered =
         state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
     if (was_registered && env != RAC_ENV_DEVELOPMENT) {
         RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping (production mode)");

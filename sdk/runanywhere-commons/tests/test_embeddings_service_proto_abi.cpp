@@ -19,11 +19,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -40,7 +40,8 @@ void check_embeddings_rpc(const google::protobuf::ServiceDescriptor* service,
           "Embeddings RPC accepts EmbeddingsRequest");
     CHECK(method->output_type()->full_name() == "runanywhere.v1.EmbeddingsResult",
           "Embeddings RPC returns EmbeddingsResult");
-    CHECK(!method->client_streaming() && !method->server_streaming(), "Embeddings RPC is unary");
+    CHECK(!(method->client_streaming() || method->server_streaming()),
+          "Embeddings RPC is unary");
 }
 
 int test_embeddings_generated_service_contract() {

@@ -25,8 +25,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 
-namespace rac {
-namespace http {
+namespace rac::http {
 
 /**
  * @brief Snapshot of upsert-mode state for a single dispatch.
@@ -58,5 +57,4 @@ struct UpsertTransform {
  */
 UpsertTransform consume_upsert_transform(const rac_http_request_t* req);
 
-}  // namespace http
-}  // namespace rac
+}  // namespace rac::http

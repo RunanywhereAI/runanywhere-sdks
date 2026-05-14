@@ -31,8 +31,7 @@
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 namespace {
 
@@ -403,5 +402,4 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     return out_result.status;
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

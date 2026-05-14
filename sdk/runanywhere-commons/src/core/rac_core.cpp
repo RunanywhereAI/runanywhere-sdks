@@ -254,7 +254,7 @@ rac_result_t rac_extract_archive(const char* archive_path, const char* destinati
         rac_extract_progress_callback_fn callback;
         void* user_data;
     };
-    bridge_ctx ctx = {progress_callback, callback_user_data};
+    bridge_ctx ctx = {.callback = progress_callback, .user_data = callback_user_data};
 
     rac_extraction_progress_fn bridged_callback = nullptr;
     void* bridged_user_data = nullptr;

@@ -430,14 +430,14 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         // Production: Flush based on batch size or timeout
         // (completion events are handled in rac_telemetry_manager_track_analytics)
         // Flush if queue reaches batch size
-        if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
+        if (queue_size >= rac_telemetry_manager::BATCH_SIZE_PRODUCTION) {
             should_flush = true;
             RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                          queue_size, manager->BATCH_SIZE_PRODUCTION);
+                          queue_size, rac_telemetry_manager::BATCH_SIZE_PRODUCTION);
         }
         // Flush if timeout reached (5 seconds since last flush)
-        else if (manager->last_flush_time_ms > 0 &&
-                 (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
+        else if (manager->last_flush_time_ms > 0 && (current_time - manager->last_flush_time_ms) >=
+                                                        rac_telemetry_manager::BATCH_TIMEOUT_MS) {
             should_flush = true;
             RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
                           current_time - manager->last_flush_time_ms);
@@ -809,7 +809,7 @@ void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_b
     if (!manager)
         return;
 
-    if (success) {
+    if (success == RAC_TRUE) {
         RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
     } else {
         RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",

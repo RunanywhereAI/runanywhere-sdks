@@ -6,7 +6,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -242,9 +244,9 @@ struct EventSink {
     const runanywhere::v1::ToolCallingSessionEvent*
     find_last(runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
         std::lock_guard<std::mutex> lg(mu);
-        for (auto it = events.rbegin(); it != events.rend(); ++it) {
-            if (it->kind_case() == kind)
-                return &*it;
+        for (auto& event : std::ranges::reverse_view(events)) {
+            if (event.kind_case() == kind)
+                return &event;
         }
         return nullptr;
     }
@@ -290,7 +292,7 @@ int test_session_emits_tool_call() {
         return 1;
     }
     set_responses({
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
     });
 
     EventSink sink;
@@ -326,7 +328,7 @@ int test_step_with_result_emits_final() {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
         "The weather in Tokyo is sunny, 25C.",
     });
 
@@ -348,7 +350,7 @@ int test_step_with_result_emits_final() {
     const auto* tool_ev = sink.find_first(EvCase::kToolCall);
     if (tool_ev)
         step.set_tool_call_id(tool_ev->tool_call().id());
-    step.set_result_json("{\"temp\":25,\"condition\":\"sunny\"}");
+    step.set_result_json(R"({"temp":25,"condition":"sunny"})");
     std::vector<uint8_t> step_bytes;
     serialize(step, &step_bytes);
 
@@ -380,9 +382,9 @@ int test_iteration_cap_respected() {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"A\"}}</tool_call>",
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"B\"}}</tool_call>",
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"C\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"B"}}</tool_call>)",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"C"}}</tool_call>)",
     });
 
     EventSink sink;
@@ -468,20 +470,27 @@ int test_destroy_clears_state() {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_tool_calling_session_proto\n");
+    try {
+        std::fprintf(stdout, "test_tool_calling_session_proto\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: no protobuf\n");
-    return 0;
+        std::fprintf(stdout, "  skip: no protobuf\n");
+        return 0;
 #else
-    test_session_emits_tool_call();
-    test_step_with_result_emits_final();
-    test_iteration_cap_respected();
-    test_destroy_clears_state();
-    if (g_registry) {
-        rac_model_registry_destroy(g_registry);
-        g_registry = nullptr;
-    }
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        test_session_emits_tool_call();
+        test_step_with_result_emits_final();
+        test_iteration_cap_respected();
+        test_destroy_clears_state();
+        if (g_registry) {
+            rac_model_registry_destroy(g_registry);
+            g_registry = nullptr;
+        }
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

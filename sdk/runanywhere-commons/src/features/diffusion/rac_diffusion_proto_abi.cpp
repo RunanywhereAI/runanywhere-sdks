@@ -77,8 +77,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_DIFFUSION);
-    event.set_severity(error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
-                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
+    event.set_severity(error && error[0] != '\0' ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                                 : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     event.set_source("cpp");
@@ -97,7 +97,7 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED, operation,
-                       0.0f, message && message[0] ? message : rac_error_message(code));
+                       0.0f, message && message[0] != '\0' ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "diffusion", operation, RAC_TRUE);
 }
 

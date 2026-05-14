@@ -65,7 +65,8 @@ void rac_benchmark_set_metrics_provider(rac_benchmark_metrics_provider_fn provid
         return;
     }
 
-    store_provider(std::make_shared<ProviderWrapper>(ProviderWrapper{provider, user_data}));
+    store_provider(
+        std::make_shared<ProviderWrapper>(ProviderWrapper{.fn = provider, .user_data = user_data}));
 }
 
 void rac_benchmark_capture_metrics(rac_benchmark_extended_metrics_t* out) {

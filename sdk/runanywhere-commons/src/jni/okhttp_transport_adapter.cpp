@@ -282,7 +282,7 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method,
                                                  j_url, j_headers, j_body, j_timeout_ms);
 
-    if (env->ExceptionCheck()) {
+    if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
         env->ExceptionClear();
         if (j_method)
@@ -436,7 +436,7 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
                                                  j_method, j_url, j_headers, j_body, j_timeout_ms,
                                                  j_native_cb, j_native_ud);
 
-    if (env->ExceptionCheck()) {
+    if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();
         env->ExceptionClear();
         if (j_method)
@@ -605,7 +605,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     jclass local_cls = env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport");
     if (local_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: OkHttpTransport class not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         return RAC_ERROR_INTERNAL;
     }
@@ -624,7 +624,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;");
     if (g.execute_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeRequest method not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         g.transport_cls = nullptr;
@@ -639,7 +639,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
     if (g.execute_streaming_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeStreamingRequest method not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         g.transport_cls = nullptr;
@@ -652,7 +652,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse");
     if (local_resp_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: HttpResponse class not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         g.transport_cls = nullptr;
@@ -671,7 +671,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     if (g.f_status_code == nullptr || g.f_headers == nullptr || g.f_body_bytes == nullptr ||
         g.f_error_message == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: HttpResponse fields not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         env->DeleteGlobalRef(g.response_cls);
@@ -687,7 +687,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse");
     if (local_sr_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: StreamResponse class not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         env->DeleteGlobalRef(g.response_cls);
@@ -709,7 +709,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     if (g.f_sr_status_code == nullptr || g.f_sr_headers == nullptr ||
         g.f_sr_error_message == nullptr || g.f_sr_cancelled == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: StreamResponse fields not found");
-        if (env->ExceptionCheck())
+        if (env->ExceptionCheck() == JNI_TRUE)
             env->ExceptionClear();
         env->DeleteGlobalRef(g.transport_cls);
         env->DeleteGlobalRef(g.response_cls);
@@ -772,7 +772,10 @@ Java_com_runanywhere_sdk_httptransport_OkHttpHttpTransport_deliverChunkNative(
         // Nothing to forward: don't cancel the call, just skip this chunk.
         return JNI_TRUE;
     }
+    // jlong opaque handles round-trip C function/user-data pointers across the JNI ABI.
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto cb = reinterpret_cast<rac_http_body_chunk_fn>(static_cast<uintptr_t>(native_callback));
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
     auto ud = reinterpret_cast<void*>(static_cast<uintptr_t>(native_user_data));
 
     // Pull the bytes into a stack-free heap buffer so the callback can

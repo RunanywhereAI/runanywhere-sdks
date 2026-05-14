@@ -19,11 +19,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -38,7 +38,8 @@ void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const c
 
     CHECK(method->input_type()->full_name() == input_type, "ModelRegistry RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "ModelRegistry RPC output type");
-    CHECK(!method->client_streaming() && !method->server_streaming(), "ModelRegistry RPC is unary");
+    CHECK(!(method->client_streaming() || method->server_streaming()),
+          "ModelRegistry RPC is unary");
 }
 
 int test_model_registry_generated_service_contract() {

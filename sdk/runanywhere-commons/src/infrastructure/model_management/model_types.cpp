@@ -952,8 +952,7 @@ rac_result_t rac_model_id_from_url(const char* url, char* out, size_t out_size) 
             break;
         }
         std::string ext = filename.substr(dot_pos + 1);
-        std::ranges::transform(ext, ext.begin(),
-                               [](unsigned char c) { return std::tolower(c); });
+        std::ranges::transform(ext, ext.begin(), [](unsigned char c) { return std::tolower(c); });
         for (const char* known : kKnownExtensions) {
             if (ext == known) {
                 filename.resize(dot_pos);

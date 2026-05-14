@@ -79,8 +79,9 @@ inline uint32_t rotr(uint32_t x, uint32_t n) {
 void sha256_transform(sha256_ctx* ctx, const uint8_t* data) {
     uint32_t w[64];
     for (int i = 0; i < 16; ++i) {
-        w[i] = (uint32_t(data[i * 4]) << 24) | (uint32_t(data[i * 4 + 1]) << 16) |
-               (uint32_t(data[i * 4 + 2]) << 8) | (uint32_t(data[i * 4 + 3]));
+        const size_t base = static_cast<size_t>(i) * 4;
+        w[i] = (uint32_t(data[base]) << 24) | (uint32_t(data[base + 1]) << 16) |
+               (uint32_t(data[base + 2]) << 8) | (uint32_t(data[base + 3]));
     }
     for (int i = 16; i < 64; ++i) {
         uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
@@ -161,10 +162,11 @@ void sha256_final(sha256_ctx* ctx, uint8_t out[32]) {
     }
     sha256_transform(ctx, ctx->buffer);
     for (int i = 0; i < 8; ++i) {
-        out[i * 4] = uint8_t(ctx->state[i] >> 24);
-        out[i * 4 + 1] = uint8_t(ctx->state[i] >> 16);
-        out[i * 4 + 2] = uint8_t(ctx->state[i] >> 8);
-        out[i * 4 + 3] = uint8_t(ctx->state[i]);
+        const size_t base = static_cast<size_t>(i) * 4;
+        out[base] = uint8_t(ctx->state[i] >> 24);
+        out[base + 1] = uint8_t(ctx->state[i] >> 16);
+        out[base + 2] = uint8_t(ctx->state[i] >> 8);
+        out[base + 3] = uint8_t(ctx->state[i]);
     }
 }
 
@@ -340,7 +342,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // the rest. Otherwise the final digest wouldn't cover the whole
     // file.
     sha256_ctx hasher;
-    bool do_hash = (req->expected_sha256_hex && req->expected_sha256_hex[0] != '\0');
+    bool do_hash = (req->expected_sha256_hex != nullptr && req->expected_sha256_hex[0] != '\0');
     if (do_hash) {
         sha256_init(&hasher);
         if (req->resume_from_byte > 0) {
@@ -349,7 +351,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                 rac_http_client_destroy(client);
                 return RAC_HTTP_DL_FILE_ERROR;
             }
-            std::vector<uint8_t> buf(64 * 1024);
+            std::vector<uint8_t> buf(static_cast<size_t>(64) * 1024);
             uint64_t remaining = req->resume_from_byte;
             while (remaining > 0 && in.good()) {
                 size_t chunk = static_cast<size_t>(std::min<uint64_t>(buf.size(), remaining));
@@ -370,7 +372,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     http_req.headers = req->headers;
     http_req.header_count = req->header_count;
     http_req.timeout_ms = req->timeout_ms;
-    http_req.follow_redirects = req->follow_redirects == RAC_TRUE ? RAC_TRUE : RAC_TRUE;
+    http_req.follow_redirects = RAC_TRUE;
 
     // ---- Drive the transfer ----------------------------------------
     dl_ctx ctx{};

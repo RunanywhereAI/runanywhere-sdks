@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -139,18 +140,23 @@ int test_stt_stream_events() {
         const std::string request_id = events[0].request_id();
         CHECK(events[0].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED,
               "STT first event is started");
-        CHECK(events[1].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL &&
-                  events[1].has_partial() && events[1].partial().text() == "draft",
-              "STT second event carries partial payload");
-        CHECK(events[2].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
-                  events[2].has_partial() && events[2].partial().is_final() &&
-                  events[2].has_final_output() && events[2].final_output().text() == "final text",
-              "STT final event carries generated final payload");
-        CHECK(events[0].seq() == 1 && events[1].seq() == 2 && events[2].seq() == 3,
-              "STT stream sequence is monotonic");
-        CHECK(!request_id.empty() && events[1].request_id() == request_id &&
-                  events[2].request_id() == request_id,
-              "STT stream request_id is stable");
+        CHECK(events[1].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL,
+              "STT second event is PARTIAL kind");
+        CHECK(events[1].has_partial(), "STT second event has partial payload");
+        CHECK(events[1].partial().text() == "draft", "STT second event partial text matches");
+        CHECK(events[2].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL,
+              "STT final event is FINAL kind");
+        CHECK(events[2].has_partial(), "STT final event has partial payload");
+        CHECK(events[2].partial().is_final(), "STT final event partial marked final");
+        CHECK(events[2].has_final_output(), "STT final event has final output");
+        CHECK(events[2].final_output().text() == "final text",
+              "STT final event final output text matches");
+        CHECK(events[0].seq() == 1, "STT stream first seq is 1");
+        CHECK(events[1].seq() == 2, "STT stream second seq is 2");
+        CHECK(events[2].seq() == 3, "STT stream third seq is 3");
+        CHECK(!request_id.empty(), "STT stream request_id is non-empty");
+        CHECK(events[1].request_id() == request_id, "STT stream request_id stable on second event");
+        CHECK(events[2].request_id() == request_id, "STT stream request_id stable on third event");
     }
 
     rac_stt_component_destroy(stt);
@@ -207,6 +213,7 @@ rac_result_t mock_persistent_stt_stream_create(void* /*impl*/, const rac_stt_opt
     g_stream_state.create_count++;
     // Use a sentinel non-null pointer so commons recognizes the stream
     // as valid. The mock never dereferences it.
+    // NOLINTNEXTLINE(performance-no-int-to-ptr): intentional sentinel handle for mock stream
     g_stream_state.last_stream = reinterpret_cast<rac_handle_t>(static_cast<intptr_t>(0xdeadbeef));
     *out_stream_handle = g_stream_state.last_stream;
     return RAC_SUCCESS;
@@ -317,11 +324,11 @@ int test_stt_persistent_stream_handle() {
     }
 
     CHECK(g_stream_state.create_count == 1, "stream_create invoked exactly once across 100 chunks");
-    CHECK(g_stream_state.feed_count == static_cast<int>(kChunksToFeed),
+    CHECK(std::cmp_equal(g_stream_state.feed_count, kChunksToFeed),
           "stream_feed_audio_chunk invoked once per chunk");
     CHECK(g_stream_state.transcribe_stream_count == 0,
           "legacy transcribe_stream fallback NOT engaged when slot is wired");
-    CHECK(proto_events == static_cast<int>(kChunksToFeed),
+    CHECK(std::cmp_equal(proto_events, kChunksToFeed),
           "every chunk emits a partial STTStreamEvent");
 
     CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS, "stream session stops");
@@ -391,14 +398,21 @@ int main() {
     std::fprintf(stdout, "  skip: STT/VAD stream event tests (no protobuf)\n");
     return 0;
 #else
-    test_stt_stream_events();
-    test_stt_persistent_stream_handle();
-    test_vad_activity_stream_event();
-    if (fail_count != 0) {
-        std::fprintf(stderr, "FAILED: %d/%d checks failed\n", fail_count, test_count);
+    try {
+        test_stt_stream_events();
+        test_stt_persistent_stream_handle();
+        test_vad_activity_stream_event();
+        if (fail_count != 0) {
+            std::fprintf(stderr, "FAILED: %d/%d checks failed\n", fail_count, test_count);
+            return 1;
+        }
+        std::fprintf(stdout, "PASS: %d checks\n", test_count);
+        return 0;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
         return 1;
     }
-    std::fprintf(stdout, "PASS: %d checks\n", test_count);
-    return 0;
 #endif
 }

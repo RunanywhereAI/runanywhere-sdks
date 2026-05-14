@@ -85,12 +85,12 @@ void set_proto_string_or_empty(Setter setter, const char* src) {
 // base language code.
 
 ::runanywhere::v1::STTLanguage stt_language_from_string(const char* lang) {
-    if (!lang || !*lang)
+    if (!lang || *lang == '\0')
         return ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
     // Take the first 2 chars, lowercase, ignore region after '-' / '_'.
     char base[3] = {0, 0, 0};
     base[0] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[0])));
-    if (lang[1] && lang[1] != '-' && lang[1] != '_') {
+    if (lang[1] != '\0' && lang[1] != '-' && lang[1] != '_') {
         base[1] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[1])));
     }
     static const std::unordered_map<std::string, ::runanywhere::v1::STTLanguage> table = {
@@ -245,7 +245,7 @@ bool rac_stt_options_to_proto(const rac_stt_options_t* in, ::runanywhere::v1::ST
         return false;
     out->Clear();
     // detect_language collapses to STT_LANGUAGE_AUTO.
-    if (in->detect_language) {
+    if (in->detect_language == RAC_TRUE) {
         out->set_language(::runanywhere::v1::STT_LANGUAGE_AUTO);
     } else {
         out->set_language(stt_language_from_string(in->language));

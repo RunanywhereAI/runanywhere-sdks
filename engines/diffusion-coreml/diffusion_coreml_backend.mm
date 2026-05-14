@@ -309,6 +309,12 @@ bool run_prediction(MLModel* model,
                     NSDictionary<NSString*, MLFeatureValue*>* features,
                     id<MLFeatureProvider>* out_provider,
                     std::string* out_error) {
+    if (!features) {
+        if (out_error) {
+            *out_error = "CoreML prediction failed: features dictionary is nil";
+        }
+        return false;
+    }
     NSError* err = nil;
     MLDictionaryFeatureProvider* provider =
         [[[MLDictionaryFeatureProvider alloc] initWithDictionary:features error:&err] autorelease];
@@ -320,6 +326,12 @@ bool run_prediction(MLModel* model,
         return false;
     }
 
+    if (!model) {
+        if (out_error) {
+            *out_error = "CoreML prediction failed: model is nil";
+        }
+        return false;
+    }
     id<MLFeatureProvider> prediction = [model predictionFromFeatures:provider error:&err];
     if (!prediction) {
         if (out_error) {
@@ -1209,8 +1221,12 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
     std::lock_guard<std::mutex> lock(impl->mtx);
 
     @autoreleasepool {
-        NSString* dir = rac_coreml_find_resource_dir([NSString stringWithUTF8String:model_path],
-                                                     @"Unet");
+        NSString* model_path_str = [NSString stringWithUTF8String:model_path];
+        if (!model_path_str) {
+            RAC_LOG_ERROR(kLogCat, "Invalid model_path encoding: %s", model_path);
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        NSString* dir = rac_coreml_find_resource_dir(model_path_str, @"Unet");
         BOOL is_dir = NO;
         if (!dir
             || ![[NSFileManager defaultManager] fileExistsAtPath:dir

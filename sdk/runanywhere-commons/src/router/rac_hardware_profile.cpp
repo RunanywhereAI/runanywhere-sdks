@@ -43,8 +43,7 @@
 #include <windows.h>
 #endif
 
-namespace rac {
-namespace router {
+namespace rac::router {
 
 namespace {
 
@@ -59,7 +58,7 @@ std::string sysctl_str(const char* name) {
     size_t len = sizeof(buf) - 1;
     if (sysctlbyname(name, buf, &len, nullptr, 0) != 0)
         return {};
-    return std::string(buf, len);
+    return {buf, len};
 }
 
 uint64_t sysctl_u64(const char* name) {
@@ -73,7 +72,7 @@ uint64_t sysctl_u64(const char* name) {
 /** "M1 Pro" / "A17 Pro" — parsed loosely from `hw.machine` + `machdep.cpu.brand_string`. */
 std::string detect_apple_chip_gen() {
     std::string brand = sysctl_str("machdep.cpu.brand_string");
-    if (brand.find("Apple ") == 0) {
+    if (brand.starts_with("Apple ")) {
         return brand.substr(6); /* strip "Apple " */
     }
     /* iOS: hw.machine like "iPhone16,1" — leave parsing to GAP-04 follow-up;
@@ -87,7 +86,7 @@ bool ane_supported(const std::string& chip) {
         return false;
     /* Conservative whitelist: M1/M2/M3/M4 + their Pro/Max/Ultra variants,
      * plus A14+ on iOS. */
-    if (chip.rfind("M", 0) == 0 && chip.size() >= 2 &&
+    if (chip.starts_with('M') && chip.size() >= 2 &&
         (chip[1] == '1' || chip[1] == '2' || chip[1] == '3' || chip[1] == '4')) {
         return true;
     }
@@ -262,5 +261,4 @@ bool HardwareProfile::supports_runtime(rac_runtime_id_t r) const {
     }
 }
 
-}  // namespace router
-}  // namespace rac
+}  // namespace rac::router

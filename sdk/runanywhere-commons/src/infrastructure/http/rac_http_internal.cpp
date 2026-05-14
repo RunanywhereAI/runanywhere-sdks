@@ -25,8 +25,7 @@ namespace {
 constexpr const char* kTag = "rac_http_facade";
 }  // namespace
 
-namespace rac {
-namespace http {
+namespace rac::http {
 
 rac_result_t execute(const rac_http_request_t& req, rac_http_response_t& out_resp) {
     // The default send path already calls rac_internal::get_http_transport()
@@ -53,5 +52,4 @@ rac_http_download_status_t execute_stream(const rac_http_download_request_t& req
     return rac_http_download_execute(&req, progress_cb, progress_user_data, out_http_status);
 }
 
-}  // namespace http
-}  // namespace rac
+}  // namespace rac::http

@@ -92,8 +92,7 @@ extern "C" rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req
 // Internal helpers — consume_upsert_transform
 // =============================================================================
 
-namespace rac {
-namespace http {
+namespace rac::http {
 
 UpsertTransform consume_upsert_transform(const rac_http_request_t* req) {
     UpsertTransform out;
@@ -119,5 +118,4 @@ UpsertTransform consume_upsert_transform(const rac_http_request_t* req) {
     return out;
 }
 
-}  // namespace http
-}  // namespace rac
+}  // namespace rac::http

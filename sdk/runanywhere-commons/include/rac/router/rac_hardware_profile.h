@@ -24,8 +24,7 @@
 
 #include "rac/plugin/rac_primitive.h" /* rac_runtime_id_t */
 
-namespace rac {
-namespace router {
+namespace rac::router {
 
 enum class CpuVendor : uint8_t { Unknown = 0, Intel, Amd, Apple, Arm, Qualcomm, Other };
 enum class GpuVendor : uint8_t {
@@ -93,7 +92,6 @@ struct HardwareProfile {
     bool supports_runtime(rac_runtime_id_t r) const;
 };
 
-}  // namespace router
-}  // namespace rac
+}  // namespace rac::router
 
 #endif /* RAC_ROUTER_HARDWARE_PROFILE_H */

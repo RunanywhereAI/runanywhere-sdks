@@ -127,10 +127,10 @@ void track_lora_applied(rac_handle_t llm_component, const std::string& base_mode
                         const runanywhere::v1::LoRAAdapterInfo& info) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
-    auto existing = std::ranges::find_if(state.adapters,
-                                         [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
-                                             return adapter.adapter_path() == info.adapter_path();
-                                         });
+    auto existing =
+        std::ranges::find_if(state.adapters, [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+            return adapter.adapter_path() == info.adapter_path();
+        });
     if (existing != state.adapters.end()) {
         *existing = info;
     } else {
@@ -142,13 +142,13 @@ void track_lora_removed_path(rac_handle_t llm_component, const std::string& base
                              const std::string& adapter_path) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
-    state.adapters.erase(std::ranges::remove_if(
-                             state.adapters,
-                             [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
-                                 return adapter.adapter_path() == adapter_path;
-                             })
-                             .begin(),
-                         state.adapters.end());
+    state.adapters.erase(
+        std::ranges::remove_if(state.adapters,
+                               [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+                                   return adapter.adapter_path() == adapter_path;
+                               })
+            .begin(),
+        state.adapters.end());
 }
 
 rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component, const std::string& base_model_id,

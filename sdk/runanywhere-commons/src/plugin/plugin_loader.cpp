@@ -95,14 +95,14 @@ std::string entry_symbol_from_path(const char* path) {
     if (last_sep != std::string::npos)
         s.erase(0, last_sep + 1);
     // Drop "lib" prefix (POSIX shared-lib convention; harmless on Win32).
-    if (s.rfind("lib", 0) == 0)
+    if (s.starts_with("lib"))
         s.erase(0, 3);
     // Drop file extension.
     auto dot = s.find('.');
     if (dot != std::string::npos)
         s.erase(dot);
     // Drop optional "runanywhere_" infix used by in-tree plugins.
-    if (s.rfind("runanywhere_", 0) == 0)
+    if (s.starts_with("runanywhere_"))
         s.erase(0, std::strlen("runanywhere_"));
     return std::string("rac_plugin_entry_") + s;
 }
@@ -219,7 +219,7 @@ void rac_registry_free_plugin_list(const char** names, size_t count) {
     for (size_t i = 0; i < count; ++i) {
         std::free(const_cast<char*>(names[i]));
     }
-    std::free(const_cast<char**>(names));
+    std::free(static_cast<void*>(const_cast<char**>(names)));
 }
 
 }  // extern "C"

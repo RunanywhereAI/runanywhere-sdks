@@ -19,11 +19,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -38,7 +38,7 @@ void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const c
 
     CHECK(method->input_type()->full_name() == input_type, "RAG unary RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "RAG unary RPC output type");
-    CHECK(!method->client_streaming() && !method->server_streaming(), "RAG RPC is unary");
+    CHECK(!(method->client_streaming() || method->server_streaming()), "RAG RPC is unary");
 }
 
 int test_rag_generated_service_contract() {
@@ -70,8 +70,8 @@ int test_rag_generated_service_contract() {
               "Stream accepts RAGQueryRequest");
         CHECK(stream->output_type()->full_name() == "runanywhere.v1.RAGStreamEvent",
               "Stream returns RAGStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
+        CHECK(!stream->client_streaming(), "Stream is not client-streaming");
+        CHECK(stream->server_streaming(), "Stream is server-streaming");
     }
 
     // D-6: RAGConfiguration carries *model ids*, not filesystem paths. Guard

@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -101,7 +102,7 @@ class BenchmarkStatsCollector {
         // TTFT stats
         if (!ttft_values_.empty()) {
             auto sorted = ttft_values_;
-            std::sort(sorted.begin(), sorted.end());
+            std::ranges::sort(sorted);
             out->ttft_p50_ms = percentile(sorted, 50);
             out->ttft_p95_ms = percentile(sorted, 95);
             out->ttft_p99_ms = percentile(sorted, 99);
@@ -114,7 +115,7 @@ class BenchmarkStatsCollector {
         // Prefill stats
         if (!prefill_values_.empty()) {
             auto sorted = prefill_values_;
-            std::sort(sorted.begin(), sorted.end());
+            std::ranges::sort(sorted);
             out->prefill_p50_ms = percentile(sorted, 50);
             out->prefill_p95_ms = percentile(sorted, 95);
             out->prefill_p99_ms = percentile(sorted, 99);
@@ -127,7 +128,7 @@ class BenchmarkStatsCollector {
         // Decode TPS stats
         if (!decode_tps_values_.empty()) {
             auto sorted = decode_tps_values_;
-            std::sort(sorted.begin(), sorted.end());
+            std::ranges::sort(sorted);
             out->decode_tps_p50 = percentile(sorted, 50);
             out->decode_tps_p95 = percentile(sorted, 95);
             out->decode_tps_p99 = percentile(sorted, 99);
@@ -140,7 +141,7 @@ class BenchmarkStatsCollector {
         // E2E stats + outlier detection
         if (!e2e_values_.empty()) {
             auto sorted = e2e_values_;
-            std::sort(sorted.begin(), sorted.end());
+            std::ranges::sort(sorted);
             out->e2e_p50_ms = percentile(sorted, 50);
             out->e2e_p95_ms = percentile(sorted, 95);
             out->e2e_p99_ms = percentile(sorted, 99);

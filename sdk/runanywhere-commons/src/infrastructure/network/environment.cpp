@@ -114,7 +114,7 @@ static bool extract_url_host(const char* url, char* host, size_t host_size) {
 
     // Find end of host (port, path, or end of string)
     const char* end = start;
-    while (*end && *end != ':' && *end != '/' && *end != '?' && *end != '#') {
+    while (*end != '\0' && *end != ':' && *end != '/' && *end != '?' && *end != '#') {
         end++;
     }
 

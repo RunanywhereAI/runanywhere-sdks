@@ -29,12 +29,12 @@ namespace {
 bool g_loader_init_called = false;
 bool g_loader_destroy_called = false;
 
-rac_result_t loader_init(void) {
+rac_result_t loader_init() {
     g_loader_init_called = true;
     return RAC_SUCCESS;
 }
 
-void loader_destroy(void) {
+void loader_destroy() {
     g_loader_destroy_called = true;
 }
 

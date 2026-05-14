@@ -124,6 +124,10 @@ onnx_embed_vtable_embed_batch(void *impl, const char *const *texts,
     out_result->processing_time_ms = 0;
     out_result->total_tokens = 0;
 
+    if (num_texts == 0) {
+      out_result->embeddings = nullptr;
+      return RAC_SUCCESS;
+    }
     out_result->embeddings = static_cast<rac_embedding_vector_t *>(
         calloc(num_texts, sizeof(rac_embedding_vector_t)));
     if (!out_result->embeddings)

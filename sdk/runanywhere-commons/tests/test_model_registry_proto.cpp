@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -91,7 +92,7 @@ runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const s
     file->set_filename("part-0001.gguf");
     file->set_is_required(true);
     file->set_size_bytes(42);
-    file->set_checksum("sha256:part");
+    file->set_checksum_sha256("sha256:part");
     file->set_relative_path("weights/part-0001.gguf");
     file->set_destination_path("part-0001.gguf");
     file->set_local_path(local_path + "/part-0001.gguf");
@@ -374,7 +375,7 @@ int test_full_field_round_trip_proto() {
     ASSERT_EQ(decoded.expected_files().files_size(), 1);
     ASSERT_TRUE(decoded.has_multi_file());
     ASSERT_EQ(decoded.multi_file().files_size(), 1);
-    ASSERT_EQ(decoded.multi_file().files(0).checksum(), "sha256:part");
+    ASSERT_EQ(decoded.multi_file().files(0).checksum_sha256(), "sha256:part");
     ASSERT_EQ(decoded.multi_file().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
     ASSERT_EQ(decoded.acceleration_preference(), runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
     ASSERT_EQ(decoded.routing_policy(), runanywhere::v1::ROUTING_POLICY_PREFER_LOCAL);
@@ -472,7 +473,7 @@ int test_update_preserves_proto_only_fields() {
     ASSERT_TRUE(decoded.has_expected_files());
     ASSERT_EQ(decoded.expected_files().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     ASSERT_TRUE(decoded.has_multi_file());
-    ASSERT_EQ(decoded.multi_file().files(0).checksum(), "sha256:part");
+    ASSERT_EQ(decoded.multi_file().files(0).checksum_sha256(), "sha256:part");
     ASSERT_TRUE(decoded.has_is_downloaded());
     ASSERT_TRUE(decoded.is_downloaded());
 
@@ -844,7 +845,8 @@ int test_proto_abi_reports_unavailable_without_protobuf() {
 }  // namespace
 
 int main() {
-    int failures = 0;
+    try {
+        int failures = 0;
 
 #define RUN(name)                                \
     do {                                         \
@@ -859,18 +861,24 @@ int main() {
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
-    RUN(test_full_field_round_trip_proto);
-    RUN(test_expanded_proto_fields_survive_struct_state_updates);
-    RUN(test_update_preserves_proto_only_fields);
-    RUN(test_query_filters_and_downloaded_list_proto);
-    RUN(test_query_source_filter_and_sorting_proto);
-    RUN(test_remove_proto);
-    RUN(test_canonical_result_shapes_and_typed_errors);
-    RUN(test_update_missing_and_invalid_bytes);
+        RUN(test_full_field_round_trip_proto);
+        RUN(test_expanded_proto_fields_survive_struct_state_updates);
+        RUN(test_update_preserves_proto_only_fields);
+        RUN(test_query_filters_and_downloaded_list_proto);
+        RUN(test_query_source_filter_and_sorting_proto);
+        RUN(test_remove_proto);
+        RUN(test_canonical_result_shapes_and_typed_errors);
+        RUN(test_update_missing_and_invalid_bytes);
 #else
-    RUN(test_proto_abi_reports_unavailable_without_protobuf);
+        RUN(test_proto_abi_reports_unavailable_without_protobuf);
 #endif
 
-    std::printf("\n%d test(s) failed\n", failures);
-    return failures == 0 ? 0 : 1;
+        std::printf("\n%d test(s) failed\n", failures);
+        return failures == 0 ? 0 : 1;
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

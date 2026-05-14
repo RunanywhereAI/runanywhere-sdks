@@ -9,6 +9,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "features/rac_nonllm_lifecycle_bridge.h"
@@ -415,14 +416,14 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
         language_enum = request.options().language();
     }
 
-    StreamCtx ctx{callback,
-                  user_data,
-                  request_id,
-                  1,
-                  language_enum,
-                  request.audio().audio_data().size(),
-                  effective_sample_rate,
-                  sample_width};
+    StreamCtx ctx{.fn = callback,
+                  .user_data = user_data,
+                  .request_id = request_id,
+                  .next_seq = 1,
+                  .language = language_enum,
+                  .audio_size = request.audio().audio_data().size(),
+                  .sample_rate = effective_sample_rate,
+                  .sample_width = sample_width};
 
     auto emit_event = [](const runanywhere::v1::STTStreamEvent& event,
                          rac_stt_lifecycle_stream_event_callback_fn fn, void* user_ctx) {
@@ -794,7 +795,7 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_p
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
                                           "failed to encode EmbeddingsResult");
     }
-    for (int i = 0; i < result.vectors_size() && i < static_cast<int>(texts.size()); ++i) {
+    for (int i = 0; i < result.vectors_size() && std::cmp_less(i, texts.size()); ++i) {
         result.mutable_vectors(i)->set_text(texts[static_cast<size_t>(i)]);
         result.mutable_vectors(i)->set_input_index(i);
     }
@@ -880,15 +881,16 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
         rac_audio_format_enum_t audio_format;
         int32_t character_count;
     };
-    StreamCtx ctx{callback,
-                  user_data,
-                  request_id,
-                  1,
-                  options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
-                  options.language ? options.language : "",
-                  options.sample_rate > 0 ? options.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                  options.audio_format,
-                  static_cast<int32_t>(text.size())};
+    StreamCtx ctx{.fn = callback,
+                  .user_data = user_data,
+                  .request_id = request_id,
+                  .next_seq = 1,
+                  .voice_id = options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
+                  .language_code = options.language ? options.language : "",
+                  .sample_rate =
+                      options.sample_rate > 0 ? options.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                  .audio_format = options.audio_format,
+                  .character_count = static_cast<int32_t>(text.size())};
 
     auto emit_event = [](const runanywhere::v1::TTSStreamEvent& event,
                          rac_tts_lifecycle_stream_event_callback_fn fn, void* user_ctx) {
@@ -1066,8 +1068,8 @@ rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, 
                                     rac_proto_buffer_t* out_result) {
     runanywhere::v1::VADServiceState state;
     state.set_is_ready(op_rc == RAC_SUCCESS);
-    const bool active =
-        (ref.ops && ref.ops->is_speech_active && ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
+    const bool active = (ref.ops != nullptr && ref.ops->is_speech_active != nullptr &&
+                         ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
     state.set_is_speech_active(active);
     state.set_energy_threshold(threshold);
     state.set_sample_rate(sample_rate);

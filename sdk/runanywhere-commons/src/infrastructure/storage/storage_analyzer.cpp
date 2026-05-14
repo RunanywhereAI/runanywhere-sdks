@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ranges>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -64,7 +65,7 @@ float used_percent(int64_t total, int64_t used) {
 std::string status_message(rac_result_t status, const char* fallback) {
     char message[160];
     std::snprintf(message, sizeof(message), "%s (status %d)", fallback, static_cast<int>(status));
-    return std::string(message);
+    return {message};
 }
 
 rac_result_t copy_string_to_proto_buffer(const std::string& bytes, rac_proto_buffer_t* out_buffer) {
@@ -179,7 +180,7 @@ void add_warning_once(runanywhere::v1::StorageDeletePlan* plan,
     if (!plan || warning.empty()) {
         return;
     }
-    if (!seen_warnings || seen_warnings->insert(warning).second) {
+    if (seen_warnings == nullptr || seen_warnings->insert(warning).second) {
         plan->add_warnings(warning);
     }
 }
@@ -189,7 +190,7 @@ void add_warning_once(runanywhere::v1::StorageDeleteResult* result,
     if (!result || warning.empty()) {
         return;
     }
-    if (!seen_warnings || seen_warnings->insert(warning).second) {
+    if (seen_warnings == nullptr || seen_warnings->insert(warning).second) {
         result->add_warnings(warning);
     }
 }
@@ -278,7 +279,7 @@ void add_model_candidate_from_info(rac_storage_analyzer_handle_t handle,
         return;
     }
 
-    const std::string id = current->id && current->id[0] ? current->id : requested_id;
+    const std::string id = current->id && current->id[0] != '\0' ? current->id : requested_id;
     if (id.empty()) {
         add_warning_once(plan, seen_warnings, "Model candidate has no model_id.");
         return;
@@ -369,21 +370,19 @@ std::vector<DeleteCandidateRow> collect_model_delete_candidates(
     }
 
     if (options.oldest_first) {
-        std::sort(rows.begin(), rows.end(),
-                  [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
-                      if (lhs.last_used != rhs.last_used) {
-                          return lhs.last_used < rhs.last_used;
-                      }
-                      return lhs.model_id < rhs.model_id;
-                  });
+        std::ranges::sort(rows, [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
+            if (lhs.last_used != rhs.last_used) {
+                return lhs.last_used < rhs.last_used;
+            }
+            return lhs.model_id < rhs.model_id;
+        });
     } else {
-        std::sort(rows.begin(), rows.end(),
-                  [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
-                      if (lhs.reclaimable_bytes != rhs.reclaimable_bytes) {
-                          return lhs.reclaimable_bytes > rhs.reclaimable_bytes;
-                      }
-                      return lhs.model_id < rhs.model_id;
-                  });
+        std::ranges::sort(rows, [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
+            if (lhs.reclaimable_bytes != rhs.reclaimable_bytes) {
+                return lhs.reclaimable_bytes > rhs.reclaimable_bytes;
+            }
+            return lhs.model_id < rhs.model_id;
+        });
     }
 
     return rows;
@@ -977,7 +976,7 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
             auto* metrics = storage->add_models();
             metrics->set_model_id(model.model_id ? model.model_id : "");
             metrics->set_size_on_disk_bytes(clamp_non_negative(model.size_on_disk));
-            if (model.model_id && model.model_id[0]) {
+            if (model.model_id && model.model_id[0] != '\0') {
                 rac_model_info_t* registry_model = nullptr;
                 if (RAC_SUCCEEDED(
                         rac_model_registry_get(registry_handle, model.model_id, &registry_model)) &&
