@@ -26,6 +26,10 @@ import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
+import {
+  missingSpeechBackendExports,
+  speechBackendRequirementMessage,
+} from '../../runtime/SpeechBackendExports';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
@@ -57,6 +61,13 @@ function requireSTTModule(feature: string): STTComponentModule {
     throw SDKException.backendNotAvailable(
       feature,
       'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  const missing = missingSpeechBackendExports(module);
+  if (missing.length > 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      speechBackendRequirementMessage(missing),
     );
   }
   return module;
@@ -198,6 +209,7 @@ export const STT = {
   supportsProtoSTT(): boolean {
     const module = tryRunanywhereModule() as STTComponentModule | null;
     if (!module) return false;
+    if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_stt_component_create !== 'function') return false;
     if (typeof module._rac_stt_component_load_model !== 'function') return false;
     if (typeof module._rac_stt_component_destroy !== 'function') return false;

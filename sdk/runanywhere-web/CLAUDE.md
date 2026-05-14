@@ -51,7 +51,7 @@ import { RunAnywhere } from '@runanywhere/web';
 await RunAnywhere.initialize({ environment: 'development' });
 await LlamaCPP.register({ acceleration: 'auto' });
 
-const stream = await RunAnywhere.textGeneration.generateStream({
+const stream = await RunAnywhere.generateStream({
   prompt: 'Write a haiku about local AI.',
   maxTokens: 128,
 });
@@ -61,20 +61,13 @@ for await (const token of stream.stream) {
 }
 ```
 
-Use these namespaces instead of flat compatibility APIs:
+Prefer Swift-shaped flat APIs at the root when Swift exposes a flat method:
 
-- `RunAnywhere.auth`, `RunAnywhere.initialize`, `RunAnywhere.completeServicesInitialization`
-- `RunAnywhere.modelRegistry.registerModel/getModel/listModels/queryModels/updateModel/removeModel/downloadedModels`
-- `RunAnywhere.modelLifecycle.loadModel/unloadModel/unloadAllModels/currentModel/isLoaded`
-- `RunAnywhere.storage`
-- `RunAnywhere.textGeneration`
-- `RunAnywhere.stt`, `RunAnywhere.tts`, `RunAnywhere.vad`
-- `RunAnywhere.voiceAgent`
-- `RunAnywhere.visionLanguage`
-- `RunAnywhere.rag`
-- `RunAnywhere.toolCalling`, `RunAnywhere.structuredOutput`, `RunAnywhere.lora`, `RunAnywhere.solutions`, `RunAnywhere.pluginLoader`
+- Model lifecycle/registry: `RunAnywhere.loadModel`, `unloadModel`, `currentModel`, `componentLifecycleSnapshot`, `listModels`, `queryModels`, `getModel`, `downloadedModels`, `downloadModel`, `importModel`.
+- LLM/structured/tool calling: `RunAnywhere.generate`, `generateStream`, `cancelGeneration`, `generateStructured`, `generateStructuredStream`, `extractStructuredOutput`, `generateWithTools`.
+- Speech/VLM/VoiceAgent/RAG: `RunAnywhere.transcribe`, `transcribeStream`, `synthesize`, `synthesizeStream`, `speak`, `stopSynthesis`, `stopSpeaking`, `detectVoiceActivity`, `streamVAD`, `resetVAD`, `processImage`, `processImageStream`, `cancelVLMGeneration`, `initializeVoiceAgent`, `processVoiceTurn`, `streamVoiceAgent`, `ragCreatePipeline`, `ragIngest`, `ragQuery`, etc.
 
-Do not reintroduce root shortcuts such as `RunAnywhere.generate`, `RunAnywhere.generateStream`, `RunAnywhere.transcribe`, or `RunAnywhere.synthesize`.
+Keep namespaces when Swift has namespace properties (`RunAnywhere.solutions`, `RunAnywhere.pluginLoader`) or when backend/package internals need lower-level handles. Example app code should prefer root Swift-shaped methods and avoid `@runanywhere/web/internal`.
 
 ## Package Structure
 
@@ -95,13 +88,13 @@ sdk/runanywhere-web/
     ├── llamacpp/
     │   ├── src/LlamaCPP.ts
     │   ├── src/Foundation/
-    │   ├── src/Infrastructure/VLMWorkerBridge.ts
+    │   ├── src/Infrastructure/LifecycleVLMProvider.ts
     │   └── wasm/
     └── onnx/
         └── src/ONNX.ts
 ```
 
-The old `packages/onnx/wasm/sherpa/` publish artifact is intentionally deleted. ONNX registration now uses the unified RACommons WASM module built with `RAC_WASM_ONNX=ON` through `npm run build:wasm -- --llamacpp --onnx`.
+The old `packages/onnx/wasm/sherpa/` publish artifact is intentionally deleted. ONNX registration now uses the unified RACommons WASM module built with `RAC_WASM_ONNX=ON` through `npm run build:wasm -- --llamacpp --onnx`, but real STT/TTS/VAD is still blocked until `sdk/runanywhere-commons/third_party/onnxruntime-wasm` and `sdk/runanywhere-commons/third_party/sherpa-onnx-wasm` contain usable static archives and headers.
 
 ## Initialization Flow
 

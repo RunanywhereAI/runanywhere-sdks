@@ -15,6 +15,13 @@ export interface ProtoWasmModule {
   lengthBytesUTF8?(str: string): number;
   getValue?(ptr: number, type: string): number;
   setValue?(ptr: number, value: number, type: string): void;
+  ccall?(
+    fname: string,
+    returnType: string | null,
+    argTypes: string[],
+    args: unknown[],
+    opts?: { async?: boolean },
+  ): unknown;
 
   _rac_proto_buffer_init?(bufferPtr: number): void;
   _rac_proto_buffer_free?(bufferPtr: number): void;
@@ -69,12 +76,34 @@ export class ProtoWasmBridge {
     ));
   }
 
+  async withEncodedRequestAsync<Request, Result>(
+    request: Request,
+    requestCodec: ProtoCodec<Request>,
+    resultCodec: ProtoCodec<Result>,
+    call: (requestBytes: number, requestSize: number, outResult: number) => number | Promise<number>,
+    functionName: string,
+  ): Promise<Result | null> {
+    const requestBytes = requestCodec.encode(request).finish();
+    return this.withHeapBytesAsync(requestBytes, (ptr, size) => (
+      this.callResultProtoAsync(resultCodec, (outResult) => call(ptr, size, outResult), functionName)
+    ));
+  }
+
   callResultProto<Result>(
     resultCodec: ProtoCodec<Result>,
     call: (outResult: number) => number,
     functionName: string,
   ): Result | null {
     const bytes = this.readResultProto(call, functionName);
+    return bytes ? resultCodec.decode(bytes) : null;
+  }
+
+  async callResultProtoAsync<Result>(
+    resultCodec: ProtoCodec<Result>,
+    call: (outResult: number) => number | Promise<number>,
+    functionName: string,
+  ): Promise<Result | null> {
+    const bytes = await this.readResultProtoAsync(call, functionName);
     return bytes ? resultCodec.decode(bytes) : null;
   }
 
@@ -130,6 +159,58 @@ export class ProtoWasmBridge {
     }
   }
 
+  async readResultProtoAsync(
+    call: (outResult: number) => number | Promise<number>,
+    functionName: string,
+  ): Promise<Uint8Array | null> {
+    const mod = this.module;
+    const missing = this.missingProtoBufferExports();
+    if (missing.length > 0) {
+      this.logger.warning(`${functionName}: module missing proto-buffer exports: ${missing.join(', ')}`);
+      return null;
+    }
+
+    const size = mod._rac_wasm_sizeof_proto_buffer!();
+    const bufferPtr = mod._malloc!(Math.max(size, 1));
+    if (!bufferPtr) {
+      this.logger.warning(`${functionName}: failed to allocate proto buffer`);
+      return null;
+    }
+
+    try {
+      mod._rac_proto_buffer_init!(bufferPtr);
+      const rc = await call(bufferPtr);
+      const status = this.readI32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_status!());
+      if (rc === RAC_ERROR_NOT_FOUND || status === RAC_ERROR_NOT_FOUND) {
+        return null;
+      }
+      if (rc !== RAC_SUCCESS) {
+        this.logger.warning(`${functionName} returned ${formatRacResult(rc)}`);
+        return null;
+      }
+      if (status !== RAC_SUCCESS) {
+        const messagePtr = this.readU32(
+          bufferPtr + mod._rac_wasm_offsetof_proto_buffer_error_message!(),
+        );
+        const message = messagePtr && mod.UTF8ToString ? mod.UTF8ToString(messagePtr) : '';
+        this.logger.warning(
+          `${functionName} buffer status ${formatRacResult(status)}${message ? `: ${message}` : ''}`,
+        );
+        return null;
+      }
+
+      const dataPtr = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_data!());
+      const dataSize = this.readU32(bufferPtr + mod._rac_wasm_offsetof_proto_buffer_size!());
+      if (!dataPtr || dataSize === 0) {
+        return new Uint8Array();
+      }
+      return mod.HEAPU8!.slice(dataPtr, dataPtr + dataSize);
+    } finally {
+      mod._rac_proto_buffer_free!(bufferPtr);
+      mod._free!(bufferPtr);
+    }
+  }
+
   withHeapBytes<T>(bytes: Uint8Array, fn: (bytesPtr: number, bytesLen: number) => T): T {
     const mod = this.module;
     if (!mod._malloc || !mod._free || !mod.HEAPU8) {
@@ -142,6 +223,26 @@ export class ProtoWasmBridge {
     try {
       mod.HEAPU8.set(bytes, ptr);
       return fn(ptr, bytes.byteLength);
+    } finally {
+      mod._free(ptr);
+    }
+  }
+
+  async withHeapBytesAsync<T>(
+    bytes: Uint8Array,
+    fn: (bytesPtr: number, bytesLen: number) => T | Promise<T>,
+  ): Promise<T> {
+    const mod = this.module;
+    if (!mod._malloc || !mod._free || !mod.HEAPU8) {
+      throw new Error('RunAnywhere WASM module is missing heap allocation helpers');
+    }
+    const ptr = mod._malloc(Math.max(bytes.byteLength, 1));
+    if (!ptr) {
+      throw new Error('Failed to allocate bytes in the RunAnywhere WASM heap');
+    }
+    try {
+      mod.HEAPU8.set(bytes, ptr);
+      return await fn(ptr, bytes.byteLength);
     } finally {
       mod._free(ptr);
     }

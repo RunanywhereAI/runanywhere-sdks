@@ -13,6 +13,13 @@ export {
 export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
 
 export {
+  hasSpeechBackendExports,
+  missingSpeechBackendExports,
+  speechBackendRequirementMessage,
+} from './runtime/SpeechBackendExports';
+export type { SpeechBackendModule } from './runtime/SpeechBackendExports';
+
+export {
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
 } from './Public/RunAnywhere';
@@ -134,4 +141,3 @@ export type {
 
 export { SolutionAdapter, SolutionHandle } from './Adapters/SolutionAdapter';
 export type { SolutionRunInput } from './Adapters/SolutionAdapter';
-

@@ -65,7 +65,7 @@ export interface HTTPModule {
   stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): void;
   lengthBytesUTF8(str: string): number;
 
-  addFunction(fn: (...args: number[]) => number | void, signature: string): number;
+  addFunction(fn: (...args: Array<number | bigint>) => number | void, signature: string): number;
   removeFunction(ptr: number): void;
 
   HEAPU8?: Uint8Array;
@@ -212,6 +212,10 @@ export enum DownloadStatus {
 // these raw ints through the chunk / progress callbacks.
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
+
+function i64ToNumber(value: number | bigint): number {
+  return typeof value === 'bigint' ? Number(value) : value;
+}
 
 // ---------------------------------------------------------------------------
 // Internals
@@ -404,8 +408,19 @@ export class HTTPAdapter {
     // → signature 'iiijji' (i=int, j=int64).
     let cancelled = false;
     const cbPtr = this.m.addFunction(
-      (chunkPtr: number, chunkLen: number, totalWritten: number, _totalWrittenHi: number, contentLength: number /* and hi + user_data further args */) => {
+      (
+        chunkPtrRaw: number | bigint,
+        chunkLenRaw: number | bigint,
+        totalWrittenRaw: number | bigint,
+        contentLengthRaw: number | bigint,
+        _userData: number | bigint,
+      ) => {
+        void _userData;
         try {
+          const chunkPtr = Number(chunkPtrRaw);
+          const chunkLen = Number(chunkLenRaw);
+          const totalWritten = i64ToNumber(totalWrittenRaw);
+          const contentLength = i64ToNumber(contentLengthRaw);
           const bytes = readBytes(this.m, chunkPtr, chunkLen);
           const keep = onChunk(bytes, totalWritten, contentLength);
           if (keep === false) {
@@ -419,7 +434,7 @@ export class HTTPAdapter {
           return RAC_FALSE;
         }
       },
-      'iiiijji',
+      'iiijji',
     );
 
     try {
@@ -461,8 +476,15 @@ export class HTTPAdapter {
     let cancelled = false;
     const progressPtr = onProgress
       ? this.m.addFunction(
-          (bytesWritten: number, _bytesWrittenHi: number, totalBytes: number /* and hi + user_data */) => {
+          (
+            bytesWrittenRaw: number | bigint,
+            totalBytesRaw: number | bigint,
+            _userData: number | bigint,
+          ) => {
+            void _userData;
             try {
+              const bytesWritten = i64ToNumber(bytesWrittenRaw);
+              const totalBytes = i64ToNumber(totalBytesRaw);
               const keep = onProgress(bytesWritten, totalBytes);
               if (keep === false) {
                 cancelled = true;

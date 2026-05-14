@@ -144,7 +144,7 @@ function renderModelList(): void {
 
   const downloadedIds = new Set<string>();
   try {
-    const downloaded = RunAnywhere.modelRegistry.downloadedModels();
+    const downloaded = RunAnywhere.downloadedModels();
     for (const m of downloaded?.models ?? []) downloadedIds.add(m.id);
   } catch {
     // tolerate — adapter may not be installed
@@ -152,7 +152,7 @@ function renderModelList(): void {
 
   let loadedId: string | null = null;
   try {
-    loadedId = RunAnywhere.modelLifecycle.currentModel()?.modelId || null;
+    loadedId = RunAnywhere.currentModel()?.modelId || null;
   } catch {
     loadedId = null;
   }
@@ -184,7 +184,7 @@ function renderModelList(): void {
 
 function lookupModelInfo(modelId: string): ModelInfo | null {
   try {
-    return RunAnywhere.modelRegistry.getModel(modelId);
+    return RunAnywhere.getModel(modelId);
   } catch {
     return null;
   }

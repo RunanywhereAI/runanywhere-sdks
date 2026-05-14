@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./scripts/build.sh --debug      # Debug build with assertions
 #   ./scripts/build.sh --pthreads   # Enable multi-threading (default)
 #   ./scripts/build.sh --no-pthreads # Disable multi-threading
+#   ./scripts/build.sh --rag        # Enable RAG after ONNX/Sherpa WASM archives are vendored
 #   ./scripts/build.sh --clean      # Clean before building
 #   ./scripts/build.sh --help       # Show help
 #
@@ -75,6 +76,11 @@ while [[ $# -gt 0 ]]; do
             ONNX="ON"
             shift
             ;;
+        --rag)
+            RAG="ON"
+            ONNX="ON"  # RAG embeddings require ONNX Runtime in the Web artifact.
+            shift
+            ;;
         --webgpu)
             WEBGPU="ON"
             LLAMACPP="ON"  # WebGPU accelerates llama.cpp
@@ -103,6 +109,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --vlm            Include VLM (Vision Language Model) via llama.cpp mtmd"
             echo "  --whispercpp     Include whisper.cpp STT backend"
             echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
+            echo "  --rag            Include RAG (requires ONNX Runtime WASM + Sherpa archives)"
             echo "  --webgpu         Enable WebGPU GPU acceleration (produces racommons-webgpu variant)"
             echo "  --all-backends   Enable WASM-compatible backends (llama.cpp + VLM)"
             echo "  --clean          Clean build directory before building"
@@ -145,6 +152,7 @@ echo " VLM (mtmd):   ${VLM}"
 echo " WebGPU:       ${WEBGPU}"
 echo " whisper.cpp:  ${WHISPERCPP}"
 echo " sherpa-onnx:  ${ONNX}"
+echo " RAG:          ${RAG}"
 echo " Debug:        ${DEBUG}"
 echo " Build dir:    ${BUILD_DIR}"
 echo " Output dir:   ${OUTPUT_DIR}"
@@ -157,6 +165,14 @@ if [ "$CLEAN" = true ]; then
 fi
 
 rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm" "${WASM_DIR}/a.out.js" "${WASM_DIR}/a.out.wasm"
+
+if [ "$RAG" = "ON" ]; then
+    if [ ! -f "${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a" ]; then
+        echo "ERROR: --rag requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+        echo "       Build or vendor ONNX Runtime WASM static archives before enabling Web RAG."
+        exit 1
+    fi
+fi
 
 # Create build directory
 mkdir -p "${BUILD_DIR}"

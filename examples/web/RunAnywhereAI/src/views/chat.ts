@@ -3,7 +3,7 @@
  *
  * Once `LlamaCPP.register()` resolves AND the user loads a model via the
  * toolbar model selector, the public surface in `@runanywhere/web`
- * (`RunAnywhere.textGeneration.generateStream`) flows through the proto-byte LLM adapter
+ * (`RunAnywhere.generateStream`) flows through the proto-byte LLM adapter
  * into the WASM module.
  *
  * The toolbar model pill + "Get Started" overlay are built by
@@ -126,7 +126,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     refreshSendButton();
 
     try {
-      const stream = await RunAnywhere.textGeneration.generateStream({
+      const stream = await RunAnywhere.generateStream({
         prompt,
         maxTokens: 256,
       });
@@ -181,7 +181,6 @@ function isLLMBackendAvailable(): boolean {
   // LlamaCppBridge finishes booting the WASM, so this works as a cheap
   // "is WASM loaded?" probe without reaching into internal adapters.
   try {
-    void RunAnywhere.textGeneration;
     return RunAnywhere.runtime.active !== null;
   } catch {
     return false;

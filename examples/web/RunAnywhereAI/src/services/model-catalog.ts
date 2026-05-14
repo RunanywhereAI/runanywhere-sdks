@@ -19,7 +19,9 @@ import {
 } from '@runanywhere/web';
 import {
   InferenceFramework,
+  ModelArtifactType,
   ModelCategory,
+  ModelFileRole,
   ModelFormat,
   ModelSource,
 } from '@runanywhere/proto-ts/model_types';
@@ -42,6 +44,15 @@ export interface CatalogEntry {
   memoryRequiredBytes: number;
   contextLength?: number;
   supportsThinking?: boolean;
+  files?: readonly CatalogFileEntry[];
+}
+
+export interface CatalogFileEntry {
+  url: string;
+  filename: string;
+  role: ModelFileRole;
+  sizeBytes: number;
+  isRequired?: boolean;
 }
 
 /**
@@ -133,9 +144,23 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
-    downloadSizeBytes: 520_000_000,
-    memoryRequiredBytes: 600_000_000,
+    downloadSizeBytes: 636_275_712,
+    memoryRequiredBytes: 700_000_000,
     contextLength: 2048,
+    files: [
+      {
+        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
+        filename: 'SmolVLM-500M-Instruct-Q8_0.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 436_806_912,
+      },
+      {
+        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+        sizeBytes: 199_468_800,
+      },
+    ],
   },
 
   // ---------- Speech Recognition (STT) ----------
@@ -245,6 +270,15 @@ export function getCatalogEntry(id: string): CatalogEntry | undefined {
 
 function toModelInfo(entry: CatalogEntry): ModelInfo {
   const now = Date.now();
+  const files = entry.files?.map((file) => ({
+    url: file.url,
+    filename: file.filename,
+    isRequired: file.isRequired ?? true,
+    sizeBytes: file.sizeBytes,
+    relativePath: file.filename,
+    destinationPath: file.filename,
+    role: file.role,
+  }));
   return {
     id: entry.id,
     name: entry.name,
@@ -262,5 +296,20 @@ function toModelInfo(entry: CatalogEntry): ModelInfo {
     createdAtUnixMs: now,
     updatedAtUnixMs: now,
     memoryRequiredBytes: entry.memoryRequiredBytes,
+    ...(files
+      ? {
+        multiFile: { files },
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
+        expectedFiles: {
+          files,
+          rootDirectory: entry.id,
+          requiredPatterns: files.map((file) => file.filename),
+          optionalPatterns: [],
+          description: `${entry.name} primary model and companion artifacts`,
+        },
+      }
+      : {
+        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+      }),
   };
 }

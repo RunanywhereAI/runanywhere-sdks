@@ -8,8 +8,9 @@
  *   1. Acquire the RACommons WASM module (loaded by a sibling backend
  *      such as `@runanywhere/web-llamacpp`, or loaded directly here when
  *      ONNX is the first backend to register).
- *   2. Call `rac_backend_onnx_register()` to install the sherpa-onnx
- *      vtable in the C++ plugin registry.
+ *   2. Call `rac_backend_onnx_register()` and
+ *      `rac_backend_sherpa_register()` to install the ONNX runtime and Sherpa
+ *      speech vtables in the C++ plugin registry.
  *
  * After `ONNX.register()` resolves, the public verbs in
  * `@runanywhere/web` (proto-byte STT/TTS/VAD facades, voice agent) route
@@ -44,12 +45,12 @@ export const ONNX = {
   },
 
   /**
-   * Register the ONNX (sherpa-onnx) backend.
+   * Register the ONNX Runtime + Sherpa speech backends.
    *
    * Loads or attaches to the RACommons WASM module and calls
-   * `rac_backend_onnx_register()`. The proto-byte STT/TTS/VAD adapters in
-   * `@runanywhere/web` core then route inference through the registered
-   * backend.
+   * `rac_backend_onnx_register()` and `rac_backend_sherpa_register()`. The
+   * proto-byte STT/TTS/VAD adapters in `@runanywhere/web` core then route
+   * inference through the registered backend.
    */
   async register(options?: ONNXRegisterOptions): Promise<void> {
     const bridge = SherpaONNXBridge.shared;

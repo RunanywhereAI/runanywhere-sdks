@@ -33,6 +33,10 @@
 
 #include "core/internal/platform_compat.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir
 #endif
@@ -886,6 +890,33 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     }
 }
 
+#ifdef __EMSCRIPTEN__
+struct emscripten_proto_download_args {
+    std::shared_ptr<proto_download_task> task;
+    int64_t resume_from = 0;
+};
+
+void run_proto_download_worker_async(void* user_data) {
+    std::unique_ptr<emscripten_proto_download_args> args(
+        static_cast<emscripten_proto_download_args*>(user_data));
+    if (!args) {
+        return;
+    }
+    run_proto_download_worker(args->task, args->resume_from);
+}
+
+void start_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
+                                 int64_t resume_from) {
+    auto* args = new emscripten_proto_download_args{task, resume_from};
+    emscripten_async_call(run_proto_download_worker_async, args, 0);
+}
+#else
+void start_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
+                                 int64_t resume_from) {
+    std::thread([task, resume_from]() { run_proto_download_worker(task, resume_from); }).detach();
+}
+#endif
+
 std::string destination_from_model_file(const std::string& model_folder,
                                         const rav1::ModelFileDescriptor& file,
                                         const std::string& url,
@@ -1618,7 +1649,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         *result.mutable_initial_progress() = task->progress;
     }
 
-    std::thread([task, resume_from]() { run_proto_download_worker(task, resume_from); }).detach();
+    start_proto_download_worker(task, resume_from);
 
     emit_progress(task);
     return serialize_proto_to_buffer(result, out_result);
@@ -1810,7 +1841,7 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
         *result.mutable_initial_progress() = task->progress;
     }
 
-    std::thread([task, resume_from]() { run_proto_download_worker(task, resume_from); }).detach();
+    start_proto_download_worker(task, resume_from);
 
     emit_progress(task);
     return serialize_proto_to_buffer(result, out_result);

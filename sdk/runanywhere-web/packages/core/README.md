@@ -12,6 +12,8 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 
 > **Beta (v0.1.0)** -- This is an early release for testing and feedback. The API surface is stable but may change before v1.0. Not yet recommended for production deployments without thorough testing.
 
+> **Current runtime status:** LLM is the only fully exercised browser E2E path in the current Web artifacts. VLM is in active validation after the WebGPU/JSPI rebuild. STT, TTS, model-backed VAD, RAG, and VoiceAgent are blocked until ONNX Runtime and Sherpa-ONNX WASM static archives are present in `sdk/runanywhere-commons/third_party/*-wasm` and the unified RACommons WASM artifact exports the required backend symbols.
+
 ---
 
 ## Quick Links
@@ -36,18 +38,18 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 - Token streaming with real-time callbacks and cancellation
 
 ### Speech-to-Text (STT)
-- Offline speech recognition via whisper.cpp and sherpa-onnx (WASM)
+- Public Swift-shaped STT facade; real browser inference is blocked until ONNX/Sherpa WASM archives are linked
 - Multiple model architectures: Whisper, Zipformer, Paraformer
 - Batch transcription from Float32Array audio data
 - Archive-based model loading (matching iOS/Android SDK approach)
 
 ### Text-to-Speech (TTS)
-- Neural voice synthesis via sherpa-onnx Piper TTS (WASM)
+- Public Swift-shaped TTS facade; real browser synthesis is blocked until ONNX/Sherpa/Piper WASM archives are linked
 - Multiple voice models with configurable parameters
 - PCM audio output (Float32Array) with sample rate metadata
 
 ### Voice Activity Detection (VAD)
-- Silero VAD model via sherpa-onnx (WASM)
+- Public Swift-shaped model-backed VAD facade; real Silero browser inference is blocked until ONNX/Sherpa WASM archives are linked
 - Real-time speech/silence detection from audio streams
 - Speech segment extraction with configurable thresholds
 - Callback-based speech activity events
@@ -55,11 +57,11 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 ### Vision Language Models (VLM)
 - Multimodal inference via llama.cpp with mtmd support
 - Accepts RGB pixel data, base64, or file paths
-- Runs in a dedicated Web Worker to keep the UI responsive
+- Loads through the shared C++ lifecycle with primary GGUF plus mmproj sidecar metadata
 - Supports Qwen2-VL and other VLM architectures
 
 ### Voice Pipeline
-- Full VAD -> STT -> LLM (streaming) -> TTS orchestration
+- Public VoiceAgent facade for VAD -> STT -> LLM -> TTS orchestration; full browser runtime is blocked until speech backends are linked
 - Callback-driven state transitions (transcription, generation, synthesis)
 - Cancellation support for in-progress generation
 
@@ -91,7 +93,7 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 | **Browser** | Chrome 96+ / Edge 96+ | Chrome 120+ / Edge 120+ |
 | **WebAssembly** | Required | Required |
 | **SharedArrayBuffer** | For multi-threaded WASM | Requires Cross-Origin Isolation headers |
-| **WebGPU** | For GPU-accelerated diffusion | Chrome 120+ |
+| **WebGPU + JSPI** | For GPU-accelerated llama.cpp/VLM paths | Chrome/Edge with `WebAssembly.promising` and `WebAssembly.Suspending` |
 | **OPFS** | For persistent model storage | All modern browsers |
 | **RAM** | 2GB | 4GB+ for larger models |
 | **Storage** | Variable | Models: 40MB -- 4GB depending on model |
@@ -105,8 +107,8 @@ The Web SDK is split into three npm packages so you only ship the backends you n
 | Package | Description | Includes |
 |---------|-------------|----------|
 | [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) | Core SDK — lifecycle, logging, events, model management, storage | TypeScript only (no WASM) |
-| [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) | LLM, VLM, tool calling, structured output, embeddings, diffusion | llama.cpp WASM (~3.7 MB CPU, ~3.9 MB WebGPU) |
-| [`@runanywhere/web-onnx`](https://www.npmjs.com/package/@runanywhere/web-onnx) | STT, TTS, VAD, audio capture/playback | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) WASM (~12 MB, lazy-loaded) |
+| [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) | LLM, VLM, tool calling, structured output | llama.cpp RACommons WASM CPU/WebGPU artifacts |
+| [`@runanywhere/web-onnx`](https://www.npmjs.com/package/@runanywhere/web-onnx) | STT, TTS, VAD registration shell | Requires ONNX/Sherpa RACommons WASM artifacts that are not vendored yet |
 
 Install only what you need — `@runanywhere/web` is always required as the core.
 
@@ -127,7 +129,7 @@ npm install @runanywhere/web @runanywhere/web-onnx
 
 ### Serve WASM Files + Cross-Origin Isolation
 
-WASM files are included in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx`. Configure your bundler to serve them as static assets.
+WASM files are included in `@runanywhere/web-llamacpp`. `@runanywhere/web-onnx` registers against the same unified RACommons module once ONNX/Sherpa WASM archives are linked. Configure your bundler to serve backend WASM assets as static files.
 
 > **Important:** Your server **must** set Cross-Origin Isolation headers for `SharedArrayBuffer` and multi-threaded WASM to work. Without these headers the SDK falls back to single-threaded mode, which is significantly slower. See [Cross-Origin Isolation Headers](#cross-origin-isolation-headers) for all platforms (Nginx, Vercel, Netlify, Cloudflare, AWS, Apache).
 
@@ -316,7 +318,7 @@ console.log(result.text);
 +---------------------------------------------+
 ```
 
-The Web SDK compiles the **same C++ core** (`runanywhere-commons`) used by the iOS and Android SDKs to WebAssembly via Emscripten. The inference engines (llama.cpp, whisper.cpp, sherpa-onnx) are the same native code running in the browser, with identical vtable dispatch, service registry, and event system.
+The Web SDK compiles the **same C++ core** (`runanywhere-commons`) used by the iOS and Android SDKs to WebAssembly via Emscripten. The llama.cpp LLM/VLM path is present in the current artifacts. The ONNX/Sherpa speech path is still gated by missing Web static archives and must not be claimed as runtime-ready until those archives are linked and exports are verified.
 
 ### Key Components
 
@@ -415,7 +417,7 @@ source ~/emsdk/emsdk_env.sh
 # Individual backends
 ./wasm/scripts/build.sh --llamacpp          # LLM only (llama.cpp)
 ./wasm/scripts/build.sh --whispercpp        # STT only (whisper.cpp)
-./wasm/scripts/build.sh --onnx              # TTS/VAD only (sherpa-onnx)
+./wasm/scripts/build.sh --onnx              # Requires ONNX/Sherpa WASM static archives first
 ./wasm/scripts/build.sh --llamacpp --vlm    # LLM + VLM (llama.cpp + mtmd)
 
 # WebGPU-accelerated build
@@ -701,7 +703,7 @@ The demo app runs on Vite with Cross-Origin Isolation headers pre-configured.
 | Export | Description |
 |--------|-------------|
 | `LlamaCPP` | Registers the llama.cpp LLM/VLM RACommons WASM backend |
-| `VLMWorkerBridge` | Backend worker bridge used by `RunAnywhere.visionLanguage` |
+| `LifecycleVLMProvider` | Backend provider used by `RunAnywhere.processImage` after `RunAnywhere.loadModel` |
 
 ### `@runanywhere/web-onnx`
 
@@ -735,7 +737,7 @@ Chrome 96+ and Edge 96+ are fully supported. Firefox 119+ works but lacks WebGPU
 
 ### Can I use a custom model?
 
-Yes. Any GGUF-format model compatible with llama.cpp works for LLM/VLM. STT models use ONNX format via whisper.cpp or sherpa-onnx. TTS models use Piper ONNX format.
+Yes for the current LLM/VLM path: GGUF-format models compatible with llama.cpp can work when memory and browser capabilities allow. STT/TTS/VAD model formats remain ONNX/Piper/Silero, but Web runtime support is blocked until ONNX/Sherpa WASM archives are linked.
 
 ---
 
@@ -775,7 +777,7 @@ optimizeDeps: {
 
 **Cause:** CLIP image encoding is computationally expensive in WASM.
 
-**Fix:** Use smaller capture dimensions (256x256 is recommended). The VLM runs in a dedicated Web Worker so the UI remains responsive during inference.
+**Fix:** Use smaller capture dimensions (256x256 is recommended) and prefer the WebGPU artifact in a JSPI-capable browser. Current lifecycle VLM inference uses the shared C++ lifecycle provider; CPU VLM can be extremely slow.
 
 ### OPFS storage not persisting
 

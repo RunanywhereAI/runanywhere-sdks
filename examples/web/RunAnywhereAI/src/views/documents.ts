@@ -102,7 +102,7 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  await RunAnywhere.rag.ingest(text, JSON.stringify({
+  await RunAnywhere.ragIngest(text, JSON.stringify({
     docId,
     docName: file.name,
     sourceUri: `web-file:${file.name}`,
@@ -110,7 +110,7 @@ async function ingestFile(file: File): Promise<void> {
     sizeBytes: String(file.size),
   }));
 
-  const stats = await RunAnywhere.rag.getStatistics();
+  const stats = await RunAnywhere.ragGetStatistics();
   setStatus(`Indexed ${file.name}. ${stats.indexedChunks} chunks total.`);
 }
 
@@ -119,7 +119,7 @@ async function clearAllDocs(): Promise<void> {
   if (!(await ensureRAGReady())) return;
   isBusy = true;
   try {
-    await RunAnywhere.rag.clearDocuments();
+    await RunAnywhere.ragClearDocuments();
     await renderDocList();
     setStatus('All documents cleared.');
   } catch (err) {
@@ -157,7 +157,7 @@ async function askQuestion(): Promise<void> {
 
   let documentCount = 0;
   try {
-    documentCount = await RunAnywhere.rag.getDocumentCount();
+    documentCount = await RunAnywhere.ragGetDocumentCount();
   } catch (err) {
     setAnswer(`Failed: ${err instanceof Error ? err.message : String(err)}`);
     return;
@@ -170,7 +170,7 @@ async function askQuestion(): Promise<void> {
   isBusy = true;
   setAnswer('Searching...');
   try {
-    const result = await RunAnywhere.rag.query(question, {
+    const result = await RunAnywhere.ragQuery(question, {
       retrievalTopK: TOP_K,
       maxTokens: 512,
       temperature: 0.4,
@@ -210,7 +210,7 @@ async function renderDocList(): Promise<void> {
   let documents: RAGDocumentSummary[];
   try {
     if (!RunAnywhere.rag.capabilities().documentListing) {
-      const stats = await RunAnywhere.rag.getStatistics();
+      const stats = await RunAnywhere.ragGetStatistics();
       listEl.innerHTML = stats.indexedDocuments === 0
         ? '<li class="docs-empty">No documents indexed yet</li>'
         : `<li class="docs-empty">${stats.indexedDocuments} document${stats.indexedDocuments === 1 ? '' : 's'} indexed. Document listing is not exposed by this RAG provider.</li>`;

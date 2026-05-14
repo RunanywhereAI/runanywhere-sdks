@@ -139,6 +139,34 @@ export class ModelLifecycleAdapter {
     );
   }
 
+  async loadAsync(request: ProtoModelLoadRequest): Promise<ProtoModelLoadResult | null> {
+    if (!this.ensureExports('load', [
+      '_rac_get_model_registry',
+      '_rac_model_lifecycle_load_proto',
+    ])) {
+      return null;
+    }
+
+    const registryHandle = this.module._rac_get_model_registry!();
+    if (!registryHandle) {
+      logger.warning('load: global registry handle is null');
+      return null;
+    }
+
+    return this.bridge().withEncodedRequestAsync(
+      request,
+      ModelLoadRequest,
+      ModelLoadResult,
+      (requestPtr, requestSize, outResult) => this.callLoad(
+        registryHandle,
+        requestPtr,
+        requestSize,
+        outResult,
+      ),
+      'rac_model_lifecycle_load_proto',
+    );
+  }
+
   unload(request: ProtoModelUnloadRequest): ProtoModelUnloadResult | null {
     if (!this.ensureExports('unload', ['_rac_model_lifecycle_unload_proto'])) {
       return null;
@@ -154,6 +182,24 @@ export class ModelLifecycleAdapter {
           requestSize,
           outResult,
         )
+      ),
+      'rac_model_lifecycle_unload_proto',
+    );
+  }
+
+  async unloadAsync(request: ProtoModelUnloadRequest): Promise<ProtoModelUnloadResult | null> {
+    if (!this.ensureExports('unload', ['_rac_model_lifecycle_unload_proto'])) {
+      return null;
+    }
+
+    return this.bridge().withEncodedRequestAsync(
+      request,
+      ModelUnloadRequest,
+      ModelUnloadResult,
+      (requestPtr, requestSize, outResult) => this.callUnload(
+        requestPtr,
+        requestSize,
+        outResult,
       ),
       'rac_model_lifecycle_unload_proto',
     );
@@ -209,6 +255,56 @@ export class ModelLifecycleAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
+  }
+
+  private callLoad(
+    registryHandle: number,
+    requestPtr: number,
+    requestSize: number,
+    outResult: number,
+  ): number | Promise<number> {
+    if (typeof this.module.ccall === 'function') {
+      const result = this.module.ccall(
+        'rac_model_lifecycle_load_proto',
+        'number',
+        ['number', 'number', 'number', 'number'],
+        [registryHandle, requestPtr, requestSize, outResult],
+        { async: true },
+      );
+      return result instanceof Promise
+        ? result.then((value) => Number(value))
+        : Number(result);
+    }
+    return this.module._rac_model_lifecycle_load_proto!(
+      registryHandle,
+      requestPtr,
+      requestSize,
+      outResult,
+    );
+  }
+
+  private callUnload(
+    requestPtr: number,
+    requestSize: number,
+    outResult: number,
+  ): number | Promise<number> {
+    if (typeof this.module.ccall === 'function') {
+      const result = this.module.ccall(
+        'rac_model_lifecycle_unload_proto',
+        'number',
+        ['number', 'number', 'number'],
+        [requestPtr, requestSize, outResult],
+        { async: true },
+      );
+      return result instanceof Promise
+        ? result.then((value) => Number(value))
+        : Number(result);
+    }
+    return this.module._rac_model_lifecycle_unload_proto!(
+      requestPtr,
+      requestSize,
+      outResult,
+    );
   }
 
   private ensureExports(

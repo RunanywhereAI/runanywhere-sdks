@@ -16,10 +16,6 @@ import {
   isSDKException,
 } from '@runanywhere/web';
 import { AudioPlayback } from '@runanywhere/web/browser';
-import {
-  TTSProtoAdapter,
-  tryRunanywhereModule,
-} from '@runanywhere/web/internal';
 import { ONNX } from '@runanywhere/web-onnx';
 
 let container: HTMLElement;
@@ -47,16 +43,14 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
 }
 
 interface SpeakStatus {
-  moduleInstalled: boolean;
   registered: boolean;
   supportsProto: boolean;
 }
 
 function inspectStatus(): SpeakStatus {
-  const moduleInstalled = tryRunanywhereModule() != null;
   const registered = ONNX.isRegistered;
-  const supportsProto = TTSProtoAdapter.tryDefault()?.supportsProtoTTS() ?? false;
-  return { moduleInstalled, registered, supportsProto };
+  const supportsProto = RunAnywhere.tts.supportsProtoTTS();
+  return { registered, supportsProto };
 }
 
 function renderSpeak(): void {
@@ -76,13 +70,10 @@ function renderSpeak(): void {
       <div class="docs-section">
         <h3>Backend status</h3>
         <ul class="feature-unavailable__list">
-          <li><code>RACommons module installed</code>: <strong>${
-            status.moduleInstalled ? 'yes' : 'no'
-          }</strong></li>
           <li><code>ONNX.isRegistered</code>: <strong>${
             status.registered ? 'yes' : 'no'
           }</strong></li>
-          <li><code>TTSProtoAdapter.supportsProtoTTS()</code>: <strong>${
+          <li><code>RunAnywhere.tts.supportsProtoTTS()</code>: <strong>${
             status.supportsProto ? 'yes' : 'no'
           }</strong></li>
         </ul>
@@ -117,14 +108,14 @@ function renderSpeak(): void {
           <div class="docs-section">
             <h3>Synthesis</h3>
             <p class="text-secondary">
-              Real TTS calls dispatch through <code>RunAnywhere.tts.synthesizeAuto(text, options)</code>
+              Real TTS calls dispatch through <code>RunAnywhere.synthesize(text, options)</code>
               once the ONNX backend is registered against a WASM build that
               includes <code>RAC_WASM_ONNX=ON</code>. PCM samples are played via
               <code>AudioPlayback</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.modelLifecycle.loadModel(...)</code></li>
-              <li><code>RunAnywhere.tts.synthesizeAuto(text, { voicePath })</code></li>
+              <li><code>RunAnywhere.loadModel(...)</code></li>
+              <li><code>RunAnywhere.synthesize(text, { voicePath })</code></li>
               <li><code>AudioPlayback.play(samples, sampleRate)</code></li>
             </ul>
           </div>`}
@@ -170,7 +161,7 @@ async function runSynthesize(): Promise<void> {
   renderSpeak();
 
   try {
-    const result = await RunAnywhere.tts.synthesizeAuto(text);
+    const result = await RunAnywhere.synthesize(text);
     lastDurationMs = result.durationMs ?? 0;
     const samples = pcmBytesToFloat32(result.audioData);
     const sampleRate = result.sampleRate || 22050;

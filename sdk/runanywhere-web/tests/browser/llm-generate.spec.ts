@@ -62,6 +62,14 @@ declare global {
           errorMessage?: string;
         } | null;
       };
+      loadModel(request: {
+        modelId: string;
+        forceReload: boolean;
+        validateAvailability: boolean;
+      }): Promise<{
+        success: boolean;
+        errorMessage?: string;
+      } | null>;
       downloads: {
         plan(request: Record<string, unknown>): {
           canStart: boolean;
@@ -255,7 +263,7 @@ test.describe('Web SDK LLM end-to-end', () => {
     // Load the model into the llamacpp backend.
     const loadResult = await page.evaluate((modelId) => {
       const ra = window.__RUNANYWHERE_SDK__!;
-      return ra.modelLifecycle.loadModel({
+      return ra.loadModel({
         modelId,
         forceReload: false,
         validateAvailability: true,

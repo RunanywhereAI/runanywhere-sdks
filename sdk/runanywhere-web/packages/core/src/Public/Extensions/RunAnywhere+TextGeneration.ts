@@ -280,6 +280,10 @@ export const TextGeneration = {
     });
   },
 
+  cancelGeneration(): void {
+    LLMProtoAdapter.tryDefault()?.cancel();
+  },
+
   async chat(prompt: string, options?: Partial<LLMGenerationOptions>): Promise<string> {
     const result = await TextGeneration.generate({
       ...(options ?? {}),

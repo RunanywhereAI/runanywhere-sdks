@@ -624,6 +624,7 @@ export interface EmscriptenRunanywhereModule {
     returnType: string | null,
     argTypes: string[],
     args: unknown[],
+    opts?: { async?: boolean },
   ) => unknown;
 }
 

@@ -24,6 +24,10 @@ import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
+import {
+  missingSpeechBackendExports,
+  speechBackendRequirementMessage,
+} from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
@@ -56,6 +60,13 @@ function requireTTSModule(feature: string): TTSComponentModule {
     throw SDKException.backendNotAvailable(
       feature,
       'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  const missing = missingSpeechBackendExports(module);
+  if (missing.length > 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      speechBackendRequirementMessage(missing),
     );
   }
   return module;
@@ -162,6 +173,7 @@ export const TTS = {
   supportsProtoTTS(): boolean {
     const module = tryRunanywhereModule() as TTSComponentModule | null;
     if (!module) return false;
+    if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_tts_component_create !== 'function') return false;
     if (typeof module._rac_tts_component_load_voice !== 'function') return false;
     if (typeof module._rac_tts_component_destroy !== 'function') return false;

@@ -489,6 +489,7 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_tool_call_normalize_json"
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
+    "_rac_tool_calling_run_loop_proto"
 
     # STT service
     "_rac_stt_create"
@@ -566,6 +567,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_component_configure"
     "_rac_vad_component_is_initialized"
     "_rac_vad_component_initialize"
+    "_rac_vad_component_is_loaded"
+    "_rac_vad_component_load_model"
+    "_rac_vad_component_unload"
     "_rac_vad_component_cleanup"
     "_rac_vad_component_set_activity_callback"
     "_rac_vad_component_set_audio_callback"
@@ -701,6 +705,9 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_structured_output_validate_proto"
     "_rac_structured_output_validation_free"
     "_rac_structured_output_parse_proto"
+    "_rac_structured_output_generate_proto"
+    "_rac_structured_output_generate_stream_proto"
+    "_rac_structured_output_schema_to_json_proto"
 
     # Diffusion component
     "_rac_diffusion_generate_proto"
@@ -1047,14 +1054,12 @@ set(EMSCRIPTEN_LINK_FLAGS
 
     # Function exports
     "-sEXPORTED_FUNCTIONS=[${RAC_EXPORTED_FUNCTIONS_STR}]"
-    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
+    "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=\\$wasmTable"
+    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
 
     # Allow JS function pointers (needed for platform adapter callbacks).
-    # Pthread workers copy the table early, so keep enough empty slots in the
-    # initial table for addFunction() callbacks without growing it after the
-    # worker pool is live. Growing later can leave workers with stale table
-    # bounds and crash as soon as a C++ download callback fires.
-    "-sINITIAL_TABLE=16384"
+    # Web downloads are scheduled on the main Emscripten runtime so JS callback
+    # pointers are invoked against the table that addFunction() mutates.
     "-sALLOW_TABLE_GROWTH=1"
 
     # Filesystem
@@ -1106,18 +1111,25 @@ if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
         # Backend registration (may probe GPU capabilities)
         "rac_backend_llamacpp_register"
         "rac_backend_llamacpp_vlm_register"
+        # C++ lifecycle/model wrappers invoked directly from TypeScript.
+        "rac_model_lifecycle_load_proto"
+        "rac_model_lifecycle_unload_proto"
         # LLM lifecycle (GPU memory allocation / inference / cleanup)
         "rac_llm_component_create"
         "rac_llm_component_load_model"
         "rac_llm_component_generate"
         "rac_llm_component_generate_stream"
         "rac_llm_component_unload"
+        "rac_llm_generate_proto"
+        "rac_llm_generate_stream_proto"
         # VLM lifecycle (GPU memory allocation / inference / cleanup)
         "rac_vlm_component_create"
         "rac_vlm_component_load_model"
         "rac_vlm_component_process"
         "rac_vlm_component_process_stream"
         "rac_vlm_component_unload"
+        "rac_vlm_process_proto"
+        "rac_vlm_process_stream_proto"
     )
     string(JOIN "\",\"" RAC_JSPI_EXPORTS_STR ${RAC_JSPI_EXPORTS})
 
@@ -1159,8 +1171,10 @@ else()
     list(APPEND EMSCRIPTEN_LINK_FLAGS
         "-sASSERTIONS=0"
         "-O3"
-        "--closure=1"
     )
+    # Keep Emscripten runtime object member names stable. The Web SDK's
+    # platform adapter and VLM worker bridge call FS.readFile/writeFile/
+    # analyzePath directly to mirror native filesystem callbacks.
     message(STATUS "Release mode (optimized)")
 endif()
 

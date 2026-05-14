@@ -19,16 +19,17 @@
  *  2. If we loaded the module ourselves, call `rac_init()` and install it
  *     via `setRunanywhereModule(...)` so the proto-byte adapters in core
  *     can find it.
- *  3. Call `_rac_backend_onnx_register()` to register the ONNX (sherpa-onnx)
- *     vtable with the C++ plugin registry. After this, all proto-byte
- *     STT/TTS/VAD calls in core route through the registered backend.
+ *  3. Call `_rac_backend_onnx_register()` and
+ *     `_rac_backend_sherpa_register()` to register the ONNX runtime and
+ *     Sherpa speech vtables with the C++ plugin registry. After this, all
+ *     proto-byte STT/TTS/VAD calls in core route through the registered backend.
  *
  * Backend availability requirement:
- *   The RACommons WASM module MUST be built with `RAC_WASM_ONNX=ON`
- *   (i.e. `npm run build:wasm -- --llamacpp --onnx`) so that
- *   `_rac_backend_onnx_register` is exported and `rac_backend_onnx` is
- *   linked. Without that, `register()` reports a typed
- *   `BackendNotAvailable` error and STT/TTS/VAD calls return null/error.
+ *   The RACommons WASM module MUST be built with ONNX Runtime WASM and
+ *   Sherpa-ONNX WASM static archives linked, so `_rac_backend_onnx_register`
+ *   and `_rac_backend_sherpa_register` are exported. Without both,
+ *   `register()` reports a typed `BackendNotAvailable` error and STT/TTS/VAD
+ *   calls stay unavailable.
  */
 
 import {
@@ -36,12 +37,15 @@ import {
   SDKLogger,
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
+  missingSpeechBackendExports,
   setRunanywhereModule,
+  speechBackendRequirementMessage,
   tryRunanywhereModule,
 } from '@runanywhere/web/internal';
 import type { EmscriptenRunanywhereModule } from '@runanywhere/web/internal';
 
 const logger = new SDKLogger('SherpaONNXBridge');
+const RAC_ERROR_MODULE_ALREADY_REGISTERED = -401;
 
 /**
  * Subset of the Emscripten module surface we touch when the ONNX package
@@ -63,6 +67,8 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
   _rac_init?(configPtr: number): number;
   _rac_backend_onnx_register?(): number;
   _rac_backend_onnx_unregister?(): number;
+  _rac_backend_sherpa_register?(): number;
+  _rac_backend_sherpa_unregister?(): number;
 }
 
 /**
@@ -90,7 +96,8 @@ export class SherpaONNXBridge {
   private static _instance: SherpaONNXBridge | null = null;
 
   private _module: CommonsModule | null = null;
-  private _backendRegistered = false;
+  private _onnxBackendRegistered = false;
+  private _sherpaBackendRegistered = false;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
 
@@ -109,7 +116,7 @@ export class SherpaONNXBridge {
   }
 
   get isBackendRegistered(): boolean {
-    return this._backendRegistered;
+    return this._onnxBackendRegistered && this._sherpaBackendRegistered;
   }
 
   /** Acquire/load the commons module and register the ONNX backend vtable. */
@@ -127,23 +134,38 @@ export class SherpaONNXBridge {
     }
   }
 
-  /** Unregister the ONNX backend vtable. Idempotent. */
+  /** Unregister the ONNX/Sherpa backend vtables. Idempotent. */
   unregister(): void {
-    if (!this._module || !this._backendRegistered) {
+    if (!this._module || (!this._onnxBackendRegistered && !this._sherpaBackendRegistered)) {
       this._loaded = false;
       return;
     }
-    try {
-      const rc = this._module._rac_backend_onnx_unregister?.() ?? 0;
-      if (rc !== 0) {
-        logger.warning(`rac_backend_onnx_unregister returned ${rc}`);
+    if (this._sherpaBackendRegistered) {
+      try {
+        const rc = this._module._rac_backend_sherpa_unregister?.() ?? 0;
+        if (rc !== 0) {
+          logger.warning(`rac_backend_sherpa_unregister returned ${rc}`);
+        }
+      } catch (err) {
+        logger.warning(
+          `rac_backend_sherpa_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-    } catch (err) {
-      logger.warning(
-        `rac_backend_onnx_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
-      );
     }
-    this._backendRegistered = false;
+    if (this._onnxBackendRegistered) {
+      try {
+        const rc = this._module._rac_backend_onnx_unregister?.() ?? 0;
+        if (rc !== 0) {
+          logger.warning(`rac_backend_onnx_unregister returned ${rc}`);
+        }
+      } catch (err) {
+        logger.warning(
+          `rac_backend_onnx_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    this._sherpaBackendRegistered = false;
+    this._onnxBackendRegistered = false;
     this._loaded = false;
   }
 
@@ -169,27 +191,36 @@ export class SherpaONNXBridge {
       setRunanywhereModule(this._module);
     }
 
-    // Phase 2: Register the ONNX backend vtable.
-    if (typeof this._module._rac_backend_onnx_register !== 'function') {
+    // Phase 2: Register the ONNX + Sherpa backend vtables. Generic speech
+    // component/proto exports are not enough for real STT/TTS/VAD inference.
+    const missing = missingSpeechBackendExports(this._module);
+    if (missing.length > 0) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
-        'The loaded RACommons WASM module does not export `rac_backend_onnx_register`. ' +
-          'Rebuild the WASM with `npm run build:wasm -- --llamacpp --onnx` ' +
-          'to include the sherpa-onnx STT/TTS/VAD backend.',
+        speechBackendRequirementMessage(missing),
       );
     }
 
     const rc = await this._callMaybeAsync(this._module, 'rac_backend_onnx_register');
-    if (rc !== 0) {
+    if (!this._isRegistrationSuccess(rc)) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
         `rac_backend_onnx_register returned ${rc}.`,
       );
     }
-    this._backendRegistered = true;
+    this._onnxBackendRegistered = true;
+
+    const sherpaRc = await this._callMaybeAsync(this._module, 'rac_backend_sherpa_register');
+    if (!this._isRegistrationSuccess(sherpaRc)) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `rac_backend_sherpa_register returned ${sherpaRc}.`,
+      );
+    }
+    this._sherpaBackendRegistered = true;
     this._loaded = true;
     await completeDeferredServicesInitialization();
-    logger.info('ONNX backend registered (STT/TTS/VAD vtable installed)');
+    logger.info('ONNX + Sherpa backends registered (STT/TTS/VAD vtables installed)');
   }
 
   private async _loadCommonsModule(
@@ -273,7 +304,7 @@ export class SherpaONNXBridge {
         module.HEAPU8.fill(0, configPtr, configPtr + sizeofConfig);
       }
       const rc = await this._callMaybeAsync(module, 'rac_init', ['number'], [configPtr]);
-      if (rc !== 0) {
+      if (!this._isRegistrationSuccess(rc)) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
           `rac_init returned ${rc}.`,
@@ -283,6 +314,10 @@ export class SherpaONNXBridge {
       if (configPtr) module._free(configPtr);
     }
     logger.info('RACommons initialized (rac_init returned 0)');
+  }
+
+  private _isRegistrationSuccess(rc: number): boolean {
+    return rc === 0 || rc === RAC_ERROR_MODULE_ALREADY_REGISTERED;
   }
 
   /**

@@ -39,7 +39,7 @@ import {
   SDKLogger,
 } from '@runanywhere/web/internal';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
-import { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
+import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider';
 
 const logger = new SDKLogger('LlamaCPP');
 
@@ -47,6 +47,7 @@ const MODULE_ID = 'llamacpp';
 
 let _isRegistered = false;
 let _registeringPromise: Promise<void> | null = null;
+const lifecycleVLMProvider = new LifecycleVLMProvider();
 
 export interface LlamaCPPRegisterOptions {
   /** Hardware acceleration strategy. Defaults to `'auto'` (WebGPU if available, otherwise CPU). */
@@ -122,7 +123,7 @@ export const LlamaCPP = {
         // Publish the active mode so `RunAnywhere.runtime.active` reflects
         // what the bridge actually picked (auto → webgpu/cpu resolution).
         setActiveAccelerationMode(bridge.accelerationMode);
-        setVisionLanguageProvider(VLMWorkerBridge.shared);
+        setVisionLanguageProvider(lifecycleVLMProvider);
         await completeDeferredServicesInitialization();
 
         _isRegistered = true;

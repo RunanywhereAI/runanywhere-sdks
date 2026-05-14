@@ -45,8 +45,16 @@ export const ModelLifecycle = {
     return requireAdapter().load(request);
   },
 
+  loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
+    return requireAdapter().loadAsync(request);
+  },
+
   unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
     return requireAdapter().unload(request);
+  },
+
+  unloadModelAsync(request: ModelUnloadRequest): Promise<ModelUnloadResult | null> {
+    return requireAdapter().unloadAsync(request);
   },
 
   unloadAllModels(): ModelUnloadResult | null {

@@ -14,8 +14,8 @@
  * Model actions flow through the proto-byte bridges:
  *
  *   - `RunAnywhere.modelRegistry.*`    — catalog list / get
- *   - `RunAnywhere.downloads.*`        — download start/cancel/poll
- *   - `RunAnywhere.modelLifecycle.*`   — load / unload / current / snapshot
+ *   - `RunAnywhere.downloadModel(...)` — download with progress callback
+ *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
  *
  * No legacy `ModelManager`, `ModelRegistry` (JS), or `ExtensionPoint` usage.
  */
@@ -48,7 +48,6 @@ type RowStatus =
 interface RowState {
   status: RowStatus;
   progress?: number;   // 0..1
-  taskId?: string;
   error?: string;
 }
 
@@ -59,7 +58,6 @@ let toolbarBtn: HTMLElement | null = null;
 let toolbarText: HTMLElement | null = null;
 let getStartedOverlay: HTMLElement | null = null;
 let getStartedBtn: HTMLButtonElement | null = null;
-let pollInterval: number | null = null;
 let catalogRegistered = false;
 const listeners: Array<() => void> = [];
 
@@ -274,44 +272,25 @@ async function startDownload(modelId: string): Promise<void> {
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const model = RunAnywhere.modelRegistry.getModel(modelId);
+    const model = RunAnywhere.getModel(modelId);
     if (!model) {
       throw new Error(`Model ${modelId} not found in registry`);
     }
-    const plan = RunAnywhere.downloads.plan({
+    const progress = await RunAnywhere.downloadModel({
       modelId,
       model,
-      resumeExisting: false,
-      availableStorageBytes: 0,
       allowMeteredNetwork: true,
-      storageNamespace: '',
-      validateExistingBytes: false,
+      resumeExisting: false,
       verifyChecksums: false,
-      requiredFreeBytesAfterDownload: 0,
-    });
-
-    if (!plan || !plan.canStart) {
-      throw new Error(plan?.errorMessage || 'Download plan unavailable');
-    }
-
-    const start = RunAnywhere.downloads.start({
-      modelId,
-      plan,
-      resume: false,
-      resumeToken: '',
+      validateExistingBytes: false,
       updateRegistryOnCompletion: true,
+      storageNamespace: '',
+      availableStorageBytes: 0,
+      requiredFreeBytesAfterDownload: 0,
+      pollIntervalMs: 500,
+      onProgress: (next) => applyProgress(modelId, next),
     });
-
-    if (!start || !start.accepted) {
-      throw new Error(start?.errorMessage || 'Download start rejected');
-    }
-
-    setRow(modelId, {
-      status: 'downloading',
-      progress: 0,
-      taskId: start.taskId,
-    });
-    startDownloadPolling();
+    applyProgress(modelId, progress);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     setRow(modelId, { status: 'error', error: message });
@@ -322,7 +301,7 @@ async function startDownload(modelId: string): Promise<void> {
 async function loadModel(modelId: string): Promise<void> {
   setRow(modelId, { status: 'loading' });
   try {
-    const result = RunAnywhere.modelLifecycle.loadModel({
+    const result = await RunAnywhere.loadModel({
       modelId,
       forceReload: false,
       validateAvailability: true,
@@ -342,7 +321,7 @@ async function loadModel(modelId: string): Promise<void> {
 
 async function unloadModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.modelLifecycle.unloadModel({
+    const result = await RunAnywhere.unloadModel({
       modelId,
       unloadAll: false,
     });
@@ -355,40 +334,6 @@ async function unloadModel(modelId: string): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     showToast(`Unload failed: ${message}`, 'warning');
   }
-}
-
-// ---------------------------------------------------------------------------
-// Download progress polling — cheap polling keeps dependencies minimal
-// ---------------------------------------------------------------------------
-
-function startDownloadPolling(): void {
-  if (pollInterval !== null) return;
-  pollInterval = window.setInterval(() => pollAll(), 500);
-}
-
-function stopDownloadPolling(): void {
-  if (pollInterval !== null) {
-    window.clearInterval(pollInterval);
-    pollInterval = null;
-  }
-}
-
-function pollAll(): void {
-  let active = false;
-  for (const [modelId, state] of rowStates.entries()) {
-    if (state.status !== 'downloading') continue;
-    active = true;
-    try {
-      const progress = RunAnywhere.downloads.poll({
-        modelId,
-        taskId: state.taskId ?? '',
-      });
-      if (progress) applyProgress(modelId, progress);
-    } catch {
-      // tolerate transient poll failures; keep polling
-    }
-  }
-  if (!active) stopDownloadPolling();
 }
 
 function applyProgress(modelId: string, progress: DownloadProgress): void {
@@ -408,7 +353,6 @@ function applyProgress(modelId: string, progress: DownloadProgress): void {
   setRow(modelId, {
     status: 'downloading',
     progress: fraction,
-    taskId: progress.taskId,
   });
 }
 
@@ -464,7 +408,7 @@ function findLoadedModelId(): string | null {
 
 function lookupModelInfo(modelId: string): ModelInfo | null {
   try {
-    return RunAnywhere.modelRegistry.getModel(modelId);
+    return RunAnywhere.getModel(modelId);
   } catch {
     return null;
   }
@@ -476,7 +420,7 @@ function lookupModelInfo(modelId: string): ModelInfo | null {
  */
 function hydrateRowStatesFromRegistry(): void {
   try {
-    const downloaded = RunAnywhere.modelRegistry.downloadedModels();
+    const downloaded = RunAnywhere.downloadedModels();
     for (const model of downloaded?.models ?? []) {
       rowStates.set(model.id, { status: 'downloaded' });
     }
@@ -485,7 +429,7 @@ function hydrateRowStatesFromRegistry(): void {
   }
 
   try {
-    const current = RunAnywhere.modelLifecycle.currentModel();
+    const current = RunAnywhere.currentModel();
     if (current?.modelId) {
       rowStates.set(current.modelId, { status: 'loaded' });
     }

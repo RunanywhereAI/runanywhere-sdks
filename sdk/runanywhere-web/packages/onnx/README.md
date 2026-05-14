@@ -1,8 +1,8 @@
 # @runanywhere/web-onnx
 
-Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web) — powered by [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) compiled to WebAssembly.
+Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend registration shell for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web).
 
-> **Note:** This package uses [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (not generic ONNX Runtime). Sherpa-onnx is a speech-focused inference engine that runs ONNX models optimized for STT (Whisper, Zipformer, Paraformer), TTS (Piper), and VAD (Silero).
+> **Current blocker:** This package does not publish a standalone speech WASM bundle. It registers against the unified RACommons WASM module, and real STT/TTS/VAD runtime support requires ONNX Runtime and Sherpa-ONNX/Piper/eSpeak WASM static archives to be present under `sdk/runanywhere-commons/third_party/*-wasm` before building. Until `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` exist in the active artifact, these APIs correctly report backend unavailable.
 
 > **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
 
@@ -24,22 +24,22 @@ await RunAnywhere.initialize({ environment: 'development' });
 // 2. Register the ONNX backend
 await ONNX.register();
 
-// 3. Speech-to-Text through the core facade
-const transcript = await RunAnywhere.stt.transcribeAuto(audioFloat32Array, {
+// 3. Speech-to-Text through the Swift-shaped core facade
+const transcript = await RunAnywhere.transcribe(audioFloat32Array, {
   modelPath: '/models/whisper-tiny.onnx',
   modelId: 'whisper-tiny',
 });
 console.log(transcript.text);
 
 // 4. Text-to-Speech
-const speech = await RunAnywhere.tts.synthesizeAuto('Hello from RunAnywhere!', {
+const speech = await RunAnywhere.synthesize('Hello from RunAnywhere!', {
   voicePath: '/models/piper-en.onnx',
   voiceId: 'piper-en',
 });
 // speech.audioData is Float32Array, speech.sampleRate is the sample rate
 
 // 5. Voice Activity Detection
-const vad = await RunAnywhere.vad.detectVoiceAuto(audioFloat32Array, {
+const vad = await RunAnywhere.detectVoiceActivity(audioFloat32Array, {
   modelPath: '/models/silero_vad.onnx',
 });
 console.log(vad);
@@ -49,9 +49,9 @@ console.log(vad);
 
 | Feature | Class | Description |
 |---------|-------|-------------|
-| **Speech-to-Text** | `RunAnywhere.stt` | Offline recognition through the RACommons STT proto ABI |
-| **Text-to-Speech** | `RunAnywhere.tts` | Neural voice synthesis through the RACommons TTS proto ABI |
-| **Voice Activity Detection** | `RunAnywhere.vad` | Speech/silence detection through the RACommons VAD proto ABI |
+| **Speech-to-Text** | `RunAnywhere.transcribe` | Offline recognition through the RACommons STT proto ABI once ONNX/Sherpa exports exist |
+| **Text-to-Speech** | `RunAnywhere.synthesize` | Neural voice synthesis through the RACommons TTS proto ABI once ONNX/Sherpa/Piper exports exist |
+| **Voice Activity Detection** | `RunAnywhere.detectVoiceActivity` | Model-backed speech/silence detection through the RACommons VAD proto ABI once ONNX/Sherpa exports exist |
 
 ## WASM Files
 

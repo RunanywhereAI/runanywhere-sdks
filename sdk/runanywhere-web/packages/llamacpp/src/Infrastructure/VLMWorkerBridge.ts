@@ -27,8 +27,14 @@
  */
 
 import {
+  SDKException,
   SDKLogger,
 } from '@runanywhere/web/internal';
+import {
+  ModelFileRole,
+  type CurrentModelResult,
+  type ModelFileDescriptor,
+} from '@runanywhere/proto-ts/model_types';
 import {
   VLMGenerationOptions,
   VLMImage,
@@ -37,7 +43,7 @@ import {
   type VLMImage as ProtoVLMImage,
   type VLMResult as ProtoVLMResult,
 } from '@runanywhere/proto-ts/vlm_options';
-import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { LlamaCppBridge, type LlamaCppModule } from '../Foundation/LlamaCppBridge';
 import type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
 
 export type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
@@ -76,6 +82,67 @@ export type VLMWorkerResponse =
 export type ProgressListener = (stage: string) => void;
 
 const logger = new SDKLogger('VLMWorkerBridge');
+
+function nonEmpty(value: string | undefined | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function findArtifact(
+  artifacts: readonly ModelFileDescriptor[],
+  role: ModelFileRole,
+): ModelFileDescriptor | null {
+  return artifacts.find((artifact) => artifact.role === role) ?? null;
+}
+
+function dirname(path: string): string {
+  const idx = path.lastIndexOf('/');
+  return idx > 0 ? path.slice(0, idx) : '';
+}
+
+function basename(path: string): string {
+  const idx = path.lastIndexOf('/');
+  return idx >= 0 ? path.slice(idx + 1) : path;
+}
+
+function resolveArtifactPath(
+  artifact: ModelFileDescriptor | null,
+  primaryPath: string | undefined,
+): string | null {
+  if (!artifact) return null;
+  const localPath = nonEmpty(artifact.localPath);
+  if (localPath) return localPath;
+
+  const relative =
+    nonEmpty(artifact.destinationPath) ??
+    nonEmpty(artifact.relativePath) ??
+    nonEmpty(artifact.filename);
+  const primary = nonEmpty(primaryPath);
+  const root = primary ? dirname(primary) : '';
+  if (relative && root) return `${root}/${relative}`;
+  return relative;
+}
+
+function readArtifactBytes(
+  module: LlamaCppModule,
+  path: string,
+  label: string,
+): Uint8Array {
+  try {
+    return module.FS!.readFile(path);
+  } catch (err) {
+    throw SDKException.backendNotAvailable(
+      'visionLanguage.loadCurrentModel',
+      `Failed to read VLM ${label} at ${path}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function copyToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
 
 // ---------------------------------------------------------------------------
 // VLMWorkerBridge — singleton main-thread proxy
@@ -202,6 +269,55 @@ export class VLMWorkerBridge {
     this._lastModelParams = params;
     this._needsRecovery = false;
     logger.info(`Model loaded in worker: ${params.modelId}`);
+  }
+
+  /**
+   * Load the currently-selected C++ lifecycle VLM artifacts into the worker.
+   * The example app calls this after `RunAnywhere.loadModel(...)` succeeds,
+   * keeping worker/MEMFS details out of app code.
+   */
+  async loadCurrentModel(currentModel: CurrentModelResult): Promise<void> {
+    const artifacts = currentModel.resolvedArtifacts ?? [];
+    const primary = findArtifact(
+      artifacts,
+      ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+    );
+    const mmproj = findArtifact(
+      artifacts,
+      ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+    );
+
+    const primaryPath =
+      resolveArtifactPath(primary, currentModel.resolvedPath) ??
+      nonEmpty(currentModel.resolvedPath);
+    const mmprojPath = resolveArtifactPath(mmproj, currentModel.resolvedPath);
+
+    if (!primaryPath || !mmprojPath) {
+      throw SDKException.componentNotReady(
+        'vlm',
+        'The loaded VLM model does not include both primary model and mmproj resolved artifacts.',
+      );
+    }
+
+    const module = LlamaCppBridge.shared.module;
+    if (!module.FS) {
+      throw SDKException.backendNotAvailable(
+        'visionLanguage.loadCurrentModel',
+        'LlamaCpp WASM module does not expose FS.readFile for resolved VLM artifacts.',
+      );
+    }
+
+    const modelBytes = readArtifactBytes(module, primaryPath, 'primary model');
+    const mmprojBytes = readArtifactBytes(module, mmprojPath, 'mmproj vision projector');
+
+    await this.loadModel({
+      modelId: currentModel.modelId,
+      modelName: currentModel.model?.name || currentModel.modelId,
+      modelFilename: primary?.filename || basename(primaryPath),
+      mmprojFilename: mmproj?.filename || basename(mmprojPath),
+      modelData: copyToArrayBuffer(modelBytes),
+      mmprojData: copyToArrayBuffer(mmprojBytes),
+    });
   }
 
   /**

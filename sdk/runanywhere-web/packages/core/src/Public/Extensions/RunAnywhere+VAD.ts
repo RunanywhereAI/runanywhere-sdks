@@ -26,6 +26,10 @@ import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
+import {
+  missingSpeechBackendExports,
+  speechBackendRequirementMessage,
+} from '../../runtime/SpeechBackendExports';
 import { VADProtoAdapter, type ProtoEventHandler } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
@@ -56,6 +60,13 @@ function requireVADModule(feature: string): VADComponentModule {
     throw SDKException.backendNotAvailable(
       feature,
       'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  const missing = missingSpeechBackendExports(module);
+  if (missing.length > 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      speechBackendRequirementMessage(missing),
     );
   }
   return module;
@@ -125,9 +136,11 @@ function callLoadModel(
   modelName?: string,
 ): void {
   if (typeof module._rac_vad_component_load_model !== 'function') {
-    // Energy-based VAD does not require model loading. The proto-byte
-    // configure path is the only requirement. Treat absence as a no-op.
-    return;
+    throw SDKException.backendNotAvailable(
+      'VAD.loadModel',
+      'Loaded WASM module does not export _rac_vad_component_load_model. ' +
+        'Swift-aligned Web VAD requires the model-backed lifecycle path, not an energy-only fallback.',
+    );
   }
   const bridge = new ProtoWasmBridge(module, logger);
   const pathPtr = bridge.allocUtf8(modelPath);
@@ -162,6 +175,8 @@ export interface DetectVoiceOptions extends Partial<VADOptions> {
 }
 
 export const VAD = {
+  detectVoiceAuto: detectVoice,
+
   /**
    * Returns true when the WASM module is loaded with both the proto-byte VAD
    * exports AND the component lifecycle exports (create / destroy).
@@ -169,6 +184,7 @@ export const VAD = {
   supportsProtoVAD(): boolean {
     const module = tryRunanywhereModule() as VADComponentModule | null;
     if (!module) return false;
+    if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_vad_component_create !== 'function') return false;
     if (typeof module._rac_vad_component_destroy !== 'function') return false;
     return VADProtoAdapter.tryDefault()?.supportsProtoVAD() ?? false;
@@ -341,12 +357,16 @@ export async function detectVoice(
       modelId = current.modelId;
     }
   }
+  if (!modelPath) {
+    throw SDKException.componentNotReady(
+      'vad',
+      'No VAD model is loaded. Call RunAnywhere.loadModel(...) with a VAD model before RunAnywhere.detectVoiceActivity().',
+    );
+  }
 
   const handle = callCreate(module);
   try {
-    if (modelPath) {
-      callLoadModel(module, handle, modelPath, modelId, modelName);
-    }
+    callLoadModel(module, handle, modelPath, modelId, modelName);
     VAD.configure(handle, options?.config);
     VAD.initialize(handle);
     return VAD.process(handle, audio, options);

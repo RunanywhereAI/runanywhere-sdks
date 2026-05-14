@@ -1,8 +1,8 @@
 /**
  * Vision Tab — V2 canonical VLM camera description.
  *
- * Re-landed against the `RunAnywhere.visionLanguage` provider (off-main-thread WASM
- * runtime) and the core `VideoCapture` helper. Flow is:
+ * Re-landed against the Swift-shaped `RunAnywhere.processImage(...)` facade
+ * and the core `VideoCapture` helper. Flow is:
  *
  *   1. User downloads + loads a VLM (e.g. SmolVLM 500M) via the shared
  *      model selection sheet (download + `modelLifecycle.load`).
@@ -10,15 +10,10 @@
  *      the preview container.
  *   3. User clicks "Capture & analyze" — the latest frame is extracted as
  *      RGB pixels, wrapped in a `VLMImage` proto message, and dispatched
- *      through `RunAnywhere.visionLanguage.processImage(image, options)`. The
- *      worker decodes on its side, calls `_rac_vlm_process_proto`, and
- *      returns the encoded `VLMResult`.
+ *      through `RunAnywhere.processImage(image, options)`.
  *
- * The worker-side `loadModel` wiring (raw GGUF + mmproj bytes transferred
- * zero-copy into the worker's MEMFS) is still TBD — until the backend
- * package installs it, `RunAnywhere.visionLanguage.isModelLoaded` stays false
- * and the view surfaces the situation inline rather than rendering a blank
- * placeholder.
+ * The Web provider reads C++ lifecycle-resolved primary GGUF and mmproj
+ * artifacts from the active WASM filesystem.
  */
 
 import type { TabLifecycle } from '../app';
@@ -76,9 +71,9 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
 
 function renderView(): void {
   const modelLoaded = isVLMModelLoaded();
-  const workerLoaded = RunAnywhere.visionLanguage.isModelLoaded;
+  const providerLoaded = RunAnywhere.visionLanguage.isModelLoaded;
   const captureReady = camera?.isCapturing ?? false;
-  const canAnalyze = workerLoaded && captureReady && !isBusy;
+  const canAnalyze = modelLoaded && captureReady && !isBusy;
 
   container.innerHTML = `
     <div class="toolbar">
@@ -95,7 +90,7 @@ function renderView(): void {
         <ul class="feature-unavailable__list">
           <li><code>VLM model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
           <li><code>RunAnywhere.visionLanguage.isInitialized</code>: <strong>${RunAnywhere.visionLanguage.isInitialized ? 'yes' : 'no'}</strong></li>
-          <li><code>RunAnywhere.visionLanguage.isModelLoaded</code>: <strong>${workerLoaded ? 'yes' : 'no'}</strong></li>
+          <li><code>RunAnywhere.visionLanguage.isModelLoaded</code>: <strong>${providerLoaded ? 'yes' : 'no'}</strong></li>
           <li><code>camera.isCapturing</code>: <strong>${captureReady ? 'yes' : 'no'}</strong></li>
         </ul>
       </div>
@@ -118,9 +113,9 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Analyze</h3>
         <p class="text-secondary">
-          Runs <code>RunAnywhere.visionLanguage.processImage(image, options)</code> on the last
+          Runs <code>RunAnywhere.processImage(image, options)</code> on the last
           captured frame. The provider decodes the proto message and calls
-          <code>_rac_vlm_process_proto</code> off-thread.
+          <code>_rac_vlm_process_proto</code>.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
         <textarea id="vision-prompt" class="chat-input" rows="2"
@@ -229,10 +224,9 @@ async function onAnalyze(): Promise<void> {
     return;
   }
 
-  if (!RunAnywhere.visionLanguage.isModelLoaded) {
+  if (!isVLMModelLoaded()) {
     setStatus(
-      'The VLM Worker has no model loaded. Load SmolVLM, then re-run Analyze — ' +
-      'worker-side model plumbing lands once the backend registers a VLM loader.',
+      'No VLM model is loaded. Load SmolVLM from the model picker, then re-run Analyze.',
     );
     renderView();
     return;
@@ -290,7 +284,7 @@ async function onAnalyze(): Promise<void> {
   renderView();
 
   try {
-    const result: VLMResult = await RunAnywhere.visionLanguage.processImage(image, options);
+    const result: VLMResult = await RunAnywhere.processImage(image, options);
     lastResult = result.text || '(empty response)';
     const tokLine =
       result.tokensPerSecond > 0
@@ -311,7 +305,7 @@ async function onAnalyze(): Promise<void> {
 
 function isVLMModelLoaded(): boolean {
   try {
-    const current = RunAnywhere.modelLifecycle.currentModel();
+    const current = RunAnywhere.currentModel();
     return current?.modelId === VLM_MODEL_ID;
   } catch {
     return false;

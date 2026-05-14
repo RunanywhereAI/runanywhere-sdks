@@ -1,10 +1,8 @@
 /**
  * Playwright configuration for the Web SDK browser E2E harness.
  *
- * This is an MVP — one smoke test that loads the example app, verifies the
- * SDK initializes end-to-end, and asserts that public API surfaces exist.
- * It does NOT download real models or run actual inference (that lives in a
- * future harness once ONNX WASM is unblocked — see gaps/inconsistencies/web.md G-01).
+ * The default suite is smoke-level. Opt-in specs (`RA_RUN_LLM_E2E=1`,
+ * `RA_RUN_VLM_E2E=1`) download real models and run browser inference.
  *
  * Running locally:
  *   cd sdk/runanywhere-web
@@ -13,6 +11,13 @@
  *   npm run test:browser
  */
 import { defineConfig, devices } from '@playwright/test';
+
+const webgpuArgs = [
+  '--enable-unsafe-webgpu',
+  '--enable-features=SharedArrayBuffer,WebAssemblyJSPI',
+  '--js-flags=--experimental-wasm-stack-switching',
+];
+const enableWebGPU = process.env.RA_RUN_VLM_E2E === '1' || process.env.RA_ENABLE_WEBGPU_BROWSER === '1';
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -25,6 +30,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    launchOptions: enableWebGPU ? { args: webgpuArgs } : undefined,
     // COOP/COEP headers are set by the example app's Vite config, so the
     // test pages inherit cross-origin isolation automatically.
   },

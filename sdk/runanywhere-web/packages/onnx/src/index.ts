@@ -6,10 +6,10 @@
  * This package is a thin shell — all STT/TTS/VAD inference flows through
  * the RACommons proto-byte C ABI (`rac_stt_component_*_proto`,
  * `rac_tts_component_*_proto`, `rac_vad_component_*_proto`) exposed by the
- * commons WASM module. Calling `ONNX.register()` simply registers the
- * sherpa-onnx vtable with the C++ plugin registry; the typed adapters in
- * `@runanywhere/web` (STTProtoAdapter, TTSProtoAdapter, VADProtoAdapter)
- * dispatch through it from then on.
+ * commons WASM module. Calling `ONNX.register()` registers both the ONNX
+ * runtime and Sherpa speech vtables with the C++ plugin registry; the typed
+ * adapters in `@runanywhere/web` (STTProtoAdapter, TTSProtoAdapter,
+ * VADProtoAdapter) dispatch through them from then on.
  *
  * @packageDocumentation
  */

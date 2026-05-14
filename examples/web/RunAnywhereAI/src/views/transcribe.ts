@@ -23,10 +23,6 @@ import {
   AudioCapture,
   AudioFileLoader,
 } from '@runanywhere/web/browser';
-import {
-  STTProtoAdapter,
-  tryRunanywhereModule,
-} from '@runanywhere/web/internal';
 import { ONNX } from '@runanywhere/web-onnx';
 
 let container: HTMLElement;
@@ -50,16 +46,14 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
 }
 
 interface TranscribeStatus {
-  moduleInstalled: boolean;
   registered: boolean;
   supportsProto: boolean;
 }
 
 function inspectStatus(): TranscribeStatus {
-  const moduleInstalled = tryRunanywhereModule() != null;
   const registered = ONNX.isRegistered;
-  const supportsProto = STTProtoAdapter.tryDefault()?.supportsProtoSTT() ?? false;
-  return { moduleInstalled, registered, supportsProto };
+  const supportsProto = RunAnywhere.stt.supportsProtoSTT();
+  return { registered, supportsProto };
 }
 
 function renderTranscribe(): void {
@@ -80,13 +74,10 @@ function renderTranscribe(): void {
       <div class="docs-section">
         <h3>Backend status</h3>
         <ul class="feature-unavailable__list">
-          <li><code>RACommons module installed</code>: <strong>${
-            status.moduleInstalled ? 'yes' : 'no'
-          }</strong></li>
           <li><code>ONNX.isRegistered</code>: <strong>${
             status.registered ? 'yes' : 'no'
           }</strong></li>
-          <li><code>STTProtoAdapter.supportsProtoSTT()</code>: <strong>${
+          <li><code>RunAnywhere.stt.supportsProtoSTT()</code>: <strong>${
             status.supportsProto ? 'yes' : 'no'
           }</strong></li>
         </ul>
@@ -97,7 +88,7 @@ function renderTranscribe(): void {
         ? `
           <div class="docs-section">
             <h3>Microphone</h3>
-            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.stt.transcribeAuto(...)</code>.</p>
+            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.transcribe(...)</code>.</p>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing ? 'disabled' : ''}>
                 ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
@@ -121,11 +112,11 @@ function renderTranscribe(): void {
             <p class="text-secondary">
               Once the ONNX backend is registered against a WASM build that
               includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
-              transcription through <code>RunAnywhere.stt.transcribeAuto(audio, options)</code>.
+              transcription through <code>RunAnywhere.transcribe(audio, options)</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.modelLifecycle.loadModel(...)</code></li>
-              <li><code>RunAnywhere.stt.transcribeAuto(audio, { modelPath })</code></li>
+              <li><code>RunAnywhere.loadModel(...)</code></li>
+              <li><code>RunAnywhere.transcribe(audio, { modelPath })</code></li>
             </ul>
           </div>`}
     </div>
@@ -216,7 +207,7 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
   renderTranscribe();
   setStatus(`Transcribing ${(samples.length / 16000).toFixed(2)}s of audio...`);
   try {
-    lastResult = await RunAnywhere.stt.transcribeAuto(samples);
+    lastResult = await RunAnywhere.transcribe(samples);
     setStatus('Done.');
   } catch (err) {
     setStatus(`Transcribe failed: ${formatErr(err)}`);

@@ -67,6 +67,35 @@ export class VLMProtoAdapter {
     ));
   }
 
+  async processAsync(
+    handle: number,
+    image: ProtoVLMImage,
+    options: ProtoVLMGenerationOptions,
+  ): Promise<ProtoVLMResult | null> {
+    if (!ensureExports(this.module, 'vlm.process', ['_rac_vlm_process_proto'])) {
+      return null;
+    }
+    const imageBytes = VLMImage.encode(image).finish();
+    const optionsBytes = VLMGenerationOptions.encode(options).finish();
+    const bridge = this.bridge();
+    return bridge.withHeapBytesAsync(imageBytes, (imagePtr, imageSize) => (
+      bridge.withHeapBytesAsync(optionsBytes, (optionsPtr, optionsSize) => (
+        bridge.callResultProtoAsync(
+          VLMResult,
+          (outResult) => this.callProcess(
+            handle,
+            imagePtr,
+            imageSize,
+            optionsPtr,
+            optionsSize,
+            outResult,
+          ),
+          'rac_vlm_process_proto',
+        )
+      ))
+    ));
+  }
+
   processStream(
     handle: number,
     image: ProtoVLMImage,
@@ -110,5 +139,35 @@ export class VLMProtoAdapter {
 
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
+  }
+
+  private callProcess(
+    handle: number,
+    imagePtr: number,
+    imageSize: number,
+    optionsPtr: number,
+    optionsSize: number,
+    outResult: number,
+  ): number | Promise<number> {
+    if (typeof this.module.ccall === 'function') {
+      const result = this.module.ccall(
+        'rac_vlm_process_proto',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number'],
+        [handle, imagePtr, imageSize, optionsPtr, optionsSize, outResult],
+        { async: true },
+      );
+      return result instanceof Promise
+        ? result.then((value) => Number(value))
+        : Number(result);
+    }
+    return this.module._rac_vlm_process_proto!(
+      handle,
+      imagePtr,
+      imageSize,
+      optionsPtr,
+      optionsSize,
+      outResult,
+    );
   }
 }

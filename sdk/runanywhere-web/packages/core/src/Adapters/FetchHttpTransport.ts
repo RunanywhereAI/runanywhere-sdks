@@ -26,9 +26,10 @@
  *   Sync XHR is deprecated on the main thread (browsers emit a console
  *   warning) but is the canonical way to block a WASM call until the
  *   browser returns a response when JSPI / ASYNCIFY are not available.
- *   For the non-WebGPU WASM build we ship today, JSPI is off, so this
- *   is the only viable implementation. In a worker context sync XHR is
- *   still supported without warnings.
+ *   Browsers forbid `responseType = 'arraybuffer'` for sync XHR issued
+ *   from a document, so the main-thread path falls back to the older
+ *   `x-user-defined` binary-text mode. In a worker context sync XHR can
+ *   still use the arraybuffer path without warnings.
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
@@ -42,6 +43,10 @@ const RAC_ERROR_NETWORK_ERROR = -150;
 const RAC_ERROR_CANCELLED = -233;
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
+
+function i64ToNumber(value: number | bigint): number {
+  return typeof value === 'bigint' ? Number(value) : value;
+}
 
 /**
  * Extension of HTTPModule with the Stage 3d registration export. Stays
@@ -152,29 +157,45 @@ export class FetchHttpTransport {
     this.requestSendPtr = 0;
 
     this.requestStreamPtr = this.m.addFunction(
-      (userData: number, reqPtr: number, cbPtr: number, cbUd: number, outMetaPtr: number) => {
-        return this.runStream(userData, reqPtr, cbPtr, cbUd, outMetaPtr, /*resumeFromByte=*/ 0);
+      (
+        userData: number | bigint,
+        reqPtr: number | bigint,
+        cbPtr: number | bigint,
+        cbUd: number | bigint,
+        outMetaPtr: number | bigint,
+      ) => {
+        return this.runStream(
+          Number(userData),
+          Number(reqPtr),
+          Number(cbPtr),
+          Number(cbUd),
+          Number(outMetaPtr),
+          /*resumeFromByte=*/ 0,
+        );
       },
       'iiiiii',
     );
 
     // Emscripten sig 'iiijiii': return i32; args = i32, i32, i64, i32, i32, i32.
-    // On wasm32 the i64 lowers to two i32 args, so the JS callback sees
-    // 7 args total: (userData, req, resumeLo, resumeHi, cb, cbUd, outMeta).
+    // Current Emscripten builds pass the i64 resume offset to JS as BigInt.
     this.requestResumePtr = this.m.addFunction(
       (
-        userData: number,
-        reqPtr: number,
-        resumeLo: number,
-        resumeHi: number,
-        cbPtr: number,
-        cbUd: number,
-        outMetaPtr: number,
+        userData: number | bigint,
+        reqPtr: number | bigint,
+        resumeRaw: number | bigint,
+        cbPtr: number | bigint,
+        cbUd: number | bigint,
+        outMetaPtr: number | bigint,
       ) => {
-        // JS numbers are safe to 2^53-1; multi-TB resume is far outside
-        // that range, so combine via Number for simplicity.
-        const resumeFromByte = (resumeHi >>> 0) * 0x100000000 + (resumeLo >>> 0);
-        return this.runStream(userData, reqPtr, cbPtr, cbUd, outMetaPtr, resumeFromByte);
+        const resumeFromByte = i64ToNumber(resumeRaw);
+        return this.runStream(
+          Number(userData),
+          Number(reqPtr),
+          Number(cbPtr),
+          Number(cbUd),
+          Number(outMetaPtr),
+          resumeFromByte,
+        );
       },
       'iiijiii',
     );
@@ -223,7 +244,13 @@ export class FetchHttpTransport {
       const req = this.readRequest(reqPtr);
       const xhr = new XMLHttpRequest();
       xhr.open(req.method, req.url, /*async=*/ false);
-      xhr.responseType = 'arraybuffer';
+      let useBinaryTextFallback = false;
+      try {
+        xhr.responseType = 'arraybuffer';
+      } catch {
+        useBinaryTextFallback = true;
+        xhr.overrideMimeType('text/plain; charset=x-user-defined');
+      }
 
       for (const h of req.headers) {
         try {
@@ -273,6 +300,8 @@ export class FetchHttpTransport {
       const body =
         xhr.response instanceof ArrayBuffer
           ? new Uint8Array(xhr.response)
+          : useBinaryTextFallback
+            ? this.binaryTextToBytes(xhr.responseText)
           : new Uint8Array(0);
       const total = body.length;
 
@@ -426,6 +455,14 @@ export class FetchHttpTransport {
     };
   }
 
+  private binaryTextToBytes(text: string): Uint8Array {
+    const out = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; i++) {
+      out[i] = text.charCodeAt(i) & 0xff;
+    }
+    return out;
+  }
+
   /**
    * Write a populated `rac_http_response_t` into WASM memory at
    * `outMetaPtr`. Mirrors `emscripten_to_response()` in
@@ -575,11 +612,11 @@ export class FetchHttpTransport {
       //   rac_bool_t (*)(const uint8_t* chunk, size_t chunk_len,
       //                  uint64_t total_written, uint64_t content_length,
       //                  void* user_data);
-      // sig 'iiijji' — expanded on wasm32 as (chunk*, chunk_len,
-      //   total_lo, total_hi, contentLen_lo, contentLen_hi, user_data) -> i32
+      // sig 'iiijji'. Current Emscripten builds pass i64 args as BigInt
+      // when calling the table entry from JS.
       const m = this.m as unknown as {
-        getWasmTableEntry?: (ptr: number) => (...args: number[]) => number;
-        wasmTable?: { get(ptr: number): (...args: number[]) => number };
+        getWasmTableEntry?: (ptr: number) => (...args: Array<number | bigint>) => number;
+        wasmTable?: { get(ptr: number): (...args: Array<number | bigint>) => number };
         dynCall_iiijji?: (
           cbPtr: number,
           chunkPtr: number,
@@ -597,7 +634,7 @@ export class FetchHttpTransport {
       const contentLo = contentLength >>> 0;
       const contentHi = Math.floor(contentLength / 0x100000000) >>> 0;
 
-      let callable: ((...args: number[]) => number) | null = null;
+      let callable: ((...args: Array<number | bigint>) => number) | null = null;
       if (typeof m.getWasmTableEntry === 'function') {
         callable = m.getWasmTableEntry(cbPtr);
       } else if (m.wasmTable && typeof m.wasmTable.get === 'function') {
@@ -608,10 +645,8 @@ export class FetchHttpTransport {
         const rv = callable(
           scratchPtr,
           chunk.length,
-          totalLo,
-          totalHi,
-          contentLo,
-          contentHi,
+          BigInt(totalWritten),
+          BigInt(contentLength),
           cbUd,
         );
         return (rv | 0) === RAC_FALSE ? RAC_FALSE : RAC_TRUE;
@@ -631,9 +666,9 @@ export class FetchHttpTransport {
       }
       logger.warning(
         'FetchHttpTransport: no way to dispatch chunk callback (neither ' +
-          'getWasmTableEntry nor dynCall_iiijji present); skipping callback',
+          'getWasmTableEntry nor dynCall_iiijji present); failing stream',
       );
-      return RAC_TRUE;
+      return RAC_FALSE;
     } finally {
       try {
         this.m._free(scratchPtr);

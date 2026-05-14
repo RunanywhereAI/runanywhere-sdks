@@ -22,6 +22,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -125,6 +126,52 @@ enum class VLMModelType {
   Generic  // Generic chatml fallback
 };
 
+std::string format_vlm_prompt_manual(const std::string &user_content,
+                                     const char *effective_system,
+                                     VLMModelType model_type) {
+  std::string formatted;
+
+  switch (model_type) {
+  case VLMModelType::SmolVLM:
+    if (effective_system) {
+      formatted += "System: ";
+      formatted += effective_system;
+      formatted += "\n";
+    }
+    formatted += "User: ";
+    formatted += user_content;
+    formatted += "\nAssistant:";
+    break;
+  case VLMModelType::LLaVA:
+    if (effective_system) {
+      formatted += "SYSTEM: ";
+      formatted += effective_system;
+      formatted += "\n";
+    }
+    formatted += "USER: ";
+    formatted += user_content;
+    formatted += "\nASSISTANT:";
+    break;
+  case VLMModelType::Qwen2VL:
+  case VLMModelType::Generic:
+  case VLMModelType::Unknown:
+  default:
+    if (effective_system) {
+      formatted = "<|im_start|>system\n";
+      formatted += effective_system;
+      formatted += "<|im_end|>\n";
+    }
+    formatted += "<|im_start|>user\n";
+    formatted += user_content;
+    formatted += "<|im_end|>\n<|im_start|>assistant\n";
+    break;
+  }
+
+  RAC_LOG_DEBUG(LOG_CAT, "Manual-formatted prompt (%d chars): %s",
+                (int)formatted.length(), formatted.c_str());
+  return formatted;
+}
+
 /**
  * Detect VLM model type from model name metadata.
  */
@@ -209,6 +256,14 @@ std::string format_vlm_prompt_with_template(llama_model *model,
     effective_system = "You are a helpful assistant.";
   }
 
+#ifdef __EMSCRIPTEN__
+  // llama.cpp's chat-template formatter can surface uncaught C++ exceptions
+  // through Emscripten as opaque `CppException` values. Web uses the same
+  // deterministic model-family formatter that the fallback path uses so the
+  // browser receives typed RACommons errors instead of escaped native throws.
+  return format_vlm_prompt_manual(user_content, effective_system, model_type);
+#endif
+
   // Get the model's chat template
   const char *tmpl = llama_model_chat_template(model, nullptr);
 
@@ -217,25 +272,35 @@ std::string format_vlm_prompt_with_template(llama_model *model,
     RAC_LOG_DEBUG(LOG_CAT, "Using model chat template: %.80s...", tmpl);
 
     if (effective_system) {
-      llama_chat_message messages[2];
-      messages[0].role = "system";
-      messages[0].content = effective_system;
-      messages[1].role = "user";
-      messages[1].content = user_content.c_str();
+      int32_t size = 0;
+      try {
+        llama_chat_message messages[2];
+        messages[0].role = "system";
+        messages[0].content = effective_system;
+        messages[1].role = "user";
+        messages[1].content = user_content.c_str();
 
-      int32_t size =
-          llama_chat_apply_template(tmpl, messages, 2, true, nullptr, 0);
-      if (size > 0) {
-        std::vector<char> buf(size + 1);
-        int32_t result = llama_chat_apply_template(tmpl, messages, 2, true,
-                                                   buf.data(), buf.size());
-        if (result > 0) {
-          std::string formatted(buf.data(), result);
-          RAC_LOG_DEBUG(LOG_CAT,
-                        "Template-formatted prompt with system (%d chars): %s",
-                        (int)formatted.length(), formatted.c_str());
-          return formatted;
+        size = llama_chat_apply_template(tmpl, messages, 2, true, nullptr, 0);
+        if (size > 0) {
+          std::vector<char> buf(size + 1);
+          int32_t result = llama_chat_apply_template(tmpl, messages, 2, true,
+                                                     buf.data(), buf.size());
+          if (result > 0) {
+            std::string formatted(buf.data(), result);
+            RAC_LOG_DEBUG(
+                LOG_CAT,
+                "Template-formatted prompt with system (%d chars): %s",
+                (int)formatted.length(), formatted.c_str());
+            return formatted;
+          }
         }
+      } catch (const std::exception &ex) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "llama_chat_apply_template with system threw: %s",
+                        ex.what());
+      } catch (...) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "llama_chat_apply_template with system threw");
       }
       if (effective_system) {
         RAC_LOG_WARNING(
@@ -257,22 +322,29 @@ std::string format_vlm_prompt_with_template(llama_model *model,
     }
 
     {
-      llama_chat_message messages[1];
-      messages[0].role = "user";
-      messages[0].content = user_content.c_str();
+      int32_t size = 0;
+      try {
+        llama_chat_message messages[1];
+        messages[0].role = "user";
+        messages[0].content = user_content.c_str();
 
-      int32_t size =
-          llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
-      if (size > 0) {
-        std::vector<char> buf(size + 1);
-        int32_t result = llama_chat_apply_template(tmpl, messages, 1, true,
-                                                   buf.data(), buf.size());
-        if (result > 0) {
-          std::string formatted(buf.data(), result);
-          RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
-                        (int)formatted.length(), formatted.c_str());
-          return formatted;
+        size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
+        if (size > 0) {
+          std::vector<char> buf(size + 1);
+          int32_t result = llama_chat_apply_template(tmpl, messages, 1, true,
+                                                     buf.data(), buf.size());
+          if (result > 0) {
+            std::string formatted(buf.data(), result);
+            RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
+                          (int)formatted.length(), formatted.c_str());
+            return formatted;
+          }
         }
+      } catch (const std::exception &ex) {
+        RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template threw: %s",
+                        ex.what());
+      } catch (...) {
+        RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template threw");
       }
       RAC_LOG_WARNING(
           LOG_CAT,
@@ -285,20 +357,7 @@ std::string format_vlm_prompt_with_template(llama_model *model,
   }
 
 manual_fallback:
-  // Fallback: manual chatml format (works for most models)
-  std::string formatted;
-  if (effective_system) {
-    formatted = "<|im_start|>system\n";
-    formatted += effective_system;
-    formatted += "<|im_end|>\n";
-  }
-  formatted += "<|im_start|>user\n";
-  formatted += user_content;
-  formatted += "<|im_end|>\n<|im_start|>assistant\n";
-
-  RAC_LOG_DEBUG(LOG_CAT, "Manual-formatted prompt (%d chars): %s",
-                (int)formatted.length(), formatted.c_str());
-  return formatted;
+  return format_vlm_prompt_manual(user_content, effective_system, model_type);
 }
 
 /**
@@ -431,6 +490,11 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
                                  const rac_vlm_options_t *options) {
   backend->cancel_requested = false;
   configure_sampler(backend, options);
+  RAC_LOG_INFO(LOG_CAT,
+               "[v3-prep] start image=%d format=%d width=%u height=%u data=%zu",
+               image ? 1 : 0, image ? static_cast<int>(image->format) : -1,
+               image ? image->width : 0, image ? image->height : 0,
+               image ? image->data_size : 0);
 
   // Clear KV cache before each new request
   llama_memory_t mem = llama_get_memory(backend->ctx);
@@ -455,10 +519,12 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
 
   if (image && backend->mtmd_ctx) {
     if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
+      RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
       bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx,
                                                  image->file_path);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS &&
                image->pixel_data) {
+      RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
       bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64 &&
                image->base64_data) {
@@ -467,12 +533,14 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     }
 
     has_image = (bitmap != nullptr);
+    RAC_LOG_INFO(LOG_CAT, "[v3-prep] bitmap ready=%d", has_image ? 1 : 0);
     if (!has_image && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
       RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
       return RAC_ERROR_INVALID_INPUT;
     }
   }
 
+  RAC_LOG_INFO(LOG_CAT, "[v3-prep] formatting prompt");
   full_prompt = format_vlm_prompt_with_template(
       backend->model, prompt, image_marker, has_image, system_prompt,
       effective_model_type);

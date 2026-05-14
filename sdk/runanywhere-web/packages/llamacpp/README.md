@@ -23,19 +23,19 @@ await RunAnywhere.initialize({ environment: 'development' });
 await LlamaCPP.register();
 
 // 3. Load a GGUF model and generate through the core facade
-await RunAnywhere.modelRegistry.registerModel({
-  modelId: 'qwen2.5-0.5b',
+RunAnywhere.importModel({
+  id: 'qwen2.5-0.5b',
   name: 'Qwen 2.5 0.5B',
   localPath: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
 });
-await RunAnywhere.modelLifecycle.loadModel({ modelId: 'qwen2.5-0.5b' });
-const result = await RunAnywhere.textGeneration.generate({
+await RunAnywhere.loadModel({ modelId: 'qwen2.5-0.5b' });
+const result = await RunAnywhere.generate({
   prompt: 'Explain quantum computing briefly.',
 });
 console.log(result.text);
 
 // Stream tokens
-const stream = await RunAnywhere.textGeneration.generateStream({
+const stream = await RunAnywhere.generateStream({
   prompt: 'Write a haiku.',
 });
 for await (const token of stream.stream) {
@@ -47,8 +47,8 @@ for await (const token of stream.stream) {
 
 | Feature | Class | Description |
 |---------|-------|-------------|
-| **Text Generation** | `RunAnywhere.textGeneration` | LLM inference with streaming, system prompts, temperature, top-k/top-p |
-| **Vision Language Models** | `VLM` | Multimodal inference (image + text) via llama.cpp mtmd — runs in a Web Worker |
+| **Text Generation** | `RunAnywhere.generate` / `RunAnywhere.generateStream` | LLM inference with streaming, system prompts, temperature, top-k/top-p |
+| **Vision Language Models** | `RunAnywhere.processImage` | Multimodal inference through llama.cpp mtmd and the shared C++ lifecycle |
 | **Tool Calling** | `ToolCalling` | Function calling with typed definitions (Hermes-style and generic) |
 | **Structured Output** | `StructuredOutput` | JSON schema-guided generation |
 | **Embeddings** | `Embeddings` | Vector embedding generation with configurable normalization/pooling |
@@ -60,10 +60,10 @@ This package includes pre-built WASM binaries:
 
 | File | Description |
 |------|-------------|
-| `wasm/racommons-llamacpp.wasm` | CPU variant (~3.7 MB) |
-| `wasm/racommons-llamacpp-webgpu.wasm` | WebGPU-accelerated variant (~3.9 MB) |
+| `wasm/racommons-llamacpp.wasm` | CPU variant (~5.8 MB in the current VLM-enabled build) |
+| `wasm/racommons-llamacpp-webgpu.wasm` | WebGPU/JSPI variant (~6.7 MB in the current VLM-enabled build) |
 
-The SDK automatically selects the WebGPU variant when available, falling back to CPU.
+The SDK automatically selects the WebGPU variant when `navigator.gpu`, `WebAssembly.promising`, and `WebAssembly.Suspending` are available, falling back to CPU.
 
 Configure your bundler to serve these as static assets — see the [main SDK README](https://www.npmjs.com/package/@runanywhere/web) for Vite/Webpack examples.
 
