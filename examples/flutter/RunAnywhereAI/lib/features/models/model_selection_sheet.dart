@@ -881,8 +881,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
             throw Exception('Model not found in registry: ${widget.model.id}'),
       );
 
-      final downloadProgress =
-          sdk.RunAnywhere.downloads.start(sdkModel.id);
+      final downloadProgress = sdk.RunAnywhere.downloads.start(sdkModel.id);
 
       // Listen to real download progress
       await for (final progress in downloadProgress) {

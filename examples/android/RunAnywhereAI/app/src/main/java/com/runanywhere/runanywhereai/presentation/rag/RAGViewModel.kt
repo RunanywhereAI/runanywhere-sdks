@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.rag
 
-import ai.runanywhere.proto.v1.RAGConfig
+import ai.runanywhere.proto.v1.RAGConfiguration
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -117,7 +117,7 @@ class RAGViewModel : ViewModel() {
     fun loadDocument(
         context: Context,
         uri: Uri,
-        config: RAGConfig,
+        config: RAGConfiguration,
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDocument = true, error = null) }

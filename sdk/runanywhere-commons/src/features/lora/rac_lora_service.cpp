@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <map>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -126,10 +127,10 @@ void track_lora_applied(rac_handle_t llm_component, const std::string& base_mode
                         const runanywhere::v1::LoRAAdapterInfo& info) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
-    auto existing = std::find_if(state.adapters.begin(), state.adapters.end(),
-                                 [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
-                                     return adapter.adapter_path() == info.adapter_path();
-                                 });
+    auto existing = std::ranges::find_if(state.adapters,
+                                         [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+                                             return adapter.adapter_path() == info.adapter_path();
+                                         });
     if (existing != state.adapters.end()) {
         *existing = info;
     } else {
@@ -141,10 +142,12 @@ void track_lora_removed_path(rac_handle_t llm_component, const std::string& base
                              const std::string& adapter_path) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
-    state.adapters.erase(std::remove_if(state.adapters.begin(), state.adapters.end(),
-                                        [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
-                                            return adapter.adapter_path() == adapter_path;
-                                        }),
+    state.adapters.erase(std::ranges::remove_if(
+                             state.adapters,
+                             [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
+                                 return adapter.adapter_path() == adapter_path;
+                             })
+                             .begin(),
                          state.adapters.end());
 }
 
@@ -185,7 +188,7 @@ rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component, const std::stri
 }
 
 void add_unique_path(std::vector<std::string>* paths, const std::string& path) {
-    if (std::find(paths->begin(), paths->end(), path) == paths->end()) {
+    if (std::ranges::find(*paths, path) == paths->end()) {
         paths->push_back(path);
     }
 }
@@ -216,8 +219,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_LORA);
-    event.set_severity(error && error[0] ? runanywhere::v1::ERROR_SEVERITY_ERROR
-                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
+    event.set_severity((error != nullptr) && error[0] != '\0'
+                           ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                           : runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_LLM);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
     event.set_source("cpp");
@@ -235,7 +239,8 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED, operation,
-                       message && message[0] ? message : rac_error_message(code));
+                       (message != nullptr) && message[0] != '\0' ? message
+                                                                  : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "llm", operation, RAC_TRUE);
 }
 
@@ -282,7 +287,7 @@ runanywhere::v1::LoRAAdapterInfo make_info(const runanywhere::v1::LoRAAdapterCon
     info.set_error_code(static_cast<int32_t>(error_code));
     if (applied)
         info.set_loaded_at_ms(now_ms());
-    if (error_message && error_message[0])
+    if ((error_message != nullptr) && error_message[0] != '\0')
         info.set_error_message(error_message);
     return info;
 }
@@ -291,16 +296,18 @@ void mark_apply_error(runanywhere::v1::LoRAApplyResult* result, rac_result_t cod
                       const char* message) {
     result->set_success(false);
     result->set_error_code(static_cast<int32_t>(code));
-    result->set_error_message(message && message[0] ? message : rac_error_message(code));
+    result->set_error_message((message != nullptr) && message[0] != '\0' ? message
+                                                                         : rac_error_message(code));
 }
 
 void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code, const char* message) {
     state->set_error_code(static_cast<int32_t>(code));
-    state->set_error_message(message && message[0] ? message : rac_error_message(code));
+    state->set_error_message((message != nullptr) && message[0] != '\0' ? message
+                                                                        : rac_error_message(code));
 }
 
 bool lora_service_loaded(rac_handle_t llm_component) {
-    return llm_component && rac_llm_component_is_loaded(llm_component) == RAC_TRUE;
+    return (llm_component != nullptr) && rac_llm_component_is_loaded(llm_component) == RAC_TRUE;
 }
 
 const char* no_service_message() {

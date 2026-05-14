@@ -21,27 +21,6 @@ class SystemDeviceInfo {
     this.osVersion = '',
     this.appVersion = '',
   });
-
-  SystemDeviceInfo copyWith({
-    String? modelName,
-    String? chipName,
-    int? totalMemory,
-    int? availableMemory,
-    bool? neuralEngineAvailable,
-    String? osVersion,
-    String? appVersion,
-  }) {
-    return SystemDeviceInfo(
-      modelName: modelName ?? this.modelName,
-      chipName: chipName ?? this.chipName,
-      totalMemory: totalMemory ?? this.totalMemory,
-      availableMemory: availableMemory ?? this.availableMemory,
-      neuralEngineAvailable:
-          neuralEngineAvailable ?? this.neuralEngineAvailable,
-      osVersion: osVersion ?? this.osVersion,
-      appVersion: appVersion ?? this.appVersion,
-    );
-  }
 }
 
 /// Extension for formatting file sizes

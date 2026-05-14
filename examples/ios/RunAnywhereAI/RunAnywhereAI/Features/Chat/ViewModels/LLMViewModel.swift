@@ -668,7 +668,13 @@ final class LLMViewModel {
         }()
 
         logger.info(
-            "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
+            """
+            [PARAMS] App getGenerationOptions: \
+            temperature=\(effectiveSettings.temperature), \
+            maxTokens=\(effectiveSettings.maxTokens), \
+            thinkingMode=\(thinkingModeEnabled), \
+            systemPrompt=\(systemPromptInfo)
+            """
         )
 
         var options = RALLMGenerationOptions.defaults()
@@ -700,7 +706,11 @@ final class LLMViewModel {
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
         logger.info(
-            "Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
+            """
+            Settings applied - Temperature: \(temperature), \
+            MaxTokens: \(maxTokens), \
+            SystemPrompt: \(savedSystemPrompt ?? "nil")
+            """
         )
     }
 

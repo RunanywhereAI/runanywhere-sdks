@@ -149,6 +149,9 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
         }
     }
 
+    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
+    // excludes from analysis; the analyzer therefore cannot see them.
+    // swiftlint:disable unused_declaration
     /// Run a request-shaped streaming C call: serialises `request`, retains a
     /// fresh `ProtoStreamContext<Event>` as the userData pointer, invokes
     /// `body` with the shared `@convention(c)` trampoline, and balances the
@@ -167,9 +170,6 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     /// - Returns: An `AsyncStream<Event>` that yields decoded events as the C
     ///   callback fires and finishes when the C call returns.
     /// - Throws: Errors raised by `request.serializedData()`.
-    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
-    // excludes from analysis; the analyzer therefore cannot see them.
-    // swiftlint:disable unused_declaration
     static func runRequestStream<Request: Message>(
         request: Request,
         category: String,

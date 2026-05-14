@@ -132,8 +132,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('📥 Starting download for model: ${model.name}');
 
-      await for (final progress
-          in sdk.RunAnywhere.downloads.start(model.id)) {
+      await for (final progress in sdk.RunAnywhere.downloads.start(model.id)) {
         final totalBytes = progress.totalBytes.toInt();
         final progressValue = totalBytes > 0
             ? progress.bytesDownloaded.toInt() / totalBytes
@@ -197,17 +196,13 @@ class ModelListViewModel extends ChangeNotifier {
       // time the user taps Send was triggering an unnecessary native
       // re-init for the same handle.
       final alreadyLoadedId = switch (model.category) {
-        ModelCategory.MODEL_CATEGORY_LANGUAGE => await sdk
-            .RunAnywhere.llm
-            .currentModel()
-            .then((m) => m?.id),
+        ModelCategory.MODEL_CATEGORY_LANGUAGE =>
+          await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION =>
           sdk.RunAnywhere.stt.currentModelId,
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS =>
           sdk.RunAnywhere.tts.currentVoiceId,
-        _ => await sdk.RunAnywhere.llm
-            .currentModel()
-            .then((m) => m?.id),
+        _ => await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
       };
 
       if (alreadyLoadedId == model.id) {
@@ -244,85 +239,10 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Unload the current model
-  Future<void> unloadCurrentModel() async {
-    if (_currentModel == null) return;
-
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await sdk.RunAnywhere.llm.unload();
-      _currentModel = null;
-      debugPrint('✅ Model unloaded successfully');
-    } catch (e) {
-      debugPrint('❌ Failed to unload model: $e');
-      _errorMessage = 'Failed to unload model: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Add a custom model from URL using SDK
-  Future<void> addModelFromURL({
-    required String name,
-    required String url,
-    required LLMFramework framework,
-    int? estimatedSize,
-    bool supportsThinking = false,
-  }) async {
-    try {
-      debugPrint('➕ Adding model from URL: $name');
-
-      final modelInfo = sdk.RunAnywhere.models.register(
-        name: name,
-        url: Uri.parse(url),
-        framework: framework,
-        modality: sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        supportsThinking: supportsThinking,
-      );
-
-      debugPrint(
-          '✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
-
-      // Refresh models from registry
-      await loadModelsFromRegistry();
-
-      debugPrint('✅ Model $name added successfully');
-    } catch (e) {
-      debugPrint('❌ Failed to add model from URL: $e');
-      _errorMessage = 'Failed to add model: $e';
-      notifyListeners();
-    }
-  }
-
-  /// Add an imported model
-  Future<void> addImportedModel(ModelInfo model) async {
-    await loadModelsFromRegistry();
-  }
-
-  /// Get models for a specific framework
-  List<ModelInfo> modelsForFramework(LLMFramework framework) {
-    return _availableModels.where((model) {
-      if (framework == LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
-        return model.preferredFramework ==
-            LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
-      }
-      return model.compatibleFrameworks.contains(framework);
-    }).toList();
-  }
-
   /// Get models for a specific context
   List<ModelInfo> modelsForContext(ModelSelectionContext context) {
     return _availableModels.where((model) {
       return context.relevantCategories.contains(model.category);
     }).toList();
-  }
-
-  /// Clear error message
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
   }
 }

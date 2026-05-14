@@ -30,6 +30,7 @@ import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/dart_bridge_voice_agent.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Central coordinator for all C++ bridges.
@@ -367,19 +368,21 @@ class DartBridge {
   // Private Helpers
   // -------------------------------------------------------------------------
 
-  /// Configure C++ logging based on environment
+  /// Configure C++ logging based on environment.
+  ///
+  /// Uses canonical `RacLogLevel` values from `basic_types.dart` matching
+  /// `rac_log_level_t` in commons (`include/rac/core/rac_types.h`):
+  /// `trace=0, debug=1, info=2, warning=3, error=4, fatal=5`.
   static void _configureLogging(SDKEnvironment environment) {
     int logLevel;
     switch (environment) {
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        logLevel = RacLogLevel.debug;
-        break;
       case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         logLevel = RacLogLevel.info;
         break;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         logLevel = RacLogLevel.warning;
         break;
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       default:
         logLevel = RacLogLevel.debug;
         break;
@@ -409,13 +412,4 @@ class DartBridge {
         return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
     }
   }
-}
-
-/// Log level constants matching rac_log_level_t
-abstract class RacLogLevel {
-  static const int error = 0;
-  static const int warning = 1;
-  static const int info = 2;
-  static const int debug = 3;
-  static const int trace = 4;
 }

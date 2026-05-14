@@ -172,7 +172,10 @@ struct RunAnywhereAIApp: App {
             // RUNANYWHERE_BASE_URL at build time. We deliberately fail loud
             // here so a release build never silently runs against placeholder
             // credentials.
-            fatalError("Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; set in Settings.bundle or .xcconfig before shipping.")
+            fatalError(
+                "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; " +
+                "set in Settings.bundle or .xcconfig before shipping."
+            )
             #endif
         }
     }
@@ -207,7 +210,8 @@ struct RunAnywhereAIApp: App {
         await initializeSDK()
     }
 
-    @MainActor private func refreshSDKCatalogs() async {
+    @MainActor
+    private func refreshSDKCatalogs() async {
         logger.info("Refreshing SDK model registry...")
 
         let listResult = await RunAnywhere.listModels()
@@ -241,7 +245,7 @@ struct RunAnywhereAIApp: App {
     // canonical `RunAnywhere.registerModel(...)` async public API, including
     // the multi-file and archive-with-structure overloads added in P5-T2.
     //
-    // swiftlint:disable:next attributes function_body_length cyclomatic_complexity
+    // swiftlint:disable:next function_body_length
     private func registerModulesAndModels() async {
         logger.info("📦 Registering modules with their models...")
 
@@ -354,7 +358,7 @@ struct RunAnywhereAIApp: App {
                 ("https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
                  "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
                 ("https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
-                 "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf"),
+                 "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf")
             ],
             framework: .llamaCpp,
             modality: .multimodal,
@@ -367,7 +371,7 @@ struct RunAnywhereAIApp: App {
                 ("https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
                  "LFM2-VL-450M-Q8_0.gguf"),
                 ("https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
-                 "mmproj-LFM2-VL-450M-Q8_0.gguf"),
+                 "mmproj-LFM2-VL-450M-Q8_0.gguf")
             ],
             framework: .llamaCpp,
             modality: .multimodal,
@@ -428,7 +432,7 @@ struct RunAnywhereAIApp: App {
             name: "All MiniLM L6 v2 (Embedding)",
             files: [
                 ("https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx", "model.onnx"),
-                ("https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt", "vocab.txt"),
+                ("https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt", "vocab.txt")
             ],
             framework: .onnx,
             modality: .embedding,
@@ -469,10 +473,13 @@ struct RunAnywhereAIApp: App {
                 supportsLora: supportsLora
             )
         } catch {
-            logger.warning("Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            logger.warning(
+                "Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 
+    // swiftlint:disable function_parameter_count
     /// Register a tar.gz / zip archive model via the canonical public API.
     /// Delegates to `RunAnywhere.registerModel(archive:structure:...)` (P5-T2),
     /// which preserves the archive type + on-disk layout.
@@ -498,6 +505,7 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: memoryRequirement
             )
         } catch {
+            // swiftlint:disable:next line_length
             logger.warning("Failed to register archive model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -534,9 +542,11 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: memoryRequirement
             )
         } catch {
+            // swiftlint:disable:next line_length
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
+    // swiftlint:enable function_parameter_count
 
     /// Infer the `RAModelFileRole` for a multi-file model descriptor based on
     /// filename conventions. Needed so the C++ VLM loader can resolve the

@@ -19,6 +19,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <mutex>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -105,8 +106,8 @@ static std::vector<std::string> split_path(const std::string& path) {
 }
 
 static std::string to_lower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(value, value.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 
@@ -126,7 +127,7 @@ static bool should_skip_model_entry(const fs::path& path) {
 }
 
 static std::string normalize_slashes(std::string value) {
-    std::replace(value.begin(), value.end(), '\\', '/');
+    std::ranges::replace(value, '\\', '/');
     return value;
 }
 
@@ -357,7 +358,7 @@ static std::vector<scanned_file> scan_model_files(const fs::path& root, rac_mode
         }
         it.increment(ec);
     }
-    std::sort(files.begin(), files.end(), [](const scanned_file& a, const scanned_file& b) {
+    std::ranges::sort(files, [](const scanned_file& a, const scanned_file& b) {
         return a.relative_path < b.relative_path;
     });
     return files;
@@ -492,8 +493,8 @@ static const scanned_file* find_matching_file(const std::vector<scanned_file>& f
 
 static bool add_missing_required(rac_model_path_resolution_t* out, const std::string& value) {
     size_t next = out->missing_required_file_count + 1;
-    char** resized =
-        static_cast<char**>(realloc(out->missing_required_files, next * sizeof(char*)));
+    char** resized = static_cast<char**>(
+        realloc(static_cast<void*>(out->missing_required_files), next * sizeof(char*)));
     if (!resized)
         return false;
     out->missing_required_files = resized;
@@ -610,10 +611,11 @@ static void sha256_transform(sha256_ctx* ctx, const uint8_t data[64]) {
         0xc67178f2};
     uint32_t w[64];
     for (int i = 0; i < 16; ++i) {
-        w[i] = (static_cast<uint32_t>(data[i * 4]) << 24) |
-               (static_cast<uint32_t>(data[i * 4 + 1]) << 16) |
-               (static_cast<uint32_t>(data[i * 4 + 2]) << 8) |
-               static_cast<uint32_t>(data[i * 4 + 3]);
+        const size_t base = static_cast<size_t>(i) * 4;
+        w[i] = (static_cast<uint32_t>(data[base]) << 24) |
+               (static_cast<uint32_t>(data[base + 1]) << 16) |
+               (static_cast<uint32_t>(data[base + 2]) << 8) |
+               static_cast<uint32_t>(data[base + 3]);
     }
     for (int i = 16; i < 64; ++i) {
         uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
@@ -925,7 +927,7 @@ void rac_model_path_resolution_free(rac_model_path_resolution_t* resolution) {
         for (size_t i = 0; i < resolution->missing_required_file_count; ++i) {
             free(resolution->missing_required_files[i]);
         }
-        free(resolution->missing_required_files);
+        free(static_cast<void*>(resolution->missing_required_files));
     }
 
     memset(resolution, 0, sizeof(*resolution));
@@ -1040,9 +1042,10 @@ rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info
                     break;
                 }
             }
-            std::string expected = descriptor.destination_path && descriptor.destination_path[0]
-                                       ? descriptor.destination_path
-                                       : (descriptor.relative_path ? descriptor.relative_path : "");
+            std::string expected =
+                descriptor.destination_path && descriptor.destination_path[0] != '\0'
+                    ? descriptor.destination_path
+                    : (descriptor.relative_path ? descriptor.relative_path : "");
             if (!match && descriptor.is_required == RAC_TRUE) {
                 if (!add_missing_required(out_resolution, expected)) {
                     rac_model_path_resolution_free(out_resolution);
@@ -1196,7 +1199,7 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     std::vector<std::string> components = split_path(path);
 
     // Find "Models" component
-    auto it = std::find(components.begin(), components.end(), "Models");
+    auto it = std::ranges::find(components, "Models");
     if (it == components.end()) {
         return RAC_ERROR_NOT_FOUND;
     }
@@ -1255,7 +1258,7 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
     std::vector<std::string> components = split_path(path);
 
     // Find "Models" component
-    auto it = std::find(components.begin(), components.end(), "Models");
+    auto it = std::ranges::find(components, "Models");
     if (it == components.end()) {
         return RAC_ERROR_NOT_FOUND;
     }

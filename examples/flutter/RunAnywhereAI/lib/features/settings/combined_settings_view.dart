@@ -9,6 +9,7 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:runanywhere_ai/core/utilities/url_utils.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -119,19 +120,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     }
   }
 
-  /// Normalize base URL by adding https:// if no scheme is present
-  String _normalizeBaseURL(String url) {
-    final trimmed = url.trim();
-    if (trimmed.isEmpty) return trimmed;
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-    return 'https://$trimmed';
-  }
-
   /// Save API configuration to keychain
   Future<void> _saveApiConfiguration(String apiKey, String baseURL) async {
-    final normalizedURL = _normalizeBaseURL(baseURL);
+    final normalizedURL = normalizeBaseURL(baseURL);
 
     await KeychainHelper.saveString(key: KeychainKeys.apiKey, data: apiKey);
     await KeychainHelper.saveString(
@@ -314,8 +305,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     });
 
     try {
-      final storageInfo =
-          await sdk.RunAnywhere.downloads.getStorageInfo();
+      final storageInfo = await sdk.RunAnywhere.downloads.getStorageInfo();
 
       final storedModels = await sdk.RunAnywhere.downloads.list();
 

@@ -152,7 +152,7 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
+    return (size == 0 || bytes != nullptr) &&
            size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
@@ -197,7 +197,7 @@ void publish_component_event(SDKComponent component,
                              const char* error_message) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_COMPONENT,
-                            error_message && error_message[0]
+                            error_message && error_message[0] != '\0'
                                 ? runanywhere::v1::ERROR_SEVERITY_ERROR
                                 : runanywhere::v1::ERROR_SEVERITY_INFO,
                             component);
@@ -213,7 +213,7 @@ void publish_component_event(SDKComponent component,
     if (unload_result) {
         lifecycle->mutable_model_unload_result()->CopyFrom(*unload_result);
     }
-    if (error_message && error_message[0]) {
+    if (error_message && error_message[0] != '\0') {
         event.mutable_error()->set_message(error_message);
         event.mutable_error()->set_c_abi_code(static_cast<int32_t>(RAC_ERROR_MODEL_LOAD_FAILED));
         event.mutable_error()->set_timestamp_ms(now_ms());
@@ -472,7 +472,7 @@ std::string vlm_config_json(const std::string& mmproj_path) {
     if (mmproj_path.empty()) {
         return "";
     }
-    return "{\"mmproj_path\":\"" + json_escape(mmproj_path) + "\"}";
+    return R"({"mmproj_path":")" + json_escape(mmproj_path) + R"("})";
 }
 
 struct ProtoModelPathBridge {

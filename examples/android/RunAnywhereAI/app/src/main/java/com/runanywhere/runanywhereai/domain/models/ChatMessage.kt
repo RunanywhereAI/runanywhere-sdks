@@ -36,16 +36,6 @@ enum class CompletionStatus {
 }
 
 /**
- * App-local generation mode enum.
- * Matches iOS GenerationMode exactly.
- */
-@Serializable
-enum class GenerationMode {
-    STREAMING,
-    NON_STREAMING,
-}
-
-/**
  * App-local generation parameters.
  * Matches iOS GenerationParameters exactly.
  */

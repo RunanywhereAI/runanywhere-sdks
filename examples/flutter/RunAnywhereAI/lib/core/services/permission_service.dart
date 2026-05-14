@@ -232,12 +232,6 @@ class PermissionService {
     return false;
   }
 
-  /// Check if camera permission is granted without requesting
-  Future<bool> isCameraPermissionGranted() async {
-    final status = await Permission.camera.status;
-    return status.isGranted;
-  }
-
   /// Show dialog to guide user to settings
   Future<bool> _showSettingsDialog(
     BuildContext context, {

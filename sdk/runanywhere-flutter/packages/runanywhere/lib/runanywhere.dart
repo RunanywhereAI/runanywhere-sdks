@@ -41,8 +41,6 @@ export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_storage.dart';
 export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
-export 'public/extensions/runanywhere_thinking_utils.dart'
-    show RunAnywhereThinkingUtils, ThinkingExtractionResult;
 export 'public/extensions/stt/stt_options_helpers.dart';
 export 'public/runanywhere.dart' show RunAnywhere;
 export 'runanywhere_protos.dart';

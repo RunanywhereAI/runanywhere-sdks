@@ -146,6 +146,9 @@ enum NativeProtoABI {
         return try responseType.init(serializedBytes: Data(bytes: bytesPtr, count: byteCount))
     }
 
+    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
+    // excludes from analysis; the analyzer therefore cannot see them.
+    // swiftlint:disable unused_declaration
     /// Context-threaded variant of `invoke` for C ABI symbols whose first
     /// parameter is an opaque handle (e.g. `rac_handle_t`,
     /// `rac_voice_agent_handle_t`, `rac_lora_registry_handle_t`, an actor
@@ -154,9 +157,6 @@ enum NativeProtoABI {
     /// `invokeProto`/`invoke`/`invokeBytes` helpers scattered across the
     /// bridge layer (see `gaps/gaps/simplification/swift-bridge-duplication.md`
     /// §1 Pattern A).
-    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
-    // excludes from analysis; the analyzer therefore cannot see them.
-    // swiftlint:disable unused_declaration
     static func invoke<Ctx, Request: Message, Response: Message>(
         _ request: Request,
         on context: Ctx,

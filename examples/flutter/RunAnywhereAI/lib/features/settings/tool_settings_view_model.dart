@@ -18,8 +18,6 @@ class ToolSettingsViewModel extends ChangeNotifier {
   // Singleton pattern (matches iOS)
   static final ToolSettingsViewModel shared = ToolSettingsViewModel._internal();
 
-  factory ToolSettingsViewModel() => shared;
-
   ToolSettingsViewModel._internal() {
     unawaited(_loadSettings());
   }

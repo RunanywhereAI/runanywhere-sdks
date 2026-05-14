@@ -105,7 +105,7 @@ void set_error_from_code(SdkInitResult* result, rac_result_t code, const char* f
         err->set_c_abi_code(signed_code);
     }
     const char* msg = rac_error_message(code);
-    err->set_message((msg && *msg) ? msg : (fallback_message ? fallback_message : ""));
+    err->set_message((msg && *msg != '\0') ? msg : (fallback_message ? fallback_message : ""));
     err->set_severity(::runanywhere::v1::ERROR_SEVERITY_ERROR);
     err->set_category(::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION);
     err->set_timestamp_ms(rac_monotonic_now_ms());
@@ -292,7 +292,7 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
         // "Device registration failed (non-critical)" branch.
         const char* msg = rac_error_message(dev_rc);
         result.set_warning(std::string("device registration deferred: ") +
-                           ((msg && *msg) ? msg : "unknown error"));
+                           ((msg && *msg != '\0') ? msg : "unknown error"));
     }
 
     // Step 3: Fetch model assignments (cached). When callbacks are not wired
@@ -311,7 +311,7 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
         if (result.warning().empty()) {
             const char* msg = rac_error_message(fetch_rc);
             result.set_warning(std::string("model assignment fetch deferred: ") +
-                               ((msg && *msg) ? msg : "unknown error"));
+                               ((msg && *msg != '\0') ? msg : "unknown error"));
         }
     }
 
@@ -364,7 +364,8 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     const char* cached_url = rac_state_get_base_url();
     const bool has_external_config =
         environment_requires_external_config(env) &&
-        cached_key && *cached_key && cached_url && *cached_url;
+        cached_key != nullptr && *cached_key != '\0' &&
+        cached_url != nullptr && *cached_url != '\0';
 
     if (!has_external_config) {
         // No retry possible — match Swift's "no usable external config" debug

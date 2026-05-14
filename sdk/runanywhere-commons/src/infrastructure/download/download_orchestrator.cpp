@@ -90,17 +90,17 @@ static std::string get_file_extension(const char* url) {
         for (auto& c : lower)
             c = static_cast<char>(tolower(c));
 
-        if (lower.rfind(".tar.gz") == lower.length() - 7)
+        if (lower.ends_with(".tar.gz"))
             return "tar.gz";
-        if (lower.rfind(".tar.bz2") == lower.length() - 8)
+        if (lower.ends_with(".tar.bz2"))
             return "tar.bz2";
-        if (lower.rfind(".tar.xz") == lower.length() - 7)
+        if (lower.ends_with(".tar.xz"))
             return "tar.xz";
-        if (lower.rfind(".tgz") == lower.length() - 4)
+        if (lower.ends_with(".tgz"))
             return "tar.gz";
-        if (lower.rfind(".tbz2") == lower.length() - 5)
+        if (lower.ends_with(".tbz2"))
             return "tar.bz2";
-        if (lower.rfind(".txz") == lower.length() - 4)
+        if (lower.ends_with(".txz"))
             return "tar.xz";
     }
 
@@ -341,7 +341,7 @@ std::string join_path(const std::string& lhs, const std::string& rhs) {
 }
 
 bool looks_like_http_url(const std::string& url) {
-    return url.rfind("http://", 0) == 0 || url.rfind("https://", 0) == 0;
+    return url.starts_with("http://") || url.starts_with("https://");
 }
 
 int64_t now_unix_ms() {
@@ -703,7 +703,8 @@ bool validate_resume_offset(const proto_plan_file& file,
     return true;
 }
 
-void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_t resume_from) {
+void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
+                               int64_t resume_from) {
     if (!task) {
         return;
     }
@@ -1517,7 +1518,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
         result.set_error_message("start request requires a startable plan");
         return serialize_proto_to_buffer(result, out_result);
     }
-    if (!rac_http_transport_is_registered()) {
+    if (rac_http_transport_is_registered() == RAC_FALSE) {
         result.set_accepted(false);
         result.set_error_message("no HTTP transport adapter registered");
         return serialize_proto_to_buffer(result, out_result);
@@ -1640,7 +1641,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
     }
 
     std::thread([task, resume_from]() {
-        run_proto_download_worker(std::move(task), resume_from);
+        run_proto_download_worker(task, resume_from);
     }).detach();
 
     emit_progress(task);
@@ -1756,7 +1757,7 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
         result.set_error_message("download task not found");
         return serialize_proto_to_buffer(result, out_result);
     }
-    if (!rac_http_transport_is_registered()) {
+    if (rac_http_transport_is_registered() == RAC_FALSE) {
         result.set_accepted(false);
         result.set_error_message("no HTTP transport adapter registered");
         return serialize_proto_to_buffer(result, out_result);
@@ -1838,7 +1839,7 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
     }
 
     std::thread([task, resume_from]() {
-        run_proto_download_worker(std::move(task), resume_from);
+        run_proto_download_worker(task, resume_from);
     }).detach();
 
     emit_progress(task);
@@ -2158,7 +2159,8 @@ rac_result_t rac_download_orchestrate_multi(
             barrier->pending++;
         }
 
-        auto* file_holder = new multi_file_holder{barrier, file.is_required == RAC_TRUE};
+        auto* file_holder =
+            new multi_file_holder{.barrier = barrier, .is_required = file.is_required == RAC_TRUE};
 
         // Stage 2 HTTP refactor: replace the async platform adapter with the
         // synchronous C++ facade driven on a detached worker thread. The

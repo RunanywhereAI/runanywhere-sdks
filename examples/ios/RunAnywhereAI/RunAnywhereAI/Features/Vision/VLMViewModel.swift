@@ -152,10 +152,8 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 200
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream {
-                if !event.generation.token.isEmpty {
-                    currentDescription += event.generation.token
-                }
+            for await event in stream where !event.generation.token.isEmpty {
+                currentDescription += event.generation.token
             }
         } catch {
             self.error = error
@@ -180,10 +178,8 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 300
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream {
-                if !event.generation.token.isEmpty {
-                    currentDescription += event.generation.token
-                }
+            for await event in stream where !event.generation.token.isEmpty {
+                currentDescription += event.generation.token
             }
         } catch {
             self.error = error
@@ -220,10 +216,8 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 300
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream {
-                if !event.generation.token.isEmpty {
-                    currentDescription += event.generation.token
-                }
+            for await event in stream where !event.generation.token.isEmpty {
+                currentDescription += event.generation.token
             }
         } catch {
             self.error = error
@@ -323,11 +317,9 @@ final class VLMViewModel: NSObject {
             options.maxTokens = 100
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
-            for await event in stream {
-                if !event.generation.token.isEmpty {
-                    newDescription += event.generation.token
-                    currentDescription = newDescription
-                }
+            for await event in stream where !event.generation.token.isEmpty {
+                newDescription += event.generation.token
+                currentDescription = newDescription
             }
         } catch {
             // Don't show errors during auto-stream, just log

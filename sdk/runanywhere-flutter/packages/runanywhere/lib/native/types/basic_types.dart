@@ -22,9 +22,6 @@ typedef RacHandle = Pointer<Void>;
 /// 0 = success, negative = error
 typedef RacResult = Int32;
 
-/// Boolean type for C compatibility (rac_bool_t)
-typedef RacBool = Int32;
-
 /// RAC boolean values
 const int RAC_TRUE = 1;
 const int RAC_FALSE = 0;
@@ -218,14 +215,6 @@ abstract class RacResultCode {
         errors.ErrorCode.ERROR_CODE_UNKNOWN;
   }
 
-  /// Convert a generated proto error enum into the C ABI result convention.
-  static int fromProtoErrorCode(errors.ErrorCode code) {
-    if (code == errors.ErrorCode.ERROR_CODE_UNSPECIFIED) {
-      return success;
-    }
-    return -code.value;
-  }
-
   /// Get human-readable message for an error code
   static String getMessage(int code) {
     switch (code) {
@@ -310,79 +299,15 @@ abstract class RacResultCode {
   }
 }
 
-/// Alias for backward compatibility
-// =============================================================================
-// Capability Types (from rac_types.h)
-// =============================================================================
-
-/// Capability types supported by backends (rac_capability_t)
-abstract class RacCapability {
-  static const int unknown = 0;
-  static const int textGeneration = 1;
-  static const int embeddings = 2;
-  static const int stt = 3;
-  static const int tts = 4;
-  static const int vad = 5;
-  static const int diarization = 6;
-  static const int visionLanguage = 7;
-  static const int diffusion = 8;
-
-  static String getName(int type) {
-    switch (type) {
-      case textGeneration:
-        return 'Text Generation';
-      case embeddings:
-        return 'Embeddings';
-      case stt:
-        return 'Speech-to-Text';
-      case tts:
-        return 'Text-to-Speech';
-      case vad:
-        return 'Voice Activity Detection';
-      case diarization:
-        return 'Speaker Diarization';
-      case visionLanguage:
-        return 'Vision-Language Model';
-      case diffusion:
-        return 'Image Generation';
-      default:
-        return 'Unknown';
-    }
-  }
-}
-
-// =============================================================================
-// Device Types (from rac_types.h)
-// =============================================================================
-
-/// Device type for backend execution (rac_device_t)
-abstract class RacDevice {
-  static const int cpu = 0;
-  static const int gpu = 1;
-  static const int npu = 2;
-  static const int auto = 3;
-
-  static String getName(int type) {
-    switch (type) {
-      case cpu:
-        return 'CPU';
-      case gpu:
-        return 'GPU';
-      case npu:
-        return 'NPU';
-      case auto:
-        return 'Auto';
-      default:
-        return 'Unknown';
-    }
-  }
-}
-
 // =============================================================================
 // Log Levels (from rac_types.h)
 // =============================================================================
 
-/// Log level for logging callback (rac_log_level_t)
+/// Log level for logging callback (rac_log_level_t).
+///
+/// Mirrors `enum rac_log_level` in `include/rac/core/rac_types.h`:
+/// `RAC_LOG_TRACE = 0, RAC_LOG_DEBUG = 1, RAC_LOG_INFO = 2,`
+/// `RAC_LOG_WARNING = 3, RAC_LOG_ERROR = 4, RAC_LOG_FATAL = 5`.
 abstract class RacLogLevel {
   static const int trace = 0;
   static const int debug = 1;
@@ -390,33 +315,4 @@ abstract class RacLogLevel {
   static const int warning = 3;
   static const int error = 4;
   static const int fatal = 5;
-}
-
-// =============================================================================
-// Audio Format (from rac_stt_types.h)
-// =============================================================================
-
-/// Audio format enumeration (rac_audio_format_enum_t)
-abstract class RacAudioFormat {
-  static const int pcm = 0;
-  static const int wav = 1;
-  static const int mp3 = 2;
-  static const int opus = 3;
-  static const int aac = 4;
-  static const int flac = 5;
-}
-
-// =============================================================================
-// Speech Activity (from rac_vad_types.h)
-// =============================================================================
-
-/// Speech activity event type (rac_speech_activity_t).
-///
-/// Mirrors `enum rac_speech_activity` in
-/// `include/rac/features/vad/rac_vad_types.h`:
-/// `RAC_SPEECH_STARTED = 0`, `RAC_SPEECH_ENDED = 1`, `RAC_SPEECH_ONGOING = 2`.
-abstract class RacSpeechActivity {
-  static const int started = 0;
-  static const int ended = 1;
-  static const int ongoing = 2;
 }

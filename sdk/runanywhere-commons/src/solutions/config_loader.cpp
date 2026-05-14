@@ -107,8 +107,7 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
-            for (size_t i = 0; i < line.size(); ++i) {
-                char c = line[i];
+            for (char c : line) {
                 if (!in_dq && c == '\'') {
                     in_sq = !in_sq;
                     clean.push_back(c);
@@ -200,7 +199,7 @@ class YamlParser {
             return YamlNode::make_mapping();
 
         const std::string trimmed = strip(first);
-        if (trimmed.rfind("- ", 0) == 0 || trimmed == "-") {
+        if (trimmed.starts_with("- ") || trimmed == "-") {
             return parse_sequence(idx, indent, err);
         }
         return parse_mapping(idx, indent, err);
@@ -220,7 +219,7 @@ class YamlParser {
                 break;  // shouldn't happen at this level
 
             const std::string trimmed = strip(lines_[idx]);
-            if (trimmed.rfind("- ", 0) != 0 && trimmed != "-")
+            if (!trimmed.starts_with("- ") && trimmed != "-")
                 break;
 
             std::string after = trimmed.size() > 1 ? strip(trimmed.substr(1)) : std::string();
@@ -248,7 +247,7 @@ class YamlParser {
                         map->mapping.emplace_back(std::move(key), std::move(child));
                     } else {
                         map->mapping.emplace_back(std::move(key),
-                                                  YamlNode::make_scalar(unquote(std::move(val))));
+                                                  YamlNode::make_scalar(unquote(val)));
                     }
                     // Continue parsing additional keys that belong to
                     // the same sequence element (indent > list indent).
@@ -259,7 +258,7 @@ class YamlParser {
                         }
                         const int ii = leading_spaces(lines_[idx]);
                         const std::string tt = strip(lines_[idx]);
-                        if (ii <= indent || tt.rfind("- ", 0) == 0 || tt == "-") {
+                        if (ii <= indent || tt.starts_with("- ") || tt == "-") {
                             break;
                         }
                         // Sub-key of the same element.
@@ -282,12 +281,12 @@ class YamlParser {
                             map->mapping.emplace_back(std::move(k2), std::move(child));
                         } else {
                             map->mapping.emplace_back(
-                                std::move(k2), YamlNode::make_scalar(unquote(std::move(v2))));
+                                std::move(k2), YamlNode::make_scalar(unquote(v2)));
                         }
                     }
                     node->sequence.push_back(std::move(map));
                 } else {
-                    node->sequence.push_back(YamlNode::make_scalar(unquote(std::move(after))));
+                    node->sequence.push_back(YamlNode::make_scalar(unquote(after)));
                 }
             } else {
                 // Bare "-"; child block below.
@@ -319,7 +318,7 @@ class YamlParser {
                 return node;
             }
             const std::string trimmed = strip(lines_[idx]);
-            if (trimmed.rfind("- ", 0) == 0 || trimmed == "-")
+            if (trimmed.starts_with("- ") || trimmed == "-")
                 break;
             auto colon = trimmed.find(':');
             if (colon == std::string::npos) {
@@ -331,7 +330,7 @@ class YamlParser {
             ++idx;
             if (!val.empty()) {
                 node->mapping.emplace_back(std::move(key),
-                                           YamlNode::make_scalar(unquote(std::move(val))));
+                                           YamlNode::make_scalar(unquote(val)));
             } else {
                 // Child block.
                 YamlNodePtr child;

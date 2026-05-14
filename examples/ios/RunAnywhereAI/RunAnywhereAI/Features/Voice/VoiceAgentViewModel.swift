@@ -17,6 +17,8 @@ import RunAnywhere
 import Combine
 import os
 
+// swiftlint:disable type_body_length
+
 /// A clean ViewModel for voice assistant using SDK's VoiceSession API.
 ///
 /// This ViewModel orchestrates the complete voice AI pipeline:
@@ -220,6 +222,7 @@ final class VoiceAgentViewModel: ObservableObject {
         llmModelState = mapState(llmState)
         ttsModelState = mapState(ttsState)
 
+        // swiftlint:disable:next line_length
         logger.info("Model states synced - VAD: \(vadState.isLoaded), STT: \(sttState.isLoaded), LLM: \(llmState.isLoaded), TTS: \(ttsState.isLoaded)")
     }
 
@@ -239,7 +242,7 @@ final class VoiceAgentViewModel: ObservableObject {
         case .ready: return .loaded
         case .error: return .error("Component failed")
         case .unloading, .shutdown, .deleting, .paused: return .notLoaded
-        case .UNRECOGNIZED(_): return .error("Unknown component state")
+        case .UNRECOGNIZED: return .error("Unknown component state")
         }
     }
 
@@ -432,6 +435,8 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
+    // swiftlint:disable function_body_length
+
     /// Start a voice conversation using the canonical
     /// `RunAnywhere.streamVoiceAgent()` proto-stream API.
     ///
@@ -478,6 +483,7 @@ final class VoiceAgentViewModel: ObservableObject {
                 vadLoad.category = .voiceActivityDetection
                 let vadResult = await RunAnywhere.loadModel(vadLoad)
                 if !vadResult.success {
+                    // swiftlint:disable:next line_length
                     logger.warning("Silero VAD auto-load failed: \(vadResult.errorMessage) — voice agent will use energy-based fallback")
                 }
             }
@@ -523,6 +529,8 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
+    // swiftlint:enable function_body_length
+
     /// Stop the current voice conversation.
     func stopConversation() async {
         logger.info("Stopping voice session...")
@@ -561,6 +569,8 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     // MARK: - Proto Event Handling (v3.1)
+
+    // swiftlint:disable cyclomatic_complexity function_body_length
 
     /// Drive UI state from the canonical `RAVoiceEvent` proto.
     ///
@@ -648,6 +658,8 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
+    // swiftlint:enable cyclomatic_complexity function_body_length
+
     // MARK: - Cleanup
 
     func cleanup() {
@@ -672,3 +684,4 @@ final class VoiceAgentViewModel: ObservableObject {
     }
     var whisperModel: String { currentSTTModel }
 }
+// swiftlint:enable type_body_length

@@ -68,16 +68,6 @@ class KeychainService {
       throw KeychainError.deleteFailed;
     }
   }
-
-  /// Check if a key exists in keychain
-  Future<bool> containsKey(String key) {
-    return _storage.containsKey(key: key);
-  }
-
-  /// Delete all data from keychain
-  Future<void> deleteAll() async {
-    await _storage.deleteAll();
-  }
 }
 
 /// Keychain error types

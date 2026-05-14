@@ -34,7 +34,6 @@ object ModelBootstrap {
         registerBackends()
         seedCuratedCatalog()
         seedLoRAAdapters()
-        refreshNativeCatalog()
         try {
             RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().forEach { m ->
                 Timber.d("📋 ${m.id}: is_downloaded=${m.is_downloaded} local_path='${m.local_path}'")
@@ -293,35 +292,6 @@ object ModelBootstrap {
             Timber.e(e, "tryRegisterMultiFile failed: ${m.id}")
             false
         }
-    }
-
-    private fun refreshNativeCatalog() {
-        Timber.w("refreshModelRegistry disabled (B10 cleanup) — relying on C++ registry self-discovery at SDK init")
-        // TODO(B10): refreshModelRegistry API was removed; the C++ commons registry now
-        // self-discovers models via racModelRegistryDiscoverProto at SDK init time, so
-        // an explicit refresh from the example app is a no-op. Original call preserved:
-        //   val result = RunAnywhere.refreshModelRegistry(
-        //       ModelRegistryRefreshRequest(
-        //           include_remote_catalog = true,
-        //           rescan_local = true,
-        //           prune_orphans = false,
-        //           include_downloaded_state = true,
-        //       ),
-        //   )
-        //   if (result.success) {
-        //       Timber.i(
-        //           "Native model catalog refreshed: registered=${result.registered_count}, " +
-        //               "downloaded=${result.downloaded_count}, available=${result.available_count}",
-        //       )
-        //   } else {
-        //       Timber.w(
-        //           "Native model catalog refresh returned an error: " +
-        //               result.error_message.ifBlank { "unknown error" },
-        //       )
-        //   }
-        //   result.warnings.forEach { warning ->
-        //       Timber.w("Native model catalog refresh warning: $warning")
-        //   }
     }
 
     // MARK: - Catalog data classes

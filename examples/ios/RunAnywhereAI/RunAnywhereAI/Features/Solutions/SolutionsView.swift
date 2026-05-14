@@ -65,7 +65,10 @@ struct SolutionsView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-                Text("Run a prepackaged pipeline (voice agent or RAG) by handing a YAML config to RunAnywhere.solutions.run.")
+                Text(
+                    "Run a prepackaged pipeline (voice agent or RAG) "
+                    + "by handing a YAML config to RunAnywhere.solutions.run."
+                )
                     .font(.callout)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)

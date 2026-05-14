@@ -213,11 +213,13 @@ if [[ "$RUN_TIDY" == "true" ]]; then
         if [[ "$MODE" == "fix" ]]; then
             tidy_args=(-p="$tidy_build_dir" --fix --fix-errors --quiet
                        --checks="$tidy_disabled_checks"
-                       --header-filter='.*rac_.*\.h$')
+                       --header-filter='.*rac_.*\.h$'
+                       --exclude-header-filter='.*/src/generated/.*\.pb\.h$')
         else
             tidy_args=(-p="$tidy_build_dir" --quiet
                        --checks="$tidy_disabled_checks"
-                       --header-filter='.*rac_.*\.h$')
+                       --header-filter='.*rac_.*\.h$'
+                       --exclude-header-filter='.*/src/generated/.*\.pb\.h$')
         fi
 
         # Only run on .cpp files (headers covered via HeaderFilterRegex)

@@ -256,8 +256,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       }
 
       final audioBytes = Uint8List.fromList(audioData);
-      final result =
-          await sdk.RunAnywhere.stt.transcribe(audioBytes);
+      final result = await sdk.RunAnywhere.stt.transcribe(audioBytes);
 
       setState(() {
         _transcribedText = result.text;

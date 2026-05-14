@@ -60,7 +60,8 @@ std::string make_event_id() {
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
@@ -115,19 +116,19 @@ void publish_generation_event(GenerationEventKind kind, const char* prompt, cons
     event.set_operation_id("llm.generate");
     auto* generation = event.mutable_generation();
     generation->set_kind(kind);
-    if (prompt && prompt[0]) {
+    if ((prompt != nullptr) && prompt[0] != '\0') {
         generation->set_prompt(prompt);
     }
-    if (token && token[0]) {
+    if ((token != nullptr) && token[0] != '\0') {
         generation->set_token(token);
     }
-    if (response && response[0]) {
+    if ((response != nullptr) && response[0] != '\0') {
         generation->set_response(response);
     }
-    if (error && error[0]) {
+    if ((error != nullptr) && error[0] != '\0') {
         generation->set_error(error);
     }
-    if (model_id && model_id[0]) {
+    if ((model_id != nullptr) && model_id[0] != '\0') {
         generation->set_model_id(model_id);
     }
     if (token_count > 0) {
@@ -152,7 +153,7 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     cancellation->set_kind(kind);
     cancellation->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
     cancellation->set_operation_id("llm.generate");
-    cancellation->set_reason(reason && reason[0] ? reason : "user_requested");
+    cancellation->set_reason((reason != nullptr) && reason[0] != '\0' ? reason : "user_requested");
     cancellation->set_user_initiated(user_initiated == RAC_TRUE);
     return event;
 }
@@ -190,7 +191,7 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
         out->set_ttft_ms(static_cast<double>(raw.time_to_first_token_ms));
     }
     out->set_tokens_per_second(static_cast<double>(raw.tokens_per_second));
-    if (ref.framework_name && ref.framework_name[0]) {
+    if ((ref.framework_name != nullptr) && ref.framework_name[0] != '\0') {
         out->set_framework(ref.framework_name);
     }
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
@@ -427,8 +428,9 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     final_result.set_completion_tokens(ctx->token_count);
     final_result.set_total_tokens(ctx->token_count);
     final_result.set_total_time_ms(now_ms() - ctx->started_ms);
-    final_result.set_finish_reason(finish_reason && finish_reason[0] ? finish_reason : "stop");
-    if (error_message && error_message[0]) {
+    final_result.set_finish_reason(
+        (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");
+    if ((error_message != nullptr) && error_message[0] != '\0') {
         final_result.set_error_message(error_message);
     }
 

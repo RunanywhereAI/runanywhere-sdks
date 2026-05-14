@@ -22,7 +22,6 @@ import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.detectVoiceActivity
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
-import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,6 +34,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.ByteArrayOutputStream
 
 /**
  * A single entry in the speech activity log.

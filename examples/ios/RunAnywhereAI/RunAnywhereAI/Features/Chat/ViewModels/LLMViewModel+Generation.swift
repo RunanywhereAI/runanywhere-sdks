@@ -11,6 +11,7 @@ import RunAnywhere
 extension LLMViewModel {
     // MARK: - Streaming Response Generation
 
+    // swiftlint:disable:next function_body_length
     func generateStreamingResponse(
         prompt: String,
         options: RALLMGenerationOptions,
@@ -50,7 +51,7 @@ extension LLMViewModel {
 
         if !terminalError.isEmpty {
             throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: terminalError,
+                NSLocalizedDescriptionKey: terminalError
             ])
         }
 

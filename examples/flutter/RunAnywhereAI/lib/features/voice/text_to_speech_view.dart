@@ -44,8 +44,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
-  // ignore: unused_field - kept for future TTS implementation
-  bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
   double _playbackProgress = 0.0;
@@ -179,7 +177,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
-      _hasAudio = false;
       _metadata = null;
     });
 
@@ -208,7 +205,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = samples.isNotEmpty;
         _duration = result.durationMs.toInt() / 1000.0;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),

@@ -20,6 +20,7 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
         ]
     }
 
+    // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
         model: RAModelInfo

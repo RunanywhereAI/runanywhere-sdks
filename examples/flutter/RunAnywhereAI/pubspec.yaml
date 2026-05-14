@@ -34,8 +34,6 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   # File system access
   path_provider: ^2.1.0
-  # UUID generation
-  uuid: ^4.0.0
   # Device information
   device_info_plus: ^10.0.0
   # App package info
@@ -48,8 +46,6 @@ dependencies:
   camera: ^0.11.0
   # Image picker for gallery photos
   image_picker: ^1.0.0
-  # Image manipulation (BGRA to RGB pixel conversion)
-  image: ^4.0.0
   # File picker for PDF/JSON document selection (RAG)
   file_picker: ^8.0.0
   # PDF text extraction (RAG)
