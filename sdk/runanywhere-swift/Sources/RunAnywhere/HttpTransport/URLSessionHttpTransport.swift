@@ -66,8 +66,7 @@ public enum URLSessionHttpTransport {
     /// bridges `URLSessionDataDelegate` callbacks back to the C chunk
     /// callback. Keyed by `URLSessionTask.taskIdentifier`. Also used
     /// by ``cancelAllStreams()`` for explicit teardown.
-    // swiftlint:disable:next strict_fileprivate
-    fileprivate static let streamRegistry = StreamRegistry()
+    fileprivate static let streamRegistry = StreamRegistry() // swiftlint:disable:this strict_fileprivate
 
     /// Static vtable handed to `rac_http_transport_register`. It must
     /// outlive every registered request, so we store it as a mutable

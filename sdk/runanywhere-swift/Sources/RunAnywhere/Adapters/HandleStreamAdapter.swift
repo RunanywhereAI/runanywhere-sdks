@@ -88,7 +88,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         private let register: Register
         private let unregister: Unregister
         private let isTerminalEvent: IsTerminalEvent?
-        private let state = OSAllocatedUnfairLock<HandleFanOutState<Event>>(initialState: HandleFanOutState<Event>())
+        private let state = OSAllocatedUnfairLock<HandleFanOutState<Event>>(
+            initialState: HandleFanOutState<Event>()
+        )
 
         init(
             handle: Handle,

@@ -47,39 +47,36 @@
 namespace {
 
 struct CallbackSlot {
-    rac_stt_stream_proto_callback_fn fn = nullptr;
-    void* user_data = nullptr;
-    uint64_t seq = 0;
+    rac_stt_stream_proto_callback_fn fn        = nullptr;
+    void*                            user_data = nullptr;
+    uint64_t                         seq       = 0;
 };
 
 struct StreamSession {
-    rac_handle_t handle = nullptr;
-    std::string request_id;
+    rac_handle_t handle    = nullptr;
+    std::string  request_id;
     std::atomic<bool> is_cancelled{false};
     // Cached language code from STTOptions; nullptr means use defaults.
     // String storage owned by the session so the rac_stt_options_t we
     // build per feed_audio_proto can borrow it safely.
-    std::string language;
-    int32_t sample_rate = 16000;
+    std::string  language;
+    int32_t      sample_rate = 16000;
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
-    bool enable_punctuation = true;
-    bool enable_diarization = false;
-    int32_t max_speakers = 0;
-    bool enable_timestamps = true;
-    bool detect_language = false;
+    bool         enable_punctuation = true;
+    bool         enable_diarization = false;
+    int32_t      max_speakers = 0;
+    bool         enable_timestamps = true;
+    bool         detect_language = false;
     // CPP-14: per-session backend recognizer handle. Lazily created on the
     // first accepted audio chunk via the new stream_create vtable slot.
     // Backends that don't implement the slot leave this nullptr and
     // rac_stt_stream_feed_audio_proto falls back to the legacy per-chunk
     // transcribe_stream path.
     rac_handle_t backend_stream_handle = nullptr;
-    bool backend_stream_unsupported = false;
+    bool         backend_stream_unsupported = false;
 };
 
-std::mutex& g_mu() {
-    static std::mutex m;
-    return m;
-}
+std::mutex& g_mu() { static std::mutex m; return m; }
 
 std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_handle_t, CallbackSlot> m;
@@ -106,62 +103,36 @@ int64_t now_us() {
 
 const char* stt_language_code(runanywhere::v1::STTLanguage language) {
     switch (language) {
-        case runanywhere::v1::STT_LANGUAGE_EN:
-            return "en";
-        case runanywhere::v1::STT_LANGUAGE_ES:
-            return "es";
-        case runanywhere::v1::STT_LANGUAGE_FR:
-            return "fr";
-        case runanywhere::v1::STT_LANGUAGE_DE:
-            return "de";
-        case runanywhere::v1::STT_LANGUAGE_ZH:
-            return "zh";
-        case runanywhere::v1::STT_LANGUAGE_JA:
-            return "ja";
-        case runanywhere::v1::STT_LANGUAGE_KO:
-            return "ko";
-        case runanywhere::v1::STT_LANGUAGE_IT:
-            return "it";
-        case runanywhere::v1::STT_LANGUAGE_PT:
-            return "pt";
-        case runanywhere::v1::STT_LANGUAGE_AR:
-            return "ar";
-        case runanywhere::v1::STT_LANGUAGE_RU:
-            return "ru";
-        case runanywhere::v1::STT_LANGUAGE_HI:
-            return "hi";
-        default:
-            return nullptr;
+        case runanywhere::v1::STT_LANGUAGE_EN: return "en";
+        case runanywhere::v1::STT_LANGUAGE_ES: return "es";
+        case runanywhere::v1::STT_LANGUAGE_FR: return "fr";
+        case runanywhere::v1::STT_LANGUAGE_DE: return "de";
+        case runanywhere::v1::STT_LANGUAGE_ZH: return "zh";
+        case runanywhere::v1::STT_LANGUAGE_JA: return "ja";
+        case runanywhere::v1::STT_LANGUAGE_KO: return "ko";
+        case runanywhere::v1::STT_LANGUAGE_IT: return "it";
+        case runanywhere::v1::STT_LANGUAGE_PT: return "pt";
+        case runanywhere::v1::STT_LANGUAGE_AR: return "ar";
+        case runanywhere::v1::STT_LANGUAGE_RU: return "ru";
+        case runanywhere::v1::STT_LANGUAGE_HI: return "hi";
+        default: return nullptr;
     }
 }
 
 runanywhere::v1::STTLanguage stt_language_from_code(const char* code) {
-    if (!code || code[0] == '\0')
-        return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-    if (std::strncmp(code, "en", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_EN;
-    if (std::strncmp(code, "es", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ES;
-    if (std::strncmp(code, "fr", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_FR;
-    if (std::strncmp(code, "de", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_DE;
-    if (std::strncmp(code, "zh", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ZH;
-    if (std::strncmp(code, "ja", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_JA;
-    if (std::strncmp(code, "ko", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_KO;
-    if (std::strncmp(code, "it", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_IT;
-    if (std::strncmp(code, "pt", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_PT;
-    if (std::strncmp(code, "ar", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_AR;
-    if (std::strncmp(code, "ru", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_RU;
-    if (std::strncmp(code, "hi", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_HI;
+    if (!code || code[0] == '\0') return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
+    if (std::strncmp(code, "en", 2) == 0) return runanywhere::v1::STT_LANGUAGE_EN;
+    if (std::strncmp(code, "es", 2) == 0) return runanywhere::v1::STT_LANGUAGE_ES;
+    if (std::strncmp(code, "fr", 2) == 0) return runanywhere::v1::STT_LANGUAGE_FR;
+    if (std::strncmp(code, "de", 2) == 0) return runanywhere::v1::STT_LANGUAGE_DE;
+    if (std::strncmp(code, "zh", 2) == 0) return runanywhere::v1::STT_LANGUAGE_ZH;
+    if (std::strncmp(code, "ja", 2) == 0) return runanywhere::v1::STT_LANGUAGE_JA;
+    if (std::strncmp(code, "ko", 2) == 0) return runanywhere::v1::STT_LANGUAGE_KO;
+    if (std::strncmp(code, "it", 2) == 0) return runanywhere::v1::STT_LANGUAGE_IT;
+    if (std::strncmp(code, "pt", 2) == 0) return runanywhere::v1::STT_LANGUAGE_PT;
+    if (std::strncmp(code, "ar", 2) == 0) return runanywhere::v1::STT_LANGUAGE_AR;
+    if (std::strncmp(code, "ru", 2) == 0) return runanywhere::v1::STT_LANGUAGE_RU;
+    if (std::strncmp(code, "hi", 2) == 0) return runanywhere::v1::STT_LANGUAGE_HI;
     return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
 }
 #endif
@@ -172,18 +143,20 @@ runanywhere::v1::STTLanguage stt_language_from_code(const char* code) {
 namespace rac::stt {
 // Forward declaration: implemented later in this same TU. Used by
 // rac_stt_stream_feed_audio_proto() to emit PARTIAL / FINAL events.
-void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
+void dispatch_stt_stream_event(rac_handle_t                            handle,
+                               runanywhere::v1::STTStreamEventKind     kind,
                                const runanywhere::v1::STTPartialResult* partial,
-                               const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code);
+                               const runanywhere::v1::STTOutput*       final_output,
+                               const char*                             error_message,
+                               int                                     error_code);
 }  // namespace rac::stt
 #endif
 
 extern "C" {
 
-rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
-                                               rac_stt_stream_proto_callback_fn callback,
-                                               void* user_data) {
+rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t                     handle,
+                                                rac_stt_stream_proto_callback_fn callback,
+                                                void*                            user_data) {
     if (handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -191,7 +164,7 @@ rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
+        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
     }
     return RAC_SUCCESS;
 }
@@ -205,12 +178,12 @@ rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* options_proto_bytes,
-                                        size_t options_proto_size, uint64_t* out_session_id) {
-    if (handle == nullptr)
-        return RAC_ERROR_INVALID_HANDLE;
-    if (out_session_id == nullptr)
-        return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_stt_stream_start_proto(rac_handle_t   handle,
+                                         const uint8_t* options_proto_bytes,
+                                         size_t         options_proto_size,
+                                         uint64_t*      out_session_id) {
+    if (handle == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    if (out_session_id == nullptr) return RAC_ERROR_NULL_POINTER;
     if (options_proto_size > 0 && options_proto_bytes == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -222,7 +195,8 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
 #else
     runanywhere::v1::STTOptions parsed;
     if (options_proto_size > 0 &&
-        !parsed.ParseFromArray(options_proto_bytes, static_cast<int>(options_proto_size))) {
+        !parsed.ParseFromArray(options_proto_bytes,
+                                static_cast<int>(options_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
 
@@ -240,22 +214,21 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         }
         s.enable_punctuation = parsed.enable_punctuation();
         s.enable_diarization = parsed.enable_diarization();
-        s.max_speakers = parsed.max_speakers();
-        s.enable_timestamps = parsed.enable_word_timestamps();
-        s.sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
-        s.audio_format = RAC_AUDIO_FORMAT_PCM;
+        s.max_speakers       = parsed.max_speakers();
+        s.enable_timestamps  = parsed.enable_word_timestamps();
+        s.sample_rate        = RAC_STT_DEFAULT_SAMPLE_RATE;
+        s.audio_format       = RAC_AUDIO_FORMAT_PCM;
     }
     *out_session_id = id;
     return RAC_SUCCESS;
 #endif
 }
 
-rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t* audio_bytes,
-                                             size_t audio_size) {
-    if (session_id == 0)
-        return RAC_ERROR_INVALID_ARGUMENT;
-    if (audio_size > 0 && audio_bytes == nullptr)
-        return RAC_ERROR_INVALID_ARGUMENT;
+rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
+                                              const uint8_t* audio_bytes,
+                                              size_t         audio_size) {
+    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
+    if (audio_size > 0 && audio_bytes == nullptr) return RAC_ERROR_INVALID_ARGUMENT;
 
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)audio_bytes;
@@ -267,34 +240,33 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // callbacks. The session's request_id flows into each emitted event
     // through the bridging callback below.
     rac_handle_t component_handle = nullptr;
-    std::string language_buffer;
-    bool detect_language = false;
-    bool enable_punctuation = true;
-    bool enable_diarization = false;
-    int32_t max_speakers = 0;
-    bool enable_timestamps = true;
-    int32_t sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
+    std::string  language_buffer;
+    bool         detect_language    = false;
+    bool         enable_punctuation = true;
+    bool         enable_diarization = false;
+    int32_t      max_speakers       = 0;
+    bool         enable_timestamps  = true;
+    int32_t      sample_rate        = RAC_STT_DEFAULT_SAMPLE_RATE;
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
     rac_handle_t backend_stream_handle = nullptr;
-    bool backend_stream_unsupported = false;
+    bool         backend_stream_unsupported = false;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end())
-            return RAC_ERROR_INVALID_ARGUMENT;
+        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
         if (it->second.is_cancelled.load(std::memory_order_relaxed)) {
             return RAC_ERROR_INVALID_ARGUMENT;
         }
-        component_handle = it->second.handle;
-        language_buffer = it->second.language;
-        detect_language = it->second.detect_language;
+        component_handle   = it->second.handle;
+        language_buffer    = it->second.language;
+        detect_language    = it->second.detect_language;
         enable_punctuation = it->second.enable_punctuation;
         enable_diarization = it->second.enable_diarization;
-        max_speakers = it->second.max_speakers;
-        enable_timestamps = it->second.enable_timestamps;
-        sample_rate = it->second.sample_rate;
-        audio_format = it->second.audio_format;
-        backend_stream_handle = it->second.backend_stream_handle;
+        max_speakers       = it->second.max_speakers;
+        enable_timestamps  = it->second.enable_timestamps;
+        sample_rate        = it->second.sample_rate;
+        audio_format       = it->second.audio_format;
+        backend_stream_handle      = it->second.backend_stream_handle;
         backend_stream_unsupported = it->second.backend_stream_unsupported;
     }
     if (component_handle == nullptr) {
@@ -307,14 +279,14 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // Build per-call options. The language buffer lives in language_buffer
     // local until the transcribe call returns.
     rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-    options.language = language_buffer.empty() ? nullptr : language_buffer.c_str();
-    options.detect_language = detect_language ? RAC_TRUE : RAC_FALSE;
+    options.language          = language_buffer.empty() ? nullptr : language_buffer.c_str();
+    options.detect_language   = detect_language ? RAC_TRUE : RAC_FALSE;
     options.enable_punctuation = enable_punctuation ? RAC_TRUE : RAC_FALSE;
     options.enable_diarization = enable_diarization ? RAC_TRUE : RAC_FALSE;
-    options.max_speakers = max_speakers;
-    options.enable_timestamps = enable_timestamps ? RAC_TRUE : RAC_FALSE;
-    options.sample_rate = sample_rate;
-    options.audio_format = audio_format;
+    options.max_speakers       = max_speakers;
+    options.enable_timestamps  = enable_timestamps ? RAC_TRUE : RAC_FALSE;
+    options.sample_rate        = sample_rate;
+    options.audio_format       = audio_format;
 
     // CPP-14: try the persistent-handle path first. Backends that advertise
     // stream_create + stream_feed_audio_chunk keep their recognizer state
@@ -355,10 +327,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                     it->second.backend_stream_unsupported = true;
                 }
             } else {
-                rac::stt::dispatch_stt_stream_event(component_handle,
-                                                    runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-                                                    /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming start failed", create_rc);
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr,
+                    "STT streaming start failed", create_rc);
                 return create_rc;
             }
         }
@@ -368,7 +340,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             // assume Int16 PCM mono — matches rac_audio_format_enum_t /
             // RAC_AUDIO_FORMAT_PCM which every current STT backend expects.
             const int16_t* samples = reinterpret_cast<const int16_t*>(audio_bytes);
-            const size_t count = audio_size / sizeof(int16_t);
+            const size_t   count   = audio_size / sizeof(int16_t);
 
             struct BridgeCtxStream {
                 rac_handle_t handle;
@@ -378,15 +350,13 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
                 auto* c = static_cast<BridgeCtxStream*>(opaque);
                 runanywhere::v1::STTPartialResult partial;
-                if (partial_text)
-                    partial.set_text(partial_text);
+                if (partial_text) partial.set_text(partial_text);
                 partial.set_is_final(is_final == RAC_TRUE);
                 partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
                 partial.set_language(c->language);
                 if (is_final == RAC_TRUE) {
                     runanywhere::v1::STTOutput final_output;
-                    if (partial_text)
-                        final_output.set_text(partial_text);
+                    if (partial_text) final_output.set_text(partial_text);
                     final_output.set_language(c->language);
                     rac::stt::dispatch_stt_stream_event(
                         c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial,
@@ -402,10 +372,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
                 component_handle, backend_stream_handle, samples, count, bridge, &ctx);
             if (feed_rc != RAC_SUCCESS) {
-                rac::stt::dispatch_stt_stream_event(component_handle,
-                                                    runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-                                                    /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming chunk failed", feed_rc);
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr,
+                    "STT streaming chunk failed", feed_rc);
             }
             return feed_rc;
         }
@@ -422,7 +392,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     struct BridgeCtx {
         rac_handle_t handle;
         runanywhere::v1::STTLanguage language;
-        size_t audio_size;
+        size_t       audio_size;
     } ctx{component_handle, stt_language_from_code(options.language), audio_size};
 
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
@@ -441,34 +411,38 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                 final_output.set_text(partial_text);
             }
             final_output.set_language(c->language);
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
-                /*error_message=*/nullptr,
-                /*error_code=*/0);
+            rac::stt::dispatch_stt_stream_event(c->handle,
+                                                runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL,
+                                                &partial,
+                                                &final_output,
+                                                /*error_message=*/nullptr,
+                                                /*error_code=*/0);
         } else {
-            rac::stt::dispatch_stt_stream_event(
-                c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
-                /*final_output=*/nullptr,
-                /*error_message=*/nullptr,
-                /*error_code=*/0);
+            rac::stt::dispatch_stt_stream_event(c->handle,
+                                                runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL,
+                                                &partial,
+                                                /*final_output=*/nullptr,
+                                                /*error_message=*/nullptr,
+                                                /*error_code=*/0);
         }
     };
 
-    rac_result_t rc = rac_stt_component_transcribe_stream(component_handle, audio_bytes, audio_size,
-                                                          &options, bridge, &ctx);
+    rac_result_t rc = rac_stt_component_transcribe_stream(
+        component_handle, audio_bytes, audio_size, &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
-        rac::stt::dispatch_stt_stream_event(
-            component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-            /*partial=*/nullptr,
-            /*final_output=*/nullptr, "STT streaming chunk failed", rc);
+        rac::stt::dispatch_stt_stream_event(component_handle,
+                                            runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                                            /*partial=*/nullptr,
+                                            /*final_output=*/nullptr,
+                                            "STT streaming chunk failed",
+                                            rc);
     }
     return rc;
 #endif
 }
 
 rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
-    if (session_id == 0)
-        return RAC_ERROR_INVALID_ARGUMENT;
+    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
 
     // Detach the session's backend handle under the lock, then destroy it
     // outside of g_mu() to avoid holding the lock across a backend cleanup
@@ -478,9 +452,8 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end())
-            return RAC_ERROR_INVALID_ARGUMENT;
-        component_handle = it->second.handle;
+        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+        component_handle      = it->second.handle;
         backend_stream_handle = it->second.backend_stream_handle;
         it->second.backend_stream_handle = nullptr;
         g_sessions().erase(it);
@@ -492,18 +465,16 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
 }
 
 rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id) {
-    if (session_id == 0)
-        return RAC_ERROR_INVALID_ARGUMENT;
+    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
 
     rac_handle_t component_handle = nullptr;
     rac_handle_t backend_stream_handle = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end())
-            return RAC_ERROR_INVALID_ARGUMENT;
+        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
         it->second.is_cancelled.store(true, std::memory_order_relaxed);
-        component_handle = it->second.handle;
+        component_handle      = it->second.handle;
         backend_stream_handle = it->second.backend_stream_handle;
         it->second.backend_stream_handle = nullptr;
         g_sessions().erase(it);
@@ -531,22 +502,24 @@ namespace rac::stt {
  * stamps its request_id on the emitted event so downstream consumers can
  * correlate partials and finals.
  */
-void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
+void dispatch_stt_stream_event(rac_handle_t                            handle,
+                               runanywhere::v1::STTStreamEventKind     kind,
                                const runanywhere::v1::STTPartialResult* partial,
-                               const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code) {
+                               const runanywhere::v1::STTOutput*       final_output,
+                               const char*                             error_message,
+                               int                                     error_code) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
-        if (it == g_slots().end() || it->second.fn == nullptr)
-            return;
+        if (it == g_slots().end() || it->second.fn == nullptr) return;
         slot = it->second;
         seq = ++(it->second.seq);
         for (const auto& [_, session] : g_sessions()) {
-            if (session.handle == handle && !session.is_cancelled.load(std::memory_order_relaxed)) {
+            if (session.handle == handle &&
+                !session.is_cancelled.load(std::memory_order_relaxed)) {
                 request_id = session.request_id;
                 break;
             }
@@ -554,7 +527,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     }
 
     thread_local runanywhere::v1::STTStreamEvent proto_event;
-    thread_local std::vector<uint8_t> scratch;
+    thread_local std::vector<uint8_t>            scratch;
 
     proto_event.Clear();
     proto_event.set_seq(seq);
@@ -577,8 +550,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
-    if (scratch.size() < needed)
-        scratch.resize(needed);
+    if (scratch.size() < needed) scratch.resize(needed);
     if (!proto_event.SerializeToArray(scratch.data(), static_cast<int>(needed))) {
         RAC_LOG_WARNING("stt", "dispatch_stt_stream_event: SerializeToArray failed");
         return;

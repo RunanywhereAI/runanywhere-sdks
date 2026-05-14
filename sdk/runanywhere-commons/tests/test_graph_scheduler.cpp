@@ -46,26 +46,26 @@ using rac::graph::StreamEdge;
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define CHECK(cond)                                                               \
-    do {                                                                          \
-        if (!(cond)) {                                                            \
+#define CHECK(cond)                                                            \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                           \
-            return;                                                               \
-        }                                                                         \
+            g_failed++;                                                        \
+            return;                                                            \
+        }                                                                      \
     } while (0)
 
-#define TEST(name)                                      \
-    static void test_##name();                          \
-    static void run_test_##name() {                     \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
-        int before_failed = g_failed;                   \
-        test_##name();                                  \
-        if (g_failed == before_failed) {                \
-            std::fprintf(stderr, "[  OK] %s\n", #name); \
-            g_passed++;                                 \
-        }                                               \
-    }                                                   \
+#define TEST(name)                                                             \
+    static void test_##name();                                                 \
+    static void run_test_##name() {                                            \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
+        int before_failed = g_failed;                                          \
+        test_##name();                                                         \
+        if (g_failed == before_failed) {                                       \
+            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
+            g_passed++;                                                        \
+        }                                                                      \
+    }                                                                          \
     static void test_##name()
 
 // ---------------------------------------------------------------------------
@@ -76,11 +76,13 @@ static int g_passed = 0;
 
 TEST(streaming_correctness) {
     auto doubler = make_primitive_node<int, int>(
-        "doubler", [](int x, StreamEdge<int>& out) { out.push(x * 2); },
+        "doubler",
+        [](int x, StreamEdge<int>& out) { out.push(x * 2); },
         /*input_capacity=*/8, /*output_capacity=*/8);
 
     auto plus_one = make_primitive_node<int, int>(
-        "plus_one", [](int x, StreamEdge<int>& out) { out.push(x + 1); },
+        "plus_one",
+        [](int x, StreamEdge<int>& out) { out.push(x + 1); },
         /*input_capacity=*/8, /*output_capacity=*/8);
 
     GraphScheduler scheduler(/*thread_pool_size=*/2);
@@ -92,16 +94,14 @@ TEST(streaming_correctness) {
     const int N = 256;
     std::thread producer([&] {
         auto in = doubler->input();
-        for (int i = 0; i < N; ++i)
-            in->push(i);
+        for (int i = 0; i < N; ++i) in->push(i);
         in->close();
     });
 
     std::vector<int> received;
     std::thread consumer([&] {
         auto out = plus_one->output();
-        while (auto x = out->pop())
-            received.push_back(*x);
+        while (auto x = out->pop()) received.push_back(*x);
     });
 
     producer.join();
@@ -109,8 +109,7 @@ TEST(streaming_correctness) {
     consumer.join();
 
     CHECK(static_cast<int>(received.size()) == N);
-    for (int i = 0; i < N; ++i)
-        CHECK(received[i] == i * 2 + 1);
+    for (int i = 0; i < N; ++i) CHECK(received[i] == i * 2 + 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +122,10 @@ TEST(streaming_correctness) {
 TEST(backpressure) {
     const size_t kCap = 2;
     auto fast = make_primitive_node<int, int>(
-        "fast", [](int x, StreamEdge<int>& out) { out.push(x); },
-        /*input_capacity=*/kCap, /*output_capacity=*/kCap, OverflowPolicy::BlockProducer);
+        "fast",
+        [](int x, StreamEdge<int>& out) { out.push(x); },
+        /*input_capacity=*/kCap, /*output_capacity=*/kCap,
+        OverflowPolicy::BlockProducer);
 
     auto slow = make_primitive_node<int, int>(
         "slow",
@@ -132,7 +133,8 @@ TEST(backpressure) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             out.push(x);
         },
-        /*input_capacity=*/kCap, /*output_capacity=*/kCap, OverflowPolicy::BlockProducer);
+        /*input_capacity=*/kCap, /*output_capacity=*/kCap,
+        OverflowPolicy::BlockProducer);
 
     GraphScheduler scheduler;
     scheduler.add_node(fast);
@@ -159,16 +161,14 @@ TEST(backpressure) {
 
     std::thread producer([&] {
         auto in = fast->input();
-        for (int i = 0; i < N; ++i)
-            in->push(i);
+        for (int i = 0; i < N; ++i) in->push(i);
         in->close();
     });
 
     std::vector<int> received;
     std::thread consumer([&] {
         auto out = slow->output();
-        while (auto x = out->pop())
-            received.push_back(*x);
+        while (auto x = out->pop()) received.push_back(*x);
     });
 
     producer.join();
@@ -179,8 +179,7 @@ TEST(backpressure) {
 
     // No drops.
     CHECK(static_cast<int>(received.size()) == N);
-    for (int i = 0; i < N; ++i)
-        CHECK(received[i] == i);
+    for (int i = 0; i < N; ++i) CHECK(received[i] == i);
     // Bounded in-flight — BlockProducer kept the edge at or under capacity.
     CHECK(max_depth.load() <= kCap);
 }
@@ -209,8 +208,7 @@ TEST(cancel_all_mid_stream) {
     std::thread producer([&] {
         auto in = slow->input();
         for (int i = 0; i < 10000; ++i) {
-            if (!in->push(i, root.get()))
-                break;
+            if (!in->push(i, root.get())) break;
             pushed.fetch_add(1);
         }
     });
@@ -220,9 +218,7 @@ TEST(cancel_all_mid_stream) {
     std::atomic<bool> consumer_done{false};
     std::thread consumer([&] {
         auto out = slow->output();
-        while (auto x = out->pop()) {
-            (void)x;
-        }
+        while (auto x = out->pop()) { (void)x; }
         consumer_done.store(true);
     });
 
@@ -255,10 +251,10 @@ TEST(cancel_all_mid_stream) {
 // ---------------------------------------------------------------------------
 
 TEST(split_merge_topology) {
-    auto head =
-        make_primitive_node<int, int>("head", [](int x, StreamEdge<int>& out) { out.push(x); });
-    auto tail =
-        make_primitive_node<int, int>("tail", [](int x, StreamEdge<int>& out) { out.push(x); });
+    auto head = make_primitive_node<int, int>(
+        "head", [](int x, StreamEdge<int>& out) { out.push(x); });
+    auto tail = make_primitive_node<int, int>(
+        "tail", [](int x, StreamEdge<int>& out) { out.push(x); });
     auto split = std::make_shared<SplitNode<int>>("split", /*num_outputs=*/2);
     auto merge = std::make_shared<MergeNode<int>>("merge", /*num_inputs=*/2);
 
@@ -280,16 +276,14 @@ TEST(split_merge_topology) {
     const int N = 40;
     std::thread producer([&] {
         auto in = head->input();
-        for (int i = 0; i < N; ++i)
-            in->push(i);
+        for (int i = 0; i < N; ++i) in->push(i);
         in->close();
     });
 
     std::vector<int> received;
     std::thread consumer([&] {
         auto out = tail->output();
-        while (auto x = out->pop())
-            received.push_back(*x);
+        while (auto x = out->pop()) received.push_back(*x);
     });
 
     producer.join();
@@ -303,8 +297,7 @@ TEST(split_merge_topology) {
         CHECK(v >= 0 && v < N);
         counts[v]++;
     }
-    for (int i = 0; i < N; ++i)
-        CHECK(counts[i] == 2);
+    for (int i = 0; i < N; ++i) CHECK(counts[i] == 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +325,7 @@ int main() {
     run_test_split_merge_topology();
     run_test_empty_scheduler();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
+    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
+                 g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

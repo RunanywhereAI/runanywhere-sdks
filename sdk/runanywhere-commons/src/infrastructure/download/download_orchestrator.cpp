@@ -14,11 +14,11 @@
  *   4. Invoke user's complete_callback with final model path
  */
 
-#include <algorithm>
+#include <condition_variable>
 #include <array>
 #include <atomic>
+#include <algorithm>
 #include <chrono>
-#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -37,7 +37,6 @@
 #include <direct.h>  // for _mkdir
 #endif
 
-#include "../http/rac_http_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -49,6 +48,7 @@
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "../http/rac_http_internal.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
@@ -514,7 +514,8 @@ void emit_progress(const std::shared_ptr<proto_download_task>& task) {
     if (!progress.SerializeToString(&slot)) {
         return;
     }
-    sink.callback(reinterpret_cast<const uint8_t*>(slot.data()), slot.size(), sink.user_data);
+    sink.callback(reinterpret_cast<const uint8_t*>(slot.data()), slot.size(),
+                  sink.user_data);
 }
 
 int64_t file_size_or_zero(const std::string& path) {
@@ -547,10 +548,15 @@ void mark_task_stopped(const std::shared_ptr<proto_download_task>& task) {
     task->cv.notify_all();
 }
 
-void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::DownloadState state,
-                       rav1::DownloadStage stage, int64_t bytes_downloaded, int64_t total_bytes,
-                       int32_t file_index, const std::string& storage_key,
-                       const std::string& local_path, const std::string& error_message) {
+void set_task_progress(const std::shared_ptr<proto_download_task>& task,
+                       rav1::DownloadState state,
+                       rav1::DownloadStage stage,
+                       int64_t bytes_downloaded,
+                       int64_t total_bytes,
+                       int32_t file_index,
+                       const std::string& storage_key,
+                       const std::string& local_path,
+                       const std::string& error_message) {
     if (!task) {
         return;
     }
@@ -586,21 +592,23 @@ void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::D
 
     float stage_progress = 0.0f;
     if (total_bytes > 0) {
-        stage_progress = static_cast<float>(std::min<double>(
-            1.0, static_cast<double>(bytes_downloaded) / static_cast<double>(total_bytes)));
+        stage_progress = static_cast<float>(
+            std::min<double>(1.0, static_cast<double>(bytes_downloaded) /
+                                      static_cast<double>(total_bytes)));
     } else if (state == rav1::DOWNLOAD_STATE_COMPLETED) {
         stage_progress = 1.0f;
     }
     progress->set_stage_progress(stage_progress);
-    progress->set_overall_progress(state == rav1::DOWNLOAD_STATE_COMPLETED ? 1.0f : stage_progress);
+    progress->set_overall_progress(state == rav1::DOWNLOAD_STATE_COMPLETED ? 1.0f
+                                                                            : stage_progress);
     int64_t elapsed_ms = now_ms - task->started_at_unix_ms;
     if (elapsed_ms > 0 && bytes_downloaded > 0) {
         float speed = static_cast<float>(static_cast<double>(bytes_downloaded) /
                                          (static_cast<double>(elapsed_ms) / 1000.0));
         progress->set_overall_speed_bps(speed);
         if (total_bytes > bytes_downloaded && speed > 0.0f) {
-            progress->set_eta_seconds(
-                static_cast<int64_t>(static_cast<double>(total_bytes - bytes_downloaded) / speed));
+            progress->set_eta_seconds(static_cast<int64_t>(
+                static_cast<double>(total_bytes - bytes_downloaded) / speed));
         } else {
             progress->set_eta_seconds(-1);
         }
@@ -637,8 +645,9 @@ rac_bool_t proto_http_progress(uint64_t bytes_written, uint64_t total_bytes, voi
         std::lock_guard<std::mutex> lock(ctx->task->mutex);
         ctx->task->last_partial_bytes = downloaded;
     }
-    set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                      downloaded, total, ctx->file_index, ctx->storage_key, "", "");
+    set_task_progress(ctx->task, rav1::DOWNLOAD_STATE_DOWNLOADING,
+                      rav1::DOWNLOAD_STAGE_DOWNLOADING, downloaded, total, ctx->file_index,
+                      ctx->storage_key, "", "");
     emit_progress(ctx->task);
     return RAC_TRUE;
 }
@@ -654,8 +663,10 @@ int64_t plan_total_expected(const std::vector<proto_plan_file>& files) {
     return total;
 }
 
-bool validate_resume_offset(const proto_plan_file& file, int64_t requested_resume_from,
-                            bool require_exact_size, int64_t* out_actual_size,
+bool validate_resume_offset(const proto_plan_file& file,
+                            int64_t requested_resume_from,
+                            bool require_exact_size,
+                            int64_t* out_actual_size,
                             std::string* out_error) {
     int64_t actual_size = file_size_or_zero(file.destination_path);
     if (out_actual_size) {
@@ -758,7 +769,8 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
             set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
                               rav1::DOWNLOAD_STAGE_DOWNLOADING,
                               completed_before_file + file_partial, total_expected,
-                              static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
+                              static_cast<int32_t>(i), file.storage_key, "",
+                              "download cancelled");
             mark_task_stopped(task);
             emit_progress(task);
             return;
@@ -771,9 +783,9 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
                 std::lock_guard<std::mutex> lock(task->mutex);
                 task->last_partial_bytes = partial;
             }
-            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                              partial, total_expected, static_cast<int32_t>(i), file.storage_key,
-                              "", error);
+            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
+                              rav1::DOWNLOAD_STAGE_DOWNLOADING, partial, total_expected,
+                              static_cast<int32_t>(i), file.storage_key, "", error);
             mark_task_stopped(task);
             emit_progress(task);
             return;
@@ -793,15 +805,17 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
             mkdir_p(task->model_folder_path.c_str());
 
             rac_extraction_result_t extraction_result{};
-            rac_result_t extract_rc = rac_extract_archive_native(
-                file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
-                nullptr, &extraction_result);
+            rac_result_t extract_rc = rac_extract_archive_native(file.destination_path.c_str(),
+                                                                 task->model_folder_path.c_str(),
+                                                                 nullptr, nullptr, nullptr,
+                                                                 &extraction_result);
             if (extract_rc != RAC_SUCCESS) {
-                set_task_progress(
-                    task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
-                    total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
-                    total_expected, static_cast<int32_t>(i), file.storage_key, "",
-                    "archive extraction failed");
+                set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED,
+                                  rav1::DOWNLOAD_STAGE_EXTRACTING,
+                                  total_expected > 0 ? completed_before_file + file.expected_bytes
+                                                     : 0,
+                                  total_expected, static_cast<int32_t>(i), file.storage_key, "",
+                                  "archive extraction failed");
                 mark_task_stopped(task);
                 emit_progress(task);
                 return;
@@ -839,8 +853,9 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
     }
 
     if (task->cancel_requested.load()) {
-        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                          completed_before_file, total_expected, 0, "", "", "download cancelled");
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
+                          rav1::DOWNLOAD_STAGE_DOWNLOADING, completed_before_file, total_expected,
+                          0, "", "", "download cancelled");
         mark_task_stopped(task);
         emit_progress(task);
         return;
@@ -875,7 +890,8 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
         rac_result_t update_rc = rac_model_registry_update_download_status(
             rac_get_model_registry(), task->model_id.c_str(), completion_local_path.c_str());
         if (update_rc == RAC_SUCCESS) {
-            RAC_LOG_INFO(LOG_TAG, "Registry self-heal: marked '%s' downloaded with local_path '%s'",
+            RAC_LOG_INFO(LOG_TAG,
+                         "Registry self-heal: marked '%s' downloaded with local_path '%s'",
                          task->model_id.c_str(), completion_local_path.c_str());
         } else {
             RAC_LOG_WARNING(LOG_TAG,
@@ -906,9 +922,12 @@ std::string destination_from_model_file(const std::string& model_folder,
 
 void append_planned_file(rav1::DownloadPlanResult* result,
                          const rav1::ModelFileDescriptor& descriptor,
-                         const std::string& model_folder, const std::string& model_id,
-                         const std::string& url, int64_t expected_bytes,
-                         const std::string& checksum_sha256, bool requires_extraction,
+                         const std::string& model_folder,
+                         const std::string& model_id,
+                         const std::string& url,
+                         int64_t expected_bytes,
+                         const std::string& checksum_sha256,
+                         bool requires_extraction,
                          bool is_resume_candidate) {
     rav1::DownloadFilePlan* out_file = result->add_files();
     copy_file_descriptor_plan(descriptor, out_file);
@@ -930,8 +949,8 @@ void append_planned_file(rav1::DownloadPlanResult* result,
         char computed[4096];
         rac_bool_t ignored = RAC_FALSE;
         if (rac_download_compute_destination(model_id.c_str(), url.c_str(), RAC_FRAMEWORK_UNKNOWN,
-                                             RAC_MODEL_FORMAT_UNKNOWN, computed, sizeof(computed),
-                                             &ignored) == RAC_SUCCESS) {
+                                             RAC_MODEL_FORMAT_UNKNOWN, computed,
+                                             sizeof(computed), &ignored) == RAC_SUCCESS) {
             destination = computed;
         }
     }
@@ -1254,9 +1273,8 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
 // =============================================================================
 
 #ifdef RAC_HAVE_PROTOBUF
-extern "C" rac_result_t
-rac_download_set_progress_proto_callback(rac_download_proto_progress_callback_fn callback,
-                                         void* user_data) {
+extern "C" rac_result_t rac_download_set_progress_proto_callback(
+    rac_download_proto_progress_callback_fn callback, void* user_data) {
     std::lock_guard<std::mutex> lock(progress_sink().mutex);
     auto& sink = progress_sink();
     sink.callback = callback;
@@ -1273,8 +1291,9 @@ rac_download_set_progress_proto_callback(rac_download_proto_progress_callback_fn
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, size_t request_size,
-                                                rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes,
+                                                 size_t request_size,
+                                                 rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1294,7 +1313,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     }
     result.set_model_id(model_id);
     result.set_storage_namespace(request.storage_namespace());
-    result.set_required_free_bytes_after_download(request.required_free_bytes_after_download());
+    result.set_required_free_bytes_after_download(
+        request.required_free_bytes_after_download());
 
     if (model_id.empty()) {
         result.set_can_start(false);
@@ -1316,8 +1336,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     rac_model_format_t format = proto_format_to_c(model.format());
 
     char model_folder[4096];
-    rac_result_t path_rc = rac_model_paths_get_model_folder(model_id.c_str(), framework,
-                                                            model_folder, sizeof(model_folder));
+    rac_result_t path_rc =
+        rac_model_paths_get_model_folder(model_id.c_str(), framework, model_folder,
+                                         sizeof(model_folder));
     if (path_rc != RAC_SUCCESS) {
         result.set_can_start(false);
         result.set_error_message("failed to compute model storage path");
@@ -1349,8 +1370,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             }
 
             rac_archive_type_t archive_type;
-            bool requires_extraction =
-                rac_archive_type_from_path(url.c_str(), &archive_type) == RAC_TRUE;
+            bool requires_extraction = rac_archive_type_from_path(url.c_str(), &archive_type) ==
+                                       RAC_TRUE;
             any_extraction = any_extraction || requires_extraction;
 
             int64_t expected_bytes = file.has_size_bytes() ? file.size_bytes() : 0;
@@ -1361,16 +1382,15 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             }
             std::string checksum = checksum_from_descriptor(file);
             if (request.verify_checksums() && checksum.empty()) {
-                result.add_warnings(
-                    "checksum verification requested but a file checksum is missing");
+                result.add_warnings("checksum verification requested but a file checksum is missing");
             }
             append_planned_file(&result, file, model_folder, model_id, url, expected_bytes,
                                 checksum, requires_extraction, false);
             rav1::DownloadFilePlan* planned = result.mutable_files(result.files_size() - 1);
             if (request.resume_existing()) {
                 int64_t existing_bytes = file_size_or_zero(planned->destination_path());
-                bool candidate =
-                    existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
+                bool candidate = existing_bytes > 0 &&
+                                 (expected_bytes <= 0 || existing_bytes <= expected_bytes);
                 planned->set_is_resume_candidate(candidate);
                 if (request.validate_existing_bytes() && expected_bytes > 0 &&
                     existing_bytes > expected_bytes) {
@@ -1388,9 +1408,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
 
         rac_bool_t needs_extraction = RAC_FALSE;
         char destination[4096];
-        rac_result_t dest_rc =
-            rac_download_compute_destination(model_id.c_str(), url.c_str(), framework, format,
-                                             destination, sizeof(destination), &needs_extraction);
+        rac_result_t dest_rc = rac_download_compute_destination(
+            model_id.c_str(), url.c_str(), framework, format, destination, sizeof(destination),
+            &needs_extraction);
         if (dest_rc != RAC_SUCCESS) {
             result.set_can_start(false);
             result.set_error_message("failed to compute download destination");
@@ -1421,8 +1441,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         result.mutable_files(0)->set_destination_path(destination);
         if (request.resume_existing()) {
             int64_t existing_bytes = file_size_or_zero(result.files(0).destination_path());
-            bool candidate =
-                existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
+            bool candidate = existing_bytes > 0 &&
+                             (expected_bytes <= 0 || existing_bytes <= expected_bytes);
             result.mutable_files(0)->set_is_resume_candidate(candidate);
             if (request.validate_existing_bytes() && expected_bytes > 0 &&
                 existing_bytes > expected_bytes) {
@@ -1471,8 +1491,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     return serialize_proto_to_buffer(result, out_result);
 }
 
-extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, size_t request_size,
-                                                 rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
+                                                  size_t request_size,
+                                                  rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1486,8 +1507,8 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     }
 
     rav1::DownloadStartResult result;
-    std::string model_id =
-        request.model_id().empty() ? request.plan().model_id() : request.model_id();
+    std::string model_id = request.model_id().empty() ? request.plan().model_id()
+                                                      : request.model_id();
     result.set_model_id(model_id);
 
     if (model_id.empty() || !request.has_plan() || request.plan().files_size() == 0 ||
@@ -1506,11 +1527,11 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     task->model_id = model_id;
     task->files = files_from_plan(request.plan());
     task->task_id = "download-proto-" + std::to_string(proto_state().next_task_id.fetch_add(1));
-    task->resume_token =
-        !request.resume_token().empty()
-            ? request.resume_token()
-            : (!request.plan().resume_token().empty() ? request.plan().resume_token()
-                                                      : make_resume_token(task->task_id, model_id));
+    task->resume_token = !request.resume_token().empty()
+                              ? request.resume_token()
+                              : (!request.plan().resume_token().empty()
+                                     ? request.plan().resume_token()
+                                     : make_resume_token(task->task_id, model_id));
 
     // Resolve the canonical per-model folder + archive structure from the
     // registry. The download plan stages archive-bearing files under the
@@ -1549,8 +1570,9 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
 
     if (any_archive && task->framework != RAC_FRAMEWORK_UNKNOWN) {
         char model_folder_buf[4096];
-        if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework, model_folder_buf,
-                                             sizeof(model_folder_buf)) == RAC_SUCCESS) {
+        if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework,
+                                             model_folder_buf, sizeof(model_folder_buf)) ==
+            RAC_SUCCESS) {
             task->model_folder_path = model_folder_buf;
         }
     }
@@ -1596,10 +1618,10 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
 
     task->update_registry_on_completion = request.update_registry_on_completion();
 
-    set_task_progress(
-        task, request.resume() ? rav1::DOWNLOAD_STATE_RESUMING : rav1::DOWNLOAD_STATE_PENDING,
-        rav1::DOWNLOAD_STAGE_DOWNLOADING, resume_from, request.plan().total_bytes(), 0,
-        task->files.front().storage_key, "", "");
+    set_task_progress(task, request.resume() ? rav1::DOWNLOAD_STATE_RESUMING
+                                             : rav1::DOWNLOAD_STATE_PENDING,
+                      rav1::DOWNLOAD_STAGE_DOWNLOADING, resume_from, request.plan().total_bytes(), 0,
+                      task->files.front().storage_key, "", "");
     {
         std::lock_guard<std::mutex> lock(task->mutex);
         task->running = true;
@@ -1625,8 +1647,9 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     return serialize_proto_to_buffer(result, out_result);
 }
 
-extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, size_t request_size,
-                                                  rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes,
+                                                   size_t request_size,
+                                                   rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1694,8 +1717,8 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
             task->last_deleted_bytes = deleted;
             task->last_partial_bytes = preserved_bytes;
         }
-        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                          preserved_bytes, total_bytes, 0,
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
+                          rav1::DOWNLOAD_STAGE_DOWNLOADING, preserved_bytes, total_bytes, 0,
                           task->files.empty() ? "" : task->files.front().storage_key, "",
                           "download cancelled");
         emit_progress(task);
@@ -1708,8 +1731,9 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
     return serialize_proto_to_buffer(result, out_result);
 }
 
-extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, size_t request_size,
-                                                  rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
+                                                   size_t request_size,
+                                                   rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1764,8 +1788,9 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
     }
     int64_t actual_size = 0;
     std::string resume_error;
-    if (!validate_resume_offset(task->files.front(), resume_from, request.validate_partial_bytes(),
-                                &actual_size, &resume_error)) {
+    if (!validate_resume_offset(task->files.front(), resume_from,
+                                request.validate_partial_bytes(), &actual_size,
+                                &resume_error)) {
         result.set_accepted(false);
         result.set_task_id(task->task_id);
         result.set_model_id(task->model_id);
@@ -1791,8 +1816,9 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
         std::lock_guard<std::mutex> lock(task->mutex);
         total_bytes = task->progress.total_bytes();
     }
-    set_task_progress(task, rav1::DOWNLOAD_STATE_RESUMING, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                      resume_from, total_bytes, 0, task->files.front().storage_key, "", "");
+    set_task_progress(task, rav1::DOWNLOAD_STATE_RESUMING,
+                      rav1::DOWNLOAD_STAGE_DOWNLOADING, resume_from, total_bytes, 0,
+                      task->files.front().storage_key, "", "");
     {
         std::lock_guard<std::mutex> lock(task->mutex);
         task->cancel_requested.store(false);
@@ -1820,8 +1846,8 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
 }
 
 extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t* request_bytes,
-                                                         size_t request_size,
-                                                         rac_proto_buffer_t* out_result) {
+                                                          size_t request_size,
+                                                          rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1848,21 +1874,12 @@ extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t* request_
     return serialize_proto_to_buffer(progress, out_result);
 }
 #else
-extern "C" rac_result_t
-rac_download_set_progress_proto_callback(rac_download_proto_progress_callback_fn, void*) {
+extern "C" rac_result_t rac_download_set_progress_proto_callback(
+    rac_download_proto_progress_callback_fn, void*) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
 extern "C" rac_result_t rac_download_plan_proto(const uint8_t*, size_t,
-                                                rac_proto_buffer_t* out_result) {
-    if (out_result) {
-        rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-                                   "protobuf support is not available");
-    }
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-}
-
-extern "C" rac_result_t rac_download_start_proto(const uint8_t*, size_t,
                                                  rac_proto_buffer_t* out_result) {
     if (out_result) {
         rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -1871,8 +1888,17 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t*, size_t,
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
-extern "C" rac_result_t rac_download_cancel_proto(const uint8_t*, size_t,
+extern "C" rac_result_t rac_download_start_proto(const uint8_t*, size_t,
                                                   rac_proto_buffer_t* out_result) {
+    if (out_result) {
+        rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                   "protobuf support is not available");
+    }
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+extern "C" rac_result_t rac_download_cancel_proto(const uint8_t*, size_t,
+                                                   rac_proto_buffer_t* out_result) {
     if (out_result) {
         rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                    "protobuf support is not available");
@@ -1881,7 +1907,7 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t*, size_t,
 }
 
 extern "C" rac_result_t rac_download_resume_proto(const uint8_t*, size_t,
-                                                  rac_proto_buffer_t* out_result) {
+                                                   rac_proto_buffer_t* out_result) {
     if (out_result) {
         rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                    "protobuf support is not available");
@@ -1890,7 +1916,7 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t*, size_t,
 }
 
 extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t*, size_t,
-                                                         rac_proto_buffer_t* out_result) {
+                                                          rac_proto_buffer_t* out_result) {
     if (out_result) {
         rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                    "protobuf support is not available");
@@ -2006,8 +2032,8 @@ rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle, c
         dl_req.expected_sha256_hex = nullptr;
 
         int32_t http_status = 0;
-        rac_http_download_status_t status =
-            rac::http::execute_stream(dl_req, orchestrate_http_progress, holder, &http_status);
+        rac_http_download_status_t status = rac::http::execute_stream(
+            dl_req, orchestrate_http_progress, holder, &http_status);
 
         // Map the download status back to rac_result_t for the existing
         // completion-callback signature. Anything non-OK maps to a download

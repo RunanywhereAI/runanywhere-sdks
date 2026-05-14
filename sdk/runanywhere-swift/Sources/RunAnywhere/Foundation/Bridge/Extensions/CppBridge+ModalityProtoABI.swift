@@ -425,3 +425,4 @@ extension CppBridge {
     /// `Generated/ModalityProtoABI+Generated.swift`.
     public enum EmbeddingsProto {}
 }
+

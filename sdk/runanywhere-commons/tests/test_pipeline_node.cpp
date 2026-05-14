@@ -32,8 +32,8 @@
 #include "rac/graph/stream_edge.hpp"
 
 using rac::graph::CancelToken;
-using rac::graph::make_primitive_node;
 using rac::graph::MemoryPool;
+using rac::graph::make_primitive_node;
 using rac::graph::MergeNode;
 using rac::graph::SplitNode;
 using rac::graph::StreamEdge;
@@ -41,26 +41,26 @@ using rac::graph::StreamEdge;
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define CHECK(cond)                                                               \
-    do {                                                                          \
-        if (!(cond)) {                                                            \
+#define CHECK(cond)                                                            \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                           \
-            return;                                                               \
-        }                                                                         \
+            g_failed++;                                                        \
+            return;                                                            \
+        }                                                                      \
     } while (0)
 
-#define TEST(name)                                      \
-    static void test_##name();                          \
-    static void run_test_##name() {                     \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
-        int before_failed = g_failed;                   \
-        test_##name();                                  \
-        if (g_failed == before_failed) {                \
-            std::fprintf(stderr, "[  OK] %s\n", #name); \
-            g_passed++;                                 \
-        }                                               \
-    }                                                   \
+#define TEST(name)                                                             \
+    static void test_##name();                                                 \
+    static void run_test_##name() {                                            \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
+        int before_failed = g_failed;                                          \
+        test_##name();                                                         \
+        if (g_failed == before_failed) {                                       \
+            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
+            g_passed++;                                                        \
+        }                                                                      \
+    }                                                                          \
     static void test_##name()
 
 // ---------------------------------------------------------------------------
@@ -72,14 +72,14 @@ static int g_passed = 0;
 
 TEST(linear_pipeline) {
     auto doubler = make_primitive_node<int, int>(
-        "doubler", [](int in, StreamEdge<int>& out) { out.push(in * 2); });
+        "doubler",
+        [](int in, StreamEdge<int>& out) { out.push(in * 2); });
     doubler->start(nullptr);
 
     const int N = 100;
     std::thread producer([&] {
         auto input = doubler->input();
-        for (int i = 0; i < N; ++i)
-            input->push(i);
+        for (int i = 0; i < N; ++i) input->push(i);
         input->close();
     });
 
@@ -96,8 +96,7 @@ TEST(linear_pipeline) {
     consumer.join();
 
     CHECK(static_cast<int>(received.size()) == N);
-    for (int i = 0; i < N; ++i)
-        CHECK(received[i] == i * 2);
+    for (int i = 0; i < N; ++i) CHECK(received[i] == i * 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,10 +115,10 @@ TEST(primitive_with_pool) {
     auto pool = MemoryPool<Frame>::create(/*capacity=*/4);
 
     auto node = make_primitive_node<int, std::shared_ptr<Frame>>(
-        "pool_emitter", [pool](int seq, StreamEdge<std::shared_ptr<Frame>>& out) {
+        "pool_emitter",
+        [pool](int seq, StreamEdge<std::shared_ptr<Frame>>& out) {
             auto handle = pool->acquire();
-            if (!handle)
-                return;
+            if (!handle) return;
             handle->seq = seq;
             out.push(std::move(handle));
         });
@@ -128,8 +127,7 @@ TEST(primitive_with_pool) {
     const int N = 20;
     std::thread producer([&] {
         auto input = node->input();
-        for (int i = 0; i < N; ++i)
-            input->push(i);
+        for (int i = 0; i < N; ++i) input->push(i);
         input->close();
     });
 
@@ -166,8 +164,7 @@ TEST(split_fanout) {
     const int N = 32;
     std::thread producer([&] {
         auto in = split.input();
-        for (int i = 0; i < N; ++i)
-            in->push(i);
+        for (int i = 0; i < N; ++i) in->push(i);
         in->close();
     });
 
@@ -184,13 +181,11 @@ TEST(split_fanout) {
 
     producer.join();
     split.join();
-    for (auto& c : consumers)
-        c.join();
+    for (auto& c : consumers) c.join();
 
     for (size_t k = 0; k < N_OUTS; ++k) {
         CHECK(static_cast<int>(per_output[k].size()) == N);
-        for (int i = 0; i < N; ++i)
-            CHECK(per_output[k][i] == i);
+        for (int i = 0; i < N; ++i) CHECK(per_output[k][i] == i);
     }
 }
 
@@ -224,12 +219,12 @@ TEST(merge_fanin) {
         }
     });
 
-    for (auto& p : producers)
-        p.join();
+    for (auto& p : producers) p.join();
     merge.join();
     consumer.join();
 
-    CHECK(static_cast<int>(received.size()) == static_cast<int>(N_INS) * per_producer);
+    CHECK(static_cast<int>(received.size())
+          == static_cast<int>(N_INS) * per_producer);
     // Count per source stream to confirm no drops/dupes.
     std::vector<int> count(N_INS, 0);
     for (int v : received) {
@@ -237,8 +232,7 @@ TEST(merge_fanin) {
         CHECK(src >= 0 && src < static_cast<int>(N_INS));
         count[src]++;
     }
-    for (size_t k = 0; k < N_INS; ++k)
-        CHECK(count[k] == per_producer);
+    for (size_t k = 0; k < N_INS; ++k) CHECK(count[k] == per_producer);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,8 +260,7 @@ TEST(cancel_mid_stream) {
     std::thread producer([&] {
         auto in = node->input();
         for (int i = 0; i < 10000; ++i) {
-            if (!in->push(i, parent_cancel.get()))
-                break;
+            if (!in->push(i, parent_cancel.get())) break;
             pushed.fetch_add(1);
         }
     });
@@ -275,9 +268,7 @@ TEST(cancel_mid_stream) {
     // Sink that discards output so the slow node can progress until cancel.
     std::thread drain([&] {
         auto out = node->output();
-        while (auto x = out->pop()) {
-            (void)x;
-        }
+        while (auto x = out->pop()) { (void)x; }
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(40));
@@ -301,15 +292,16 @@ TEST(cancel_mid_stream) {
 // ---------------------------------------------------------------------------
 
 TEST(idempotent_start_stop) {
-    auto node = make_primitive_node<int, int>("identity",
-                                              [](int in, StreamEdge<int>& out) { out.push(in); });
+    auto node = make_primitive_node<int, int>(
+        "identity",
+        [](int in, StreamEdge<int>& out) { out.push(in); });
 
     node->start(nullptr);
     node->start(nullptr);  // second call is a no-op — must not spawn a 2nd thread
     node->stop();
-    node->stop();  // repeated stop is a no-op
+    node->stop();          // repeated stop is a no-op
     node->join();
-    node->join();  // join after join is fine
+    node->join();          // join after join is fine
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +316,7 @@ int main() {
     run_test_cancel_mid_stream();
     run_test_idempotent_start_stop();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
+    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
+                 g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }
