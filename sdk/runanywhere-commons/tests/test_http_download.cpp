@@ -13,19 +13,19 @@
  *   - checksum mismatch → CHECKSUM_FAILED
  */
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
 #include <atomic>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <netinet/in.h>
 #include <sstream>
 #include <string>
+#include <sys/socket.h>
 #include <thread>
 #include <vector>
 
@@ -43,7 +43,8 @@ uint16_t g_port = 0;
 
 std::vector<uint8_t> make_payload(size_t n) {
     std::vector<uint8_t> p(n);
-    for (size_t i = 0; i < n; ++i) p[i] = static_cast<uint8_t>((i * 7) & 0xff);
+    for (size_t i = 0; i < n; ++i)
+        p[i] = static_cast<uint8_t>((i * 7) & 0xff);
     return p;
 }
 // 512 KiB gives the test transport enough chunks for cancel / resume
@@ -83,15 +84,16 @@ rac_bool_t no_adapter_chunk(const uint8_t*, size_t, uint64_t, uint64_t, void*) {
 }
 
 rac_result_t test_transport_send(void*, const rac_http_request_t*, rac_http_response_t* out_resp) {
-    if (!out_resp) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_resp)
+        return RAC_ERROR_INVALID_ARGUMENT;
     out_resp->status = 200;
     return RAC_SUCCESS;
 }
 
-rac_result_t test_transport_stream(void*, const rac_http_request_t* req,
-                                   rac_http_body_chunk_fn cb, void* cb_user_data,
-                                   rac_http_response_t* out_resp_meta) {
-    if (!req || !req->url || !cb || !out_resp_meta) return RAC_ERROR_INVALID_ARGUMENT;
+rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_http_body_chunk_fn cb,
+                                   void* cb_user_data, rac_http_response_t* out_resp_meta) {
+    if (!req || !req->url || !cb || !out_resp_meta)
+        return RAC_ERROR_INVALID_ARGUMENT;
     std::string path = path_from_url(req->url);
     if (path == "/payload") {
         out_resp_meta->status = 200;
@@ -111,7 +113,8 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req,
 rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_t resume_from_byte,
                                    rac_http_body_chunk_fn cb, void* cb_user_data,
                                    rac_http_response_t* out_resp_meta) {
-    if (!req || !req->url || !cb || !out_resp_meta) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!req || !req->url || !cb || !out_resp_meta)
+        return RAC_ERROR_INVALID_ARGUMENT;
     std::string path = path_from_url(req->url);
     if (path != "/payload") {
         out_resp_meta->status = 404;
@@ -124,18 +127,15 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
 }
 
 const rac_http_transport_ops_t g_test_transport_ops = {
-    test_transport_send,
-    test_transport_stream,
-    test_transport_resume,
-    nullptr,
-    nullptr,
+    test_transport_send, test_transport_stream, test_transport_resume, nullptr, nullptr,
 };
 
 void write_all(int fd, const void* buf, size_t n) {
     const char* p = static_cast<const char*>(buf);
     while (n > 0) {
         ssize_t w = ::send(fd, p, n, 0);
-        if (w <= 0) return;
+        if (w <= 0)
+            return;
         p += w;
         n -= static_cast<size_t>(w);
     }
@@ -146,9 +146,11 @@ void handle_client(int c) {
     std::string raw;
     while (true) {
         ssize_t n = ::recv(c, buf, sizeof(buf), 0);
-        if (n <= 0) break;
+        if (n <= 0)
+            break;
         raw.append(buf, buf + n);
-        if (raw.find("\r\n\r\n") != std::string::npos) break;
+        if (raw.find("\r\n\r\n") != std::string::npos)
+            break;
     }
     // Parse request line + Range.
     std::string method, path, range;
@@ -162,7 +164,8 @@ void handle_client(int c) {
             auto eolr = raw.find("\r\n", rpos);
             std::string line = raw.substr(rpos, eolr - rpos);
             auto bpos = line.find("bytes=");
-            if (bpos != std::string::npos) range = line.substr(bpos + 6);
+            if (bpos != std::string::npos)
+                range = line.substr(bpos + 6);
         }
     }
 
@@ -219,7 +222,8 @@ void loop(int fd) {
         socklen_t len = sizeof(cli);
         int c = ::accept(fd, reinterpret_cast<sockaddr*>(&cli), &len);
         if (c < 0) {
-            if (g_running) continue;
+            if (g_running)
+                continue;
             break;
         }
         handle_client(c);
@@ -228,7 +232,8 @@ void loop(int fd) {
 
 bool start() {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) return false;
+    if (fd < 0)
+        return false;
     int one = 1;
     ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
     sockaddr_in addr{};
@@ -282,7 +287,9 @@ static const uint32_t K[64] = {
     0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-inline uint32_t rr(uint32_t x, uint32_t n) { return (x >> n) | (x << (32 - n)); }
+inline uint32_t rr(uint32_t x, uint32_t n) {
+    return (x >> n) | (x << (32 - n));
+}
 void tr(ctx* c, const uint8_t* d) {
     uint32_t w[64];
     for (int i = 0; i < 16; ++i)
@@ -372,19 +379,20 @@ std::string hash(const uint8_t* data, size_t len) {
 
 int passes = 0, failures = 0;
 
-#define T_CHECK(cond)                                                                  \
-    do {                                                                               \
-        if (cond) {                                                                    \
-            ++passes;                                                                  \
-        } else {                                                                       \
-            ++failures;                                                                \
-            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__       \
-                      << " — " #cond << "\n";                                          \
-        }                                                                              \
+#define T_CHECK(cond)                                                                           \
+    do {                                                                                        \
+        if (cond) {                                                                             \
+            ++passes;                                                                           \
+        } else {                                                                                \
+            ++failures;                                                                         \
+            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__ << " — " #cond \
+                      << "\n";                                                                  \
+        }                                                                                       \
     } while (0)
 
 fs::path tmp_file(const std::string& name) {
-    fs::path p = fs::temp_directory_path() / ("rac_http_dl_" + std::to_string(::getpid()) + "_" + name);
+    fs::path p =
+        fs::temp_directory_path() / ("rac_http_dl_" + std::to_string(::getpid()) + "_" + name);
     fs::remove(p);
     return p;
 }

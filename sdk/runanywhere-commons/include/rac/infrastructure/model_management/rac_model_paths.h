@@ -235,9 +235,10 @@ typedef struct rac_model_path_resolution {
  *         checksum mismatch; RAC_ERROR_NOT_FOUND when no primary model can be
  *         selected.
  */
-RAC_API rac_result_t rac_model_paths_resolve_artifact(
-    const rac_model_info_t* model_info, const char* artifact_root,
-    const char* expected_primary_sha256, rac_model_path_resolution_t* out_resolution);
+RAC_API rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info,
+                                                      const char* artifact_root,
+                                                      const char* expected_primary_sha256,
+                                                      rac_model_path_resolution_t* out_resolution);
 
 /**
  * @brief Release memory owned by a model path resolution result.

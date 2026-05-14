@@ -53,13 +53,12 @@ extern "C" {
  * Thread-safe. The first call also triggers HardwareProfile::detect();
  * subsequent calls reuse the memoized profile.
  */
-RAC_API rac_result_t rac_plugin_route(rac_primitive_t              primitive,
-                                      uint32_t                     format,
-                                      const rac_routing_hints_t*   hints,
-                                      const rac_engine_vtable_t**  out_vtable);
+RAC_API rac_result_t rac_plugin_route(rac_primitive_t primitive, uint32_t format,
+                                      const rac_routing_hints_t* hints,
+                                      const rac_engine_vtable_t** out_vtable);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  /* RAC_ROUTER_ROUTE_H */
+#endif /* RAC_ROUTER_ROUTE_H */

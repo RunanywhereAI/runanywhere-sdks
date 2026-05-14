@@ -3,12 +3,10 @@
  * @brief Canonical model lifecycle C ABI over generated proto bytes.
  */
 
-#include "rac/core/rac_model_lifecycle.h"
-
-#include <chrono>
-#include <cstdint>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <functional>
@@ -21,11 +19,12 @@
 #include <utility>
 #include <vector>
 
-#include "rac/features/diffusion/rac_diffusion_service.h"
-#include "rac/features/embeddings/rac_embeddings_service.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "rac/core/rac_model_lifecycle.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -47,14 +46,12 @@ namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-using runanywhere::v1::ComponentLifecycleEvent;
 using runanywhere::v1::ComponentLifecycleSnapshot;
 using runanywhere::v1::ComponentLifecycleState;
 using runanywhere::v1::CurrentModelRequest;
 using runanywhere::v1::CurrentModelResult;
-using runanywhere::v1::EventCategory;
-using runanywhere::v1::EventDestination;
 using runanywhere::v1::ErrorSeverity;
+using runanywhere::v1::EventCategory;
 using runanywhere::v1::InferenceFramework;
 using runanywhere::v1::ModelCategory;
 using runanywhere::v1::ModelFileDescriptor;
@@ -63,7 +60,6 @@ using runanywhere::v1::ModelFormat;
 using runanywhere::v1::ModelInfo;
 using runanywhere::v1::ModelLoadRequest;
 using runanywhere::v1::ModelLoadResult;
-using runanywhere::v1::ModelRegistryEventKind;
 using runanywhere::v1::ModelUnloadRequest;
 using runanywhere::v1::ModelUnloadResult;
 using runanywhere::v1::SDKComponent;
@@ -71,8 +67,7 @@ using runanywhere::v1::SDKEvent;
 
 struct LoadedModel {
     SDKComponent component{runanywhere::v1::SDK_COMPONENT_UNSPECIFIED};
-    ComponentLifecycleState state{
-        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED};
+    ComponentLifecycleState state{runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED};
     std::string model_id;
     std::string resolved_path;
     std::string mmproj_path;
@@ -111,21 +106,18 @@ std::string generate_event_id() {
     static std::atomic<uint64_t> counter{0};
     const uint64_t c = counter.fetch_add(1);
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%lld-%llu",
-                  static_cast<long long>(now_ms()),
+    std::snprintf(buffer, sizeof(buffer), "%lld-%llu", static_cast<long long>(now_ms()),
                   static_cast<unsigned long long>(c));
     return buffer;
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize proto result");
     }
@@ -155,8 +147,7 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
@@ -168,9 +159,7 @@ rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
     return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
 }
 
-void populate_event_envelope(SDKEvent* event,
-                             EventCategory category,
-                             ErrorSeverity severity,
+void populate_event_envelope(SDKEvent* event, EventCategory category, ErrorSeverity severity,
                              SDKComponent component) {
     event->set_id(generate_event_id());
     event->set_timestamp_ms(now_ms());
@@ -184,20 +173,16 @@ void populate_event_envelope(SDKEvent* event,
 rac_result_t publish_event(const SDKEvent& event) {
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return RAC_ERROR_ENCODING_ERROR;
     }
     return rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
 }
 
-void publish_component_event(SDKComponent component,
-                             ComponentLifecycleState previous,
-                             ComponentLifecycleState current,
-                             const std::string& model_id,
+void publish_component_event(SDKComponent component, ComponentLifecycleState previous,
+                             ComponentLifecycleState current, const std::string& model_id,
                              const ModelLoadResult* load_result,
-                             const ModelUnloadResult* unload_result,
-                             const char* error_message) {
+                             const ModelUnloadResult* unload_result, const char* error_message) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_COMPONENT,
                             error_message && error_message[0]
@@ -232,8 +217,7 @@ void publish_current_model_event(const CurrentModelResult& result, SDKComponent 
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_MODEL,
                             runanywhere::v1::ERROR_SEVERITY_INFO, component);
     auto* registry = event.mutable_model_registry();
-    registry->set_kind(
-        runanywhere::v1::MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED);
+    registry->set_kind(runanywhere::v1::MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED);
     registry->set_model_id(result.model_id());
     registry->set_assigned_component(component);
     registry->mutable_current_model_result()->CopyFrom(result);
@@ -284,8 +268,7 @@ rac_primitive_t primitive_for_component(SDKComponent component) {
     }
 }
 
-const char* framework_to_plugin_name(InferenceFramework framework,
-                                     rac_primitive_t primitive) {
+const char* framework_to_plugin_name(InferenceFramework framework, rac_primitive_t primitive) {
     switch (framework) {
         case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
             if (primitive == RAC_PRIMITIVE_VLM) {
@@ -293,8 +276,7 @@ const char* framework_to_plugin_name(InferenceFramework framework,
             }
             return "llamacpp";
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
-            if (primitive == RAC_PRIMITIVE_DETECT_VOICE ||
-                primitive == RAC_PRIMITIVE_TRANSCRIBE ||
+            if (primitive == RAC_PRIMITIVE_DETECT_VOICE || primitive == RAC_PRIMITIVE_TRANSCRIBE ||
                 primitive == RAC_PRIMITIVE_SYNTHESIZE) {
                 return "sherpa";
             }
@@ -344,9 +326,8 @@ rac_model_category_t c_category_from_proto(ModelCategory category) {
 
 rac_model_format_t c_format_from_proto(ModelFormat format) {
     const int value = static_cast<int>(format);
-    return runanywhere::v1::ModelFormat_IsValid(value)
-               ? static_cast<rac_model_format_t>(value)
-               : RAC_MODEL_FORMAT_UNKNOWN;
+    return runanywhere::v1::ModelFormat_IsValid(value) ? static_cast<rac_model_format_t>(value)
+                                                       : RAC_MODEL_FORMAT_UNKNOWN;
 }
 
 rac_inference_framework_t c_framework_from_proto(InferenceFramework framework) {
@@ -506,7 +487,7 @@ struct ProtoModelPathBridge {
         populate_artifact_kind(proto);
     }
 
-private:
+   private:
     void add_pattern(std::vector<std::string>* storage, const std::string& pattern) {
         if (!storage || pattern.empty()) {
             return;
@@ -569,14 +550,12 @@ private:
     }
 
     void add_descriptor(const ModelFileDescriptor& file) {
-        std::string relative =
-            file.has_relative_path() && !file.relative_path().empty()
-                ? file.relative_path()
-                : (!file.url().empty() ? file.url() : file.filename());
-        std::string destination =
-            file.has_destination_path() && !file.destination_path().empty()
-                ? file.destination_path()
-                : file.filename();
+        std::string relative = file.has_relative_path() && !file.relative_path().empty()
+                                   ? file.relative_path()
+                                   : (!file.url().empty() ? file.url() : file.filename());
+        std::string destination = file.has_destination_path() && !file.destination_path().empty()
+                                      ? file.destination_path()
+                                      : file.filename();
         if (relative.empty()) {
             relative = destination;
         }
@@ -615,14 +594,12 @@ private:
             }
         }
         for (size_t i = 0; i < descriptors.size(); ++i) {
-            descriptors[i].relative_path =
-                descriptor_relative_paths[i].empty()
-                    ? nullptr
-                    : descriptor_relative_paths[i].c_str();
-            descriptors[i].destination_path =
-                descriptor_destination_paths[i].empty()
-                    ? nullptr
-                    : descriptor_destination_paths[i].c_str();
+            descriptors[i].relative_path = descriptor_relative_paths[i].empty()
+                                               ? nullptr
+                                               : descriptor_relative_paths[i].c_str();
+            descriptors[i].destination_path = descriptor_destination_paths[i].empty()
+                                                  ? nullptr
+                                                  : descriptor_destination_paths[i].c_str();
         }
         if (!descriptors.empty()) {
             artifact.file_descriptors = descriptors.data();
@@ -687,10 +664,9 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
 
     ProtoModelPathBridge bridge(model);
     rac_model_path_resolution_t resolution = {};
-    const char* checksum =
-        model.has_checksum_sha256() && !model.checksum_sha256().empty()
-            ? model.checksum_sha256().c_str()
-            : nullptr;
+    const char* checksum = model.has_checksum_sha256() && !model.checksum_sha256().empty()
+                               ? model.checksum_sha256().c_str()
+                               : nullptr;
     const rac_result_t rc = rac_model_paths_resolve_artifact(
         &bridge.model, out.resolved_path.c_str(), checksum, &resolution);
     if ((rc == RAC_SUCCESS || resolution.primary_model_path || resolution.file_count > 0) &&
@@ -718,20 +694,16 @@ InferenceFramework preferred_framework_for(const ModelLoadRequest& request,
     return model.framework();
 }
 
-ModelCategory preferred_category_for(const ModelLoadRequest& request,
-                                     const ModelInfo& model) {
+ModelCategory preferred_category_for(const ModelLoadRequest& request, const ModelInfo& model) {
     if (request.has_category()) {
         return request.category();
     }
     return model.category();
 }
 
-rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
-                                 rac_primitive_t primitive,
-                                 const std::string& resolved_path,
-                                 const std::string& mmproj_path,
-                                 void** out_impl,
-                                 std::function<void()>* out_destroy) {
+rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t primitive,
+                                 const std::string& resolved_path, const std::string& mmproj_path,
+                                 void** out_impl, std::function<void()>* out_destroy) {
     if (!vt || !out_impl || !out_destroy) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -743,7 +715,8 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
 
     switch (primitive) {
         case RAC_PRIMITIVE_GENERATE_TEXT:
-            if (!vt->llm_ops || !vt->llm_ops->create) return RAC_ERROR_BACKEND_NOT_FOUND;
+            if (!vt->llm_ops || !vt->llm_ops->create)
+                return RAC_ERROR_BACKEND_NOT_FOUND;
             rc = vt->llm_ops->create(resolved_path.c_str(), nullptr, &impl);
             if (rc == RAC_SUCCESS && impl && vt->llm_ops->initialize) {
                 rc = vt->llm_ops->initialize(impl, resolved_path.c_str());
@@ -751,13 +724,16 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->llm_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
         case RAC_PRIMITIVE_TRANSCRIBE:
-            if (!vt->stt_ops || !vt->stt_ops->create) return RAC_ERROR_BACKEND_NOT_FOUND;
+            if (!vt->stt_ops || !vt->stt_ops->create)
+                return RAC_ERROR_BACKEND_NOT_FOUND;
             rc = vt->stt_ops->create(resolved_path.c_str(), nullptr, &impl);
             if (rc == RAC_SUCCESS && impl && vt->stt_ops->initialize) {
                 rc = vt->stt_ops->initialize(impl, resolved_path.c_str());
@@ -765,13 +741,16 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->stt_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
         case RAC_PRIMITIVE_SYNTHESIZE:
-            if (!vt->tts_ops || !vt->tts_ops->create) return RAC_ERROR_BACKEND_NOT_FOUND;
+            if (!vt->tts_ops || !vt->tts_ops->create)
+                return RAC_ERROR_BACKEND_NOT_FOUND;
             rc = vt->tts_ops->create(resolved_path.c_str(), nullptr, &impl);
             if (rc == RAC_SUCCESS && impl && vt->tts_ops->initialize) {
                 rc = vt->tts_ops->initialize(impl);
@@ -779,13 +758,16 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->tts_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
         case RAC_PRIMITIVE_DETECT_VOICE:
-            if (!vt->vad_ops || !vt->vad_ops->create) return RAC_ERROR_BACKEND_NOT_FOUND;
+            if (!vt->vad_ops || !vt->vad_ops->create)
+                return RAC_ERROR_BACKEND_NOT_FOUND;
             rc = vt->vad_ops->create(resolved_path.c_str(), nullptr, &impl);
             if (rc == RAC_SUCCESS && impl && vt->vad_ops->initialize) {
                 rc = vt->vad_ops->initialize(impl, resolved_path.c_str());
@@ -793,7 +775,8 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->vad_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
@@ -808,29 +791,33 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->embedding_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
         case RAC_PRIMITIVE_VLM:
-            if (!vt->vlm_ops || !vt->vlm_ops->create) return RAC_ERROR_BACKEND_NOT_FOUND;
+            if (!vt->vlm_ops || !vt->vlm_ops->create)
+                return RAC_ERROR_BACKEND_NOT_FOUND;
             {
                 const std::string config_json = vlm_config_json(mmproj_path);
-                rc = vt->vlm_ops->create(
-                    resolved_path.c_str(),
-                    config_json.empty() ? nullptr : config_json.c_str(), &impl);
+                rc =
+                    vt->vlm_ops->create(resolved_path.c_str(),
+                                        config_json.empty() ? nullptr : config_json.c_str(), &impl);
             }
             if (rc == RAC_SUCCESS && impl && vt->vlm_ops->initialize) {
-                rc = vt->vlm_ops->initialize(
-                    impl, resolved_path.c_str(),
-                    mmproj_path.empty() ? nullptr : mmproj_path.c_str());
+                rc = vt->vlm_ops->initialize(impl, resolved_path.c_str(),
+                                             mmproj_path.empty() ? nullptr : mmproj_path.c_str());
             }
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->vlm_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
@@ -845,8 +832,10 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
             if (rc == RAC_SUCCESS && impl) {
                 auto* ops = vt->diffusion_ops;
                 *out_destroy = [ops, impl]() {
-                    if (ops->cleanup) (void)ops->cleanup(impl);
-                    if (ops->destroy) ops->destroy(impl);
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
                 };
             }
             break;
@@ -858,16 +847,20 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
         if (impl) {
             switch (primitive) {
                 case RAC_PRIMITIVE_GENERATE_TEXT:
-                    if (vt->llm_ops && vt->llm_ops->destroy) vt->llm_ops->destroy(impl);
+                    if (vt->llm_ops && vt->llm_ops->destroy)
+                        vt->llm_ops->destroy(impl);
                     break;
                 case RAC_PRIMITIVE_TRANSCRIBE:
-                    if (vt->stt_ops && vt->stt_ops->destroy) vt->stt_ops->destroy(impl);
+                    if (vt->stt_ops && vt->stt_ops->destroy)
+                        vt->stt_ops->destroy(impl);
                     break;
                 case RAC_PRIMITIVE_SYNTHESIZE:
-                    if (vt->tts_ops && vt->tts_ops->destroy) vt->tts_ops->destroy(impl);
+                    if (vt->tts_ops && vt->tts_ops->destroy)
+                        vt->tts_ops->destroy(impl);
                     break;
                 case RAC_PRIMITIVE_DETECT_VOICE:
-                    if (vt->vad_ops && vt->vad_ops->destroy) vt->vad_ops->destroy(impl);
+                    if (vt->vad_ops && vt->vad_ops->destroy)
+                        vt->vad_ops->destroy(impl);
                     break;
                 case RAC_PRIMITIVE_EMBED:
                     if (vt->embedding_ops && vt->embedding_ops->destroy) {
@@ -875,7 +868,8 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
                     }
                     break;
                 case RAC_PRIMITIVE_VLM:
-                    if (vt->vlm_ops && vt->vlm_ops->destroy) vt->vlm_ops->destroy(impl);
+                    if (vt->vlm_ops && vt->vlm_ops->destroy)
+                        vt->vlm_ops->destroy(impl);
                     break;
                 case RAC_PRIMITIVE_DIFFUSION:
                     if (vt->diffusion_ops && vt->diffusion_ops->destroy) {
@@ -897,14 +891,10 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt,
     return RAC_SUCCESS;
 }
 
-ModelLoadResult make_load_result(bool success,
-                                 const std::string& model_id,
-                                 ModelCategory category,
-                                 InferenceFramework framework,
-                                 const std::string& resolved_path,
+ModelLoadResult make_load_result(bool success, const std::string& model_id, ModelCategory category,
+                                 InferenceFramework framework, const std::string& resolved_path,
                                  const std::vector<ModelFileDescriptor>& artifacts,
-                                 int64_t loaded_at_ms,
-                                 const std::string& error) {
+                                 int64_t loaded_at_ms, const std::string& error) {
     ModelLoadResult result;
     result.set_success(success);
     result.set_model_id(model_id);
@@ -917,11 +907,8 @@ ModelLoadResult make_load_result(bool success,
     return result;
 }
 
-bool matches_current_filter(const LoadedModel& loaded,
-                            bool has_category,
-                            ModelCategory category,
-                            bool has_framework,
-                            InferenceFramework framework) {
+bool matches_current_filter(const LoadedModel& loaded, bool has_category, ModelCategory category,
+                            bool has_framework, InferenceFramework framework) {
     if (has_category && loaded.category != category) {
         return false;
     }
@@ -931,8 +918,7 @@ bool matches_current_filter(const LoadedModel& loaded,
     return loaded.state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
 }
 
-void fill_snapshot(const LoadedModel* loaded,
-                   SDKComponent component,
+void fill_snapshot(const LoadedModel* loaded, SDKComponent component,
                    ComponentLifecycleSnapshot* out) {
     out->set_component(component);
     out->set_updated_at_ms(now_ms());
@@ -1152,9 +1138,8 @@ namespace rac::lifecycle {
 
 #if defined(RAC_HAVE_PROTOBUF)
 template <typename Ref, typename OpsPtr>
-rac_result_t acquire_component(runanywhere::v1::SDKComponent component,
-                               Ref* out_ref,
-                               OpsPtr LoadedModel::*ops_field) {
+rac_result_t acquire_component(runanywhere::v1::SDKComponent component, Ref* out_ref,
+                               OpsPtr LoadedModel::* ops_field) {
     if (!out_ref) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -1203,11 +1188,11 @@ void release_component(Ref* ref) {
 
 rac_result_t acquire_lifecycle_stt(LifecycleSttRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref) *out_ref = {};
+    if (out_ref)
+        *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
-    return acquire_component(runanywhere::v1::SDK_COMPONENT_STT, out_ref,
-                             &LoadedModel::stt_ops);
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_STT, out_ref, &LoadedModel::stt_ops);
 #endif
 }
 
@@ -1215,17 +1200,18 @@ void release_lifecycle_stt(LifecycleSttRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else
-    if (ref) *ref = {};
+    if (ref)
+        *ref = {};
 #endif
 }
 
 rac_result_t acquire_lifecycle_tts(LifecycleTtsRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref) *out_ref = {};
+    if (out_ref)
+        *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
-    return acquire_component(runanywhere::v1::SDK_COMPONENT_TTS, out_ref,
-                             &LoadedModel::tts_ops);
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_TTS, out_ref, &LoadedModel::tts_ops);
 #endif
 }
 
@@ -1233,17 +1219,18 @@ void release_lifecycle_tts(LifecycleTtsRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else
-    if (ref) *ref = {};
+    if (ref)
+        *ref = {};
 #endif
 }
 
 rac_result_t acquire_lifecycle_vad(LifecycleVadRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref) *out_ref = {};
+    if (out_ref)
+        *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
-    return acquire_component(runanywhere::v1::SDK_COMPONENT_VAD, out_ref,
-                             &LoadedModel::vad_ops);
+    return acquire_component(runanywhere::v1::SDK_COMPONENT_VAD, out_ref, &LoadedModel::vad_ops);
 #endif
 }
 
@@ -1251,13 +1238,15 @@ void release_lifecycle_vad(LifecycleVadRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else
-    if (ref) *ref = {};
+    if (ref)
+        *ref = {};
 #endif
 }
 
 rac_result_t acquire_lifecycle_embeddings(LifecycleEmbeddingsRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref) *out_ref = {};
+    if (out_ref)
+        *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
     return acquire_component(runanywhere::v1::SDK_COMPONENT_EMBEDDINGS, out_ref,
@@ -1269,13 +1258,15 @@ void release_lifecycle_embeddings(LifecycleEmbeddingsRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else
-    if (ref) *ref = {};
+    if (ref)
+        *ref = {};
 #endif
 }
 
 rac_result_t acquire_lifecycle_diffusion(LifecycleDiffusionRef* out_ref) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    if (out_ref) *out_ref = {};
+    if (out_ref)
+        *out_ref = {};
     return out_ref ? RAC_ERROR_FEATURE_NOT_AVAILABLE : RAC_ERROR_NULL_POINTER;
 #else
     return acquire_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION, out_ref,
@@ -1287,7 +1278,8 @@ void release_lifecycle_diffusion(LifecycleDiffusionRef* ref) {
 #if defined(RAC_HAVE_PROTOBUF)
     release_component(ref);
 #else
-    if (ref) *ref = {};
+    if (ref)
+        *ref = {};
 #endif
 }
 
@@ -1328,9 +1320,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
 
     uint8_t* model_bytes = nullptr;
     size_t model_size = 0;
-    rac_result_t rc =
-        rac_model_registry_get_proto(registry, request.model_id().c_str(), &model_bytes,
-                                     &model_size);
+    rac_result_t rc = rac_model_registry_get_proto(registry, request.model_id().c_str(),
+                                                   &model_bytes, &model_size);
     if (rc != RAC_SUCCESS) {
         ModelLoadResult result = make_load_result(
             false, request.model_id(),
@@ -1348,8 +1339,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     }
 
     ModelInfo model;
-    const bool parsed_model =
-        model.ParseFromArray(model_bytes, static_cast<int>(model_size));
+    const bool parsed_model = model.ParseFromArray(model_bytes, static_cast<int>(model_size));
     rac_model_registry_proto_free(model_bytes);
     if (!parsed_model) {
         return parse_error(out_result, "failed to parse registered ModelInfo");
@@ -1368,8 +1358,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             make_load_result(false, request.model_id(), category, framework, resolved_path,
                              artifact_resolution.artifacts, 0,
                              "model category is not supported by lifecycle routing");
-        publish_component_event(component,
-                                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+        publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                 request.model_id(), &result, nullptr,
                                 result.error_message().c_str());
@@ -1382,18 +1371,16 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         if (existing != g_loaded.end() && !request.force_reload() &&
             existing->second->model_id == request.model_id() &&
             existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
-            ModelLoadResult result =
-                make_load_result(true, existing->second->model_id, existing->second->category,
-                                 existing->second->framework, existing->second->resolved_path,
-                                 existing->second->resolved_artifacts,
-                                 existing->second->loaded_at_ms, "");
+            ModelLoadResult result = make_load_result(
+                true, existing->second->model_id, existing->second->category,
+                existing->second->framework, existing->second->resolved_path,
+                existing->second->resolved_artifacts, existing->second->loaded_at_ms, "");
             return copy_proto(result, out_result);
         }
     }
 
     std::shared_ptr<LoadedModel> previous_loaded;
-    ComponentLifecycleState previous_state =
-        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+    ComponentLifecycleState previous_state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     {
         std::lock_guard<std::mutex> lock(g_lifecycle_mutex);
         auto existing = g_loaded.find(component);
@@ -1406,8 +1393,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     destroy_loaded_model(previous_loaded);
 
     publish_component_event(component, previous_state,
-                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                            request.model_id(), nullptr, nullptr, nullptr);
+                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING, request.model_id(),
+                            nullptr, nullptr, nullptr);
 
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework, primitive);
@@ -1439,8 +1426,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             failed->error_message = error;
             g_loaded[component] = std::move(failed);
         }
-        publish_component_event(component,
-                                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+        publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                 request.model_id(), &result, nullptr,
                                 result.error_message().c_str());
@@ -1449,8 +1435,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
 
     void* impl = nullptr;
     std::function<void()> destroy;
-    rc = create_backend_impl(vt, primitive, resolved_path, artifact_resolution.mmproj_path,
-                             &impl, &destroy);
+    rc = create_backend_impl(vt, primitive, resolved_path, artifact_resolution.mmproj_path, &impl,
+                             &destroy);
     if (rc != RAC_SUCCESS) {
         ModelLoadResult result =
             make_load_result(false, request.model_id(), category, framework, resolved_path,
@@ -1471,8 +1457,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             failed->error_message = result.error_message();
             g_loaded[component] = std::move(failed);
         }
-        publish_component_event(component,
-                                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+        publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                 request.model_id(), &result, nullptr,
                                 result.error_message().c_str());
@@ -1519,10 +1504,9 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     ModelLoadResult result =
         make_load_result(true, request.model_id(), category, framework, resolved_path,
                          artifact_resolution.artifacts, loaded_at_ms, "");
-    publish_component_event(component,
-                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
-                            request.model_id(), &result, nullptr, nullptr);
+    publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY, request.model_id(),
+                            &result, nullptr, nullptr);
     return copy_proto(result, out_result);
 #endif
 }
@@ -1633,14 +1617,13 @@ rac_result_t rac_model_lifecycle_current_model_proto(const uint8_t* request_prot
         result.set_found(false);
     }
     publish_current_model_event(result, component);
-    publish_component_event(component,
-                            result.model_id().empty()
-                                ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
-                                : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
-                            result.model_id().empty()
-                                ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
-                                : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
-                            result.model_id(), nullptr, nullptr, nullptr);
+    publish_component_event(
+        component,
+        result.model_id().empty() ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
+                                  : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+        result.model_id().empty() ? runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED
+                                  : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+        result.model_id(), nullptr, nullptr, nullptr);
     return copy_proto(result, out_result);
 #endif
 }

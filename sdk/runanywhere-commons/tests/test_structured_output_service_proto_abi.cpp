@@ -6,9 +6,9 @@
 #include <cstdio>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/descriptor.h>
-
 #include "structured_output.pb.h"
+
+#include <google/protobuf/descriptor.h>
 #endif
 
 namespace {
@@ -16,33 +16,28 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-void check_unary_rpc(const google::protobuf::ServiceDescriptor* service,
-                     const char* method_name,
-                     const char* input_type,
-                     const char* output_type) {
-    const google::protobuf::MethodDescriptor* method =
-        service->FindMethodByName(method_name);
+void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
+                     const char* input_type, const char* output_type) {
+    const google::protobuf::MethodDescriptor* method = service->FindMethodByName(method_name);
     CHECK(method != nullptr, method_name);
-    if (!method) return;
+    if (!method)
+        return;
 
-    CHECK(method->input_type()->full_name() == input_type,
-          "StructuredOutput RPC input type");
-    CHECK(method->output_type()->full_name() == output_type,
-          "StructuredOutput RPC output type");
+    CHECK(method->input_type()->full_name() == input_type, "StructuredOutput RPC input type");
+    CHECK(method->output_type()->full_name() == output_type, "StructuredOutput RPC output type");
     CHECK(!method->client_streaming() && !method->server_streaming(),
           "StructuredOutput RPC is unary");
 }
@@ -52,27 +47,22 @@ int test_structured_output_generated_service_contract() {
         runanywhere::v1::StructuredOutputRequest::descriptor()->file();
     const google::protobuf::ServiceDescriptor* service =
         file->FindServiceByName("StructuredOutput");
-    CHECK(service != nullptr,
-          "generated StructuredOutput service descriptor exists");
-    if (!service) return 0;
+    CHECK(service != nullptr, "generated StructuredOutput service descriptor exists");
+    if (!service)
+        return 0;
 
-    CHECK(service->method_count() == 3,
-          "generated StructuredOutput service exposes three RPCs");
+    CHECK(service->method_count() == 3, "generated StructuredOutput service exposes three RPCs");
 
-    check_unary_rpc(service, "PreparePrompt",
-                    "runanywhere.v1.StructuredOutputRequest",
+    check_unary_rpc(service, "PreparePrompt", "runanywhere.v1.StructuredOutputRequest",
                     "runanywhere.v1.StructuredOutputPromptResult");
-    check_unary_rpc(service, "Validate",
-                    "runanywhere.v1.StructuredOutputValidationRequest",
+    check_unary_rpc(service, "Validate", "runanywhere.v1.StructuredOutputValidationRequest",
                     "runanywhere.v1.StructuredOutputValidation");
-    check_unary_rpc(service, "Parse",
-                    "runanywhere.v1.StructuredOutputParseRequest",
+    check_unary_rpc(service, "Parse", "runanywhere.v1.StructuredOutputParseRequest",
                     "runanywhere.v1.StructuredOutputResult");
 
     const google::protobuf::Descriptor* parse_request =
         runanywhere::v1::StructuredOutputParseRequest::descriptor();
-    const google::protobuf::FieldDescriptor* text =
-        parse_request->FindFieldByName("text");
+    const google::protobuf::FieldDescriptor* text = parse_request->FindFieldByName("text");
     CHECK(text != nullptr, "StructuredOutputParseRequest carries model text");
     if (text) {
         CHECK(text->type() == google::protobuf::FieldDescriptor::TYPE_STRING,
@@ -81,8 +71,7 @@ int test_structured_output_generated_service_contract() {
 
     const google::protobuf::FieldDescriptor* parse_options =
         parse_request->FindFieldByName("options");
-    CHECK(parse_options != nullptr,
-          "StructuredOutputParseRequest carries options");
+    CHECK(parse_options != nullptr, "StructuredOutputParseRequest carries options");
     if (parse_options) {
         CHECK(parse_options->message_type()->full_name() ==
                   "runanywhere.v1.StructuredOutputOptions",
@@ -95,8 +84,7 @@ int test_structured_output_generated_service_contract() {
         runanywhere::v1::StructuredOutputValidationRequest::descriptor();
     const google::protobuf::FieldDescriptor* validation_options =
         validation_request->FindFieldByName("options");
-    CHECK(validation_options != nullptr,
-          "StructuredOutputValidationRequest carries options");
+    CHECK(validation_options != nullptr, "StructuredOutputValidationRequest carries options");
     if (validation_options) {
         CHECK(validation_options->message_type()->full_name() ==
                   "runanywhere.v1.StructuredOutputOptions",
@@ -109,18 +97,15 @@ int test_structured_output_generated_service_contract() {
         runanywhere::v1::StructuredOutputPromptResult::descriptor();
     const google::protobuf::FieldDescriptor* prepared_prompt =
         prompt_result->FindFieldByName("prepared_prompt");
-    CHECK(prepared_prompt != nullptr,
-          "StructuredOutputPromptResult carries prepared prompt");
+    CHECK(prepared_prompt != nullptr, "StructuredOutputPromptResult carries prepared prompt");
     if (prepared_prompt) {
-        CHECK(prepared_prompt->type() ==
-                  google::protobuf::FieldDescriptor::TYPE_STRING,
+        CHECK(prepared_prompt->type() == google::protobuf::FieldDescriptor::TYPE_STRING,
               "StructuredOutputPromptResult prepared_prompt is a string");
     }
 
     const google::protobuf::FieldDescriptor* json_schema =
         prompt_result->FindFieldByName("json_schema");
-    CHECK(json_schema != nullptr,
-          "StructuredOutputPromptResult carries JSON schema constraint");
+    CHECK(json_schema != nullptr, "StructuredOutputPromptResult carries JSON schema constraint");
     if (json_schema) {
         CHECK(json_schema->type() == google::protobuf::FieldDescriptor::TYPE_STRING,
               "StructuredOutputPromptResult json_schema is a string");

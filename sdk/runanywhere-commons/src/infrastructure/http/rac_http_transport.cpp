@@ -65,8 +65,7 @@ extern "C" rac_result_t rac_http_transport_register(const rac_http_transport_ops
 
     // Registering NULL is the explicit "unregister" path.
     if (ops == nullptr) {
-        RAC_LOG_INFO(kTag,
-                     "Platform HTTP transport unregistered; no HTTP fallback is installed");
+        RAC_LOG_INFO(kTag, "Platform HTTP transport unregistered; no HTTP fallback is installed");
         return RAC_SUCCESS;
     }
 

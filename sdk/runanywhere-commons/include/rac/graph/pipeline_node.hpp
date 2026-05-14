@@ -63,7 +63,7 @@
 namespace rac::graph {
 
 class IPipelineNode {
-public:
+   public:
     virtual ~IPipelineNode() = default;
 
     /// Spawn the worker thread(s). `parent_cancel` — if non-null — is the
@@ -88,44 +88,46 @@ public:
 
 template <typename In, typename Out>
 class PipelineNode : public IPipelineNode {
-public:
-    using InputEdge  = StreamEdge<In>;
+   public:
+    using InputEdge = StreamEdge<In>;
     using OutputEdge = StreamEdge<Out>;
 
-    explicit PipelineNode(std::string name,
-                          size_t input_capacity  = 16,
-                          size_t output_capacity = 16,
-                          OverflowPolicy policy  = OverflowPolicy::BlockProducer)
+    explicit PipelineNode(std::string name, size_t input_capacity = 16, size_t output_capacity = 16,
+                          OverflowPolicy policy = OverflowPolicy::BlockProducer)
         : name_(std::move(name)),
           input_(std::make_shared<InputEdge>(input_capacity, policy)),
           output_(std::make_shared<OutputEdge>(output_capacity, policy)) {}
 
-    PipelineNode(const PipelineNode&)            = delete;
+    PipelineNode(const PipelineNode&) = delete;
     PipelineNode& operator=(const PipelineNode&) = delete;
 
     void start(std::shared_ptr<CancelToken> parent_cancel) override {
         bool expected = false;
-        if (!started_.compare_exchange_strong(expected, true)) return;
-        cancel_ = parent_cancel ? parent_cancel->create_child()
-                                : std::make_shared<CancelToken>();
+        if (!started_.compare_exchange_strong(expected, true))
+            return;
+        cancel_ = parent_cancel ? parent_cancel->create_child() : std::make_shared<CancelToken>();
         worker_ = std::thread([this] { run(); });
     }
 
     void stop() override {
-        if (cancel_) cancel_->cancel();
-        if (input_)  input_->close();
+        if (cancel_)
+            cancel_->cancel();
+        if (input_)
+            input_->close();
     }
 
     void join() override {
-        if (worker_.joinable()) worker_.join();
-        if (output_) output_->close();
+        if (worker_.joinable())
+            worker_.join();
+        if (output_)
+            output_->close();
     }
 
     const char* name() const noexcept override { return name_.c_str(); }
 
     // ---- Edge accessors --------------------------------------------------
 
-    std::shared_ptr<InputEdge>  input()  { return input_; }
+    std::shared_ptr<InputEdge> input() { return input_; }
     std::shared_ptr<OutputEdge> output() { return output_; }
 
     /// Replace the input edge. Used by GraphScheduler::connect() to share a
@@ -137,7 +139,7 @@ public:
 
     CancelToken* cancel_token() const noexcept { return cancel_.get(); }
 
-protected:
+   protected:
     /// Called once per input item. Implementations push zero or more Out
     /// values into `out`. May block on backpressure; must honour cancel_.
     virtual void process(In in, OutputEdge& out) = 0;
@@ -148,22 +150,23 @@ protected:
 
     std::shared_ptr<CancelToken> cancel_;
 
-private:
+   private:
     void run() {
         while (cancel_ && !cancel_->is_cancelled()) {
             auto item = input_->pop(cancel_.get());
-            if (!item) break;
+            if (!item)
+                break;
             process(std::move(*item), *output_);
         }
         on_drained(*output_);
         output_->close();
     }
 
-    std::string                 name_;
-    std::shared_ptr<InputEdge>  input_;
+    std::string name_;
+    std::shared_ptr<InputEdge> input_;
     std::shared_ptr<OutputEdge> output_;
-    std::thread                 worker_;
-    std::atomic<bool>           started_{false};
+    std::thread worker_;
+    std::atomic<bool> started_{false};
 };
 
 // ---------------------------------------------------------------------------
@@ -177,35 +180,27 @@ private:
 
 template <typename In, typename Out, typename Op>
 class PrimitiveNode : public PipelineNode<In, Out> {
-public:
-    PrimitiveNode(std::string name,
-                  Op op,
-                  size_t input_capacity  = 16,
-                  size_t output_capacity = 16,
-                  OverflowPolicy policy  = OverflowPolicy::BlockProducer)
-        : PipelineNode<In, Out>(std::move(name), input_capacity,
-                                output_capacity, policy),
+   public:
+    PrimitiveNode(std::string name, Op op, size_t input_capacity = 16, size_t output_capacity = 16,
+                  OverflowPolicy policy = OverflowPolicy::BlockProducer)
+        : PipelineNode<In, Out>(std::move(name), input_capacity, output_capacity, policy),
           op_(std::move(op)) {}
 
-protected:
-    void process(In in, StreamEdge<Out>& out) override {
-        op_(std::move(in), out);
-    }
+   protected:
+    void process(In in, StreamEdge<Out>& out) override { op_(std::move(in), out); }
 
-private:
+   private:
     Op op_;
 };
 
 // Deduction helper — construct without repeating the Op type.
 template <typename In, typename Out, typename Op>
 std::shared_ptr<PrimitiveNode<In, Out, std::decay_t<Op>>>
-make_primitive_node(std::string name, Op&& op,
-                    size_t input_capacity  = 16,
+make_primitive_node(std::string name, Op&& op, size_t input_capacity = 16,
                     size_t output_capacity = 16,
-                    OverflowPolicy policy  = OverflowPolicy::BlockProducer) {
+                    OverflowPolicy policy = OverflowPolicy::BlockProducer) {
     return std::make_shared<PrimitiveNode<In, Out, std::decay_t<Op>>>(
-        std::move(name), std::forward<Op>(op),
-        input_capacity, output_capacity, policy);
+        std::move(name), std::forward<Op>(op), input_capacity, output_capacity, policy);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,22 +209,19 @@ make_primitive_node(std::string name, Op&& op,
 
 template <typename T>
 class SplitNode : public IPipelineNode {
-public:
+   public:
     using Edge = StreamEdge<T>;
 
-    SplitNode(std::string name,
-              size_t num_outputs,
-              size_t capacity       = 16,
+    SplitNode(std::string name, size_t num_outputs, size_t capacity = 16,
               OverflowPolicy policy = OverflowPolicy::BlockProducer)
-        : name_(std::move(name)),
-          input_(std::make_shared<Edge>(capacity, policy)) {
+        : name_(std::move(name)), input_(std::make_shared<Edge>(capacity, policy)) {
         outputs_.reserve(num_outputs);
         for (size_t i = 0; i < num_outputs; ++i) {
             outputs_.emplace_back(std::make_shared<Edge>(capacity, policy));
         }
     }
 
-    SplitNode(const SplitNode&)            = delete;
+    SplitNode(const SplitNode&) = delete;
     SplitNode& operator=(const SplitNode&) = delete;
 
     std::shared_ptr<Edge> input() { return input_; }
@@ -240,29 +232,34 @@ public:
 
     void start(std::shared_ptr<CancelToken> parent_cancel) override {
         bool expected = false;
-        if (!started_.compare_exchange_strong(expected, true)) return;
-        cancel_ = parent_cancel ? parent_cancel->create_child()
-                                : std::make_shared<CancelToken>();
+        if (!started_.compare_exchange_strong(expected, true))
+            return;
+        cancel_ = parent_cancel ? parent_cancel->create_child() : std::make_shared<CancelToken>();
         worker_ = std::thread([this] { run(); });
     }
 
     void stop() override {
-        if (cancel_) cancel_->cancel();
-        if (input_)  input_->close();
+        if (cancel_)
+            cancel_->cancel();
+        if (input_)
+            input_->close();
     }
 
     void join() override {
-        if (worker_.joinable()) worker_.join();
-        for (auto& out : outputs_) out->close();
+        if (worker_.joinable())
+            worker_.join();
+        for (auto& out : outputs_)
+            out->close();
     }
 
     const char* name() const noexcept override { return name_.c_str(); }
 
-private:
+   private:
     void run() {
         while (cancel_ && !cancel_->is_cancelled()) {
             auto item = input_->pop(cancel_.get());
-            if (!item) break;
+            if (!item)
+                break;
             // Copy to N-1 outputs, move into the last one. Requires T to be
             // copy-constructible; if that's ever a problem swap in shared_ptr.
             for (size_t i = 0; i + 1 < outputs_.size(); ++i) {
@@ -274,12 +271,12 @@ private:
         }
     }
 
-    std::string                         name_;
-    std::shared_ptr<Edge>               input_;
-    std::vector<std::shared_ptr<Edge>>  outputs_;
-    std::shared_ptr<CancelToken>        cancel_;
-    std::thread                         worker_;
-    std::atomic<bool>                   started_{false};
+    std::string name_;
+    std::shared_ptr<Edge> input_;
+    std::vector<std::shared_ptr<Edge>> outputs_;
+    std::shared_ptr<CancelToken> cancel_;
+    std::thread worker_;
+    std::atomic<bool> started_{false};
 };
 
 // ---------------------------------------------------------------------------
@@ -288,40 +285,34 @@ private:
 
 template <typename T>
 class MergeNode : public IPipelineNode {
-public:
+   public:
     using Edge = StreamEdge<T>;
 
-    MergeNode(std::string name,
-              size_t num_inputs,
-              size_t capacity       = 16,
+    MergeNode(std::string name, size_t num_inputs, size_t capacity = 16,
               OverflowPolicy policy = OverflowPolicy::BlockProducer)
-        : name_(std::move(name)),
-          output_(std::make_shared<Edge>(capacity, policy)) {
+        : name_(std::move(name)), output_(std::make_shared<Edge>(capacity, policy)) {
         inputs_.reserve(num_inputs);
         for (size_t i = 0; i < num_inputs; ++i) {
             inputs_.emplace_back(std::make_shared<Edge>(capacity, policy));
         }
     }
 
-    MergeNode(const MergeNode&)            = delete;
+    MergeNode(const MergeNode&) = delete;
     MergeNode& operator=(const MergeNode&) = delete;
 
     std::shared_ptr<Edge> input(size_t idx) { return inputs_.at(idx); }
-    void set_input(size_t idx, std::shared_ptr<Edge> in) {
-        inputs_.at(idx) = std::move(in);
-    }
+    void set_input(size_t idx, std::shared_ptr<Edge> in) { inputs_.at(idx) = std::move(in); }
     size_t input_count() const noexcept { return inputs_.size(); }
 
     std::shared_ptr<Edge> output() { return output_; }
 
     void start(std::shared_ptr<CancelToken> parent_cancel) override {
         bool expected = false;
-        if (!started_.compare_exchange_strong(expected, true)) return;
-        cancel_ = parent_cancel ? parent_cancel->create_child()
-                                : std::make_shared<CancelToken>();
+        if (!started_.compare_exchange_strong(expected, true))
+            return;
+        cancel_ = parent_cancel ? parent_cancel->create_child() : std::make_shared<CancelToken>();
         workers_.reserve(inputs_.size());
-        active_.store(static_cast<int>(inputs_.size()),
-                      std::memory_order_release);
+        active_.store(static_cast<int>(inputs_.size()), std::memory_order_release);
         for (size_t i = 0; i < inputs_.size(); ++i) {
             auto in = inputs_[i];
             workers_.emplace_back([this, in] { drain_one(in); });
@@ -329,27 +320,32 @@ public:
     }
 
     void stop() override {
-        if (cancel_) cancel_->cancel();
-        for (auto& in : inputs_) in->close();
+        if (cancel_)
+            cancel_->cancel();
+        for (auto& in : inputs_)
+            in->close();
     }
 
     void join() override {
         for (auto& th : workers_) {
-            if (th.joinable()) th.join();
+            if (th.joinable())
+                th.join();
         }
         workers_.clear();
         // Output was already closed by the last drain-worker; closing
         // again is a no-op but keeps the post-condition obvious.
-        if (output_) output_->close();
+        if (output_)
+            output_->close();
     }
 
     const char* name() const noexcept override { return name_.c_str(); }
 
-private:
+   private:
     void drain_one(std::shared_ptr<Edge> in) {
         while (cancel_ && !cancel_->is_cancelled()) {
             auto item = in->pop(cancel_.get());
-            if (!item) break;
+            if (!item)
+                break;
             output_->push(std::move(*item), cancel_.get());
         }
         // Last input-drainer closes the output so downstream consumers
@@ -359,13 +355,13 @@ private:
         }
     }
 
-    std::string                         name_;
-    std::vector<std::shared_ptr<Edge>>  inputs_;
-    std::shared_ptr<Edge>               output_;
-    std::shared_ptr<CancelToken>        cancel_;
-    std::vector<std::thread>            workers_;
-    std::atomic<int>                    active_{0};
-    std::atomic<bool>                   started_{false};
+    std::string name_;
+    std::vector<std::shared_ptr<Edge>> inputs_;
+    std::shared_ptr<Edge> output_;
+    std::shared_ptr<CancelToken> cancel_;
+    std::vector<std::thread> workers_;
+    std::atomic<int> active_{0};
+    std::atomic<bool> started_{false};
 };
 
 }  // namespace rac::graph

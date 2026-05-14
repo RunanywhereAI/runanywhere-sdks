@@ -17,14 +17,16 @@
  *   // typed adapters (ModelLifecycleAdapter, DownloadAdapter, ...) become live.
  */
 
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
-import type { STTOutput } from '@runanywhere/proto-ts/stt_options';
-import type { TTSOutput } from '@runanywhere/proto-ts/tts_options';
-import type { VADResult } from '@runanywhere/proto-ts/vad_options';
-import { SDKEventType } from '../types/enums';
+import {
+  SdkInitEnvironment,
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+  SdkInitResult,
+  type SdkInitResult as ProtoSdkInitResult,
+} from '@runanywhere/proto-ts/sdk_init';
 import type { SDKInitOptions } from '../types/models';
-import type { LLMStreamingResult } from '../types/index';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
@@ -32,45 +34,35 @@ import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
-import * as RAGExt from './Extensions/RunAnywhere+RAG';
-import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
+import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG';
+import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent';
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
 import { ModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
-import {
-  TextGeneration as TextGenerationCapability,
-  generateStructuredStream,
-  extractStructuredOutput,
-} from './Extensions/RunAnywhere+TextGeneration';
+import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
-import {
-  STT as STTCapability,
-  transcribe as transcribeImpl,
-  type TranscribeOptions,
-} from './Extensions/RunAnywhere+STT';
-import {
-  TTS as TTSCapability,
-  synthesize as synthesizeImpl,
-  type SynthesizeOptions,
-} from './Extensions/RunAnywhere+TTS';
-import {
-  VAD as VADCapability,
-  detectVoice as detectVoiceImpl,
-  type DetectVoiceOptions,
-} from './Extensions/RunAnywhere+VAD';
+import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
+import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
+import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
+import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
+import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import { createStorageNamespace } from './Extensions/RunAnywhere+Storage';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
 import { DownloadAdapter } from '../Adapters/DownloadAdapter';
 import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
-import { LlmThinking } from '../Features/LLM/LlmThinking';
 import { SDK_VERSION } from '../Foundation/Version';
-import { tryRunanywhereModule } from '../runtime/EmscriptenModule';
+import {
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../runtime/EmscriptenModule';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -91,11 +83,29 @@ let _initOptions: SDKInitOptions | null = null;
 let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
+let _hasCompletedNativePhase1 = false;
 
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
 let _hasCompletedServicesInit = false;
 let _servicesInitPromise: Promise<void> | null = null;
+
+interface SdkInitModule extends EmscriptenRunanywhereModule {
+  _rac_sdk_init_phase1_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_sdk_init_phase2_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_auth_is_authenticated?(): number;
+  _rac_auth_get_user_id?(): number;
+  _rac_auth_get_organization_id?(): number;
+  _rac_state_is_device_registered?(): number;
+}
 
 /** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
 function generateDeviceId(): string {
@@ -131,6 +141,106 @@ function ensureDeviceId(): string {
   return id;
 }
 
+function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
+  switch (env) {
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+    default:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+  }
+}
+
+function invokeSdkInitProto(
+  module: SdkInitModule,
+  bytes: Uint8Array,
+  fn: (requestBytes: number, requestSize: number, outResult: number) => number,
+  functionName: string,
+): ProtoSdkInitResult | null {
+  return new ProtoWasmBridge(module, logger).withHeapBytes(bytes, (ptr, size) => (
+    new ProtoWasmBridge(module, logger).callResultProto(
+      SdkInitResult,
+      (outResult) => fn(ptr, size, outResult),
+      functionName,
+    )
+  ));
+}
+
+function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string): void {
+  if (!result) {
+    throw SDKException.fromCode(
+      SDKErrorCode.InitializationFailed,
+      `${phase} returned no sdk-init result.`,
+    );
+  }
+  if (!result.success) {
+    throw new SDKException(result.error ?? {
+      category: 0,
+      code: 0,
+      cAbiCode: SDKErrorCode.InitializationFailed,
+      message: `${phase} failed.`,
+      nestedMessage: result.warning || undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: 0,
+      component: 'sdk',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    });
+  }
+  if (result.warning) {
+    logger.warning(`${phase} warning: ${result.warning}`);
+  }
+}
+
+export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModule): void {
+  if (_hasCompletedNativePhase1) return;
+  const sdkModule = module as SdkInitModule;
+  if (typeof sdkModule._rac_sdk_init_phase1_proto !== 'function') {
+    logger.warning(
+      'WASM module missing _rac_sdk_init_phase1_proto; native Phase 1 will run after the artifact is rebuilt.',
+    );
+    return;
+  }
+
+  const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+  const bytes = SdkInitPhase1Request.encode({
+    environment: mapSdkInitEnvironment(environment),
+    apiKey: _initOptions?.apiKey ?? '',
+    baseUrl: _initOptions?.baseURL ?? '',
+    deviceId: ensureDeviceId(),
+  }).finish();
+
+  const result = invokeSdkInitProto(
+    sdkModule,
+    bytes,
+    sdkModule._rac_sdk_init_phase1_proto.bind(sdkModule),
+    'rac_sdk_init_phase1_proto',
+  );
+  throwIfSdkInitFailed(result, 'SDK Phase 1');
+  _hasCompletedNativePhase1 = true;
+}
+
+export async function completeDeferredServicesInitialization(): Promise<void> {
+  if (!_isInitialized || _hasCompletedServicesInit) return;
+  await RunAnywhere.completeServicesInitialization();
+}
+
+function readNullableCString(fn?: () => number): string | null {
+  if (typeof fn !== 'function') return null;
+  const module = tryRunanywhereModule() as SdkInitModule | null;
+  if (!module) return null;
+  try {
+    const ptr = fn.call(module);
+    return ptr ? module.UTF8ToString(ptr) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // RunAnywhere Public API
 // ---------------------------------------------------------------------------
@@ -141,11 +251,6 @@ export const RunAnywhere = {
   // =========================================================================
 
   get isInitialized(): boolean {
-    return _isInitialized;
-  },
-
-  /** Mirror Swift `RunAnywhere.isSDKInitialized` (Phase 1 complete). */
-  get isSDKInitialized(): boolean {
     return _isInitialized;
   },
 
@@ -193,15 +298,34 @@ export const RunAnywhere = {
    * auth wiring arrives, this call will reflect the real state without
    * further changes.
    */
-  isAuthenticated(): boolean {
-    const mod = tryRunanywhereModule();
+  get isAuthenticated(): boolean {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
     if (!mod) return false;
-    const fn = (mod as unknown as {
-      _rac_auth_is_authenticated?: () => number;
-    })._rac_auth_is_authenticated;
+    const fn = mod._rac_auth_is_authenticated;
     if (typeof fn !== 'function') return false;
     try {
-      return fn() !== 0;
+      return fn.call(mod) !== 0;
+    } catch {
+      return false;
+    }
+  },
+
+  getUserId(): string | null {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    return readNullableCString(mod?._rac_auth_get_user_id);
+  },
+
+  getOrganizationId(): string | null {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    return readNullableCString(mod?._rac_auth_get_organization_id);
+  },
+
+  isDeviceRegistered(): boolean {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    const fn = mod?._rac_state_is_device_registered;
+    if (typeof fn !== 'function') return false;
+    try {
+      return fn.call(mod) !== 0;
     } catch {
       return false;
     }
@@ -267,7 +391,7 @@ export const RunAnywhere = {
         }
 
         try {
-          await RunAnywhere.restoreLocalStorage();
+          await RunAnywhere.storage.restoreLocalStorage();
         } catch (err) {
           logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -277,7 +401,7 @@ export const RunAnywhere = {
         ensureDeviceId();
 
         logger.info('RunAnywhere Web SDK initialized successfully');
-        EventBus.shared.emit('sdk.initialized', SDKEventType.Initialization, {
+        EventBus.shared.emit('sdk.initialized', EventCategory.EVENT_CATEGORY_INITIALIZATION, {
           environment: env,
         });
 
@@ -305,6 +429,31 @@ export const RunAnywhere = {
 
     _servicesInitPromise = (async () => {
       try {
+        const module = tryRunanywhereModule() as SdkInitModule | null;
+        if (!module) {
+          logger.debug('Services initialization deferred until a Web backend registers a WASM module');
+          return;
+        }
+
+        if (!_hasCompletedNativePhase1) {
+          completeNativePhase1ForModule(module);
+        }
+
+        if (typeof module._rac_sdk_init_phase2_proto === 'function') {
+          const bytes = SdkInitPhase2Request.encode({}).finish();
+          const result = invokeSdkInitProto(
+            module,
+            bytes,
+            module._rac_sdk_init_phase2_proto.bind(module),
+            'rac_sdk_init_phase2_proto',
+          );
+          throwIfSdkInitFailed(result, 'SDK Phase 2');
+        } else {
+          logger.warning(
+            'WASM module missing _rac_sdk_init_phase2_proto; services init remains browser-only until rebuild.',
+          );
+        }
+
         _hasCompletedServicesInit = true;
         logger.debug('Services initialization complete (Phase 2)');
       } finally {
@@ -323,210 +472,74 @@ export const RunAnywhere = {
   },
 
   // =========================================================================
-  // Local File Storage (persistent model storage)
+  // Storage namespace
   // =========================================================================
 
-  get isLocalStorageSupported(): boolean {
-    return LocalFileStorage.isSupported;
-  },
+  storage: createStorageNamespace({
+    get isLocalStorageSupported(): boolean {
+      return LocalFileStorage.isSupported;
+    },
 
-  get isLocalStorageReady(): boolean {
-    return _localFileStorage?.isReady ?? false;
-  },
+    get isLocalStorageReady(): boolean {
+      return _localFileStorage?.isReady ?? false;
+    },
 
-  get hasLocalStorageHandle(): boolean {
-    return _localFileStorage?.hasStoredHandle ?? false;
-  },
+    get hasLocalStorageHandle(): boolean {
+      return _localFileStorage?.hasStoredHandle ?? false;
+    },
 
-  get localStorageDirectoryName(): string | null {
-    return _localFileStorage?.directoryName ?? LocalFileStorage.storedDirectoryName;
-  },
+    get localStorageDirectoryName(): string | null {
+      return _localFileStorage?.directoryName ?? LocalFileStorage.storedDirectoryName;
+    },
 
-  /**
-   * Which persistent storage backend is currently active.
-   *
-   * Resolution order:
-   *   1. `fsAccess` — File System Access API with an active directory handle.
-   *   2. `opfs` — Origin Private File System detected (feature-flag only; the C++
-   *      download orchestrator currently writes to Emscripten MEMFS via the
-   *      PlatformAdapter file callbacks, so OPFS persistence is NOT yet wired).
-   *   3. `memory` — No persistent backend available.
-   *
-   * NOTE: `'opfs'` here reflects browser capability only. Persisting downloaded
-   * models across reloads via OPFS requires wiring the PlatformAdapter file_*
-   * callbacks to an OPFS Sync Access Handle worker — tracked as a follow-up
-   * (see BUG-WEB-MEMFS-VOLATILE, successor of the deleted BUG-WEB-008).
-   */
-  get storageBackend(): StorageBackend {
-    if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
-      return 'fsAccess';
-    }
-    const hasOPFS = typeof navigator !== 'undefined'
-      && 'storage' in navigator
-      && 'getDirectory' in (navigator.storage || {});
-    if (hasOPFS) {
-      return 'opfs';
-    }
-    return 'memory';
-  },
+    get storageBackend(): StorageBackend {
+      if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
+        return 'fsAccess';
+      }
+      const hasOPFS = typeof navigator !== 'undefined'
+        && 'storage' in navigator
+        && 'getDirectory' in (navigator.storage || {});
+      return hasOPFS ? 'opfs' : 'memory';
+    },
 
-  async chooseLocalStorageDirectory(): Promise<boolean> {
-    if (!LocalFileStorage.isSupported) {
-      logger.warning('File System Access API not supported — using browser storage (OPFS)');
-      return false;
-    }
+    async chooseLocalStorageDirectory(): Promise<boolean> {
+      if (!LocalFileStorage.isSupported) {
+        logger.warning('File System Access API not supported — using browser storage (OPFS)');
+        return false;
+      }
 
-    if (!_localFileStorage) {
-      _localFileStorage = new LocalFileStorage();
-    }
+      if (!_localFileStorage) {
+        _localFileStorage = new LocalFileStorage();
+      }
 
-    const success = await _localFileStorage.chooseDirectory();
-    if (success) {
-      EventBus.shared.emit('storage.localDirectorySelected', SDKEventType.Storage, {
-        directoryName: _localFileStorage.directoryName,
-      });
-    }
-    return success;
-  },
+      const success = await _localFileStorage.chooseDirectory();
+      if (success) {
+        EventBus.shared.emit('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
+          directoryName: _localFileStorage.directoryName,
+        });
+      }
+      return success;
+    },
 
-  async restoreLocalStorage(): Promise<boolean> {
-    if (!LocalFileStorage.isSupported) return false;
+    async restoreLocalStorage(): Promise<boolean> {
+      if (!LocalFileStorage.isSupported) return false;
 
-    if (!_localFileStorage) {
-      _localFileStorage = new LocalFileStorage();
-    }
+      if (!_localFileStorage) {
+        _localFileStorage = new LocalFileStorage();
+      }
 
-    const success = await _localFileStorage.restoreDirectory();
-    if (success) {
-      logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
-    }
-    return success;
-  },
+      const success = await _localFileStorage.restoreDirectory();
+      if (success) {
+        logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
+      }
+      return success;
+    },
 
-  async requestLocalStorageAccess(): Promise<boolean> {
-    if (!_localFileStorage) return false;
-    return _localFileStorage.requestAccess();
-  },
-
-  // =========================================================================
-  // Top-level convenience verbs that delegate to the proto-byte adapters.
-  // =========================================================================
-
-  /** Generate text via the LLM proto adapter. */
-  async generate(
-    prompt: string,
-    options?: Partial<LLMGenerationOptions>,
-  ): Promise<LLMGenerationResult> {
-    return TextGenerationCapability.generate({
-      ...(options ?? {}),
-      prompt,
-    } as Partial<LLMGenerationOptions>);
-  },
-
-  async generateStream(
-    prompt: string,
-    options?: Partial<LLMGenerationOptions>,
-  ): Promise<LLMStreamingResult> {
-    return TextGenerationCapability.generateStream({
-      ...(options ?? {}),
-      prompt,
-    } as Partial<LLMGenerationOptions>);
-  },
-
-  async chat(
-    prompt: string,
-    options?: Partial<LLMGenerationOptions>,
-  ): Promise<string> {
-    return TextGenerationCapability.chat(prompt, options);
-  },
-
-  /**
-   * Transcribe audio. Auto-creates an STT component handle, loads the current
-   * STT model from lifecycle (if no `modelPath` is supplied), runs transcription,
-   * and tears the handle down. Use `RunAnywhere.stt.*` directly when you want
-   * to reuse a handle across multiple calls.
-   */
-  async transcribe(
-    audio: Uint8Array | Float32Array,
-    options?: TranscribeOptions,
-  ): Promise<STTOutput> {
-    return transcribeImpl(audio, options);
-  },
-
-  /**
-   * Synthesize speech. Auto-creates a TTS component handle, loads the current
-   * TTS voice from lifecycle (if no `voicePath` is supplied), synthesizes, and
-   * tears the handle down.
-   */
-  async synthesize(
-    text: string,
-    options?: SynthesizeOptions,
-  ): Promise<TTSOutput> {
-    return synthesizeImpl(text, options);
-  },
-
-  /**
-   * Detect speech activity in an audio buffer. Auto-creates a VAD handle,
-   * configures + initializes it, runs one process pass, and destroys the handle.
-   */
-  async detectVoice(
-    audio: Float32Array,
-    options?: DetectVoiceOptions,
-  ): Promise<VADResult> {
-    return detectVoiceImpl(audio, options);
-  },
-
-  // Thinking token utilities — canonical §3 helpers.
-  /** Extract thinking and response from LLM output (§3). */
-  extractThinkingTokens(text: string): { response: string; thinking: string | null } {
-    return LlmThinking.extract(text);
-  },
-
-  /** Strip all thinking tokens from LLM output (§3). */
-  stripThinkingTokens(text: string): string {
-    return LlmThinking.strip(text);
-  },
-
-  /** Split thinking and response sections (§3). */
-  splitThinkingAndResponse(text: string): { thinking: string; response: string } {
-    const { thinking, response } = LlmThinking.extract(text);
-    return { thinking: thinking ?? '', response };
-  },
-
-  // RAG — flat (RAG is stateless from public-API view).
-  ragCreatePipeline: RAGExt.ragCreatePipeline,
-  ragDestroyPipeline: RAGExt.ragDestroyPipeline,
-  ragIngest: RAGExt.ragIngest,
-  ragAddDocumentsBatch: RAGExt.ragAddDocumentsBatch,
-  ragQuery: RAGExt.ragQuery,
-  ragClearDocuments: RAGExt.ragClearDocuments,
-  ragGetDocumentCount: RAGExt.ragGetDocumentCount,
-  ragGetStatistics: RAGExt.ragGetStatistics,
-  ragListDocuments: RAGExt.ragListDocuments,
-  ragRemoveDocument: RAGExt.ragRemoveDocument,
-  ragGetCapabilities: RAGExt.ragGetCapabilities,
-  createDefaultRAGConfiguration: RAGExt.createDefaultRAGConfiguration,
-  getRAGAvailability: RAGExt.getRAGAvailability,
-  isRAGAvailable: RAGExt.isRAGAvailable,
-
-  // LLM structured stream + extraction — canonical §3 flat verbs.
-  generateStructuredStream,
-  extractStructuredOutput,
-
-  // VoiceAgent C-ABI parity.
-  initializeVoiceAgent: VoiceAgentExt.initializeVoiceAgent,
-  initializeVoiceAgentWithLoadedModels: VoiceAgentExt.initializeVoiceAgentWithLoadedModels,
-  isVoiceAgentReady: VoiceAgentExt.isVoiceAgentReady,
-  getVoiceAgentComponentStates: VoiceAgentExt.getVoiceAgentComponentStates,
-  areAllVoiceComponentsReady: VoiceAgentExt.areAllVoiceComponentsReady,
-  processVoiceTurn: VoiceAgentExt.processVoiceTurn,
-  voiceAgentTranscribe: VoiceAgentExt.voiceAgentTranscribe,
-  voiceAgentGenerateResponse: VoiceAgentExt.voiceAgentGenerateResponse,
-  voiceAgentSynthesizeSpeech: VoiceAgentExt.voiceAgentSynthesizeSpeech,
-  streamVoiceAgent: VoiceAgentExt.streamVoiceAgent,
-  cleanupVoiceAgent: VoiceAgentExt.cleanupVoiceAgent,
-  getVoiceAgentAvailability: VoiceAgentExt.getVoiceAgentAvailability,
-  isVoiceAgentAvailable: VoiceAgentExt.isVoiceAgentAvailable,
+    async requestLocalStorageAccess(): Promise<boolean> {
+      if (!_localFileStorage) return false;
+      return _localFileStorage.requestAccess();
+    },
+  }),
 
   // =========================================================================
   // Solutions namespace
@@ -575,7 +588,16 @@ export const RunAnywhere = {
   lora: LoRACapability,
 
   /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
-  rag: RAGExt.RAG,
+  rag: RAGCapability,
+
+  /** Voice-agent orchestration — `RunAnywhere.voiceAgent.processTurn(...)` etc. */
+  voiceAgent: VoiceAgentCapability,
+
+  /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
+  visionLanguage: VisionLanguageCapability,
+
+  /** Runtime plugin loader — unavailable on plain WASM unless host exports the ABI. */
+  pluginLoader: PluginLoaderCapability,
 
   /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
   hardware: HardwareCapability,
@@ -601,6 +623,7 @@ export const RunAnywhere = {
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;
+    _hasCompletedNativePhase1 = false;
     _hasCompletedServicesInit = false;
     _servicesInitPromise = null;
 

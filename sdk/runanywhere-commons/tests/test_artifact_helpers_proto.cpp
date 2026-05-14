@@ -21,8 +21,8 @@
  *   - Negative paths: NULL out pointer, malformed bytes.
  */
 
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -38,33 +38,30 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                 \
-    do {                                                                                  \
-        if (!(cond)) {                                                                    \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__,          \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                   \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,   \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                               \
-    do {                                                                                  \
-        if ((a) != (b)) {                                                                 \
-            std::fprintf(stderr,                                                          \
-                         "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
-                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),              \
-                         std::string(b).c_str());                                         \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_STR_EQ(a, b)                                                                        \
+    do {                                                                                           \
+        if ((a) != (b)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
+                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),                       \
+                         std::string(b).c_str());                                                  \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -264,21 +261,17 @@ int test_multi_file_descriptors() {
     ASSERT_EQ(result.optional_patterns_size(), 0);
     ASSERT_EQ(result.files_size(), 3);
 
-    ASSERT_STR_EQ(result.files(0).url(),
-                  std::string("https://example.test/qwen-vl/model.gguf"));
+    ASSERT_STR_EQ(result.files(0).url(), std::string("https://example.test/qwen-vl/model.gguf"));
     ASSERT_STR_EQ(result.files(0).filename(), std::string("model.gguf"));
     ASSERT_EQ(result.files(0).is_required(), true);
-    ASSERT_EQ(result.files(0).role(),
-              runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+    ASSERT_EQ(result.files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
 
     ASSERT_STR_EQ(result.files(1).filename(), std::string("mmproj.gguf"));
-    ASSERT_EQ(result.files(1).role(),
-              runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
+    ASSERT_EQ(result.files(1).role(), runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
 
     ASSERT_STR_EQ(result.files(2).filename(), std::string("tokenizer.json"));
     ASSERT_EQ(result.files(2).is_required(), false);
-    ASSERT_EQ(result.files(2).role(),
-              runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
+    ASSERT_EQ(result.files(2).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     return 0;
 }
 
@@ -381,8 +374,7 @@ int test_malformed_input_bytes() {
     static const uint8_t kGarbage[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
-    rac_result_t rc = rac_artifact_expected_files_proto(
-        kGarbage, sizeof(kGarbage), &buffer);
+    rac_result_t rc = rac_artifact_expected_files_proto(kGarbage, sizeof(kGarbage), &buffer);
     ASSERT_EQ(rc, RAC_ERROR_DECODING_ERROR);
     rac_proto_buffer_free(&buffer);
     return 0;
@@ -404,23 +396,17 @@ int main(int /*argc*/, char** /*argv*/) {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {"top_level_expected_files_short_circuit",
-         test_top_level_expected_files_short_circuit},
-        {"single_file_with_explicit_manifest",
-         test_single_file_with_explicit_manifest},
-        {"single_file_with_pattern_shorthand",
-         test_single_file_with_pattern_shorthand},
-        {"zip_archive_with_explicit_manifest",
-         test_zip_archive_with_explicit_manifest},
-        {"tar_gz_archive_with_pattern_shorthand",
-         test_tar_gz_archive_with_pattern_shorthand},
+        {"top_level_expected_files_short_circuit", test_top_level_expected_files_short_circuit},
+        {"single_file_with_explicit_manifest", test_single_file_with_explicit_manifest},
+        {"single_file_with_pattern_shorthand", test_single_file_with_pattern_shorthand},
+        {"zip_archive_with_explicit_manifest", test_zip_archive_with_explicit_manifest},
+        {"tar_gz_archive_with_pattern_shorthand", test_tar_gz_archive_with_pattern_shorthand},
         {"multi_file_descriptors", test_multi_file_descriptors},
         {"multi_file_empty_descriptors", test_multi_file_empty_descriptors},
         {"no_artifact_default", test_no_artifact_default},
         {"built_in_artifact_default", test_built_in_artifact_default},
         {"custom_strategy_id_default", test_custom_strategy_id_default},
-        {"empty_model_bytes_returns_empty_manifest",
-         test_empty_model_bytes_returns_empty_manifest},
+        {"empty_model_bytes_returns_empty_manifest", test_empty_model_bytes_returns_empty_manifest},
         {"null_out_pointer", test_null_out_pointer},
         {"invalid_input_bytes", test_invalid_input_bytes},
         {"malformed_input_bytes", test_malformed_input_bytes},
@@ -442,8 +428,7 @@ int main(int /*argc*/, char** /*argv*/) {
         std::fprintf(stderr, "\n%d test(s) failed.\n", failures);
         return 1;
     }
-    std::printf("\nAll %zu test(s) passed.\n",
-                sizeof(kTests) / sizeof(kTests[0]));
+    std::printf("\nAll %zu test(s) passed.\n", sizeof(kTests) / sizeof(kTests[0]));
     return 0;
 #endif
 }

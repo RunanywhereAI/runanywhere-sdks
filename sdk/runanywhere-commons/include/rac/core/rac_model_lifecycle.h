@@ -29,31 +29,28 @@ extern "C" {
  * request-level success. Semantic failures such as missing models or no route
  * are represented as ModelLoadResult.success=false.
  */
-RAC_API rac_result_t rac_model_lifecycle_load_proto(
-    rac_model_registry_handle_t registry,
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry,
+                                                    const uint8_t* request_proto_bytes,
+                                                    size_t request_proto_size,
+                                                    rac_proto_buffer_t* out_result);
 
 /**
  * @brief Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
  *
  * Returns serialized runanywhere.v1.ModelUnloadResult bytes in out_result.
  */
-RAC_API rac_result_t rac_model_lifecycle_unload_proto(
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_model_lifecycle_unload_proto(const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      rac_proto_buffer_t* out_result);
 
 /**
  * @brief Query current model from serialized runanywhere.v1.CurrentModelRequest bytes.
  *
  * Returns serialized runanywhere.v1.CurrentModelResult bytes in out_result.
  */
-RAC_API rac_result_t rac_model_lifecycle_current_model_proto(
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_model_lifecycle_current_model_proto(const uint8_t* request_proto_bytes,
+                                                             size_t request_proto_size,
+                                                             rac_proto_buffer_t* out_result);
 
 /**
  * @brief Snapshot a component lifecycle state as serialized
@@ -61,9 +58,8 @@ RAC_API rac_result_t rac_model_lifecycle_current_model_proto(
  *
  * component is the numeric runanywhere.v1.SDKComponent value.
  */
-RAC_API rac_result_t rac_component_lifecycle_snapshot_proto(
-    uint32_t component,
-    rac_proto_buffer_t* out_snapshot);
+RAC_API rac_result_t rac_component_lifecycle_snapshot_proto(uint32_t component,
+                                                            rac_proto_buffer_t* out_snapshot);
 
 /**
  * @brief Test helper: unload all tracked models and reset lifecycle state.

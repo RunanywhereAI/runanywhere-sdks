@@ -42,7 +42,6 @@ using runanywhere::v1::GenerationEventKind;
 using runanywhere::v1::LLMGenerateRequest;
 using runanywhere::v1::LLMGenerationResult;
 using runanywhere::v1::LLMStreamFinalResult;
-using runanywhere::v1::SDKComponent;
 using runanywhere::v1::SDKEvent;
 using runanywhere::v1::TokenKind;
 

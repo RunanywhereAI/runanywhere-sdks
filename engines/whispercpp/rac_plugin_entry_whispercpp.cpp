@@ -8,10 +8,10 @@
  * the served primitive set alongside the routing metadata.
  */
 
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
-#include "rac/features/stt/rac_stt_service.h"
 
 extern "C" {
 
@@ -22,9 +22,7 @@ extern const rac_stt_service_ops_t g_whispercpp_stt_ops;
  * binary is loaded the whisper.cpp library was linked in, so the primitives
  * are always dispatchable. Return RAC_SUCCESS to signal "available".
  */
-static rac_result_t whispercpp_capability_check(void) {
-    return RAC_SUCCESS;
-}
+static rac_result_t whispercpp_capability_check(void) { return RAC_SUCCESS; }
 
 static const rac_runtime_id_t k_whispercpp_runtimes[] = {
     RAC_RUNTIME_CPU,
@@ -43,22 +41,25 @@ static const rac_primitive_t k_whispercpp_primitives[] = {
 };
 
 static const rac_engine_manifest_t k_whispercpp_manifest = {
-    .name             = "whispercpp",
-    .display_name     = "whisper.cpp",
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "runanywhere_whispercpp",
-    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority         = 80,
+    .name = "whispercpp",
+    .display_name = "whisper.cpp",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_whispercpp",
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority = 80,
     .capability_flags = 0,
-    .primitives       = k_whispercpp_primitives,
-    .primitives_count = sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
-    .runtimes         = k_whispercpp_runtimes,
-    .runtimes_count   = sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
-    .formats          = k_whispercpp_formats,
-    .formats_count    = sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .primitives = k_whispercpp_primitives,
+    .primitives_count =
+        sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
+    .runtimes = k_whispercpp_runtimes,
+    .runtimes_count =
+        sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
+    .formats = k_whispercpp_formats,
+    .formats_count =
+        sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
@@ -75,13 +76,21 @@ static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(whispercpp) {
-    return rac_engine_entry_with_manifest(&k_whispercpp_manifest,
-                                          &g_whispercpp_engine_vtable);
+  return rac_engine_entry_with_manifest(&k_whispercpp_manifest,
+                                        &g_whispercpp_engine_vtable);
 }
 
-}  // extern "C"
+} // extern "C"

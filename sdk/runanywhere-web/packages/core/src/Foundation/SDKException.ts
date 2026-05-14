@@ -234,6 +234,10 @@ export class SDKException extends Error {
       details,
     );
   }
+
+  static invalidInput(message: string, details?: string): SDKException {
+    return SDKException.fromCode(SDKErrorCode.InvalidParameter, message, details);
+  }
 }
 
 /** Type guard: returns true if the value is an SDKException instance. */

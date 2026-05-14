@@ -33,14 +33,14 @@ extension RASDKError {
         category: RAErrorCategory = .component,
         nestedMessage: String? = nil
     ) -> RASDKError {
-        var p = RASDKError()
-        p.code = code
-        p.message = message
-        p.category = category
+        var proto = RASDKError()
+        proto.code = code
+        proto.message = message
+        proto.category = category
         if let nested = nestedMessage {
-            p.nestedMessage = nested
+            proto.nestedMessage = nested
         }
-        return p
+        return proto
     }
 
     /// Map a `rac_result_t` to a proto `RASDKError` via the canonical

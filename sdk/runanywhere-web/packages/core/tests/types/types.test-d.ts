@@ -17,7 +17,6 @@ import {
   type LLMGenerationOptions,
   type ChatMessage,
   type DownloadProgress,
-  type IRunAnywhere,
   type LoRAAdapterConfig,
   type LoRAApplyRequest,
   type LoRAApplyResult,
@@ -34,9 +33,9 @@ import {
   type LoraCompatibilityResult,
   type ToolDefinition,
   type ToolValue,
-} from '../index';
+} from '@runanywhere/web';
 
-// InitializeOptions (SDKInitOptions) must accept environment
+// initialize options must accept the proto-canonical environment enum.
 type InitOptions = Parameters<(typeof RunAnywhere)['initialize']>[0];
 const opts: InitOptions = {
   environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
@@ -59,7 +58,6 @@ const msg: ChatMessage = {
   role: MessageRole.MESSAGE_ROLE_USER,
   content: 'Hello',
   timestampUs: 0,
-  toolCallsJson: [],
   toolCalls: [],
   status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
   metadata: {},
@@ -90,10 +88,6 @@ const prog: DownloadProgress = {
   resumeToken: '',
 };
 expectType<number>(prog.stageProgress);
-
-// IRunAnywhere must be satisfied by the RunAnywhere export
-const sdk: IRunAnywhere = RunAnywhere;
-expectType<IRunAnywhere>(sdk);
 
 const loraHandle = 1;
 const loraConfig: LoRAAdapterConfig = {

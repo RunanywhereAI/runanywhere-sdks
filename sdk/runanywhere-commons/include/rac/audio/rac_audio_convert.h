@@ -33,7 +33,8 @@ namespace audio {
  * If `in` is NULL or `n_samples` is zero the call is a no-op.
  */
 inline void rac_audio_pcm16_to_float32(const int16_t* in, size_t n_samples, float* out) {
-    if (in == nullptr || out == nullptr || n_samples == 0) return;
+    if (in == nullptr || out == nullptr || n_samples == 0)
+        return;
     for (size_t i = 0; i < n_samples; ++i) {
         out[i] = static_cast<float>(in[i]) / 32768.0f;
     }

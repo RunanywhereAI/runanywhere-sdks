@@ -42,7 +42,8 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
@@ -53,8 +54,7 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 }
 
 void populate_result(runanywhere::v1::ModelCompatibilityResult* result,
-                     const rac_model_compatibility_result_t& source,
-                     const std::string& model_id) {
+                     const rac_model_compatibility_result_t& source, const std::string& model_id) {
     result->set_model_id(model_id);
     result->set_is_compatible(source.is_compatible == RAC_TRUE);
     result->set_can_run(source.can_run == RAC_TRUE);
@@ -89,7 +89,8 @@ void populate_result(runanywhere::v1::ModelCompatibilityResult* result,
 extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* request_bytes,
                                                             size_t request_size,
                                                             rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_bytes;
     (void)request_size;
@@ -102,9 +103,8 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
     }
 
     runanywhere::v1::ModelCompatibilityRequest request;
-    if (request_size > 0 &&
-        !request.ParseFromArray(parse_data(request_bytes, request_size),
-                                static_cast<int>(request_size))) {
+    if (request_size > 0 && !request.ParseFromArray(parse_data(request_bytes, request_size),
+                                                    static_cast<int>(request_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse ModelCompatibilityRequest");
     }
@@ -131,15 +131,15 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
     }
 
     rac_model_compatibility_result_t struct_result = {};
-    rac_result_t rc = rac_model_check_compatibility(registry, request.model_id().c_str(),
-                                                    request.available_ram_bytes(),
-                                                    request.available_storage_bytes(),
-                                                    &struct_result);
+    rac_result_t rc = rac_model_check_compatibility(
+        registry, request.model_id().c_str(), request.available_ram_bytes(),
+        request.available_storage_bytes(), &struct_result);
     if (rc != RAC_SUCCESS) {
         const char* msg = rac_error_message(rc);
         proto_result.set_error_code(static_cast<int32_t>(rc));
         proto_result.set_error_message(msg ? msg : "compatibility check failed");
-        if (msg && msg[0]) proto_result.add_reasons(msg);
+        if (msg && msg[0])
+            proto_result.add_reasons(msg);
         return copy_proto(proto_result, out_result);
     }
 

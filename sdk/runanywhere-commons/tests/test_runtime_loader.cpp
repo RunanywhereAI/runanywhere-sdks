@@ -61,7 +61,7 @@ const rac_runtime_vtable_v2_t k_loader_vtable_v2 = {
 const rac_runtime_vtable_t k_loader_vtable = {
     /* .metadata = */ {
         /* .abi_version             = */ RAC_RUNTIME_ABI_VERSION,
-        /* .id                      = */ RAC_RUNTIME_QNN,  /* arbitrary unused id */
+        /* .id                      = */ RAC_RUNTIME_QNN, /* arbitrary unused id */
         /* .name                    = */ "test_static_runtime",
         /* .display_name            = */ "T4.1 static-register fixture",
         /* .version                 = */ "0.0.0",
@@ -93,16 +93,16 @@ const rac_runtime_vtable_t k_loader_vtable = {
 int g_test_count = 0;
 int g_fail_count = 0;
 
-#define CHECK(cond, label) do { \
-    ++g_test_count; \
-    if (!(cond)) { \
-        ++g_fail_count; \
-        std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", \
-                     label, __FILE__, __LINE__, #cond); \
-    } else { \
-        std::fprintf(stdout, "  ok:   %s\n", label); \
-    } \
-} while (0)
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++g_test_count;                                                                          \
+        if (!(cond)) {                                                                           \
+            ++g_fail_count;                                                                      \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
+    } while (0)
 
 }  // namespace
 
@@ -117,12 +117,10 @@ int main() {
 
     /* (1) Pre-main registration: the fixture's init() ran during static init
      *     and the vtable is already in the registry. */
-    CHECK(g_loader_init_called,
-          "(1) init() ran before main (RAC_STATIC_RUNTIME_REGISTER fired)");
+    CHECK(g_loader_init_called, "(1) init() ran before main (RAC_STATIC_RUNTIME_REGISTER fired)");
 
     const rac_runtime_vtable_t* found = rac_runtime_get_by_id(RAC_RUNTIME_QNN);
-    CHECK(found == &k_loader_vtable,
-          "(1) registry entry matches the statically-registered vtable");
+    CHECK(found == &k_loader_vtable, "(1) registry entry matches the statically-registered vtable");
 
     /* (2) Entry-point returns the same vtable address. */
     CHECK(rac_runtime_entry_test_static_runtime() == &k_loader_vtable,
@@ -138,15 +136,12 @@ int main() {
 
     CHECK(rac_runtime_unregister(RAC_RUNTIME_QNN) == RAC_SUCCESS,
           "(3) unregister returns RAC_SUCCESS");
-    CHECK(g_loader_destroy_called,
-          "(3) destroy() fires during unregister");
-    CHECK(rac_runtime_get_by_id(RAC_RUNTIME_QNN) == nullptr,
-          "(3) lookup NULL after unregister");
+    CHECK(g_loader_destroy_called, "(3) destroy() fires during unregister");
+    CHECK(rac_runtime_get_by_id(RAC_RUNTIME_QNN) == nullptr, "(3) lookup NULL after unregister");
 
     CHECK(rac_runtime_register(&k_loader_vtable) == RAC_SUCCESS,
           "(3) re-register after unregister succeeds");
-    CHECK(g_loader_init_called,
-          "(3) init() fires on re-register");
+    CHECK(g_loader_init_called, "(3) init() fires on re-register");
     CHECK(rac_runtime_get_by_id(RAC_RUNTIME_QNN) == &k_loader_vtable,
           "(3) vtable pointer stable across re-register cycle");
 

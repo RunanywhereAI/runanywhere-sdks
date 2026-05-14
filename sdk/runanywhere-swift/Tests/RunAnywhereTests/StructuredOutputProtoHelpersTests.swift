@@ -25,7 +25,7 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
         schema.type = .object
         schema.properties = [
             "answer": answer,
-            "score": score,
+            "score": score
         ]
         schema.required = ["answer"]
         schema.additionalProperties = false

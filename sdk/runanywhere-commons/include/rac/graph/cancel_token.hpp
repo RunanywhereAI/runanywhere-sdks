@@ -28,31 +28,28 @@
 namespace rac::graph {
 
 class CancelToken : public std::enable_shared_from_this<CancelToken> {
-public:
+   public:
     CancelToken() = default;
 
     /// Construct a child token that inherits its parent's cancel state.
     /// If `parent` is already cancelled, the new child is cancelled too.
-    explicit CancelToken(std::shared_ptr<CancelToken> parent)
-        : parent_(std::move(parent)) {
+    explicit CancelToken(std::shared_ptr<CancelToken> parent) : parent_(std::move(parent)) {
         if (parent_ && parent_->is_cancelled()) {
             cancelled_.store(true, std::memory_order_relaxed);
         }
     }
 
-    CancelToken(const CancelToken&)            = delete;
+    CancelToken(const CancelToken&) = delete;
     CancelToken& operator=(const CancelToken&) = delete;
 
     /// Lock-free check — called on every pipeline iteration.
-    bool is_cancelled() const noexcept {
-        return cancelled_.load(std::memory_order_acquire);
-    }
+    bool is_cancelled() const noexcept { return cancelled_.load(std::memory_order_acquire); }
 
     /// Cancel this token and all registered children. Idempotent.
     void cancel() {
-        const bool was_already_cancelled = cancelled_.exchange(
-            true, std::memory_order_release);
-        if (was_already_cancelled) return;
+        const bool was_already_cancelled = cancelled_.exchange(true, std::memory_order_release);
+        if (was_already_cancelled)
+            return;
 
         // Cascade to children. Take the lock once and release after
         // copying the list — avoids a re-entrant cancel deadlock
@@ -75,7 +72,8 @@ public:
     /// Register `child` for cascade. Should usually be called by
     /// `CancelToken::create_child()` below, not directly.
     void add_child(std::shared_ptr<CancelToken> child) {
-        if (!child) return;
+        if (!child)
+            return;
         std::lock_guard<std::mutex> lock(children_mu_);
         children_.emplace_back(child);
     }
@@ -88,11 +86,11 @@ public:
         return child;
     }
 
-private:
-    std::atomic<bool>                           cancelled_{false};
-    std::shared_ptr<CancelToken>                parent_;
-    std::mutex                                  children_mu_;
-    std::vector<std::weak_ptr<CancelToken>>     children_;
+   private:
+    std::atomic<bool> cancelled_{false};
+    std::shared_ptr<CancelToken> parent_;
+    std::mutex children_mu_;
+    std::vector<std::weak_ptr<CancelToken>> children_;
 };
 
 }  // namespace rac::graph

@@ -34,6 +34,7 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_primitive.h"
 
+// NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,14 +48,14 @@ extern "C" {
  * the specific per-domain header for the primitive they implement.
  * =========================================================================== */
 
-struct rac_llm_service_ops;              /* rac/features/llm/rac_llm_service.h */
-struct rac_stt_service_ops;              /* rac/features/stt/rac_stt_service.h */
-struct rac_tts_service_ops;              /* rac/features/tts/rac_tts_service.h */
-struct rac_vad_service_ops;              /* rac/features/vad/rac_vad_service.h */
-struct rac_embeddings_service_ops;       /* rac/features/embeddings/rac_embeddings_service.h */
-struct rac_rerank_service_ops;           /* rac/features/rerank/rac_rerank_service.h (future) */
-struct rac_vlm_service_ops;              /* rac/features/vlm/rac_vlm_service.h */
-struct rac_diffusion_service_ops;        /* rac/features/diffusion/rac_diffusion_service.h */
+struct rac_llm_service_ops;        /* rac/features/llm/rac_llm_service.h */
+struct rac_stt_service_ops;        /* rac/features/stt/rac_stt_service.h */
+struct rac_tts_service_ops;        /* rac/features/tts/rac_tts_service.h */
+struct rac_vad_service_ops;        /* rac/features/vad/rac_vad_service.h */
+struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_service.h */
+struct rac_rerank_service_ops;     /* rac/features/rerank/rac_rerank_service.h (future) */
+struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
+struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 
 /**
  * @brief Plugin metadata carried in every vtable.
@@ -112,13 +113,13 @@ typedef struct rac_engine_metadata {
      *  runtime registry (e.g. llama.cpp today, which bundles its own Metal
      *  shaders) simply continue to score off priority + hardware profile. */
     const rac_runtime_id_t* runtimes;
-    size_t                  runtimes_count;
+    size_t runtimes_count;
 
     /** Model file formats this engine accepts (`RAC_MODEL_FORMAT_ID_*` values
      *  mirroring `runanywhere.v1.ModelFormat`). MAY be NULL. Frontends pass
      *  the proto enum value directly via `RouteRequest.format`. */
-    const uint32_t*         formats;
-    size_t                  formats_count;
+    const uint32_t* formats;
+    size_t formats_count;
 } rac_engine_metadata_t;
 
 /**
@@ -149,25 +150,25 @@ typedef struct rac_engine_vtable {
     /* ─────────── Primitive slot groups (8 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
-    const struct rac_llm_service_ops*       llm_ops;
+    const struct rac_llm_service_ops* llm_ops;
 
     /** Speech-to-Text (`RAC_PRIMITIVE_TRANSCRIBE`). */
-    const struct rac_stt_service_ops*       stt_ops;
+    const struct rac_stt_service_ops* stt_ops;
 
     /** Text-to-Speech (`RAC_PRIMITIVE_SYNTHESIZE`). */
-    const struct rac_tts_service_ops*       tts_ops;
+    const struct rac_tts_service_ops* tts_ops;
 
     /** Voice Activity Detection (`RAC_PRIMITIVE_DETECT_VOICE`). */
-    const struct rac_vad_service_ops*       vad_ops;
+    const struct rac_vad_service_ops* vad_ops;
 
     /** Text / multimodal embeddings (`RAC_PRIMITIVE_EMBED`). */
     const struct rac_embeddings_service_ops* embedding_ops;
 
     /** Cross-encoder reranking (`RAC_PRIMITIVE_RERANK`). */
-    const struct rac_rerank_service_ops*    rerank_ops;
+    const struct rac_rerank_service_ops* rerank_ops;
 
     /** Vision-Language Model (`RAC_PRIMITIVE_VLM`). */
-    const struct rac_vlm_service_ops*       vlm_ops;
+    const struct rac_vlm_service_ops* vlm_ops;
 
     /** Diffusion / image generation (`RAC_PRIMITIVE_DIFFUSION`). */
     const struct rac_diffusion_service_ops* diffusion_ops;
@@ -201,11 +202,11 @@ typedef struct rac_engine_vtable {
  * or for primitives outside the 1..8 range. The returned pointer must be
  * cast to the primitive's per-domain ops struct type.
  */
-const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt,
-                                   rac_primitive_t primitive);
+const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_t primitive);
 
 #ifdef __cplusplus
 }
 #endif
+// NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)
 
 #endif /* RAC_PLUGIN_ENGINE_VTABLE_H */

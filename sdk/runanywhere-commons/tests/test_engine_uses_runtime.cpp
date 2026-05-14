@@ -11,13 +11,12 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
-#define CHECK(cond, msg)                                                        \
-    do {                                                                        \
-        if (!(cond)) {                                                          \
-            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":"          \
-                      << __LINE__ << std::endl;                                 \
-            return 1;                                                           \
-        }                                                                       \
+#define CHECK(cond, msg)                                                                        \
+    do {                                                                                        \
+        if (!(cond)) {                                                                          \
+            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            return 1;                                                                           \
+        }                                                                                       \
     } while (0)
 
 namespace {
@@ -31,15 +30,16 @@ int g_provider_destroy_calls = 0;
 
 rac_result_t probe_provider_create(const rac_runtime_session_desc_t* desc,
                                    rac_runtime_session_t** out) {
-    if (desc == nullptr || out == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (desc == nullptr || out == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     *out = reinterpret_cast<rac_runtime_session_t*>(new (std::nothrow) ProbeSession());
-    if (*out == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+    if (*out == nullptr)
+        return RAC_ERROR_OUT_OF_MEMORY;
     ++g_provider_create_calls;
     return RAC_SUCCESS;
 }
 
-rac_result_t probe_provider_run(rac_runtime_session_t* session,
-                                const rac_runtime_io_t*, size_t,
+rac_result_t probe_provider_run(rac_runtime_session_t* session, const rac_runtime_io_t*, size_t,
                                 rac_runtime_io_t*, size_t) {
     return session == nullptr ? RAC_ERROR_NULL_POINTER : RAC_SUCCESS;
 }
@@ -49,10 +49,9 @@ void probe_provider_destroy(rac_runtime_session_t* session) {
     ++g_provider_destroy_calls;
 }
 
-rac_result_t probe_engine_create(const char* model_id,
-                                 const char*,
-                                 void** out_impl) {
-    if (model_id == nullptr || out_impl == nullptr) return RAC_ERROR_NULL_POINTER;
+rac_result_t probe_engine_create(const char* model_id, const char*, void** out_impl) {
+    if (model_id == nullptr || out_impl == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
     const rac_runtime_vtable_t* runtime = rac_runtime_get_by_id(RAC_RUNTIME_CPU);
     if (runtime == nullptr || runtime->create_session == nullptr) {
@@ -118,8 +117,16 @@ const rac_engine_vtable_t k_probe_engine = {
     /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 }  // namespace
@@ -140,8 +147,7 @@ int main() {
     CHECK(rac_cpu_runtime_register_provider(&provider) == RAC_SUCCESS,
           "register CPU probe provider");
 
-    CHECK(rac_plugin_register(&k_probe_engine) == RAC_SUCCESS,
-          "register probe engine");
+    CHECK(rac_plugin_register(&k_probe_engine) == RAC_SUCCESS, "register probe engine");
     const rac_engine_vtable_t* selected = rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT);
     CHECK(selected == &k_probe_engine, "probe engine selected for LLM primitive");
     CHECK(selected->llm_ops != nullptr && selected->llm_ops->create != nullptr,

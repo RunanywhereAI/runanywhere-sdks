@@ -40,19 +40,19 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
         category: RAErrorCategory = .component,
         underlying: (any Error)? = nil
     ) {
-        var p = RASDKError()
-        p.code = code
-        p.message = message
-        p.category = category
+        var proto = RASDKError()
+        proto.code = code
+        proto.message = message
+        proto.category = category
         // Round-trip C ABI code: positive proto code ↔ negative rac_result_t
         let raw = code.rawValue
         if raw > 0 && raw <= 899 {
-            p.cAbiCode = -Int32(raw)
+            proto.cAbiCode = -Int32(raw)
         }
-        if let u = underlying {
-            p.nestedMessage = String(describing: u)
+        if let unwrapped = underlying {
+            proto.nestedMessage = String(describing: unwrapped)
         }
-        self.proto = p
+        self.proto = proto
         self.underlying = underlying
         self.stackTrace = Thread.callStackSymbols
     }
@@ -100,8 +100,8 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
 
     public var description: String {
         var result = "SDKException[\(proto.category).\(proto.code)]: \(proto.message)"
-        if let u = underlying {
-            result += "\n  Caused by: \(u)"
+        if let unwrapped = underlying {
+            result += "\n  Caused by: \(unwrapped)"
         }
         return result
     }

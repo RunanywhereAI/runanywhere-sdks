@@ -225,8 +225,7 @@ RAC_API void rac_vlm_component_destroy(rac_handle_t handle);
  * rac_vlm_cancel_proto) and is released via rac_vlm_destroy.
  */
 RAC_API rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

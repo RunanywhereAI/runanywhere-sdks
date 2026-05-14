@@ -20,16 +20,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -53,8 +52,7 @@ constexpr const char* kRefreshResponse =
     R"({"access_token":"access-2","refresh_token":"refresh-2","device_id":"device-1","user_id":"user-1","organization_id":"org-1","token_type":"bearer","expires_in":7200})";
 
 void expect_auth_envelope(const runanywhere::v1::SDKEvent& event,
-                          runanywhere::v1::AuthEventKind kind,
-                          const char* operation) {
+                          runanywhere::v1::AuthEventKind kind, const char* operation) {
     CHECK(!event.id().empty(), "auth SDKEvent has id");
     CHECK(event.timestamp_ms() > 0, "auth SDKEvent has timestamp");
     CHECK(event.category() == runanywhere::v1::EVENT_CATEGORY_AUTH,
@@ -95,8 +93,7 @@ int main() {
           "authenticate success severity is info");
     CHECK(auth_event.auth().subject_id() == "user-1", "authenticate event carries subject");
     const auto device_property = auth_event.properties().find("device_id");
-    CHECK(device_property != auth_event.properties().end() &&
-              device_property->second == "device-1",
+    CHECK(device_property != auth_event.properties().end() && device_property->second == "device-1",
           "authenticate event carries device id property");
 
     rac_sdk_event_clear_queue();

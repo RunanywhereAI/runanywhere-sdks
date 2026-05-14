@@ -3,7 +3,7 @@
  *
  * v3-readiness Phase A4. Typed surface over the Emscripten-compiled
  * RACommons module so TypeScript call sites (VoiceAgentStreamAdapter,
- * LlmThinking, future ccall wrappers) can reference `runanywhereModule`
+ * future ccall wrappers) can reference `runanywhereModule`
  * without each site re-declaring the function signatures.
  *
  * Initialization pattern:
@@ -33,7 +33,7 @@ import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
 /**
  * Minimal subset of the Emscripten Module object that this SDK uses.
  * Add exported-function signatures here as they're wired through the
- * TS surface (e.g. `_rac_llm_extract_thinking` in Phase A11).
+ * TS surface.
  */
 export interface EmscriptenRunanywhereModule {
   // =============================================================================
@@ -331,52 +331,22 @@ export interface EmscriptenRunanywhereModule {
   ): number;
 
   // -----------------------------------------------------------------------------
-  // LLM Thinking (v3 Phase A11 / GAP 08 #6)
+  // SDK initialization / auth state
   // -----------------------------------------------------------------------------
-  // Reach these via ccall wrappers in LlmThinking.ts — they take char*
-  // pointers via _malloc + stringToUTF8 and out-pointers via _malloc for
-  // out-char** / out-size_t / out-int32_t slots.
-
-  /**
-   * `rac_result_t rac_llm_extract_thinking(
-   *    const char* text,
-   *    const char** out_response, size_t* out_response_len,
-   *    const char** out_thinking, size_t* out_thinking_len);`
-   */
-  _rac_llm_extract_thinking(
-    textPtr: number,
-    outRespPtrPtr: number,
-    outRespLenPtr: number,
-    outThinkPtrPtr: number,
-    outThinkLenPtr: number,
+  _rac_sdk_init_phase1_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
   ): number;
-
-  /**
-   * `rac_result_t rac_llm_strip_thinking(
-   *    const char* text,
-   *    const char** out_stripped, size_t* out_stripped_len);`
-   */
-  _rac_llm_strip_thinking(
-    textPtr: number,
-    outPtrPtr: number,
-    outLenPtr: number,
+  _rac_sdk_init_phase2_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
   ): number;
-
-  /**
-   * `rac_result_t rac_llm_split_thinking_tokens(
-   *    int32_t total_completion_tokens,
-   *    const char* response_text,
-   *    const char* thinking_text,
-   *    int32_t* out_thinking_tokens,
-   *    int32_t* out_response_tokens);`
-   */
-  _rac_llm_split_thinking_tokens(
-    totalCompletionTokens: number,
-    respTextPtr: number,
-    thinkTextPtr: number,
-    outThinkingTokensPtr: number,
-    outResponseTokensPtr: number,
-  ): number;
+  _rac_auth_is_authenticated?(): number;
+  _rac_auth_get_user_id?(): number;
+  _rac_auth_get_organization_id?(): number;
+  _rac_state_is_device_registered?(): number;
 
   // -----------------------------------------------------------------------------
   // Solutions runtime (T4.7 / T4.8) — `rac/solutions/rac_solution.h`
@@ -627,7 +597,7 @@ export interface EmscriptenRunanywhereModule {
    * Requires `-sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction']`
    * and `-sALLOW_TABLE_GROWTH=1` at link time.
    */
-  addFunction(fn: (...args: number[]) => number | void, signature: string): number;
+  addFunction(fn: (...args: number[]) => number | bigint | void, signature: string): number;
 
   /** Remove a previously-installed JS callback. Idempotent. */
   removeFunction(ptr: number): void;

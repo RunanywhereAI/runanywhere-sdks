@@ -74,8 +74,7 @@ RAC_API void rac_rag_session_destroy_proto(rac_handle_t session);
  * metadata are persisted as ingestion metadata. out_stats receives
  * runanywhere.v1.RAGStatistics.
  */
-RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session,
-                                          const uint8_t* document_proto_bytes,
+RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_proto_bytes,
                                           size_t document_proto_size,
                                           rac_proto_buffer_t* out_stats);
 
@@ -84,22 +83,18 @@ RAC_API rac_result_t rac_rag_ingest_proto(rac_handle_t session,
  *
  * out_result receives serialized runanywhere.v1.RAGResult bytes.
  */
-RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session,
-                                         const uint8_t* query_proto_bytes,
-                                         size_t query_proto_size,
-                                         rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
+                                         size_t query_proto_size, rac_proto_buffer_t* out_result);
 
 /**
  * @brief Clear a RAG session and return serialized runanywhere.v1.RAGStatistics.
  */
-RAC_API rac_result_t rac_rag_clear_proto(rac_handle_t session,
-                                         rac_proto_buffer_t* out_stats);
+RAC_API rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_stats);
 
 /**
  * @brief Return serialized runanywhere.v1.RAGStatistics for a RAG session.
  */
-RAC_API rac_result_t rac_rag_stats_proto(rac_handle_t session,
-                                         rac_proto_buffer_t* out_stats);
+RAC_API rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_stats);
 
 // =============================================================================
 // CANONICAL DEFAULTS (P2-T14)
@@ -141,8 +136,7 @@ RAC_API rac_result_t rac_rag_stats_proto(rac_handle_t session,
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
  */
 RAC_API rac_result_t rac_rag_request_with_defaults_proto(
-    const uint8_t* in_request_bytes, size_t in_size,
-    rac_proto_buffer_t* out_RARAGConfiguration);
+    const uint8_t* in_request_bytes, size_t in_size, rac_proto_buffer_t* out_RARAGConfiguration);
 
 #ifdef __cplusplus
 }

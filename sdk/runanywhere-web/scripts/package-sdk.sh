@@ -72,9 +72,9 @@ DIST_DIR="${WEB_ROOT}/dist/sdk-web"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-for pkg in core llamacpp onnx; do
-    echo ">> npm pack packages/$pkg"
-    (cd "packages/$pkg" && npm pack --pack-destination "$DIST_DIR" >/dev/null)
+for pkg in ../shared/proto-ts packages/core packages/llamacpp packages/onnx; do
+    echo ">> npm pack $pkg"
+    (cd "$pkg" && npm pack --pack-destination "$DIST_DIR" >/dev/null)
 done
 
 echo ""
@@ -91,5 +91,5 @@ done
 
 if [ -x "${REPO_ROOT}/scripts/validate-artifact.sh" ]; then
     echo ""
-    "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz 2>/dev/null || true
+    "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz
 fi

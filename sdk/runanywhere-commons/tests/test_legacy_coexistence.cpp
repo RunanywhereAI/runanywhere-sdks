@@ -26,8 +26,8 @@ int main() {
     static const int k_fake_stt_ops = 1;
     rac_engine_vtable_t vt{};
     vt.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    vt.metadata.name        = "coex-demo";
-    vt.metadata.priority    = 50;
+    vt.metadata.name = "coex-demo";
+    vt.metadata.priority = 50;
     vt.stt_ops = reinterpret_cast<const struct rac_stt_service_ops*>(&k_fake_stt_ops);
 
     if (rac_plugin_register(&vt) != RAC_SUCCESS) {

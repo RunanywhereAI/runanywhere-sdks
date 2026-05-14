@@ -313,8 +313,7 @@ RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
  *           safety net used by `rac_lora_apply_proto` at load time. SDKs
  *           consume LoRA compatibility through the `rac_lora_*_proto` API.
  */
-rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
-                                                 const char* adapter_path,
+rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle, const char* adapter_path,
                                                  char** out_error);
 
 // =============================================================================

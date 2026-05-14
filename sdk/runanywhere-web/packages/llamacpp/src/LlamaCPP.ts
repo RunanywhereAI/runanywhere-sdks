@@ -6,8 +6,8 @@
  * llama.cpp + llama.cpp-VLM backends, then installs the module on every
  * core proto-byte adapter via `setRunanywhereModule(...)`.
  *
- * After `LlamaCPP.register()` resolves, `RunAnywhere.generate(...)`,
- * `RunAnywhere.generateStream(...)`, tool calling, structured output,
+ * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
+ * tool calling, structured output,
  * embeddings, and diffusion all flow through `@runanywhere/web` core's
  * proto-byte adapters (`LLMProtoAdapter`, `EmbeddingsProtoAdapter`,
  * `DiffusionProtoAdapter`, `StructuredOutputProtoAdapter`,
@@ -21,7 +21,8 @@
  *     await RunAnywhere.initialize({ environment: 'development' });
  *     await LlamaCPP.register({ acceleration: 'auto' });
  *
- *     const stream = await RunAnywhere.generateStream('Hello!', {
+ *     const stream = await RunAnywhere.textGeneration.generateStream({
+ *       prompt: 'Hello!',
  *       maxTokens: 256,
  *     });
  *     for await (const token of stream.stream) {
@@ -31,11 +32,14 @@
  */
 
 import {
+  completeDeferredServicesInitialization,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
+  setVisionLanguageProvider,
   SDKLogger,
-} from '@runanywhere/web';
+} from '@runanywhere/web/internal';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
+import { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
 
 const logger = new SDKLogger('LlamaCPP');
 
@@ -118,6 +122,8 @@ export const LlamaCPP = {
         // Publish the active mode so `RunAnywhere.runtime.active` reflects
         // what the bridge actually picked (auto → webgpu/cpu resolution).
         setActiveAccelerationMode(bridge.accelerationMode);
+        setVisionLanguageProvider(VLMWorkerBridge.shared);
+        await completeDeferredServicesInitialization();
 
         _isRegistered = true;
         logger.info(`LlamaCpp backend registered (${bridge.accelerationMode})`);
@@ -136,6 +142,7 @@ export const LlamaCPP = {
     if (!_isRegistered) return;
     setAccelerationSwitcher(null);
     setActiveAccelerationMode(null);
+    setVisionLanguageProvider(null);
     LlamaCppBridge.shared.shutdown();
     _isRegistered = false;
     logger.info('LlamaCpp backend unregistered');

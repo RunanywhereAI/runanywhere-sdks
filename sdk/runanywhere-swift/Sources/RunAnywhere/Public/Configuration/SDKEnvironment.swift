@@ -33,8 +33,8 @@ extension RASDKEnvironment: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 

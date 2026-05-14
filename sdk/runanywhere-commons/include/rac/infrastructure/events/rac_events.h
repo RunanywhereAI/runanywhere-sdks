@@ -29,9 +29,10 @@
 // Internal-use guard. Defined automatically when commons or engines build
 // against the C++ source tree. Public SDK headers MUST NOT include this file.
 // ---------------------------------------------------------------------------
-#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) &&    \
+#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) && \
     !defined(RAC_INTERNAL_TRANSLATION_UNIT)
-#warning "rac_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only inside engine plugins or commons internals."
+#warning \
+    "rac_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only inside engine plugins or commons internals."
 #endif
 
 #include "rac/core/rac_types.h"

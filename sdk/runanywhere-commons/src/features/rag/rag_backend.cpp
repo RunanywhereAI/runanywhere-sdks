@@ -5,13 +5,14 @@
 
 #include "rag_backend.h"
 
+#include "rag_pipeline_graph.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <unordered_set>
 
 #include "rac/core/rac_logger.h"
-#include "rag_pipeline_graph.h"
 
 #define LOG_TAG "RAG.Backend"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -392,14 +393,13 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
     RAGGraphResult g_out;
     rac_result_t status = run_rag_query(g_in, std::move(on_token), g_out);
     auto t_end = std::chrono::high_resolution_clock::now();
-    const double total_ms =
-        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    const double total_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
-    if (status != RAC_SUCCESS) return status;
+    if (status != RAC_SUCCESS)
+        return status;
 
     if (out_result) {
-        out_result->text =
-            !g_out.answer.empty() ? rac_strdup(g_out.answer.c_str()) : nullptr;
+        out_result->text = !g_out.answer.empty() ? rac_strdup(g_out.answer.c_str()) : nullptr;
         out_result->completion_tokens = 0;
         out_result->prompt_tokens = 0;
         out_result->total_tokens = 0;

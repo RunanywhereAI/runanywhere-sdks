@@ -9,10 +9,10 @@
  * ONNX Runtime model services.
  */
 
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_engine_manifest.h"
-#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/plugin/rac_engine_manifest.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 extern "C" {
 
@@ -44,27 +44,28 @@ static const rac_primitive_t k_onnx_primitives[] = {
 // only owns the embeddings primitive on this build (stt/tts/vad ops are
 // nullptr and shipped by engines/sherpa). Keep priority below sherpa's 90.
 static const rac_engine_manifest_t k_onnx_manifest = {
-    .name             = "onnx",
-    .display_name     = "ONNX Runtime",
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "rac_backend_onnx",
-    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority         = 50,
+    .name = "onnx",
+    .display_name = "ONNX Runtime",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "rac_backend_onnx",
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority = 50,
     .capability_flags = 0,
 #if defined(RAC_BACKEND_RAG)
-    .primitives       = k_onnx_primitives,
-    .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+    .primitives = k_onnx_primitives,
+    .primitives_count =
+        sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
 #else
-    .primitives       = nullptr,
+    .primitives = nullptr,
     .primitives_count = 0,
 #endif
-    .runtimes         = k_onnx_runtimes,
-    .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
-    .formats          = k_onnx_formats,
-    .formats_count    = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .runtimes = k_onnx_runtimes,
+    .runtimes_count = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
+    .formats = k_onnx_formats,
+    .formats_count = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 static const rac_engine_vtable_t g_onnx_engine_vtable = {
@@ -86,13 +87,21 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* diffusion_ops    */ nullptr,
 
     /* reserved_slot_0..9 */
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(onnx) {
-    return rac_engine_entry_with_manifest(&k_onnx_manifest,
-                                          &g_onnx_engine_vtable);
+  return rac_engine_entry_with_manifest(&k_onnx_manifest,
+                                        &g_onnx_engine_vtable);
 }
 
-}  // extern "C"
+} // extern "C"

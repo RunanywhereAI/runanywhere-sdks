@@ -105,8 +105,7 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -122,8 +121,7 @@ rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
 
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize STT proto result");
     }
@@ -165,18 +163,30 @@ runanywhere::v1::STTLanguage language_from_code(const char* language) {
     if (!language || language[0] == '\0') {
         return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
     }
-    if (std::strncmp(language, "en", 2) == 0) return runanywhere::v1::STT_LANGUAGE_EN;
-    if (std::strncmp(language, "es", 2) == 0) return runanywhere::v1::STT_LANGUAGE_ES;
-    if (std::strncmp(language, "fr", 2) == 0) return runanywhere::v1::STT_LANGUAGE_FR;
-    if (std::strncmp(language, "de", 2) == 0) return runanywhere::v1::STT_LANGUAGE_DE;
-    if (std::strncmp(language, "zh", 2) == 0) return runanywhere::v1::STT_LANGUAGE_ZH;
-    if (std::strncmp(language, "ja", 2) == 0) return runanywhere::v1::STT_LANGUAGE_JA;
-    if (std::strncmp(language, "ko", 2) == 0) return runanywhere::v1::STT_LANGUAGE_KO;
-    if (std::strncmp(language, "it", 2) == 0) return runanywhere::v1::STT_LANGUAGE_IT;
-    if (std::strncmp(language, "pt", 2) == 0) return runanywhere::v1::STT_LANGUAGE_PT;
-    if (std::strncmp(language, "ar", 2) == 0) return runanywhere::v1::STT_LANGUAGE_AR;
-    if (std::strncmp(language, "ru", 2) == 0) return runanywhere::v1::STT_LANGUAGE_RU;
-    if (std::strncmp(language, "hi", 2) == 0) return runanywhere::v1::STT_LANGUAGE_HI;
+    if (std::strncmp(language, "en", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_EN;
+    if (std::strncmp(language, "es", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_ES;
+    if (std::strncmp(language, "fr", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_FR;
+    if (std::strncmp(language, "de", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_DE;
+    if (std::strncmp(language, "zh", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_ZH;
+    if (std::strncmp(language, "ja", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_JA;
+    if (std::strncmp(language, "ko", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_KO;
+    if (std::strncmp(language, "it", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_IT;
+    if (std::strncmp(language, "pt", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_PT;
+    if (std::strncmp(language, "ar", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_AR;
+    if (std::strncmp(language, "ru", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_RU;
+    if (std::strncmp(language, "hi", 2) == 0)
+        return runanywhere::v1::STT_LANGUAGE_HI;
     return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
 }
 
@@ -199,17 +209,14 @@ rac_stt_options_t options_from_proto(const runanywhere::v1::STTOptions& proto,
 
 int64_t estimate_audio_length_ms(size_t audio_size, int32_t sample_rate) {
     const int32_t rate = sample_rate > 0 ? sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
-    return static_cast<int64_t>((static_cast<double>(audio_size) /
-                                 static_cast<double>(RAC_STT_BYTES_PER_SAMPLE) /
-                                 static_cast<double>(rate)) *
-                                1000.0);
+    return static_cast<int64_t>(
+        (static_cast<double>(audio_size) / static_cast<double>(RAC_STT_BYTES_PER_SAMPLE) /
+         static_cast<double>(rate)) *
+        1000.0);
 }
 
-void fill_stt_output(const rac_stt_result_t& result,
-                     const rac_stt_options_t& options,
-                     size_t audio_size,
-                     const char* model_id,
-                     runanywhere::v1::STTOutput* out) {
+void fill_stt_output(const rac_stt_result_t& result, const rac_stt_options_t& options,
+                     size_t audio_size, const char* model_id, runanywhere::v1::STTOutput* out) {
     if (result.text) {
         out->set_text(result.text);
     }
@@ -234,9 +241,8 @@ void fill_stt_output(const rac_stt_result_t& result,
     const int64_t audio_length_ms = estimate_audio_length_ms(audio_size, options.sample_rate);
     metadata->set_audio_length_ms(audio_length_ms);
     if (audio_length_ms > 0 && result.processing_time_ms > 0) {
-        metadata->set_real_time_factor(
-            static_cast<float>(static_cast<double>(result.processing_time_ms) /
-                               static_cast<double>(audio_length_ms)));
+        metadata->set_real_time_factor(static_cast<float>(
+            static_cast<double>(result.processing_time_ms) / static_cast<double>(audio_length_ms)));
     }
 }
 
@@ -256,8 +262,7 @@ bool validate_stt_stream_event(const runanywhere::v1::STTStreamEvent& event) {
         case runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL:
             return event.has_partial() && !event.partial().is_final();
         case runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL:
-            return (event.has_partial() && event.partial().is_final()) ||
-                   event.has_final_output();
+            return (event.has_partial() && event.partial().is_final()) || event.has_final_output();
         case runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR:
             return event.error_code() != RAC_SUCCESS || event.has_error_message();
         default:
@@ -266,24 +271,20 @@ bool validate_stt_stream_event(const runanywhere::v1::STTStreamEvent& event) {
 }
 
 void emit_stt_stream_event(const runanywhere::v1::STTStreamEvent& event,
-                           rac_stt_proto_stream_event_callback_fn callback,
-                           void* user_data) {
+                           rac_stt_proto_stream_event_callback_fn callback, void* user_data) {
     if (!callback || !validate_stt_stream_event(event)) {
         return;
     }
 
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
     }
 }
 
-void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind,
-                             const char* text,
-                             float confidence,
-                             rac_result_t error_code = RAC_SUCCESS) {
+void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind, const char* text,
+                             float confidence, rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_id(generate_unique_id());
@@ -306,8 +307,7 @@ void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind,
 
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
@@ -901,13 +901,10 @@ extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
 // GENERATED-PROTO C ABI
 // =============================================================================
 
-extern "C" rac_result_t rac_stt_component_transcribe_proto(
-    rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t
+rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, size_t audio_size,
+                                   const uint8_t* options_proto_bytes, size_t options_proto_size,
+                                   rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -967,13 +964,9 @@ extern "C" rac_result_t rac_stt_component_transcribe_proto(
 }
 
 extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
-    rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_stt_proto_stream_event_callback_fn callback,
-    void* user_data) {
+    rac_handle_t handle, const void* audio_data, size_t audio_size,
+    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_stt_proto_stream_event_callback_fn callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
     (void)audio_data;
@@ -1115,14 +1108,14 @@ extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
     return service->ops->stream_create(service->impl, effective, out_stream_handle);
 }
 
-extern "C" rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle,
-                                                                   rac_handle_t stream_handle,
-                                                                   const int16_t* samples,
-                                                                   size_t count,
-                                                                   rac_stt_stream_callback_t callback,
-                                                                   void* user_data) {
-    if (!handle) return RAC_ERROR_INVALID_HANDLE;
-    if (count > 0 && !samples) return RAC_ERROR_INVALID_ARGUMENT;
+extern "C" rac_result_t
+rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle, rac_handle_t stream_handle,
+                                          const int16_t* samples, size_t count,
+                                          rac_stt_stream_callback_t callback, void* user_data) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (count > 0 && !samples)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
@@ -1142,8 +1135,10 @@ extern "C" rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t h
 
 extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
                                                          rac_handle_t stream_handle) {
-    if (!handle) return RAC_ERROR_INVALID_HANDLE;
-    if (!stream_handle) return RAC_SUCCESS;
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!stream_handle)
+        return RAC_SUCCESS;
 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);

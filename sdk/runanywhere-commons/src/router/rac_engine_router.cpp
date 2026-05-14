@@ -28,6 +28,8 @@
 
 #include "rac/router/rac_engine_router.h"
 
+#include "accelerator_preference_internal.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -35,8 +37,6 @@
 
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_runtime_registry.h"
-
-#include "accelerator_preference_internal.h"
 
 namespace rac {
 namespace router {
@@ -65,7 +65,7 @@ constexpr int kAcceleratorPreferenceWeight = 50;
 /* `runanywhere.v1.AccelerationPreference` values that this router recognises
  * as scoring hints.  Mirrors hardware_profile.proto. */
 enum class AcceleratorClass {
-    None,   // UNSPECIFIED / AUTO — no scoring effect
+    None,  // UNSPECIFIED / AUTO — no scoring effect
     Cpu,
     Gpu,
     Npu,
@@ -73,10 +73,14 @@ enum class AcceleratorClass {
 
 AcceleratorClass preference_to_class(int preference_enum) {
     switch (preference_enum) {
-        case 2: return AcceleratorClass::Cpu;  // ACCELERATION_PREFERENCE_CPU
-        case 3: return AcceleratorClass::Gpu;  // ACCELERATION_PREFERENCE_GPU
-        case 4: return AcceleratorClass::Npu;  // ACCELERATION_PREFERENCE_NPU
-        default: return AcceleratorClass::None;
+        case 2:
+            return AcceleratorClass::Cpu;  // ACCELERATION_PREFERENCE_CPU
+        case 3:
+            return AcceleratorClass::Gpu;  // ACCELERATION_PREFERENCE_GPU
+        case 4:
+            return AcceleratorClass::Npu;  // ACCELERATION_PREFERENCE_NPU
+        default:
+            return AcceleratorClass::None;
     }
 }
 
@@ -90,12 +94,11 @@ bool runtime_matches_class(rac_runtime_id_t r, AcceleratorClass c) {
         case AcceleratorClass::Cpu:
             return r == RAC_RUNTIME_CPU;
         case AcceleratorClass::Gpu:
-            return r == RAC_RUNTIME_METAL || r == RAC_RUNTIME_CUDA ||
-                   r == RAC_RUNTIME_VULKAN || r == RAC_RUNTIME_WEBGPU ||
-                   r == RAC_RUNTIME_HIPBLAS || r == RAC_RUNTIME_OPENCL;
+            return r == RAC_RUNTIME_METAL || r == RAC_RUNTIME_CUDA || r == RAC_RUNTIME_VULKAN ||
+                   r == RAC_RUNTIME_WEBGPU || r == RAC_RUNTIME_HIPBLAS || r == RAC_RUNTIME_OPENCL;
         case AcceleratorClass::Npu:
-            return r == RAC_RUNTIME_ANE || r == RAC_RUNTIME_QNN ||
-                   r == RAC_RUNTIME_NNAPI || r == RAC_RUNTIME_COREML;
+            return r == RAC_RUNTIME_ANE || r == RAC_RUNTIME_QNN || r == RAC_RUNTIME_NNAPI ||
+                   r == RAC_RUNTIME_COREML;
         case AcceleratorClass::None:
         default:
             return false;
@@ -103,10 +106,13 @@ bool runtime_matches_class(rac_runtime_id_t r, AcceleratorClass c) {
 }
 
 bool engine_declares_class(const rac_engine_vtable_t& vt, AcceleratorClass c) {
-    if (c == AcceleratorClass::None) return false;
-    if (vt.metadata.runtimes == nullptr) return false;
+    if (c == AcceleratorClass::None)
+        return false;
+    if (vt.metadata.runtimes == nullptr)
+        return false;
     for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-        if (runtime_matches_class(vt.metadata.runtimes[i], c)) return true;
+        if (runtime_matches_class(vt.metadata.runtimes[i], c))
+            return true;
     }
     return false;
 }
@@ -114,20 +120,24 @@ bool engine_declares_class(const rac_engine_vtable_t& vt, AcceleratorClass c) {
 /** Snapshot the global registry's vtables for `primitive`, descending priority.
  *  Uses the C ABI `rac_plugin_list` so we don't reach into registry internals. */
 std::vector<const rac_engine_vtable_t*> snapshot_for_primitive(rac_primitive_t p) {
-    constexpr size_t kMax = 64;  /* cap; no realistic deployment has more engines per primitive */
+    constexpr size_t kMax = 64; /* cap; no realistic deployment has more engines per primitive */
     const rac_engine_vtable_t* buf[kMax] = {nullptr};
     size_t n = 0;
-    if (rac_plugin_list(p, buf, kMax, &n) != RAC_SUCCESS) return {};
+    if (rac_plugin_list(p, buf, kMax, &n) != RAC_SUCCESS)
+        return {};
     std::vector<const rac_engine_vtable_t*> v;
     v.reserve(n);
-    for (size_t i = 0; i < n; ++i) v.push_back(buf[i]);
+    for (size_t i = 0; i < n; ++i)
+        v.push_back(buf[i]);
     return v;
 }
 
 bool declares_runtime(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
-    if (runtime == RAC_RUNTIME_UNSPECIFIED || vt.metadata.runtimes == nullptr) return false;
+    if (runtime == RAC_RUNTIME_UNSPECIFIED || vt.metadata.runtimes == nullptr)
+        return false;
     for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-        if (vt.metadata.runtimes[i] == runtime) return true;
+        if (vt.metadata.runtimes[i] == runtime)
+            return true;
     }
     return false;
 }
@@ -137,9 +147,11 @@ bool declares_runtime(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
  * currently registered with the L1 runtime registry. False is the only
  * value that triggers the runtime-unavailable hard reject. */
 bool has_registered_declared_runtime(const rac_engine_vtable_t& vt) {
-    if (vt.metadata.runtimes == nullptr || vt.metadata.runtimes_count == 0) return true;
+    if (vt.metadata.runtimes == nullptr || vt.metadata.runtimes_count == 0)
+        return true;
     for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-        if (rac_runtime_is_registered(vt.metadata.runtimes[i])) return true;
+        if (rac_runtime_is_registered(vt.metadata.runtimes[i]))
+            return true;
     }
     return false;
 }
@@ -149,9 +161,11 @@ bool preferred_runtime_registered(const rac_engine_vtable_t& vt, rac_runtime_id_
 }
 
 bool matches_model_format(const rac_engine_vtable_t& vt, uint32_t format) {
-    if (format == 0 || vt.metadata.formats == nullptr) return false;
+    if (format == 0 || vt.metadata.formats == nullptr)
+        return false;
     for (size_t i = 0; i < vt.metadata.formats_count; ++i) {
-        if (vt.metadata.formats[i] == format) return true;
+        if (vt.metadata.formats[i] == format)
+            return true;
     }
     return false;
 }
@@ -166,12 +180,12 @@ bool EngineRouter::serves(const rac_engine_vtable_t& vt, rac_primitive_t p) cons
 
 int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) const {
     /* Hard reject: vtable does not serve the requested primitive. */
-    if (!serves(vt, req.primitive)) return kRejectScore;
+    if (!serves(vt, req.primitive))
+        return kRejectScore;
 
     /* Hard reject: pinned engine name mismatch. */
     if (!req.pinned_engine.empty()) {
-        if (vt.metadata.name == nullptr ||
-            req.pinned_engine != vt.metadata.name) {
+        if (vt.metadata.name == nullptr || req.pinned_engine != vt.metadata.name) {
             return kRejectScore;
         }
         /* Pinned-name match is itself a strong signal — give a large bonus
@@ -183,7 +197,8 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
      * but none of them are registered on this host. Surfaced as
      * `RAC_ERROR_RUNTIME_UNAVAILABLE` through the C ABI when no other
      * candidate survives. */
-    if (!has_registered_declared_runtime(vt)) return kRuntimeRejectScore;
+    if (!has_registered_declared_runtime(vt))
+        return kRuntimeRejectScore;
 
     /* Base score = plugin's declared priority. */
     int s = vt.metadata.priority;
@@ -209,10 +224,8 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
      * matches an accelerator class declared by the engine. Lets callers
      * steer routing without a per-request `preferred_runtime` hint — e.g.
      * "GPU preferred, any GPU-class runtime is fine." */
-    const AcceleratorClass pref_class =
-        preference_to_class(internal::get_accelerator_preference());
-    if (pref_class != AcceleratorClass::None &&
-        engine_declares_class(vt, pref_class)) {
+    const AcceleratorClass pref_class = preference_to_class(internal::get_accelerator_preference());
+    if (pref_class != AcceleratorClass::None && engine_declares_class(vt, pref_class)) {
         s += kAcceleratorPreferenceWeight;
     }
 
@@ -227,7 +240,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
 
     /* Score every candidate. */
     struct Scored {
-        int                       score;
+        int score;
         const rac_engine_vtable_t* vt;
     };
     std::vector<Scored> scored;
@@ -239,7 +252,8 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     bool any_runtime_reject = false;
     bool any_other_reject = false;
     for (auto* vt : candidates) {
-        if (vt == nullptr) continue;
+        if (vt == nullptr)
+            continue;
         int s = score(*vt, req);
         if (s > kRejectScore) {
             scored.push_back({s, vt});
@@ -252,9 +266,8 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     if (scored.empty()) {
         if (!req.pinned_engine.empty() && req.no_fallback) {
             return RouteResult{nullptr, -1,
-                               std::string("pinned engine '") +
-                               std::string(req.pinned_engine) +
-                               "' not registered; no_fallback=true"};
+                               std::string("pinned engine '") + std::string(req.pinned_engine) +
+                                   "' not registered; no_fallback=true"};
         }
         if (any_runtime_reject && !any_other_reject) {
             return RouteResult{nullptr, -1,
@@ -267,14 +280,14 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     /* Stable sort: score desc, priority desc (tiebreak), name asc (final tiebreak).
      * Determinism is required by the spec — same RouteRequest in same process
      * MUST yield same winner across 1000 calls. */
-    std::sort(scored.begin(), scored.end(),
-              [](const Scored& a, const Scored& b) {
-                  if (a.score != b.score) return a.score > b.score;
-                  if (a.vt->metadata.priority != b.vt->metadata.priority) {
-                      return a.vt->metadata.priority > b.vt->metadata.priority;
-                  }
-                  return std::strcmp(a.vt->metadata.name, b.vt->metadata.name) < 0;
-              });
+    std::sort(scored.begin(), scored.end(), [](const Scored& a, const Scored& b) {
+        if (a.score != b.score)
+            return a.score > b.score;
+        if (a.vt->metadata.priority != b.vt->metadata.priority) {
+            return a.vt->metadata.priority > b.vt->metadata.priority;
+        }
+        return std::strcmp(a.vt->metadata.name, b.vt->metadata.name) < 0;
+    });
 
     return RouteResult{scored.front().vt, scored.front().score, {}};
 }
@@ -284,14 +297,13 @@ std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const 
     std::vector<RouteResult> out;
     out.reserve(candidates.size());
     for (auto* vt : candidates) {
-        if (vt == nullptr) continue;
+        if (vt == nullptr)
+            continue;
         int s = score(*vt, req);
         out.push_back(RouteResult{vt, s, {}});
     }
     std::sort(out.begin(), out.end(),
-              [](const RouteResult& a, const RouteResult& b) {
-                  return a.score > b.score;
-              });
+              [](const RouteResult& a, const RouteResult& b) { return a.score > b.score; });
     return out;
 }
 

@@ -3,7 +3,7 @@
  *
  * Once `LlamaCPP.register()` resolves AND the user loads a model via the
  * toolbar model selector, the public surface in `@runanywhere/web`
- * (`RunAnywhere.generateStream`) flows through the proto-byte LLM adapter
+ * (`RunAnywhere.textGeneration.generateStream`) flows through the proto-byte LLM adapter
  * into the WASM module.
  *
  * The toolbar model pill + "Get Started" overlay are built by
@@ -126,7 +126,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     refreshSendButton();
 
     try {
-      const stream = await RunAnywhere.generateStream(prompt, {
+      const stream = await RunAnywhere.textGeneration.generateStream({
+        prompt,
         maxTokens: 256,
       });
       cancelGeneration = stream.cancel;

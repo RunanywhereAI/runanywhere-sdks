@@ -53,9 +53,8 @@ extern "C" {
  *
  * See file header for lifetime constraints on @p event_bytes.
  */
-typedef void (*rac_stt_stream_proto_callback_fn)(const uint8_t* event_bytes,
-                                                  size_t         event_size,
-                                                  void*          user_data);
+typedef void (*rac_stt_stream_proto_callback_fn)(const uint8_t* event_bytes, size_t event_size,
+                                                 void* user_data);
 
 /**
  * @brief Register a proto-byte stream callback on an STT component handle.
@@ -66,9 +65,9 @@ typedef void (*rac_stt_stream_proto_callback_fn)(const uint8_t* event_bytes,
  * @retval RAC_SUCCESS                     Callback registered.
  * @retval RAC_ERROR_INVALID_HANDLE        @p handle is null or invalid.
  */
-RAC_API rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t                     handle,
+RAC_API rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
                                                        rac_stt_stream_proto_callback_fn callback,
-                                                       void*                            user_data);
+                                                       void* user_data);
 
 /**
  * @brief Unregister the proto-byte stream callback for a handle.
@@ -95,10 +94,10 @@ RAC_API rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle);
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE Library was built without Protobuf.
  * @retval RAC_ERROR_NOT_IMPLEMENTED       Session backend not yet wired (stub).
  */
-RAC_API rac_result_t rac_stt_stream_start_proto(rac_handle_t   handle,
+RAC_API rac_result_t rac_stt_stream_start_proto(rac_handle_t handle,
                                                 const uint8_t* options_proto_bytes,
-                                                size_t         options_proto_size,
-                                                uint64_t*      out_session_id);
+                                                size_t options_proto_size,
+                                                uint64_t* out_session_id);
 
 /**
  * @brief Feed an audio frame into a streaming STT session.
@@ -115,9 +114,8 @@ RAC_API rac_result_t rac_stt_stream_start_proto(rac_handle_t   handle,
  * @retval RAC_ERROR_INVALID_ARGUMENT Session id unknown or audio buffer null.
  * @retval RAC_ERROR_NOT_IMPLEMENTED  Session backend not yet wired (stub).
  */
-RAC_API rac_result_t rac_stt_stream_feed_audio_proto(uint64_t       session_id,
-                                                      const uint8_t* audio_bytes,
-                                                      size_t         audio_size);
+RAC_API rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id,
+                                                     const uint8_t* audio_bytes, size_t audio_size);
 
 /**
  * @brief Stop a streaming STT session, flushing any pending final events.
@@ -135,7 +133,7 @@ RAC_API rac_result_t rac_stt_stream_stop_proto(uint64_t session_id);
 RAC_API rac_result_t rac_stt_stream_cancel_proto(uint64_t session_id);
 
 #ifdef __cplusplus
-}  /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* RAC_FEATURES_STT_RAC_STT_STREAM_H */

@@ -199,9 +199,8 @@ RAC_API rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_htt
  * writing the new bytes.
  */
 RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_http_request_t* req,
-                                             uint64_t resume_from_byte,
-                                             rac_http_body_chunk_fn cb, void* user_data,
-                                             rac_http_response_t* out_resp_meta);
+                                             uint64_t resume_from_byte, rac_http_body_chunk_fn cb,
+                                             void* user_data, rac_http_response_t* out_resp_meta);
 
 /**
  * @brief Free a response struct. NULL-safe. Frees `body_bytes`,

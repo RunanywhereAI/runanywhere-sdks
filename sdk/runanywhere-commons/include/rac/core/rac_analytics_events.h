@@ -36,9 +36,10 @@
 // by SDK-side telemetry shims that have not yet migrated to the canonical
 // SDKEvent proto stream. Public SDK code MUST not opt in.
 // ---------------------------------------------------------------------------
-#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) &&    \
+#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) && \
     !defined(RAC_INTERNAL_TRANSLATION_UNIT)
-#warning "rac_analytics_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only if you are an internal telemetry-bridge shim."
+#warning \
+    "rac_analytics_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only if you are an internal telemetry-bridge shim."
 #endif
 
 #include "rac/core/rac_types.h"

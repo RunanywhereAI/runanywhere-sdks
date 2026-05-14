@@ -62,9 +62,9 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
 
   container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', async () => {
     try {
-      const ok = await RunAnywhere.chooseLocalStorageDirectory();
+      const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
       if (ok) {
-        showToast(`Using folder: ${RunAnywhere.localStorageDirectoryName ?? 'selected'}`, 'success');
+        showToast(`Using folder: ${RunAnywhere.storage.localStorageDirectoryName ?? 'selected'}`, 'success');
       } else {
         showToast('Folder selection cancelled or unsupported', 'info');
       }
@@ -75,7 +75,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
   });
 
   container.querySelector('#storage-reauth-btn')!.addEventListener('click', async () => {
-    const ok = await RunAnywhere.requestLocalStorageAccess();
+    const ok = await RunAnywhere.storage.requestLocalStorageAccess();
     showToast(ok ? 'Access re-authorized' : 'Access not granted', ok ? 'success' : 'warning');
     updateStorageLocationUI();
   });
@@ -112,14 +112,14 @@ function updateStorageLocationUI(): void {
   const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLElement;
   const reauthBtn = container.querySelector('#storage-reauth-btn') as HTMLElement;
 
-  if (RunAnywhere.isLocalStorageReady) {
-    const safeName = escapeHtml(RunAnywhere.localStorageDirectoryName ?? 'Unknown');
+  if (RunAnywhere.storage.isLocalStorageReady) {
+    const safeName = escapeHtml(RunAnywhere.storage.localStorageDirectoryName ?? 'Unknown');
     label.innerHTML = `<strong>Local Folder:</strong> ~/${safeName}/`
       + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files &mdash; visible in Finder, persists forever</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
     reauthBtn.style.display = 'none';
-  } else if (RunAnywhere.hasLocalStorageHandle) {
+  } else if (RunAnywhere.storage.hasLocalStorageHandle) {
     label.innerHTML = 'Local folder configured &mdash; needs re-authorization'
       + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
     label.style.color = 'var(--color-warning, #ff9800)';
@@ -144,7 +144,7 @@ function renderModelList(): void {
 
   const downloadedIds = new Set<string>();
   try {
-    const downloaded = RunAnywhere.modelRegistry.listDownloaded();
+    const downloaded = RunAnywhere.modelRegistry.downloadedModels();
     for (const m of downloaded?.models ?? []) downloadedIds.add(m.id);
   } catch {
     // tolerate — adapter may not be installed
@@ -184,7 +184,7 @@ function renderModelList(): void {
 
 function lookupModelInfo(modelId: string): ModelInfo | null {
   try {
-    return RunAnywhere.modelRegistry.get(modelId);
+    return RunAnywhere.modelRegistry.getModel(modelId);
   } catch {
     return null;
   }

@@ -23,16 +23,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -57,8 +56,7 @@ bool poll_event(runanywhere::v1::SDKEvent* out) {
     if (rc != RAC_SUCCESS) {
         return false;
     }
-    const bool parsed =
-        out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
+    const bool parsed = out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
     rac_proto_buffer_free(&buffer);
     return parsed;
 }
@@ -95,9 +93,8 @@ int main() {
     CHECK(sub != 0, "SDKEvent subscription returns non-zero id");
 
     rac_sdk_event_clear_queue();
-    rac_result_t rc = rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT,
-                                                    "bad argument", "llm",
-                                                    "unitTestOperation", RAC_TRUE);
+    rac_result_t rc = rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, "bad argument",
+                                                    "llm", "unitTestOperation", RAC_TRUE);
     CHECK(rc == RAC_SUCCESS, "failure helper publishes SDKEvent bytes");
     CHECK(capture.events.size() == 1, "subscriber receives published SDKEvent bytes");
 
@@ -120,14 +117,13 @@ int main() {
 
     runanywhere::v1::SDKEvent polled_failure;
     CHECK(poll_event(&polled_failure), "poll returns queued SDKEvent bytes");
-    CHECK(polled_failure.id() == callback_event.id(),
-          "callback and poll observe same first event");
+    CHECK(polled_failure.id() == callback_event.id(), "callback and poll observe same first event");
 
     rac_sdk_event_unsubscribe(sub);
     capture.events.clear();
     rac_sdk_event_clear_queue();
-    rc = rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, "after unsubscribe",
-                                       "llm", "unsubscribe", RAC_FALSE);
+    rc = rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, "after unsubscribe", "llm",
+                                       "unsubscribe", RAC_FALSE);
     CHECK(rc == RAC_SUCCESS, "publish after unsubscribe succeeds");
     CHECK(capture.events.empty(), "unsubscribed callback is not invoked");
 
@@ -140,8 +136,8 @@ int main() {
     rac_proto_buffer_free(&uninitialized_shutdown_poll);
 
     rac_sdk_event_clear_queue();
-    rc = rac_state_initialize(RAC_ENV_DEVELOPMENT, "api-key", "https://example.invalid",
-                              "device-1");
+    rc =
+        rac_state_initialize(RAC_ENV_DEVELOPMENT, "api-key", "https://example.invalid", "device-1");
     CHECK(rc == RAC_SUCCESS, "state initialize succeeds");
 
     runanywhere::v1::SDKEvent first_state;
@@ -149,12 +145,10 @@ int main() {
     CHECK(poll_event(&first_state), "poll returns initialization started event");
     CHECK(poll_event(&second_state), "poll returns initialization completed event");
     CHECK(first_state.has_initialization() &&
-              first_state.initialization().stage() ==
-                  runanywhere::v1::INITIALIZATION_STAGE_STARTED,
+              first_state.initialization().stage() == runanywhere::v1::INITIALIZATION_STAGE_STARTED,
           "state emits initialization started first");
-    CHECK(second_state.has_initialization() &&
-              second_state.initialization().stage() ==
-                  runanywhere::v1::INITIALIZATION_STAGE_COMPLETED,
+    CHECK(second_state.has_initialization() && second_state.initialization().stage() ==
+                                                   runanywhere::v1::INITIALIZATION_STAGE_COMPLETED,
           "state emits initialization completed second");
     rac_proto_buffer_t empty_poll;
     rac_proto_buffer_init(&empty_poll);
@@ -165,13 +159,11 @@ int main() {
     rac_sdk_event_clear_queue();
     rac_state_set_device_registered(true);
     runanywhere::v1::SDKEvent device_registered;
-    CHECK(poll_event(&device_registered),
-          "device registration state true publishes SDKEvent");
+    CHECK(poll_event(&device_registered), "device registration state true publishes SDKEvent");
     CHECK(device_registered.category() == runanywhere::v1::EVENT_CATEGORY_DEVICE,
           "device registration event category is canonical");
     CHECK(device_registered.has_device(), "device registration event uses DeviceEvent");
-    CHECK(device_registered.device().kind() ==
-              runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED,
+    CHECK(device_registered.device().kind() == runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED,
           "device registration true event uses registered kind");
     CHECK(device_registered.device().property() == "registered" &&
               device_registered.device().new_value() == "true",
@@ -181,11 +173,9 @@ int main() {
     rac_state_reset();
     CHECK(!rac_state_is_device_registered(), "state reset clears device registration flag");
     runanywhere::v1::SDKEvent reset_device;
-    CHECK(poll_event(&reset_device),
-          "state reset publishes device unregistered transition");
+    CHECK(poll_event(&reset_device), "state reset publishes device unregistered transition");
     CHECK(reset_device.has_device(), "state reset event uses DeviceEvent");
-    CHECK(reset_device.device().kind() ==
-              runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED,
+    CHECK(reset_device.device().kind() == runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED,
           "state reset event uses state changed kind");
     CHECK(reset_device.device().property() == "registered" &&
               reset_device.device().new_value() == "false",
@@ -209,15 +199,13 @@ int main() {
     CHECK(poll_event(&shutdown_device),
           "state shutdown publishes device unregistered transition first");
     CHECK(poll_event(&shutdown_event), "state shutdown publishes shutdown event");
-    CHECK(shutdown_device.has_device() &&
-              shutdown_device.device().property() == "registered" &&
+    CHECK(shutdown_device.has_device() && shutdown_device.device().property() == "registered" &&
               shutdown_device.device().new_value() == "false",
           "state shutdown device event carries registered=false transition");
     CHECK(shutdown_event.category() == runanywhere::v1::EVENT_CATEGORY_SHUTDOWN,
           "state shutdown event category is canonical");
-    CHECK(shutdown_event.has_initialization() &&
-              shutdown_event.initialization().stage() ==
-                  runanywhere::v1::INITIALIZATION_STAGE_SHUTDOWN,
+    CHECK(shutdown_event.has_initialization() && shutdown_event.initialization().stage() ==
+                                                     runanywhere::v1::INITIALIZATION_STAGE_SHUTDOWN,
           "state shutdown event uses shutdown initialization stage");
 
     rac_sdk_event_clear_queue();

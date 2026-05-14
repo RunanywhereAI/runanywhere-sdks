@@ -42,17 +42,17 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
-#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_component.h"
-#include "rac/features/voice_agent/rac_voice_event_abi.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
+#include "rac/features/voice_agent/rac_voice_event_abi.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 // SWIFT-VOICE-AGENT-001 (T16 / Path X) — voice agent proto path now consults
@@ -89,22 +89,21 @@
 // `voice_agent_internal.h` now owns the rac_voice_agent struct layout so
 // `voice_agent_pipeline.cpp` can read the component handles too.
 #include "voice_agent_internal.h"
+
 #include "voice_agent_pipeline.hpp"
 
 namespace {
-inline void rac_va_emit(rac_voice_agent_handle_t          handle,
-                        const rac_voice_agent_event_t*    event,
-                        rac_voice_agent_event_callback_fn cb,
-                        void*                             user_data) {
-    if (cb) cb(event, user_data);
+inline void rac_va_emit(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event,
+                        rac_voice_agent_event_callback_fn cb, void* user_data) {
+    if (cb)
+        cb(event, user_data);
     rac::voice_agent::dispatch_proto_event(handle, event);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -119,8 +118,7 @@ rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize voice-agent proto result");
     }
@@ -208,16 +206,14 @@ void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_e
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
     const size_t size = sdk_event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
 
-void emit_generated_voice_event(rac_voice_agent_handle_t handle,
-                                const runanywhere::v1::VoiceEvent& event,
-                                runanywhere::v1::ErrorSeverity sdk_severity =
-                                    runanywhere::v1::ERROR_SEVERITY_INFO) {
+void emit_generated_voice_event(
+    rac_voice_agent_handle_t handle, const runanywhere::v1::VoiceEvent& event,
+    runanywhere::v1::ErrorSeverity sdk_severity = runanywhere::v1::ERROR_SEVERITY_INFO) {
     rac::voice_agent::dispatch_proto_voice_event(handle, event);
     publish_voice_pipeline_sdk_event(event, sdk_severity);
 }
@@ -234,8 +230,7 @@ void emit_component_states(rac_voice_agent_handle_t handle) {
 
 void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
                          runanywhere::v1::TurnLifecycleEventKind kind,
-                         const char* transcript = nullptr,
-                         const char* response = nullptr,
+                         const char* transcript = nullptr, const char* response = nullptr,
                          const char* error = nullptr) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_us(rac_get_current_time_ms() * 1000);
@@ -247,18 +242,19 @@ void emit_turn_lifecycle(rac_voice_agent_handle_t handle,
     auto* turn = event.mutable_turn_lifecycle();
     turn->set_kind(kind);
     turn->set_turn_id(event_id("turn"));
-    if (transcript) turn->set_transcript(transcript);
-    if (response) turn->set_response(response);
-    if (error) turn->set_error(error);
+    if (transcript)
+        turn->set_transcript(transcript);
+    if (response)
+        turn->set_response(response);
+    if (error)
+        turn->set_error(error);
     emit_generated_voice_event(handle, event,
                                error ? runanywhere::v1::ERROR_SEVERITY_ERROR
                                      : runanywhere::v1::ERROR_SEVERITY_INFO);
 }
 
-void emit_component_failure(rac_voice_agent_handle_t handle,
-                            const char* component,
-                            rac_result_t code,
-                            const char* message) {
+void emit_component_failure(rac_voice_agent_handle_t handle, const char* component,
+                            rac_result_t code, const char* message) {
     runanywhere::v1::VoiceEvent event;
     event.set_timestamp_us(rac_get_current_time_ms() * 1000);
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
@@ -272,8 +268,8 @@ void emit_component_failure(rac_voice_agent_handle_t handle,
         session_error->set_failed_component(component);
     }
     emit_generated_voice_event(handle, event, runanywhere::v1::ERROR_SEVERITY_ERROR);
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_FAILED, nullptr,
-                        nullptr, message ? message : rac_error_message(code));
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_FAILED, nullptr, nullptr,
+                        message ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, component ? component : "voice_agent",
                                         "processVoiceTurn", RAC_TRUE);
 }
@@ -299,9 +295,9 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
         proto.vad_sample_rate() > 0 ? proto.vad_sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
     config.vad_config.frame_length =
         proto.vad_frame_length() > 0.0f ? proto.vad_frame_length() : RAC_VAD_DEFAULT_FRAME_LENGTH;
-    config.vad_config.energy_threshold =
-        proto.vad_energy_threshold() > 0.0f ? proto.vad_energy_threshold()
-                                            : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
+    config.vad_config.energy_threshold = proto.vad_energy_threshold() > 0.0f
+                                             ? proto.vad_energy_threshold()
+                                             : RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT.energy_threshold;
     config.wakeword_config.enabled = proto.wakeword_enabled() ? RAC_TRUE : RAC_FALSE;
     config.wakeword_config.model_path =
         proto.has_wakeword_model_path() ? proto.wakeword_model_path().c_str() : nullptr;
@@ -309,13 +305,12 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
         proto.has_wakeword_model_id() ? proto.wakeword_model_id().c_str() : nullptr;
     config.wakeword_config.wake_word =
         proto.has_wakeword_phrase() ? proto.wakeword_phrase().c_str() : nullptr;
-    config.wakeword_config.threshold =
-        proto.wakeword_threshold() > 0.0f ? proto.wakeword_threshold()
-                                          : RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT.threshold;
+    config.wakeword_config.threshold = proto.wakeword_threshold() > 0.0f
+                                           ? proto.wakeword_threshold()
+                                           : RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT.threshold;
     config.wakeword_config.embedding_model_path =
-        proto.has_wakeword_embedding_model_path()
-            ? proto.wakeword_embedding_model_path().c_str()
-            : nullptr;
+        proto.has_wakeword_embedding_model_path() ? proto.wakeword_embedding_model_path().c_str()
+                                                  : nullptr;
     config.wakeword_config.vad_model_path =
         proto.has_wakeword_vad_model_path() ? proto.wakeword_vad_model_path().c_str() : nullptr;
     return config;
@@ -401,37 +396,38 @@ static rac_result_t legacy_component_ready(const char* name, rac_handle_t handle
 static rac_result_t validate_all_components_ready(rac_voice_agent_handle_t handle) {
     // STT
     {
-        rac_result_t rc =
-            lifecycle_modality_ready<rac::lifecycle::LifecycleSttRef,
-                                     rac::lifecycle::acquire_lifecycle_stt,
-                                     rac::lifecycle::release_lifecycle_stt>("STT");
+        rac_result_t rc = lifecycle_modality_ready<rac::lifecycle::LifecycleSttRef,
+                                                   rac::lifecycle::acquire_lifecycle_stt,
+                                                   rac::lifecycle::release_lifecycle_stt>("STT");
         if (rc != RAC_SUCCESS) {
             rc = legacy_component_ready("STT", handle ? handle->stt_handle : nullptr,
                                         rac_stt_component_get_state);
-            if (rc != RAC_SUCCESS) return rc;
+            if (rc != RAC_SUCCESS)
+                return rc;
         }
     }
     // LLM
     {
-        rac_result_t rc = lifecycle_modality_ready<rac::llm::LifecycleLlmRef,
-                                                   rac::llm::acquire_lifecycle_llm,
-                                                   rac::llm::release_lifecycle_llm>("LLM");
+        rac_result_t rc =
+            lifecycle_modality_ready<rac::llm::LifecycleLlmRef, rac::llm::acquire_lifecycle_llm,
+                                     rac::llm::release_lifecycle_llm>("LLM");
         if (rc != RAC_SUCCESS) {
             rc = legacy_component_ready("LLM", handle ? handle->llm_handle : nullptr,
                                         rac_llm_component_get_state);
-            if (rc != RAC_SUCCESS) return rc;
+            if (rc != RAC_SUCCESS)
+                return rc;
         }
     }
     // TTS
     {
-        rac_result_t rc =
-            lifecycle_modality_ready<rac::lifecycle::LifecycleTtsRef,
-                                     rac::lifecycle::acquire_lifecycle_tts,
-                                     rac::lifecycle::release_lifecycle_tts>("TTS");
+        rac_result_t rc = lifecycle_modality_ready<rac::lifecycle::LifecycleTtsRef,
+                                                   rac::lifecycle::acquire_lifecycle_tts,
+                                                   rac::lifecycle::release_lifecycle_tts>("TTS");
         if (rc != RAC_SUCCESS) {
             rc = legacy_component_ready("TTS", handle ? handle->tts_handle : nullptr,
                                         rac_tts_component_get_state);
-            if (rc != RAC_SUCCESS) return rc;
+            if (rc != RAC_SUCCESS)
+                return rc;
         }
     }
     return RAC_SUCCESS;
@@ -534,8 +530,7 @@ rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
     agent->tts_handle = tts_component_handle;
     agent->vad_handle = vad_component_handle;
 
-    RAC_LOG_INFO("VoiceAgent",
-                 "Voice agent created with external handles (legacy compose API)");
+    RAC_LOG_INFO("VoiceAgent", "Voice agent created with external handles (legacy compose API)");
 
     *out_handle = agent;
     return RAC_SUCCESS;
@@ -1036,8 +1031,8 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     // its own worker thread; bounded edges between stages provide
     // backpressure; cancel_all() (invoked from destroy/cleanup) tears the
     // graph down deterministically.
-    auto pipeline = std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
-        handle, callback, user_data);
+    auto pipeline =
+        std::make_shared<rac::voice_agent::VoiceAgentPipeline>(handle, callback, user_data);
     handle->pipeline = pipeline;
 
     rac_result_t result = pipeline->run_once(audio_data, audio_size);
@@ -1180,11 +1175,10 @@ rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, cons
 // GENERATED-PROTO C ABI
 // =============================================================================
 
-rac_result_t rac_voice_agent_initialize_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* config_proto_bytes,
-    size_t config_proto_size,
-    rac_proto_buffer_t* out_component_states) {
+rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
+                                              const uint8_t* config_proto_bytes,
+                                              size_t config_proto_size,
+                                              rac_proto_buffer_t* out_component_states) {
     if (!out_component_states) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1233,9 +1227,8 @@ rac_result_t rac_voice_agent_initialize_proto(
 #endif
 }
 
-rac_result_t rac_voice_agent_component_states_proto(
-    rac_voice_agent_handle_t handle,
-    rac_proto_buffer_t* out_component_states) {
+rac_result_t rac_voice_agent_component_states_proto(rac_voice_agent_handle_t handle,
+                                                    rac_proto_buffer_t* out_component_states) {
     if (!out_component_states) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1255,11 +1248,9 @@ rac_result_t rac_voice_agent_component_states_proto(
 #endif
 }
 
-rac_result_t rac_voice_agent_process_voice_turn_proto(
-    rac_voice_agent_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    rac_proto_buffer_t* out_result) {
+rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
+                                                      const void* audio_data, size_t audio_size,
+                                                      rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1312,10 +1303,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
 
     emit_component_states(handle);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
-    emit_turn_lifecycle(handle,
-                        runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
-    emit_turn_lifecycle(handle,
-                        runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
 
     // SWIFT-VOICE-AGENT-001 (T16/Path X): dispatch through the lifecycle
     // (level-1 impl + ops) instead of the agent's per-modality component
@@ -1348,12 +1337,10 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
                                           "STT transcription was empty");
     }
-    emit_turn_lifecycle(handle,
-                        runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL,
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL,
                         stt.text);
 
-    emit_turn_lifecycle(handle,
-                        runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
                         stt.text);
 
     rac::llm::LifecycleLlmRef llm_ref;
@@ -1377,8 +1364,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rac_proto_buffer_set_error(out_result, rc, "LLM generation failed");
     }
-    emit_turn_lifecycle(handle,
-                        runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
                         stt.text, llm.text);
 
     rac::lifecycle::LifecycleTtsRef tts_ref;
@@ -1437,8 +1423,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
     }
     fill_component_states(handle, result.mutable_final_state());
 
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED,
-                        stt.text, llm.text);
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED, stt.text,
+                        llm.text);
 
     std::free(wav_data);
     rac_tts_result_free(&tts);
@@ -1626,45 +1612,40 @@ rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t fro
 
 namespace {
 
-void d7_emit_voice_event(rac_voice_agent_handle_t handle,
-                         runanywhere::v1::VoiceEvent* event,
-                         const std::string& session_id,
-                         const std::string& turn_id,
-                         const std::string& request_id,
-                         rac_voice_agent_turn_event_callback_fn cb,
+void d7_emit_voice_event(rac_voice_agent_handle_t handle, runanywhere::v1::VoiceEvent* event,
+                         const std::string& session_id, const std::string& turn_id,
+                         const std::string& request_id, rac_voice_agent_turn_event_callback_fn cb,
                          void* user_data) {
-    if (!event) return;
+    if (!event)
+        return;
     if (event->timestamp_us() == 0) {
         event->set_timestamp_us(rac_get_current_time_ms() * 1000);
     }
-    if (!session_id.empty() && event->session_id().empty()) event->set_session_id(session_id);
-    if (!turn_id.empty() && event->turn_id().empty()) event->set_turn_id(turn_id);
-    if (!request_id.empty() && event->request_id().empty()) event->set_request_id(request_id);
+    if (!session_id.empty() && event->session_id().empty())
+        event->set_session_id(session_id);
+    if (!turn_id.empty() && event->turn_id().empty())
+        event->set_turn_id(turn_id);
+    if (!request_id.empty() && event->request_id().empty())
+        event->set_request_id(request_id);
 
     if (cb) {
         const size_t size = event->ByteSizeLong();
         std::vector<uint8_t> bytes(size);
-        if (size == 0 ||
-            event->SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        if (size == 0 || event->SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
             cb(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
         }
     }
     rac::voice_agent::dispatch_proto_voice_event(handle, *event);
-    publish_voice_pipeline_sdk_event(
-        *event,
-        event->severity() == runanywhere::v1::ERROR_SEVERITY_ERROR
-            ? runanywhere::v1::ERROR_SEVERITY_ERROR
-            : runanywhere::v1::ERROR_SEVERITY_INFO);
+    publish_voice_pipeline_sdk_event(*event,
+                                     event->severity() == runanywhere::v1::ERROR_SEVERITY_ERROR
+                                         ? runanywhere::v1::ERROR_SEVERITY_ERROR
+                                         : runanywhere::v1::ERROR_SEVERITY_INFO);
 }
 
-void d7_emit_state(rac_voice_agent_handle_t handle,
-                   runanywhere::v1::PipelineState previous,
-                   runanywhere::v1::PipelineState current,
-                   const std::string& session_id,
-                   const std::string& turn_id,
-                   const std::string& request_id,
-                   rac_voice_agent_turn_event_callback_fn cb,
-                   void* user_data) {
+void d7_emit_state(rac_voice_agent_handle_t handle, runanywhere::v1::PipelineState previous,
+                   runanywhere::v1::PipelineState current, const std::string& session_id,
+                   const std::string& turn_id, const std::string& request_id,
+                   rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
@@ -1675,13 +1656,9 @@ void d7_emit_state(rac_voice_agent_handle_t handle,
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
-void d7_emit_vad(rac_voice_agent_handle_t handle,
-                 runanywhere::v1::VADStreamEventKind kind,
-                 bool is_speech,
-                 const std::string& session_id,
-                 const std::string& turn_id,
-                 const std::string& request_id,
-                 rac_voice_agent_turn_event_callback_fn cb,
+void d7_emit_vad(rac_voice_agent_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
+                 bool is_speech, const std::string& session_id, const std::string& turn_id,
+                 const std::string& request_id, rac_voice_agent_turn_event_callback_fn cb,
                  void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VAD);
@@ -1693,57 +1670,50 @@ void d7_emit_vad(rac_voice_agent_handle_t handle,
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
-void d7_emit_user_said(rac_voice_agent_handle_t handle,
-                       const char* text,
-                       const std::string& lang,
-                       const std::string& session_id,
-                       const std::string& turn_id,
-                       const std::string& request_id,
-                       rac_voice_agent_turn_event_callback_fn cb,
+void d7_emit_user_said(rac_voice_agent_handle_t handle, const char* text, const std::string& lang,
+                       const std::string& session_id, const std::string& turn_id,
+                       const std::string& request_id, rac_voice_agent_turn_event_callback_fn cb,
                        void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_STT);
     auto* u = event.mutable_user_said();
-    if (text) u->set_text(text);
+    if (text)
+        u->set_text(text);
     u->set_is_final(true);
-    if (!lang.empty()) u->set_language_code(lang);
+    if (!lang.empty())
+        u->set_language_code(lang);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
-void d7_emit_assistant_token(rac_voice_agent_handle_t handle,
-                             const char* text, bool is_final,
-                             const std::string& session_id,
-                             const std::string& turn_id,
+void d7_emit_assistant_token(rac_voice_agent_handle_t handle, const char* text, bool is_final,
+                             const std::string& session_id, const std::string& turn_id,
                              const std::string& request_id,
-                             rac_voice_agent_turn_event_callback_fn cb,
-                             void* user_data) {
+                             rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_LLM);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_LLM);
     auto* t = event.mutable_assistant_token();
-    if (text) t->set_text(text);
+    if (text)
+        t->set_text(text);
     t->set_is_final(is_final);
     t->set_kind(runanywhere::v1::TOKEN_KIND_ANSWER);
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
-void d7_emit_audio(rac_voice_agent_handle_t handle,
-                   const void* data, size_t size,
-                   int32_t sample_rate, bool is_final,
-                   const std::string& session_id,
-                   const std::string& turn_id,
-                   const std::string& request_id,
-                   rac_voice_agent_turn_event_callback_fn cb,
-                   void* user_data) {
+void d7_emit_audio(rac_voice_agent_handle_t handle, const void* data, size_t size,
+                   int32_t sample_rate, bool is_final, const std::string& session_id,
+                   const std::string& turn_id, const std::string& request_id,
+                   rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
     auto* a = event.mutable_audio();
-    if (data && size > 0) a->set_pcm(data, size);
+    if (data && size > 0)
+        a->set_pcm(data, size);
     a->set_sample_rate_hz(sample_rate > 0 ? sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE);
     a->set_channels(1);
     a->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
@@ -1751,14 +1721,9 @@ void d7_emit_audio(rac_voice_agent_handle_t handle,
     d7_emit_voice_event(handle, &event, session_id, turn_id, request_id, cb, user_data);
 }
 
-void d7_emit_error(rac_voice_agent_handle_t handle,
-                   rac_result_t code,
-                   const char* component_name,
-                   const char* message,
-                   const std::string& session_id,
-                   const std::string& turn_id,
-                   const std::string& request_id,
-                   rac_voice_agent_turn_event_callback_fn cb,
+void d7_emit_error(rac_voice_agent_handle_t handle, rac_result_t code, const char* component_name,
+                   const char* message, const std::string& session_id, const std::string& turn_id,
+                   const std::string& request_id, rac_voice_agent_turn_event_callback_fn cb,
                    void* user_data) {
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_ERROR);
@@ -1780,17 +1745,20 @@ std::string d7_pick_turn_id(const std::string& request_id) {
 #endif  // RAC_HAVE_PROTOBUF
 
 extern "C" rac_result_t rac_voice_agent_process_turn_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_voice_agent_turn_event_callback_fn event_callback,
-    void* user_data) {
+    rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
+    rac_voice_agent_turn_event_callback_fn event_callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle; (void)request_bytes; (void)request_size; (void)event_callback; (void)user_data;
+    (void)handle;
+    (void)request_bytes;
+    (void)request_size;
+    (void)event_callback;
+    (void)user_data;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    if (!handle || !event_callback) return RAC_ERROR_INVALID_ARGUMENT;
-    if (!proto_bytes_valid(request_bytes, request_size)) return RAC_ERROR_DECODING_ERROR;
+    if (!handle || !event_callback)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!proto_bytes_valid(request_bytes, request_size))
+        return RAC_ERROR_DECODING_ERROR;
 
     runanywhere::v1::VoiceAgentTurnRequest request;
     if (!request.ParseFromArray(proto_parse_data(request_bytes, request_size),
@@ -1825,8 +1793,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     };
     for (const auto& entry : required) {
         if (entry.state != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
-            d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, entry.name, entry.message,
-                          session_id, turn_id, request_id, event_callback, user_data);
+            d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, entry.name, entry.message, session_id,
+                          turn_id, request_id, event_callback, user_data);
             emit_component_failure(handle, entry.name, RAC_ERROR_NOT_INITIALIZED, entry.message);
             return RAC_ERROR_NOT_INITIALIZED;
         }
@@ -1835,8 +1803,8 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     const std::string& audio = request.audio_data();
     if (audio.empty()) {
         d7_emit_error(handle, RAC_ERROR_INVALID_ARGUMENT, "voice_agent",
-                      "voice turn request is missing audio_data", session_id, turn_id,
-                      request_id, event_callback, user_data);
+                      "voice turn request is missing audio_data", session_id, turn_id, request_id,
+                      event_callback, user_data);
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -1848,15 +1816,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
     d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-                /*is_speech=*/true, session_id, turn_id, request_id,
-                event_callback, user_data);
+                /*is_speech=*/true, session_id, turn_id, request_id, event_callback, user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_LISTENING,
                   runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH, session_id, turn_id,
                   request_id, event_callback, user_data);
     rac_stt_result_t stt = {};
-    rac_result_t rc = rac_stt_component_transcribe(
-        handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
+    rac_result_t rc =
+        rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
     if (rc != RAC_SUCCESS) {
         d7_emit_error(handle, rc, "stt", "STT transcription failed", session_id, turn_id,
                       request_id, event_callback, user_data);
@@ -1865,16 +1832,14 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     }
     if (!stt.text || stt.text[0] == '\0') {
         rac_stt_result_free(&stt);
-        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt",
-                      "STT transcription was empty", session_id, turn_id, request_id,
-                      event_callback, user_data);
+        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt", "STT transcription was empty",
+                      session_id, turn_id, request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
                                "STT transcription was empty");
         return RAC_ERROR_INVALID_STATE;
     }
     d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-                /*is_speech=*/false, session_id, turn_id,
-                request_id, event_callback, user_data);
+                /*is_speech=*/false, session_id, turn_id, request_id, event_callback, user_data);
     d7_emit_user_said(handle, stt.text,
                       request.session_config().has_language_code()
                           ? request.session_config().language_code()
@@ -1888,13 +1853,13 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
     if (rc != RAC_SUCCESS) {
         rac_stt_result_free(&stt);
-        d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id,
-                      request_id, event_callback, user_data);
+        d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id, request_id,
+                      event_callback, user_data);
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rc;
     }
-    d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id,
-                            event_callback, user_data);
+    d7_emit_assistant_token(handle, llm.text, true, session_id, turn_id, request_id, event_callback,
+                            user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE,
                   runanywhere::v1::PIPELINE_STATE_PLAYING_TTS, session_id, turn_id, request_id,
@@ -1904,23 +1869,22 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     if (rc != RAC_SUCCESS) {
         rac_stt_result_free(&stt);
         rac_llm_result_free(&llm);
-        d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id,
-                      request_id, event_callback, user_data);
+        d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id, request_id,
+                      event_callback, user_data);
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
         return rc;
     }
 
-    d7_emit_audio(handle,
-                  tts.audio_data && tts.audio_size > 0 ? tts.audio_data : nullptr,
+    d7_emit_audio(handle, tts.audio_data && tts.audio_size > 0 ? tts.audio_data : nullptr,
                   tts.audio_data && tts.audio_size > 0 ? tts.audio_size : 0,
-                  tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                  true, session_id, turn_id, request_id, event_callback, user_data);
+                  tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, true,
+                  session_id, turn_id, request_id, event_callback, user_data);
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_PLAYING_TTS,
                   runanywhere::v1::PIPELINE_STATE_IDLE, session_id, turn_id, request_id,
                   event_callback, user_data);
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED,
-                        stt.text, llm.text);
+    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED, stt.text,
+                        llm.text);
 
     rac_stt_result_free(&stt);
     rac_llm_result_free(&llm);
@@ -1929,14 +1893,16 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_voice_agent_transcribe_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_INVALID_ARGUMENT;
+extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_t handle,
+                                                         const uint8_t* request_bytes,
+                                                         size_t request_size,
+                                                         rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle; (void)request_bytes; (void)request_size;
+    (void)handle;
+    (void)request_bytes;
+    (void)request_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
@@ -1965,15 +1931,17 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(
                                           "transcribe request is missing audio_data");
     }
     rac_stt_result_t stt = {};
-    rac_result_t rc = rac_stt_component_transcribe(
-        handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
+    rac_result_t rc =
+        rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
     if (rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     runanywhere::v1::STTOutput output;
-    if (stt.text) output.set_text(stt.text);
+    if (stt.text)
+        output.set_text(stt.text);
     output.set_confidence(stt.confidence);
-    if (stt.detected_language) output.set_language_code(stt.detected_language);
+    if (stt.detected_language)
+        output.set_language_code(stt.detected_language);
     if (stt.processing_time_ms > 0) {
         auto* metadata = output.mutable_metadata();
         metadata->set_processing_time_ms(stt.processing_time_ms);
@@ -1984,14 +1952,16 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_INVALID_ARGUMENT;
+extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_handle_t handle,
+                                                                const uint8_t* request_bytes,
+                                                                size_t request_size,
+                                                                rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle; (void)request_bytes; (void)request_size;
+    (void)handle;
+    (void)request_bytes;
+    (void)request_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
@@ -2006,9 +1976,8 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(
     runanywhere::v1::VoiceAgentSynthesizeSpeechProtoRequest request;
     if (!request.ParseFromArray(proto_parse_data(request_bytes, request_size),
                                 static_cast<int>(request_size))) {
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_DECODING_ERROR,
-            "failed to parse VoiceAgentSynthesizeSpeechProtoRequest");
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse VoiceAgentSynthesizeSpeechProtoRequest");
     }
     if (!handle->tts_handle ||
         rac_tts_component_get_state(handle->tts_handle) != RAC_LIFECYCLE_STATE_LOADED) {
@@ -2026,7 +1995,8 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(
         return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
     }
     runanywhere::v1::TTSOutput output;
-    if (tts.audio_data && tts.audio_size > 0) output.set_audio_data(tts.audio_data, tts.audio_size);
+    if (tts.audio_data && tts.audio_size > 0)
+        output.set_audio_data(tts.audio_data, tts.audio_size);
     output.set_sample_rate(tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE);
     output.set_duration_ms(tts.duration_ms);
     output.set_timestamp_ms(rac_get_current_time_ms());
@@ -2037,25 +2007,27 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_voice_agent_component_create_proto(
-    const uint8_t* config_bytes,
-    size_t config_size,
-    rac_voice_agent_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_INVALID_ARGUMENT;
+extern "C" rac_result_t
+rac_voice_agent_component_create_proto(const uint8_t* config_bytes, size_t config_size,
+                                       rac_voice_agent_handle_t* out_handle) {
+    if (!out_handle)
+        return RAC_ERROR_INVALID_ARGUMENT;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)config_bytes; (void)config_size;
+    (void)config_bytes;
+    (void)config_size;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    if (!proto_bytes_valid(config_bytes, config_size)) return RAC_ERROR_DECODING_ERROR;
+    if (!proto_bytes_valid(config_bytes, config_size))
+        return RAC_ERROR_DECODING_ERROR;
     runanywhere::v1::VoiceAgentComposeConfig proto;
-    if (config_size > 0 &&
-        !proto.ParseFromArray(proto_parse_data(config_bytes, config_size),
-                              static_cast<int>(config_size))) {
+    if (config_size > 0 && !proto.ParseFromArray(proto_parse_data(config_bytes, config_size),
+                                                 static_cast<int>(config_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
     rac_voice_agent_handle_t handle = nullptr;
     rac_result_t rc = rac_voice_agent_create_standalone(&handle);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
     if (config_size > 0) {
         rac_voice_agent_config_t config = config_from_proto(proto);
         rc = rac_voice_agent_initialize(handle, &config);
@@ -2070,6 +2042,7 @@ extern "C" rac_result_t rac_voice_agent_component_create_proto(
 }
 
 extern "C" rac_result_t rac_voice_agent_component_destroy_proto(rac_voice_agent_handle_t handle) {
-    if (handle) rac_voice_agent_destroy(handle);
+    if (handle)
+        rac_voice_agent_destroy(handle);
     return RAC_SUCCESS;
 }

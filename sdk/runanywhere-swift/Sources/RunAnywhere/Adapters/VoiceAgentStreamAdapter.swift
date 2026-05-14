@@ -25,8 +25,8 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 import os
+import SwiftProtobuf
 
 /// AsyncStream-based wrapper over the GAP 09 proto-byte voice agent ABI.
 ///
@@ -52,8 +52,8 @@ public extension HandleStreamAdapter where Handle == rac_voice_agent_handle_t, E
         self.init(
             handle: handle,
             streamKey: "voice-agent",
-            register: { h, cb, ud in rac_voice_agent_set_proto_callback(h, cb, ud) },
-            unregister: { h in _ = rac_voice_agent_set_proto_callback(h, nil, nil) }
+            register: { handle, cb, ud in rac_voice_agent_set_proto_callback(handle, cb, ud) },
+            unregister: { handle in _ = rac_voice_agent_set_proto_callback(handle, nil, nil) }
         )
     }
 }

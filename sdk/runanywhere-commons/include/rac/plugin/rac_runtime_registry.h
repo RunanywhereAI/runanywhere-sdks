@@ -21,7 +21,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/plugin/rac_primitive.h"        /* rac_runtime_id_t */
+#include "rac/plugin/rac_primitive.h" /* rac_runtime_id_t */
 #include "rac/plugin/rac_runtime_vtable.h"
 
 #ifdef __cplusplus
@@ -70,8 +70,7 @@ RAC_API const rac_runtime_vtable_t* rac_runtime_get_by_id(rac_runtime_id_t id);
  * `max` entries and sets `*out_count` to the number of writes. Returns
  * `RAC_SUCCESS` with `*out_count = 0` when empty.
  */
-RAC_API rac_result_t rac_runtime_list(const rac_runtime_vtable_t** out_runtimes,
-                                      size_t max,
+RAC_API rac_result_t rac_runtime_list(const rac_runtime_vtable_t** out_runtimes, size_t max,
                                       size_t* out_count);
 
 /**
@@ -139,23 +138,21 @@ RAC_API rac_result_t rac_runtime_unload(rac_runtime_id_t id);
 
 #ifdef __cplusplus
 
-#  if defined(__GNUC__) || defined(__clang__)
-#    define RAC_STATIC_RUNTIME_USED_ATTR __attribute__((used))
-#  else
-#    define RAC_STATIC_RUNTIME_USED_ATTR /* unsupported */
-#  endif
+#if defined(__GNUC__) || defined(__clang__)
+#define RAC_STATIC_RUNTIME_USED_ATTR __attribute__((used))
+#else
+#define RAC_STATIC_RUNTIME_USED_ATTR /* unsupported */
+#endif
 
-#define RAC_STATIC_RUNTIME_REGISTER(name)                                      \
-    namespace rac_runtime_autoreg_##name {                                     \
-        struct Registrar {                                                     \
-            Registrar() noexcept {                                             \
-                (void)::rac_runtime_register(::rac_runtime_entry_##name());    \
-            }                                                                  \
-        };                                                                     \
-        RAC_STATIC_RUNTIME_USED_ATTR static Registrar g_registrar;             \
-    }                                                                          \
-    extern "C" RAC_STATIC_RUNTIME_USED_ATTR                                    \
-    const char* const rac_runtime_static_marker_##name = #name
+#define RAC_STATIC_RUNTIME_REGISTER(name)                                                        \
+    namespace rac_runtime_autoreg_##name {                                                       \
+        struct Registrar {                                                                       \
+            Registrar() noexcept { (void)::rac_runtime_register(::rac_runtime_entry_##name()); } \
+        };                                                                                       \
+        RAC_STATIC_RUNTIME_USED_ATTR static Registrar g_registrar;                               \
+    }                                                                                            \
+    extern "C" RAC_STATIC_RUNTIME_USED_ATTR const char* const rac_runtime_static_marker_##name = \
+        #name
 
 #endif
 

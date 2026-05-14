@@ -16,8 +16,8 @@
  * adapted to the Web SDK's no-bridge environment.
  */
 
+import type { EventCategory } from '@runanywhere/proto-ts/component_types';
 import type { ModelCategory, SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-import type { SDKEventType } from '../types/enums';
 import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKLogger } from './SDKLogger';
 
@@ -32,7 +32,7 @@ export type Unsubscribe = () => void;
 /** Event envelope wrapping all emitted events */
 export interface SDKEventEnvelope {
   type: string;
-  category: SDKEventType;
+  category: EventCategory;
   timestamp: number;
   data: Record<string, unknown>;
 }
@@ -158,7 +158,7 @@ export class EventBus {
   /**
    * Emit an event.
    */
-  emit<K extends keyof SDKEventMap>(eventType: K, category: SDKEventType, data?: SDKEventMap[K]): void {
+  emit<K extends keyof SDKEventMap>(eventType: K, category: EventCategory, data?: SDKEventMap[K]): void {
     const key = eventType as string;
     const payload = (data ?? {}) as Record<string, unknown>;
     const envelope: SDKEventEnvelope = {

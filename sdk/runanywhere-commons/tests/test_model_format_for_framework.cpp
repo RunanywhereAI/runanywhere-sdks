@@ -28,23 +28,22 @@
 
 namespace {
 
-#define EXPECT_TRUE(_cond)                                                              \
-    do {                                                                                 \
-        if (!(_cond)) {                                                                  \
-            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond);     \
-            return 1;                                                                    \
-        }                                                                                \
+#define EXPECT_TRUE(_cond)                                                          \
+    do {                                                                            \
+        if (!(_cond)) {                                                             \
+            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond); \
+            return 1;                                                               \
+        }                                                                           \
     } while (0)
 
-#define EXPECT_RC(_rc_expr, _expected)                                                  \
-    do {                                                                                 \
-        rac_result_t _rc = (_rc_expr);                                                   \
-        if (_rc != (_expected)) {                                                        \
-            std::fprintf(stderr,                                                         \
-                         "FAIL @ %s:%d: rc=%d expected=%d\n",                            \
-                         __FILE__, __LINE__, _rc, (_expected));                          \
-            return 1;                                                                    \
-        }                                                                                \
+#define EXPECT_RC(_rc_expr, _expected)                                                         \
+    do {                                                                                       \
+        rac_result_t _rc = (_rc_expr);                                                         \
+        if (_rc != (_expected)) {                                                              \
+            std::fprintf(stderr, "FAIL @ %s:%d: rc=%d expected=%d\n", __FILE__, __LINE__, _rc, \
+                         (_expected));                                                         \
+            return 1;                                                                          \
+        }                                                                                      \
     } while (0)
 
 // Helper: invoke the API and assert it returns SUCCESS, return the bool.
@@ -120,7 +119,7 @@ int test_unknown_extensions() {
     EXPECT_TRUE(!query(RAC_FRAMEWORK_ONNX, ".bar"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_COREML, "qux"));
     EXPECT_TRUE(!query(RAC_FRAMEWORK_METALRT, "txt"));
-    EXPECT_TRUE(!query(RAC_FRAMEWORK_SHERPA, ""));   // empty string
+    EXPECT_TRUE(!query(RAC_FRAMEWORK_SHERPA, ""));  // empty string
 
     return 0;
 }
@@ -161,8 +160,7 @@ int test_builtin_frameworks() {
 int test_null_out_pointer() {
     EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_LLAMACPP, ".gguf", nullptr),
               RAC_ERROR_NULL_POINTER);
-    EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_FOUNDATION_MODELS, "anything",
-                                              nullptr),
+    EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_FOUNDATION_MODELS, "anything", nullptr),
               RAC_ERROR_NULL_POINTER);
     return 0;
 }
@@ -172,8 +170,7 @@ int test_null_out_pointer() {
 // ---------------------------------------------------------------------------
 int test_null_extension_non_builtin() {
     rac_bool_t out = RAC_TRUE;  // sentinel — should be set to RAC_FALSE
-    EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_LLAMACPP, nullptr, &out),
-              RAC_SUCCESS);
+    EXPECT_RC(rac_model_format_for_framework(RAC_FRAMEWORK_LLAMACPP, nullptr, &out), RAC_SUCCESS);
     EXPECT_TRUE(out == RAC_FALSE);
 
     out = RAC_TRUE;
@@ -215,7 +212,6 @@ int main(int /*argc*/, char** /*argv*/) {
         std::fprintf(stdout, "[PASS] test_model_format_for_framework\n");
         return 0;
     }
-    std::fprintf(stderr, "[FAIL] test_model_format_for_framework (%d failure(s))\n",
-                 failures);
+    std::fprintf(stderr, "[FAIL] test_model_format_for_framework (%d failure(s))\n", failures);
     return 1;
 }

@@ -28,6 +28,9 @@
 
 #include "rac/solutions/config_loader.hpp"
 
+#include "pipeline.pb.h"
+#include "solutions.pb.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -40,9 +43,7 @@
 #include <variant>
 #include <vector>
 
-#include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
-#include "solutions.pb.h"
 
 namespace rac::solutions {
 
@@ -59,8 +60,8 @@ struct YamlNode {
     enum class Kind { Scalar, Sequence, Mapping };
     Kind kind = Kind::Scalar;
 
-    std::string                                     scalar;
-    std::vector<YamlNodePtr>                        sequence;
+    std::string scalar;
+    std::vector<YamlNodePtr> sequence;
     std::vector<std::pair<std::string, YamlNodePtr>> mapping;
 
     static YamlNodePtr make_scalar(std::string v) {
@@ -81,9 +82,11 @@ struct YamlNode {
     }
 
     YamlNodePtr find(std::string_view key) const {
-        if (kind != Kind::Mapping) return nullptr;
+        if (kind != Kind::Mapping)
+            return nullptr;
         for (const auto& [k, v] : mapping) {
-            if (k == key) return v;
+            if (k == key)
+                return v;
         }
         return nullptr;
     }
@@ -94,11 +97,11 @@ struct YamlNode {
 // ===========================================================================
 
 class YamlParser {
-public:
+   public:
     explicit YamlParser(const std::string& text) {
         // Split into raw lines, stripping comments and trailing WS.
         std::istringstream in(text);
-        std::string        line;
+        std::string line;
         while (std::getline(in, line)) {
             // Strip comments (outside of quotes). Tracking quote state
             // keeps us honest for strings containing '#'.
@@ -106,14 +109,23 @@ public:
             bool in_sq = false, in_dq = false;
             for (size_t i = 0; i < line.size(); ++i) {
                 char c = line[i];
-                if (!in_dq && c == '\'') { in_sq = !in_sq; clean.push_back(c); continue; }
-                if (!in_sq && c == '"')  { in_dq = !in_dq; clean.push_back(c); continue; }
-                if (!in_sq && !in_dq && c == '#') break;
+                if (!in_dq && c == '\'') {
+                    in_sq = !in_sq;
+                    clean.push_back(c);
+                    continue;
+                }
+                if (!in_sq && c == '"') {
+                    in_dq = !in_dq;
+                    clean.push_back(c);
+                    continue;
+                }
+                if (!in_sq && !in_dq && c == '#')
+                    break;
                 clean.push_back(c);
             }
             // Trim trailing WS.
-            while (!clean.empty() && (clean.back() == ' ' || clean.back() == '\t'
-                                     || clean.back() == '\r')) {
+            while (!clean.empty() &&
+                   (clean.back() == ' ' || clean.back() == '\t' || clean.back() == '\r')) {
                 clean.pop_back();
             }
             lines_.push_back(std::move(clean));
@@ -123,18 +135,21 @@ public:
     YamlNodePtr parse(std::string* err) {
         size_t idx = 0;
         // Skip leading blanks.
-        while (idx < lines_.size() && is_blank(lines_[idx])) ++idx;
-        if (idx >= lines_.size()) return YamlNode::make_mapping();
+        while (idx < lines_.size() && is_blank(lines_[idx]))
+            ++idx;
+        if (idx >= lines_.size())
+            return YamlNode::make_mapping();
         const int base_indent = leading_spaces(lines_[idx]);
         return parse_block(idx, base_indent, err);
     }
 
-private:
+   private:
     std::vector<std::string> lines_;
 
     static bool is_blank(const std::string& s) {
         for (char c : s) {
-            if (c != ' ' && c != '\t') return false;
+            if (c != ' ' && c != '\t')
+                return false;
         }
         return true;
     }
@@ -142,25 +157,29 @@ private:
     static int leading_spaces(const std::string& s) {
         int n = 0;
         for (char c : s) {
-            if (c == ' ') ++n;
-            else if (c == '\t') n += 2;  // tolerate tabs as 2 spaces
-            else break;
+            if (c == ' ')
+                ++n;
+            else if (c == '\t')
+                n += 2;  // tolerate tabs as 2 spaces
+            else
+                break;
         }
         return n;
     }
 
     static std::string strip(const std::string& s) {
         size_t a = 0;
-        while (a < s.size() && (s[a] == ' ' || s[a] == '\t')) ++a;
+        while (a < s.size() && (s[a] == ' ' || s[a] == '\t'))
+            ++a;
         size_t b = s.size();
-        while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t')) --b;
+        while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t'))
+            --b;
         return s.substr(a, b - a);
     }
 
     static std::string unquote(const std::string& s) {
         if (s.size() >= 2 &&
-            ((s.front() == '"' && s.back() == '"') ||
-             (s.front() == '\'' && s.back() == '\''))) {
+            ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
             return s.substr(1, s.size() - 2);
         }
         return s;
@@ -170,12 +189,15 @@ private:
     /// >= base_indent. Advances idx past the consumed region.
     YamlNodePtr parse_block(size_t& idx, int base_indent, std::string* err) {
         // Skip blank lines.
-        while (idx < lines_.size() && is_blank(lines_[idx])) ++idx;
-        if (idx >= lines_.size()) return YamlNode::make_mapping();
+        while (idx < lines_.size() && is_blank(lines_[idx]))
+            ++idx;
+        if (idx >= lines_.size())
+            return YamlNode::make_mapping();
 
         const std::string& first = lines_[idx];
-        const int          indent = leading_spaces(first);
-        if (indent < base_indent) return YamlNode::make_mapping();
+        const int indent = leading_spaces(first);
+        if (indent < base_indent)
+            return YamlNode::make_mapping();
 
         const std::string trimmed = strip(first);
         if (trimmed.rfind("- ", 0) == 0 || trimmed == "-") {
@@ -187,16 +209,21 @@ private:
     YamlNodePtr parse_sequence(size_t& idx, int indent, std::string* err) {
         auto node = YamlNode::make_sequence();
         while (idx < lines_.size()) {
-            if (is_blank(lines_[idx])) { ++idx; continue; }
+            if (is_blank(lines_[idx])) {
+                ++idx;
+                continue;
+            }
             const int line_indent = leading_spaces(lines_[idx]);
-            if (line_indent < indent) break;
-            if (line_indent > indent) break;  // shouldn't happen at this level
+            if (line_indent < indent)
+                break;
+            if (line_indent > indent)
+                break;  // shouldn't happen at this level
 
             const std::string trimmed = strip(lines_[idx]);
-            if (trimmed.rfind("- ", 0) != 0 && trimmed != "-") break;
+            if (trimmed.rfind("- ", 0) != 0 && trimmed != "-")
+                break;
 
-            std::string after = trimmed.size() > 1 ? strip(trimmed.substr(1))
-                                                  : std::string();
+            std::string after = trimmed.size() > 1 ? strip(trimmed.substr(1)) : std::string();
             ++idx;
 
             // Three flavours: "- scalar", "- key: value" (inline map
@@ -212,69 +239,61 @@ private:
                     if (val.empty()) {
                         // Nested block: child lines belong to this key.
                         YamlNodePtr child;
-                        if (idx < lines_.size()
-                            && !is_blank(lines_[idx])
-                            && leading_spaces(lines_[idx]) > indent) {
-                            child = parse_block(idx,
-                                                leading_spaces(lines_[idx]),
-                                                err);
+                        if (idx < lines_.size() && !is_blank(lines_[idx]) &&
+                            leading_spaces(lines_[idx]) > indent) {
+                            child = parse_block(idx, leading_spaces(lines_[idx]), err);
                         } else {
                             child = YamlNode::make_mapping();
                         }
-                        map->mapping.emplace_back(std::move(key),
-                                                  std::move(child));
+                        map->mapping.emplace_back(std::move(key), std::move(child));
                     } else {
-                        map->mapping.emplace_back(
-                            std::move(key),
-                            YamlNode::make_scalar(unquote(std::move(val))));
+                        map->mapping.emplace_back(std::move(key),
+                                                  YamlNode::make_scalar(unquote(std::move(val))));
                     }
                     // Continue parsing additional keys that belong to
                     // the same sequence element (indent > list indent).
                     while (idx < lines_.size()) {
-                        if (is_blank(lines_[idx])) { ++idx; continue; }
+                        if (is_blank(lines_[idx])) {
+                            ++idx;
+                            continue;
+                        }
                         const int ii = leading_spaces(lines_[idx]);
                         const std::string tt = strip(lines_[idx]);
-                        if (ii <= indent || tt.rfind("- ", 0) == 0
-                                          || tt == "-") {
+                        if (ii <= indent || tt.rfind("- ", 0) == 0 || tt == "-") {
                             break;
                         }
                         // Sub-key of the same element.
                         auto cc = tt.find(':');
-                        if (cc == std::string::npos) { ++idx; continue; }
+                        if (cc == std::string::npos) {
+                            ++idx;
+                            continue;
+                        }
                         std::string k2 = strip(tt.substr(0, cc));
                         std::string v2 = strip(tt.substr(cc + 1));
                         ++idx;
                         if (v2.empty()) {
                             YamlNodePtr child;
-                            if (idx < lines_.size()
-                                && !is_blank(lines_[idx])
-                                && leading_spaces(lines_[idx]) > ii) {
-                                child = parse_block(idx,
-                                                    leading_spaces(lines_[idx]),
-                                                    err);
+                            if (idx < lines_.size() && !is_blank(lines_[idx]) &&
+                                leading_spaces(lines_[idx]) > ii) {
+                                child = parse_block(idx, leading_spaces(lines_[idx]), err);
                             } else {
                                 child = YamlNode::make_mapping();
                             }
-                            map->mapping.emplace_back(std::move(k2),
-                                                      std::move(child));
+                            map->mapping.emplace_back(std::move(k2), std::move(child));
                         } else {
                             map->mapping.emplace_back(
-                                std::move(k2),
-                                YamlNode::make_scalar(unquote(std::move(v2))));
+                                std::move(k2), YamlNode::make_scalar(unquote(std::move(v2))));
                         }
                     }
                     node->sequence.push_back(std::move(map));
                 } else {
-                    node->sequence.push_back(
-                        YamlNode::make_scalar(unquote(std::move(after))));
+                    node->sequence.push_back(YamlNode::make_scalar(unquote(std::move(after))));
                 }
             } else {
                 // Bare "-"; child block below.
-                if (idx < lines_.size()
-                    && !is_blank(lines_[idx])
-                    && leading_spaces(lines_[idx]) > indent) {
-                    node->sequence.push_back(
-                        parse_block(idx, leading_spaces(lines_[idx]), err));
+                if (idx < lines_.size() && !is_blank(lines_[idx]) &&
+                    leading_spaces(lines_[idx]) > indent) {
+                    node->sequence.push_back(parse_block(idx, leading_spaces(lines_[idx]), err));
                 } else {
                     node->sequence.push_back(YamlNode::make_scalar(""));
                 }
@@ -286,16 +305,22 @@ private:
     YamlNodePtr parse_mapping(size_t& idx, int indent, std::string* err) {
         auto node = YamlNode::make_mapping();
         while (idx < lines_.size()) {
-            if (is_blank(lines_[idx])) { ++idx; continue; }
-            const int         line_indent = leading_spaces(lines_[idx]);
-            if (line_indent < indent) break;
+            if (is_blank(lines_[idx])) {
+                ++idx;
+                continue;
+            }
+            const int line_indent = leading_spaces(lines_[idx]);
+            if (line_indent < indent)
+                break;
             if (line_indent > indent) {
                 // Orphan indentation — bail out; caller handles.
-                if (err) *err = "unexpected indentation";
+                if (err)
+                    *err = "unexpected indentation";
                 return node;
             }
             const std::string trimmed = strip(lines_[idx]);
-            if (trimmed.rfind("- ", 0) == 0 || trimmed == "-") break;
+            if (trimmed.rfind("- ", 0) == 0 || trimmed == "-")
+                break;
             auto colon = trimmed.find(':');
             if (colon == std::string::npos) {
                 ++idx;
@@ -305,15 +330,13 @@ private:
             std::string val = strip(trimmed.substr(colon + 1));
             ++idx;
             if (!val.empty()) {
-                node->mapping.emplace_back(
-                    std::move(key),
-                    YamlNode::make_scalar(unquote(std::move(val))));
+                node->mapping.emplace_back(std::move(key),
+                                           YamlNode::make_scalar(unquote(std::move(val))));
             } else {
                 // Child block.
                 YamlNodePtr child;
-                if (idx < lines_.size()
-                    && !is_blank(lines_[idx])
-                    && leading_spaces(lines_[idx]) > indent) {
+                if (idx < lines_.size() && !is_blank(lines_[idx]) &&
+                    leading_spaces(lines_[idx]) > indent) {
                     child = parse_block(idx, leading_spaces(lines_[idx]), err);
                 } else {
                     child = YamlNode::make_mapping();
@@ -330,45 +353,66 @@ private:
 // ===========================================================================
 
 static int to_int(const std::string& s, int fallback = 0) {
-    try { return std::stoi(s); } catch (...) { return fallback; }
+    try {
+        return std::stoi(s);
+    } catch (...) {
+        return fallback;
+    }
 }
 static float to_float(const std::string& s, float fallback = 0.0f) {
-    try { return std::stof(s); } catch (...) { return fallback; }
+    try {
+        return std::stof(s);
+    } catch (...) {
+        return fallback;
+    }
 }
 static bool to_bool(const std::string& s) {
-    std::string lower; lower.reserve(s.size());
-    for (char c : s) lower.push_back(static_cast<char>(std::tolower(c)));
+    std::string lower;
+    lower.reserve(s.size());
+    for (char c : s)
+        lower.push_back(static_cast<char>(std::tolower(c)));
     return lower == "true" || lower == "yes" || lower == "1" || lower == "on";
 }
 
 runanywhere::v1::DeviceAffinity parse_device(const std::string& s) {
     using runanywhere::v1::DeviceAffinity;
-    std::string lower; for (char c : s) lower.push_back(static_cast<char>(std::tolower(c)));
-    if (lower == "cpu") return DeviceAffinity::DEVICE_AFFINITY_CPU;
-    if (lower == "gpu") return DeviceAffinity::DEVICE_AFFINITY_GPU;
+    std::string lower;
+    for (char c : s)
+        lower.push_back(static_cast<char>(std::tolower(c)));
+    if (lower == "cpu")
+        return DeviceAffinity::DEVICE_AFFINITY_CPU;
+    if (lower == "gpu")
+        return DeviceAffinity::DEVICE_AFFINITY_GPU;
     if (lower == "ane" || lower == "npu")
         return DeviceAffinity::DEVICE_AFFINITY_ANE;
-    if (lower == "any") return DeviceAffinity::DEVICE_AFFINITY_ANY;
+    if (lower == "any")
+        return DeviceAffinity::DEVICE_AFFINITY_ANY;
     return DeviceAffinity::DEVICE_AFFINITY_UNSPECIFIED;
 }
 
 runanywhere::v1::EdgePolicy parse_policy(const std::string& s) {
     using runanywhere::v1::EdgePolicy;
-    if (s == "block")       return EdgePolicy::EDGE_POLICY_BLOCK;
-    if (s == "drop_oldest") return EdgePolicy::EDGE_POLICY_DROP_OLDEST;
-    if (s == "drop_newest") return EdgePolicy::EDGE_POLICY_DROP_NEWEST;
+    if (s == "block")
+        return EdgePolicy::EDGE_POLICY_BLOCK;
+    if (s == "drop_oldest")
+        return EdgePolicy::EDGE_POLICY_DROP_OLDEST;
+    if (s == "drop_newest")
+        return EdgePolicy::EDGE_POLICY_DROP_NEWEST;
     return EdgePolicy::EDGE_POLICY_UNSPECIFIED;
 }
 
-void populate_operator(const YamlNode& node,
-                       runanywhere::v1::OperatorSpec* op) {
-    if (auto n = node.find("name"))          op->set_name(n->scalar);
-    if (auto n = node.find("type"))          op->set_type(n->scalar);
-    if (auto n = node.find("pinned_engine")) op->set_pinned_engine(n->scalar);
-    if (auto n = node.find("model_id"))      op->set_model_id(n->scalar);
-    if (auto n = node.find("device"))        op->set_device(parse_device(n->scalar));
-    if (auto params = node.find("params");
-        params && params->kind == YamlNode::Kind::Mapping) {
+void populate_operator(const YamlNode& node, runanywhere::v1::OperatorSpec* op) {
+    if (auto n = node.find("name"))
+        op->set_name(n->scalar);
+    if (auto n = node.find("type"))
+        op->set_type(n->scalar);
+    if (auto n = node.find("pinned_engine"))
+        op->set_pinned_engine(n->scalar);
+    if (auto n = node.find("model_id"))
+        op->set_model_id(n->scalar);
+    if (auto n = node.find("device"))
+        op->set_device(parse_device(n->scalar));
+    if (auto params = node.find("params"); params && params->kind == YamlNode::Kind::Mapping) {
         for (const auto& [k, v] : params->mapping) {
             if (v && v->kind == YamlNode::Kind::Scalar) {
                 (*op->mutable_params())[k] = v->scalar;
@@ -378,15 +422,17 @@ void populate_operator(const YamlNode& node,
 }
 
 void populate_edge(const YamlNode& node, runanywhere::v1::EdgeSpec* edge) {
-    if (auto n = node.find("from"))     edge->set_from(n->scalar);
-    if (auto n = node.find("to"))       edge->set_to(n->scalar);
-    if (auto n = node.find("capacity")) edge->set_capacity(
-        static_cast<uint32_t>(std::max(0, to_int(n->scalar))));
-    if (auto n = node.find("policy"))   edge->set_policy(parse_policy(n->scalar));
+    if (auto n = node.find("from"))
+        edge->set_from(n->scalar);
+    if (auto n = node.find("to"))
+        edge->set_to(n->scalar);
+    if (auto n = node.find("capacity"))
+        edge->set_capacity(static_cast<uint32_t>(std::max(0, to_int(n->scalar))));
+    if (auto n = node.find("policy"))
+        edge->set_policy(parse_policy(n->scalar));
 }
 
-void populate_options(const YamlNode& node,
-                      runanywhere::v1::PipelineOptions* opts) {
+void populate_options(const YamlNode& node, runanywhere::v1::PipelineOptions* opts) {
     if (auto n = node.find("latency_budget_ms")) {
         opts->set_latency_budget_ms(to_int(n->scalar));
     }
@@ -398,29 +444,29 @@ void populate_options(const YamlNode& node,
     }
 }
 
-rac_result_t populate_pipeline(const YamlNode& root,
-                               runanywhere::v1::PipelineSpec* spec) {
+rac_result_t populate_pipeline(const YamlNode& root, runanywhere::v1::PipelineSpec* spec) {
     if (root.kind != YamlNode::Kind::Mapping) {
         rac_error_set_details("YAML root must be a mapping");
         return RAC_ERROR_INVALID_FORMAT;
     }
-    if (auto n = root.find("name")) spec->set_name(n->scalar);
+    if (auto n = root.find("name"))
+        spec->set_name(n->scalar);
     if (auto operators = root.find("operators");
         operators && operators->kind == YamlNode::Kind::Sequence) {
         for (const auto& item : operators->sequence) {
-            if (!item || item->kind != YamlNode::Kind::Mapping) continue;
+            if (!item || item->kind != YamlNode::Kind::Mapping)
+                continue;
             populate_operator(*item, spec->add_operators());
         }
     }
-    if (auto edges = root.find("edges");
-        edges && edges->kind == YamlNode::Kind::Sequence) {
+    if (auto edges = root.find("edges"); edges && edges->kind == YamlNode::Kind::Sequence) {
         for (const auto& item : edges->sequence) {
-            if (!item || item->kind != YamlNode::Kind::Mapping) continue;
+            if (!item || item->kind != YamlNode::Kind::Mapping)
+                continue;
             populate_edge(*item, spec->add_edges());
         }
     }
-    if (auto opts = root.find("options");
-        opts && opts->kind == YamlNode::Kind::Mapping) {
+    if (auto opts = root.find("options"); opts && opts->kind == YamlNode::Kind::Mapping) {
         populate_options(*opts, spec->mutable_options());
     }
     return RAC_SUCCESS;
@@ -433,18 +479,24 @@ rac_result_t populate_pipeline(const YamlNode& root,
 
 runanywhere::v1::AudioSource parse_audio_source(const std::string& s) {
     using runanywhere::v1::AudioSource;
-    if (s == "microphone" || s == "mic") return AudioSource::AUDIO_SOURCE_MICROPHONE;
-    if (s == "file")                     return AudioSource::AUDIO_SOURCE_FILE;
-    if (s == "callback")                 return AudioSource::AUDIO_SOURCE_CALLBACK;
+    if (s == "microphone" || s == "mic")
+        return AudioSource::AUDIO_SOURCE_MICROPHONE;
+    if (s == "file")
+        return AudioSource::AUDIO_SOURCE_FILE;
+    if (s == "callback")
+        return AudioSource::AUDIO_SOURCE_CALLBACK;
     return AudioSource::AUDIO_SOURCE_UNSPECIFIED;
 }
 
-void populate_voice_agent(const YamlNode& node,
-                          runanywhere::v1::VoiceAgentConfig* cfg) {
-    if (auto n = node.find("llm_model_id")) cfg->set_llm_model_id(n->scalar);
-    if (auto n = node.find("stt_model_id")) cfg->set_stt_model_id(n->scalar);
-    if (auto n = node.find("tts_model_id")) cfg->set_tts_model_id(n->scalar);
-    if (auto n = node.find("vad_model_id")) cfg->set_vad_model_id(n->scalar);
+void populate_voice_agent(const YamlNode& node, runanywhere::v1::VoiceAgentConfig* cfg) {
+    if (auto n = node.find("llm_model_id"))
+        cfg->set_llm_model_id(n->scalar);
+    if (auto n = node.find("stt_model_id"))
+        cfg->set_stt_model_id(n->scalar);
+    if (auto n = node.find("tts_model_id"))
+        cfg->set_tts_model_id(n->scalar);
+    if (auto n = node.find("vad_model_id"))
+        cfg->set_vad_model_id(n->scalar);
     if (auto n = node.find("sample_rate_hz"))
         cfg->set_sample_rate_hz(to_int(n->scalar, 16000));
     if (auto n = node.find("chunk_ms"))
@@ -471,46 +523,57 @@ void populate_voice_agent(const YamlNode& node,
 
 runanywhere::v1::VectorStore parse_vector_store(const std::string& s) {
     using runanywhere::v1::VectorStore;
-    if (s == "usearch")  return VectorStore::VECTOR_STORE_USEARCH;
-    if (s == "pgvector") return VectorStore::VECTOR_STORE_PGVECTOR;
+    if (s == "usearch")
+        return VectorStore::VECTOR_STORE_USEARCH;
+    if (s == "pgvector")
+        return VectorStore::VECTOR_STORE_PGVECTOR;
     return VectorStore::VECTOR_STORE_UNSPECIFIED;
 }
 
 void populate_rag(const YamlNode& node, runanywhere::v1::RAGConfig* cfg) {
-    if (auto n = node.find("embed_model_id"))  cfg->set_embed_model_id(n->scalar);
-    if (auto n = node.find("rerank_model_id")) cfg->set_rerank_model_id(n->scalar);
-    if (auto n = node.find("llm_model_id"))    cfg->set_llm_model_id(n->scalar);
+    if (auto n = node.find("embed_model_id"))
+        cfg->set_embed_model_id(n->scalar);
+    if (auto n = node.find("rerank_model_id"))
+        cfg->set_rerank_model_id(n->scalar);
+    if (auto n = node.find("llm_model_id"))
+        cfg->set_llm_model_id(n->scalar);
     if (auto n = node.find("vector_store"))
         cfg->set_vector_store(parse_vector_store(n->scalar));
     if (auto n = node.find("vector_store_path"))
         cfg->set_vector_store_path(n->scalar);
-    if (auto n = node.find("retrieve_k")) cfg->set_retrieve_k(to_int(n->scalar));
-    if (auto n = node.find("rerank_top")) cfg->set_rerank_top(to_int(n->scalar));
-    if (auto n = node.find("bm25_k1"))    cfg->set_bm25_k1(to_float(n->scalar));
-    if (auto n = node.find("bm25_b"))     cfg->set_bm25_b(to_float(n->scalar));
-    if (auto n = node.find("rrf_k"))      cfg->set_rrf_k(to_int(n->scalar));
+    if (auto n = node.find("retrieve_k"))
+        cfg->set_retrieve_k(to_int(n->scalar));
+    if (auto n = node.find("rerank_top"))
+        cfg->set_rerank_top(to_int(n->scalar));
+    if (auto n = node.find("bm25_k1"))
+        cfg->set_bm25_k1(to_float(n->scalar));
+    if (auto n = node.find("bm25_b"))
+        cfg->set_bm25_b(to_float(n->scalar));
+    if (auto n = node.find("rrf_k"))
+        cfg->set_rrf_k(to_int(n->scalar));
     if (auto n = node.find("prompt_template"))
         cfg->set_prompt_template(n->scalar);
 }
 
-void populate_wake_word(const YamlNode& node,
-                        runanywhere::v1::WakeWordConfig* cfg) {
-    if (auto n = node.find("model_id"))     cfg->set_model_id(n->scalar);
-    if (auto n = node.find("keyword"))      cfg->set_keyword(n->scalar);
-    if (auto n = node.find("threshold"))    cfg->set_threshold(to_float(n->scalar));
-    if (auto n = node.find("pre_roll_ms"))  cfg->set_pre_roll_ms(to_int(n->scalar));
+void populate_wake_word(const YamlNode& node, runanywhere::v1::WakeWordConfig* cfg) {
+    if (auto n = node.find("model_id"))
+        cfg->set_model_id(n->scalar);
+    if (auto n = node.find("keyword"))
+        cfg->set_keyword(n->scalar);
+    if (auto n = node.find("threshold"))
+        cfg->set_threshold(to_float(n->scalar));
+    if (auto n = node.find("pre_roll_ms"))
+        cfg->set_pre_roll_ms(to_int(n->scalar));
     if (auto n = node.find("sample_rate_hz"))
         cfg->set_sample_rate_hz(to_int(n->scalar, 16000));
 }
 
-rac_result_t populate_solution(const YamlNode& root,
-                               runanywhere::v1::SolutionConfig* cfg) {
+rac_result_t populate_solution(const YamlNode& root, runanywhere::v1::SolutionConfig* cfg) {
     if (root.kind != YamlNode::Kind::Mapping) {
         rac_error_set_details("YAML root must be a mapping");
         return RAC_ERROR_INVALID_FORMAT;
     }
-    if (auto n = root.find("voice_agent");
-        n && n->kind == YamlNode::Kind::Mapping) {
+    if (auto n = root.find("voice_agent"); n && n->kind == YamlNode::Kind::Mapping) {
         populate_voice_agent(*n, cfg->mutable_voice_agent());
         return RAC_SUCCESS;
     }
@@ -522,8 +585,7 @@ rac_result_t populate_solution(const YamlNode& root,
         populate_wake_word(*n, cfg->mutable_wake_word());
         return RAC_SUCCESS;
     }
-    rac_error_set_details(
-        "SolutionConfig YAML must declare one of: voice_agent, rag, wake_word");
+    rac_error_set_details("SolutionConfig YAML must declare one of: voice_agent, rag, wake_word");
     return RAC_ERROR_INVALID_FORMAT;
 }
 
@@ -535,8 +597,10 @@ rac_result_t populate_solution(const YamlNode& root,
 
 rac_result_t load_pipeline_from_proto_bytes(const void* data, size_t len,
                                             runanywhere::v1::PipelineSpec* out_spec) {
-    if (!out_spec)              return RAC_ERROR_INVALID_ARGUMENT;
-    if (!data && len > 0)       return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_spec)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!data && len > 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
     out_spec->Clear();
     if (!out_spec->ParseFromArray(data, static_cast<int>(len))) {
         rac_error_set_details("failed to decode PipelineSpec proto bytes");
@@ -547,8 +611,10 @@ rac_result_t load_pipeline_from_proto_bytes(const void* data, size_t len,
 
 rac_result_t load_solution_from_proto_bytes(const void* data, size_t len,
                                             runanywhere::v1::SolutionConfig* out_config) {
-    if (!out_config)            return RAC_ERROR_INVALID_ARGUMENT;
-    if (!data && len > 0)       return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_config)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (!data && len > 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
     out_config->Clear();
     if (!out_config->ParseFromArray(data, static_cast<int>(len))) {
         rac_error_set_details("failed to decode SolutionConfig proto bytes");
@@ -559,11 +625,12 @@ rac_result_t load_solution_from_proto_bytes(const void* data, size_t len,
 
 rac_result_t load_pipeline_from_yaml(const std::string& yaml,
                                      runanywhere::v1::PipelineSpec* out_spec) {
-    if (!out_spec) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_spec)
+        return RAC_ERROR_INVALID_ARGUMENT;
     out_spec->Clear();
-    YamlParser  parser(yaml);
+    YamlParser parser(yaml);
     std::string err;
-    auto        root = parser.parse(&err);
+    auto root = parser.parse(&err);
     if (!err.empty()) {
         rac_error_set_details(("YAML parse error: " + err).c_str());
         return RAC_ERROR_INVALID_FORMAT;
@@ -577,11 +644,12 @@ rac_result_t load_pipeline_from_yaml(const std::string& yaml,
 
 rac_result_t load_solution_from_yaml(const std::string& yaml,
                                      runanywhere::v1::SolutionConfig* out_config) {
-    if (!out_config) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!out_config)
+        return RAC_ERROR_INVALID_ARGUMENT;
     out_config->Clear();
-    YamlParser  parser(yaml);
+    YamlParser parser(yaml);
     std::string err;
-    auto        root = parser.parse(&err);
+    auto root = parser.parse(&err);
     if (!err.empty()) {
         rac_error_set_details(("YAML parse error: " + err).c_str());
         return RAC_ERROR_INVALID_FORMAT;

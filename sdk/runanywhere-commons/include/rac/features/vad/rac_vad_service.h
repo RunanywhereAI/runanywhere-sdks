@@ -241,9 +241,9 @@ RAC_API void rac_vad_destroy(rac_handle_t handle);
  * platform-owned. out_result receives serialized runanywhere.v1.VADResult
  * bytes.
  */
-RAC_API rac_result_t rac_vad_process_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                     size_t request_proto_size,
+                                                     rac_proto_buffer_t* out_result);
 
 /**
  * @brief Configure the lifecycle-loaded VAD with a VADConfiguration proto.
@@ -253,9 +253,9 @@ RAC_API rac_result_t rac_vad_process_lifecycle_proto(
  * serialized runanywhere.v1.VADServiceState bytes reflecting the post-
  * configure state.
  */
-RAC_API rac_result_t rac_vad_configure_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
 
 /**
  * @brief Start the lifecycle-loaded VAD processing session.

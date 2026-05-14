@@ -9,8 +9,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
-#include <atomic>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -120,8 +120,7 @@ std::unordered_map<rac_handle_t, ProtoStreamSlot>& proto_stream_slots() {
 }
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -136,8 +135,7 @@ rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize VAD proto result");
     }
@@ -200,33 +198,26 @@ bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
 }
 
 void emit_vad_stream_event(const runanywhere::v1::VADStreamEvent& event,
-                           rac_vad_proto_stream_event_callback_fn callback,
-                           void* user_data) {
+                           rac_vad_proto_stream_event_callback_fn callback, void* user_data) {
     if (!callback || !validate_vad_stream_event(event)) {
         return;
     }
 
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
     }
 }
 
-void publish_vad_pipeline_event(bool is_speech,
-                                float confidence,
-                                float energy,
-                                int32_t duration_ms,
+void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, int32_t duration_ms,
                                 rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::VoiceEvent voice_event;
     voice_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
-    voice_event.set_category(error_code == RAC_SUCCESS
-                                 ? runanywhere::v1::EVENT_CATEGORY_VAD
-                                 : runanywhere::v1::EVENT_CATEGORY_ERROR);
-    voice_event.set_severity(error_code == RAC_SUCCESS
-                                 ? runanywhere::v1::ERROR_SEVERITY_INFO
-                                 : runanywhere::v1::ERROR_SEVERITY_ERROR);
+    voice_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
+                                                       : runanywhere::v1::EVENT_CATEGORY_ERROR);
+    voice_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                       : runanywhere::v1::ERROR_SEVERITY_ERROR);
     voice_event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     if (error_code == RAC_SUCCESS) {
         auto* vad = voice_event.mutable_vad();
@@ -260,8 +251,7 @@ void publish_vad_pipeline_event(bool is_speech,
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
     const size_t size = sdk_event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
@@ -371,7 +361,7 @@ extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
     // 1. Energy threshold range (Swift lines 64-69)
     if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
         RAC_LOG_ERROR("VAD.Component",
-                  "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
+                      "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
@@ -673,7 +663,8 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
 
     auto* service = static_cast<rac_vad_service_t*>(malloc(sizeof(rac_vad_service_t)));
     if (!service) {
-        if (vt->vad_ops->destroy) vt->vad_ops->destroy(impl);
+        if (vt->vad_ops->destroy)
+            vt->vad_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->vad_ops;
@@ -691,7 +682,8 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     if (component->model_service->ops && component->model_service->ops->start) {
         result = component->model_service->ops->start(component->model_service->impl);
         if (result != RAC_SUCCESS) {
-            RAC_LOG_ERROR("VAD.Component", "Model VAD start failed: %d — rolling back load", result);
+            RAC_LOG_ERROR("VAD.Component", "Model VAD start failed: %d — rolling back load",
+                          result);
             if (component->model_service->ops->destroy) {
                 component->model_service->ops->destroy(component->model_service->impl);
             }
@@ -715,8 +707,8 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
         const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
         char props[128];
         snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("vad.backend.created", RAC_EVENT_CATEGORY_VOICE,
-                        RAC_EVENT_DESTINATION_ALL, props);
+        rac_event_track("vad.backend.created", RAC_EVENT_CATEGORY_VOICE, RAC_EVENT_DESTINATION_ALL,
+                        props);
     }
 
     return RAC_SUCCESS;
@@ -911,16 +903,19 @@ extern "C" rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
 }
 
 extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
-                                                          float* ambient_level_out,
-                                                          float* recent_avg_out,
-                                                          float* recent_max_out) {
+                                                         float* ambient_level_out,
+                                                         float* recent_avg_out,
+                                                         float* recent_max_out) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
 
     // Initialise outputs to safe defaults regardless of code path.
-    if (ambient_level_out) *ambient_level_out = 0.0f;
-    if (recent_avg_out)    *recent_avg_out    = 0.0f;
-    if (recent_max_out)    *recent_max_out    = 0.0f;
+    if (ambient_level_out)
+        *ambient_level_out = 0.0f;
+    if (recent_avg_out)
+        *recent_avg_out = 0.0f;
+    if (recent_max_out)
+        *recent_max_out = 0.0f;
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
@@ -938,9 +933,12 @@ extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
         return result;
     }
 
-    if (ambient_level_out) *ambient_level_out = stats.ambient;
-    if (recent_avg_out)    *recent_avg_out    = stats.recent_avg;
-    if (recent_max_out)    *recent_max_out    = stats.recent_max;
+    if (ambient_level_out)
+        *ambient_level_out = stats.ambient;
+    if (recent_avg_out)
+        *recent_avg_out = stats.recent_avg;
+    if (recent_max_out)
+        *recent_max_out = stats.recent_max;
 
     return RAC_SUCCESS;
 }
@@ -949,10 +947,9 @@ extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
 // GENERATED-PROTO C ABI
 // =============================================================================
 
-extern "C" rac_result_t rac_vad_component_configure_proto(
-    rac_handle_t handle,
-    const uint8_t* config_proto_bytes,
-    size_t config_proto_size) {
+extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
+                                                          const uint8_t* config_proto_bytes,
+                                                          size_t config_proto_size) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
     (void)config_proto_bytes;
@@ -973,11 +970,11 @@ extern "C" rac_result_t rac_vad_component_configure_proto(
     }
 
     rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
-    config.sample_rate = proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
-    config.frame_length =
-        proto.frame_length_ms() > 0
-            ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
-            : RAC_VAD_DEFAULT_FRAME_LENGTH;
+    config.sample_rate =
+        proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    config.frame_length = proto.frame_length_ms() > 0
+                              ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
+                              : RAC_VAD_DEFAULT_FRAME_LENGTH;
     config.energy_threshold =
         proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     config.enable_auto_calibration = proto.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
@@ -985,13 +982,11 @@ extern "C" rac_result_t rac_vad_component_configure_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_vad_component_process_proto(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
+                                                        size_t num_samples,
+                                                        const uint8_t* options_proto_bytes,
+                                                        size_t options_proto_size,
+                                                        rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1053,11 +1048,10 @@ extern "C" rac_result_t rac_vad_component_process_proto(
     const float energy = compute_rms_energy(samples, num_samples);
     const float confidence =
         threshold > 0.0f ? std::min(1.0f, energy / threshold) : (is_speech ? 1.0f : 0.0f);
-    const int32_t duration_ms =
-        static_cast<int32_t>((static_cast<double>(num_samples) /
-                              static_cast<double>(sample_rate > 0 ? sample_rate
-                                                                  : RAC_VAD_DEFAULT_SAMPLE_RATE)) *
-                             1000.0);
+    const int32_t duration_ms = static_cast<int32_t>(
+        (static_cast<double>(num_samples) /
+         static_cast<double>(sample_rate > 0 ? sample_rate : RAC_VAD_DEFAULT_SAMPLE_RATE)) *
+        1000.0);
 
     runanywhere::v1::VADResult result;
     result.set_is_speech(is_speech == RAC_TRUE);
@@ -1069,9 +1063,8 @@ extern "C" rac_result_t rac_vad_component_process_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_vad_component_get_statistics_proto(
-    rac_handle_t handle,
-    rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_vad_component_get_statistics_proto(rac_handle_t handle,
+                                                               rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1088,8 +1081,7 @@ extern "C" rac_result_t rac_vad_component_get_statistics_proto(
     float ambient = 0.0f;
     float recent_avg = 0.0f;
     float recent_max = 0.0f;
-    rac_result_t rc =
-        rac_vad_component_get_statistics(handle, &ambient, &recent_avg, &recent_max);
+    rac_result_t rc = rac_vad_component_get_statistics(handle, &ambient, &recent_avg, &recent_max);
     if (rc != RAC_SUCCESS) {
         return rac_proto_buffer_set_error(out_result, rc, "VAD statistics query failed");
     }
@@ -1105,9 +1097,7 @@ extern "C" rac_result_t rac_vad_component_get_statistics_proto(
 }
 
 extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
-    rac_handle_t handle,
-    rac_vad_proto_stream_event_callback_fn callback,
-    void* user_data) {
+    rac_handle_t handle, rac_vad_proto_stream_event_callback_fn callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
     (void)callback;

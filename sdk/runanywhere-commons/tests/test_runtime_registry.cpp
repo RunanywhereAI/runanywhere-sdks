@@ -35,20 +35,20 @@ namespace {
 int g_test_count = 0;
 int g_fail_count = 0;
 
-#define CHECK(cond, label) do { \
-    ++g_test_count; \
-    if (!(cond)) { \
-        ++g_fail_count; \
-        std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", \
-                     label, __FILE__, __LINE__, #cond); \
-    } else { \
-        std::fprintf(stdout, "  ok:   %s\n", label); \
-    } \
-} while (0)
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++g_test_count;                                                                          \
+        if (!(cond)) {                                                                           \
+            ++g_fail_count;                                                                      \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
+    } while (0)
 
 /* Lightweight per-vtable state so we can observe init/destroy callbacks. */
 struct VtState {
-    int init_calls    = 0;
+    int init_calls = 0;
     int destroy_calls = 0;
     rac_result_t init_result = RAC_SUCCESS;
 };
@@ -76,12 +76,14 @@ const rac_runtime_vtable_v2_t k_noop_v2 = {
 };
 
 /* Each vtable references its own VtState index via metadata.reserved_0. */
-#define MAKE_OPS(slot)                                              \
-    rac_result_t init_##slot(void) {                                \
-        g_states[slot].init_calls++;                                \
-        return g_states[slot].init_result;                          \
-    }                                                               \
-    void destroy_##slot(void) { g_states[slot].destroy_calls++; }
+#define MAKE_OPS(slot)                     \
+    rac_result_t init_##slot(void) {       \
+        g_states[slot].init_calls++;       \
+        return g_states[slot].init_result; \
+    }                                      \
+    void destroy_##slot(void) {            \
+        g_states[slot].destroy_calls++;    \
+    }
 
 MAKE_OPS(0)
 MAKE_OPS(1)
@@ -90,19 +92,17 @@ MAKE_OPS(3)
 MAKE_OPS(4)
 
 /* Build a runtime vtable with explicit slot + priority + id. */
-rac_runtime_vtable_t make_vt(int slot, rac_runtime_id_t id, const char* name,
-                             int32_t priority,
-                             rac_result_t (*init)(void),
-                             void (*destroy)(void)) {
+rac_runtime_vtable_t make_vt(int slot, rac_runtime_id_t id, const char* name, int32_t priority,
+                             rac_result_t (*init)(void), void (*destroy)(void)) {
     rac_runtime_vtable_t v{};
     v.metadata.abi_version = RAC_RUNTIME_ABI_VERSION;
-    v.metadata.id          = id;
-    v.metadata.name        = name;
+    v.metadata.id = id;
+    v.metadata.name = name;
     v.metadata.display_name = name;
-    v.metadata.version     = "0.0.0";
-    v.metadata.priority    = priority;
-    v.metadata.reserved_0  = static_cast<uint64_t>(slot);
-    v.init    = init;
+    v.metadata.version = "0.0.0";
+    v.metadata.priority = priority;
+    v.metadata.reserved_0 = static_cast<uint64_t>(slot);
+    v.init = init;
     v.destroy = destroy;
     v.reserved_slot_0 = &k_noop_v2;
     return v;
@@ -115,7 +115,8 @@ void reset_registry() {
     size_t n = 0;
     rac_runtime_list(buf, 32, &n);
     for (size_t i = 0; i < n; ++i) {
-        if (buf[i] != nullptr) rac_runtime_unregister(buf[i]->metadata.id);
+        if (buf[i] != nullptr)
+            rac_runtime_unregister(buf[i]->metadata.id);
     }
 }
 
@@ -127,32 +128,29 @@ int main() {
 
     /* --- (1) register + get_by_id round-trip ---------------------------- */
     {
-        for (auto& s : g_states) s = {};
-        auto vt = make_vt(0, RAC_RUNTIME_METAL, "metal_fake", 50,
-                          init_0, destroy_0);
+        for (auto& s : g_states)
+            s = {};
+        auto vt = make_vt(0, RAC_RUNTIME_METAL, "metal_fake", 50, init_0, destroy_0);
         CHECK(rac_runtime_register(&vt) == RAC_SUCCESS,
               "(1) register happy-path returns RAC_SUCCESS");
-        CHECK(g_states[0].init_calls == 1,
-              "(1) register invokes init exactly once");
+        CHECK(g_states[0].init_calls == 1, "(1) register invokes init exactly once");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_METAL) == &vt,
               "(1) get_by_id returns the registered vtable");
         CHECK(rac_runtime_vtable_get_v2(&vt) == &k_noop_v2,
               "(1) v2 extension accessor returns the extension");
-        CHECK(rac_runtime_count() == 1,
-              "(1) rac_runtime_count reflects one entry");
+        CHECK(rac_runtime_count() == 1, "(1) rac_runtime_count reflects one entry");
         rac_runtime_unregister(RAC_RUNTIME_METAL);
     }
 
     /* --- (2) unregister removes + follow-up lookup returns NULL --------- */
     {
-        for (auto& s : g_states) s = {};
-        auto vt = make_vt(0, RAC_RUNTIME_CUDA, "cuda_fake", 10,
-                          init_0, destroy_0);
+        for (auto& s : g_states)
+            s = {};
+        auto vt = make_vt(0, RAC_RUNTIME_CUDA, "cuda_fake", 10, init_0, destroy_0);
         rac_runtime_register(&vt);
         CHECK(rac_runtime_unregister(RAC_RUNTIME_CUDA) == RAC_SUCCESS,
               "(2) unregister returns RAC_SUCCESS");
-        CHECK(g_states[0].destroy_calls == 1,
-              "(2) unregister invokes destroy exactly once");
+        CHECK(g_states[0].destroy_calls == 1, "(2) unregister invokes destroy exactly once");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_CUDA) == nullptr,
               "(2) get_by_id returns NULL after unregister");
         CHECK(rac_runtime_unregister(RAC_RUNTIME_CUDA) == RAC_ERROR_NOT_FOUND,
@@ -164,23 +162,19 @@ int main() {
         CHECK(rac_runtime_register(nullptr) == RAC_ERROR_NULL_POINTER,
               "(3) NULL vtable → RAC_ERROR_NULL_POINTER");
 
-        auto vt = make_vt(0, RAC_RUNTIME_VULKAN, nullptr, 0,
-                          init_0, destroy_0);
+        auto vt = make_vt(0, RAC_RUNTIME_VULKAN, nullptr, 0, init_0, destroy_0);
         CHECK(rac_runtime_register(&vt) == RAC_ERROR_INVALID_PARAMETER,
               "(3) NULL metadata.name → RAC_ERROR_INVALID_PARAMETER");
 
-        auto no_init = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_init", 0,
-                               nullptr, destroy_0);
+        auto no_init = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_init", 0, nullptr, destroy_0);
         CHECK(rac_runtime_register(&no_init) == RAC_ERROR_INVALID_PARAMETER,
               "(3) NULL init op → RAC_ERROR_INVALID_PARAMETER");
 
-        auto no_dtor = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_dtor", 0,
-                               init_0, nullptr);
+        auto no_dtor = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_dtor", 0, init_0, nullptr);
         CHECK(rac_runtime_register(&no_dtor) == RAC_ERROR_INVALID_PARAMETER,
               "(3) NULL destroy op → RAC_ERROR_INVALID_PARAMETER");
 
-        auto no_v2 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_v2", 0,
-                             init_0, destroy_0);
+        auto no_v2 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_v2", 0, init_0, destroy_0);
         no_v2.reserved_slot_0 = nullptr;
         CHECK(rac_runtime_register(&no_v2) == RAC_ERROR_INVALID_PARAMETER,
               "(3) missing v2 extension → RAC_ERROR_INVALID_PARAMETER");
@@ -188,19 +182,17 @@ int main() {
 
     /* --- (4) ABI version mismatch / v1 rejected ------------------------- */
     {
-        for (auto& s : g_states) s = {};
-        auto vt = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_bad_abi", 0,
-                          init_0, destroy_0);
+        for (auto& s : g_states)
+            s = {};
+        auto vt = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_bad_abi", 0, init_0, destroy_0);
         vt.metadata.abi_version = RAC_RUNTIME_ABI_VERSION + 99u;
         CHECK(rac_runtime_register(&vt) == RAC_ERROR_ABI_VERSION_MISMATCH,
               "(4) bad abi_version → RAC_ERROR_ABI_VERSION_MISMATCH");
-        CHECK(g_states[0].init_calls == 0,
-              "(4) init() not called when ABI check fails");
+        CHECK(g_states[0].init_calls == 0, "(4) init() not called when ABI check fails");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_VULKAN) == nullptr,
               "(4) rejected runtime absent from registry");
 
-        auto v1 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_v1", 0,
-                          init_0, destroy_0);
+        auto v1 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_v1", 0, init_0, destroy_0);
         v1.metadata.abi_version = RAC_RUNTIME_ABI_VERSION_V1;
         CHECK(rac_runtime_register(&v1) == RAC_ERROR_ABI_VERSION_MISMATCH,
               "(4) ABI v1 runtime → RAC_ERROR_ABI_VERSION_MISMATCH");
@@ -208,27 +200,24 @@ int main() {
 
     /* --- (5) init returning non-zero → silent reject -------------------- */
     {
-        for (auto& s : g_states) s = {};
+        for (auto& s : g_states)
+            s = {};
         g_states[1].init_result = RAC_ERROR_CAPABILITY_UNSUPPORTED;
-        auto vt = make_vt(1, RAC_RUNTIME_NNAPI, "nnapi_gated", 0,
-                          init_1, destroy_1);
+        auto vt = make_vt(1, RAC_RUNTIME_NNAPI, "nnapi_gated", 0, init_1, destroy_1);
         CHECK(rac_runtime_register(&vt) == RAC_ERROR_CAPABILITY_UNSUPPORTED,
               "(5) init!=0 → RAC_ERROR_CAPABILITY_UNSUPPORTED");
-        CHECK(g_states[1].init_calls == 1,
-              "(5) init called once even on rejection");
-        CHECK(g_states[1].destroy_calls == 0,
-              "(5) destroy NOT called when init failed");
+        CHECK(g_states[1].init_calls == 1, "(5) init called once even on rejection");
+        CHECK(g_states[1].destroy_calls == 0, "(5) destroy NOT called when init failed");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_NNAPI) == nullptr,
               "(5) gated runtime absent from registry");
     }
 
     /* --- (6) duplicate id, lower priority → rejected -------------------- */
     {
-        for (auto& s : g_states) s = {};
-        auto hi = make_vt(0, RAC_RUNTIME_COREML, "coreml_hi", 100,
-                          init_0, destroy_0);
-        auto lo = make_vt(1, RAC_RUNTIME_COREML, "coreml_lo",  10,
-                          init_1, destroy_1);
+        for (auto& s : g_states)
+            s = {};
+        auto hi = make_vt(0, RAC_RUNTIME_COREML, "coreml_hi", 100, init_0, destroy_0);
+        auto lo = make_vt(1, RAC_RUNTIME_COREML, "coreml_lo", 10, init_1, destroy_1);
         rac_runtime_register(&hi);
         CHECK(rac_runtime_register(&lo) == RAC_ERROR_PLUGIN_DUPLICATE,
               "(6) lower-priority duplicate rejected");
@@ -238,21 +227,19 @@ int main() {
               "(6) duplicate's destroy() was called to unwind init");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_COREML) == &hi,
               "(6) existing higher-priority vtable survives");
-        CHECK(g_states[0].destroy_calls == 0,
-              "(6) existing vtable was NOT torn down");
+        CHECK(g_states[0].destroy_calls == 0, "(6) existing vtable was NOT torn down");
         rac_runtime_unregister(RAC_RUNTIME_COREML);
     }
 
     /* --- (7) duplicate id, equal/higher priority → replaces ------------- */
     {
-        for (auto& s : g_states) s = {};
+        for (auto& s : g_states)
+            s = {};
         auto old = make_vt(0, RAC_RUNTIME_CPU, "cpu_old", 10, init_0, destroy_0);
         auto fresh = make_vt(1, RAC_RUNTIME_CPU, "cpu_new", 10, init_1, destroy_1);
         rac_runtime_register(&old);
-        CHECK(rac_runtime_register(&fresh) == RAC_SUCCESS,
-              "(7) equal-priority duplicate accepted");
-        CHECK(g_states[0].destroy_calls == 1,
-              "(7) evicted vtable's destroy fires");
+        CHECK(rac_runtime_register(&fresh) == RAC_SUCCESS, "(7) equal-priority duplicate accepted");
+        CHECK(g_states[0].destroy_calls == 1, "(7) evicted vtable's destroy fires");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_CPU) == &fresh,
               "(7) registry now points at the replacement");
         rac_runtime_unregister(RAC_RUNTIME_CPU);
@@ -260,10 +247,11 @@ int main() {
 
     /* --- (8) list ordering + count + bounded-max semantics -------------- */
     {
-        for (auto& s : g_states) s = {};
-        auto a = make_vt(0, RAC_RUNTIME_CPU,    "cpu",   10, init_0, destroy_0);
-        auto b = make_vt(1, RAC_RUNTIME_METAL,  "metal", 90, init_1, destroy_1);
-        auto c = make_vt(2, RAC_RUNTIME_CUDA,   "cuda",  50, init_2, destroy_2);
+        for (auto& s : g_states)
+            s = {};
+        auto a = make_vt(0, RAC_RUNTIME_CPU, "cpu", 10, init_0, destroy_0);
+        auto b = make_vt(1, RAC_RUNTIME_METAL, "metal", 90, init_1, destroy_1);
+        auto c = make_vt(2, RAC_RUNTIME_CUDA, "cuda", 50, init_2, destroy_2);
         rac_runtime_register(&a);
         rac_runtime_register(&b);
         rac_runtime_register(&c);
@@ -272,8 +260,7 @@ int main() {
 
         const rac_runtime_vtable_t* buf[8] = {nullptr};
         size_t n = 0;
-        CHECK(rac_runtime_list(buf, 8, &n) == RAC_SUCCESS,
-              "(8) list returns RAC_SUCCESS");
+        CHECK(rac_runtime_list(buf, 8, &n) == RAC_SUCCESS, "(8) list returns RAC_SUCCESS");
         CHECK(n == 3, "(8) list writes all 3 entries when max=8");
         CHECK(buf[0] == &b, "(8) entry 0 = highest priority (metal, 90)");
         CHECK(buf[1] == &c, "(8) entry 1 = mid priority (cuda, 50)");
@@ -302,7 +289,8 @@ int main() {
 
     /* --- (9) rac_runtime_is_available mirrors get_by_id ----------------- */
     {
-        for (auto& s : g_states) s = {};
+        for (auto& s : g_states)
+            s = {};
         CHECK(rac_runtime_is_available(RAC_RUNTIME_CPU) == 0,
               "(9) is_available=false when nothing registered");
         auto vt = make_vt(0, RAC_RUNTIME_CPU, "cpu", 0, init_0, destroy_0);

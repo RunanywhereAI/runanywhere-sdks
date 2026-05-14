@@ -48,9 +48,8 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 // ModelInfoMakeRequest by design — same field tags, same types — but we
 // translate explicitly so the proto layer is decoupled and either schema can
 // evolve independently).
-void translate_to_make_request(
-    const runanywhere::v1::RegisterModelFromUrlRequest& in,
-    runanywhere::v1::ModelInfoMakeRequest* out) {
+void translate_to_make_request(const runanywhere::v1::RegisterModelFromUrlRequest& in,
+                               runanywhere::v1::ModelInfoMakeRequest* out) {
     out->set_url(in.url());
     out->set_name(in.name());
     if (in.has_framework()) {
@@ -85,17 +84,14 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
                                       "protobuf support is not available");
 #else
     if (!valid_bytes(in_request_bytes, in_size)) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "RegisterModelFromUrlRequest bytes are invalid");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "RegisterModelFromUrlRequest bytes are invalid");
     }
 
     runanywhere::v1::RegisterModelFromUrlRequest request;
-    if (in_size > 0 &&
-        !request.ParseFromArray(in_request_bytes, static_cast<int>(in_size))) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "failed to parse RegisterModelFromUrlRequest");
+    if (in_size > 0 && !request.ParseFromArray(in_request_bytes, static_cast<int>(in_size))) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse RegisterModelFromUrlRequest");
     }
 
     // -------------------------------------------------------------------------
@@ -111,21 +107,19 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         if (mr_size > 0 &&
             !make_request.SerializeToArray(make_request_bytes.data(),
                                            static_cast<int>(make_request_bytes.size()))) {
-            return rac_proto_buffer_set_error(
-                out_proto, RAC_ERROR_ENCODING_ERROR,
-                "failed to serialize ModelInfoMakeRequest");
+            return rac_proto_buffer_set_error(out_proto, RAC_ERROR_ENCODING_ERROR,
+                                              "failed to serialize ModelInfoMakeRequest");
         }
     }
 
     rac_proto_buffer_t make_buffer;
     rac_proto_buffer_init(&make_buffer);
-    rac_result_t make_rc = rac_model_info_make_proto(
-        make_request_bytes.empty() ? nullptr : make_request_bytes.data(),
-        make_request_bytes.size(), &make_buffer);
+    rac_result_t make_rc =
+        rac_model_info_make_proto(make_request_bytes.empty() ? nullptr : make_request_bytes.data(),
+                                  make_request_bytes.size(), &make_buffer);
     if (make_rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&make_buffer);
-        return rac_proto_buffer_set_error(
-            out_proto, make_rc, "rac_model_info_make_proto failed");
+        return rac_proto_buffer_set_error(out_proto, make_rc, "rac_model_info_make_proto failed");
     }
     if (make_buffer.status != RAC_SUCCESS) {
         const rac_result_t status = make_buffer.status;
@@ -144,13 +138,12 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
         rac_proto_buffer_free(&make_buffer);
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_NOT_INITIALIZED,
-            "global model registry is not available");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_NOT_INITIALIZED,
+                                          "global model registry is not available");
     }
 
-    rac_result_t save_rc = rac_model_registry_register_proto_buffer(
-        registry, make_buffer.data, make_buffer.size, out_proto);
+    rac_result_t save_rc = rac_model_registry_register_proto_buffer(registry, make_buffer.data,
+                                                                    make_buffer.size, out_proto);
     rac_proto_buffer_free(&make_buffer);
 
     if (save_rc != RAC_SUCCESS) {
@@ -162,8 +155,8 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         return out_proto->status;
     }
 
-    RAC_LOG_DEBUG(LOG_CAT, "registered model from url=%s (saved %zu bytes)",
-                  request.url().c_str(), out_proto->size);
+    RAC_LOG_DEBUG(LOG_CAT, "registered model from url=%s (saved %zu bytes)", request.url().c_str(),
+                  out_proto->size);
     return RAC_SUCCESS;
 #endif
 }

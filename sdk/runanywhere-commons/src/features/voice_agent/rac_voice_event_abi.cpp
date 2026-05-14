@@ -26,8 +26,6 @@
 
 #include "rac_voice_event_abi_internal.h"
 
-#include "rac/core/rac_logger.h"
-
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -35,20 +33,25 @@
 #include <unordered_map>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
+
 namespace {
 
 /** Registered (callback, user_data) per handle. */
 struct CallbackSlot {
-    rac_voice_agent_proto_event_callback_fn fn        = nullptr;
-    void*                                   user_data = nullptr;
+    rac_voice_agent_proto_event_callback_fn fn = nullptr;
+    void* user_data = nullptr;
     // Per-handle, per-session sequence counter. Mirrors the LLM stream fix
     // (B-FL-7-001): a process-wide counter caused decoders to reject the
     // second session on the same handle. Reset on every fresh registration
     // so each session starts at 1 again.
-    uint64_t                                seq       = 0;
+    uint64_t seq = 0;
 };
 
-std::mutex&                                                 g_mu()    { static std::mutex m; return m; }
+std::mutex& g_mu() {
+    static std::mutex m;
+    return m;
+}
 std::unordered_map<rac_voice_agent_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_voice_agent_handle_t, CallbackSlot> m;
     return m;
@@ -58,9 +61,9 @@ std::unordered_map<rac_voice_agent_handle_t, CallbackSlot>& g_slots() {
 
 extern "C" {
 
-rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t                handle,
-                                                 rac_voice_agent_proto_event_callback_fn callback,
-                                                 void*                                   user_data) {
+rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t handle,
+                                                rac_voice_agent_proto_event_callback_fn callback,
+                                                void* user_data) {
     if (handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -72,7 +75,7 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t        
         g_slots().erase(handle);
     } else {
         // Always start with seq = 0 for a fresh session.
-        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
+        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
     }
     return RAC_SUCCESS;
 }
@@ -141,7 +144,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_STT);
             auto* u = dst.mutable_user_said();
-            if (src.data.transcription) u->set_text(src.data.transcription);
+            if (src.data.transcription)
+                u->set_text(src.data.transcription);
             u->set_is_final(true);
             u->set_confidence(0.0f);
             u->set_audio_start_us(0);
@@ -153,7 +157,8 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_LLM);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_LLM);
             auto* t = dst.mutable_assistant_token();
-            if (src.data.response) t->set_text(src.data.response);
+            if (src.data.response)
+                t->set_text(src.data.response);
             /* Voice-agent response events are full-utterance, so is_final
              * is true. Streaming token-level deltas come through GAP 09's
              * llm_service path, not this one. */
@@ -223,18 +228,19 @@ namespace rac::voice_agent {
 void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event) {
     CallbackSlot slot;
-    uint64_t     seq;
+    uint64_t seq;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
-        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        if (it == g_slots().end() || it->second.fn == nullptr)
+            return;
         slot = it->second;
         // Bump the per-handle counter under the lock so concurrent dispatches
         // on the same handle still produce monotonic seq values.
         seq = ++(it->second.seq);
     }
 
-    thread_local std::vector<uint8_t>        scratch;
+    thread_local std::vector<uint8_t> scratch;
 
     runanywhere::v1::VoiceEvent proto_event(event);
     if (proto_event.seq() == 0) {
@@ -245,7 +251,8 @@ void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
-    if (scratch.size() < needed) scratch.resize(needed);
+    if (scratch.size() < needed)
+        scratch.resize(needed);
     if (!proto_event.SerializeToArray(scratch.data(), static_cast<int>(needed))) {
         /* Serialization should never fail for a valid message; log and
          * drop instead of crashing. */
@@ -258,9 +265,9 @@ void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
     slot.fn(scratch.data(), needed, slot.user_data);
 }
 
-void dispatch_proto_event(rac_voice_agent_handle_t       handle,
-                           const rac_voice_agent_event_t* event) {
-    if (event == nullptr) return;
+void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event) {
+    if (event == nullptr)
+        return;
 
     runanywhere::v1::VoiceEvent proto_event;
     translate(*event, proto_event);
@@ -324,19 +331,22 @@ inline void wire_tag(std::vector<uint8_t>& out, uint32_t field, uint32_t wire_ty
 }
 
 inline void wire_uint64_field(std::vector<uint8_t>& out, uint32_t field, uint64_t value) {
-    if (value == 0) return;  // proto3 default omission
+    if (value == 0)
+        return;  // proto3 default omission
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, value);
 }
 
 inline void wire_int64_field(std::vector<uint8_t>& out, uint32_t field, int64_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, static_cast<uint64_t>(value));  // varint, not zigzag (proto3 int64)
 }
 
 inline void wire_int32_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     /* proto3 int32 encodes negative values as 10-byte varint via sign
      * extension to 64 bits. Cast through int64 first to preserve the
@@ -345,19 +355,22 @@ inline void wire_int32_field(std::vector<uint8_t>& out, uint32_t field, int32_t 
 }
 
 inline void wire_bool_field(std::vector<uint8_t>& out, uint32_t field, bool value) {
-    if (!value) return;
+    if (!value)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     out.push_back(0x01);
 }
 
 inline void wire_enum_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, static_cast<uint64_t>(value));
 }
 
 inline void wire_double_field(std::vector<uint8_t>& out, uint32_t field, double value) {
-    if (value == 0.0) return;
+    if (value == 0.0)
+        return;
     wire_tag(out, field, /*wire_type=*/1);  // fixed64
     uint64_t bits;
     std::memcpy(&bits, &value, sizeof(bits));  // bit-cast (memcpy avoids strict-aliasing UB)
@@ -367,7 +380,8 @@ inline void wire_double_field(std::vector<uint8_t>& out, uint32_t field, double 
 }
 
 inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const char* str) {
-    if (str == nullptr || str[0] == '\0') return;
+    if (str == nullptr || str[0] == '\0')
+        return;
     const size_t len = std::strlen(str);
     wire_tag(out, field, /*wire_type=*/2);
     wire_varint(out, len);
@@ -378,7 +392,8 @@ inline void wire_string_field_force(std::vector<uint8_t>& out, uint32_t field, c
     /* Variant that emits the string even when empty. Used for fixed
      * "component" tags inside ErrorEvent so frontends always see the
      * field set. */
-    if (str == nullptr) return;
+    if (str == nullptr)
+        return;
     const size_t len = std::strlen(str);
     wire_tag(out, field, /*wire_type=*/2);
     wire_varint(out, len);
@@ -387,9 +402,10 @@ inline void wire_string_field_force(std::vector<uint8_t>& out, uint32_t field, c
     }
 }
 
-inline void wire_bytes_field(std::vector<uint8_t>& out, uint32_t field,
-                             const void* data, size_t size) {
-    if (data == nullptr || size == 0) return;
+inline void wire_bytes_field(std::vector<uint8_t>& out, uint32_t field, const void* data,
+                             size_t size) {
+    if (data == nullptr || size == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/2);
     wire_varint(out, size);
     const auto* p = static_cast<const uint8_t*>(data);
@@ -418,7 +434,7 @@ void encode_user_said(std::vector<uint8_t>& s, const char* text) {
     /*  1: string text             */
     wire_string_field(s, 1, text);
     /*  2: bool   is_final         (always true for full-utterance) */
-    wire_bool_field  (s, 2, true);
+    wire_bool_field(s, 2, true);
     /*  3: float  confidence       (default 0.0f → omitted) */
     /*  4: int64  audio_start_us   (default 0    → omitted) */
     /*  5: int64  audio_end_us     (default 0    → omitted) */
@@ -428,28 +444,27 @@ void encode_assistant_token(std::vector<uint8_t>& s, const char* text) {
     /*  1: string text             */
     wire_string_field(s, 1, text);
     /*  2: bool   is_final         */
-    wire_bool_field  (s, 2, true);
+    wire_bool_field(s, 2, true);
     /*  3: enum   kind             (1 = TOKEN_KIND_ANSWER) */
-    wire_enum_field  (s, 3, 1);
+    wire_enum_field(s, 3, 1);
 }
 
-void encode_audio_frame(std::vector<uint8_t>& s,
-                        const void* pcm, size_t pcm_size) {
+void encode_audio_frame(std::vector<uint8_t>& s, const void* pcm, size_t pcm_size) {
     /*  1: bytes pcm              */
-    wire_bytes_field (s, 1, pcm, pcm_size);
+    wire_bytes_field(s, 1, pcm, pcm_size);
     /*  2: int32 sample_rate_hz   (24000) */
-    wire_int32_field (s, 2, 24000);
+    wire_int32_field(s, 2, 24000);
     /*  3: int32 channels         (1) */
-    wire_int32_field (s, 3, 1);
+    wire_int32_field(s, 3, 1);
     /*  4: enum  encoding         (1 = AUDIO_ENCODING_PCM_F32_LE) */
-    wire_enum_field  (s, 4, 1);
+    wire_enum_field(s, 4, 1);
 }
 
 void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
     /*  1: enum type  (VADStreamEventKind — IDL-18 canonical VAD event enum)
      *     3 = VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY (start + end both ride this;
      *         direction is carried in the companion `is_speech` bool field).  */
-    wire_enum_field  (s, 1, 3);
+    wire_enum_field(s, 1, 3);
     /*  2: int64 frame_offset_us (default 0 → omitted) */
     /*  4: bool  is_speech  (proto3 omits defaults; emit only when true)     */
     if (speech_active) {
@@ -457,17 +472,16 @@ void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
     }
 }
 
-void encode_state_change(std::vector<uint8_t>& s,
-                         int32_t previous, int32_t current) {
+void encode_state_change(std::vector<uint8_t>& s, int32_t previous, int32_t current) {
     /*  1: enum previous          */
-    wire_enum_field  (s, 1, previous);
+    wire_enum_field(s, 1, previous);
     /*  2: enum current           */
-    wire_enum_field  (s, 2, current);
+    wire_enum_field(s, 2, current);
 }
 
 void encode_error(std::vector<uint8_t>& s, int32_t code) {
     /*  1: int32  code            */
-    wire_int32_field (s, 1, code);
+    wire_int32_field(s, 1, code);
     /*  2: string message         (empty → omitted) */
     /*  3: string component       (always "pipeline" so the frontend can
      *                             route by component without a guard) */
@@ -495,8 +509,7 @@ void encode_metrics(std::vector<uint8_t>& /*s*/) {
 
 namespace rac::voice_agent {
 
-void dispatch_proto_voice_event(rac_voice_agent_handle_t,
-                                const runanywhere::v1::VoiceEvent&) {
+void dispatch_proto_voice_event(rac_voice_agent_handle_t, const runanywhere::v1::VoiceEvent&) {
     // Generated VoiceEvent dispatch is only available when libprotobuf is linked.
 }
 
@@ -512,16 +525,17 @@ void dispatch_proto_voice_event(rac_voice_agent_handle_t,
  * scratch buffer is thread_local so concurrent dispatches on different
  * threads do not contend on heap allocation.
  */
-void dispatch_proto_event(rac_voice_agent_handle_t       handle,
-                           const rac_voice_agent_event_t* event) {
-    if (event == nullptr) return;
+void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event) {
+    if (event == nullptr)
+        return;
 
     CallbackSlot slot;
-    uint64_t     seq;
+    uint64_t seq;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
-        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        if (it == g_slots().end() || it->second.fn == nullptr)
+            return;
         slot = it->second;
         seq = ++(it->second.seq);
     }
@@ -532,56 +546,50 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
 
     /* Top-level VoiceEvent header. */
     wire_uint64_field(scratch, 1, seq);
-    wire_int64_field (scratch, 2, now_us());
+    wire_int64_field(scratch, 2, now_us());
 
     /* Oneof payload — exactly one arm per event. Field numbers below match
      * idl/voice_events.proto; the C → proto routing matches the existing
      * RAC_HAVE_PROTOBUF translate() above. */
     switch (event->type) {
         case RAC_VOICE_AGENT_EVENT_PROCESSED:
-            wire_submessage(scratch, /*field=*/17, [](std::vector<uint8_t>& s) {
-                encode_metrics(s);
-            });
+            wire_submessage(scratch, /*field=*/17,
+                            [](std::vector<uint8_t>& s) { encode_metrics(s); });
             break;
 
         case RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED: {
             const bool speech_active = (event->data.vad_speech_active == RAC_TRUE);
-            wire_submessage(scratch, /*field=*/13, [&](std::vector<uint8_t>& s) {
-                encode_vad(s, speech_active);
-            });
+            wire_submessage(scratch, /*field=*/13,
+                            [&](std::vector<uint8_t>& s) { encode_vad(s, speech_active); });
             break;
         }
 
         case RAC_VOICE_AGENT_EVENT_TRANSCRIPTION: {
             const char* text = event->data.transcription;
-            wire_submessage(scratch, /*field=*/10, [&](std::vector<uint8_t>& s) {
-                encode_user_said(s, text);
-            });
+            wire_submessage(scratch, /*field=*/10,
+                            [&](std::vector<uint8_t>& s) { encode_user_said(s, text); });
             break;
         }
 
         case RAC_VOICE_AGENT_EVENT_RESPONSE: {
             const char* text = event->data.response;
-            wire_submessage(scratch, /*field=*/11, [&](std::vector<uint8_t>& s) {
-                encode_assistant_token(s, text);
-            });
+            wire_submessage(scratch, /*field=*/11,
+                            [&](std::vector<uint8_t>& s) { encode_assistant_token(s, text); });
             break;
         }
 
         case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
-            const void* pcm  = event->data.audio.audio_data;
+            const void* pcm = event->data.audio.audio_data;
             const size_t len = event->data.audio.audio_size;
-            wire_submessage(scratch, /*field=*/12, [&](std::vector<uint8_t>& s) {
-                encode_audio_frame(s, pcm, len);
-            });
+            wire_submessage(scratch, /*field=*/12,
+                            [&](std::vector<uint8_t>& s) { encode_audio_frame(s, pcm, len); });
             break;
         }
 
         case RAC_VOICE_AGENT_EVENT_ERROR: {
             const int32_t code = static_cast<int32_t>(event->data.error_code);
-            wire_submessage(scratch, /*field=*/16, [&](std::vector<uint8_t>& s) {
-                encode_error(s, code);
-            });
+            wire_submessage(scratch, /*field=*/16,
+                            [&](std::vector<uint8_t>& s) { encode_error(s, code); });
             break;
         }
 
@@ -598,4 +606,4 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
 
 }  // namespace rac::voice_agent
 
-#endif  /* RAC_HAVE_PROTOBUF */
+#endif /* RAC_HAVE_PROTOBUF */

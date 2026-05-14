@@ -31,14 +31,16 @@ int main() {
     const HardwareProfile& a = HardwareProfile::cached();
     const HardwareProfile& b = HardwareProfile::cached();
     if (&a != &b) {
-        std::fprintf(stderr, "  FAIL: cached() did not memoize\n"); ++fails;
+        std::fprintf(stderr, "  FAIL: cached() did not memoize\n");
+        ++fails;
     } else {
         std::fprintf(stdout, "  ok:   cached() returns memoized reference\n");
     }
 
     /* (2) supports_runtime(CPU) is always true. */
     if (!a.supports_runtime(RAC_RUNTIME_CPU)) {
-        std::fprintf(stderr, "  FAIL: CPU runtime not supported (impossible)\n"); ++fails;
+        std::fprintf(stderr, "  FAIL: CPU runtime not supported (impossible)\n");
+        ++fails;
     } else {
         std::fprintf(stdout, "  ok:   CPU runtime always supported\n");
     }
@@ -50,7 +52,8 @@ int main() {
      * happens to allocate in the same slot; either way, supports_runtime(CPU)
      * must remain true. */
     if (!c.supports_runtime(RAC_RUNTIME_CPU)) {
-        std::fprintf(stderr, "  FAIL: refresh() broke CPU support\n"); ++fails;
+        std::fprintf(stderr, "  FAIL: refresh() broke CPU support\n");
+        ++fails;
     } else {
         std::fprintf(stdout, "  ok:   refresh() yields a fresh profile\n");
     }
@@ -59,18 +62,20 @@ int main() {
     setenv("RAC_FORCE_RUNTIME", "cpu", 1);
     HardwareProfile::refresh();
     const HardwareProfile& d = HardwareProfile::cached();
-    bool any_accel = d.has_metal || d.has_ane || d.has_coreml || d.has_cuda ||
-                     d.has_vulkan || d.has_qnn || d.has_nnapi || d.has_webgpu;
+    bool any_accel = d.has_metal || d.has_ane || d.has_coreml || d.has_cuda || d.has_vulkan ||
+                     d.has_qnn || d.has_nnapi || d.has_webgpu;
     if (any_accel) {
-        std::fprintf(stderr, "  FAIL: RAC_FORCE_RUNTIME=cpu but accelerators detected\n"); ++fails;
+        std::fprintf(stderr, "  FAIL: RAC_FORCE_RUNTIME=cpu but accelerators detected\n");
+        ++fails;
     } else {
         std::fprintf(stdout, "  ok:   RAC_FORCE_RUNTIME=cpu disables every accelerator\n");
     }
     if (!d.supports_runtime(RAC_RUNTIME_CPU)) {
-        std::fprintf(stderr, "  FAIL: CPU still not supported under FORCE\n"); ++fails;
+        std::fprintf(stderr, "  FAIL: CPU still not supported under FORCE\n");
+        ++fails;
     }
     unsetenv("RAC_FORCE_RUNTIME");
-    HardwareProfile::refresh();  /* leave cache in normal state for any later tests */
+    HardwareProfile::refresh(); /* leave cache in normal state for any later tests */
 
 #ifdef RAC_HAVE_PROTOBUF
     /* (5) Hardware C ABI returns canonical HardwareProfileResult proto bytes. */
@@ -78,10 +83,8 @@ int main() {
     size_t profile_size = 0;
     rac_result_t profile_rc = rac_hardware_profile_get(&profile_bytes, &profile_size);
     if (profile_rc != RAC_SUCCESS || profile_bytes == nullptr || profile_size == 0) {
-        std::fprintf(stderr,
-                     "  FAIL: rac_hardware_profile_get returned rc=%d size=%zu\n",
-                     static_cast<int>(profile_rc),
-                     profile_size);
+        std::fprintf(stderr, "  FAIL: rac_hardware_profile_get returned rc=%d size=%zu\n",
+                     static_cast<int>(profile_rc), profile_size);
         ++fails;
     } else {
         runanywhere::v1::HardwareProfileResult decoded;
@@ -108,12 +111,9 @@ int main() {
     size_t accelerator_size = 0;
     rac_result_t accelerator_rc =
         rac_hardware_get_accelerators(&accelerator_bytes, &accelerator_size);
-    if (accelerator_rc != RAC_SUCCESS || accelerator_bytes == nullptr ||
-        accelerator_size == 0) {
-        std::fprintf(stderr,
-                     "  FAIL: rac_hardware_get_accelerators returned rc=%d size=%zu\n",
-                     static_cast<int>(accelerator_rc),
-                     accelerator_size);
+    if (accelerator_rc != RAC_SUCCESS || accelerator_bytes == nullptr || accelerator_size == 0) {
+        std::fprintf(stderr, "  FAIL: rac_hardware_get_accelerators returned rc=%d size=%zu\n",
+                     static_cast<int>(accelerator_rc), accelerator_size);
         ++fails;
     } else {
         runanywhere::v1::HardwareProfileResult decoded;
@@ -121,15 +121,13 @@ int main() {
             std::fprintf(stderr, "  FAIL: accelerator proto bytes did not decode\n");
             ++fails;
         } else if (decoded.has_profile()) {
-            std::fprintf(stderr,
-                         "  FAIL: accelerator-only proto unexpectedly included profile\n");
+            std::fprintf(stderr, "  FAIL: accelerator-only proto unexpectedly included profile\n");
             ++fails;
         } else if (decoded.accelerators_size() == 0) {
             std::fprintf(stderr, "  FAIL: accelerator-only proto missing accelerators\n");
             ++fails;
         } else {
-            std::fprintf(stdout,
-                         "  ok:   accelerator C ABI returns decodable proto list\n");
+            std::fprintf(stdout, "  ok:   accelerator C ABI returns decodable proto list\n");
         }
     }
     rac_hardware_profile_free(accelerator_bytes);

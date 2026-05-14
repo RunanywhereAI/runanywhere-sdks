@@ -7,6 +7,8 @@
  * surface each platform SDK had previously implemented locally.
  */
 
+#include "test_common.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -21,8 +23,6 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
-
-#include "test_common.h"
 
 namespace {
 
@@ -68,16 +68,19 @@ rac_result_t mock_secure_get(const char* key, char** out_value, void* /*user_dat
     std::lock_guard<std::mutex> lock(g_mock.mutex);
     g_mock.secure_get_calls++;
     if (key == nullptr || std::strcmp(key, "device_id") != 0) {
-        if (out_value) *out_value = nullptr;
+        if (out_value)
+            *out_value = nullptr;
         return RAC_ERROR_NOT_FOUND;
     }
     if (!g_mock.has_stored) {
-        if (out_value) *out_value = nullptr;
+        if (out_value)
+            *out_value = nullptr;
         return RAC_ERROR_NOT_FOUND;
     }
     if (out_value) {
         *out_value = strdup(g_mock.stored.c_str());
-        if (*out_value == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+        if (*out_value == nullptr)
+            return RAC_ERROR_OUT_OF_MEMORY;
     }
     return RAC_SUCCESS;
 }
@@ -138,15 +141,18 @@ void prepare(bool with_vendor_id) {
 }
 
 bool looks_like_uuid(const std::string& s) {
-    if (s.size() != 36) return false;
+    if (s.size() != 36)
+        return false;
     for (size_t i = 0; i < s.size(); ++i) {
         char c = s[i];
         if (i == 8 || i == 13 || i == 18 || i == 23) {
-            if (c != '-') return false;
+            if (c != '-')
+                return false;
         } else {
-            const bool is_hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-                                (c >= 'A' && c <= 'F');
-            if (!is_hex) return false;
+            const bool is_hex =
+                (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!is_hex)
+                return false;
         }
     }
     return true;
@@ -215,19 +221,16 @@ TestResult test_secure_get_miss_no_vendor_id_generates_uuid() {
     rac_result_t rc = rac_device_get_or_create_persistent_id(buf, sizeof(buf));
     ASSERT_EQ(rc, RAC_SUCCESS, "expected RAC_SUCCESS on synth path");
     const std::string id(buf);
-    ASSERT_TRUE(looks_like_uuid(id),
-                std::string("expected canonical UUID v4, got: ") + id);
+    ASSERT_TRUE(looks_like_uuid(id), std::string("expected canonical UUID v4, got: ") + id);
 
     {
         std::lock_guard<std::mutex> lock(g_mock.mutex);
         ASSERT_EQ(g_mock.secure_get_calls, 1, "secure_get should be called once");
-        ASSERT_EQ(g_mock.vendor_id_calls, 0,
-                  "vendor_id MUST NOT be called when slot is NULL");
+        ASSERT_EQ(g_mock.vendor_id_calls, 0, "vendor_id MUST NOT be called when slot is NULL");
         ASSERT_EQ(g_mock.secure_set_calls, 1, "secure_set should persist the synth id");
         ASSERT_TRUE(g_mock.stored == id, "secure storage should hold the synthesized id");
         // Verify version-4 nibble.
-        ASSERT_TRUE(id[14] == '4',
-                    std::string("expected v4 nibble at index 14, got: ") + id);
+        ASSERT_TRUE(id[14] == '4', std::string("expected v4 nibble at index 14, got: ") + id);
     }
     clear_adapter();
     return TEST_PASS();
@@ -255,11 +258,11 @@ TestResult test_concurrent_calls_return_same_id() {
             }
         });
     }
-    for (auto& t : threads) t.join();
+    for (auto& t : threads)
+        t.join();
 
     std::set<std::string> distinct(results.begin(), results.end());
-    ASSERT_EQ(distinct.size(), 1u,
-              "concurrent callers MUST observe the same persistent id");
+    ASSERT_EQ(distinct.size(), 1u, "concurrent callers MUST observe the same persistent id");
     ASSERT_TRUE(!results[0].empty(), "first thread must have populated a result");
 
     clear_adapter();

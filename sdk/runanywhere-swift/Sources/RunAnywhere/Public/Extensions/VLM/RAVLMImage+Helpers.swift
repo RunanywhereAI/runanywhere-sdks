@@ -11,11 +11,11 @@ import Foundation
 
 extension RAVLMConfiguration {
     public static func defaults(modelId: String = "") -> RAVLMConfiguration {
-        var c = RAVLMConfiguration()
-        c.modelID = modelId
-        c.maxImageSizePx = 1_024
-        c.maxTokens = 0
-        return c
+        var container = RAVLMConfiguration()
+        container.modelID = modelId
+        container.maxImageSizePx = 1_024
+        container.maxTokens = 0
+        return container
     }
 }
 
@@ -23,13 +23,13 @@ extension RAVLMConfiguration {
 
 extension RAVLMGenerationOptions {
     public static func defaults(prompt: String = "") -> RAVLMGenerationOptions {
-        var o = RAVLMGenerationOptions()
-        o.prompt = prompt
-        o.maxTokens = 256
-        o.temperature = 0.7
-        o.topP = 0.9
-        o.topK = 40
-        return o
+        var options = RAVLMGenerationOptions()
+        options.prompt = prompt
+        options.maxTokens = 256
+        options.temperature = 0.7
+        options.topP = 0.9
+        options.topK = 40
+        return options
     }
 }
 
@@ -100,14 +100,12 @@ extension RAVLMImage {
 extension RAVLMImage {
     /// Create a proto VLM image from a UIImage. Returns nil if conversion fails.
     public static func fromUIImage(_ image: UIImage) -> RAVLMImage? {
-        guard let rgb = image._raToRGBData(), let cgImage = image.cgImage else { return nil }
+        guard let rgb = rgbData(from: image), let cgImage = image.cgImage else { return nil }
         return fromRawRGB(rgb, width: cgImage.width, height: cgImage.height)
     }
-}
 
-extension UIImage {
-    fileprivate func _raToRGBData() -> Data? {
-        guard let cgImage = self.cgImage else { return nil }
+    private static func rgbData(from image: UIImage) -> Data? {
+        guard let cgImage = image.cgImage else { return nil }
         let width = cgImage.width
         let height = cgImage.height
         let bytesPerRow = 4 * width
@@ -148,27 +146,25 @@ extension UIImage {
 extension RAVLMImage {
     /// Create a proto VLM image from a CVPixelBuffer (BGRA only).
     public static func fromPixelBuffer(_ buffer: CVPixelBuffer) -> RAVLMImage? {
-        guard let rgb = buffer._raToRGBData() else { return nil }
+        guard let rgb = rgbData(from: buffer) else { return nil }
         let width = CVPixelBufferGetWidth(buffer)
         let height = CVPixelBufferGetHeight(buffer)
         return fromRawRGB(rgb, width: width, height: height)
     }
-}
 
-extension CVPixelBuffer {
-    fileprivate func _raToRGBData() -> Data? {
-        CVPixelBufferLockBaseAddress(self, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(self, .readOnly) }
+    private static func rgbData(from buffer: CVPixelBuffer) -> Data? {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
 
-        let pixelFormat = CVPixelBufferGetPixelFormatType(self)
+        let pixelFormat = CVPixelBufferGetPixelFormatType(buffer)
         guard pixelFormat == kCVPixelFormatType_32BGRA else {
             return nil
         }
 
-        let width = CVPixelBufferGetWidth(self)
-        let height = CVPixelBufferGetHeight(self)
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(self)
-        guard let baseAddress = CVPixelBufferGetBaseAddress(self) else { return nil }
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+        guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else { return nil }
 
         var rgbData = Data(capacity: width * height * 3)
         let pixels = baseAddress.assumingMemoryBound(to: UInt8.self)

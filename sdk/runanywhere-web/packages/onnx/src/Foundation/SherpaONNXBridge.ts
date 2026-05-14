@@ -25,7 +25,7 @@
  *
  * Backend availability requirement:
  *   The RACommons WASM module MUST be built with `RAC_WASM_ONNX=ON`
- *   (i.e. `./scripts/build-web.sh --build-wasm --llamacpp --onnx`) so that
+ *   (i.e. `npm run build:wasm -- --llamacpp --onnx`) so that
  *   `_rac_backend_onnx_register` is exported and `rac_backend_onnx` is
  *   linked. Without that, `register()` reports a typed
  *   `BackendNotAvailable` error and STT/TTS/VAD calls return null/error.
@@ -34,10 +34,12 @@
 import {
   SDKException,
   SDKLogger,
+  completeDeferredServicesInitialization,
+  completeNativePhase1ForModule,
   setRunanywhereModule,
   tryRunanywhereModule,
-} from '@runanywhere/web';
-import type { EmscriptenRunanywhereModule } from '@runanywhere/web';
+} from '@runanywhere/web/internal';
+import type { EmscriptenRunanywhereModule } from '@runanywhere/web/internal';
 
 const logger = new SDKLogger('SherpaONNXBridge');
 
@@ -163,6 +165,7 @@ export class SherpaONNXBridge {
       // initialize commons + install the module in the singleton so the
       // proto-byte adapters in core can reach it.
       await this._initCommons(this._module);
+      completeNativePhase1ForModule(this._module);
       setRunanywhereModule(this._module);
     }
 
@@ -171,7 +174,7 @@ export class SherpaONNXBridge {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
         'The loaded RACommons WASM module does not export `rac_backend_onnx_register`. ' +
-          'Rebuild the WASM with `./scripts/build-web.sh --build-wasm --llamacpp --onnx` ' +
+          'Rebuild the WASM with `npm run build:wasm -- --llamacpp --onnx` ' +
           'to include the sherpa-onnx STT/TTS/VAD backend.',
       );
     }
@@ -185,6 +188,7 @@ export class SherpaONNXBridge {
     }
     this._backendRegistered = true;
     this._loaded = true;
+    await completeDeferredServicesInitialization();
     logger.info('ONNX backend registered (STT/TTS/VAD vtable installed)');
   }
 

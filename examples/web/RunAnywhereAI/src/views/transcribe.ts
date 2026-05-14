@@ -2,7 +2,7 @@
  * Transcribe Tab — V2 canonical proto-byte STT.
  *
  * Once `ONNX.register()` resolves, the public surface in `@runanywhere/web`
- * (`RunAnywhere.transcribe`, `RunAnywhere.stt.*`) flows through the proto-byte
+ * (`RunAnywhere.stt.*`) flows through the proto-byte
  * STT adapter into the WASM module. This view supports two input paths:
  *  1. Microphone capture via `AudioCapture` (push-to-talk style).
  *  2. File picker via `AudioFileLoader`.
@@ -15,14 +15,18 @@
 
 import type { TabLifecycle } from '../app';
 import {
-  AudioCapture,
-  AudioFileLoader,
   RunAnywhere,
-  STTProtoAdapter,
   isSDKException,
-  tryRunanywhereModule,
   type STTOutput,
 } from '@runanywhere/web';
+import {
+  AudioCapture,
+  AudioFileLoader,
+} from '@runanywhere/web/browser';
+import {
+  STTProtoAdapter,
+  tryRunanywhereModule,
+} from '@runanywhere/web/internal';
 import { ONNX } from '@runanywhere/web-onnx';
 
 let container: HTMLElement;
@@ -93,7 +97,7 @@ function renderTranscribe(): void {
         ? `
           <div class="docs-section">
             <h3>Microphone</h3>
-            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.transcribe(...)</code>.</p>
+            <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.stt.transcribeAuto(...)</code>.</p>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing ? 'disabled' : ''}>
                 ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
@@ -117,11 +121,11 @@ function renderTranscribe(): void {
             <p class="text-secondary">
               Once the ONNX backend is registered against a WASM build that
               includes <code>RAC_WASM_ONNX=ON</code>, this view dispatches
-              transcription through <code>RunAnywhere.transcribe(audio, options)</code>.
+              transcription through <code>RunAnywhere.stt.transcribeAuto(audio, options)</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.modelLifecycle.load(...)</code></li>
-              <li><code>RunAnywhere.transcribe(audio, { modelPath })</code></li>
+              <li><code>RunAnywhere.modelLifecycle.loadModel(...)</code></li>
+              <li><code>RunAnywhere.stt.transcribeAuto(audio, { modelPath })</code></li>
             </ul>
           </div>`}
     </div>
@@ -212,7 +216,7 @@ async function runTranscribe(samples: Float32Array): Promise<void> {
   renderTranscribe();
   setStatus(`Transcribing ${(samples.length / 16000).toFixed(2)}s of audio...`);
   try {
-    lastResult = await RunAnywhere.transcribe(samples);
+    lastResult = await RunAnywhere.stt.transcribeAuto(samples);
     setStatus('Done.');
   } catch (err) {
     setStatus(`Transcribe failed: ${formatErr(err)}`);

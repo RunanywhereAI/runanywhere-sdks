@@ -30,7 +30,7 @@ public extension RunAnywhere {
     /// Stateless namespace exposing generated-proto hardware results from the C++ bridge.
     struct Hardware: Sendable {
 
-        fileprivate init() {}
+        private init() {}
 
         // MARK: - Canonical Methods
 

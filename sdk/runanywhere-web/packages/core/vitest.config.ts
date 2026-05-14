@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts', '../../../../tests/streaming/**/*.web.test.ts'],
+    include: ['tests/unit/**/*.test.ts', '../../../../tests/streaming/**/*.web.test.ts'],
     environment: 'node',
     testTimeout: 30_000,
   },

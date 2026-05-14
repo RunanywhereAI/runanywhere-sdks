@@ -16,13 +16,13 @@ extension RAStructuredOutputOptions {
         includeSchemaInPrompt: Bool = true,
         strict: Bool = false
     ) -> RAStructuredOutputOptions {
-        var o = RAStructuredOutputOptions()
-        o.schema = schema
-        o.includeSchemaInPrompt = includeSchemaInPrompt
-        o.strictMode = strict
-        o.jsonSchema = schema.jsonSchemaString
-        o.mode = .jsonSchema
-        return o
+        var options = RAStructuredOutputOptions()
+        options.schema = schema
+        options.includeSchemaInPrompt = includeSchemaInPrompt
+        options.strictMode = strict
+        options.jsonSchema = schema.jsonSchemaString
+        options.mode = .jsonSchema
+        return options
     }
 }
 

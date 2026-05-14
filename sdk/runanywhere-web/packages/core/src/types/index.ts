@@ -257,6 +257,13 @@ export type {
 export * from '@runanywhere/proto-ts/tool_calling';
 
 // ---------------------------------------------------------------------------
+// Chat / downloads — pure proto re-exports
+// ---------------------------------------------------------------------------
+export type { ChatMessage } from '@runanywhere/proto-ts/chat';
+export { ChatMessageStatus, MessageRole } from '@runanywhere/proto-ts/chat';
+export type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
+
+// ---------------------------------------------------------------------------
 // Canonical proto enums/messages that used to be mirrored by Web-local enums.
 // The short Web aliases (`SDKEnvironment.Development`,
 // `ModelCategory.Language`, etc.) are intentionally not re-exported here.
@@ -286,13 +293,6 @@ export {
 export { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
-
-// Web-only enums (browser UI/runtime state with no generated proto contract).
-export {
-  ComponentState,
-  FrameworkModality,
-  ModelStatus,
-} from './enums';
 
 export type {
   DeviceInfoData,

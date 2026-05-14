@@ -636,8 +636,8 @@ class RetrieveNode final : public OperatorNode {
             return;
         }
 
-        rac_handle_t session = reinterpret_cast<rac_handle_t>(
-            static_cast<std::uintptr_t>(session_handle_id_));
+        rac_handle_t session =
+            reinterpret_cast<rac_handle_t>(static_cast<std::uintptr_t>(session_handle_id_));
 
         ProtoBufferGuard buffer;
         rac_result_t rc = rac_rag_query_proto(session, bytes.data(), bytes.size(), buffer.raw());
@@ -669,7 +669,8 @@ class RetrieveNode final : public OperatorNode {
         std::string out_text = result.context_used();
         if (out_text.empty()) {
             for (int i = 0; i < result.retrieved_chunks_size(); ++i) {
-                if (!out_text.empty()) out_text.push_back('\n');
+                if (!out_text.empty())
+                    out_text.push_back('\n');
                 out_text.append(result.retrieved_chunks(i).text());
             }
         }

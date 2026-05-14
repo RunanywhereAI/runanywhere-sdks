@@ -8,9 +8,10 @@ set -euo pipefail
 # Builds RACommons + platform shims to WebAssembly using Emscripten.
 #
 # Usage:
-#   ./scripts/build.sh              # Release build
+#   ./scripts/build.sh              # Release CPU build with llama.cpp
 #   ./scripts/build.sh --debug      # Debug build with assertions
-#   ./scripts/build.sh --pthreads   # Enable multi-threading
+#   ./scripts/build.sh --pthreads   # Enable multi-threading (default)
+#   ./scripts/build.sh --no-pthreads # Disable multi-threading
 #   ./scripts/build.sh --clean      # Clean before building
 #   ./scripts/build.sh --help       # Show help
 #
@@ -27,7 +28,7 @@ OUTPUT_DIR="${WASM_DIR}/../packages/llamacpp/wasm"
 
 # Defaults
 BUILD_TYPE="Release"
-PTHREADS="OFF"
+PTHREADS="ON"
 DEBUG="OFF"
 LLAMACPP="OFF"
 VLM="OFF"
@@ -51,6 +52,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --pthreads)
             PTHREADS="ON"
+            shift
+            ;;
+        --no-pthreads)
+            PTHREADS="OFF"
             shift
             ;;
         --llamacpp)
@@ -79,7 +84,7 @@ while [[ $# -gt 0 ]]; do
             LLAMACPP="ON"
             VLM="ON"
             # WhisperCPP excluded: v1.8.2 GGML API is incompatible with llama.cpp b8011+.
-            # STT is handled by sherpa-onnx (separate WASM module via --build-sherpa).
+            # STT/TTS/VAD are registered through the unified RACommons ONNX backend.
             # ONNX excluded: requires native ONNX Runtime headers (not available for WASM).
             shift
             ;;
@@ -92,7 +97,8 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --debug          Debug build with assertions and safe heap"
-            echo "  --pthreads       Enable pthreads (requires Cross-Origin Isolation)"
+            echo "  --pthreads       Enable pthreads (default; requires Cross-Origin Isolation)"
+            echo "  --no-pthreads    Disable pthreads (download orchestration will not be E2E-capable)"
             echo "  --llamacpp       Include llama.cpp LLM backend"
             echo "  --vlm            Include VLM (Vision Language Model) via llama.cpp mtmd"
             echo "  --whispercpp     Include whisper.cpp STT backend"
@@ -109,6 +115,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [ "$LLAMACPP" = "OFF" ] && [ "$VLM" = "OFF" ] && [ "$WHISPERCPP" = "OFF" ] && [ "$ONNX" = "OFF" ]; then
+    LLAMACPP="ON"
+fi
 
 # Use a separate build directory for WebGPU variant to avoid cache conflicts
 if [ "$WEBGPU" = "ON" ]; then
@@ -146,10 +156,20 @@ if [ "$CLEAN" = true ]; then
     rm -rf "${BUILD_DIR}"
 fi
 
-rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
+rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm" "${WASM_DIR}/a.out.js" "${WASM_DIR}/a.out.wasm"
 
 # Create build directory
 mkdir -p "${BUILD_DIR}"
+
+CMAKE_THREAD_ARGS=()
+if [ "$PTHREADS" = "ON" ]; then
+    # pthreads must be present on every object that is linked into the final
+    # shared-memory module, not just on the final Emscripten executable target.
+    CMAKE_THREAD_ARGS=(
+        -DCMAKE_C_FLAGS="-pthread"
+        -DCMAKE_CXX_FLAGS="-pthread"
+    )
+fi
 
 # Configure the single-root CMake build with Emscripten
 echo ""
@@ -171,7 +191,8 @@ emcmake cmake \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
     -DRAC_WASM_ONNX="${ONNX}" \
     -DRAC_WASM_WEBGPU="${WEBGPU}" \
-    -DRAC_BACKEND_RAG="${RAG}"
+    -DRAC_BACKEND_RAG="${RAG}" \
+    "${CMAKE_THREAD_ARGS[@]}"
 
 # Build
 echo ""
@@ -218,7 +239,7 @@ else
     exit 1
 fi
 
-rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
+rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm" "${WASM_DIR}/a.out.js" "${WASM_DIR}/a.out.wasm"
 
 echo ""
 echo "WASM module ready at: ${OUTPUT_DIR}/"

@@ -27,15 +27,15 @@
 #ifndef RUNANYWHERE_RAG_PIPELINE_GRAPH_H
 #define RUNANYWHERE_RAG_PIPELINE_GRAPH_H
 
+#include "vector_store_usearch.h"
+
 #include <functional>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
-
 #include "rac/core/rac_types.h"
 #include "rac/features/llm/rac_llm_types.h"
-#include "vector_store_usearch.h"
 
 namespace runanywhere {
 namespace rag {

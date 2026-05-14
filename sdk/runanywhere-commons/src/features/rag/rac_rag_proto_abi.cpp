@@ -11,7 +11,7 @@
  * (which owns them and destroys on session destroy).
  */
 
-#include "rac/features/rag/rac_rag.h"
+#include "rag_backend.h"
 
 #include <atomic>
 #include <chrono>
@@ -19,10 +19,9 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -30,9 +29,9 @@
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rag_backend.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
@@ -58,8 +57,7 @@ int64_t now_ms() {
 std::string event_id() {
     static std::atomic<uint64_t> counter{0};
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%lld-%llu",
-                  static_cast<long long>(now_ms()),
+    std::snprintf(buffer, sizeof(buffer), "%lld-%llu", static_cast<long long>(now_ms()),
                   static_cast<unsigned long long>(counter.fetch_add(1)));
     return buffer;
 }
@@ -73,13 +71,12 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
     return size == 0 || bytes != nullptr;
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize proto result");
     }
@@ -89,15 +86,14 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message,
 void publish_event(const runanywhere::v1::SDKEvent& event) {
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
 
-void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
-                        const char* operation, float progress, int64_t input_count,
-                        int64_t output_count, const char* error) {
+void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
+                        float progress, int64_t input_count, int64_t output_count,
+                        const char* error) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -117,14 +113,14 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
     cap->set_progress(progress);
     cap->set_input_count(input_count);
     cap->set_output_count(output_count);
-    if (error) cap->set_error(error);
+    if (error)
+        cap->set_error(error);
     publish_event(event);
 }
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED,
-                       operation, 0.0f, 0, 0,
-                       message && message[0] ? message : rac_error_message(code));
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED, operation, 0.0f,
+                       0, 0, message && message[0] ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "rag", operation, RAC_TRUE);
 }
 
@@ -140,7 +136,8 @@ void publish_failure(rac_result_t code, const char* operation, const char* messa
 std::string resolve_rag_model_id_to_path(const std::string& model_id,
                                          std::string* out_err_message) {
     if (model_id.empty()) {
-        if (out_err_message) *out_err_message = "model id is required";
+        if (out_err_message)
+            *out_err_message = "model id is required";
         return {};
     }
     rac_model_info_t* info = nullptr;
@@ -149,13 +146,14 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
         if (out_err_message) {
             *out_err_message = "RAG model id '" + model_id + "' is not registered";
         }
-        if (info) rac_model_info_free(info);
+        if (info)
+            rac_model_info_free(info);
         return {};
     }
     if (!info->local_path || info->local_path[0] == '\0') {
         if (out_err_message) {
-            *out_err_message = "RAG model '" + model_id +
-                               "' is registered but has no local_path (not downloaded)";
+            *out_err_message =
+                "RAG model '" + model_id + "' is registered but has no local_path (not downloaded)";
         }
         rac_model_info_free(info);
         return {};
@@ -243,9 +241,9 @@ rac_result_t feature_unavailable(rac_proto_buffer_t* out) {
 extern "C" {
 
 rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
-                                          size_t config_proto_size,
-                                          rac_handle_t* out_session) {
-    if (!out_session) return RAC_ERROR_NULL_POINTER;
+                                          size_t config_proto_size, rac_handle_t* out_session) {
+    if (!out_session)
+        return RAC_ERROR_NULL_POINTER;
     *out_session = nullptr;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)config_proto_bytes;
@@ -283,8 +281,7 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     std::string err_message;
     std::string embedding_path = resolve_rag_model_id_to_path(embedding_model_id, &err_message);
     if (embedding_path.empty()) {
-        publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
-                        err_message.c_str());
+        publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
         return RAC_ERROR_MODEL_NOT_FOUND;
     }
 
@@ -292,8 +289,7 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     if (!llm_model_id.empty()) {
         llm_path = resolve_rag_model_id_to_path(llm_model_id, &err_message);
         if (llm_path.empty()) {
-            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
-                            err_message.c_str());
+            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
     }
@@ -303,11 +299,9 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // path yet (see the separate reranker-wiring task), so we validate and
     // discard.
     if (!reranker_model_id.empty()) {
-        std::string reranker_path =
-            resolve_rag_model_id_to_path(reranker_model_id, &err_message);
+        std::string reranker_path = resolve_rag_model_id_to_path(reranker_model_id, &err_message);
         if (reranker_path.empty()) {
-            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
-                            err_message.c_str());
+            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
     }
@@ -326,8 +320,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     LOGI("sessionCreate: embed_path=%s, llm_path=%s", embedding_path.c_str(),
          llm_path.empty() ? "(none)" : llm_path.c_str());
 
-    rac_result_t rc = rac_embeddings_create_with_config(
-        embedding_path.c_str(), embedding_config_json, &embed_handle);
+    rac_result_t rc = rac_embeddings_create_with_config(embedding_path.c_str(),
+                                                        embedding_config_json, &embed_handle);
     if (rc != RAC_SUCCESS || !embed_handle) {
         rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_INITIALIZATION_FAILED;
         publish_failure(rc, "rag.sessionCreate", rac_error_message(rc));
@@ -346,9 +340,9 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
 
     try {
         auto session = std::make_unique<Session>();
-        session->backend = std::make_unique<RAGBackend>(build_backend_config(proto),
-                                                        llm_handle, embed_handle,
-                                                        /*owns_services=*/true);
+        session->backend =
+            std::make_unique<RAGBackend>(build_backend_config(proto), llm_handle, embed_handle,
+                                         /*owns_services=*/true);
         if (!session->backend->is_initialized()) {
             publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
                             "RAG pipeline failed to initialize");
@@ -360,8 +354,10 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_SUCCESS;
     } catch (const std::exception& e) {
         LOGE("Exception creating RAG session: %s", e.what());
-        if (llm_handle) rac_llm_destroy(llm_handle);
-        if (embed_handle) rac_embeddings_destroy(embed_handle);
+        if (llm_handle)
+            rac_llm_destroy(llm_handle);
+        if (embed_handle)
+            rac_embeddings_destroy(embed_handle);
         publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate", e.what());
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
@@ -376,11 +372,10 @@ void rac_rag_session_destroy_proto(rac_handle_t session) {
 #endif
 }
 
-rac_result_t rac_rag_ingest_proto(rac_handle_t session,
-                                  const uint8_t* document_proto_bytes,
-                                  size_t document_proto_size,
-                                  rac_proto_buffer_t* out_stats) {
-    if (!out_stats) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_proto_bytes,
+                                  size_t document_proto_size, rac_proto_buffer_t* out_stats) {
+    if (!out_stats)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
     (void)document_proto_bytes;
@@ -389,8 +384,7 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session,
 #else
     auto* s = as_session(session);
     if (!s || !s->backend) {
-        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.ingest",
-                        "RAG session is not loaded");
+        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.ingest", "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_stats, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");
     }
@@ -443,11 +437,10 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session,
 #endif
 }
 
-rac_result_t rac_rag_query_proto(rac_handle_t session,
-                                 const uint8_t* query_proto_bytes,
-                                 size_t query_proto_size,
-                                 rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_proto_bytes,
+                                 size_t query_proto_size, rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
     (void)query_proto_bytes;
@@ -456,8 +449,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
 #else
     auto* s = as_session(session);
     if (!s || !s->backend) {
-        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.query",
-                        "RAG session is not loaded");
+        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.query", "RAG session is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
                                           "RAG session is not loaded");
     }
@@ -483,8 +475,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
 
     rac_llm_options_t opts = {};
     opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
-    opts.temperature =
-        query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
+    opts.temperature = query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
@@ -504,8 +495,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_PROCESSING_FAILED, e.what());
     }
     const auto t_end = std::chrono::high_resolution_clock::now();
-    const double total_ms =
-        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    const double total_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
     if (status != RAC_SUCCESS) {
         rac_llm_result_free(&llm_result);
@@ -514,7 +504,8 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
     }
 
     runanywhere::v1::RAGResult proto;
-    if (llm_result.text) proto.set_answer(llm_result.text);
+    if (llm_result.text)
+        proto.set_answer(llm_result.text);
 
     if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
         proto.set_context_used(metadata["context_used"].get<std::string>());
@@ -550,7 +541,8 @@ rac_result_t rac_rag_query_proto(rac_handle_t session,
 }
 
 rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_stats) {
-    if (!out_stats) return RAC_ERROR_NULL_POINTER;
+    if (!out_stats)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
     return feature_unavailable(out_stats);
@@ -565,7 +557,8 @@ rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_s
 }
 
 rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_t* out_stats) {
-    if (!out_stats) return RAC_ERROR_NULL_POINTER;
+    if (!out_stats)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session;
     return feature_unavailable(out_stats);

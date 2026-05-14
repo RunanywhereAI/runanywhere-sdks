@@ -14,10 +14,10 @@
 #include <cstdio>
 
 #include "rac/core/rac_error.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry_llamacpp.h"
-#include "rac/features/llm/rac_llm_service.h"
 
 int main() {
     std::fprintf(stdout, "test_plugin_entry_llamacpp\n");
@@ -28,8 +28,8 @@ int main() {
         return 1;
     }
     if (vt->metadata.abi_version != RAC_PLUGIN_API_VERSION) {
-        std::fprintf(stderr, "abi_version mismatch: plugin=%u host=%u\n",
-                     vt->metadata.abi_version, RAC_PLUGIN_API_VERSION);
+        std::fprintf(stderr, "abi_version mismatch: plugin=%u host=%u\n", vt->metadata.abi_version,
+                     RAC_PLUGIN_API_VERSION);
         return 1;
     }
     if (vt->llm_ops == nullptr) {
@@ -37,8 +37,7 @@ int main() {
         return 1;
     }
     // Core LLM ops must be populated.
-    if (vt->llm_ops->initialize == nullptr ||
-        vt->llm_ops->generate == nullptr ||
+    if (vt->llm_ops->initialize == nullptr || vt->llm_ops->generate == nullptr ||
         vt->llm_ops->destroy == nullptr) {
         std::fprintf(stderr, "Core LLM ops (initialize/generate/destroy) NULL\n");
         return 1;
@@ -54,10 +53,8 @@ int main() {
         return 1;
     }
     const rac_engine_manifest_t* manifest = rac_engine_manifest_find("llamacpp");
-    if (manifest == nullptr ||
-        manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
-        manifest->primitives_count != 1 ||
-        manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT) {
+    if (manifest == nullptr || manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
+        manifest->primitives_count != 1 || manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT) {
         std::fprintf(stderr, "llama.cpp manifest was not published correctly\n");
         return 1;
     }

@@ -36,15 +36,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__);          \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                      \
-        }                                                                                     \
+#define CHECK(cond, label)                                                           \
+    do {                                                                             \
+        ++test_count;                                                                \
+        if (!(cond)) {                                                               \
+            ++fail_count;                                                            \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__); \
+        } else {                                                                     \
+            std::fprintf(stdout, "  ok:   %s\n", label);                             \
+        }                                                                            \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -64,24 +64,29 @@ int g_generate_calls = 0;
 char* dup_cstr(const char* value) {
     const size_t len = std::strlen(value);
     char* out = static_cast<char*>(std::malloc(len + 1));
-    if (!out) return nullptr;
+    if (!out)
+        return nullptr;
     std::memcpy(out, value, len + 1);
     return out;
 }
 
 rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
-    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new MockLlm();
     impl->model_path = model_id;
     *out_impl = impl;
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_initialize(void*, const char*) { return RAC_SUCCESS; }
+rac_result_t mock_initialize(void*, const char*) {
+    return RAC_SUCCESS;
+}
 
 rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
                            rac_llm_result_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
     std::string response;
     {
         std::lock_guard<std::mutex> lg(g_responses_mutex);
@@ -94,7 +99,8 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
         }
     }
     out_result->text = dup_cstr(response.c_str());
-    if (!out_result->text) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->text)
+        return RAC_ERROR_OUT_OF_MEMORY;
     out_result->prompt_tokens = 3;
     out_result->completion_tokens = 5;
     out_result->total_tokens = 8;
@@ -104,9 +110,15 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_cancel(void*) { return RAC_SUCCESS; }
-rac_result_t mock_cleanup(void*) { return RAC_SUCCESS; }
-void mock_destroy(void* impl) { delete static_cast<MockLlm*>(impl); }
+rac_result_t mock_cancel(void*) {
+    return RAC_SUCCESS;
+}
+rac_result_t mock_cleanup(void*) {
+    return RAC_SUCCESS;
+}
+void mock_destroy(void* impl) {
+    delete static_cast<MockLlm*>(impl);
+}
 
 rac_llm_service_ops_t g_mock_ops = [] {
     rac_llm_service_ops_t ops{};
@@ -119,8 +131,7 @@ rac_llm_service_ops_t g_mock_ops = [] {
     return ops;
 }();
 
-const uint32_t g_formats[] = {
-    static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+const uint32_t g_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
 
 rac_engine_vtable_t g_mock_vtable = [] {
     rac_engine_vtable_t v{};
@@ -137,7 +148,8 @@ rac_engine_vtable_t g_mock_vtable = [] {
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    if (out->empty()) return true;
+    if (out->empty())
+        return true;
     return message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
@@ -176,10 +188,10 @@ void cleanup_environment() {
 
 bool load_mock_llm() {
     cleanup_environment();
-    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS) return false;
+    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
+        return false;
 
-    if (!g_registry &&
-        (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {
+    if (!g_registry && (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {
         return false;
     }
 
@@ -194,7 +206,8 @@ bool load_mock_llm() {
     runanywhere::v1::ModelLoadRequest load;
     load.set_model_id("toolloop.llm");
     std::vector<uint8_t> load_bytes;
-    if (!serialize(load, &load_bytes)) return false;
+    if (!serialize(load, &load_bytes))
+        return false;
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -223,15 +236,16 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
     return tool;
 }
 
-runanywhere::v1::ToolCallingSessionCreateRequest make_request(
-    const std::string& prompt, uint32_t max_iterations = 0) {
+runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
+                                                              uint32_t max_iterations = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
     request.set_max_tokens(64);
     request.set_temperature(0.5f);
     *request.add_tools() = make_weather_tool();
     request.set_format_hint("default");
-    if (max_iterations > 0) request.set_max_iterations(max_iterations);
+    if (max_iterations > 0)
+        request.set_max_iterations(max_iterations);
     return request;
 }
 
@@ -252,7 +266,8 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
                                rac_proto_buffer_t* out_result, void* user_data) {
     auto* state = static_cast<ExecutorState*>(user_data);
     runanywhere::v1::ToolCall received;
-    if (in_size > 0) received.ParseFromArray(in_bytes, static_cast<int>(in_size));
+    if (in_size > 0)
+        received.ParseFromArray(in_bytes, static_cast<int>(in_size));
 
     {
         std::lock_guard<std::mutex> lg(state->mu);
@@ -284,8 +299,7 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     std::vector<uint8_t> bytes;
     serialize(tr, &bytes);
     rac_proto_buffer_init(out_result);
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                 out_result);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,8 +320,8 @@ int test_no_tool_call_completes_immediately() {
     ExecutorState exec;
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_calling_run_loop_proto(
-        bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS");
     CHECK(out.data != nullptr && out.size > 0, "out has bytes");
 
@@ -329,7 +343,8 @@ int test_no_tool_call_completes_immediately() {
 }
 
 int test_one_tool_call_then_final_text() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     set_responses({
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
         "The weather in Tokyo is sunny, 25C.",
@@ -346,8 +361,8 @@ int test_one_tool_call_then_final_text() {
     }
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_calling_run_loop_proto(
-        bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS");
 
     runanywhere::v1::ToolCallingResult result;
@@ -373,7 +388,8 @@ int test_one_tool_call_then_final_text() {
 }
 
 int test_max_iterations_capped() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     // Three loop iterations would consume three responses, but max_iterations=2
     // forces the loop to stop after two parses (executor invoked twice when
     // both responses are tool calls).
@@ -390,8 +406,8 @@ int test_max_iterations_capped() {
     ExecutorState exec;
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_calling_run_loop_proto(
-        bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS");
 
     runanywhere::v1::ToolCallingResult result;
@@ -410,7 +426,8 @@ int test_max_iterations_capped() {
 }
 
 int test_validation_failure_short_circuits() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     // Tool name that is NOT in the request's tool list should fail validation
     // before the executor is invoked.
     set_responses({
@@ -424,8 +441,8 @@ int test_validation_failure_short_circuits() {
     ExecutorState exec;
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_calling_run_loop_proto(
-        bytes.data(), bytes.size(), executor_callback, &exec, &out);
+    rac_result_t rc =
+        rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS (failed result inside)");
 
     runanywhere::v1::ToolCallingResult result;
@@ -449,8 +466,7 @@ int test_validation_failure_short_circuits() {
 int test_null_arguments_return_null_pointer() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_tool_calling_run_loop_proto(nullptr, 0, nullptr, nullptr, &out);
+    rac_result_t rc = rac_tool_calling_run_loop_proto(nullptr, 0, nullptr, nullptr, &out);
     CHECK(rc == RAC_ERROR_NULL_POINTER, "null callback rejected");
     rac_proto_buffer_free(&out);
 

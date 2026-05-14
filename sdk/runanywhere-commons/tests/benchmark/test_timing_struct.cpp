@@ -3,9 +3,8 @@
  * @brief Tests for rac_benchmark_timing_t struct and initialization
  */
 
-#include <gtest/gtest.h>
-
 #include <cstring>
+#include <gtest/gtest.h>
 
 #include "rac/core/rac_benchmark.h"
 
@@ -119,15 +118,15 @@ TEST(TimingStruct, DerivedMetrics) {
     EXPECT_EQ(decode_ms, 1005);
 
     // Decode TPS: 100 tokens / 1.005s ≈ 99.50 tokens/s
-    double tps = static_cast<double>(timing.output_tokens) / static_cast<double>(decode_ms) * 1000.0;
+    double tps =
+        static_cast<double>(timing.output_tokens) / static_cast<double>(decode_ms) * 1000.0;
     EXPECT_NEAR(tps, 99.50, 0.1);
 
     // E2E: t6 - t0 = 1070ms
     EXPECT_EQ(timing.t6_request_end_ms - timing.t0_request_start_ms, 1070);
 
     // Component overhead: E2E - decode - prefill
-    int64_t overhead = (timing.t6_request_end_ms - timing.t0_request_start_ms) -
-                       decode_ms -
+    int64_t overhead = (timing.t6_request_end_ms - timing.t0_request_start_ms) - decode_ms -
                        (timing.t3_prefill_end_ms - timing.t2_prefill_start_ms);
     EXPECT_EQ(overhead, 15);  // 1070 - 1005 - 50 = 15ms
 }

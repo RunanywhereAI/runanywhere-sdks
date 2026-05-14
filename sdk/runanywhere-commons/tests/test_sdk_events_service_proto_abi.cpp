@@ -6,9 +6,9 @@
 #include <cstdio>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/descriptor.h>
-
 #include "sdk_events.pb.h"
+
+#include <google/protobuf/descriptor.h>
 #endif
 
 namespace {
@@ -16,44 +16,38 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-void check_rpc(const google::protobuf::ServiceDescriptor* service,
-               const char* method_name,
-               const char* input_type,
-               const char* output_type,
-               bool server_streaming) {
-    const google::protobuf::MethodDescriptor* method =
-        service->FindMethodByName(method_name);
+void check_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
+               const char* input_type, const char* output_type, bool server_streaming) {
+    const google::protobuf::MethodDescriptor* method = service->FindMethodByName(method_name);
     CHECK(method != nullptr, method_name);
-    if (!method) return;
+    if (!method)
+        return;
 
     CHECK(method->input_type()->full_name() == input_type, "SDKEvents RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "SDKEvents RPC output type");
     CHECK(!method->client_streaming(), "SDKEvents RPC is not client-streaming");
-    CHECK(method->server_streaming() == server_streaming,
-          "SDKEvents RPC server-streaming shape");
+    CHECK(method->server_streaming() == server_streaming, "SDKEvents RPC server-streaming shape");
 }
 
 int test_sdk_events_generated_service_contract() {
-    const google::protobuf::FileDescriptor* file =
-        runanywhere::v1::SDKEvent::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service =
-        file->FindServiceByName("SDKEvents");
+    const google::protobuf::FileDescriptor* file = runanywhere::v1::SDKEvent::descriptor()->file();
+    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("SDKEvents");
     CHECK(service != nullptr, "generated SDKEvents service descriptor exists");
-    if (!service) return 0;
+    if (!service)
+        return 0;
 
     CHECK(service->method_count() == 2, "generated SDKEvents service exposes two RPCs");
 
@@ -102,8 +96,7 @@ int test_sdk_events_generated_service_contract() {
         CHECK(filter->has_presence(), "Subscribe filter field has presence");
     }
 
-    const google::protobuf::Descriptor* filter_desc =
-        runanywhere::v1::SDKEventFilter::descriptor();
+    const google::protobuf::Descriptor* filter_desc = runanywhere::v1::SDKEventFilter::descriptor();
     const google::protobuf::FieldDescriptor* categories =
         filter_desc->FindFieldByName("categories");
     CHECK(categories != nullptr, "SDKEventFilter carries categories");

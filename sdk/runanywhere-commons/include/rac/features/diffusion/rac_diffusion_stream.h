@@ -43,8 +43,7 @@ extern "C" {
  *        with serialized proto bytes.
  */
 typedef void (*rac_diffusion_stream_proto_callback_fn)(const uint8_t* event_bytes,
-                                                        size_t         event_size,
-                                                        void*          user_data);
+                                                       size_t event_size, void* user_data);
 
 /**
  * @brief Register a proto-byte stream callback on a diffusion component
@@ -54,9 +53,7 @@ typedef void (*rac_diffusion_stream_proto_callback_fn)(const uint8_t* event_byte
  * Pass NULL to clear.
  */
 RAC_API rac_result_t rac_diffusion_set_stream_proto_callback(
-    rac_handle_t                            handle,
-    rac_diffusion_stream_proto_callback_fn  callback,
-    void*                                   user_data);
+    rac_handle_t handle, rac_diffusion_stream_proto_callback_fn callback, void* user_data);
 
 /**
  * @brief Unregister the proto-byte stream callback for a handle.
@@ -72,10 +69,10 @@ RAC_API rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t hand
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE Library was built without Protobuf.
  * @retval RAC_ERROR_NOT_IMPLEMENTED       Session backend not yet wired (stub).
  */
-RAC_API rac_result_t rac_diffusion_stream_start_proto(rac_handle_t   handle,
-                                                       const uint8_t* request_proto_bytes,
-                                                       size_t         request_proto_size,
-                                                       uint64_t*      out_session_id);
+RAC_API rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
+                                                      const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      uint64_t* out_session_id);
 
 /**
  * @brief Stop a diffusion streaming session, flushing pending events.
@@ -88,7 +85,7 @@ RAC_API rac_result_t rac_diffusion_stream_stop_proto(uint64_t session_id);
 RAC_API rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id);
 
 #ifdef __cplusplus
-}  /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* RAC_FEATURES_DIFFUSION_RAC_DIFFUSION_STREAM_H */

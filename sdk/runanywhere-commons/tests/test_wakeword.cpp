@@ -9,19 +9,19 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
-#include "rac/backends/rac_wakeword_onnx.h"
-
 #include <cstring>
 #include <string>
+
+#include "rac/backends/rac_wakeword_onnx.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -64,12 +64,15 @@ static rac_config_t make_test_config() {
 
 static bool setup() {
     rac_config_t config = make_test_config();
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_wakeword_onnx_register();
     return true;
 }
 
-static void teardown() { rac_shutdown(); }
+static void teardown() {
+    rac_shutdown();
+}
 
 // =============================================================================
 // Helper: full wakeword setup (create + init shared + load model)
@@ -82,14 +85,17 @@ struct WakewordSetup {
 };
 
 static bool full_wakeword_setup(WakewordSetup& ws, TestResult& result,
-                                 const std::string& test_name) {
+                                const std::string& test_name) {
     std::string embedding_path = test_config::get_wakeword_embedding_path();
     std::string melspec_path = test_config::get_wakeword_melspec_path();
     std::string model_path = test_config::get_wakeword_model_path();
 
-    if (!test_config::require_model(embedding_path, test_name, result)) return false;
-    if (!test_config::require_model(melspec_path, test_name, result)) return false;
-    if (!test_config::require_model(model_path, test_name, result)) return false;
+    if (!test_config::require_model(embedding_path, test_name, result))
+        return false;
+    if (!test_config::require_model(melspec_path, test_name, result))
+        return false;
+    if (!test_config::require_model(model_path, test_name, result))
+        return false;
 
     if (!setup()) {
         result.test_name = test_name;
@@ -109,7 +115,7 @@ static bool full_wakeword_setup(WakewordSetup& ws, TestResult& result,
     }
 
     rc = rac_wakeword_onnx_init_shared_models(ws.handle, embedding_path.c_str(),
-                                                melspec_path.c_str());
+                                              melspec_path.c_str());
     if (rc != RAC_SUCCESS) {
         result.test_name = test_name;
         result.passed = false;
@@ -168,8 +174,10 @@ static TestResult test_init_shared_models() {
     std::string embedding_path = test_config::get_wakeword_embedding_path();
     std::string melspec_path = test_config::get_wakeword_melspec_path();
 
-    if (!test_config::require_model(embedding_path, result.test_name, result)) return result;
-    if (!test_config::require_model(melspec_path, result.test_name, result)) return result;
+    if (!test_config::require_model(embedding_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(melspec_path, result.test_name, result))
+        return result;
 
     if (!setup()) {
         result.passed = false;
@@ -182,8 +190,7 @@ static TestResult test_init_shared_models() {
     rac_result_t rc = rac_wakeword_onnx_create(&cfg, &handle);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_create should succeed");
 
-    rc = rac_wakeword_onnx_init_shared_models(handle, embedding_path.c_str(),
-                                                melspec_path.c_str());
+    rc = rac_wakeword_onnx_init_shared_models(handle, embedding_path.c_str(), melspec_path.c_str());
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_init_shared_models should succeed");
 
     rac_wakeword_onnx_destroy(handle);
@@ -203,9 +210,12 @@ static TestResult test_load_unload_model() {
     std::string melspec_path = test_config::get_wakeword_melspec_path();
     std::string model_path = test_config::get_wakeword_model_path();
 
-    if (!test_config::require_model(embedding_path, result.test_name, result)) return result;
-    if (!test_config::require_model(melspec_path, result.test_name, result)) return result;
-    if (!test_config::require_model(model_path, result.test_name, result)) return result;
+    if (!test_config::require_model(embedding_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(melspec_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(model_path, result.test_name, result))
+        return result;
 
     if (!setup()) {
         result.passed = false;
@@ -218,8 +228,7 @@ static TestResult test_load_unload_model() {
     rac_result_t rc = rac_wakeword_onnx_create(&cfg, &handle);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_create should succeed");
 
-    rc = rac_wakeword_onnx_init_shared_models(handle, embedding_path.c_str(),
-                                                melspec_path.c_str());
+    rc = rac_wakeword_onnx_init_shared_models(handle, embedding_path.c_str(), melspec_path.c_str());
     ASSERT_EQ(rc, RAC_SUCCESS, "init shared models should succeed");
 
     rc = rac_wakeword_onnx_load_model(handle, model_path.c_str(), "hey-jarvis", "Hey Jarvis");
@@ -240,12 +249,13 @@ static TestResult test_load_unload_model() {
 static TestResult test_process_silence() {
     TestResult result;
     WakewordSetup ws;
-    if (!full_wakeword_setup(ws, result, "process_silence")) return result;
+    if (!full_wakeword_setup(ws, result, "process_silence"))
+        return result;
 
     // Generate 2 seconds of silence at 16kHz = 32000 samples
     // Wake word uses RAW float samples: silence is just 0.0f
     const size_t total_samples = 32000;
-    const size_t frame_size = 1280; // 80ms at 16kHz
+    const size_t frame_size = 1280;  // 80ms at 16kHz
     std::vector<float> silence(total_samples, 0.0f);
 
     bool any_detection = false;
@@ -253,7 +263,7 @@ static TestResult test_process_silence() {
         int32_t detected_idx = -1;
         float confidence = 0.0f;
         rac_result_t rc = rac_wakeword_onnx_process(ws.handle, &silence[offset], frame_size,
-                                                      &detected_idx, &confidence);
+                                                    &detected_idx, &confidence);
         ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_process should succeed");
 
         if (detected_idx >= 0) {
@@ -276,14 +286,15 @@ static TestResult test_process_silence() {
 static TestResult test_process_noise() {
     TestResult result;
     WakewordSetup ws;
-    if (!full_wakeword_setup(ws, result, "process_noise")) return result;
+    if (!full_wakeword_setup(ws, result, "process_noise"))
+        return result;
 
     // Generate 2 seconds of white noise at 16kHz with low amplitude
     const size_t total_samples = 32000;
     const size_t frame_size = 1280;
     // Use raw float values: amplitude 0.05 means small fluctuations around zero
     std::vector<float> noise(total_samples);
-    std::srand(42); // deterministic seed
+    std::srand(42);  // deterministic seed
     for (size_t i = 0; i < total_samples; ++i) {
         float r = static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
         noise[i] = 0.05f * (2.0f * r - 1.0f);
@@ -294,7 +305,7 @@ static TestResult test_process_noise() {
         int32_t detected_idx = -1;
         float confidence = 0.0f;
         rac_result_t rc = rac_wakeword_onnx_process(ws.handle, &noise[offset], frame_size,
-                                                      &detected_idx, &confidence);
+                                                    &detected_idx, &confidence);
         ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_process should succeed");
 
         if (detected_idx >= 0) {
@@ -344,7 +355,8 @@ static TestResult test_set_threshold() {
 static TestResult test_reset() {
     TestResult result;
     WakewordSetup ws;
-    if (!full_wakeword_setup(ws, result, "reset")) return result;
+    if (!full_wakeword_setup(ws, result, "reset"))
+        return result;
 
     rac_result_t rc = rac_wakeword_onnx_reset(ws.handle);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_wakeword_onnx_reset should succeed");
@@ -371,7 +383,8 @@ static TestResult test_wakeword_wav(const std::string& wav_path, bool expect_det
 
     // Full wakeword setup
     WakewordSetup ws;
-    if (!full_wakeword_setup(ws, result, "wakeword_wav")) return result;
+    if (!full_wakeword_setup(ws, result, "wakeword_wav"))
+        return result;
 
     // Convert int16 samples to float WITHOUT normalization (critical for openWakeWord)
     std::vector<float> float_samples = int16_to_float_raw(wav.samples);
@@ -384,8 +397,8 @@ static TestResult test_wakeword_wav(const std::string& wav_path, bool expect_det
     for (size_t offset = 0; offset + chunk_size <= float_samples.size(); offset += chunk_size) {
         int32_t detected_idx = -1;
         float confidence = 0.0f;
-        rac_result_t rc = rac_wakeword_onnx_process(ws.handle, &float_samples[offset],
-                                                      chunk_size, &detected_idx, &confidence);
+        rac_result_t rc = rac_wakeword_onnx_process(ws.handle, &float_samples[offset], chunk_size,
+                                                    &detected_idx, &confidence);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details = "rac_wakeword_onnx_process failed at offset " +
@@ -405,14 +418,14 @@ static TestResult test_wakeword_wav(const std::string& wav_path, bool expect_det
         }
     }
 
-    float duration_sec = static_cast<float>(wav.samples.size()) /
-                         static_cast<float>(wav.sample_rate);
+    float duration_sec =
+        static_cast<float>(wav.samples.size()) / static_cast<float>(wav.sample_rate);
 
     if (detected != expect_detection) {
         result.passed = false;
         result.details = std::string("expected detection=") +
-                         (expect_detection ? "true" : "false") +
-                         " but got " + (detected ? "true" : "false") +
+                         (expect_detection ? "true" : "false") + " but got " +
+                         (detected ? "true" : "false") +
                          ", max_confidence=" + std::to_string(max_confidence) +
                          ", duration=" + std::to_string(duration_sec) + "s";
     } else {
@@ -435,7 +448,8 @@ static TestResult test_detect_real_wakeword() {
     TestResult result;
     result.test_name = "detect_real_wakeword";
     std::string path = test_config::get_test_audio_file("hey-jarvis-real.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, true);
     result.test_name = "detect_real_wakeword";
     return result;
@@ -445,7 +459,8 @@ static TestResult test_detect_amplified_wakeword() {
     TestResult result;
     result.test_name = "detect_amplified_wakeword";
     std::string path = test_config::get_test_audio_file("hey-jarvis-amplified.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, true);
     result.test_name = "detect_amplified_wakeword";
     return result;
@@ -455,7 +470,8 @@ static TestResult test_reject_hey_marcus() {
     TestResult result;
     result.test_name = "reject_hey_marcus";
     std::string path = test_config::get_test_audio_file("edge-cases/hey-marcus.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_hey_marcus";
     return result;
@@ -465,7 +481,8 @@ static TestResult test_reject_hey_travis() {
     TestResult result;
     result.test_name = "reject_hey_travis";
     std::string path = test_config::get_test_audio_file("edge-cases/hey-travis.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_hey_travis";
     return result;
@@ -475,7 +492,8 @@ static TestResult test_reject_hey_only() {
     TestResult result;
     result.test_name = "reject_hey_only";
     std::string path = test_config::get_test_audio_file("edge-cases/hey-only.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_hey_only";
     return result;
@@ -485,7 +503,8 @@ static TestResult test_reject_jarvis_only() {
     TestResult result;
     result.test_name = "reject_jarvis_only";
     std::string path = test_config::get_test_audio_file("edge-cases/jarvis-only.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_jarvis_only";
     return result;
@@ -495,7 +514,8 @@ static TestResult test_detect_fast_wakeword() {
     TestResult result;
     result.test_name = "detect_fast_wakeword";
     std::string path = test_config::get_test_audio_file("edge-cases/hey-jarvis-fast.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     // Model can't reliably detect fast speech — expect no detection
     result = test_wakeword_wav(path, false);
     result.test_name = "detect_fast_wakeword";
@@ -506,7 +526,8 @@ static TestResult test_detect_slow_wakeword() {
     TestResult result;
     result.test_name = "detect_slow_wakeword";
     std::string path = test_config::get_test_audio_file("edge-cases/hey-jarvis-slow.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     // Model can't reliably detect slow speech — expect no detection
     result = test_wakeword_wav(path, false);
     result.test_name = "detect_slow_wakeword";
@@ -517,7 +538,8 @@ static TestResult test_reject_brown_noise() {
     TestResult result;
     result.test_name = "reject_brown_noise";
     std::string path = test_config::get_test_audio_file("edge-cases/brown-noise.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_brown_noise";
     return result;
@@ -527,7 +549,8 @@ static TestResult test_reject_tone() {
     TestResult result;
     result.test_name = "reject_tone";
     std::string path = test_config::get_test_audio_file("edge-cases/tone-1khz.wav");
-    if (!test_config::require_audio_file(path, result.test_name, result)) return result;
+    if (!test_config::require_audio_file(path, result.test_name, result))
+        return result;
     result = test_wakeword_wav(path, false);
     result.test_name = "reject_tone";
     return result;

@@ -9,20 +9,20 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
-#include "rac/backends/rac_llm_llamacpp.h"
-
 #include <atomic>
 #include <cstring>
 #include <string>
+
+#include "rac/backends/rac_llm_llamacpp.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -65,12 +65,15 @@ static rac_config_t make_test_config() {
 
 static bool setup() {
     rac_config_t config = make_test_config();
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_llamacpp_register();
     return true;
 }
 
-static void teardown() { rac_shutdown(); }
+static void teardown() {
+    rac_shutdown();
+}
 
 // =============================================================================
 // Test: create and destroy with valid model path
@@ -222,7 +225,7 @@ static rac_bool_t stream_callback(const char* token, rac_bool_t is_final, void* 
     if (is_final == RAC_TRUE) {
         data->got_final = true;
     }
-    return RAC_TRUE; // continue
+    return RAC_TRUE;  // continue
 }
 
 static TestResult test_generate_stream() {
@@ -251,7 +254,7 @@ static TestResult test_generate_stream() {
     {
         ScopedTimer timer("llm_generate_stream");
         rc = rac_llm_llamacpp_generate_stream(handle, "What is 2+2? Answer briefly.", &opts,
-                                               stream_callback, &cb_data);
+                                              stream_callback, &cb_data);
     }
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_generate_stream should succeed");
     ASSERT_TRUE(cb_data.token_count > 0, "should have received at least one token");
@@ -272,13 +275,12 @@ struct CancelCallbackData {
     int token_count = 0;
 };
 
-static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/,
-                                   void* user_data) {
+static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/, void* user_data) {
     auto* data = static_cast<CancelCallbackData*>(user_data);
     data->token_count++;
     // Stop after 3 tokens
     if (data->token_count >= 3) {
-        return RAC_FALSE; // request cancellation
+        return RAC_FALSE;  // request cancellation
     }
     return RAC_TRUE;
 }
@@ -307,7 +309,7 @@ static TestResult test_cancel_generation() {
 
     CancelCallbackData cb_data;
     rc = rac_llm_llamacpp_generate_stream(handle, "Write a long story about space exploration.",
-                                           &opts, cancel_callback, &cb_data);
+                                          &opts, cancel_callback, &cb_data);
     // The return code may be RAC_SUCCESS or RAC_ERROR_CANCELLED depending on implementation
     ASSERT_TRUE(cb_data.token_count >= 1, "callback should have been called at least once");
 

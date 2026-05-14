@@ -90,7 +90,7 @@ public actor HTTPClientAdapter {
     /// Fetch an absolute URL without requiring adapter configuration or auth.
     /// Intended for ancillary asset fetches (e.g. tokenizer blobs) that live
     /// outside the SDK's configured base URL.
-    public static func fetchURL(_ url: URL, timeoutMs: Int32 = 30_000) async throws -> Data {
+    public static func fetchURL(_ url: URL) async throws -> Data {
         try await dispatch(
             method: "GET",
             urlString: url.absoluteString,

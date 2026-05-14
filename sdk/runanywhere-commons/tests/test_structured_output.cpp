@@ -3,8 +3,8 @@
  * @brief Focused tests for centralized structured-output helpers.
  */
 
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -18,36 +18,40 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                 \
+    do {                                                                                  \
+        if (!(cond)) {                                                                    \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
+            return 1;                                                                     \
+        }                                                                                 \
+    } while (0)
 
-#define ASSERT_EQ_INT(a, b) do { \
-    if ((a) != (b)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__, \
-                     static_cast<int>(a), static_cast<int>(b)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_INT(a, b)                                                             \
+    do {                                                                                \
+        if ((a) != (b)) {                                                               \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__, \
+                         static_cast<int>(a), static_cast<int>(b));                     \
+            return 1;                                                                   \
+        }                                                                               \
+    } while (0)
 
-#define ASSERT_EQ_STR(actual, expected) do { \
-    if (std::strcmp((actual), (expected)) != 0) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
-                     __FILE__, __LINE__, (expected), (actual)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_STR(actual, expected)                                                           \
+    do {                                                                                          \
+        if (std::strcmp((actual), (expected)) != 0) {                                             \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
+                         __FILE__, __LINE__, (expected), (actual));                               \
+            return 1;                                                                             \
+        }                                                                                         \
+    } while (0)
 
-#define ASSERT_SUBSTR(haystack, needle) do { \
-    if (std::strstr((haystack), (needle)) == nullptr) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", \
-                     __FILE__, __LINE__, (needle), (haystack)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_SUBSTR(haystack, needle)                                                         \
+    do {                                                                                        \
+        if (std::strstr((haystack), (needle)) == nullptr) {                                     \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", __FILE__, \
+                         __LINE__, (needle), (haystack));                                       \
+            return 1;                                                                           \
+        }                                                                                       \
+    } while (0)
 
 int test_extract_object_from_mixed_text() {
     char* json = nullptr;
@@ -75,8 +79,8 @@ int test_extract_array_with_braces_in_string() {
 
 int test_extract_skips_invalid_candidate() {
     char* json = nullptr;
-    const rac_result_t rc = rac_structured_output_extract_json(
-        "ignore {not json} then {\"ok\":true}", &json, nullptr);
+    const rac_result_t rc =
+        rac_structured_output_extract_json("ignore {not json} then {\"ok\":true}", &json, nullptr);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(json != nullptr);
     ASSERT_EQ_STR(json, "{\"ok\":true}");
@@ -86,8 +90,7 @@ int test_extract_skips_invalid_candidate() {
 
 int test_validate_success_and_failure() {
     rac_structured_output_validation_t validation{};
-    rac_result_t rc =
-        rac_structured_output_validate("result {\"value\":42}", nullptr, &validation);
+    rac_result_t rc = rac_structured_output_validate("result {\"value\":42}", nullptr, &validation);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
     ASSERT_TRUE(validation.extracted_json != nullptr);
@@ -119,8 +122,8 @@ int test_parse_result_schema_validation() {
     config.include_schema_in_prompt = RAC_TRUE;
 
     rac_structured_output_parse_result_t parsed{};
-    rac_result_t rc = rac_structured_output_parse(
-        "result {\"status\":\"ok\",\"count\":2}", &config, &parsed);
+    rac_result_t rc =
+        rac_structured_output_parse("result {\"status\":\"ok\",\"count\":2}", &config, &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(parsed.is_valid, RAC_TRUE);
     ASSERT_EQ_INT(parsed.contains_json, RAC_TRUE);
@@ -161,8 +164,7 @@ int test_parse_proto_uses_generated_contract() {
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::StructuredOutputResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_TRUE(result.has_validation());
     ASSERT_EQ_INT(result.validation().is_valid(), true);
     ASSERT_EQ_INT(result.validation().contains_json(), true);
@@ -178,8 +180,9 @@ int test_prepare_prompt_proto_uses_generated_contract() {
     request.set_prompt("Return a status");
     auto* options = request.mutable_options();
     options->set_include_schema_in_prompt(true);
-    options->set_json_schema("{\"type\":\"object\",\"required\":[\"status\"],"
-                             "\"properties\":{\"status\":{\"type\":\"string\"}}}");
+    options->set_json_schema(
+        "{\"type\":\"object\",\"required\":[\"status\"],"
+        "\"properties\":{\"status\":{\"type\":\"string\"}}}");
 
     std::string bytes;
     ASSERT_TRUE(request.SerializeToString(&bytes));
@@ -193,8 +196,7 @@ int test_prepare_prompt_proto_uses_generated_contract() {
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::StructuredOutputPromptResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "Return a status");
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "\"status\"");
@@ -229,8 +231,7 @@ int test_validate_proto_uses_generated_contract() {
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::StructuredOutputValidation result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.is_valid(), true);
     ASSERT_EQ_INT(result.contains_json(), true);
     ASSERT_TRUE(result.has_raw_output());
@@ -250,8 +251,7 @@ int test_prepare_prompt_and_system_prompt() {
     config.include_schema_in_prompt = RAC_TRUE;
 
     char* prepared = nullptr;
-    rac_result_t rc =
-        rac_structured_output_prepare_prompt("Return a status", &config, &prepared);
+    rac_result_t rc = rac_structured_output_prepare_prompt("Return a status", &config, &prepared);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(prepared != nullptr);
     ASSERT_SUBSTR(prepared, "Return a status");

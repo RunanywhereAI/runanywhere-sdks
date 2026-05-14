@@ -44,11 +44,10 @@ extern "C" {
  *         RAC_ERROR_ENCODING_ERROR when the response cannot be serialized,
  *         or RAC_ERROR_FEATURE_NOT_AVAILABLE when protobuf support is missing.
  */
-RAC_API rac_result_t rac_router_frameworks_for_capability_proto(
-    const uint8_t* request_bytes,
-    size_t request_size,
-    uint8_t** out_response_bytes,
-    size_t* out_response_size);
+RAC_API rac_result_t rac_router_frameworks_for_capability_proto(const uint8_t* request_bytes,
+                                                                size_t request_size,
+                                                                uint8_t** out_response_bytes,
+                                                                size_t* out_response_size);
 
 /**
  * @brief Free a buffer returned by

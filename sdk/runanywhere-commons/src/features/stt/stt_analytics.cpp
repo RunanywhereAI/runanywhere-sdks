@@ -158,7 +158,7 @@ rac_result_t rac_stt_analytics_start_transcription(rac_stt_analytics_handle_t ha
     memcpy(*out_transcription_id, id.c_str(), id.size() + 1);
 
     RAC_LOG_DEBUG("STT.Analytics", "Transcription started: %s, model: %s, audio: %.1fms, %d bytes",
-              id.c_str(), model_id, audio_length_ms, audio_size_bytes);
+                  id.c_str(), model_id, audio_length_ms, audio_size_bytes);
 
     return RAC_SUCCESS;
 }
@@ -219,7 +219,7 @@ rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("STT.Analytics", "Transcription completed: %s, model: %s, RTF: %.3f",
-              transcription_id, tracker.model_id.c_str(), real_time_factor);
+                  transcription_id, tracker.model_id.c_str(), real_time_factor);
 
     return RAC_SUCCESS;
 }
@@ -239,7 +239,7 @@ rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_hand
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("STT.Analytics", "Transcription failed %s: %d - %s", transcription_id, error_code,
-              error_message ? error_message : "");
+                  error_message ? error_message : "");
 
     return RAC_SUCCESS;
 }
@@ -268,8 +268,8 @@ rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("STT.Analytics", "STT error in %s: %d - %s (model: %s, trans: %s)",
-              operation ? operation : "unknown", error_code, error_message ? error_message : "",
-              model_id ? model_id : "none", transcription_id ? transcription_id : "none");
+                  operation ? operation : "unknown", error_code, error_message ? error_message : "",
+                  model_id ? model_id : "none", transcription_id ? transcription_id : "none");
 
     return RAC_SUCCESS;
 }

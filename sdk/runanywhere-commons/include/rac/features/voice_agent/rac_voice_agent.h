@@ -696,27 +696,24 @@ RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
 /**
  * @brief Initialize from serialized runanywhere.v1.VoiceAgentComposeConfig bytes.
  */
-RAC_API rac_result_t rac_voice_agent_initialize_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* config_proto_bytes,
-    size_t config_proto_size,
-    rac_proto_buffer_t* out_component_states);
+RAC_API rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
+                                                      const uint8_t* config_proto_bytes,
+                                                      size_t config_proto_size,
+                                                      rac_proto_buffer_t* out_component_states);
 
 /**
  * @brief Snapshot component state as serialized runanywhere.v1.VoiceAgentComponentStates bytes.
  */
 RAC_API rac_result_t rac_voice_agent_component_states_proto(
-    rac_voice_agent_handle_t handle,
-    rac_proto_buffer_t* out_component_states);
+    rac_voice_agent_handle_t handle, rac_proto_buffer_t* out_component_states);
 
 /**
  * @brief Process one voice turn and return serialized runanywhere.v1.VoiceAgentResult bytes.
  */
-RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(
-    rac_voice_agent_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
+                                                              const void* audio_data,
+                                                              size_t audio_size,
+                                                              rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }
@@ -728,35 +725,27 @@ extern "C" {
 #endif
 
 typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_bytes,
-                                                       size_t event_size,
-                                                       void* user_data);
+                                                       size_t event_size, void* user_data);
 
 RAC_API rac_result_t rac_voice_agent_process_turn_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_voice_agent_turn_event_callback_fn event_callback,
-    void* user_data);
+    rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
+    rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);
 
-RAC_API rac_result_t rac_voice_agent_transcribe_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_t handle,
+                                                      const uint8_t* request_bytes,
+                                                      size_t request_size,
+                                                      rac_proto_buffer_t* out_result);
 
-RAC_API rac_result_t rac_voice_agent_synthesize_speech_proto(
-    rac_voice_agent_handle_t handle,
-    const uint8_t* request_bytes,
-    size_t request_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_handle_t handle,
+                                                             const uint8_t* request_bytes,
+                                                             size_t request_size,
+                                                             rac_proto_buffer_t* out_result);
 
-RAC_API rac_result_t rac_voice_agent_component_create_proto(
-    const uint8_t* config_bytes,
-    size_t config_size,
-    rac_voice_agent_handle_t* out_handle);
+RAC_API rac_result_t rac_voice_agent_component_create_proto(const uint8_t* config_bytes,
+                                                            size_t config_size,
+                                                            rac_voice_agent_handle_t* out_handle);
 
-RAC_API rac_result_t rac_voice_agent_component_destroy_proto(
-    rac_voice_agent_handle_t handle);
+RAC_API rac_result_t rac_voice_agent_component_destroy_proto(rac_voice_agent_handle_t handle);
 
 #ifdef __cplusplus
 }

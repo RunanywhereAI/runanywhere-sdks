@@ -12,6 +12,8 @@ const workspaceRoot = path.resolve(__dir, '../../..');
 // SDK WASM directories (each backend ships its own WASM)
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
 const webCoreSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts');
+const webCoreInternalSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/internal.ts');
+const webCoreBrowserSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/browser.ts');
 const llamacppSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/index.ts');
 const onnxSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/src/index.ts');
 const vlmWorkerSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts');
@@ -68,6 +70,8 @@ export default defineConfig({
       { find: /^@runanywhere\/web-llamacpp\/vlm-worker(.*)$/, replacement: `${vlmWorkerSrc}$1` },
       { find: /^@runanywhere\/web-llamacpp$/, replacement: llamacppSrc },
       { find: /^@runanywhere\/web-onnx$/, replacement: onnxSrc },
+      { find: /^@runanywhere\/web\/internal$/, replacement: webCoreInternalSrc },
+      { find: /^@runanywhere\/web\/browser$/, replacement: webCoreBrowserSrc },
       { find: /^@runanywhere\/web$/, replacement: webCoreSrc },
       { find: /^@runanywhere\/proto-ts\/(.*)$/, replacement: protoTsSrc + '/$1.ts' },
       { find: '@runanywhere/proto-ts', replacement: protoTsSrc + '/index.ts' },

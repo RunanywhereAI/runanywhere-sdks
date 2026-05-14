@@ -1,16 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
-import { ModalityProtoAdapter, type ModalityProtoModule } from '../../Adapters/ModalityProtoAdapter';
-import { clearRunanywhereModule } from '../../runtime/EmscriptenModule';
+import { SDKErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
+import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
+import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
 import {
   RAG,
+  createRAGNativeProvider,
   createDefaultRAGConfiguration,
   setRAGProvider,
-} from './RunAnywhere+RAG';
+  setRAGSessionHandle,
+  unavailableRAGResult,
+} from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import {
   VoiceAgent,
+  setVoiceAgentHandle,
   setVoiceAgentProvider,
-} from './RunAnywhere+VoiceAgent';
+} from '../../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
 
 describe('VoiceAgent and RAG provider-required facades', () => {
   afterEach(() => {
@@ -65,8 +69,8 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('rejects missing native RAG and voice-agent handles instead of marking them available', () => {
-    expect(() => RAG.setSessionHandle(0)).toThrow(SDKException);
-    expect(() => VoiceAgent.setHandle(0, {} as never)).toThrow(SDKException);
+    expect(() => setRAGSessionHandle(0)).toThrow(SDKException);
+    expect(() => setVoiceAgentHandle(0, {} as never)).toThrow(SDKException);
 
     expect(RAG.availability().available).toBe(false);
     expect(VoiceAgent.availability().available).toBe(false);
@@ -74,7 +78,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
 
   it('rejects native Web RAG persistence until a browser storage-backed provider exists', async () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
-    RAG.setProvider(RAG.createNativeProvider());
+    setRAGProvider(createRAGNativeProvider());
 
     await expect(RAG.createPipeline(createDefaultRAGConfiguration({
       embeddingModelPath: '/models/embed.onnx',
@@ -92,7 +96,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   it('rejects persistent config at native Web RAG provider construction', () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
 
-    expect(() => RAG.createNativeProvider({
+    expect(() => createRAGNativeProvider({
       config: {
         persistIndex: true,
         indexPath: 'opfs://runanywhere/rag/docs',
@@ -104,7 +108,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
 
   it('keeps native RAG document listing and removal unavailable without native APIs', async () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
-    RAG.setSessionHandle(7);
+    setRAGSessionHandle(7);
 
     expect(RAG.availability()).toMatchObject({
       available: true,
@@ -133,7 +137,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       async ragDestroyPipeline() {},
       async ragIngest() {},
       async ragQuery(question) {
-        return RAG.unavailableResult(question);
+        return unavailableRAGResult(question);
       },
       async ragClearDocuments() {},
       async ragGetDocumentCount() {
@@ -168,7 +172,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       async ragDestroyPipeline() {},
       async ragIngest() {},
       async ragQuery(question) {
-        return RAG.unavailableResult(question);
+        return unavailableRAGResult(question);
       },
       async ragClearDocuments() {},
       async ragGetDocumentCount() {

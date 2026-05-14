@@ -45,13 +45,13 @@ extern "C" {
  * on Linux), will be rejected with `RAC_ERROR_CAPABILITY_UNSUPPORTED`.
  */
 typedef enum rac_onnxrt_ep_type {
-    RAC_ONNXRT_EP_CPU      = 0,  /**< Default CPU EP (no-op — always active). */
-    RAC_ONNXRT_EP_COREML   = 1,  /**< Apple CoreML (CPU / GPU / ANE fused).  */
-    RAC_ONNXRT_EP_CUDA     = 2,  /**< NVIDIA CUDA (discrete / integrated).   */
-    RAC_ONNXRT_EP_DIRECTML = 3,  /**< Windows DirectML (any D3D12 GPU).      */
-    RAC_ONNXRT_EP_NNAPI    = 4,  /**< Android NNAPI accelerator path.        */
-    RAC_ONNXRT_EP_QNN      = 5,  /**< Qualcomm QNN HTP / DSP / HMX.          */
-    RAC_ONNXRT_EP_WEBGPU   = 6,  /**< Emscripten WebGPU EP.                  */
+    RAC_ONNXRT_EP_CPU = 0,      /**< Default CPU EP (no-op — always active). */
+    RAC_ONNXRT_EP_COREML = 1,   /**< Apple CoreML (CPU / GPU / ANE fused).  */
+    RAC_ONNXRT_EP_CUDA = 2,     /**< NVIDIA CUDA (discrete / integrated).   */
+    RAC_ONNXRT_EP_DIRECTML = 3, /**< Windows DirectML (any D3D12 GPU).      */
+    RAC_ONNXRT_EP_NNAPI = 4,    /**< Android NNAPI accelerator path.        */
+    RAC_ONNXRT_EP_QNN = 5,      /**< Qualcomm QNN HTP / DSP / HMX.          */
+    RAC_ONNXRT_EP_WEBGPU = 6,   /**< Emscripten WebGPU EP.                  */
 } rac_onnxrt_ep_type_t;
 
 /**
@@ -67,7 +67,7 @@ typedef enum rac_onnxrt_ep_type {
  */
 typedef struct rac_onnxrt_ep_config {
     rac_onnxrt_ep_type_t type;
-    const char*          config_json;  /**< Optional. Owned by caller; copied. */
+    const char* config_json; /**< Optional. Owned by caller; copied. */
 } rac_onnxrt_ep_config_t;
 
 /**
@@ -84,8 +84,8 @@ typedef struct rac_onnxrt_ep_config {
  *     current ORT / platform build (caller should fall back to CPU).
  *   - `RAC_ERROR_INVALID_PARAMETER` on malformed config.
  */
-RAC_API rac_result_t rac_onnxrt_runtime_enable_execution_provider(
-    const rac_onnxrt_ep_config_t* config);
+RAC_API rac_result_t
+rac_onnxrt_runtime_enable_execution_provider(const rac_onnxrt_ep_config_t* config);
 
 /**
  * Read back the currently active EP.
@@ -93,8 +93,7 @@ RAC_API rac_result_t rac_onnxrt_runtime_enable_execution_provider(
  * `out` must not be NULL. Returns `RAC_ONNXRT_EP_CPU` when no EP has been
  * activated or activation was cleared.
  */
-RAC_API rac_result_t rac_onnxrt_runtime_get_active_ep(
-    rac_onnxrt_ep_type_t* out);
+RAC_API rac_result_t rac_onnxrt_runtime_get_active_ep(rac_onnxrt_ep_type_t* out);
 
 /**
  * Query whether an EP is compiled in for the current build.
@@ -111,8 +110,7 @@ RAC_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t type);
  * class when a non-CPU EP is active. Returns `RAC_DEVICE_CLASS_CPU` for
  * `RAC_ONNXRT_EP_CPU` and for any unrecognised value.
  */
-RAC_API rac_device_class_t rac_onnxrt_runtime_ep_device_class(
-    rac_onnxrt_ep_type_t type);
+RAC_API rac_device_class_t rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type);
 
 #ifdef __cplusplus
 }

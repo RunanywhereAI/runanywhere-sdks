@@ -6,9 +6,9 @@
 #include <cstdio>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/descriptor.h>
-
 #include "vlm_options.pb.h"
+
+#include <google/protobuf/descriptor.h>
 #endif
 
 namespace {
@@ -16,16 +16,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -35,28 +34,25 @@ int test_vlm_generated_service_contract() {
         runanywhere::v1::VLMGenerationRequest::descriptor()->file();
     const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("VLM");
     CHECK(service != nullptr, "generated VLM service descriptor exists");
-    if (!service) return 0;
+    if (!service)
+        return 0;
 
     CHECK(service->method_count() == 2, "generated VLM service exposes two RPCs");
 
-    const google::protobuf::MethodDescriptor* generate =
-        service->FindMethodByName("Generate");
+    const google::protobuf::MethodDescriptor* generate = service->FindMethodByName("Generate");
     CHECK(generate != nullptr, "VLM Generate RPC exists");
     if (generate) {
-        CHECK(generate->input_type()->full_name() ==
-                  "runanywhere.v1.VLMGenerationRequest",
+        CHECK(generate->input_type()->full_name() == "runanywhere.v1.VLMGenerationRequest",
               "Generate accepts VLMGenerationRequest");
         CHECK(generate->output_type()->full_name() == "runanywhere.v1.VLMResult",
               "Generate returns VLMResult");
-        CHECK(!generate->client_streaming() && !generate->server_streaming(),
-              "Generate is unary");
+        CHECK(!generate->client_streaming() && !generate->server_streaming(), "Generate is unary");
     }
 
     const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
     CHECK(stream != nullptr, "VLM Stream RPC exists");
     if (stream) {
-        CHECK(stream->input_type()->full_name() ==
-                  "runanywhere.v1.VLMGenerationRequest",
+        CHECK(stream->input_type()->full_name() == "runanywhere.v1.VLMGenerationRequest",
               "Stream accepts VLMGenerationRequest");
         CHECK(stream->output_type()->full_name() == "runanywhere.v1.VLMStreamEvent",
               "Stream returns VLMStreamEvent");

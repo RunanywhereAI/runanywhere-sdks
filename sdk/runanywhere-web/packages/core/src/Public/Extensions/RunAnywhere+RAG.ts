@@ -593,15 +593,10 @@ function unavailableCapabilities(): RAGProviderCapabilities {
 }
 
 export const RAG = {
-  setProvider: setRAGProvider,
-  createNativeProvider: createRAGNativeProvider,
-  setSessionHandle: setRAGSessionHandle,
   availability: getRAGAvailability,
   isAvailable: isRAGAvailable,
   capabilities: ragGetCapabilities,
   defaultConfiguration: createDefaultRAGConfiguration,
-  unavailableResult: unavailableRAGResult,
-  unavailableStatistics: unavailableRAGStatistics,
   createPipeline: ragCreatePipeline,
   destroyPipeline: ragDestroyPipeline,
   ingest: ragIngest,

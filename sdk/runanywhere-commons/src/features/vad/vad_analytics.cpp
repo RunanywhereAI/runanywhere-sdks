@@ -121,7 +121,7 @@ rac_result_t rac_vad_analytics_track_initialization_failed(rac_vad_analytics_han
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("VAD.Analytics", "VAD initialization failed: %d - %s", error_code,
-              error_message ? error_message : "");
+                  error_message ? error_message : "");
     return RAC_SUCCESS;
 }
 
@@ -250,7 +250,8 @@ rac_result_t rac_vad_analytics_track_model_load_started(rac_vad_analytics_handle
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    RAC_LOG_DEBUG("VAD.Analytics", "Model load started: %s, size: %lld", model_id, model_size_bytes);
+    RAC_LOG_DEBUG("VAD.Analytics", "Model load started: %s, size: %lld", model_id,
+                  model_size_bytes);
     return RAC_SUCCESS;
 }
 
@@ -266,8 +267,8 @@ rac_result_t rac_vad_analytics_track_model_load_completed(rac_vad_analytics_hand
     handle->last_event_time_ms = get_current_time_ms();
     handle->has_last_event_time = true;
 
-    RAC_LOG_DEBUG("VAD.Analytics", "Model load completed: %s, duration: %.1fms, size: %lld", model_id,
-              duration_ms, model_size_bytes);
+    RAC_LOG_DEBUG("VAD.Analytics", "Model load completed: %s, duration: %.1fms, size: %lld",
+                  model_id, duration_ms, model_size_bytes);
     return RAC_SUCCESS;
 }
 
@@ -285,7 +286,7 @@ rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics_handle_
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("VAD.Analytics", "Model load failed: %s, error: %d - %s", model_id, error_code,
-              error_message ? error_message : "");
+                  error_message ? error_message : "");
     return RAC_SUCCESS;
 }
 

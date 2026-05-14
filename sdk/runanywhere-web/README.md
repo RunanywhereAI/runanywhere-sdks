@@ -79,8 +79,8 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 - In-memory fallback cache for quota-exceeded scenarios
 - Model download with progress tracking and multi-file support
 - Browser capability detection (WebGPU, SharedArrayBuffer, OPFS)
-- Structured logging with configurable log levels via `SDKLogger`
-- Event system via `EventBus` for model lifecycle and SDK events
+- Structured logging via `RunAnywhere.logging`
+- Event system via `RunAnywhere.events` for model lifecycle and SDK events
 
 ---
 
@@ -100,25 +100,32 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 
 ## Package Structure
 
-The Web SDK is a single npm package. Unlike native SDKs (iOS, Android, React Native, Flutter) which use separate packages per backend, the Web SDK compiles all inference backends into a single WebAssembly binary. Backend selection happens at WASM build time, not at the package level.
+The Web SDK is split into a small core package and backend registration packages. App code imports the Swift-shaped facade from `@runanywhere/web`; backend packages only install RACommons WASM modules and native plugin vtables.
 
-```
-@runanywhere/web           -- TypeScript API + pre-built WASM (all backends)
-```
-
-The pre-built WASM includes llama.cpp (LLM/VLM), whisper.cpp (STT), and sherpa-onnx (TTS/VAD). Developers who need a smaller WASM binary with specific backends can [build from source](#building-from-source) with selective flags.
+| Package | Description | Includes |
+|---------|-------------|----------|
+| [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) | Core SDK facade, proto-derived types, browser helpers | TypeScript only |
+| [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) | LLM and VLM backend registration | llama.cpp RACommons WASM CPU/WebGPU artifacts |
+| [`@runanywhere/web-onnx`](https://www.npmjs.com/package/@runanywhere/web-onnx) | STT, TTS, and VAD backend registration | sherpa-onnx/ONNX RACommons WASM artifacts |
 
 ---
 
 ## Installation
 
 ```bash
-npm install @runanywhere/web
+# Core + all current backends
+npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
+
+# LLM/VLM only
+npm install @runanywhere/web @runanywhere/web-llamacpp
+
+# Speech only
+npm install @runanywhere/web @runanywhere/web-onnx
 ```
 
 ### Serve WASM Files + Cross-Origin Isolation
 
-The package includes pre-built WASM files in `node_modules/@runanywhere/web/wasm/`. Configure your bundler to serve these as static assets.
+Backend packages include their WASM files and resolve them with `import.meta.url`. Configure your bundler to serve `.wasm` assets without pre-bundling backend packages.
 
 > **Important:** Your server **must** set Cross-Origin Isolation headers for `SharedArrayBuffer` and multi-threaded WASM to work. Without these headers the SDK falls back to single-threaded mode, which is significantly slower. See [Cross-Origin Isolation Headers](#cross-origin-isolation-headers) for all platforms (Nginx, Vercel, Netlify, Cloudflare, AWS, Apache).
 
@@ -170,18 +177,17 @@ module.exports = {
 import {
   RunAnywhere,
   SDKEnvironment,
-  SDKError,
+  SDKException,
   SDKErrorCode,
-  isSDKError,
+  isSDKException,
   type SDKInitOptions,
   type LLMGenerationOptions,
   type ChatMessage,
-  type ModelDescriptor,
 } from '@runanywhere/web';
 
 // Fully typed initialization
 const options: SDKInitOptions = {
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 };
 await RunAnywhere.initialize(options);
 
@@ -196,7 +202,7 @@ const genOptions: Partial<LLMGenerationOptions> = {
 try {
   // ... any SDK call (e.g. loadModel, or backend TextGeneration.generate, etc.)
 } catch (error) {
-  if (isSDKError(error)) {
+  if (isSDKException(error)) {
     switch (error.code) {
       case SDKErrorCode.NotInitialized:
         console.error('Call RunAnywhere.initialize() first.');
@@ -211,34 +217,46 @@ try {
 }
 ```
 
-Note: `LLMGenerationOptions` is the proto-generated type for LLM generation parameters. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
+Note: `LLMGenerationOptions` is the proto-generated type for LLM generation parameters. App code uses the Swift-shaped `RunAnywhere.*` namespaces from `@runanywhere/web`; backend packages only register native WASM modules.
 
 ---
 
 ## Quick Start
 
-### 1. Initialize the SDK
+### 1. Initialize the SDK and Backends
 
 ```typescript
-import { RunAnywhere } from '@runanywhere/web';
+import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
+import { LlamaCPP } from '@runanywhere/web-llamacpp';
+import { ONNX } from '@runanywhere/web-onnx';
 
-await RunAnywhere.initialize({ environment: 'development', debug: true });
+await RunAnywhere.initialize({
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+  debug: true,
+});
+await LlamaCPP.register({ acceleration: 'auto' });
+await ONNX.register();
 ```
 
 ### 2. Text Generation (LLM)
 
 ```typescript
-import { TextGeneration } from '@runanywhere/web';
+await RunAnywhere.modelRegistry.registerModel({
+  modelId: 'qwen2.5-0.5b',
+  name: 'Qwen 2.5 0.5B',
+  localPath: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
+});
+await RunAnywhere.modelLifecycle.loadModel({ modelId: 'qwen2.5-0.5b' });
 
-// Load a GGUF model
-await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
-
-// Generate
-const result = await TextGeneration.generate('Explain quantum computing briefly.');
+const result = await RunAnywhere.textGeneration.generate({
+  prompt: 'Explain quantum computing briefly.',
+});
 console.log(result.text);
 
-// Stream tokens
-for await (const token of TextGeneration.generateStream('Write a haiku about code.')) {
+const stream = await RunAnywhere.textGeneration.generateStream({
+  prompt: 'Write a haiku about code.',
+});
+for await (const token of stream.stream) {
   process.stdout.write(token);
 }
 ```
@@ -246,64 +264,76 @@ for await (const token of TextGeneration.generateStream('Write a haiku about cod
 ### 3. Speech-to-Text (STT)
 
 ```typescript
-import { STT } from '@runanywhere/web';
-
-await STT.loadModel({
-  modelId: 'whisper-tiny',
-  type: STTModelType.Whisper,
-  modelFiles: { encoder: '/models/encoder.onnx', decoder: '/models/decoder.onnx', tokens: '/models/tokens.txt' },
-  sampleRate: 16000,
-});
-
-const result = await STT.transcribe(audioFloat32Array);
-console.log(result.text);
+const stt = RunAnywhere.stt.create();
+try {
+  RunAnywhere.stt.loadModel(stt, '/models/whisper-tiny/model.onnx', 'whisper-tiny');
+  const result = RunAnywhere.stt.transcribe(stt, audioFloat32Array, { sampleRate: 16000 });
+  console.log(result.text);
+} finally {
+  RunAnywhere.stt.destroy(stt);
+}
 ```
 
 ### 4. Text-to-Speech (TTS)
 
 ```typescript
-import { TTS } from '@runanywhere/web';
-
-await TTS.loadVoice({
-  voiceId: 'piper-en',
-  modelPath: '/models/piper-en.onnx',
-  tokensPath: '/models/tokens.txt',
-  dataDir: '/models/espeak-ng-data',
-});
-
-const result = await TTS.synthesize('Hello from RunAnywhere!');
-// result.audioData is Float32Array, result.sampleRate is the sample rate
+const tts = RunAnywhere.tts.create();
+try {
+  RunAnywhere.tts.loadVoice(tts, '/models/piper-en.onnx', 'piper-en');
+  const result = RunAnywhere.tts.synthesize(tts, 'Hello from RunAnywhere!');
+  console.log(result.sampleRate, result.audioData.length);
+} finally {
+  RunAnywhere.tts.destroy(tts);
+}
 ```
 
 ### 5. Voice Activity Detection (VAD)
 
 ```typescript
-import { VAD, SpeechActivity } from '@runanywhere/web';
-
-await VAD.initialize({ modelPath: '/models/silero_vad.onnx' });
-
-VAD.onSpeechActivity((activity) => {
-  if (activity === SpeechActivity.Ended) {
-    const segment = VAD.popSpeechSegment();
-    if (segment) console.log(`Speech: ${segment.samples.length} samples`);
-  }
-});
-
-// Feed audio chunks from microphone
-VAD.processSamples(audioChunk);
+const vad = RunAnywhere.vad.create();
+try {
+  RunAnywhere.vad.configure(vad, { sampleRate: 16000 });
+  RunAnywhere.vad.initialize(vad);
+  const result = RunAnywhere.vad.process(vad, audioChunk);
+  console.log(result.isSpeech);
+} finally {
+  RunAnywhere.vad.destroy(vad);
+}
 ```
 
 ### 6. Vision Language Model (VLM)
 
 ```typescript
-import { VLM, VLMImageFormat } from '@runanywhere/web';
+import { VLMImageFormat, VLMModelFamily } from '@runanywhere/web';
 
-await VLM.loadModel('/models/qwen2-vl.gguf', '/models/mmproj.gguf', 'qwen2-vl');
+await RunAnywhere.visionLanguage.loadModel({
+  modelId: 'qwen2-vl',
+  modelName: 'Qwen2 VL',
+  modelFilename: 'qwen2-vl.gguf',
+  mmprojFilename: 'mmproj.gguf',
+  modelData,
+  mmprojData,
+});
 
-const result = await VLM.process(
-  { format: VLMImageFormat.RGB, rgbPixels: pixelData, width: 256, height: 256 },
-  'Describe this image.',
-  { maxTokens: 100 },
+const result = await RunAnywhere.visionLanguage.processImage(
+  { format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB, rawRgb: pixelData, width: 256, height: 256 },
+  {
+    prompt: 'Describe this image.',
+    maxTokens: 100,
+    temperature: 0.2,
+    topP: 1,
+    topK: 40,
+    stopSequences: [],
+    streamingEnabled: false,
+    maxImageSize: 512,
+    nThreads: 4,
+    useGpu: true,
+    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_QWEN2_VL,
+    seed: 0,
+    repetitionPenalty: 1,
+    minP: 0,
+    emitImageEmbeddings: false,
+  },
 );
 console.log(result.text);
 ```
@@ -315,8 +345,8 @@ console.log(result.text);
 ```
 +---------------------------------------------+
 |  TypeScript API                              |
-|  RunAnywhere / TextGeneration / STT / TTS   |
-|  VAD / VLM / VoicePipeline / Embeddings     |
+|  RunAnywhere facade + namespaced APIs       |
+|  textGeneration / stt / tts / vad / vlm     |
 +---------------------------------------------+
 |  WASMBridge + PlatformAdapter               |
 |  (Emscripten addFunction / ccall / cwrap)   |
@@ -338,26 +368,18 @@ The Web SDK compiles the **same C++ core** (`runanywhere-commons`) used by the i
 
 | Layer | Component | Description |
 |-------|-----------|-------------|
-| **Public** | `RunAnywhere` | SDK lifecycle (initialize, shutdown, device capabilities) |
-| **Public** | `TextGeneration` | LLM text generation and streaming |
-| **Public** | `STT` | Speech-to-text transcription |
-| **Public** | `TTS` | Text-to-speech synthesis |
-| **Public** | `VAD` | Voice activity detection |
-| **Public** | `VLM` | Vision-language model inference |
-| **Public** | `VoicePipeline` | STT -> LLM -> TTS orchestration |
-| **Public** | `ToolCalling` | Function calling with typed definitions |
-| **Public** | `StructuredOutput` | JSON schema-guided generation |
-| **Public** | `Embeddings` | Vector embedding generation |
-| **Foundation** | `WASMBridge` | Emscripten module loader and C interop |
-| **Foundation** | `SDKLogger` | Structured logging with configurable levels |
-| **Foundation** | `EventBus` | Typed event system for SDK lifecycle events |
-| **Foundation** | `SDKError` | Typed error hierarchy with error codes |
-| **Infrastructure** | `ModelManager` | Model download, storage, and loading orchestration |
-| **Infrastructure** | `OPFSStorage` | Persistent storage via Origin Private File System |
-| **Infrastructure** | `AudioCapture` | Microphone capture with Web Audio API |
-| **Infrastructure** | `VideoCapture` | Camera capture and frame extraction |
-| **Infrastructure** | `AudioPlayback` | Audio playback via Web Audio API |
-| **Infrastructure** | `VLMWorkerBridge` | Web Worker bridge for off-main-thread VLM inference |
+| **Public** | `RunAnywhere` | Swift-shaped SDK lifecycle and namespace facade |
+| **Public** | `RunAnywhere.textGeneration` | LLM text generation and streaming |
+| **Public** | `RunAnywhere.stt` | Speech-to-text component lifecycle and transcription |
+| **Public** | `RunAnywhere.tts` | Text-to-speech component lifecycle and synthesis |
+| **Public** | `RunAnywhere.vad` | Voice activity detection component lifecycle and processing |
+| **Public** | `RunAnywhere.visionLanguage` | Vision-language model inference |
+| **Public** | `RunAnywhere.modelRegistry` | C++ model registry proto bridge |
+| **Public** | `RunAnywhere.modelLifecycle` | C++ model lifecycle proto bridge |
+| **Public** | `RunAnywhere.downloads` | C++ download workflow proto bridge |
+| **Public** | `RunAnywhere.storage` | Browser storage helpers plus native storage analyzer bridge |
+| **Internal** | `@runanywhere/web/internal` | Backend-only WASM, adapter, logging, and provider hooks |
+| **Browser** | `@runanywhere/web/browser` | Audio/video capture, playback, file loading, and capability helpers |
 
 ---
 
@@ -375,34 +397,29 @@ sdk/runanywhere-web/
 |       |   |       +-- RunAnywhere+STT.ts
 |       |   |       +-- RunAnywhere+TTS.ts
 |       |   |       +-- RunAnywhere+VAD.ts
-|       |   |       +-- RunAnywhere+VLM.ts
-|       |   |       +-- RunAnywhere+VoicePipeline.ts
+|       |   |       +-- RunAnywhere+VisionLanguage.ts
+|       |   |       +-- RunAnywhere+VoiceAgent.ts
 |       |   |       +-- RunAnywhere+ToolCalling.ts
 |       |   |       +-- RunAnywhere+StructuredOutput.ts
-|       |   |       +-- RunAnywhere+Embeddings.ts
-|       |   |       +-- RunAnywhere+Diffusion.ts
-|       |   |       +-- RunAnywhere+ModelManagement.ts
+|       |   |       +-- RunAnywhere+ModelRegistry.ts
+|       |   |       +-- RunAnywhere+ModelLifecycle.ts
+|       |   |       +-- RunAnywhere+Storage.ts
+|       |   |       +-- RunAnywhere+PluginLoader.ts
+|       |   +-- Adapters/            # Proto-byte C ABI adapters
+|       |   +-- runtime/             # Emscripten module singleton + proto bridge
 |       |   +-- Foundation/         # Core infrastructure
-|       |   |   +-- WASMBridge.ts
-|       |   |   +-- PlatformAdapter.ts
 |       |   |   +-- EventBus.ts
 |       |   |   +-- SDKLogger.ts
-|       |   |   +-- ErrorTypes.ts
-|       |   |   +-- SherpaONNXBridge.ts
 |       |   +-- Infrastructure/     # Browser services
-|       |   |   +-- ModelManager.ts
-|       |   |   +-- ModelDownloader.ts
-|       |   |   +-- ModelRegistry.ts
-|       |   |   +-- OPFSStorage.ts
 |       |   |   +-- AudioCapture.ts
 |       |   |   +-- AudioPlayback.ts
 |       |   |   +-- VideoCapture.ts
-|       |   |   +-- VLMWorkerBridge.ts
 |       |   |   +-- DeviceCapabilities.ts
-|       |   |   +-- ArchiveUtility.ts
-|       |   +-- types/              # Shared type definitions
-|       +-- wasm/                   # WASM build output (generated)
+|       |   +-- types/              # Proto re-exports + Web-only I/O types
+|       +-- tests/                  # Unit and type tests, outside SDK source
 |       +-- dist/                   # TypeScript build output (generated)
+|   +-- llamacpp/                   # @runanywhere/web-llamacpp backend shell
+|   +-- onnx/                       # @runanywhere/web-onnx backend shell
 +-- wasm/                           # Emscripten build system
 |   +-- CMakeLists.txt
 |   +-- src/wasm_exports.cpp
@@ -410,7 +427,7 @@ sdk/runanywhere-web/
 |   +-- scripts/
 |       +-- build.sh                # Main WASM build script
 |       +-- setup-emsdk.sh          # Emscripten SDK installer
-|       +-- build-sherpa-onnx.sh    # Sherpa-ONNX WASM build
+|       +-- build.sh                # Unified RACommons WASM build
 +-- package.json                    # Workspace root
 +-- tsconfig.base.json
 ```
@@ -646,13 +663,13 @@ await RunAnywhere.initialize({
 
 ### Logging
 
-The SDK uses `SDKLogger` for all internal logging. Configure log level and enable/disable:
+Configure logging through the public `RunAnywhere.logging` namespace:
 
 ```typescript
-import { SDKLogger, LogLevel } from '@runanywhere/web';
+import { RunAnywhere, LogLevel } from '@runanywhere/web';
 
-SDKLogger.level = LogLevel.Debug;    // Trace | Debug | Info | Warning | Error | Fatal
-SDKLogger.enabled = true;           // Toggle all SDK logging
+RunAnywhere.logging.setLevel(LogLevel.Debug);
+RunAnywhere.logging.setEnabled(true);
 ```
 
 ### Events
@@ -660,14 +677,12 @@ SDKLogger.enabled = true;           // Toggle all SDK logging
 Subscribe to SDK lifecycle events:
 
 ```typescript
-import { EventBus } from '@runanywhere/web';
-
-EventBus.shared.on('model.downloadProgress', (event) => {
-  console.log(`Download: ${(event.data.progress * 100).toFixed(0)}%`);
+RunAnywhere.events.on('model.downloadProgress', (event) => {
+  console.log(`Download: ${(event.progress * 100).toFixed(0)}%`);
 });
 
-EventBus.shared.on('model.loadCompleted', (event) => {
-  console.log(`Model loaded: ${event.data.modelId}`);
+RunAnywhere.events.on('model.loadCompleted', (event) => {
+  console.log(`Model loaded: ${event.modelId}`);
 });
 ```
 
@@ -678,12 +693,12 @@ EventBus.shared.on('model.loadCompleted', (event) => {
 The SDK uses typed errors with error codes:
 
 ```typescript
-import { SDKError, SDKErrorCode } from '@runanywhere/web';
+import { SDKException, SDKErrorCode } from '@runanywhere/web';
 
 try {
-  await TextGeneration.generate('Hello');
+  await RunAnywhere.textGeneration.generate({ prompt: 'Hello' });
 } catch (err) {
-  if (err instanceof SDKError) {
+  if (err instanceof SDKException) {
     switch (err.code) {
       case SDKErrorCode.NotInitialized:
         console.error('SDK not initialized');
@@ -714,38 +729,31 @@ The demo app runs on Vite with Cross-Origin Isolation headers pre-configured.
 
 ---
 
-## npm Package
+## npm Packages
 
-```
-@runanywhere/web
-```
-
-### Published Exports
+### `@runanywhere/web`
 
 | Export | Description |
 |--------|-------------|
-| `RunAnywhere` | SDK lifecycle (initialize, shutdown, capabilities) |
-| `TextGeneration` | LLM text generation and streaming |
-| `STT` | Speech-to-text transcription |
-| `TTS` | Text-to-speech synthesis |
-| `VAD` | Voice activity detection |
-| `VLM` | Vision-language model inference |
-| `VoicePipeline` | TS-side STT -> LLM -> TTS orchestration (compose-your-own via ExtensionPoint) |
-| `VoiceAgentStreamAdapter` | Proto `VoiceEvent` async iterable — cross-SDK parity with iOS / Android / Flutter / RN |
-| `ToolCalling` | Function calling with typed tool definitions |
-| `StructuredOutput` | JSON schema-guided generation |
-| `Embeddings` | Vector embedding generation |
-| `Diffusion` | Image generation (WebGPU, scaffold) |
-| `AudioCapture` | Microphone capture via Web Audio API |
-| `AudioPlayback` | Audio playback via Web Audio API |
-| `VideoCapture` | Camera capture and frame extraction |
-| `ModelManager` | Advanced model download/storage/loading |
-| `OPFSStorage` | Low-level OPFS persistence |
-| `VLMWorkerBridge` | Web Worker bridge for VLM inference |
-| `SDKLogger` | Structured logging |
-| `SDKError` | Typed error hierarchy |
-| `EventBus` | SDK event system |
-| `detectCapabilities` | Browser feature detection |
+| `RunAnywhere` | SDK lifecycle and Swift-shaped namespaces (`textGeneration`, `stt`, `tts`, `vad`, `voiceAgent`, `visionLanguage`, `modelRegistry`, `modelLifecycle`, `downloads`, `storage`, `pluginLoader`) |
+| `LogLevel` | Public logging level enum for `RunAnywhere.logging` |
+| `SDKException`, `SDKErrorCode`, `isSDKException` | Typed error hierarchy |
+| Proto-derived types/enums | `SDKEnvironment`, `InferenceFramework`, `ModelCategory`, `VLMImageFormat`, `ToolDefinition`, `DownloadProgress`, and related generated types |
+| `@runanywhere/web/browser` | Browser helpers: `AudioCapture`, `AudioPlayback`, `AudioFileLoader`, `VideoCapture`, `detectCapabilities`, `getDeviceInfo` |
+| `@runanywhere/web/internal` | Backend-only adapter/runtime hooks, not an application API |
+
+### `@runanywhere/web-llamacpp`
+
+| Export | Description |
+|--------|-------------|
+| `LlamaCPP` | Registers the llama.cpp LLM/VLM RACommons WASM backend |
+| `VLMWorkerBridge` | Backend worker bridge used by `RunAnywhere.visionLanguage` |
+
+### `@runanywhere/web-onnx`
+
+| Export | Description |
+|--------|-------------|
+| `ONNX` | Registers the ONNX/sherpa RACommons WASM backend for `RunAnywhere.stt`, `RunAnywhere.tts`, and `RunAnywhere.vad` |
 
 ---
 
@@ -761,7 +769,7 @@ Models are stored in the browser's Origin Private File System (OPFS), a sandboxe
 
 ### How large are the WASM files?
 
-The core `racommons.wasm` is approximately 3.6 MB (all backends). The sherpa-onnx WASM (for TTS/VAD) is approximately 12 MB and is loaded separately only when needed. These are downloaded once and cached by the browser.
+The Web SDK ships unified RACommons WASM artifacts from the backend packages. LLM/VLM and STT/TTS/VAD support are selected at build time with `npm run build:wasm -- --llamacpp --onnx --vlm --webgpu` and cached by the browser after download.
 
 ### Is my data private?
 
@@ -813,7 +821,7 @@ Yes. Any GGUF-format model compatible with llama.cpp works for LLM/VLM. STT mode
 
 ## Known Limitations (Beta)
 
-- No test suite yet (planned for v0.2.0)
+- Core unit/type tests, package build checks, browser smoke tests, and LLM browser E2E are covered by the Web validation workflow.
 - No model hash verification on download
 - WASM memory allocations in some extension methods lack guaranteed cleanup via `finally` blocks (low probability, planned fix)
 - VLM inference is single-threaded (one frame at a time)

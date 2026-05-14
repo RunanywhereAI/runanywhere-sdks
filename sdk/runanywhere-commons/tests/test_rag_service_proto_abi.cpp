@@ -6,9 +6,9 @@
 #include <cstdio>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/descriptor.h>
-
 #include "rag.pb.h"
+
+#include <google/protobuf/descriptor.h>
 #endif
 
 namespace {
@@ -16,28 +16,25 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-void check_unary_rpc(const google::protobuf::ServiceDescriptor* service,
-                     const char* method_name,
-                     const char* input_type,
-                     const char* output_type) {
-    const google::protobuf::MethodDescriptor* method =
-        service->FindMethodByName(method_name);
+void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
+                     const char* input_type, const char* output_type) {
+    const google::protobuf::MethodDescriptor* method = service->FindMethodByName(method_name);
     CHECK(method != nullptr, method_name);
-    if (!method) return;
+    if (!method)
+        return;
 
     CHECK(method->input_type()->full_name() == input_type, "RAG unary RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "RAG unary RPC output type");
@@ -49,7 +46,8 @@ int test_rag_generated_service_contract() {
         runanywhere::v1::RAGConfiguration::descriptor()->file();
     const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("RAG");
     CHECK(service != nullptr, "generated RAG service descriptor exists");
-    if (!service) return 0;
+    if (!service)
+        return 0;
 
     CHECK(service->method_count() == 7, "generated RAG service exposes seven RPCs");
 
@@ -57,8 +55,7 @@ int test_rag_generated_service_contract() {
                     "runanywhere.v1.RAGServiceState");
     check_unary_rpc(service, "Ingest", "runanywhere.v1.RAGIngestRequest",
                     "runanywhere.v1.RAGIngestResult");
-    check_unary_rpc(service, "Query", "runanywhere.v1.RAGQueryRequest",
-                    "runanywhere.v1.RAGResult");
+    check_unary_rpc(service, "Query", "runanywhere.v1.RAGQueryRequest", "runanywhere.v1.RAGResult");
     check_unary_rpc(service, "Search", "runanywhere.v1.RAGQueryRequest",
                     "runanywhere.v1.RAGResult");
     check_unary_rpc(service, "Stats", "runanywhere.v1.RAGServiceState",
@@ -101,15 +98,12 @@ int test_rag_generated_service_contract() {
     CHECK(retrieved_chunks != nullptr, "RAGResult carries retrieved chunks");
     if (retrieved_chunks) {
         CHECK(retrieved_chunks->is_repeated(), "RAGResult retrieved_chunks are repeated");
-        CHECK(retrieved_chunks->message_type()->full_name() ==
-                  "runanywhere.v1.RAGSearchResult",
+        CHECK(retrieved_chunks->message_type()->full_name() == "runanywhere.v1.RAGSearchResult",
               "RAGResult retrieved_chunks use RAGSearchResult");
     }
 
-    const google::protobuf::Descriptor* ingest =
-        runanywhere::v1::RAGIngestRequest::descriptor();
-    const google::protobuf::FieldDescriptor* documents =
-        ingest->FindFieldByName("documents");
+    const google::protobuf::Descriptor* ingest = runanywhere::v1::RAGIngestRequest::descriptor();
+    const google::protobuf::FieldDescriptor* documents = ingest->FindFieldByName("documents");
     CHECK(documents != nullptr, "RAGIngestRequest carries documents");
     if (documents) {
         CHECK(documents->is_repeated(), "RAGIngestRequest documents are repeated");
@@ -126,8 +120,7 @@ int test_rag_generated_service_contract() {
         CHECK(chunk->has_presence(), "RAG stream chunk field has presence");
     }
 
-    const google::protobuf::FieldDescriptor* terminal_result =
-        event->FindFieldByName("result");
+    const google::protobuf::FieldDescriptor* terminal_result = event->FindFieldByName("result");
     CHECK(terminal_result != nullptr, "RAG stream event has terminal result field");
     if (terminal_result) {
         CHECK(terminal_result->message_type()->full_name() == "runanywhere.v1.RAGResult",
@@ -135,8 +128,7 @@ int test_rag_generated_service_contract() {
         CHECK(terminal_result->has_presence(), "RAG stream result field has presence");
     }
 
-    const google::protobuf::EnumDescriptor* kind =
-        file->FindEnumTypeByName("RAGStreamEventKind");
+    const google::protobuf::EnumDescriptor* kind = file->FindEnumTypeByName("RAGStreamEventKind");
     CHECK(kind != nullptr, "RAG stream event kind enum exists");
     if (kind) {
         CHECK(kind->FindValueByName("RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED") != nullptr,

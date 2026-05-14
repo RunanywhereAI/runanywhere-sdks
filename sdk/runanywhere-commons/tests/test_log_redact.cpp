@@ -8,11 +8,11 @@
  * match) must be redacted; everything else must pass through.
  */
 
+#include "test_common.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
-
-#include "test_common.h"
 
 namespace {
 
@@ -41,8 +41,8 @@ TestResult run_positive_cases() {
             fail.passed = false;
             fail.expected = "RAC_TRUE (redacted)";
             fail.actual = "RAC_FALSE";
-            fail.details = std::string("positive case '") + c.key + "' (" + c.note +
-                           ") was NOT redacted";
+            fail.details =
+                std::string("positive case '") + c.key + "' (" + c.note + ") was NOT redacted";
             return fail;
         }
     }

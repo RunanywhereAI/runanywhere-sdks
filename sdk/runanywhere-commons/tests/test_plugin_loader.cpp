@@ -18,21 +18,22 @@
 #include "rac/plugin/rac_primitive.h"
 
 #ifndef RAC_TEST_PLUGIN_PATH
-#  error "RAC_TEST_PLUGIN_PATH must be set by tests/CMakeLists.txt"
+#error "RAC_TEST_PLUGIN_PATH must be set by tests/CMakeLists.txt"
 #endif
 
 int main() {
     std::fprintf(stdout, "test_plugin_loader: %s\n", RAC_TEST_PLUGIN_PATH);
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
-    std::fprintf(stdout,
-                 "  skip: RAC_PLUGIN_MODE_STATIC is set; loader returns FEATURE_NOT_AVAILABLE by design\n");
+    std::fprintf(
+        stdout,
+        "  skip: RAC_PLUGIN_MODE_STATIC is set; loader returns FEATURE_NOT_AVAILABLE by design\n");
     return 0;
 #else
     /* (1) ABI version helper agrees with the macro. */
     if (rac_plugin_api_version() != RAC_PLUGIN_API_VERSION) {
-        std::fprintf(stderr, "abi_version mismatch: %u vs %u\n",
-                     rac_plugin_api_version(), RAC_PLUGIN_API_VERSION);
+        std::fprintf(stderr, "abi_version mismatch: %u vs %u\n", rac_plugin_api_version(),
+                     RAC_PLUGIN_API_VERSION);
         return 1;
     }
 
@@ -60,7 +61,8 @@ int main() {
     }
     bool found = false;
     for (size_t i = 0; i < n; ++i) {
-        if (std::strcmp(names[i], "test_plugin") == 0) found = true;
+        if (std::strcmp(names[i], "test_plugin") == 0)
+            found = true;
     }
     rac_registry_free_plugin_list(names, n);
     if (!found) {

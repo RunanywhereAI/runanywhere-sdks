@@ -59,9 +59,8 @@ void copy_request(const rac_http_request_t* req) {
     g_capture.url = req->url ? req->url : "";
     g_capture.headers.clear();
     for (size_t i = 0; i < req->header_count; ++i) {
-        g_capture.headers.emplace_back(
-            req->headers[i].name ? req->headers[i].name : "",
-            req->headers[i].value ? req->headers[i].value : "");
+        g_capture.headers.emplace_back(req->headers[i].name ? req->headers[i].name : "",
+                                       req->headers[i].value ? req->headers[i].value : "");
     }
     g_capture.body.assign(reinterpret_cast<const char*>(req->body_bytes),
                           req->body_bytes ? req->body_len : 0);
@@ -106,47 +105,47 @@ const rac_http_transport_ops_t kStubOps = {
 int g_failures = 0;
 int g_passes = 0;
 
-#define CHECK(cond)                                                                    \
-    do {                                                                               \
-        if (cond) {                                                                    \
-            ++g_passes;                                                                \
-        } else {                                                                       \
-            ++g_failures;                                                              \
-            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__                      \
-                      << " - " #cond << "\n";                                          \
-        }                                                                              \
+#define CHECK(cond)                                                                       \
+    do {                                                                                  \
+        if (cond) {                                                                       \
+            ++g_passes;                                                                   \
+        } else {                                                                          \
+            ++g_failures;                                                                 \
+            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__ << " - " #cond << "\n"; \
+        }                                                                                 \
     } while (0)
 
-#define CHECK_EQ_I(a, b)                                                               \
-    do {                                                                               \
-        auto _a = (a);                                                                 \
-        auto _b = (b);                                                                 \
-        if (_a == _b) {                                                                \
-            ++g_passes;                                                                \
-        } else {                                                                       \
-            ++g_failures;                                                              \
-            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__                      \
-                      << " - " #a " == " #b " (got " << _a << " vs " << _b << ")\n";   \
-        }                                                                              \
+#define CHECK_EQ_I(a, b)                                                                         \
+    do {                                                                                         \
+        auto _a = (a);                                                                           \
+        auto _b = (b);                                                                           \
+        if (_a == _b) {                                                                          \
+            ++g_passes;                                                                          \
+        } else {                                                                                 \
+            ++g_failures;                                                                        \
+            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__ << " - " #a " == " #b " (got " \
+                      << _a << " vs " << _b << ")\n";                                            \
+        }                                                                                        \
     } while (0)
 
-#define CHECK_EQ_S(a, b)                                                               \
-    do {                                                                               \
-        std::string _a = (a);                                                          \
-        std::string _b = (b);                                                          \
-        if (_a == _b) {                                                                \
-            ++g_passes;                                                                \
-        } else {                                                                       \
-            ++g_failures;                                                              \
-            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__                      \
-                      << " - " #a " == " #b " (got '" << _a << "' vs '" << _b << "')\n"; \
-        }                                                                              \
+#define CHECK_EQ_S(a, b)                                                                          \
+    do {                                                                                          \
+        std::string _a = (a);                                                                     \
+        std::string _b = (b);                                                                     \
+        if (_a == _b) {                                                                           \
+            ++g_passes;                                                                           \
+        } else {                                                                                  \
+            ++g_failures;                                                                         \
+            std::cerr << "[FAIL] " << __FILE__ << ":" << __LINE__ << " - " #a " == " #b " (got '" \
+                      << _a << "' vs '" << _b << "')\n";                                          \
+        }                                                                                         \
     } while (0)
 
 bool find_header(const std::string& name, std::string* value_out) {
     for (auto& kv : g_capture.headers) {
         if (kv.first == name) {
-            if (value_out) *value_out = kv.second;
+            if (value_out)
+                *value_out = kv.second;
             return true;
         }
     }
@@ -223,15 +222,14 @@ void test_upsert_url_with_existing_query() {
     rac_http_client_create(&client);
 
     // Pre-existing `?select=*` — upsert must use `&` not `?`.
-    rac_http_request_t req = make_request("https://example.test/devices?select=*", nullptr, 0,
-                                          "{}");
+    rac_http_request_t req =
+        make_request("https://example.test/devices?select=*", nullptr, 0, "{}");
     rac_http_request_set_upsert_mode(&req, "device_id");
 
     rac_http_response_t resp{};
     rac_http_request_send(client, &req, &resp);
 
-    CHECK_EQ_S(g_capture.url,
-               "https://example.test/devices?select=*&on_conflict=device_id");
+    CHECK_EQ_S(g_capture.url, "https://example.test/devices?select=*&on_conflict=device_id");
 
     rac_http_response_free(&resp);
     rac_http_client_destroy(client);
@@ -319,8 +317,7 @@ void test_upsert_is_single_shot() {
 }
 
 void test_upsert_invalid_args() {
-    CHECK_EQ_I(rac_http_request_set_upsert_mode(nullptr, "device_id"),
-               RAC_ERROR_INVALID_ARGUMENT);
+    CHECK_EQ_I(rac_http_request_set_upsert_mode(nullptr, "device_id"), RAC_ERROR_INVALID_ARGUMENT);
 }
 
 void test_upsert_applied_in_stream() {

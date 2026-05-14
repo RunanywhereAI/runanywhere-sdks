@@ -14,10 +14,9 @@
 
 #include <cstdint>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -39,30 +38,30 @@ void json_to_tool_value_proto(const json& j, runanywhere::v1::ToolValue* out);
 json tool_value_proto_to_json(const runanywhere::v1::ToolValue& value) {
     using ToolValue = runanywhere::v1::ToolValue;
     switch (value.kind_case()) {
-    case ToolValue::kStringValue:
-        return json(value.string_value());
-    case ToolValue::kNumberValue:
-        return json(value.number_value());
-    case ToolValue::kBoolValue:
-        return json(value.bool_value());
-    case ToolValue::kArrayValue: {
-        json arr = json::array();
-        for (const auto& item : value.array_value().values()) {
-            arr.push_back(tool_value_proto_to_json(item));
+        case ToolValue::kStringValue:
+            return json(value.string_value());
+        case ToolValue::kNumberValue:
+            return json(value.number_value());
+        case ToolValue::kBoolValue:
+            return json(value.bool_value());
+        case ToolValue::kArrayValue: {
+            json arr = json::array();
+            for (const auto& item : value.array_value().values()) {
+                arr.push_back(tool_value_proto_to_json(item));
+            }
+            return arr;
         }
-        return arr;
-    }
-    case ToolValue::kObjectValue: {
-        json obj = json::object();
-        for (const auto& entry : value.object_value().fields()) {
-            obj[entry.first] = tool_value_proto_to_json(entry.second);
+        case ToolValue::kObjectValue: {
+            json obj = json::object();
+            for (const auto& entry : value.object_value().fields()) {
+                obj[entry.first] = tool_value_proto_to_json(entry.second);
+            }
+            return obj;
         }
-        return obj;
-    }
-    case ToolValue::kNullValue:
-    case ToolValue::KIND_NOT_SET:
-    default:
-        return json(nullptr);
+        case ToolValue::kNullValue:
+        case ToolValue::KIND_NOT_SET:
+        default:
+            return json(nullptr);
     }
 }
 
@@ -99,8 +98,7 @@ void json_to_tool_value_proto(const json& j, runanywhere::v1::ToolValue* out) {
 }
 
 template <typename ProtoMessage>
-rac_result_t serialize_to_buffer(const ProtoMessage& message,
-                                 rac_proto_buffer_t* out,
+rac_result_t serialize_to_buffer(const ProtoMessage& message, rac_proto_buffer_t* out,
                                  const char* message_name) {
     const size_t size = message.ByteSizeLong();
     if (size > static_cast<size_t>(std::numeric_limits<int>::max())) {
@@ -119,10 +117,9 @@ rac_result_t serialize_to_buffer(const ProtoMessage& message,
 }  // namespace
 #endif  // RAC_HAVE_PROTOBUF
 
-extern "C" rac_result_t rac_tool_value_to_json_proto(
-    const uint8_t* in_tool_value_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_string_proto) {
+extern "C" rac_result_t rac_tool_value_to_json_proto(const uint8_t* in_tool_value_bytes,
+                                                     size_t in_size,
+                                                     rac_proto_buffer_t* out_string_proto) {
     if (!out_string_proto) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -155,10 +152,9 @@ extern "C" rac_result_t rac_tool_value_to_json_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_tool_value_from_json_proto(
-    const uint8_t* in_string_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_tool_value) {
+extern "C" rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_bytes,
+                                                       size_t in_size,
+                                                       rac_proto_buffer_t* out_tool_value) {
     if (!out_tool_value) {
         return RAC_ERROR_NULL_POINTER;
     }

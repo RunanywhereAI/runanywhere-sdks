@@ -38,33 +38,30 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                 \
-    do {                                                                                  \
-        if (!(cond)) {                                                                    \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__,          \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                   \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,   \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                               \
-    do {                                                                                  \
-        if ((a) != (b)) {                                                                 \
-            std::fprintf(stderr,                                                          \
-                         "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
-                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),              \
-                         std::string(b).c_str());                                         \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_STR_EQ(a, b)                                                                        \
+    do {                                                                                           \
+        if ((a) != (b)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
+                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),                       \
+                         std::string(b).c_str());                                                  \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -89,8 +86,8 @@ rac_bool_t mock_is_non_empty_directory(const char* /*path*/, void* /*user*/) {
 }
 
 rac_result_t mock_file_list_directory(const char* /*dir_path*/,
-                                      rac_directory_entry_t* /*out_entries*/,
-                                      size_t* in_out_count, void* /*user*/) {
+                                      rac_directory_entry_t* /*out_entries*/, size_t* in_out_count,
+                                      void* /*user*/) {
     g_mock_state.list_dir_calls++;
     if (in_out_count) {
         *in_out_count = g_mock_state.list_dir_returns_entry ? 1u : 0u;
@@ -129,8 +126,7 @@ struct MakeArgs {
     runanywhere::v1::InferenceFramework framework =
         runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
     bool has_category = false;
-    runanywhere::v1::ModelCategory category =
-        runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
+    runanywhere::v1::ModelCategory category = runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     bool has_source = false;
     runanywhere::v1::ModelSource source = runanywhere::v1::MODEL_SOURCE_UNSPECIFIED;
 };
@@ -139,9 +135,12 @@ bool make_proto(const MakeArgs& args, runanywhere::v1::ModelInfo* out) {
     runanywhere::v1::ModelInfoMakeRequest request;
     request.set_url(args.url);
     request.set_name(args.name);
-    if (args.has_framework) request.set_framework(args.framework);
-    if (args.has_category) request.set_category(args.category);
-    if (args.has_source) request.set_source(args.source);
+    if (args.has_framework)
+        request.set_framework(args.framework);
+    if (args.has_category)
+        request.set_category(args.category);
+    if (args.has_source)
+        request.set_source(args.source);
 
     std::string bytes;
     if (!request.SerializeToString(&bytes)) {
@@ -151,8 +150,8 @@ bool make_proto(const MakeArgs& args, runanywhere::v1::ModelInfo* out) {
 
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
-    rac_result_t rc = rac_model_info_make_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &buffer);
+    rac_result_t rc = rac_model_info_make_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                                bytes.size(), &buffer);
     if (rc != RAC_SUCCESS) {
         std::fprintf(stderr, "rac_model_info_make_proto rc=%d\n", rc);
         rac_proto_buffer_free(&buffer);
@@ -268,8 +267,7 @@ int test_make_tar_gz_archive() {
     ASSERT_TRUE(model.has_archive());
     ASSERT_EQ(model.archive().type(), runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
     ASSERT_EQ(model.archive().structure(), runanywhere::v1::ARCHIVE_STRUCTURE_UNKNOWN);
-    ASSERT_EQ(model.artifact_type(),
-              runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
+    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
     // Format is unspecified for a .tar.gz wrapper (Swift's
     // detect_format_from_extension only knows .gz at the lowest layer; the
     // make() factory doesn't strip ".tar." pairs by itself).
@@ -286,8 +284,7 @@ int test_make_zip_archive() {
 
     ASSERT_EQ(model.artifact_case(), runanywhere::v1::ModelInfo::kArchive);
     ASSERT_EQ(model.archive().type(), runanywhere::v1::ARCHIVE_TYPE_ZIP);
-    ASSERT_EQ(model.artifact_type(),
-              runanywhere::v1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE);
+    ASSERT_EQ(model.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE);
     return 0;
 }
 
@@ -322,8 +319,7 @@ int test_make_request_overrides() {
     runanywhere::v1::ModelInfo model;
     ASSERT_TRUE(make_proto(args, &model));
 
-    ASSERT_EQ(model.framework(),
-              runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
+    ASSERT_EQ(model.framework(), runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS);
     ASSERT_EQ(model.category(), runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
     ASSERT_EQ(model.source(), runanywhere::v1::MODEL_SOURCE_BUILT_IN);
     ASSERT_EQ(model.context_length(), 2048);
@@ -458,8 +454,7 @@ int main(int /*argc*/, char** /*argv*/) {
         {"make_multi_file_inferred", test_make_multi_file_inferred},
         {"make_request_overrides", test_make_request_overrides},
         {"path_probe_with_callback", test_path_probe_with_callback},
-        {"path_probe_fallback_to_list_directory",
-         test_path_probe_fallback_to_list_directory},
+        {"path_probe_fallback_to_list_directory", test_path_probe_fallback_to_list_directory},
         {"path_probe_no_callbacks", test_path_probe_no_callbacks},
         {"path_probe_null_path", test_path_probe_null_path},
         {"null_out_pointer", test_null_out_pointer},

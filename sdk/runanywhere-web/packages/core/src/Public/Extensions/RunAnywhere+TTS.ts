@@ -3,7 +3,7 @@
  *
  * Text-to-speech namespace — mirrors Swift's `RunAnywhere+TTS.swift`.
  * Provides `RunAnywhere.tts.*` capability surface for owning TTS component
- * handles plus a top-level `RunAnywhere.synthesize(text, options)` shortcut.
+ * handles plus a `RunAnywhere.tts.synthesizeAuto(text, options)` shortcut.
  *
  * The proto-byte adapters (`TTSProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_tts_component_create()` followed by
@@ -152,6 +152,8 @@ export interface SynthesizeOptions extends Partial<TTSOptions> {
 }
 
 export const TTS = {
+  synthesizeAuto: synthesize,
+
   /**
    * Returns true when the WASM module is loaded with both the proto-byte
    * TTS exports AND the component lifecycle exports (create / load_voice /
@@ -275,7 +277,7 @@ export async function synthesize(
   text: string,
   options?: SynthesizeOptions,
 ): Promise<TTSOutput> {
-  const module = requireTTSModule('RunAnywhere.synthesize');
+  const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
   let voicePath = options?.voicePath;
   let voiceId = options?.voiceId;
   let voiceName: string | undefined;
@@ -283,7 +285,7 @@ export async function synthesize(
   if (!voicePath) {
     if (!ModelLifecycle.supportsNativeLifecycle()) {
       throw SDKException.backendNotAvailable(
-        'RunAnywhere.synthesize',
+        'RunAnywhere.tts.synthesizeAuto',
         'No voicePath provided and the model lifecycle proto adapter is not installed.',
       );
     }
@@ -291,7 +293,7 @@ export async function synthesize(
     if (!current?.modelId) {
       throw SDKException.componentNotReady(
         'tts',
-        'No TTS voice is loaded. Call ModelLifecycle.load(...) before RunAnywhere.synthesize().',
+        'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
       );
     }
     voicePath = current.resolvedPath || current.modelId;

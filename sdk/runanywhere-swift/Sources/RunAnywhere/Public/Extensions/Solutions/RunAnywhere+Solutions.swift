@@ -15,8 +15,8 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 import os
+import SwiftProtobuf
 
 // MARK: - SolutionHandle
 
@@ -31,13 +31,14 @@ public final class SolutionHandle: @unchecked Sendable {
     // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
     private let handle: OSAllocatedUnfairLock<rac_solution_handle_t?>
 
+    // swiftlint:disable:next strict_fileprivate
     fileprivate init(handle: rac_solution_handle_t) {
         self.handle = OSAllocatedUnfairLock(initialState: handle)
     }
 
     deinit {
-        if let h = handle.withLock({ $0 }) {
-            rac_solution_destroy(h)
+        if let handle = handle.withLock({ $0 }) {
+            rac_solution_destroy(handle)
         }
     }
 
@@ -71,8 +72,8 @@ public final class SolutionHandle: @unchecked Sendable {
     /// Cancel, join, and destroy the solution. Idempotent.
     public func destroy() {
         handle.withLock { current in
-            if let h = current {
-                rac_solution_destroy(h)
+            if let handle = current {
+                rac_solution_destroy(handle)
                 current = nil
             }
         }
@@ -119,6 +120,7 @@ public extension RunAnywhere {
     /// owns its own native solution.
     struct Solutions: Sendable {
 
+        // swiftlint:disable:next strict_fileprivate
         fileprivate init() {}
 
         /// Construct and return a started solution from a serialised

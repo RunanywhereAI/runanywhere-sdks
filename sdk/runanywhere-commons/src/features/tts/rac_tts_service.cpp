@@ -32,15 +32,24 @@ static const char* LOG_CAT = "TTS.Service";
 // move to a shared header in rac/router/.
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:               return "onnx";
-        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
-        case RAC_FRAMEWORK_METALRT:            return "metalrt";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
-        case RAC_FRAMEWORK_COREML:             return "platform";
-        default:                               return nullptr;
+        case RAC_FRAMEWORK_LLAMACPP:
+            return "llamacpp";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+            return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
+        case RAC_FRAMEWORK_COREML:
+            return "platform";
+        default:
+            return nullptr;
     }
 }
 
@@ -121,7 +130,8 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
 
     auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
     if (!service) {
-        if (vt->tts_ops->destroy) vt->tts_ops->destroy(impl);
+        if (vt->tts_ops->destroy)
+            vt->tts_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->tts_ops;
@@ -137,8 +147,8 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
         const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
         char props[128];
         snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("tts.backend.created", RAC_EVENT_CATEGORY_TTS,
-                        RAC_EVENT_DESTINATION_ALL, props);
+        rac_event_track("tts.backend.created", RAC_EVENT_CATEGORY_TTS, RAC_EVENT_DESTINATION_ALL,
+                        props);
     }
 
     RAC_LOG_INFO(LOG_CAT, "TTS service created");

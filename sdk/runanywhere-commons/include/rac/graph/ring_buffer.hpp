@@ -25,14 +25,12 @@ namespace rac::graph {
 
 template <typename T>
 class RingBuffer {
-public:
+   public:
     /// @param capacity Must be >= 2. Power-of-2 is not required but
     ///                 encouraged (index wrap is modulo-capacity).
-    explicit RingBuffer(size_t capacity)
-        : capacity_(capacity),
-          buffer_(new T[capacity]) {}
+    explicit RingBuffer(size_t capacity) : capacity_(capacity), buffer_(new T[capacity]) {}
 
-    RingBuffer(const RingBuffer&)            = delete;
+    RingBuffer(const RingBuffer&) = delete;
     RingBuffer& operator=(const RingBuffer&) = delete;
 
     /// Producer-side push. Returns false if the buffer is full.
@@ -83,8 +81,7 @@ public:
     size_t capacity() const noexcept { return capacity_; }
 
     bool empty() const noexcept {
-        return head_.load(std::memory_order_acquire)
-            == tail_.load(std::memory_order_acquire);
+        return head_.load(std::memory_order_acquire) == tail_.load(std::memory_order_acquire);
     }
 
     bool full() const noexcept {
@@ -93,8 +90,8 @@ public:
         return next == tail_.load(std::memory_order_acquire);
     }
 
-private:
-    const size_t         capacity_;
+   private:
+    const size_t capacity_;
     std::unique_ptr<T[]> buffer_;
     // Align to 64 bytes (cache line) to prevent false sharing between
     // producer and consumer threads. Benchmarks show ~30% throughput

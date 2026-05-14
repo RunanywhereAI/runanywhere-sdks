@@ -23,21 +23,20 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                    \
-    do {                                                                                     \
-        if (!(cond)) {                                                                       \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__);  \
-            return 1;                                                                        \
-        }                                                                                    \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                    \
-    do {                                                                                   \
-        if (!((a) == (b))) {                                                               \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,    \
-                         __LINE__);                                                        \
-            return 1;                                                                      \
-        }                                                                                  \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -53,7 +52,7 @@ std::vector<uint8_t> serialize_format_request(const std::string& url) {
 }
 
 std::vector<uint8_t> serialize_artifact_request(const std::string& url,
-                                                 const std::string& model_id = "") {
+                                                const std::string& model_id = "") {
     runanywhere::v1::ArtifactInferFromUrlRequest req;
     req.set_url(url);
     if (!model_id.empty()) {
@@ -107,8 +106,8 @@ int test_format_from_url_single_file_formats() {
         runanywhere::v1::ModelFormatFromUrlResult result;
         ASSERT_TRUE(parse_format_result(out, &result));
         if (result.format() != c.expected) {
-            std::fprintf(stderr, "url=%s expected=%d got=%d\n", c.url,
-                         static_cast<int>(c.expected), static_cast<int>(result.format()));
+            std::fprintf(stderr, "url=%s expected=%d got=%d\n", c.url, static_cast<int>(c.expected),
+                         static_cast<int>(result.format()));
             rac_proto_buffer_free(&out);
             return 1;
         }
@@ -125,8 +124,8 @@ int test_format_from_url_single_file_formats() {
 int test_format_from_url_archives() {
     // .tar.gz wrapping ONNX content → format UNSPECIFIED, inner ONNX.
     {
-        auto req = serialize_format_request(
-            "https://example.test/sherpa-onnx-whisper-base.en.tar.gz");
+        auto req =
+            serialize_format_request("https://example.test/sherpa-onnx-whisper-base.en.tar.gz");
         rac_proto_buffer_t out;
         rac_proto_buffer_init(&out);
         rac_result_t rc = rac_model_format_from_url_proto(req.data(), req.size(), &out);
@@ -263,8 +262,7 @@ int test_artifact_zip_archive() {
 // Test: artifact_infer_from_url on .tar.bz2 URLs → TAR_BZ2_ARCHIVE.
 // ---------------------------------------------------------------------------
 int test_artifact_tar_bz2_archive() {
-    auto req = serialize_artifact_request(
-        "https://example.test/piper-en-amy.tar.bz2");
+    auto req = serialize_artifact_request("https://example.test/piper-en-amy.tar.bz2");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_artifact_infer_from_url_proto(req.data(), req.size(), &out);

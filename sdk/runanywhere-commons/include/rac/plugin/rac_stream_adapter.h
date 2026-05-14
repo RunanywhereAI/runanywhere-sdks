@@ -11,7 +11,8 @@
  * Usage:
  *   using LLMStreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;
  *   LLMStreamAdapter adapter = {callback, user_data};
- *   rac_llm_<backend>_generate_stream(..., &stream_adapter_trampoline<rac_llm_stream_callback_fn>, &adapter);
+ *   rac_llm_<backend>_generate_stream(..., &stream_adapter_trampoline<rac_llm_stream_callback_fn>,
+ * &adapter);
  *
  * Each backend still supplies its own C trampoline function to thread the
  * `is_final` / context -> user_data translation, because those shapes differ

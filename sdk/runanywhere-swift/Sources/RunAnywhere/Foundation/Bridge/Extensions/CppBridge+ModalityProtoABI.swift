@@ -293,13 +293,17 @@ extension CppBridge.VAD {
             return true
         }
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
-        let rc = setCallback(handle, { bytes, size, userData in
-            guard let userData else { return }
-            _ = Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
-                .fromOpaque(userData)
-                .takeUnretainedValue()
-                .emit(bytes: bytes, size: size)
-        }, contextPtr)
+        let rc = setCallback(
+            handle,
+            { bytes, size, userData in
+                guard let userData else { return }
+                _ = Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
+                    .fromOpaque(userData)
+                    .takeUnretainedValue()
+                    .emit(bytes: bytes, size: size)
+            },
+            contextPtr
+        )
         guard rc == RAC_SUCCESS else {
             Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
                 .fromOpaque(contextPtr)
@@ -421,4 +425,3 @@ extension CppBridge {
     /// `Generated/ModalityProtoABI+Generated.swift`.
     public enum EmbeddingsProto {}
 }
-

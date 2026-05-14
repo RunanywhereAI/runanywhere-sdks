@@ -23,26 +23,29 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if (!((a) == (b))) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
-#define ASSERT_STREQ(a, b) do { \
-    if (std::strcmp((a), (b)) != 0) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_STREQ(a, b)                                                                         \
+    do {                                                                                           \
+        if (std::strcmp((a), (b)) != 0) {                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 struct MockStorage {
     int64_t total_space = 0;
@@ -88,8 +91,7 @@ rac_result_t mock_delete_path(const char* path, int recursive, void* user_data) 
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_is_model_loaded(const char* model_id,
-                                  rac_bool_t* out_is_loaded,
+rac_result_t mock_is_model_loaded(const char* model_id, rac_bool_t* out_is_loaded,
                                   void* user_data) {
     auto* storage = static_cast<MockStorage*>(user_data);
     *out_is_loaded = storage->loaded_models.count(model_id ? model_id : "") ? RAC_TRUE : RAC_FALSE;
@@ -117,11 +119,8 @@ rac_storage_callbacks_t callbacks_for(MockStorage* storage) {
     return callbacks;
 }
 
-rac_model_info_t model(const char* id,
-                       const char* name,
-                       const char* local_path,
-                       int64_t download_size,
-                       int64_t last_used) {
+rac_model_info_t model(const char* id, const char* name, const char* local_path,
+                       int64_t download_size, int64_t last_used) {
     rac_model_info_t info{};
     info.id = const_cast<char*>(id);
     info.name = const_cast<char*>(name);
@@ -133,12 +132,8 @@ rac_model_info_t model(const char* id,
     return info;
 }
 
-int save_model(rac_model_registry_handle_t registry,
-               const char* id,
-               const char* name,
-               const char* local_path,
-               int64_t download_size,
-               int64_t last_used) {
+int save_model(rac_model_registry_handle_t registry, const char* id, const char* name,
+               const char* local_path, int64_t download_size, int64_t last_used) {
     rac_model_info_t info = model(id, name, local_path, download_size, last_used);
     ASSERT_EQ(rac_model_registry_save(registry, &info), RAC_SUCCESS);
     return 0;
@@ -173,8 +168,7 @@ bool poll_sdk_event(runanywhere::v1::SDKEvent* out) {
 bool storage_event_has_kind(const runanywhere::v1::SDKEvent& event,
                             runanywhere::v1::StorageLifecycleEventKind kind) {
     return event.category() == runanywhere::v1::EVENT_CATEGORY_STORAGE &&
-           event.has_storage_lifecycle() &&
-           event.storage_lifecycle().kind() == kind;
+           event.has_storage_lifecycle() && event.storage_lifecycle().kind() == kind;
 }
 
 int test_info_aggregation_and_model_breakdown() {
@@ -592,12 +586,17 @@ int main() {
 #else
     int failures = 0;
 
-#define RUN(name) do { \
-    std::printf("[ RUN  ] %s\n", #name); \
-    int rc = name(); \
-    if (rc == 0) std::printf("[  OK  ] %s\n", #name); \
-    else        { std::printf("[ FAIL ] %s\n", #name); ++failures; } \
-} while (0)
+#define RUN(name)                                \
+    do {                                         \
+        std::printf("[ RUN  ] %s\n", #name);     \
+        int rc = name();                         \
+        if (rc == 0)                             \
+            std::printf("[  OK  ] %s\n", #name); \
+        else {                                   \
+            std::printf("[ FAIL ] %s\n", #name); \
+            ++failures;                          \
+        }                                        \
+    } while (0)
 
     RUN(test_info_aggregation_and_model_breakdown);
     RUN(test_availability_offsets_existing_model_bytes);

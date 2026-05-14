@@ -16,6 +16,8 @@
  *   - NULL out-pointers are rejected with RAC_ERROR_INVALID_ARGUMENT.
  */
 
+#include "test_common.h"
+
 #include <cstddef>
 #include <cstring>
 #include <iostream>
@@ -26,8 +28,6 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
-
-#include "test_common.h"
 
 namespace {
 
@@ -53,8 +53,7 @@ TestResult test_canonical_content_matches_swift() {
     // Canonical content (mirrors Swift's HTTPClientAdapter.defaultHeaders).
     auto sdk_client = map.find("X-SDK-Client");
     ASSERT_TRUE(sdk_client != map.end(), "X-SDK-Client must be present");
-    ASSERT_TRUE(sdk_client->second == "RunAnywhereSDK",
-                "X-SDK-Client must equal RunAnywhereSDK");
+    ASSERT_TRUE(sdk_client->second == "RunAnywhereSDK", "X-SDK-Client must equal RunAnywhereSDK");
 
     auto sdk_version = map.find("X-SDK-Version");
     ASSERT_TRUE(sdk_version != map.end(), "X-SDK-Version must be present");
@@ -73,8 +72,7 @@ TestResult test_canonical_content_matches_swift() {
 
     auto accept = map.find("Accept");
     ASSERT_TRUE(accept != map.end(), "Accept must be present");
-    ASSERT_TRUE(accept->second == "application/json",
-                "Accept must equal application/json");
+    ASSERT_TRUE(accept->second == "application/json", "Accept must equal application/json");
 
     return TEST_PASS();
 }
@@ -91,9 +89,9 @@ TestResult test_x_platform_not_included() {
         // Defensive case-insensitive compare — the platform header must
         // NOT appear under any casing.
         ASSERT_TRUE(std::strlen(name) > 0, "header name must be non-empty");
-        bool is_platform = (std::strcmp(name, "X-Platform") == 0)
-                           || (std::strcmp(name, "x-platform") == 0)
-                           || (std::strcmp(name, "X-PLATFORM") == 0);
+        bool is_platform = (std::strcmp(name, "X-Platform") == 0) ||
+                           (std::strcmp(name, "x-platform") == 0) ||
+                           (std::strcmp(name, "X-PLATFORM") == 0);
         ASSERT_TRUE(!is_platform, "X-Platform must not be in the default header list");
     }
 
@@ -130,16 +128,13 @@ TestResult test_null_out_pointers_rejected() {
     size_t count = 0;
 
     rac_result_t rc_null_kvs = rac_http_default_headers(nullptr, &count);
-    ASSERT_EQ(rc_null_kvs, RAC_ERROR_INVALID_ARGUMENT,
-              "NULL out_kvs must be rejected");
+    ASSERT_EQ(rc_null_kvs, RAC_ERROR_INVALID_ARGUMENT, "NULL out_kvs must be rejected");
 
     rac_result_t rc_null_count = rac_http_default_headers(&kvs, nullptr);
-    ASSERT_EQ(rc_null_count, RAC_ERROR_INVALID_ARGUMENT,
-              "NULL out_count must be rejected");
+    ASSERT_EQ(rc_null_count, RAC_ERROR_INVALID_ARGUMENT, "NULL out_count must be rejected");
 
     rac_result_t rc_both_null = rac_http_default_headers(nullptr, nullptr);
-    ASSERT_EQ(rc_both_null, RAC_ERROR_INVALID_ARGUMENT,
-              "both NULL must be rejected");
+    ASSERT_EQ(rc_both_null, RAC_ERROR_INVALID_ARGUMENT, "both NULL must be rejected");
 
     return TEST_PASS();
 }

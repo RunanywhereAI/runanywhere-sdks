@@ -26,7 +26,7 @@ public extension RunAnywhere {
     /// `CppBridge.LoraRegistry` (catalog ops).
     struct LoRA: Sendable {
 
-        fileprivate init() {}
+        private init() {}
 
         // MARK: Runtime Operations
 

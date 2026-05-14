@@ -31,8 +31,7 @@ namespace rac::solutions {
 /// error code (RAC_ERROR_INVALID_CONFIGURATION) when the config oneof
 /// is unset or unsupported; otherwise populates `*out_spec` and
 /// returns RAC_SUCCESS.
-rac_result_t convert_solution_to_pipeline(
-    const runanywhere::v1::SolutionConfig& config,
-    runanywhere::v1::PipelineSpec*         out_spec);
+rac_result_t convert_solution_to_pipeline(const runanywhere::v1::SolutionConfig& config,
+                                          runanywhere::v1::PipelineSpec* out_spec);
 
 }  // namespace rac::solutions

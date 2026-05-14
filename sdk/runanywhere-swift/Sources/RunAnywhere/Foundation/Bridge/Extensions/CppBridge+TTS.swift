@@ -31,8 +31,6 @@ extension CppBridge {
         /// TTS's vtable.loadModel forwards to `rac_tts_component_load_voice`.
         private let inner = ComponentActor(vtable: .tts)
 
-        private let logger = SDKLogger(category: "CppBridge.TTS")
-
         private init() {}
 
         // MARK: - Handle Management

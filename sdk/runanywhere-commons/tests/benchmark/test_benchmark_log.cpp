@@ -3,10 +3,9 @@
  * @brief Tests for benchmark JSON/CSV serialization and logging
  */
 
-#include <gtest/gtest.h>
-
 #include <cstdlib>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <string>
 
 #include "rac/core/rac_benchmark.h"
@@ -124,7 +123,8 @@ TEST(BenchmarkLog, TimingToCsvRow) {
     // Should contain commas separating fields
     size_t comma_count = 0;
     for (char c : s) {
-        if (c == ',') comma_count++;
+        if (c == ',')
+            comma_count++;
     }
     // CSV header has 14 commas (15 fields), data row should match
     EXPECT_EQ(comma_count, 14u);

@@ -27,16 +27,21 @@ static const char* LOG_CAT = "VLM.Service";
 
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp_vlm";
-        case RAC_FRAMEWORK_ONNX:               return "onnx";
-        case RAC_FRAMEWORK_METALRT:            return "metalrt";
-        default:                               return nullptr;
+        case RAC_FRAMEWORK_LLAMACPP:
+            return "llamacpp_vlm";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
+        default:
+            return nullptr;
     }
 }
 
 static std::string json_escape(const char* value) {
     std::string out;
-    if (!value) return out;
+    if (!value)
+        return out;
     for (const char* p = value; *p; ++p) {
         switch (*p) {
             case '\\':
@@ -111,15 +116,14 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
 
         rac_model_path_resolution_t resolution = {};
         rac_result_t path_rc = rac_model_paths_resolve_artifact(
-            model_info, model_path_owned.c_str(), /*expected_primary_sha256=*/nullptr,
-            &resolution);
+            model_info, model_path_owned.c_str(), /*expected_primary_sha256=*/nullptr, &resolution);
         if (path_rc == RAC_SUCCESS) {
             if (resolution.primary_model_path) {
                 model_path_owned = resolution.primary_model_path;
             }
             if (resolution.mmproj_path) {
-                config_json_owned = "{\"mmproj_path\":\"" +
-                                    json_escape(resolution.mmproj_path) + "\"}";
+                config_json_owned =
+                    "{\"mmproj_path\":\"" + json_escape(resolution.mmproj_path) + "\"}";
             }
         }
         rac_model_path_resolution_free(&resolution);
@@ -149,9 +153,9 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
-    result = vt->vlm_ops->create(
-        model_path_owned.c_str(),
-        config_json_owned.empty() ? nullptr : config_json_owned.c_str(), &impl);
+    result =
+        vt->vlm_ops->create(model_path_owned.c_str(),
+                            config_json_owned.empty() ? nullptr : config_json_owned.c_str(), &impl);
     if (result != RAC_SUCCESS || !impl) {
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
@@ -159,7 +163,8 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
 
     auto* service = static_cast<rac_vlm_service_t*>(malloc(sizeof(rac_vlm_service_t)));
     if (!service) {
-        if (vt->vlm_ops->destroy) vt->vlm_ops->destroy(impl);
+        if (vt->vlm_ops->destroy)
+            vt->vlm_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->vlm_ops;

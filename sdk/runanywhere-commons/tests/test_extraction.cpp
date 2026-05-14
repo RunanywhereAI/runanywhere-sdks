@@ -11,17 +11,17 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/infrastructure/extraction/rac_extraction.h"
-#include "rac/infrastructure/model_management/rac_model_strategy.h"
-#include "rac/infrastructure/model_management/rac_model_types.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <string>
-#include "core/internal/platform_compat.h"
 #include <vector>
+
+#include "core/internal/platform_compat.h"
+#include "rac/infrastructure/extraction/rac_extraction.h"
+#include "rac/infrastructure/model_management/rac_model_strategy.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef _WIN32
 #include <direct.h>
@@ -93,15 +93,16 @@ static bool file_exists(const std::string& path) {
 /** Read entire file contents. */
 static std::string read_file_contents(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
-    if (!f.is_open()) return "";
-    return std::string((std::istreambuf_iterator<char>(f)),
-                        std::istreambuf_iterator<char>());
+    if (!f.is_open())
+        return "";
+    return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 }
 
 /** Write bytes to a file. */
 static bool write_file(const std::string& path, const void* data, size_t size) {
     std::ofstream f(path, std::ios::binary);
-    if (!f.is_open()) return false;
+    if (!f.is_open())
+        return false;
     f.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
     return f.good();
 }
@@ -149,7 +150,8 @@ static std::string create_test_tar_gz(const std::string& base_dir) {
 
     std::string archive_path = base_dir + "/test.tar.gz";
     std::string cmd = "tar czf \"" + archive_path + "\" -C \"" + base_dir + "\" content";
-    if (system(cmd.c_str()) != 0) return "";
+    if (system(cmd.c_str()) != 0)
+        return "";
     return archive_path;
 }
 
@@ -166,7 +168,8 @@ static std::string create_test_tar(const std::string& base_dir) {
 
     std::string archive_path = base_dir + "/test.tar";
     std::string cmd = "tar cf \"" + archive_path + "\" -C \"" + base_dir + "\" tarcontent";
-    if (system(cmd.c_str()) != 0) return "";
+    if (system(cmd.c_str()) != 0)
+        return "";
     return archive_path;
 }
 
@@ -185,13 +188,15 @@ static std::string create_test_zip(const std::string& base_dir) {
     write_file(sub_dir + "/deep.txt", "Deep nested\n");
 
     std::string archive_path = base_dir + "/test.zip";
-    std::string cmd = "cd \"" + base_dir + "\" && zip -r \"" + archive_path + "\" zipcontent > /dev/null 2>&1";
-    if (system(cmd.c_str()) != 0) return "";
+    std::string cmd =
+        "cd \"" + base_dir + "\" && zip -r \"" + archive_path + "\" zipcontent > /dev/null 2>&1";
+    if (system(cmd.c_str()) != 0)
+        return "";
     return archive_path;
 }
 
-static const rac_resolved_model_file_t* find_resolution_file(
-    const rac_model_path_resolution_t& resolution, const char* relative_path) {
+static const rac_resolved_model_file_t*
+find_resolution_file(const rac_model_path_resolution_t& resolution, const char* relative_path) {
     for (size_t i = 0; i < resolution.file_count; ++i) {
         if (resolution.files[i].relative_path &&
             std::strcmp(resolution.files[i].relative_path, relative_path) == 0) {
@@ -206,11 +211,14 @@ static const rac_resolved_model_file_t* find_resolution_file(
 // =============================================================================
 
 static TestResult test_null_pointer() {
-    rac_result_t rc = rac_extract_archive_native(nullptr, "/tmp", nullptr, nullptr, nullptr, nullptr);
+    rac_result_t rc =
+        rac_extract_archive_native(nullptr, "/tmp", nullptr, nullptr, nullptr, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER, "NULL archive_path should return RAC_ERROR_NULL_POINTER");
 
-    rc = rac_extract_archive_native("/tmp/test.tar.gz", nullptr, nullptr, nullptr, nullptr, nullptr);
-    ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER, "NULL destination_dir should return RAC_ERROR_NULL_POINTER");
+    rc =
+        rac_extract_archive_native("/tmp/test.tar.gz", nullptr, nullptr, nullptr, nullptr, nullptr);
+    ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER,
+              "NULL destination_dir should return RAC_ERROR_NULL_POINTER");
 
     rc = rac_extract_archive_native(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_NULL_POINTER, "Both NULL should return RAC_ERROR_NULL_POINTER");
@@ -223,9 +231,8 @@ static TestResult test_null_pointer() {
 // =============================================================================
 
 static TestResult test_file_not_found() {
-    rac_result_t rc = rac_extract_archive_native(
-        "/nonexistent/path/archive.tar.gz", "/tmp/dest",
-        nullptr, nullptr, nullptr, nullptr);
+    rac_result_t rc = rac_extract_archive_native("/nonexistent/path/archive.tar.gz", "/tmp/dest",
+                                                 nullptr, nullptr, nullptr, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_FILE_NOT_FOUND,
               "Non-existent archive should return RAC_ERROR_FILE_NOT_FOUND");
 
@@ -403,9 +410,8 @@ static TestResult test_extract_tar_gz() {
 
     // Extract
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should succeed");
 
     // Verify extracted files
@@ -415,12 +421,10 @@ static TestResult test_extract_tar_gz() {
 
     // Verify file contents
     std::string hello_content = read_file_contents(dest_dir + "/content/hello.txt");
-    ASSERT_TRUE(hello_content == "Hello, World!\n",
-                "hello.txt content should match");
+    ASSERT_TRUE(hello_content == "Hello, World!\n", "hello.txt content should match");
 
     std::string nested_content = read_file_contents(dest_dir + "/content/subdir/nested.txt");
-    ASSERT_TRUE(nested_content == "Nested file content\n",
-                "nested.txt content should match");
+    ASSERT_TRUE(nested_content == "Nested file content\n", "nested.txt content should match");
 
     std::string data_content = read_file_contents(dest_dir + "/content/data.bin");
     ASSERT_EQ(static_cast<int>(data_content.size()), 256, "data.bin should be 256 bytes");
@@ -455,8 +459,8 @@ static TestResult test_extract_plain_tar() {
     ASSERT_TRUE(file_exists(archive_path), "Archive file should exist");
 
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(), nullptr, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Plain TAR extraction should succeed");
     ASSERT_TRUE(result.files_extracted >= 2, "Should extract tar files");
     ASSERT_TRUE(file_exists(dest_dir + "/tarcontent/plain.txt"),
@@ -493,15 +497,13 @@ static TestResult test_extract_zip() {
 
     // Verify detection
     rac_archive_type_t type;
-    ASSERT_EQ(rac_detect_archive_type(archive_path.c_str(), &type), RAC_TRUE,
-              "Should detect ZIP");
+    ASSERT_EQ(rac_detect_archive_type(archive_path.c_str(), &type), RAC_TRUE, "Should detect ZIP");
     ASSERT_EQ(type, RAC_ARCHIVE_TYPE_ZIP, "Should be ZIP");
 
     // Extract
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "ZIP extraction should succeed");
 
     // Verify extracted files
@@ -510,12 +512,10 @@ static TestResult test_extract_zip() {
 
     // Verify file contents
     std::string readme_content = read_file_contents(dest_dir + "/zipcontent/readme.txt");
-    ASSERT_TRUE(readme_content == "ZIP test file\n",
-                "readme.txt content should match");
+    ASSERT_TRUE(readme_content == "ZIP test file\n", "readme.txt content should match");
 
     std::string deep_content = read_file_contents(dest_dir + "/zipcontent/subdir/deep.txt");
-    ASSERT_TRUE(deep_content == "Deep nested\n",
-                "deep.txt content should match");
+    ASSERT_TRUE(deep_content == "Deep nested\n", "deep.txt content should match");
 
     // Cleanup
     remove_dir(archive_dir);
@@ -535,7 +535,7 @@ struct ProgressData {
 };
 
 static void test_progress_callback(int32_t files_extracted, int32_t /*total_files*/,
-                                    int64_t bytes_extracted, void* user_data) {
+                                   int64_t bytes_extracted, void* user_data) {
     auto* data = static_cast<ProgressData*>(user_data);
     data->callback_count++;
     data->last_files_extracted = files_extracted;
@@ -558,16 +558,12 @@ static TestResult test_progress_callback_invoked() {
     ASSERT_TRUE(!archive_path.empty(), "Should create archive");
 
     ProgressData progress = {0, 0, 0};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, test_progress_callback, &progress, nullptr);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 test_progress_callback, &progress, nullptr);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction with progress should succeed");
-    ASSERT_TRUE(progress.callback_count > 0,
-                "Progress callback should be invoked at least once");
-    ASSERT_TRUE(progress.last_files_extracted > 0,
-                "Last files_extracted should be > 0");
-    ASSERT_TRUE(progress.last_bytes_extracted > 0,
-                "Last bytes_extracted should be > 0");
+    ASSERT_TRUE(progress.callback_count > 0, "Progress callback should be invoked at least once");
+    ASSERT_TRUE(progress.last_files_extracted > 0, "Last files_extracted should be > 0");
+    ASSERT_TRUE(progress.last_bytes_extracted > 0, "Last bytes_extracted should be > 0");
 
     remove_dir(archive_dir);
     remove_dir(dest_dir);
@@ -595,23 +591,18 @@ static TestResult test_extraction_result_stats() {
     ASSERT_TRUE(!archive_path.empty(), "Should create archive");
 
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should succeed");
 
     // We created 3 files (hello.txt, data.bin, nested.txt)
-    ASSERT_EQ(result.files_extracted, 3,
-              "Should extract exactly 3 files");
+    ASSERT_EQ(result.files_extracted, 3, "Should extract exactly 3 files");
     // We created 2 directories (content, content/subdir)
-    ASSERT_TRUE(result.directories_created >= 1,
-                "Should create at least 1 directory");
+    ASSERT_TRUE(result.directories_created >= 1, "Should create at least 1 directory");
     // hello.txt(14) + data.bin(256) + nested.txt(20) = 290 bytes
-    ASSERT_TRUE(result.bytes_extracted >= 290,
-                "bytes_extracted should account for all file data");
+    ASSERT_TRUE(result.bytes_extracted >= 290, "bytes_extracted should account for all file data");
     // No entries should be skipped (no macOS resource forks, no unsafe paths)
-    ASSERT_EQ(result.entries_skipped, 0,
-              "No entries should be skipped");
+    ASSERT_EQ(result.entries_skipped, 0, "No entries should be skipped");
 
     remove_dir(archive_dir);
     remove_dir(dest_dir);
@@ -632,9 +623,8 @@ static TestResult test_unsupported_format() {
     std::string dest_dir = create_temp_dir("unsup_dest");
     ASSERT_TRUE(!dest_dir.empty(), "Should create dest dir");
 
-    rac_result_t rc = rac_extract_archive_native(
-        path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, nullptr);
+    rac_result_t rc = rac_extract_archive_native(path.c_str(), dest_dir.c_str(), nullptr, nullptr,
+                                                 nullptr, nullptr);
     ASSERT_EQ(rc, RAC_ERROR_UNSUPPORTED_ARCHIVE,
               "Invalid archive should return RAC_ERROR_UNSUPPORTED_ARCHIVE");
 
@@ -665,10 +655,9 @@ static TestResult test_archive_hint_mismatch_rejected() {
 
     rac_extraction_options_t opts = RAC_EXTRACTION_OPTIONS_DEFAULT;
     opts.archive_type_hint = RAC_ARCHIVE_TYPE_ZIP;
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(), &opts, nullptr, nullptr, nullptr);
-    ASSERT_EQ(rc, RAC_ERROR_UNSUPPORTED_ARCHIVE,
-              "Mismatched archive type hint should be rejected");
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), &opts,
+                                                 nullptr, nullptr, nullptr);
+    ASSERT_EQ(rc, RAC_ERROR_UNSUPPORTED_ARCHIVE, "Mismatched archive type hint should be rejected");
 
     remove_dir(archive_dir);
     remove_dir(dest_dir);
@@ -689,12 +678,10 @@ static TestResult test_resolve_single_file_with_checksum() {
     rac_model_path_resolution_t resolution = {};
     rac_result_t rc = rac_model_paths_resolve_artifact(
         &model, model_path.c_str(),
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-        &resolution);
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", &resolution);
     ASSERT_EQ(rc, RAC_SUCCESS, "Single file with matching SHA-256 should resolve");
     ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be populated");
-    ASSERT_TRUE(std::string(resolution.primary_model_path).find("single.gguf") !=
-                    std::string::npos,
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("single.gguf") != std::string::npos,
                 "Primary path should point to the GGUF file");
     ASSERT_EQ(resolution.checksum_validated, RAC_TRUE, "Checksum should be validated");
     ASSERT_EQ(resolution.checksum_matched, RAC_TRUE, "Checksum should match");
@@ -788,8 +775,7 @@ static TestResult test_resolve_expected_marks_required_and_prefers_tokenizer() {
     rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
     ASSERT_EQ(rc, RAC_SUCCESS, "Expected files should resolve");
     ASSERT_TRUE(resolution.tokenizer_path != nullptr, "Tokenizer path should be set");
-    ASSERT_TRUE(std::string(resolution.tokenizer_path).find("tokenizer.json") !=
-                    std::string::npos,
+    ASSERT_TRUE(std::string(resolution.tokenizer_path).find("tokenizer.json") != std::string::npos,
                 "Tokenizer path should prefer tokenizer.json over sidecar token files");
     const rac_resolved_model_file_t* tokenizer_file =
         find_resolution_file(resolution, "tokenizer.json");
@@ -905,12 +891,10 @@ static TestResult test_resolve_file_descriptor_roles() {
     rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
     ASSERT_EQ(rc, RAC_SUCCESS, "Descriptor roles should resolve");
     ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be populated");
-    ASSERT_TRUE(std::string(resolution.primary_model_path).find("vision.gguf") !=
-                    std::string::npos,
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("vision.gguf") != std::string::npos,
                 "Primary role should select vision.gguf");
     ASSERT_TRUE(resolution.mmproj_path != nullptr, "Projector path should be populated");
-    ASSERT_TRUE(std::string(resolution.mmproj_path).find("projector.gguf") !=
-                    std::string::npos,
+    ASSERT_TRUE(std::string(resolution.mmproj_path).find("projector.gguf") != std::string::npos,
                 "Vision projector role should select projector.gguf");
     const rac_resolved_model_file_t* projector_file =
         find_resolution_file(resolution, "projector.gguf");
@@ -973,10 +957,8 @@ static TestResult test_resolve_checksum_mismatch() {
     rac_model_path_resolution_t resolution = {};
     rac_result_t rc = rac_model_paths_resolve_artifact(
         &model, model_path.c_str(),
-        "0000000000000000000000000000000000000000000000000000000000000000",
-        &resolution);
-    ASSERT_EQ(rc, RAC_ERROR_MODEL_VALIDATION_FAILED,
-              "Wrong checksum should fail validation");
+        "0000000000000000000000000000000000000000000000000000000000000000", &resolution);
+    ASSERT_EQ(rc, RAC_ERROR_MODEL_VALIDATION_FAILED, "Wrong checksum should fail validation");
     ASSERT_EQ(resolution.checksum_validated, RAC_TRUE, "Checksum should be attempted");
     ASSERT_EQ(resolution.checksum_matched, RAC_FALSE, "Checksum should not match");
     rac_model_path_resolution_free(&resolution);
@@ -1024,8 +1006,8 @@ static TestResult test_extract_and_resolve_archive() {
     rac_model_extraction_result_t result = {};
     rac_result_t rc = rac_extract_model_archive_native(
         archive_path.c_str(), dest_dir.c_str(), &model,
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", nullptr,
-        nullptr, nullptr, &result);
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", nullptr, nullptr,
+        nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Archive extraction and model resolution should succeed");
     ASSERT_EQ(result.archive_type, RAC_ARCHIVE_TYPE_TAR_GZ, "Archive type should be detected");
     ASSERT_TRUE(result.extraction.files_extracted >= 2, "Should extract model and tokenizer");
@@ -1056,14 +1038,11 @@ static TestResult test_model_strategy_default_post_process_archive() {
     std::string archive_dir = create_temp_dir("strategy_archive_src");
     std::string content_dir = archive_dir + "/strategy-bundle";
     compat_mkdir(content_dir.c_str());
-    ASSERT_TRUE(write_file(content_dir + "/strategy.gguf", "model"),
-                "Should write archive model");
-    ASSERT_TRUE(write_file(content_dir + "/tokenizer.json", "{}"),
-                "Should write tokenizer");
+    ASSERT_TRUE(write_file(content_dir + "/strategy.gguf", "model"), "Should write archive model");
+    ASSERT_TRUE(write_file(content_dir + "/tokenizer.json", "{}"), "Should write tokenizer");
 
     std::string archive_path = archive_dir + "/strategy.tar.gz";
-    std::string cmd =
-        "tar czf \"" + archive_path + "\" -C \"" + archive_dir + "\" strategy-bundle";
+    std::string cmd = "tar czf \"" + archive_path + "\" -C \"" + archive_dir + "\" strategy-bundle";
     ASSERT_TRUE(system(cmd.c_str()) == 0, "Should create strategy model archive");
 
     std::string dest_dir = create_temp_dir("strategy_archive_dest");
@@ -1077,8 +1056,8 @@ static TestResult test_model_strategy_default_post_process_archive() {
     config.expected_size = 123;
 
     rac_download_result_t result = {};
-    rac_result_t rc = rac_model_strategy_post_process(
-        RAC_FRAMEWORK_LLAMACPP, &config, archive_path.c_str(), &result);
+    rac_result_t rc = rac_model_strategy_post_process(RAC_FRAMEWORK_LLAMACPP, &config,
+                                                      archive_path.c_str(), &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should extract and resolve archive");
     ASSERT_EQ(result.was_extracted, RAC_TRUE, "Default strategy should report extraction");
     ASSERT_EQ(result.downloaded_size, static_cast<int64_t>(123),
@@ -1104,8 +1083,8 @@ static TestResult test_model_strategy_default_find_path() {
     ASSERT_TRUE(write_file(dir + "/strategy.gguf", "model"), "Should write preferred model");
 
     char out_path[1024];
-    rac_result_t rc = rac_model_strategy_find_path(
-        RAC_FRAMEWORK_LLAMACPP, "strategy", dir.c_str(), out_path, sizeof(out_path));
+    rac_result_t rc = rac_model_strategy_find_path(RAC_FRAMEWORK_LLAMACPP, "strategy", dir.c_str(),
+                                                   out_path, sizeof(out_path));
     ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should resolve model path");
     ASSERT_TRUE(std::string(out_path).find("strategy.gguf") != std::string::npos,
                 "Default strategy should prefer model_id filename");
@@ -1136,13 +1115,11 @@ static TestResult test_creates_dest_dir() {
     std::string dest_dir = g_test_dir + "/new_nested/extraction/output";
     ASSERT_TRUE(!file_exists(dest_dir), "Dest dir should not exist yet");
 
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, nullptr);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, nullptr);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should create destination and succeed");
     ASSERT_TRUE(file_exists(dest_dir), "Destination dir should now exist");
-    ASSERT_TRUE(file_exists(dest_dir + "/content/hello.txt"),
-                "Extracted file should exist");
+    ASSERT_TRUE(file_exists(dest_dir + "/content/hello.txt"), "Extracted file should exist");
 
     remove_dir(archive_dir);
 
@@ -1180,9 +1157,8 @@ static TestResult test_default_options_skip_macos() {
     ASSERT_TRUE(!dest_dir.empty(), "Should create dest dir");
 
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        nullptr, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should succeed");
 
     // real_file.txt should be extracted
@@ -1190,8 +1166,7 @@ static TestResult test_default_options_skip_macos() {
                 "Real file should be extracted");
 
     // macOS resource forks should be skipped
-    ASSERT_TRUE(result.entries_skipped > 0,
-                "Should skip macOS resource entries");
+    ASSERT_TRUE(result.entries_skipped > 0, "Should skip macOS resource entries");
     ASSERT_TRUE(!file_exists(dest_dir + "/macos_content/__MACOSX/metadata.plist"),
                 "__MACOSX directory contents should be skipped");
     ASSERT_TRUE(!file_exists(dest_dir + "/macos_content/._resource_fork"),
@@ -1238,14 +1213,12 @@ static TestResult test_custom_options_keep_macos() {
     opts.archive_type_hint = RAC_ARCHIVE_TYPE_NONE;
 
     rac_extraction_result_t result = {};
-    rac_result_t rc = rac_extract_archive_native(
-        archive_path.c_str(), dest_dir.c_str(),
-        &opts, nullptr, nullptr, &result);
+    rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), &opts,
+                                                 nullptr, nullptr, &result);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction should succeed");
 
     // Both files should be extracted (no skipping)
-    ASSERT_TRUE(file_exists(dest_dir + "/keep_content/file.txt"),
-                "file.txt should be extracted");
+    ASSERT_TRUE(file_exists(dest_dir + "/keep_content/file.txt"), "file.txt should be extracted");
     ASSERT_TRUE(file_exists(dest_dir + "/keep_content/__MACOSX/meta.plist"),
                 "__MACOSX content should be extracted when skip_macos_resources=FALSE");
 

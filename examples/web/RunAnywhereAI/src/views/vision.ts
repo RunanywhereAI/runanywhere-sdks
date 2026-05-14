@@ -1,7 +1,7 @@
 /**
  * Vision Tab — V2 canonical VLM camera description.
  *
- * Re-landed against the existing `VLMWorkerBridge` (off-main-thread WASM
+ * Re-landed against the `RunAnywhere.visionLanguage` provider (off-main-thread WASM
  * runtime) and the core `VideoCapture` helper. Flow is:
  *
  *   1. User downloads + loads a VLM (e.g. SmolVLM 500M) via the shared
@@ -10,13 +10,13 @@
  *      the preview container.
  *   3. User clicks "Capture & analyze" — the latest frame is extracted as
  *      RGB pixels, wrapped in a `VLMImage` proto message, and dispatched
- *      through `VLMWorkerBridge.shared.process(image, options)`. The
+ *      through `RunAnywhere.visionLanguage.processImage(image, options)`. The
  *      worker decodes on its side, calls `_rac_vlm_process_proto`, and
  *      returns the encoded `VLMResult`.
  *
  * The worker-side `loadModel` wiring (raw GGUF + mmproj bytes transferred
  * zero-copy into the worker's MEMFS) is still TBD — until the backend
- * package installs it, `VLMWorkerBridge.shared.isModelLoaded` stays false
+ * package installs it, `RunAnywhere.visionLanguage.isModelLoaded` stays false
  * and the view surfaces the situation inline rather than rendering a blank
  * placeholder.
  */
@@ -24,14 +24,13 @@
 import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
-  VideoCapture,
   VLMImageFormat,
   isSDKException,
   type VLMGenerationOptions,
   type VLMImage,
   type VLMResult,
 } from '@runanywhere/web';
-import { VLMWorkerBridge } from '@runanywhere/web-llamacpp';
+import { VideoCapture } from '@runanywhere/web/browser';
 import {
   ensureCatalogRegistered,
   onModelStateChange,
@@ -76,9 +75,8 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
 // ---------------------------------------------------------------------------
 
 function renderView(): void {
-  const bridge = VLMWorkerBridge.shared;
   const modelLoaded = isVLMModelLoaded();
-  const workerLoaded = bridge.isModelLoaded;
+  const workerLoaded = RunAnywhere.visionLanguage.isModelLoaded;
   const captureReady = camera?.isCapturing ?? false;
   const canAnalyze = workerLoaded && captureReady && !isBusy;
 
@@ -96,8 +94,8 @@ function renderView(): void {
         <h3>Backend status</h3>
         <ul class="feature-unavailable__list">
           <li><code>VLM model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
-          <li><code>VLMWorkerBridge.isInitialized</code>: <strong>${bridge.isInitialized ? 'yes' : 'no'}</strong></li>
-          <li><code>VLMWorkerBridge.isModelLoaded</code>: <strong>${workerLoaded ? 'yes' : 'no'}</strong></li>
+          <li><code>RunAnywhere.visionLanguage.isInitialized</code>: <strong>${RunAnywhere.visionLanguage.isInitialized ? 'yes' : 'no'}</strong></li>
+          <li><code>RunAnywhere.visionLanguage.isModelLoaded</code>: <strong>${workerLoaded ? 'yes' : 'no'}</strong></li>
           <li><code>camera.isCapturing</code>: <strong>${captureReady ? 'yes' : 'no'}</strong></li>
         </ul>
       </div>
@@ -120,8 +118,8 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Analyze</h3>
         <p class="text-secondary">
-          Runs <code>VLMWorkerBridge.shared.process(image, options)</code> on the last
-          captured frame. The worker decodes the proto message and calls
+          Runs <code>RunAnywhere.visionLanguage.processImage(image, options)</code> on the last
+          captured frame. The provider decodes the proto message and calls
           <code>_rac_vlm_process_proto</code> off-thread.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
@@ -231,8 +229,7 @@ async function onAnalyze(): Promise<void> {
     return;
   }
 
-  const bridge = VLMWorkerBridge.shared;
-  if (!bridge.isModelLoaded) {
+  if (!RunAnywhere.visionLanguage.isModelLoaded) {
     setStatus(
       'The VLM Worker has no model loaded. Load SmolVLM, then re-run Analyze — ' +
       'worker-side model plumbing lands once the backend registers a VLM loader.',
@@ -293,7 +290,7 @@ async function onAnalyze(): Promise<void> {
   renderView();
 
   try {
-    const result: VLMResult = await bridge.process(image, options);
+    const result: VLMResult = await RunAnywhere.visionLanguage.processImage(image, options);
     lastResult = result.text || '(empty response)';
     const tokLine =
       result.tokensPerSecond > 0

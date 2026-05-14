@@ -9,9 +9,10 @@
  *   - When `RAC_PLUGIN_MODE_STATIC` is set (iOS / WASM hosts, or
  *     `cmake -DRAC_STATIC_PLUGINS=ON`), this TU expands the
  *     `RAC_STATIC_PLUGIN_REGISTER(llamacpp)` macro, which schedules a
- *     file-scope ctor to call `rac_plugin_register(rac_plugin_entry_llamacpp())`
- *     before main(). The host MUST also tell the linker not to drop this TU
- *     from the static archive (see rac_plugin_entry.h header doc on
+ *     file-scope ctor to call
+ * `rac_plugin_register(rac_plugin_entry_llamacpp())` before main(). The host
+ * MUST also tell the linker not to drop this TU from the static archive (see
+ * rac_plugin_entry.h header doc on
  *     `-force_load` / `--whole-archive`).
  *   - When `RAC_PLUGIN_MODE_SHARED` is set (default desktop / Android), this
  *     TU is the shared library's entry-symbol carrier. The host loads the

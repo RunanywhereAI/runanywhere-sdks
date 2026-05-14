@@ -6,12 +6,12 @@
 
 #include "test_common.h"
 
-#include "rac/core/rac_audio_utils.h"
-#include "rac/core/rac_error.h"
-
 #include <cmath>
 #include <cstddef>
 #include <vector>
+
+#include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_error.h"
 
 // -----------------------------------------------------------------------------
 // Test: silence -> -100 dB floor
@@ -38,16 +38,15 @@ static TestResult test_full_scale_sine() {
     const double sample_rate = 16000.0;
     std::vector<float> samples(num_samples);
     for (size_t i = 0; i < num_samples; ++i) {
-        samples[i] = static_cast<float>(
-            std::sin(2.0 * M_PI * freq * static_cast<double>(i) / sample_rate));
+        samples[i] =
+            static_cast<float>(std::sin(2.0 * M_PI * freq * static_cast<double>(i) / sample_rate));
     }
 
     float db = 0.0f;
     rac_result_t rc = rac_audio_compute_level_db(samples.data(), samples.size(), &db);
     ASSERT_EQ(rc, RAC_SUCCESS, "compute_level_db should succeed on sine");
     ASSERT_TRUE(db < 0.0f, "sine RMS < 1.0 implies dB < 0");
-    ASSERT_TRUE(std::fabs(db - (-3.0103f)) < 0.05f,
-                "unit-amplitude sine should yield ~ -3 dB RMS");
+    ASSERT_TRUE(std::fabs(db - (-3.0103f)) < 0.05f, "unit-amplitude sine should yield ~ -3 dB RMS");
     return TEST_PASS();
 }
 

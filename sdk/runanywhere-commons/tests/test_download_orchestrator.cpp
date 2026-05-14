@@ -10,11 +10,6 @@
 
 #include "test_common.h"
 
-#include "rac/infrastructure/download/rac_download_orchestrator.h"
-#include "rac/infrastructure/http/rac_http_transport.h"
-#include "rac/infrastructure/model_management/rac_model_paths.h"
-#include "rac/infrastructure/model_management/rac_model_types.h"
-
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -23,7 +18,12 @@
 #include <mutex>
 #include <string>
 #include <thread>
+
 #include "core/internal/platform_compat.h"
+#include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "download_service.pb.h"
@@ -153,12 +153,11 @@ static TestResult test_requires_extraction_url_with_query() {
     TestResult r;
     r.test_name = "requires_extraction_url_with_query";
 
-    ASSERT_TRUE(
-        rac_download_requires_extraction("https://example.com/model.tar.gz?token=abc") == RAC_TRUE,
-        ".tar.gz with query string should require extraction");
-    ASSERT_TRUE(
-        rac_download_requires_extraction("https://example.com/model.gguf?v=2") == RAC_FALSE,
-        ".gguf with query string should NOT require extraction");
+    ASSERT_TRUE(rac_download_requires_extraction("https://example.com/model.tar.gz?token=abc") ==
+                    RAC_TRUE,
+                ".tar.gz with query string should require extraction");
+    ASSERT_TRUE(rac_download_requires_extraction("https://example.com/model.gguf?v=2") == RAC_FALSE,
+                ".gguf with query string should NOT require extraction");
 
     r.passed = true;
     return r;
@@ -186,8 +185,7 @@ static TestResult test_find_model_single_gguf() {
     ASSERT_TRUE(result == RAC_SUCCESS, "Should find model path");
 
     std::string found(out_path);
-    ASSERT_TRUE(found.find("llama-7b.gguf") != std::string::npos,
-                "Should find the .gguf file");
+    ASSERT_TRUE(found.find("llama-7b.gguf") != std::string::npos, "Should find the .gguf file");
 
     remove_dir(dir);
     r.passed = true;
@@ -213,8 +211,7 @@ static TestResult test_find_model_nested_gguf() {
     ASSERT_TRUE(result == RAC_SUCCESS, "Should find nested model path");
 
     std::string found(out_path);
-    ASSERT_TRUE(found.find("model.gguf") != std::string::npos,
-                "Should find the nested .gguf file");
+    ASSERT_TRUE(found.find("model.gguf") != std::string::npos, "Should find the nested .gguf file");
 
     remove_dir(dir);
     r.passed = true;
@@ -329,8 +326,7 @@ static TestResult test_find_model_unknown_structure() {
     ASSERT_TRUE(result == RAC_SUCCESS, "Should find model with unknown structure");
 
     std::string found(out_path);
-    ASSERT_TRUE(found.find("model.bin") != std::string::npos,
-                "Should find the .bin model file");
+    ASSERT_TRUE(found.find("model.bin") != std::string::npos, "Should find the .bin model file");
 
     remove_dir(dir);
     r.passed = true;
@@ -364,14 +360,14 @@ static TestResult test_find_model_null_args() {
     char out_path[4096];
 
     ASSERT_TRUE(rac_find_model_path_after_extraction(nullptr, RAC_ARCHIVE_STRUCTURE_UNKNOWN,
-                                                      RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
-                                                      out_path, sizeof(out_path)) ==
+                                                     RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                     out_path, sizeof(out_path)) ==
                     RAC_ERROR_INVALID_ARGUMENT,
                 "NULL extracted_dir should return INVALID_ARGUMENT");
 
     ASSERT_TRUE(rac_find_model_path_after_extraction("/tmp", RAC_ARCHIVE_STRUCTURE_UNKNOWN,
-                                                      RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
-                                                      nullptr, 0) == RAC_ERROR_INVALID_ARGUMENT,
+                                                     RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                     nullptr, 0) == RAC_ERROR_INVALID_ARGUMENT,
                 "NULL out_path should return INVALID_ARGUMENT");
 
     r.passed = true;
@@ -403,8 +399,7 @@ static TestResult test_compute_destination_needs_base_dir() {
     ASSERT_TRUE(needs_extraction == RAC_FALSE, ".gguf should not need extraction");
 
     std::string path(out_path);
-    ASSERT_TRUE(path.find("model.gguf") != std::string::npos,
-                "Should contain the filename");
+    ASSERT_TRUE(path.find("model.gguf") != std::string::npos, "Should contain the filename");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -431,10 +426,10 @@ static TestResult test_compute_destination_archive() {
     ASSERT_TRUE(needs_extraction == RAC_TRUE, ".tar.bz2 should need extraction");
 
     std::string path(out_path);
-    ASSERT_TRUE(path.find("Downloads") != std::string::npos || path.find("download") != std::string::npos,
+    ASSERT_TRUE(path.find("Downloads") != std::string::npos ||
+                    path.find("download") != std::string::npos,
                 "Archive should download to downloads/temp directory");
-    ASSERT_TRUE(path.find(".tar.bz2") != std::string::npos,
-                "Should preserve archive extension");
+    ASSERT_TRUE(path.find(".tar.bz2") != std::string::npos, "Should preserve archive extension");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -449,9 +444,8 @@ static TestResult test_compute_destination_null_args() {
     rac_bool_t needs_extraction = RAC_FALSE;
 
     ASSERT_TRUE(rac_download_compute_destination(nullptr, "url", RAC_FRAMEWORK_LLAMACPP,
-                                                  RAC_MODEL_FORMAT_GGUF, out_path,
-                                                  sizeof(out_path),
-                                                  &needs_extraction) == RAC_ERROR_INVALID_ARGUMENT,
+                                                 RAC_MODEL_FORMAT_GGUF, out_path, sizeof(out_path),
+                                                 &needs_extraction) == RAC_ERROR_INVALID_ARGUMENT,
                 "NULL model_id should return INVALID_ARGUMENT");
 
     r.passed = true;
@@ -480,14 +474,14 @@ struct FakeTransport {
 };
 
 rac_bool_t fake_send_chunk(rac_http_body_chunk_fn cb, void* cb_user_data,
-                           const std::vector<uint8_t>& payload, size_t start,
-                           size_t chunk_size, int sleep_ms) {
+                           const std::vector<uint8_t>& payload, size_t start, size_t chunk_size,
+                           int sleep_ms) {
     uint64_t delivered = 0;
     for (size_t offset = start; offset < payload.size(); offset += chunk_size) {
         size_t n = std::min(chunk_size, payload.size() - offset);
         delivered += n;
-        if (cb(payload.data() + offset, n, delivered,
-               static_cast<uint64_t>(payload.size() - start), cb_user_data) == RAC_FALSE) {
+        if (cb(payload.data() + offset, n, delivered, static_cast<uint64_t>(payload.size() - start),
+               cb_user_data) == RAC_FALSE) {
             return RAC_FALSE;
         }
         if (sleep_ms > 0) {
@@ -521,8 +515,8 @@ rac_result_t fake_request_stream(void* user_data, const rac_http_request_t* req,
         return RAC_SUCCESS;
     }
     out_resp_meta->status = 200;
-    return fake_send_chunk(cb, cb_user_data, fake->payload, 0, 8192,
-                           fake->sleep_ms_per_chunk) == RAC_TRUE
+    return fake_send_chunk(cb, cb_user_data, fake->payload, 0, 8192, fake->sleep_ms_per_chunk) ==
+                   RAC_TRUE
                ? RAC_SUCCESS
                : RAC_ERROR_CANCELLED;
 }
@@ -543,20 +537,14 @@ rac_result_t fake_request_resume(void* user_data, const rac_http_request_t* req,
 }
 
 rac_http_transport_ops_t fake_ops = {
-    fake_request_send,
-    fake_request_stream,
-    fake_request_resume,
-    nullptr,
-    nullptr,
+    fake_request_send, fake_request_stream, fake_request_resume, nullptr, nullptr,
 };
 
 struct ScopedFakeTransport {
     explicit ScopedFakeTransport(FakeTransport* fake) {
         rac_http_transport_register(&fake_ops, fake);
     }
-    ~ScopedFakeTransport() {
-        rac_http_transport_register(nullptr, nullptr);
-    }
+    ~ScopedFakeTransport() { rac_http_transport_register(nullptr, nullptr); }
 };
 
 std::string serialize_msg(const google::protobuf::MessageLite& msg) {
@@ -636,8 +624,8 @@ bool poll_progress(const std::string& task_id, rav1::DownloadProgress* out_progr
 
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
-    rac_result_t rc = rac_download_progress_poll_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
-                                                       bytes.size(), &buffer);
+    rac_result_t rc = rac_download_progress_poll_proto(
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &buffer);
     bool ok = rc == RAC_SUCCESS && buffer.status == RAC_SUCCESS && buffer.data &&
               out_progress->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
     rac_proto_buffer_free(&buffer);
@@ -648,8 +636,7 @@ bool wait_for_terminal(const std::string& task_id, rav1::DownloadProgress* out_p
     for (int i = 0; i < 250; ++i) {
         if (poll_progress(task_id, out_progress)) {
             auto state = out_progress->state();
-            if (state == rav1::DOWNLOAD_STATE_COMPLETED ||
-                state == rav1::DOWNLOAD_STATE_FAILED ||
+            if (state == rav1::DOWNLOAD_STATE_COMPLETED || state == rav1::DOWNLOAD_STATE_FAILED ||
                 state == rav1::DOWNLOAD_STATE_CANCELLED) {
                 return true;
             }
@@ -682,9 +669,7 @@ struct ScopedProgressCallback {
     explicit ScopedProgressCallback(ProgressCapture* capture) {
         rac_download_set_progress_proto_callback(progress_capture_cb, capture);
     }
-    ~ScopedProgressCallback() {
-        rac_download_set_progress_proto_callback(nullptr, nullptr);
-    }
+    ~ScopedProgressCallback() { rac_download_set_progress_proto_callback(nullptr, nullptr); }
 };
 
 void progress_capture_cb(const uint8_t* bytes, size_t size, void* user_data) {
@@ -776,9 +761,9 @@ static TestResult test_proto_plan_resume_metadata() {
     char destination[4096];
     rac_bool_t needs_extraction = RAC_FALSE;
     ASSERT_TRUE(rac_download_compute_destination(model_id.c_str(), model_url.c_str(),
-                                                  RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
-                                                  destination, sizeof(destination),
-                                                  &needs_extraction) == RAC_SUCCESS,
+                                                 RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                 destination, sizeof(destination),
+                                                 &needs_extraction) == RAC_SUCCESS,
                 "Destination should compute");
     std::string dest_path(destination);
     auto slash = dest_path.rfind('/');
@@ -838,9 +823,9 @@ static TestResult test_proto_plan_rejects_invalid_existing_bytes() {
     char destination[4096];
     rac_bool_t needs_extraction = RAC_FALSE;
     ASSERT_TRUE(rac_download_compute_destination(model_id.c_str(), model_url.c_str(),
-                                                  RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
-                                                  destination, sizeof(destination),
-                                                  &needs_extraction) == RAC_SUCCESS,
+                                                 RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                 destination, sizeof(destination),
+                                                 &needs_extraction) == RAC_SUCCESS,
                 "Destination should compute");
     std::string dest_path(destination);
     auto slash = dest_path.rfind('/');
@@ -884,8 +869,7 @@ static TestResult test_proto_start_no_adapter() {
     rac_model_paths_set_base_dir(base_dir.c_str());
 
     rav1::DownloadPlanResult plan;
-    ASSERT_TRUE(make_plan("proto-model-no-adapter", "http://fake/success/model.gguf", 100,
-                          &plan),
+    ASSERT_TRUE(make_plan("proto-model-no-adapter", "http://fake/success/model.gguf", 100, &plan),
                 "Plan should succeed");
 
     rav1::DownloadStartResult start;
@@ -932,7 +916,8 @@ static TestResult test_proto_start_progress_callback_complete() {
     ASSERT_TRUE(!terminal.local_path().empty(), "Completed progress should include local_path");
     ASSERT_TRUE(terminal.overall_progress() == 1.0f,
                 "Completed progress should report overall progress");
-    ASSERT_TRUE(!terminal.resume_token().empty(), "Completed progress should preserve resume token");
+    ASSERT_TRUE(!terminal.resume_token().empty(),
+                "Completed progress should preserve resume token");
     ASSERT_TRUE(terminal.updated_at_unix_ms() >= terminal.started_at_unix_ms(),
                 "Progress timestamps should be populated");
 
@@ -1015,10 +1000,10 @@ static TestResult test_proto_cancel_resume() {
     std::string stale_resume_bytes = serialize_msg(stale_resume);
     rac_proto_buffer_t stale_resume_buffer;
     rac_proto_buffer_init(&stale_resume_buffer);
-    ASSERT_TRUE(rac_download_resume_proto(
-                    reinterpret_cast<const uint8_t*>(stale_resume_bytes.data()),
-                    stale_resume_bytes.size(), &stale_resume_buffer) == RAC_SUCCESS,
-                "Stale resume call should return a result proto");
+    ASSERT_TRUE(
+        rac_download_resume_proto(reinterpret_cast<const uint8_t*>(stale_resume_bytes.data()),
+                                  stale_resume_bytes.size(), &stale_resume_buffer) == RAC_SUCCESS,
+        "Stale resume call should return a result proto");
     rav1::DownloadResumeResult stale_resume_result;
     ASSERT_TRUE(parse_resume(stale_resume_buffer, &stale_resume_result),
                 "Stale resume result should parse");

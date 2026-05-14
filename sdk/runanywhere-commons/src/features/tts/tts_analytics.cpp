@@ -152,8 +152,8 @@ rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle
     }
     memcpy(*out_synthesis_id, id.c_str(), id.size() + 1);
 
-    RAC_LOG_DEBUG("TTS.Analytics", "Synthesis started: %s, voice: %s, %d characters", id.c_str(), voice,
-              character_count);
+    RAC_LOG_DEBUG("TTS.Analytics", "Synthesis started: %s, voice: %s, %d characters", id.c_str(),
+                  voice, character_count);
 
     return RAC_SUCCESS;
 }
@@ -207,7 +207,7 @@ rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_handle_t han
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("TTS.Analytics", "Synthesis completed: %s, voice: %s, audio: %.1fms, %d bytes",
-              synthesis_id, tracker.model_id.c_str(), audio_duration_ms, audio_size_bytes);
+                  synthesis_id, tracker.model_id.c_str(), audio_duration_ms, audio_size_bytes);
 
     return RAC_SUCCESS;
 }
@@ -227,7 +227,7 @@ rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_handle_t
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("TTS.Analytics", "Synthesis failed %s: %d - %s", synthesis_id, error_code,
-              error_message ? error_message : "");
+                  error_message ? error_message : "");
 
     return RAC_SUCCESS;
 }
@@ -246,8 +246,8 @@ rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t handle,
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("TTS.Analytics", "TTS error in %s: %d - %s (model: %s, syn: %s)",
-              operation ? operation : "unknown", error_code, error_message ? error_message : "",
-              model_id ? model_id : "none", synthesis_id ? synthesis_id : "none");
+                  operation ? operation : "unknown", error_code, error_message ? error_message : "",
+                  model_id ? model_id : "none", synthesis_id ? synthesis_id : "none");
 
     return RAC_SUCCESS;
 }

@@ -26,8 +26,8 @@
 
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
-#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/llm/rac_llm_stream.h"
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
@@ -287,11 +287,10 @@ RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
  * callback receives one serialized runanywhere.v1.LLMStreamEvent per token and
  * exactly one terminal event with is_final=true.
  */
-RAC_API rac_result_t rac_llm_generate_stream_proto(
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_llm_stream_proto_callback_fn callback,
-    void* user_data);
+RAC_API rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
+                                                   size_t request_proto_size,
+                                                   rac_llm_stream_proto_callback_fn callback,
+                                                   void* user_data);
 
 /**
  * @brief Cancel the lifecycle-owned LLM generation, if one is active.

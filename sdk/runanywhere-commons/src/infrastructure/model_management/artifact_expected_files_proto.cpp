@@ -45,34 +45,28 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
     static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty)
-                     : static_cast<const void*>(bytes);
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(),
-                                              static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(
-            out, RAC_ERROR_ENCODING_ERROR,
-            "failed to serialize ExpectedModelFiles result");
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize ExpectedModelFiles result");
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(),
-                                 bytes.size(), out);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
 }
 
 // Synthesise an ExpectedModelFiles whose required/optional_patterns mirror the
 // inbound shorthand. Mirrors Swift's `RAExpectedModelFiles.patterns(...)` in
 // ModelTypes+Artifacts.swift.
-void copy_patterns_into(
-    const google::protobuf::RepeatedPtrField<std::string>& required,
-    const google::protobuf::RepeatedPtrField<std::string>& optional,
-    runanywhere::v1::ExpectedModelFiles* out) {
+void copy_patterns_into(const google::protobuf::RepeatedPtrField<std::string>& required,
+                        const google::protobuf::RepeatedPtrField<std::string>& optional,
+                        runanywhere::v1::ExpectedModelFiles* out) {
     out->mutable_required_patterns()->CopyFrom(required);
     out->mutable_optional_patterns()->CopyFrom(optional);
 }
@@ -85,33 +79,28 @@ void copy_patterns_into(
 // PUBLIC API
 // =============================================================================
 
-extern "C" rac_result_t rac_artifact_expected_files_proto(
-    const uint8_t* in_model_bytes,
-    size_t in_model_size,
-    rac_proto_buffer_t* out_proto) {
+extern "C" rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_bytes,
+                                                          size_t in_model_size,
+                                                          rac_proto_buffer_t* out_proto) {
     if (!out_proto) {
         return RAC_ERROR_NULL_POINTER;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)in_model_bytes;
     (void)in_model_size;
-    return rac_proto_buffer_set_error(
-        out_proto, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-        "protobuf support is not available");
+    return rac_proto_buffer_set_error(out_proto, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
 #else
     if (!valid_bytes(in_model_bytes, in_model_size)) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "ModelInfo bytes are invalid");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "ModelInfo bytes are invalid");
     }
 
     runanywhere::v1::ModelInfo model;
-    if (in_model_size > 0 &&
-        !model.ParseFromArray(parse_data(in_model_bytes, in_model_size),
-                              static_cast<int>(in_model_size))) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "failed to parse ModelInfo");
+    if (in_model_size > 0 && !model.ParseFromArray(parse_data(in_model_bytes, in_model_size),
+                                                   static_cast<int>(in_model_size))) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ModelInfo");
     }
 
     // -------------------------------------------------------------------------
@@ -136,8 +125,7 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(
                 return copy_proto(art.expected_files(), out_proto);
             }
             // Fallback: pattern shorthand → manifest.
-            copy_patterns_into(art.required_patterns(),
-                               art.optional_patterns(), &result);
+            copy_patterns_into(art.required_patterns(), art.optional_patterns(), &result);
             break;
         }
         case runanywhere::v1::ModelInfo::kArchive: {
@@ -145,8 +133,7 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(
             if (art.has_expected_files()) {
                 return copy_proto(art.expected_files(), out_proto);
             }
-            copy_patterns_into(art.required_patterns(),
-                               art.optional_patterns(), &result);
+            copy_patterns_into(art.required_patterns(), art.optional_patterns(), &result);
             break;
         }
         case runanywhere::v1::ModelInfo::kMultiFile: {
@@ -167,11 +154,9 @@ extern "C" rac_result_t rac_artifact_expected_files_proto(
             break;
     }
 
-    RAC_LOG_DEBUG(LOG_CAT,
-                  "expected_files: model_id=%s case=%d files=%d req=%d opt=%d",
-                  model.id().c_str(), static_cast<int>(model.artifact_case()),
-                  result.files_size(), result.required_patterns_size(),
-                  result.optional_patterns_size());
+    RAC_LOG_DEBUG(LOG_CAT, "expected_files: model_id=%s case=%d files=%d req=%d opt=%d",
+                  model.id().c_str(), static_cast<int>(model.artifact_case()), result.files_size(),
+                  result.required_patterns_size(), result.optional_patterns_size());
 
     return copy_proto(result, out_proto);
 #endif

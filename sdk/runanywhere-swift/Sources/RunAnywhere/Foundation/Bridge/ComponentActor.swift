@@ -77,16 +77,16 @@ extension CppBridge {
 
             var newHandle: rac_handle_t?
             let status = vtable.create(&newHandle)
-            guard status == RAC_SUCCESS, let h = newHandle else {
+            guard status == RAC_SUCCESS, let createdHandle = newHandle else {
                 throw SDKException(
                     code: .notInitialized,
                     message: "Failed to create \(vtable.component.label) component: \(status)",
                     category: .component
                 )
             }
-            self.handle = h
+            self.handle = createdHandle
             logger.debug("\(vtable.component.label) component created")
-            return h
+            return createdHandle
         }
 
         // MARK: - State queries

@@ -6,19 +6,19 @@
  * Requires: vits-piper-en_US-lessac-medium model directory at the configured path.
  */
 
+#include "rac_tts_sherpa.h"  // engines/sherpa: rac_tts_sherpa_* function declarations
 #include "test_common.h"
 #include "test_config.h"
-
-#include "rac/backends/rac_tts_onnx.h"  // for RAC_TTS_ONNX_CONFIG_DEFAULT typedefs
-#include "rac/backends/rac_vad_onnx.h"  // for rac_backend_onnx_register()
-#include "rac_tts_sherpa.h"  // engines/sherpa: rac_tts_sherpa_* function declarations
-#include "rac/core/rac_audio_utils.h"
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
 
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+
+#include "rac/backends/rac_tts_onnx.h"  // for RAC_TTS_ONNX_CONFIG_DEFAULT typedefs
+#include "rac/backends/rac_vad_onnx.h"  // for rac_backend_onnx_register()
+#include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // Minimal Test Platform Adapter
@@ -129,7 +129,8 @@ static bool setup() {
     config.log_level = RAC_LOG_INFO;
     config.log_tag = "test_tts";
     config.reserved = nullptr;
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_onnx_register();
     return true;
 }
@@ -159,7 +160,8 @@ static TestResult test_create_destroy() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
@@ -194,13 +196,13 @@ static TestResult test_create_invalid_path() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc =
-        rac_tts_sherpa_create("/nonexistent", &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc = rac_tts_sherpa_create("/nonexistent", &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc == RAC_SUCCESS) {
         result.passed = false;
         result.details = "expected error for invalid path, got RAC_SUCCESS";
-        if (handle != RAC_INVALID_HANDLE) rac_tts_sherpa_destroy(handle);
+        if (handle != RAC_INVALID_HANDLE)
+            rac_tts_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -228,7 +230,8 @@ static TestResult test_synthesize_short() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -269,7 +272,8 @@ static TestResult test_synthesize_short() {
 
     if (tts_result.sample_rate != 22050) {
         result.passed = false;
-        result.details = "expected sample_rate 22050, got " + std::to_string(tts_result.sample_rate);
+        result.details =
+            "expected sample_rate 22050, got " + std::to_string(tts_result.sample_rate);
         rac_free(tts_result.audio_data);
         rac_tts_sherpa_destroy(handle);
         teardown();
@@ -303,7 +307,8 @@ static TestResult test_synthesize_long() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -332,9 +337,8 @@ static TestResult test_synthesize_long() {
     {
         ScopedTimer timer("synthesize_long");
         rc = rac_tts_sherpa_synthesize(
-            handle,
-            "The quick brown fox jumps over the lazy dog. This is a longer test.",
-            nullptr, &long_result);
+            handle, "The quick brown fox jumps over the lazy dog. This is a longer test.", nullptr,
+            &long_result);
     }
     if (rc != RAC_SUCCESS) {
         result.passed = false;
@@ -346,9 +350,9 @@ static TestResult test_synthesize_long() {
 
     if (long_result.audio_size <= short_size) {
         result.passed = false;
-        result.details = "longer text produced less audio: long=" +
-                         std::to_string(long_result.audio_size) +
-                         " <= short=" + std::to_string(short_size);
+        result.details =
+            "longer text produced less audio: long=" + std::to_string(long_result.audio_size) +
+            " <= short=" + std::to_string(short_size);
     } else {
         result.passed = true;
         result.details = "long=" + std::to_string(long_result.audio_size) +
@@ -378,7 +382,8 @@ static TestResult test_synthesize_empty() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -395,9 +400,11 @@ static TestResult test_synthesize_empty() {
         result.details = "returned error " + std::to_string(rc) + " for empty text (acceptable)";
     } else {
         result.passed = true;
-        result.details = "returned success with audio_size=" +
-                         std::to_string(tts_result.audio_size) + " for empty text (acceptable)";
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        result.details =
+            "returned success with audio_size=" + std::to_string(tts_result.audio_size) +
+            " for empty text (acceptable)";
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
     }
 
     rac_tts_sherpa_destroy(handle);
@@ -422,7 +429,8 @@ static TestResult test_stop_idempotent() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -432,7 +440,7 @@ static TestResult test_stop_idempotent() {
 
     // Call stop when not synthesizing - should not crash
     rac_tts_sherpa_stop(handle);
-    rac_tts_sherpa_stop(handle); // call twice to verify idempotency
+    rac_tts_sherpa_stop(handle);  // call twice to verify idempotency
 
     result.passed = true;
     result.details = "stop() called twice without crash";
@@ -459,7 +467,8 @@ static TestResult test_output_valid_wav() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -501,13 +510,13 @@ static TestResult test_output_valid_wav() {
     // Try converting to WAV using the float32 path first, fall back to int16
     void* wav_data = nullptr;
     size_t wav_size = 0;
-    rac_result_t wav_rc = rac_audio_float32_to_wav(
-        tts_result.audio_data, tts_result.audio_size, sr, &wav_data, &wav_size);
+    rac_result_t wav_rc = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size, sr,
+                                                   &wav_data, &wav_size);
 
     if (wav_rc != RAC_SUCCESS) {
         // Fall back to int16 conversion
-        wav_rc = rac_audio_int16_to_wav(
-            tts_result.audio_data, tts_result.audio_size, sr, &wav_data, &wav_size);
+        wav_rc = rac_audio_int16_to_wav(tts_result.audio_data, tts_result.audio_size, sr, &wav_data,
+                                        &wav_size);
     }
 
     if (wav_rc != RAC_SUCCESS) {
@@ -522,7 +531,8 @@ static TestResult test_output_valid_wav() {
     // Standard WAV header is 44 bytes
     if (wav_size <= 44) {
         result.passed = false;
-        result.details = "WAV output too small: " + std::to_string(wav_size) + " bytes (expected > 44)";
+        result.details =
+            "WAV output too small: " + std::to_string(wav_size) + " bytes (expected > 44)";
         rac_free(wav_data);
         rac_free(tts_result.audio_data);
         rac_tts_sherpa_destroy(handle);
@@ -561,7 +571,8 @@ static TestResult test_synthesize_punctuation() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -572,9 +583,8 @@ static TestResult test_synthesize_punctuation() {
     rac_tts_result_t tts_result = {};
     {
         ScopedTimer timer("synthesize_punctuation");
-        rc = rac_tts_sherpa_synthesize(handle,
-                                     "Hello! How are you? I'm fine, thanks.",
-                                     nullptr, &tts_result);
+        rc = rac_tts_sherpa_synthesize(handle, "Hello! How are you? I'm fine, thanks.", nullptr,
+                                       &tts_result);
     }
 
     if (rc != RAC_SUCCESS) {
@@ -628,7 +638,8 @@ static TestResult test_synthesize_numbers() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -696,7 +707,8 @@ static TestResult test_synthesize_multisentence() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
@@ -775,7 +787,8 @@ static TestResult test_get_voices() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_tts_sherpa_create(model_path.c_str(), &RAC_TTS_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);

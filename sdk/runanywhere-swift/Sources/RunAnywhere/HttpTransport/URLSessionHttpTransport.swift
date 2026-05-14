@@ -42,7 +42,7 @@ public enum URLSessionHttpTransport {
     /// `urlCache = nil` because the commons layer owns its own caching
     /// strategy (cache keys land in the model registry, not in URL
     /// responses).
-    fileprivate static let sharedSession: URLSession = {
+    fileprivate static let sharedSession: URLSession = { // swiftlint:disable:this strict_fileprivate
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
         config.timeoutIntervalForResource = 600
@@ -59,13 +59,14 @@ public enum URLSessionHttpTransport {
     /// session (handled by their `AppDelegate`
     /// `handleEventsForBackgroundURLSession`) or custom retry/backoff
     /// plug it in here via ``register(streamingSession:)``.
-    fileprivate static let streamingSessionOverride =
+    fileprivate static let streamingSessionOverride = // swiftlint:disable:this strict_fileprivate
         OSAllocatedUnfairLock<URLSession?>(initialState: nil)
 
     /// Streaming-task coordinator. One instance per streaming call;
     /// bridges `URLSessionDataDelegate` callbacks back to the C chunk
     /// callback. Keyed by `URLSessionTask.taskIdentifier`. Also used
     /// by ``cancelAllStreams()`` for explicit teardown.
+    // swiftlint:disable:next strict_fileprivate
     fileprivate static let streamRegistry = StreamRegistry()
 
     /// Static vtable handed to `rac_http_transport_register`. It must

@@ -33,10 +33,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/features/llm/rac_llm_schema_to_json.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -108,9 +107,8 @@ json parse_json_value_or_raw(const std::string& raw) {
 json property_to_json_object(const ::runanywhere::v1::JSONSchemaProperty& property) {
     // Swift seeds the object from the nested object schema (full recursion);
     // C-side mirror must do the same to preserve nested-object metadata.
-    json object = property.has_object_schema()
-                      ? schema_to_json_object(property.object_schema())
-                      : json::object();
+    json object = property.has_object_schema() ? schema_to_json_object(property.object_schema())
+                                               : json::object();
 
     if (const char* type = schema_type_name(property.type())) {
         object["type"] = type;
@@ -248,8 +246,9 @@ json schema_to_json_object(const ::runanywhere::v1::JSONSchema& schema) {
 }  // namespace
 #endif  // RAC_HAVE_PROTOBUF
 
-extern "C" rac_result_t rac_structured_output_schema_to_json_proto(
-    const uint8_t* in_RAJSONSchema_bytes, size_t in_size, rac_proto_buffer_t* out) {
+extern "C" rac_result_t
+rac_structured_output_schema_to_json_proto(const uint8_t* in_RAJSONSchema_bytes, size_t in_size,
+                                           rac_proto_buffer_t* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -266,9 +265,8 @@ extern "C" rac_result_t rac_structured_output_schema_to_json_proto(
     }
 
     ::runanywhere::v1::JSONSchema schema;
-    if (!schema.ParseFromArray(
-            rac_proto_bytes_data_or_empty(in_RAJSONSchema_bytes, in_size),
-            static_cast<int>(in_size))) {
+    if (!schema.ParseFromArray(rac_proto_bytes_data_or_empty(in_RAJSONSchema_bytes, in_size),
+                               static_cast<int>(in_size))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse JSONSchema bytes");
     }
@@ -280,8 +278,8 @@ extern "C" rac_result_t rac_structured_output_schema_to_json_proto(
         const std::string& raw = schema.raw_json();
         const auto first = raw.find_first_not_of(" \t\n\r");
         if (first != std::string::npos) {
-            return rac_proto_buffer_copy(
-                reinterpret_cast<const uint8_t*>(raw.data()), raw.size(), out);
+            return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(raw.data()), raw.size(),
+                                         out);
         }
     }
 
@@ -291,7 +289,6 @@ extern "C" rac_result_t rac_structured_output_schema_to_json_proto(
     // option emits.
     const nlohmann::json schema_object = schema_to_json_object(schema);
     std::string text = schema_object.dump();
-    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(text.data()),
-                                 text.size(), out);
+    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(text.data()), text.size(), out);
 #endif
 }

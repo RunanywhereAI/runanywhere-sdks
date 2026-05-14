@@ -29,6 +29,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/plugin/rac_engine_vtable.h"
 
+// NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -94,8 +95,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   RAC_PLUGIN_ENTRY_DECL(llamacpp);
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DECL(name) \
-    const rac_engine_vtable_t* rac_plugin_entry_##name(void)
+#define RAC_PLUGIN_ENTRY_DECL(name) const rac_engine_vtable_t* rac_plugin_entry_##name(void)
 
 /**
  * @brief Define a plugin entry point in the .cpp file.
@@ -108,8 +108,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   }
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DEF(name) \
-    RAC_PLUGIN_ENTRY_DECL(name)
+#define RAC_PLUGIN_ENTRY_DEF(name) RAC_PLUGIN_ENTRY_DECL(name)
 
 /* ===========================================================================
  * Static registration (iOS / Android / no-dlopen builds)
@@ -158,33 +157,31 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  */
 #ifdef __cplusplus
 
-#  if defined(__GNUC__) || defined(__clang__)
-#    define RAC_STATIC_REGISTRAR_USED_ATTR __attribute__((used))
-#  else
-#    define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
-#  endif
+#if defined(__GNUC__) || defined(__clang__)
+#define RAC_STATIC_REGISTRAR_USED_ATTR __attribute__((used))
+#else
+#define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
+#endif
 
-#define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
-    namespace rac_plugin_autoreg_##name {                                      \
-        struct Registrar {                                                     \
-            Registrar() noexcept {                                             \
-                (void)::rac_plugin_register(::rac_plugin_entry_##name());      \
-            }                                                                  \
-        };                                                                     \
-        /* `used` keeps the symbol after compiler dead-code analysis; the host \
-         * still has to ask the linker not to drop the .o file (see header     \
-         * docs above for the per-platform link flag). */                      \
-        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;           \
-    }                                                                          \
-    /* Force at least one externally-visible symbol per plugin so the linker  \
-     * can be asked to keep the TU by name without `-force_load`. */          \
-    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR                                  \
-    const char* const rac_plugin_static_marker_##name = #name
+#define RAC_STATIC_PLUGIN_REGISTER(name)                                                          \
+    namespace rac_plugin_autoreg_##name {                                                         \
+        struct Registrar {                                                                        \
+            Registrar() noexcept { (void)::rac_plugin_register(::rac_plugin_entry_##name()); }    \
+        };                                                                                        \
+        /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
+         * still has to ask the linker not to drop the .o file (see header                        \
+         * docs above for the per-platform link flag). */                                         \
+        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;                              \
+    }                                                                                             \
+    /* Force at least one externally-visible symbol per plugin so the linker                      \
+     * can be asked to keep the TU by name without `-force_load`. */                              \
+    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR const char* const rac_plugin_static_marker_##name = \
+        #name
 
 #else
-#define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
-    /* Static registration requires C++ linkage — put a one-line C++ shim TU \
-     * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
+#define RAC_STATIC_PLUGIN_REGISTER(name)
+/* Static registration requires C++ linkage — put a one-line C++ shim TU \
+ * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
 #endif
 
 /* ===========================================================================
@@ -214,37 +211,37 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * =========================================================================== */
 
 #ifdef __cplusplus
-#  define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                              \
-      static ::rac_result_t name##_##primitive##_create_impl(                     \
-          const char* model_id, const char* /*config_json*/, void** out_impl) {   \
-          if (!out_impl) return RAC_ERROR_NULL_POINTER;                           \
-          *out_impl = nullptr;                                                    \
-          RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",    \
-                       model_id ? model_id : "(default)");                        \
-          ::rac_handle_t backend_handle = nullptr;                                \
-          ::rac_result_t rc =                                                     \
-              rac_##primitive##_##name##_create(model_id, nullptr,                \
-                                                &backend_handle);                 \
-          if (rc != RAC_SUCCESS) return rc;                                       \
-          *out_impl = backend_handle;                                             \
-          return RAC_SUCCESS;                                                     \
-      }
+#define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                                                 \
+    static ::rac_result_t name##_##primitive##_create_impl(                                        \
+        const char* model_id, const char* /*config_json*/, void** out_impl) {                      \
+        if (!out_impl)                                                                             \
+            return RAC_ERROR_NULL_POINTER;                                                         \
+        *out_impl = nullptr;                                                                       \
+        RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",                       \
+                     model_id ? model_id : "(default)");                                           \
+        ::rac_handle_t backend_handle = nullptr;                                                   \
+        ::rac_result_t rc = rac_##primitive##_##name##_create(model_id, nullptr, &backend_handle); \
+        if (rc != RAC_SUCCESS)                                                                     \
+            return rc;                                                                             \
+        *out_impl = backend_handle;                                                                \
+        return RAC_SUCCESS;                                                                        \
+    }
 #else
-#  define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                              \
-      static rac_result_t name##_##primitive##_create_impl(                       \
-          const char* model_id, const char* /*config_json*/, void** out_impl) {   \
-          if (!out_impl) return RAC_ERROR_NULL_POINTER;                           \
-          *out_impl = NULL;                                                       \
-          RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",    \
-                       model_id ? model_id : "(default)");                        \
-          rac_handle_t backend_handle = NULL;                                     \
-          rac_result_t rc =                                                       \
-              rac_##primitive##_##name##_create(model_id, NULL,                   \
-                                                &backend_handle);                 \
-          if (rc != RAC_SUCCESS) return rc;                                       \
-          *out_impl = backend_handle;                                             \
-          return RAC_SUCCESS;                                                     \
-      }
+#define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                                            \
+    static rac_result_t name##_##primitive##_create_impl(                                     \
+        const char* model_id, const char* /*config_json*/, void** out_impl) {                 \
+        if (!out_impl)                                                                        \
+            return RAC_ERROR_NULL_POINTER;                                                    \
+        *out_impl = NULL;                                                                     \
+        RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",                  \
+                     model_id ? model_id : "(default)");                                      \
+        rac_handle_t backend_handle = NULL;                                                   \
+        rac_result_t rc = rac_##primitive##_##name##_create(model_id, NULL, &backend_handle); \
+        if (rc != RAC_SUCCESS)                                                                \
+            return rc;                                                                        \
+        *out_impl = backend_handle;                                                           \
+        return RAC_SUCCESS;                                                                   \
+    }
 #endif
 
 /* ===========================================================================
@@ -285,8 +282,7 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
  * registry fills it in-place. Values >= `max` are truncated.
  */
 RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
-                                     const rac_engine_vtable_t** out_plugins,
-                                     size_t max,
+                                     const rac_engine_vtable_t** out_plugins, size_t max,
                                      size_t* out_count);
 
 /**
@@ -298,5 +294,6 @@ size_t rac_plugin_count(void);
 #ifdef __cplusplus
 }
 #endif
+// NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)
 
 #endif /* RAC_PLUGIN_ENTRY_H */

@@ -150,9 +150,11 @@ RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_get_languages(rac_handle_t ha
  * @param out_language  Output: malloc'd language code (e.g. "en"). Caller frees.
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t
-rac_stt_whispercpp_detect_language(rac_handle_t handle, const void* audio_data, size_t audio_size,
-                                   const rac_stt_options_t* options, char** out_language);
+RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_detect_language(rac_handle_t handle,
+                                                                   const void* audio_data,
+                                                                   size_t audio_size,
+                                                                   const rac_stt_options_t* options,
+                                                                   char** out_language);
 
 // =============================================================================
 // BACKEND REGISTRATION

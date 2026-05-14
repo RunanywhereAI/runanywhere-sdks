@@ -153,9 +153,10 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
  * out_result receives serialized runanywhere.v1.EmbeddingsResult bytes with
  * dense vector values populated.
  */
-RAC_API rac_result_t rac_embeddings_embed_batch_proto(
-    rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
+                                                      const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      rac_proto_buffer_t* out_result);
 
 /**
  * @brief Generate embeddings using the lifecycle-loaded embeddings model.
@@ -164,9 +165,9 @@ RAC_API rac_result_t rac_embeddings_embed_batch_proto(
  * resolves the current embeddings lifecycle component and out_result receives
  * serialized runanywhere.v1.EmbeddingsResult bytes.
  */
-RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                                size_t request_proto_size,
+                                                                rac_proto_buffer_t* out_result);
 
 /**
  * @brief Create an embeddings session from serialized

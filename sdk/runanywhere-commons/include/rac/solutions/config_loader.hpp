@@ -39,31 +39,25 @@ namespace rac::solutions {
 /// Parse binary-encoded PipelineSpec. `data`/`len` describe the wire
 /// bytes produced by `PipelineSpec::SerializeToArray`. Returns
 /// RAC_ERROR_DECODING_ERROR on a malformed payload.
-rac_result_t load_pipeline_from_proto_bytes(
-    const void*                    data,
-    size_t                         len,
-    runanywhere::v1::PipelineSpec* out_spec);
+rac_result_t load_pipeline_from_proto_bytes(const void* data, size_t len,
+                                            runanywhere::v1::PipelineSpec* out_spec);
 
 /// Parse binary-encoded SolutionConfig. Same semantics as the pipeline
 /// loader above.
-rac_result_t load_solution_from_proto_bytes(
-    const void*                       data,
-    size_t                            len,
-    runanywhere::v1::SolutionConfig*  out_config);
+rac_result_t load_solution_from_proto_bytes(const void* data, size_t len,
+                                            runanywhere::v1::SolutionConfig* out_config);
 
 /// Parse a YAML document describing a PipelineSpec (top-level fields:
 /// `name`, `operators`, `edges`, `options`). Returns
 /// RAC_ERROR_INVALID_FORMAT on a syntax or structural error.
-rac_result_t load_pipeline_from_yaml(
-    const std::string&             yaml,
-    runanywhere::v1::PipelineSpec* out_spec);
+rac_result_t load_pipeline_from_yaml(const std::string& yaml,
+                                     runanywhere::v1::PipelineSpec* out_spec);
 
 /// Parse a YAML document describing a SolutionConfig. The document is
 /// expected to have exactly one of the oneof keys (`voice_agent`,
 /// `rag`, `wake_word`, `agent_loop`, `time_series`) as the top-level
 /// key, mirroring the proto oneof.
-rac_result_t load_solution_from_yaml(
-    const std::string&                yaml,
-    runanywhere::v1::SolutionConfig*  out_config);
+rac_result_t load_solution_from_yaml(const std::string& yaml,
+                                     runanywhere::v1::SolutionConfig* out_config);
 
 }  // namespace rac::solutions

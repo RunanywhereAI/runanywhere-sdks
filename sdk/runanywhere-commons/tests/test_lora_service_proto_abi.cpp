@@ -8,9 +8,11 @@
 #include <vector>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <algorithm>
+#include "lora_options.pb.h"
 
+#include <algorithm>
 #include <google/protobuf/descriptor.h>
+#include <ranges>
 
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -18,8 +20,6 @@
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/plugin/rac_plugin_entry.h"
-
-#include "lora_options.pb.h"
 #endif
 
 namespace {
@@ -27,16 +27,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (cond) {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -51,8 +50,7 @@ struct DummyLlm {
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    return out->empty() ||
-           message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+    return out->empty() || message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
 template <typename T>
@@ -62,7 +60,8 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
 }
 
 rac_result_t dummy_llm_create(const char*, const char*, void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = new DummyLlm();
     return *out_impl ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
@@ -71,8 +70,7 @@ rac_result_t dummy_llm_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t*,
-                                rac_llm_result_t*) {
+rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t*, rac_llm_result_t*) {
     return RAC_SUCCESS;
 }
 
@@ -82,27 +80,28 @@ rac_result_t dummy_llm_stream(void*, const char*, const rac_llm_options_t*,
 }
 
 rac_result_t dummy_lora_load(void* impl, const char* adapter_path, float scale) {
-    if (!adapter_path || adapter_path[0] == '\0') return RAC_ERROR_INVALID_ARGUMENT;
+    if (!adapter_path || adapter_path[0] == '\0')
+        return RAC_ERROR_INVALID_ARGUMENT;
     auto* dummy = static_cast<DummyLlm*>(impl);
     dummy->load_lora_count += 1;
-    auto existing =
-        std::find(dummy->loaded_paths.begin(), dummy->loaded_paths.end(), adapter_path);
+    auto existing = std::ranges::find(dummy->loaded_paths, adapter_path);
     if (existing != dummy->loaded_paths.end()) {
         const size_t index = static_cast<size_t>(existing - dummy->loaded_paths.begin());
         dummy->loaded_scales[index] = scale;
     } else {
-        dummy->loaded_paths.push_back(adapter_path);
+        dummy->loaded_paths.emplace_back(adapter_path);
         dummy->loaded_scales.push_back(scale);
     }
     return RAC_SUCCESS;
 }
 
 rac_result_t dummy_lora_remove(void* impl, const char* adapter_path) {
-    if (!adapter_path || adapter_path[0] == '\0') return RAC_ERROR_INVALID_ARGUMENT;
+    if (!adapter_path || adapter_path[0] == '\0')
+        return RAC_ERROR_INVALID_ARGUMENT;
     auto* dummy = static_cast<DummyLlm*>(impl);
-    auto existing =
-        std::find(dummy->loaded_paths.begin(), dummy->loaded_paths.end(), adapter_path);
-    if (existing == dummy->loaded_paths.end()) return RAC_ERROR_NOT_FOUND;
+    auto existing = std::ranges::find(dummy->loaded_paths, adapter_path);
+    if (existing == dummy->loaded_paths.end())
+        return RAC_ERROR_NOT_FOUND;
     const auto index = existing - dummy->loaded_paths.begin();
     dummy->loaded_paths.erase(existing);
     dummy->loaded_scales.erase(dummy->loaded_scales.begin() + index);
@@ -148,26 +147,22 @@ rac_engine_vtable_t make_vtable(const char* name, const rac_llm_service_ops_t* l
     return v;
 }
 
-void check_unary_rpc(const google::protobuf::ServiceDescriptor* service,
-                     const char* method_name,
-                     const char* input_type,
-                     const char* output_type) {
-    const google::protobuf::MethodDescriptor* method =
-        service->FindMethodByName(method_name);
+void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
+                     const char* input_type, const char* output_type) {
+    const google::protobuf::MethodDescriptor* method = service->FindMethodByName(method_name);
     CHECK(method != nullptr, method_name);
-    if (!method) return;
+    if (!method)
+        return;
 
     CHECK(method->input_type()->full_name() == input_type, "LoRA unary RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "LoRA unary RPC output type");
     CHECK(!method->client_streaming() && !method->server_streaming(), "LoRA RPC is unary");
 }
 
-bool state_has_adapter(const runanywhere::v1::LoRAState& state,
-                       const std::string& adapter_id,
+bool state_has_adapter(const runanywhere::v1::LoRAState& state, const std::string& adapter_id,
                        const std::string& adapter_path) {
     for (const auto& adapter : state.loaded_adapters()) {
-        if (adapter.adapter_id() == adapter_id &&
-            adapter.adapter_path() == adapter_path &&
+        if (adapter.adapter_id() == adapter_id && adapter.adapter_path() == adapter_path &&
             adapter.applied()) {
             return true;
         }
@@ -175,11 +170,10 @@ bool state_has_adapter(const runanywhere::v1::LoRAState& state,
     return false;
 }
 
-runanywhere::v1::LoraAdapterCatalogEntry make_catalog_entry(
-    const std::string& id,
-    const std::string& name,
-    const std::string& model_id,
-    const std::string& tag) {
+runanywhere::v1::LoraAdapterCatalogEntry make_catalog_entry(const std::string& id,
+                                                            const std::string& name,
+                                                            const std::string& model_id,
+                                                            const std::string& tag) {
     runanywhere::v1::LoraAdapterCatalogEntry entry;
     entry.set_id(id);
     entry.set_name(name);
@@ -201,21 +195,18 @@ int test_lora_generated_service_contract() {
         runanywhere::v1::LoRAApplyRequest::descriptor()->file();
     const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("LoRA");
     CHECK(service != nullptr, "generated LoRA service descriptor exists");
-    if (!service) return 0;
+    if (!service)
+        return 0;
 
     CHECK(service->method_count() == 10, "generated LoRA service exposes ten RPCs");
 
-    check_unary_rpc(service, "RegisterCatalogEntry",
-                    "runanywhere.v1.LoraAdapterCatalogEntry",
+    check_unary_rpc(service, "RegisterCatalogEntry", "runanywhere.v1.LoraAdapterCatalogEntry",
                     "runanywhere.v1.LoraAdapterCatalogEntry");
-    check_unary_rpc(service, "ListCatalog",
-                    "runanywhere.v1.LoraAdapterCatalogListRequest",
+    check_unary_rpc(service, "ListCatalog", "runanywhere.v1.LoraAdapterCatalogListRequest",
                     "runanywhere.v1.LoraAdapterCatalogListResult");
-    check_unary_rpc(service, "QueryCatalog",
-                    "runanywhere.v1.LoraAdapterCatalogQuery",
+    check_unary_rpc(service, "QueryCatalog", "runanywhere.v1.LoraAdapterCatalogQuery",
                     "runanywhere.v1.LoraAdapterCatalogListResult");
-    check_unary_rpc(service, "GetCatalogEntry",
-                    "runanywhere.v1.LoraAdapterCatalogGetRequest",
+    check_unary_rpc(service, "GetCatalogEntry", "runanywhere.v1.LoraAdapterCatalogGetRequest",
                     "runanywhere.v1.LoraAdapterCatalogGetResult");
     check_unary_rpc(service, "MarkDownloadCompleted",
                     "runanywhere.v1.LoraAdapterDownloadCompletedRequest",
@@ -226,26 +217,20 @@ int test_lora_generated_service_contract() {
                     "runanywhere.v1.LoRAState");
     check_unary_rpc(service, "CheckCompatibility", "runanywhere.v1.LoRAAdapterConfig",
                     "runanywhere.v1.LoraCompatibilityResult");
-    check_unary_rpc(service, "List", "runanywhere.v1.LoRAState",
-                    "runanywhere.v1.LoRAState");
-    check_unary_rpc(service, "State", "runanywhere.v1.LoRAState",
-                    "runanywhere.v1.LoRAState");
+    check_unary_rpc(service, "List", "runanywhere.v1.LoRAState", "runanywhere.v1.LoRAState");
+    check_unary_rpc(service, "State", "runanywhere.v1.LoRAState", "runanywhere.v1.LoRAState");
 
-    const google::protobuf::Descriptor* apply =
-        runanywhere::v1::LoRAApplyRequest::descriptor();
+    const google::protobuf::Descriptor* apply = runanywhere::v1::LoRAApplyRequest::descriptor();
     const google::protobuf::FieldDescriptor* adapters = apply->FindFieldByName("adapters");
     CHECK(adapters != nullptr, "LoRAApplyRequest carries adapters");
     if (adapters) {
         CHECK(adapters->is_repeated(), "LoRAApplyRequest adapters are repeated");
-        CHECK(adapters->message_type()->full_name() ==
-                  "runanywhere.v1.LoRAAdapterConfig",
+        CHECK(adapters->message_type()->full_name() == "runanywhere.v1.LoRAAdapterConfig",
               "LoRAApplyRequest adapters use LoRAAdapterConfig");
     }
 
-    const google::protobuf::Descriptor* remove =
-        runanywhere::v1::LoRARemoveRequest::descriptor();
-    const google::protobuf::FieldDescriptor* adapter_ids =
-        remove->FindFieldByName("adapter_ids");
+    const google::protobuf::Descriptor* remove = runanywhere::v1::LoRARemoveRequest::descriptor();
+    const google::protobuf::FieldDescriptor* adapter_ids = remove->FindFieldByName("adapter_ids");
     CHECK(adapter_ids != nullptr, "LoRARemoveRequest carries adapter ids");
     if (adapter_ids) {
         CHECK(adapter_ids->is_repeated(), "LoRARemoveRequest adapter ids are repeated");
@@ -254,8 +239,7 @@ int test_lora_generated_service_contract() {
     }
 
     const google::protobuf::Descriptor* state = runanywhere::v1::LoRAState::descriptor();
-    const google::protobuf::FieldDescriptor* loaded =
-        state->FindFieldByName("loaded_adapters");
+    const google::protobuf::FieldDescriptor* loaded = state->FindFieldByName("loaded_adapters");
     CHECK(loaded != nullptr, "LoRAState carries loaded adapters");
     if (loaded) {
         CHECK(loaded->is_repeated(), "LoRAState loaded adapters are repeated");
@@ -263,8 +247,7 @@ int test_lora_generated_service_contract() {
               "LoRAState loaded adapters use LoRAAdapterInfo");
     }
 
-    const google::protobuf::FieldDescriptor* base_model =
-        state->FindFieldByName("base_model_id");
+    const google::protobuf::FieldDescriptor* base_model = state->FindFieldByName("base_model_id");
     CHECK(base_model != nullptr, "LoRAState carries base model id");
     if (base_model) {
         CHECK(base_model->has_presence(), "LoRAState base model id has presence");
@@ -298,13 +281,11 @@ int test_lora_generated_service_contract() {
 
     const google::protobuf::Descriptor* catalog_result =
         runanywhere::v1::LoraAdapterCatalogListResult::descriptor();
-    const google::protobuf::FieldDescriptor* entries =
-        catalog_result->FindFieldByName("entries");
+    const google::protobuf::FieldDescriptor* entries = catalog_result->FindFieldByName("entries");
     CHECK(entries != nullptr, "LoraAdapterCatalogListResult carries entries");
     if (entries) {
         CHECK(entries->is_repeated(), "LoraAdapterCatalogListResult entries are repeated");
-        CHECK(entries->message_type()->full_name() ==
-                  "runanywhere.v1.LoraAdapterCatalogEntry",
+        CHECK(entries->message_type()->full_name() == "runanywhere.v1.LoraAdapterCatalogEntry",
               "LoraAdapterCatalogListResult entries use catalog entry");
     }
 
@@ -335,8 +316,7 @@ int test_generated_lora_catalog_register_list_query_get_and_completion() {
     CHECK(registered_style.id() == "style", "LoRA catalog register preserves id");
     CHECK(registered_style.default_scale() > 0.69f && registered_style.default_scale() < 0.71f,
           "LoRA catalog register preserves default scale");
-    CHECK(!registered_style.has_local_path(),
-          "LoRA catalog register scrubs incoming local path");
+    CHECK(!registered_style.has_local_path(), "LoRA catalog register scrubs incoming local path");
     CHECK(!registered_style.has_is_downloaded(),
           "LoRA catalog register scrubs incoming downloaded state");
     rac_proto_buffer_free(&out);
@@ -401,11 +381,10 @@ int test_generated_lora_catalog_register_list_query_get_and_completion() {
     completed.set_completed_at_unix_ms(9999);
     completed.set_status_message("ready");
     std::vector<uint8_t> completed_bytes;
-    CHECK(serialize(completed, &completed_bytes),
-          "LoRA catalog completion request serializes");
+    CHECK(serialize(completed, &completed_bytes), "LoRA catalog completion request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_catalog_mark_download_completed_proto(
-        registry, completed_bytes.data(), completed_bytes.size(), &out);
+    rc = rac_lora_catalog_mark_download_completed_proto(registry, completed_bytes.data(),
+                                                        completed_bytes.size(), &out);
     runanywhere::v1::LoraAdapterDownloadCompletedResult completed_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &completed_result),
           "LoRA catalog completion returns result");
@@ -413,12 +392,10 @@ int test_generated_lora_catalog_register_list_query_get_and_completion() {
           "LoRA catalog completion persists state");
     CHECK(completed_result.entry().local_path() == "/models/lora/style.gguf",
           "LoRA catalog completion stores local path");
-    CHECK(completed_result.entry().is_downloaded(),
-          "LoRA catalog completion marks downloaded");
+    CHECK(completed_result.entry().is_downloaded(), "LoRA catalog completion marks downloaded");
     CHECK(completed_result.entry().downloaded_at_unix_ms() == 9999,
           "LoRA catalog completion stores completion time");
-    CHECK(completed_result.entry().size_bytes() == 1234,
-          "LoRA catalog completion updates size");
+    CHECK(completed_result.entry().size_bytes() == 1234, "LoRA catalog completion updates size");
     CHECK(completed_result.entry().checksum_sha256() == "sha256:downloaded-style",
           "LoRA catalog completion updates checksum");
     rac_proto_buffer_free(&out);
@@ -489,8 +466,7 @@ int test_generated_lora_catalog_negative_errors() {
     runanywhere::v1::LoraAdapterCatalogGetResult get_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &get_result),
           "LoRA catalog get missing returns typed result");
-    CHECK(!get_result.found() &&
-              get_result.error_message().find("not found") != std::string::npos,
+    CHECK(!get_result.found() && get_result.error_message().find("not found") != std::string::npos,
           "LoRA catalog get missing reports not found");
     rac_proto_buffer_free(&out);
 
@@ -498,11 +474,10 @@ int test_generated_lora_catalog_negative_errors() {
     completed.set_adapter_id("missing");
     completed.set_local_path("/models/lora/missing.gguf");
     std::vector<uint8_t> completed_bytes;
-    CHECK(serialize(completed, &completed_bytes),
-          "LoRA negative completion request serializes");
+    CHECK(serialize(completed, &completed_bytes), "LoRA negative completion request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_catalog_mark_download_completed_proto(
-        registry, completed_bytes.data(), completed_bytes.size(), &out);
+    rc = rac_lora_catalog_mark_download_completed_proto(registry, completed_bytes.data(),
+                                                        completed_bytes.size(), &out);
     runanywhere::v1::LoraAdapterDownloadCompletedResult completed_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &completed_result),
           "LoRA catalog completion missing returns typed result");
@@ -513,11 +488,10 @@ int test_generated_lora_catalog_negative_errors() {
     rac_proto_buffer_free(&out);
 
     completed.clear_adapter_id();
-    CHECK(serialize(completed, &completed_bytes),
-          "LoRA invalid completion request serializes");
+    CHECK(serialize(completed, &completed_bytes), "LoRA invalid completion request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_catalog_mark_download_completed_proto(
-        registry, completed_bytes.data(), completed_bytes.size(), &out);
+    rc = rac_lora_catalog_mark_download_completed_proto(registry, completed_bytes.data(),
+                                                        completed_bytes.size(), &out);
     CHECK(rc == RAC_ERROR_INVALID_ARGUMENT && out.status == RAC_ERROR_INVALID_ARGUMENT,
           "LoRA catalog completion requires adapter id");
     rac_proto_buffer_free(&out);
@@ -543,14 +517,12 @@ int test_generated_lora_apply_no_service_typed_error() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_lora_apply_proto(component, bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_lora_apply_proto(component, bytes.data(), bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "LoRA apply no-service returns typed result");
     CHECK(!result.success(), "LoRA apply no-service result is unsuccessful");
-    CHECK(result.request_id() == "apply-no-service",
-          "LoRA apply no-service preserves request id");
+    CHECK(result.request_id() == "apply-no-service", "LoRA apply no-service preserves request id");
     CHECK(result.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "LoRA apply no-service carries component-not-ready code");
     CHECK(result.error_message().find("LoRA service is not loaded") != std::string::npos,
@@ -564,14 +536,13 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
     (void)rac_plugin_unregister("llamacpp");
-    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS,
-          "LoRA service test plugin registers");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA service test plugin registers");
 
     rac_handle_t component = nullptr;
     CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
           "LLM component creates for generated LoRA apply");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm",
-                                       "Mock LLM") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
+              RAC_SUCCESS,
           "LLM component loads mock model for generated LoRA apply");
 
     runanywhere::v1::LoRAApplyRequest apply;
@@ -590,8 +561,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rac_result_t rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "generated LoRA apply returns LoRAApplyResult");
@@ -608,8 +578,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     rac_proto_buffer_init(&out);
     rc = rac_lora_list_proto(component, state_bytes.data(), state_bytes.size(), &out);
     runanywhere::v1::LoRAState state;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "generated LoRA list returns LoRAState");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA list returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA list has no error");
     CHECK(state.has_active_adapters() && state.loaded_adapters_size() == 2,
           "generated LoRA list returns active adapters");
@@ -622,8 +591,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(component, state_bytes.data(), state_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "generated LoRA state returns LoRAState");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA state returns LoRAState");
     CHECK(state.has_active_adapters() && state.loaded_adapters_size() == 2,
           "generated LoRA state mirrors tracked adapters");
     rac_proto_buffer_free(&out);
@@ -677,8 +645,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     CHECK(serialize(remove, &remove_bytes), "generated LoRA clear request serializes");
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(component, remove_bytes.data(), remove_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "generated LoRA clear returns LoRAState");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA clear returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA clear has no error");
     CHECK(!state.has_active_adapters() && state.loaded_adapters_size() == 0,
           "generated LoRA clear returns empty state");
@@ -694,14 +661,13 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
     (void)rac_plugin_unregister("llamacpp");
-    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS,
-          "LoRA unknown-id plugin registers");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA unknown-id plugin registers");
 
     rac_handle_t component = nullptr;
     CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
           "LLM component creates for generated LoRA unknown-id test");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm",
-                                       "Mock LLM") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
+              RAC_SUCCESS,
           "LLM component loads mock model for generated LoRA unknown-id test");
 
     runanywhere::v1::LoRAApplyRequest apply;
@@ -715,8 +681,7 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rac_result_t rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "LoRA apply-before-unknown-id returns result");
@@ -726,8 +691,7 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
     runanywhere::v1::LoRARemoveRequest remove_by_id;
     remove_by_id.add_adapter_ids("missing");
     std::vector<uint8_t> remove_bytes;
-    CHECK(serialize(remove_by_id, &remove_bytes),
-          "LoRA remove unknown-id request serializes");
+    CHECK(serialize(remove_by_id, &remove_bytes), "LoRA remove unknown-id request serializes");
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(component, remove_bytes.data(), remove_bytes.size(), &out);
@@ -753,8 +717,7 @@ int test_generated_lora_state_is_scoped_per_component() {
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
     (void)rac_plugin_unregister("llamacpp");
-    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS,
-          "LoRA scoped-state plugin registers");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA scoped-state plugin registers");
 
     rac_handle_t first = nullptr;
     rac_handle_t second = nullptr;
@@ -762,11 +725,11 @@ int test_generated_lora_state_is_scoped_per_component() {
           "first LLM component creates for scoped LoRA state");
     CHECK(rac_llm_component_create(&second) == RAC_SUCCESS && second != nullptr,
           "second LLM component creates for scoped LoRA state");
-    CHECK(rac_llm_component_load_model(first, "/tmp/model-a.gguf", "model-a",
-                                       "Model A") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(first, "/tmp/model-a.gguf", "model-a", "Model A") ==
+              RAC_SUCCESS,
           "first LLM component loads model for scoped LoRA state");
-    CHECK(rac_llm_component_load_model(second, "/tmp/model-b.gguf", "model-b",
-                                       "Model B") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(second, "/tmp/model-b.gguf", "model-b", "Model B") ==
+              RAC_SUCCESS,
           "second LLM component loads model for scoped LoRA state");
 
     runanywhere::v1::LoRAApplyRequest apply_first;
@@ -776,8 +739,7 @@ int test_generated_lora_state_is_scoped_per_component() {
     first_adapter->set_adapter_id("first");
     first_adapter->set_scale(0.4f);
     std::vector<uint8_t> first_apply_bytes;
-    CHECK(serialize(apply_first, &first_apply_bytes),
-          "first scoped LoRA apply request serializes");
+    CHECK(serialize(apply_first, &first_apply_bytes), "first scoped LoRA apply request serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -813,18 +775,15 @@ int test_generated_lora_state_is_scoped_per_component() {
     runanywhere::v1::LoRAState state;
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(first, state_bytes.data(), state_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "first scoped LoRA state returns state");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "first scoped LoRA state returns state");
     CHECK(state.base_model_id() == "model-a", "first scoped LoRA state keeps model id");
-    CHECK(state.loaded_adapters_size() == 1 &&
-              state_has_adapter(state, "first", "/tmp/first.gguf"),
+    CHECK(state.loaded_adapters_size() == 1 && state_has_adapter(state, "first", "/tmp/first.gguf"),
           "first scoped LoRA state sees only first adapter");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(second, state_bytes.data(), state_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
-          "second scoped LoRA state returns state");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "second scoped LoRA state returns state");
     CHECK(state.base_model_id() == "model-b", "second scoped LoRA state keeps model id");
     CHECK(state.loaded_adapters_size() == 1 &&
               state_has_adapter(state, "second", "/tmp/second.gguf"),
@@ -847,13 +806,21 @@ int main() {
     std::fprintf(stdout, "  skip: LoRA service proto ABI tests (no protobuf)\n");
     return 0;
 #else
-    test_lora_generated_service_contract();
-    test_generated_lora_catalog_register_list_query_get_and_completion();
-    test_generated_lora_catalog_negative_errors();
-    test_generated_lora_apply_no_service_typed_error();
-    test_generated_lora_apply_list_state_remove_and_clear();
-    test_generated_lora_remove_unknown_id_is_typed_error();
-    test_generated_lora_state_is_scoped_per_component();
+    try {
+        test_lora_generated_service_contract();
+        test_generated_lora_catalog_register_list_query_get_and_completion();
+        test_generated_lora_catalog_negative_errors();
+        test_generated_lora_apply_no_service_typed_error();
+        test_generated_lora_apply_list_state_remove_and_clear();
+        test_generated_lora_remove_unknown_id_is_typed_error();
+        test_generated_lora_state_is_scoped_per_component();
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "  FATAL: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "  FATAL: uncaught unknown exception\n");
+        return 1;
+    }
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 #endif

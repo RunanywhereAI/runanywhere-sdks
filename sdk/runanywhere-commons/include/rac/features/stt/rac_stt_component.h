@@ -209,33 +209,26 @@ RAC_API rac_result_t rac_stt_component_detect_language(rac_handle_t handle, cons
  * The byte buffer is valid only for the duration of the callback.
  */
 typedef void (*rac_stt_proto_stream_event_callback_fn)(const uint8_t* event_proto_bytes,
-                                                       size_t event_proto_size,
-                                                       void* user_data);
+                                                       size_t event_proto_size, void* user_data);
 
 /**
  * @brief Transcribe audio using serialized runanywhere.v1.STTOptions bytes.
  *
  * Returns serialized runanywhere.v1.STTOutput bytes in out_result.
  */
-RAC_API rac_result_t rac_stt_component_transcribe_proto(
-    rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data,
+                                                        size_t audio_size,
+                                                        const uint8_t* options_proto_bytes,
+                                                        size_t options_proto_size,
+                                                        rac_proto_buffer_t* out_result);
 
 /**
  * @brief Stream transcription as generated runanywhere.v1.STTStreamEvent bytes.
  */
 RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
-    rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_stt_proto_stream_event_callback_fn callback,
-    void* user_data);
+    rac_handle_t handle, const void* audio_data, size_t audio_size,
+    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_stt_proto_stream_event_callback_fn callback, void* user_data);
 
 // =============================================================================
 // CPP-14 (Wave 1): persistent per-session streaming handles.
@@ -282,8 +275,7 @@ RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
  */
 RAC_API rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle,
                                                                rac_handle_t stream_handle,
-                                                               const int16_t* samples,
-                                                               size_t count,
+                                                               const int16_t* samples, size_t count,
                                                                rac_stt_stream_callback_t callback,
                                                                void* user_data);
 

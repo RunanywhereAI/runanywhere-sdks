@@ -424,12 +424,8 @@ export function streamVoiceAgent(
 }
 
 export const VoiceAgent = {
-  setProvider: setVoiceAgentProvider,
-  setHandle: setVoiceAgentHandle,
-  createHandleProvider: createVoiceAgentHandleProvider,
   availability: getVoiceAgentAvailability,
   isAvailable: isVoiceAgentAvailable,
-  unavailableResult: unavailableVoiceAgentResult,
   initialize: initializeVoiceAgent,
   initializeWithLoadedModels: initializeVoiceAgentWithLoadedModels,
   isReady: isVoiceAgentReady,

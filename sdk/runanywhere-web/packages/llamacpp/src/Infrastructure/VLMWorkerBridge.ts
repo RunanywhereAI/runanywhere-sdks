@@ -28,13 +28,15 @@
 
 import {
   SDKLogger,
-  VLMImage,
+} from '@runanywhere/web/internal';
+import {
   VLMGenerationOptions,
+  VLMImage,
   VLMResult,
-  type VLMImage as ProtoVLMImage,
   type VLMGenerationOptions as ProtoVLMGenerationOptions,
+  type VLMImage as ProtoVLMImage,
   type VLMResult as ProtoVLMResult,
-} from '@runanywhere/web';
+} from '@runanywhere/proto-ts/vlm_options';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
 
@@ -152,7 +154,7 @@ export class VLMWorkerBridge {
 
     const bridge = LlamaCppBridge.shared;
     const useWebGPU = bridge.accelerationMode === 'webgpu';
-    const resolvedUrl = wasmJsUrl ?? bridge.wasmUrl ?? null;
+    const resolvedUrl = wasmJsUrl ?? (useWebGPU ? bridge.webgpuWasmUrl : bridge.wasmUrl) ?? null;
 
     if (!resolvedUrl) {
       throw new Error(
@@ -183,7 +185,7 @@ export class VLMWorkerBridge {
     const isQwenVL =
       /qwen.*vl/i.test(params.modelId) || /qwen.*vl/i.test(params.modelName);
     if (isQwenVL && bridge.accelerationMode === 'webgpu') {
-      const currentUrl = bridge.wasmUrl ?? '';
+      const currentUrl = bridge.webgpuWasmUrl ?? bridge.wasmUrl ?? '';
       const cpuUrl = currentUrl.replace(/-webgpu\.js$/, '.js');
       if (cpuUrl !== currentUrl) {
         logger.info(
@@ -252,10 +254,21 @@ export class VLMWorkerBridge {
     }
   }
 
+  processImage(
+    image: ProtoVLMImage,
+    options: ProtoVLMGenerationOptions,
+  ): Promise<ProtoVLMResult> {
+    return this.process(image, options);
+  }
+
   /** Cancel the in-flight VLM generation. Best-effort — no result returned. */
   cancel(): void {
     if (!this.worker) return;
     this.worker.postMessage({ type: 'cancel', id: -2 });
+  }
+
+  cancelVLMGeneration(): void {
+    this.cancel();
   }
 
   /** Unload the model in the worker (keeps the WASM instance). */

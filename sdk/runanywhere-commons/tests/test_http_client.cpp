@@ -15,17 +15,17 @@
  *   - Resume (start → cancel at 50% → resume → verify merged content)
  */
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
+#include <arpa/inet.h>
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <netinet/in.h>
 #include <sstream>
 #include <string>
+#include <sys/socket.h>
 #include <thread>
 #include <vector>
 
@@ -65,7 +65,8 @@ void write_all(int fd, const void* buf, size_t n) {
     const char* p = static_cast<const char*>(buf);
     while (n > 0) {
         ssize_t w = ::send(fd, p, n, 0);
-        if (w <= 0) return;
+        if (w <= 0)
+            return;
         p += w;
         n -= static_cast<size_t>(w);
     }
@@ -79,34 +80,42 @@ void parse_request(const std::string& raw) {
     g_last_path.clear();
 
     size_t end_of_headers = raw.find("\r\n\r\n");
-    if (end_of_headers == std::string::npos) return;
+    if (end_of_headers == std::string::npos)
+        return;
     std::string head = raw.substr(0, end_of_headers);
     g_last_body = raw.substr(end_of_headers + 4);
 
     std::istringstream iss(head);
     std::string line;
-    if (!std::getline(iss, line)) return;
-    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (!std::getline(iss, line))
+        return;
+    if (!line.empty() && line.back() == '\r')
+        line.pop_back();
     {
         std::istringstream ls(line);
         std::string version;
         ls >> g_last_method >> g_last_path >> version;
     }
     while (std::getline(iss, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.empty()) break;
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (line.empty())
+            break;
         auto c = line.find(':');
-        if (c == std::string::npos) continue;
+        if (c == std::string::npos)
+            continue;
         std::string n = line.substr(0, c);
         std::string v = line.substr(c + 1);
-        while (!v.empty() && (v.front() == ' ' || v.front() == '\t')) v.erase(0, 1);
+        while (!v.empty() && (v.front() == ' ' || v.front() == '\t'))
+            v.erase(0, 1);
         g_last_headers.emplace_back(std::move(n), std::move(v));
     }
 }
 
 std::string header_value(const std::string& name) {
     for (auto& h : g_last_headers) {
-        if (h.first == name) return h.second;
+        if (h.first == name)
+            return h.second;
     }
     return {};
 }
@@ -126,8 +135,8 @@ void respond(int client, int status, const std::string& status_text, const std::
     write_all(client, body.data(), body.size());
 }
 
-void respond_bytes(int client, int status, const std::string& status_text,
-                   const uint8_t* bytes, size_t n,
+void respond_bytes(int client, int status, const std::string& status_text, const uint8_t* bytes,
+                   size_t n,
                    const std::vector<std::pair<std::string, std::string>>& extra_headers = {}) {
     std::ostringstream oss;
     oss << "HTTP/1.1 " << status << " " << status_text << "\r\n";
@@ -148,7 +157,8 @@ void handle_client(int client) {
     std::string raw;
     while (true) {
         ssize_t n = ::recv(client, buf, sizeof(buf), 0);
-        if (n <= 0) break;
+        if (n <= 0)
+            break;
         raw.append(buf, buf + n);
         if (raw.find("\r\n\r\n") != std::string::npos) {
             // If there's a Content-Length, keep reading body.
@@ -158,7 +168,8 @@ void handle_client(int client) {
                 size_t want = std::stoul(cl);
                 while (g_last_body.size() < want) {
                     ssize_t m = ::recv(client, buf, sizeof(buf), 0);
-                    if (m <= 0) break;
+                    if (m <= 0)
+                        break;
                     g_last_body.append(buf, buf + m);
                 }
             }
@@ -172,8 +183,7 @@ void handle_client(int client) {
         respond(client, 200, "OK", g_last_body,
                 {{"X-Echo-Method", g_last_method}, {"X-Echo-Custom", header_value("X-Custom")}});
     } else if (g_last_path == "/redirect-301") {
-        respond(client, 301, "Moved Permanently", "",
-                {{"Location", "/echo"}});
+        respond(client, 301, "Moved Permanently", "", {{"Location", "/echo"}});
     } else if (g_last_path == "/redirect-302") {
         respond(client, 302, "Found", "", {{"Location", "/echo"}});
     } else if (g_last_path == "/redirect-307") {
@@ -216,7 +226,8 @@ void server_loop(int fd) {
         socklen_t len = sizeof(cli);
         int c = ::accept(fd, reinterpret_cast<sockaddr*>(&cli), &len);
         if (c < 0) {
-            if (g_server_running) continue;
+            if (g_server_running)
+                continue;
             break;
         }
         handle_client(c);
@@ -225,7 +236,8 @@ void server_loop(int fd) {
 
 bool start_server() {
     int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) return false;
+    if (fd < 0)
+        return false;
     int one = 1;
     ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
     sockaddr_in addr{};
@@ -274,28 +286,28 @@ std::string server_url(const std::string& path) {
 int g_failures = 0;
 int g_passes = 0;
 
-#define CHECK(cond)                                                                    \
-    do {                                                                               \
-        if (cond) {                                                                    \
-            ++g_passes;                                                                \
-        } else {                                                                       \
-            ++g_failures;                                                              \
-            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__       \
-                      << " — " #cond << "\n";                                          \
-        }                                                                              \
+#define CHECK(cond)                                                                             \
+    do {                                                                                        \
+        if (cond) {                                                                             \
+            ++g_passes;                                                                         \
+        } else {                                                                                \
+            ++g_failures;                                                                       \
+            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__ << " — " #cond \
+                      << "\n";                                                                  \
+        }                                                                                       \
     } while (0)
 
-#define CHECK_EQ_I(a, b)                                                               \
-    do {                                                                               \
-        auto _a = (a);                                                                 \
-        auto _b = (b);                                                                 \
-        if (_a == _b) {                                                                \
-            ++g_passes;                                                                \
-        } else {                                                                       \
-            ++g_failures;                                                              \
-            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__       \
-                      << " — " #a " == " #b " (got " << _a << " vs " << _b << ")\n";   \
-        }                                                                              \
+#define CHECK_EQ_I(a, b)                                                             \
+    do {                                                                             \
+        auto _a = (a);                                                               \
+        auto _b = (b);                                                               \
+        if (_a == _b) {                                                              \
+            ++g_passes;                                                              \
+        } else {                                                                     \
+            ++g_failures;                                                            \
+            std::cerr << "\033[31m[FAIL]\033[0m " << __FILE__ << ":" << __LINE__     \
+                      << " — " #a " == " #b " (got " << _a << " vs " << _b << ")\n"; \
+        }                                                                            \
     } while (0)
 
 // =============================================================================
@@ -497,8 +509,8 @@ void test_resume_merged_matches() {
     // --- pass 2: resume from where we stopped ---------------------
     collect_ctx rest;
     rac_http_response_t r2{};
-    rac_result_t rc = rac_http_request_resume(c, &req, first.bytes.size(), collect_chunks,
-                                              &rest, &r2);
+    rac_result_t rc =
+        rac_http_request_resume(c, &req, first.bytes.size(), collect_chunks, &rest, &r2);
     CHECK_EQ_I(rc, RAC_SUCCESS);
     CHECK_EQ_I(r2.status, 206);
 

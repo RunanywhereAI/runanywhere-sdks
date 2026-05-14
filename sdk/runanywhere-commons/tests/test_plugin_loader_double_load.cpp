@@ -16,7 +16,7 @@
 #include "rac/plugin/rac_primitive.h"
 
 #ifndef RAC_TEST_PLUGIN_PATH
-#  error "RAC_TEST_PLUGIN_PATH must be set by tests/CMakeLists.txt"
+#error "RAC_TEST_PLUGIN_PATH must be set by tests/CMakeLists.txt"
 #endif
 
 int main() {
@@ -41,15 +41,12 @@ int main() {
      * that the count does not grow. */
     rc = rac_registry_load_plugin(RAC_TEST_PLUGIN_PATH);
     if (rc != RAC_SUCCESS && rc != RAC_ERROR_PLUGIN_DUPLICATE) {
-        std::fprintf(stderr,
-                     "second load returned unexpected code: %d\n",
-                     static_cast<int>(rc));
+        std::fprintf(stderr, "second load returned unexpected code: %d\n", static_cast<int>(rc));
         return 1;
     }
     size_t count_after_second = rac_registry_plugin_count();
     if (count_after_second != count_after_first) {
-        std::fprintf(stderr,
-                     "registry leaked: count after first=%zu, after second=%zu\n",
+        std::fprintf(stderr, "registry leaked: count after first=%zu, after second=%zu\n",
                      count_after_first, count_after_second);
         return 1;
     }
@@ -68,8 +65,7 @@ int main() {
     /* (4) Unloading a name that no longer exists returns NOT_FOUND, never crash. */
     rc = rac_registry_unload_plugin("test_plugin");
     if (rc != RAC_ERROR_NOT_FOUND) {
-        std::fprintf(stderr,
-                     "second unload returned unexpected: %d (want NOT_FOUND)\n",
+        std::fprintf(stderr, "second unload returned unexpected: %d (want NOT_FOUND)\n",
                      static_cast<int>(rc));
         return 1;
     }

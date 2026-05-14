@@ -23,67 +23,67 @@
 namespace {
 
 // InferenceFramework
-constexpr int32_t kProtoIfwUnspecified       = 0;
-constexpr int32_t kProtoIfwOnnx              = 1;
-constexpr int32_t kProtoIfwLlamaCpp          = 2;
-constexpr int32_t kProtoIfwFoundationModels  = 3;
-constexpr int32_t kProtoIfwSystemTts         = 4;
-constexpr int32_t kProtoIfwFluidAudio        = 5;
-constexpr int32_t kProtoIfwCoreml            = 6;
-constexpr int32_t kProtoIfwMlx               = 7;
-constexpr int32_t kProtoIfwWhisperkitCoreml  = 8;
-constexpr int32_t kProtoIfwMetalrt           = 9;
-constexpr int32_t kProtoIfwGenie             = 10;
-constexpr int32_t kProtoIfwTflite            = 11;
-constexpr int32_t kProtoIfwExecutorch        = 12;
-constexpr int32_t kProtoIfwMediapipe         = 13;
-constexpr int32_t kProtoIfwMlc               = 14;
-constexpr int32_t kProtoIfwPicoLlm           = 15;
-constexpr int32_t kProtoIfwPiperTts          = 16;
-constexpr int32_t kProtoIfwWhisperkit        = 17;
-constexpr int32_t kProtoIfwOpenaiWhisper     = 18;
+constexpr int32_t kProtoIfwUnspecified = 0;
+constexpr int32_t kProtoIfwOnnx = 1;
+constexpr int32_t kProtoIfwLlamaCpp = 2;
+constexpr int32_t kProtoIfwFoundationModels = 3;
+constexpr int32_t kProtoIfwSystemTts = 4;
+constexpr int32_t kProtoIfwFluidAudio = 5;
+constexpr int32_t kProtoIfwCoreml = 6;
+constexpr int32_t kProtoIfwMlx = 7;
+constexpr int32_t kProtoIfwWhisperkitCoreml = 8;
+constexpr int32_t kProtoIfwMetalrt = 9;
+constexpr int32_t kProtoIfwGenie = 10;
+constexpr int32_t kProtoIfwTflite = 11;
+constexpr int32_t kProtoIfwExecutorch = 12;
+constexpr int32_t kProtoIfwMediapipe = 13;
+constexpr int32_t kProtoIfwMlc = 14;
+constexpr int32_t kProtoIfwPicoLlm = 15;
+constexpr int32_t kProtoIfwPiperTts = 16;
+constexpr int32_t kProtoIfwWhisperkit = 17;
+constexpr int32_t kProtoIfwOpenaiWhisper = 18;
 constexpr int32_t kProtoIfwSwiftTransformers = 19;
-constexpr int32_t kProtoIfwBuiltIn           = 20;
-constexpr int32_t kProtoIfwNone              = 21;
-constexpr int32_t kProtoIfwUnknown           = 22;
-constexpr int32_t kProtoIfwSherpa            = 23;
+constexpr int32_t kProtoIfwBuiltIn = 20;
+constexpr int32_t kProtoIfwNone = 21;
+constexpr int32_t kProtoIfwUnknown = 22;
+constexpr int32_t kProtoIfwSherpa = 23;
 
 // ModelCategory
-constexpr int32_t kProtoMcUnspecified              = 0;
-constexpr int32_t kProtoMcLanguage                 = 1;
-constexpr int32_t kProtoMcSpeechRecognition        = 2;
-constexpr int32_t kProtoMcSpeechSynthesis          = 3;
-constexpr int32_t kProtoMcVision                   = 4;
-constexpr int32_t kProtoMcImageGeneration          = 5;
-constexpr int32_t kProtoMcMultimodal               = 6;
-constexpr int32_t kProtoMcAudio                    = 7;
-constexpr int32_t kProtoMcEmbedding                = 8;
-constexpr int32_t kProtoMcVoiceActivityDetection   = 9;
+constexpr int32_t kProtoMcUnspecified = 0;
+constexpr int32_t kProtoMcLanguage = 1;
+constexpr int32_t kProtoMcSpeechRecognition = 2;
+constexpr int32_t kProtoMcSpeechSynthesis = 3;
+constexpr int32_t kProtoMcVision = 4;
+constexpr int32_t kProtoMcImageGeneration = 5;
+constexpr int32_t kProtoMcMultimodal = 6;
+constexpr int32_t kProtoMcAudio = 7;
+constexpr int32_t kProtoMcEmbedding = 8;
+constexpr int32_t kProtoMcVoiceActivityDetection = 9;
 
 // ModelSource
 constexpr int32_t kProtoMsUnspecified = 0;
-constexpr int32_t kProtoMsRemote      = 1;
-constexpr int32_t kProtoMsLocal       = 2;
-constexpr int32_t kProtoMsBuiltIn     = 3;
+constexpr int32_t kProtoMsRemote = 1;
+constexpr int32_t kProtoMsLocal = 2;
+constexpr int32_t kProtoMsBuiltIn = 3;
 
 // ArchiveType
 constexpr int32_t kProtoAtUnspecified = 0;
-constexpr int32_t kProtoAtZip         = 1;
-constexpr int32_t kProtoAtTarBz2      = 2;
-constexpr int32_t kProtoAtTarGz       = 3;
-constexpr int32_t kProtoAtTarXz       = 4;
+constexpr int32_t kProtoAtZip = 1;
+constexpr int32_t kProtoAtTarBz2 = 2;
+constexpr int32_t kProtoAtTarGz = 3;
+constexpr int32_t kProtoAtTarXz = 4;
 
 // ArchiveStructure
-constexpr int32_t kProtoAsUnspecified       = 0;
-constexpr int32_t kProtoAsSingleFileNested  = 1;
-constexpr int32_t kProtoAsDirectoryBased    = 2;
-constexpr int32_t kProtoAsNestedDirectory   = 3;
-constexpr int32_t kProtoAsUnknown           = 4;
+constexpr int32_t kProtoAsUnspecified = 0;
+constexpr int32_t kProtoAsSingleFileNested = 1;
+constexpr int32_t kProtoAsDirectoryBased = 2;
+constexpr int32_t kProtoAsNestedDirectory = 3;
+constexpr int32_t kProtoAsUnknown = 4;
 
 // ModelFormat — these already match rac_model_format_t value-for-value via
 // RAC_MODEL_FORMAT_ID_*, so listing them here is for documentation.
 constexpr int32_t kProtoMfUnspecified = 0;
-constexpr int32_t kProtoMfUnknown     = 15;
+constexpr int32_t kProtoMfUnknown = 15;
 
 }  // namespace
 
@@ -442,8 +442,7 @@ rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out) {
 // ArchiveStructure
 // =============================================================================
 
-rac_result_t rac_archive_structure_from_proto(int32_t proto_value,
-                                              rac_archive_structure_t* out) {
+rac_result_t rac_archive_structure_from_proto(int32_t proto_value, rac_archive_structure_t* out) {
     if (out == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

@@ -341,6 +341,7 @@ RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t*
 
 #include <sstream>
 #include <string>
+#include <utility>
 
 namespace rac {
 
@@ -355,7 +356,7 @@ namespace rac {
 class Logger {
    public:
     explicit Logger(const char* category) : category_(category) {}
-    explicit Logger(const std::string& category) : category_(category) {}
+    explicit Logger(std::string category) : category_(std::move(category)) {}
 
     void trace(const char* format, ...) const {
         if (RAC_LOG_TRACE < rac_logger_get_min_level())

@@ -39,16 +39,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -76,8 +75,7 @@ std::string g_last_vlm_create_config;
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    return out->empty() ||
-           message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+    return out->empty() || message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
 template <typename T>
@@ -90,7 +88,8 @@ bool poll_event(runanywhere::v1::SDKEvent* out) {
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
     const rac_result_t rc = rac_sdk_event_poll(&buffer);
-    if (rc != RAC_SUCCESS) return false;
+    if (rc != RAC_SUCCESS)
+        return false;
     const bool ok = out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
     rac_proto_buffer_free(&buffer);
     return ok;
@@ -99,15 +98,17 @@ bool poll_event(runanywhere::v1::SDKEvent* out) {
 bool poll_capability(runanywhere::v1::CapabilityOperationEventKind kind) {
     for (int i = 0; i < 32; ++i) {
         runanywhere::v1::SDKEvent event;
-        if (!poll_event(&event)) return false;
-        if (event.has_capability() && event.capability().kind() == kind) return true;
+        if (!poll_event(&event))
+            return false;
+        if (event.has_capability() && event.capability().kind() == kind)
+            return true;
     }
     return false;
 }
 
 std::filesystem::path temp_root(const char* name) {
-    auto root = std::filesystem::temp_directory_path() /
-                ("rac-advanced-modality-" + std::string(name));
+    auto root =
+        std::filesystem::temp_directory_path() / ("rac-advanced-modality-" + std::string(name));
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     return root;
@@ -119,7 +120,8 @@ void write_file(const std::filesystem::path& path, const std::string& contents) 
 }
 
 rac_result_t dummy_vlm_create(const char* model_id, const char* config_json, void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new DummyVlm();
     g_last_vlm_create_model = model_id ? model_id : "";
     g_last_vlm_create_config = config_json ? config_json : "";
@@ -133,7 +135,8 @@ rac_result_t dummy_vlm_initialize(void*, const char*, const char*) {
 
 rac_result_t dummy_vlm_process(void*, const rac_vlm_image_t* image, const char* prompt,
                                const rac_vlm_options_t*, rac_vlm_result_t* out_result) {
-    if (!image || !prompt || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!image || !prompt || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     std::string text = std::string("vlm:") + prompt;
     out_result->text = rac_strdup(text.c_str());
     out_result->prompt_tokens = 2;
@@ -144,12 +147,14 @@ rac_result_t dummy_vlm_process(void*, const rac_vlm_image_t* image, const char* 
     return out_result->text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
 }
 
-rac_result_t dummy_vlm_stream(void*, const rac_vlm_image_t*, const char*,
-                              const rac_vlm_options_t*, rac_vlm_stream_callback_fn callback,
-                              void* user_data) {
-    if (!callback) return RAC_ERROR_NULL_POINTER;
-    if (callback("hello", user_data) != RAC_TRUE) return RAC_ERROR_CANCELLED;
-    if (callback(" vision", user_data) != RAC_TRUE) return RAC_ERROR_CANCELLED;
+rac_result_t dummy_vlm_stream(void*, const rac_vlm_image_t*, const char*, const rac_vlm_options_t*,
+                              rac_vlm_stream_callback_fn callback, void* user_data) {
+    if (!callback)
+        return RAC_ERROR_NULL_POINTER;
+    if (callback("hello", user_data) != RAC_TRUE)
+        return RAC_ERROR_CANCELLED;
+    if (callback(" vision", user_data) != RAC_TRUE)
+        return RAC_ERROR_CANCELLED;
     return RAC_SUCCESS;
 }
 
@@ -164,11 +169,13 @@ void dummy_vlm_destroy(void* impl) {
 
 rac_result_t fill_embeddings(const char* const* texts, size_t count,
                              rac_embeddings_result_t* out_result) {
-    if (!texts || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!texts || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     constexpr size_t kDim = 3;
-    out_result->embeddings = static_cast<rac_embedding_vector_t*>(
-        rac_alloc(sizeof(rac_embedding_vector_t) * count));
-    if (!out_result->embeddings) return RAC_ERROR_OUT_OF_MEMORY;
+    out_result->embeddings =
+        static_cast<rac_embedding_vector_t*>(rac_alloc(sizeof(rac_embedding_vector_t) * count));
+    if (!out_result->embeddings)
+        return RAC_ERROR_OUT_OF_MEMORY;
     std::memset(out_result->embeddings, 0, sizeof(rac_embedding_vector_t) * count);
     out_result->num_embeddings = count;
     out_result->dimension = kDim;
@@ -177,7 +184,8 @@ rac_result_t fill_embeddings(const char* const* texts, size_t count,
     for (size_t i = 0; i < count; ++i) {
         out_result->embeddings[i].dimension = kDim;
         out_result->embeddings[i].data = static_cast<float*>(rac_alloc(sizeof(float) * kDim));
-        if (!out_result->embeddings[i].data) return RAC_ERROR_OUT_OF_MEMORY;
+        if (!out_result->embeddings[i].data)
+            return RAC_ERROR_OUT_OF_MEMORY;
         out_result->embeddings[i].data[0] = 1.0f;
         out_result->embeddings[i].data[1] = 0.0f;
         out_result->embeddings[i].data[2] = 0.0f;
@@ -186,7 +194,8 @@ rac_result_t fill_embeddings(const char* const* texts, size_t count,
 }
 
 rac_result_t dummy_embeddings_create(const char*, const char*, void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = new DummyEmbeddings();
     return RAC_SUCCESS;
 }
@@ -195,16 +204,15 @@ rac_result_t dummy_embeddings_initialize(void*, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t dummy_embeddings_embed(void* impl, const char* text,
-                                    const rac_embeddings_options_t*,
+rac_result_t dummy_embeddings_embed(void* impl, const char* text, const rac_embeddings_options_t*,
                                     rac_embeddings_result_t* out_result) {
     static_cast<DummyEmbeddings*>(impl)->embed_count += 1;
     const char* texts[] = {text};
     return fill_embeddings(texts, 1, out_result);
 }
 
-rac_result_t dummy_embeddings_embed_batch(void* impl, const char* const* texts,
-                                          size_t count, const rac_embeddings_options_t*,
+rac_result_t dummy_embeddings_embed_batch(void* impl, const char* const* texts, size_t count,
+                                          const rac_embeddings_options_t*,
                                           rac_embeddings_result_t* out_result) {
     static_cast<DummyEmbeddings*>(impl)->embed_count += static_cast<int>(count);
     return fill_embeddings(texts, count, out_result);
@@ -216,10 +224,12 @@ void dummy_embeddings_destroy(void* impl) {
 
 rac_result_t dummy_diffusion_generate(void*, const rac_diffusion_options_t* options,
                                       rac_diffusion_result_t* out_result) {
-    if (!options || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!options || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     out_result->image_size = 4;
     out_result->image_data = static_cast<uint8_t*>(rac_alloc(out_result->image_size));
-    if (!out_result->image_data) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->image_data)
+        return RAC_ERROR_OUT_OF_MEMORY;
     out_result->image_data[0] = 1;
     out_result->image_data[1] = 2;
     out_result->image_data[2] = 3;
@@ -233,8 +243,7 @@ rac_result_t dummy_diffusion_generate(void*, const rac_diffusion_options_t* opti
 }
 
 rac_result_t dummy_diffusion_progress(void* impl, const rac_diffusion_options_t* options,
-                                      rac_diffusion_progress_callback_fn callback,
-                                      void* user_data,
+                                      rac_diffusion_progress_callback_fn callback, void* user_data,
                                       rac_diffusion_result_t* out_result) {
     if (callback) {
         rac_diffusion_progress_t progress = {};
@@ -242,7 +251,8 @@ rac_result_t dummy_diffusion_progress(void* impl, const rac_diffusion_options_t*
         progress.current_step = 1;
         progress.total_steps = 2;
         progress.stage = "Denoising";
-        if (callback(&progress, user_data) != RAC_TRUE) return RAC_ERROR_CANCELLED;
+        if (callback(&progress, user_data) != RAC_TRUE)
+            return RAC_ERROR_CANCELLED;
     }
     return dummy_diffusion_generate(impl, options, out_result);
 }
@@ -253,7 +263,8 @@ rac_result_t dummy_diffusion_cancel(void* impl) {
 }
 
 rac_result_t dummy_llm_create(const char*, const char*, void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = new DummyLlm();
     return RAC_SUCCESS;
 }
@@ -272,9 +283,12 @@ rac_result_t dummy_llm_generate(void*, const char*, const rac_llm_options_t*,
 
 rac_result_t dummy_llm_stream(void*, const char*, const rac_llm_options_t*,
                               rac_llm_stream_callback_fn callback, void* user_data) {
-    if (!callback) return RAC_ERROR_NULL_POINTER;
-    if (callback("mock ", user_data) != RAC_TRUE) return RAC_ERROR_CANCELLED;
-    if (callback("answer", user_data) != RAC_TRUE) return RAC_ERROR_CANCELLED;
+    if (!callback)
+        return RAC_ERROR_NULL_POINTER;
+    if (callback("mock ", user_data) != RAC_TRUE)
+        return RAC_ERROR_CANCELLED;
+    if (callback("answer", user_data) != RAC_TRUE)
+        return RAC_ERROR_CANCELLED;
     return RAC_SUCCESS;
 }
 
@@ -356,8 +370,8 @@ int test_missing_component_and_parse_error() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_embeddings_embed_batch_proto(
-        nullptr, request_bytes.data(), request_bytes.size(), &out);
+    rac_result_t rc =
+        rac_embeddings_embed_batch_proto(nullptr, request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc == RAC_ERROR_COMPONENT_NOT_READY,
           "missing embeddings component returns component-not-ready");
     CHECK(out.status == RAC_ERROR_COMPONENT_NOT_READY,
@@ -490,8 +504,7 @@ int test_embeddings_mocked_result() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_embeddings_embed_batch_proto(&service, bytes.data(), bytes.size(), &out);
+    rac_result_t rc = rac_embeddings_embed_batch_proto(&service, bytes.data(), bytes.size(), &out);
     runanywhere::v1::EmbeddingsResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "embeddings proto returns EmbeddingsResult");
@@ -500,11 +513,9 @@ int test_embeddings_mocked_result() {
     CHECK(result.vectors(0).text() == "alpha", "embeddings result preserves text ordering");
     CHECK(result.vectors(0).values_size() == 3 && result.vectors(0).values(0) == 1.0f,
           "embeddings result carries mocked values");
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED),
           "embeddings emits started capability event");
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED),
           "embeddings emits completed capability event");
     rac_proto_buffer_free(&out);
     return 0;
@@ -554,16 +565,14 @@ int test_diffusion_progress_cancel_and_unsupported() {
           "diffusion progress bytes decode");
     rac_proto_buffer_free(&out);
 
-    CHECK(rac_diffusion_cancel_proto(&service) == RAC_SUCCESS,
-          "diffusion cancel proto succeeds");
+    CHECK(rac_diffusion_cancel_proto(&service) == RAC_SUCCESS, "diffusion cancel proto succeeds");
     CHECK(impl.cancel_count == 1, "diffusion cancel dispatches backend cancel");
 
     rac_diffusion_service_ops_t unsupported_ops{};
     rac_diffusion_service_t unsupported_service{&unsupported_ops, &impl, "unsupported"};
     rac_proto_buffer_init(&out);
     rc = rac_diffusion_generate_proto(&unsupported_service, bytes.data(), bytes.size(), &out);
-    CHECK(rc == RAC_ERROR_NOT_SUPPORTED,
-          "unsupported diffusion backend returns typed C ABI error");
+    CHECK(rc == RAC_ERROR_NOT_SUPPORTED, "unsupported diffusion backend returns typed C ABI error");
     CHECK(out.status == RAC_ERROR_NOT_SUPPORTED,
           "unsupported diffusion backend marks proto buffer error");
     rac_proto_buffer_free(&out);
@@ -609,8 +618,7 @@ int test_rag_ingest_query_mocked_path() {
     llm_model.format = RAC_MODEL_FORMAT_GGUF;
     llm_model.framework = RAC_FRAMEWORK_LLAMACPP;
     llm_model.local_path = const_cast<char*>(llm_path_str.c_str());
-    CHECK(rac_register_model(&llm_model) == RAC_SUCCESS,
-          "RAG LLM model registers globally");
+    CHECK(rac_register_model(&llm_model) == RAC_SUCCESS, "RAG LLM model registers globally");
 
     runanywhere::v1::RAGConfiguration config;
     config.set_embedding_model_id("rag.embedding.mock");
@@ -625,7 +633,7 @@ int test_rag_ingest_query_mocked_path() {
 
     rac_handle_t session = nullptr;
     CHECK(rac_rag_session_create_proto(config_bytes.data(), config_bytes.size(), &session) ==
-              RAC_SUCCESS &&
+                  RAC_SUCCESS &&
               session != nullptr,
           "RAG session creates from proto");
 
@@ -651,11 +659,9 @@ int test_rag_ingest_query_mocked_path() {
     // CPP-07: bespoke RAG ingestion publishes the canonical SDKEvent
     // capability lifecycle (matches what an L5 solution composing
     // embed -> retrieve would emit on its event stream).
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED),
           "RAG ingest publishes RAG_INGESTION_STARTED");
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED),
           "RAG ingest publishes RAG_INGESTION_COMPLETED");
 
     runanywhere::v1::RAGQueryOptions query;
@@ -673,11 +679,9 @@ int test_rag_ingest_query_mocked_path() {
     rac_proto_buffer_free(&out);
     // CPP-07: bespoke RAG query path emits the canonical query lifecycle
     // events (equivalent to an L5 retrieve -> generate solution).
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED),
           "RAG query publishes RAG_QUERY_STARTED");
-    CHECK(poll_capability(
-              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
           "RAG query publishes RAG_QUERY_COMPLETED");
 
     rac_proto_buffer_init(&out);
@@ -744,8 +748,8 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(serialize(entry, &entry_bytes), "LoRA catalog entry serializes");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_lora_register_proto(registry, entry_bytes.data(),
-                                              entry_bytes.size(), &out);
+    rac_result_t rc =
+        rac_lora_register_proto(registry, entry_bytes.data(), entry_bytes.size(), &out);
     runanywhere::v1::LoraAdapterCatalogEntry registered;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &registered),
           "LoRA register returns catalog entry");
@@ -761,8 +765,8 @@ int test_lora_register_compat_apply_remove_clear() {
     rac_handle_t component = nullptr;
     CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
           "LLM component creates for LoRA");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm",
-                                       "Mock LLM") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
+              RAC_SUCCESS,
           "LLM component loads mocked model");
 
     runanywhere::v1::LoRAAdapterConfig config;
@@ -818,8 +822,8 @@ int test_lora_register_compat_apply_remove_clear() {
     component = nullptr;
     CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
           "LLM component creates for unsupported LoRA check");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm",
-                                       "Mock LLM") == RAC_SUCCESS,
+    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
+              RAC_SUCCESS,
           "LLM component loads non-LoRA model");
     rac_proto_buffer_init(&out);
     rc = rac_lora_compatibility_proto(component, config_bytes.data(), config_bytes.size(), &out);

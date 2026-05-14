@@ -47,7 +47,7 @@ interface WorkerWasmModule {
   UTF8ToString(ptr: number, maxBytesToRead?: number): string;
   stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): void | number;
   lengthBytesUTF8(str: string): number;
-  addFunction(fn: (...args: number[]) => number | void, signature: string): number;
+  addFunction(fn: (...args: number[]) => number | bigint | void, signature: string): number;
   removeFunction?(ptr: number): void;
   ccall(
     name: string,
@@ -339,7 +339,7 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
   m.setValue(adapterPtr + getAdapterOffset('track_error'), 0, '*');
 
   // now_ms: int64_t (*)(void* user_data)
-  const nowMsCb = m.addFunction((_ud: number) => Date.now(), 'ii');
+  const nowMsCb = m.addFunction((_ud: number) => BigInt(Date.now()), 'ji');
   m.setValue(adapterPtr + getAdapterOffset('now_ms'), nowMsCb, '*');
 
   // get_memory_info: rac_result_t (*)(rac_memory_info_t* out_info, void* user_data)

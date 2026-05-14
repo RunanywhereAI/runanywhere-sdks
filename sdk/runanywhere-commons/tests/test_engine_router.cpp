@@ -62,7 +62,8 @@ const rac_runtime_vtable_v2_t k_noop_runtime_v2 = {
     /* .reserved_7     = */ nullptr,
 };
 
-rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name, int32_t priority = 100) {
+rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name,
+                                     int32_t priority = 100) {
     rac_runtime_vtable_t v{};
     v.metadata.abi_version = RAC_RUNTIME_ABI_VERSION;
     v.metadata.id = id;
@@ -75,36 +76,36 @@ rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name, int3
     return v;
 }
 
-rac_engine_vtable_t make_vt(const char* name, int32_t priority,
-                            const rac_runtime_id_t* rts, size_t rts_n,
-                            const uint32_t* fmts, size_t fmts_n,
+rac_engine_vtable_t make_vt(const char* name, int32_t priority, const rac_runtime_id_t* rts,
+                            size_t rts_n, const uint32_t* fmts, size_t fmts_n,
                             rac_result_t (*capability_check)(void) = nullptr) {
     rac_engine_vtable_t v{};
-    v.metadata.abi_version    = RAC_PLUGIN_API_VERSION;
-    v.metadata.name           = name;
-    v.metadata.display_name   = name;
+    v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    v.metadata.name = name;
+    v.metadata.display_name = name;
     v.metadata.engine_version = "0.0.0";
-    v.metadata.priority       = priority;
-    v.metadata.runtimes       = rts;
+    v.metadata.priority = priority;
+    v.metadata.runtimes = rts;
     v.metadata.runtimes_count = rts_n;
-    v.metadata.formats        = fmts;
-    v.metadata.formats_count  = fmts_n;
-    v.capability_check        = capability_check;
+    v.metadata.formats = fmts;
+    v.metadata.formats_count = fmts_n;
+    v.capability_check = capability_check;
     /* Single sentinel pointer reused for all primitive slots — never deref'd. */
     v.llm_ops = reinterpret_cast<const struct rac_llm_service_ops*>(&k_sentinel);
     return v;
 }
 
 int test_count = 0, fail_count = 0;
-#define CHECK(cond, label) do { \
-    ++test_count; \
-    if (!(cond)) { \
-        ++fail_count; \
-        std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
-    } else { \
-        std::fprintf(stdout, "  ok:   %s\n", label); \
-    } \
-} while (0)
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) — %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
+    } while (0)
 
 /* Build a router that lies about hardware so tests are deterministic
  * regardless of which CI node we run on. */
@@ -124,16 +125,16 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t metal[] = {RAC_RUNTIME_METAL};
-        const rac_runtime_id_t cpu[]   = {RAC_RUNTIME_CPU};
+        const rac_runtime_id_t cpu[] = {RAC_RUNTIME_CPU};
         auto rt_metal = make_runtime_vt(RAC_RUNTIME_METAL, "metal-test");
         rac_runtime_register(&rt_metal);
         auto v_metal = make_vt("metal_engine", 50, metal, 1, nullptr, 0);
-        auto v_cpu   = make_vt("cpu_engine",   50, cpu,   1, nullptr, 0);
+        auto v_cpu = make_vt("cpu_engine", 50, cpu, 1, nullptr, 0);
         rac_plugin_register(&v_metal);
         rac_plugin_register(&v_cpu);
 
         rac::router::RouteRequest req;
-        req.primitive         = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.preferred_runtime = RAC_RUNTIME_METAL;
         auto result = router.route(req);
         CHECK(result.vtable == &v_metal, "(1) Metal plugin wins over CPU plugin");
@@ -148,22 +149,24 @@ int main() {
     /* --- (2) ANEHintSelectsWhisperKit ------------------------------------ */
     {
         rac::router::HardwareProfile prof{};
-        prof.has_ane = true; prof.has_coreml = true; prof.has_metal = true;
+        prof.has_ane = true;
+        prof.has_coreml = true;
+        prof.has_metal = true;
         rac::router::EngineRouter router(prof);
 
-        const rac_runtime_id_t ane_rts[]  = {RAC_RUNTIME_COREML, RAC_RUNTIME_ANE};
+        const rac_runtime_id_t ane_rts[] = {RAC_RUNTIME_COREML, RAC_RUNTIME_ANE};
         const rac_runtime_id_t onnx_rts[] = {RAC_RUNTIME_ONNXRT};
         auto rt_ane = make_runtime_vt(RAC_RUNTIME_ANE, "ane-test");
         auto rt_onnxrt = make_runtime_vt(RAC_RUNTIME_ONNXRT, "onnxrt-test");
         rac_runtime_register(&rt_ane);
         rac_runtime_register(&rt_onnxrt);
-        auto v_wkit = make_vt("whisperkit_coreml", 110, ane_rts,  2, nullptr, 0);
-        auto v_onnx = make_vt("onnx",                80, onnx_rts, 1, nullptr, 0);
+        auto v_wkit = make_vt("whisperkit_coreml", 110, ane_rts, 2, nullptr, 0);
+        auto v_onnx = make_vt("onnx", 80, onnx_rts, 1, nullptr, 0);
         rac_plugin_register(&v_wkit);
         rac_plugin_register(&v_onnx);
 
         rac::router::RouteRequest req;
-        req.primitive         = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.preferred_runtime = RAC_RUNTIME_ANE;
         auto result = router.route(req);
         CHECK(result.vtable == &v_wkit, "(2) ANE hint picks WhisperKit over ONNX");
@@ -179,13 +182,13 @@ int main() {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
 
-        auto v_low  = make_vt("forced",      10, nullptr, 0, nullptr, 0);
+        auto v_low = make_vt("forced", 10, nullptr, 0, nullptr, 0);
         auto v_high = make_vt("would_win", 1000, nullptr, 0, nullptr, 0);
         rac_plugin_register(&v_low);
         rac_plugin_register(&v_high);
 
         rac::router::RouteRequest req;
-        req.primitive     = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.pinned_engine = "forced";
         auto result = router.route(req);
         CHECK(result.vtable == &v_low, "(3) pinned_engine hard-wins over higher priority");
@@ -203,13 +206,12 @@ int main() {
         rac_plugin_register(&v);
 
         rac::router::RouteRequest req;
-        req.primitive     = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.pinned_engine = "absent";
-        req.no_fallback   = true;
+        req.no_fallback = true;
         auto result = router.route(req);
         CHECK(result.vtable == nullptr, "(4) no_fallback + missing pin → no plugin");
-        CHECK(!result.rejection_reason.empty(),
-              "(4) router populates rejection_reason");
+        CHECK(!result.rejection_reason.empty(), "(4) router populates rejection_reason");
 
         rac_plugin_unregister("present");
     }
@@ -220,7 +222,7 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         auto a = make_vt("a", 50, nullptr, 0, nullptr, 0);
-        auto b = make_vt("b", 50, nullptr, 0, nullptr, 0);  /* tied with a on score */
+        auto b = make_vt("b", 50, nullptr, 0, nullptr, 0); /* tied with a on score */
         auto c = make_vt("c", 30, nullptr, 0, nullptr, 0);
         rac_plugin_register(&a);
         rac_plugin_register(&b);
@@ -232,7 +234,8 @@ int main() {
         bool deterministic = true;
         for (int i = 0; i < 1000; ++i) {
             if (router.route(req).vtable != first_winner) {
-                deterministic = false; break;
+                deterministic = false;
+                break;
             }
         }
         CHECK(deterministic, "(5) 1000 routes return same winner (deterministic tiebreak)");
@@ -256,8 +259,8 @@ int main() {
         rac_plugin_register(&v_hi);
 
         rac::router::RouteRequest req;
-        req.primitive         = RAC_PRIMITIVE_GENERATE_TEXT;
-        req.preferred_runtime = RAC_RUNTIME_METAL;  /* ignored — neither declares it */
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.preferred_runtime = RAC_RUNTIME_METAL; /* ignored — neither declares it */
         auto result = router.route(req);
         CHECK(result.vtable == &v_hi, "(6) legacy NULL-runtime plugins routed by priority");
 
@@ -386,8 +389,8 @@ int main() {
 
         const rac_engine_vtable_t* out = nullptr;
         rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
-        CHECK(rc == RAC_SUCCESS,    "(C) rac_plugin_route returns RAC_SUCCESS");
-        CHECK(out == &v,            "(C) rac_plugin_route returns the registered vt");
+        CHECK(rc == RAC_SUCCESS, "(C) rac_plugin_route returns RAC_SUCCESS");
+        CHECK(out == &v, "(C) rac_plugin_route returns the registered vt");
 
         rac_plugin_unregister("c_abi_smoke");
     }
@@ -416,15 +419,13 @@ int main() {
         auto result = router.route(req);
         CHECK(result.vtable == nullptr,
               "(CPP-05.1) Metal-only engine rejected when Metal runtime not registered");
-        CHECK(!result.rejection_reason.empty(),
-              "(CPP-05.1) router populates rejection_reason");
+        CHECK(!result.rejection_reason.empty(), "(CPP-05.1) router populates rejection_reason");
 
         const rac_engine_vtable_t* out = nullptr;
         rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
               "(CPP-05.1) rac_plugin_route surfaces RAC_ERROR_RUNTIME_UNAVAILABLE");
-        CHECK(out == nullptr,
-              "(CPP-05.1) rac_plugin_route leaves out_vtable NULL on runtime miss");
+        CHECK(out == nullptr, "(CPP-05.1) rac_plugin_route leaves out_vtable NULL on runtime miss");
 
         rac_plugin_unregister("metal_only_engine");
     }
@@ -491,10 +492,10 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t coreml_rts[] = {RAC_RUNTIME_COREML};
-        const rac_runtime_id_t cpu_rts[]    = {RAC_RUNTIME_CPU};
+        const rac_runtime_id_t cpu_rts[] = {RAC_RUNTIME_CPU};
 
         auto v_coreml = make_vt("coreml_high_prio", 500, coreml_rts, 1, nullptr, 0);
-        auto v_cpu    = make_vt("cpu_low_prio",      10, cpu_rts,    1, nullptr, 0);
+        auto v_cpu = make_vt("cpu_low_prio", 10, cpu_rts, 1, nullptr, 0);
         rac_plugin_register(&v_coreml);
         rac_plugin_register(&v_cpu);
 
@@ -539,8 +540,7 @@ int main() {
         /* Engine that serves STT, never LLM — primitive bucket isolation. */
         auto v_stt = make_vt("stt_only_engine", 50, nullptr, 0, nullptr, 0);
         v_stt.llm_ops = nullptr;
-        v_stt.stt_ops =
-            reinterpret_cast<const struct rac_stt_service_ops*>(&k_sentinel);
+        v_stt.stt_ops = reinterpret_cast<const struct rac_stt_service_ops*>(&k_sentinel);
         rac_plugin_register(&v_stt);
 
         const rac_engine_vtable_t* out = nullptr;
@@ -548,8 +548,7 @@ int main() {
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
               "(CPP-05.5) C ABI returns RAC_ERROR_RUNTIME_UNAVAILABLE when "
               "all LLM candidates are runtime-rejected");
-        CHECK(out == nullptr,
-              "(CPP-05.5) C ABI leaves out_vtable NULL on runtime rejection");
+        CHECK(out == nullptr, "(CPP-05.5) C ABI leaves out_vtable NULL on runtime rejection");
 
         rac_plugin_unregister("cuda_only_engine");
         rac_plugin_unregister("stt_only_engine");
@@ -560,11 +559,10 @@ int main() {
         /* CPU is bootstrapped lazily on first registry touch — calling either
          * accessor triggers the bootstrap, so both must agree afterwards. */
         int avail = rac_runtime_is_available(RAC_RUNTIME_CPU);
-        int reg   = rac_runtime_is_registered(RAC_RUNTIME_CPU);
+        int reg = rac_runtime_is_registered(RAC_RUNTIME_CPU);
         CHECK(avail == reg,
               "(CPP-05.6) rac_runtime_is_registered mirrors rac_runtime_is_available");
-        CHECK(reg == 1,
-              "(CPP-05.6) CPU runtime is registered after bootstrap");
+        CHECK(reg == 1, "(CPP-05.6) CPU runtime is registered after bootstrap");
 
         /* An obviously-not-registered id should report 0 from both. */
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_CUDA) == 0,
@@ -582,11 +580,10 @@ int main() {
         const rac_runtime_id_t qnn_rts[] = {RAC_RUNTIME_QNN};
         const uint32_t onnx_fmt[] = {RAC_MODEL_FORMAT_ID_ONNX};
         auto fallback = make_vt("fallback_llm", 10, nullptr, 0, nullptr, 0);
-        auto genie_without_sdk = make_vt("genie", 200, qnn_rts, 1, onnx_fmt, 1,
-                                        backend_unavailable_capability_check);
+        auto genie_without_sdk =
+            make_vt("genie", 200, qnn_rts, 1, onnx_fmt, 1, backend_unavailable_capability_check);
 
-        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS,
-              "(G) fallback LLM registers");
+        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS, "(G) fallback LLM registers");
         CHECK(rac_plugin_register(&genie_without_sdk) == RAC_ERROR_CAPABILITY_UNSUPPORTED,
               "(G) Genie without SDK is rejected during registration");
 
@@ -603,8 +600,7 @@ int main() {
         req.pinned_engine = "genie";
         req.no_fallback = true;
         result = router.route(req);
-        CHECK(result.vtable == nullptr,
-              "(G) pinned SDK-absent Genie still has no route");
+        CHECK(result.vtable == nullptr, "(G) pinned SDK-absent Genie still has no route");
 
         rac_plugin_unregister("fallback_llm");
         rac_plugin_unregister("genie");
@@ -623,12 +619,12 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t metal_rts[] = {RAC_RUNTIME_METAL};
-        const rac_runtime_id_t cpu_rts[]   = {RAC_RUNTIME_CPU};
+        const rac_runtime_id_t cpu_rts[] = {RAC_RUNTIME_CPU};
         auto rt_metal = make_runtime_vt(RAC_RUNTIME_METAL, "metal-pref-test");
         rac_runtime_register(&rt_metal);
 
         auto v_gpu = make_vt("gpu_engine", 50, metal_rts, 1, nullptr, 0);
-        auto v_cpu = make_vt("cpu_engine", 50, cpu_rts,   1, nullptr, 0);
+        auto v_cpu = make_vt("cpu_engine", 50, cpu_rts, 1, nullptr, 0);
         rac_plugin_register(&v_gpu);
         rac_plugin_register(&v_cpu);
 
@@ -650,8 +646,7 @@ int main() {
         CHECK(rac_hardware_set_accelerator_preference(2) == RAC_SUCCESS,
               "(CPP-15) setter accepts ACCELERATION_PREFERENCE_CPU");
         auto cpu_result = router.route(req);
-        CHECK(cpu_result.vtable == &v_cpu,
-              "(CPP-15) CPU preference selects CPU-declaring engine");
+        CHECK(cpu_result.vtable == &v_cpu, "(CPP-15) CPU preference selects CPU-declaring engine");
         CHECK(cpu_result.score > v_gpu.metadata.priority + 40,
               "(CPP-15) CPU-preferred score exceeds GPU engine's base + runtime weight");
 

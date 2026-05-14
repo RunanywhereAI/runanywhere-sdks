@@ -59,8 +59,7 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     if (name.find("llama") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
     }
-    if (name.find("whisperkit") != std::string::npos &&
-        name.find("coreml") != std::string::npos) {
+    if (name.find("whisperkit") != std::string::npos && name.find("coreml") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
     }
     if (name.find("coreml") != std::string::npos) {
@@ -106,8 +105,8 @@ std::vector<rac_primitive_t> primitives_for_component(runanywhere::v1::SDKCompon
         case runanywhere::v1::SDK_COMPONENT_DIFFUSION:
             return {RAC_PRIMITIVE_DIFFUSION};
         case runanywhere::v1::SDK_COMPONENT_VOICE_AGENT:
-            return {RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE,
-                    RAC_PRIMITIVE_SYNTHESIZE, RAC_PRIMITIVE_DETECT_VOICE};
+            return {RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_TRANSCRIBE, RAC_PRIMITIVE_SYNTHESIZE,
+                    RAC_PRIMITIVE_DETECT_VOICE};
         case runanywhere::v1::SDK_COMPONENT_RAG:
             /* RAG composes LLM generation + (optional) embeddings. */
             return {RAC_PRIMITIVE_GENERATE_TEXT, RAC_PRIMITIVE_EMBED};
@@ -132,7 +131,8 @@ std::vector<const rac_engine_vtable_t*> list_plugins_for_primitive(rac_primitive
     std::vector<const rac_engine_vtable_t*> out;
     out.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-        if (buf[i] != nullptr) out.push_back(buf[i]);
+        if (buf[i] != nullptr)
+            out.push_back(buf[i]);
     }
     return out;
 }
@@ -141,11 +141,10 @@ std::vector<const rac_engine_vtable_t*> list_plugins_for_primitive(rac_primitive
 
 }  // namespace
 
-extern "C" rac_result_t rac_router_frameworks_for_capability_proto(
-    const uint8_t* request_bytes,
-    size_t request_size,
-    uint8_t** out_response_bytes,
-    size_t* out_response_size) {
+extern "C" rac_result_t rac_router_frameworks_for_capability_proto(const uint8_t* request_bytes,
+                                                                   size_t request_size,
+                                                                   uint8_t** out_response_bytes,
+                                                                   size_t* out_response_size) {
     if (out_response_bytes == nullptr || out_response_size == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -162,8 +161,8 @@ extern "C" rac_result_t rac_router_frameworks_for_capability_proto(
     }
 
     runanywhere::v1::FrameworksForCapabilityRequest request;
-    if (request_size > 0 && !request.ParseFromArray(request_bytes,
-                                                    static_cast<int>(request_size))) {
+    if (request_size > 0 &&
+        !request.ParseFromArray(request_bytes, static_cast<int>(request_size))) {
         RAC_LOG_WARNING(LOG_CAT, "failed to parse FrameworksForCapabilityRequest (%zu bytes)",
                         request_size);
         return RAC_ERROR_DECODING_ERROR;

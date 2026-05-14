@@ -52,8 +52,7 @@ typedef void* rac_solution_handle_t;
  *         disabled at build time), RAC_ERROR_DECODING_ERROR, or
  *         RAC_ERROR_INVALID_CONFIGURATION.
  */
-RAC_API rac_result_t rac_solution_create_from_proto(const void*            proto_bytes,
-                                                    size_t                 len,
+RAC_API rac_result_t rac_solution_create_from_proto(const void* proto_bytes, size_t len,
                                                     rac_solution_handle_t* out_handle);
 
 /**
@@ -68,7 +67,7 @@ RAC_API rac_result_t rac_solution_create_from_proto(const void*            proto
  * @return RAC_SUCCESS or the same error codes as the proto entry
  *         point, plus RAC_ERROR_INVALID_FORMAT on a YAML parse error.
  */
-RAC_API rac_result_t rac_solution_create_from_yaml(const char*            yaml_text,
+RAC_API rac_result_t rac_solution_create_from_yaml(const char* yaml_text,
                                                    rac_solution_handle_t* out_handle);
 
 /**

@@ -14,7 +14,7 @@
  * it in.
  */
 
-import { SDKLogger } from '@runanywhere/web';
+import { SDKLogger } from '@runanywhere/web/internal';
 import type { LlamaCppModule } from './LlamaCppBridge';
 
 const logger = new SDKLogger('PlatformAdapter');
@@ -286,15 +286,12 @@ export class PlatformAdapter {
     }, 'viiii');
   }
 
-  /** int64_t (*)(void* user_data) — clang lowers as i32-pair on wasm32. */
+  /** int64_t (*)(void* user_data) */
   private registerNowMs(): number {
     const m = this.m;
-    // Emscripten's int64 ABI is sometimes split into two i32 result values.
-    // Returning a JS number from `'ii'` truncates to 32 bits, which is fine
-    // for monotonic millisecond timestamps used by the C side as a delta clock.
     return m.addFunction((_userData: number) => {
-      return Date.now() | 0;
-    }, 'ii');
+      return BigInt(Date.now());
+    }, 'ji');
   }
 
   /** rac_result_t (*)(rac_memory_info_t* out_info, void* user_data) */

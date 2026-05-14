@@ -48,22 +48,17 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
     static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty)
-                     : static_cast<const void*>(bytes);
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(
-            out, RAC_ERROR_ENCODING_ERROR,
-            "failed to serialize RAGConfiguration defaults");
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize RAGConfiguration defaults");
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(),
-                                 bytes.size(), out);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -74,33 +69,28 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message,
 // PUBLIC API
 // =============================================================================
 
-extern "C" rac_result_t rac_rag_request_with_defaults_proto(
-    const uint8_t* in_request_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_RARAGConfiguration) {
+extern "C" rac_result_t
+rac_rag_request_with_defaults_proto(const uint8_t* in_request_bytes, size_t in_size,
+                                    rac_proto_buffer_t* out_RARAGConfiguration) {
     if (!out_RARAGConfiguration) {
         return RAC_ERROR_NULL_POINTER;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)in_request_bytes;
     (void)in_size;
-    return rac_proto_buffer_set_error(
-        out_RARAGConfiguration, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-        "protobuf support is not available");
+    return rac_proto_buffer_set_error(out_RARAGConfiguration, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
 #else
     if (!valid_bytes(in_request_bytes, in_size)) {
-        return rac_proto_buffer_set_error(
-            out_RARAGConfiguration, RAC_ERROR_DECODING_ERROR,
-            "RAGConfiguration request bytes are invalid");
+        return rac_proto_buffer_set_error(out_RARAGConfiguration, RAC_ERROR_DECODING_ERROR,
+                                          "RAGConfiguration request bytes are invalid");
     }
 
     runanywhere::v1::RAGConfiguration request;
     if (in_size > 0 &&
-        !request.ParseFromArray(parse_data(in_request_bytes, in_size),
-                                static_cast<int>(in_size))) {
-        return rac_proto_buffer_set_error(
-            out_RARAGConfiguration, RAC_ERROR_DECODING_ERROR,
-            "failed to parse RAGConfiguration request");
+        !request.ParseFromArray(parse_data(in_request_bytes, in_size), static_cast<int>(in_size))) {
+        return rac_proto_buffer_set_error(out_RARAGConfiguration, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse RAGConfiguration request");
     }
 
     // Start from the canonical defaults, then layer caller overrides over them.

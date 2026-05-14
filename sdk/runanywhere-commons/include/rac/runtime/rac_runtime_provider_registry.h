@@ -53,8 +53,7 @@ namespace runtime {
  * lookup so unsupported primitives fall through to `RAC_ERROR_NOT_IMPLEMENTED`.
  */
 inline bool rac_runtime_primitive_in_range(rac_primitive_t primitive) {
-    return primitive > RAC_PRIMITIVE_UNSPECIFIED &&
-           primitive <  RAC_PRIMITIVE_COUNT;
+    return primitive > RAC_PRIMITIVE_UNSPECIFIED && primitive < RAC_PRIMITIVE_COUNT;
 }
 
 /**
@@ -75,7 +74,7 @@ inline bool rac_runtime_primitive_in_range(rac_primitive_t primitive) {
  */
 template <typename ProviderT>
 class ProviderRegistry {
-public:
+   public:
     ProviderRegistry() = default;
     ProviderRegistry(const ProviderRegistry&) = delete;
     ProviderRegistry& operator=(const ProviderRegistry&) = delete;
@@ -115,11 +114,15 @@ public:
 
     /** Unregister a provider by name. NULL or unknown name is a no-op. */
     void unregister_provider(const char* name) {
-        if (name == nullptr) return;
+        if (name == nullptr)
+            return;
         std::lock_guard<std::mutex> lock(mutex_);
-        entries_.erase(std::remove_if(entries_.begin(), entries_.end(), [&](const auto& entry) {
-            return entry.name != nullptr && std::strcmp(entry.name, name) == 0;
-        }), entries_.end());
+        entries_.erase(std::remove_if(entries_.begin(), entries_.end(),
+                                      [&](const auto& entry) {
+                                          return entry.name != nullptr &&
+                                                 std::strcmp(entry.name, name) == 0;
+                                      }),
+                       entries_.end());
     }
 
     /**
@@ -130,9 +133,9 @@ public:
      * == 0`, is treated as format-agnostic. Returns a by-value snapshot so the
      * caller does not need to hold the registry mutex during dispatch.
      */
-    bool find_by_desc(const rac_runtime_session_desc_t* desc,
-                      ProviderT* out_provider) const {
-        if (desc == nullptr || out_provider == nullptr) return false;
+    bool find_by_desc(const rac_runtime_session_desc_t* desc, ProviderT* out_provider) const {
+        if (desc == nullptr || out_provider == nullptr)
+            return false;
         std::lock_guard<std::mutex> lock(mutex_);
         for (const auto& provider : entries_) {
             if (provider.primitive == desc->primitive &&
@@ -158,15 +161,14 @@ public:
         }
     }
 
-private:
-    static bool provider_supports_format(const ProviderT& provider,
-                                         uint32_t model_format) {
-        if (provider.formats == nullptr || provider.formats_count == 0 ||
-            model_format == 0) {
+   private:
+    static bool provider_supports_format(const ProviderT& provider, uint32_t model_format) {
+        if (provider.formats == nullptr || provider.formats_count == 0 || model_format == 0) {
             return true;
         }
         for (size_t i = 0; i < provider.formats_count; ++i) {
-            if (provider.formats[i] == model_format) return true;
+            if (provider.formats[i] == model_format)
+                return true;
         }
         return false;
     }

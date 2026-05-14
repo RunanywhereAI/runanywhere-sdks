@@ -7,7 +7,7 @@
 
 import type { TabLifecycle } from '../app';
 import {
-  RAG,
+  RunAnywhere,
   type RAGDocumentSummary,
   type RAGSearchResult,
 } from '@runanywhere/web';
@@ -102,7 +102,7 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  await RAG.ingest(text, JSON.stringify({
+  await RunAnywhere.rag.ingest(text, JSON.stringify({
     docId,
     docName: file.name,
     sourceUri: `web-file:${file.name}`,
@@ -110,7 +110,7 @@ async function ingestFile(file: File): Promise<void> {
     sizeBytes: String(file.size),
   }));
 
-  const stats = await RAG.getStatistics();
+  const stats = await RunAnywhere.rag.getStatistics();
   setStatus(`Indexed ${file.name}. ${stats.indexedChunks} chunks total.`);
 }
 
@@ -119,7 +119,7 @@ async function clearAllDocs(): Promise<void> {
   if (!(await ensureRAGReady())) return;
   isBusy = true;
   try {
-    await RAG.clearDocuments();
+    await RunAnywhere.rag.clearDocuments();
     await renderDocList();
     setStatus('All documents cleared.');
   } catch (err) {
@@ -134,7 +134,7 @@ async function removeDocument(id: string): Promise<void> {
   if (!(await ensureRAGReady())) return;
   isBusy = true;
   try {
-    await RAG.removeDocument(id);
+    await RunAnywhere.rag.removeDocument(id);
     await renderDocList();
     setStatus('Document removed.');
   } catch (err) {
@@ -157,7 +157,7 @@ async function askQuestion(): Promise<void> {
 
   let documentCount = 0;
   try {
-    documentCount = await RAG.getDocumentCount();
+    documentCount = await RunAnywhere.rag.getDocumentCount();
   } catch (err) {
     setAnswer(`Failed: ${err instanceof Error ? err.message : String(err)}`);
     return;
@@ -170,7 +170,7 @@ async function askQuestion(): Promise<void> {
   isBusy = true;
   setAnswer('Searching...');
   try {
-    const result = await RAG.query(question, {
+    const result = await RunAnywhere.rag.query(question, {
       retrievalTopK: TOP_K,
       maxTokens: 512,
       temperature: 0.4,
@@ -200,7 +200,7 @@ async function askQuestion(): Promise<void> {
 
 async function renderDocList(): Promise<void> {
   const listEl = container.querySelector('#docs-list')!;
-  const availability = RAG.availability();
+  const availability = RunAnywhere.rag.availability();
   if (!availability.available) {
     listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
     setStatus(availability.reason);
@@ -209,8 +209,8 @@ async function renderDocList(): Promise<void> {
 
   let documents: RAGDocumentSummary[];
   try {
-    if (!RAG.capabilities().documentListing) {
-      const stats = await RAG.getStatistics();
+    if (!RunAnywhere.rag.capabilities().documentListing) {
+      const stats = await RunAnywhere.rag.getStatistics();
       listEl.innerHTML = stats.indexedDocuments === 0
         ? '<li class="docs-empty">No documents indexed yet</li>'
         : `<li class="docs-empty">${stats.indexedDocuments} document${stats.indexedDocuments === 1 ? '' : 's'} indexed. Document listing is not exposed by this RAG provider.</li>`;
@@ -219,7 +219,7 @@ async function renderDocList(): Promise<void> {
       }
       return;
     }
-    documents = await RAG.listDocuments();
+    documents = await RunAnywhere.rag.listDocuments();
   } catch (err) {
     listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
     setStatus(`Unable to list documents: ${err instanceof Error ? err.message : String(err)}`);
@@ -231,7 +231,7 @@ async function renderDocList(): Promise<void> {
     return;
   }
 
-  const canRemoveDocuments = RAG.capabilities().documentRemoval;
+  const canRemoveDocuments = RunAnywhere.rag.capabilities().documentRemoval;
   listEl.innerHTML = documents.map((doc) => `
     <li class="docs-item" data-id="${escapeHtml(doc.id)}">
       <div>
@@ -263,7 +263,7 @@ function setAnswer(msg: string): void {
 }
 
 async function ensureRAGReady(): Promise<boolean> {
-  const availability = RAG.availability();
+  const availability = RunAnywhere.rag.availability();
   if (!availability.available) {
     setStatus(availability.reason);
     return false;

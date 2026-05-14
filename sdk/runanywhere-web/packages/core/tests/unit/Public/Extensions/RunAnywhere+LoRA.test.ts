@@ -14,10 +14,10 @@ import {
   type LoraAdapterCatalogQuery as ProtoLoraAdapterCatalogQuery,
   type LoraAdapterDownloadCompletedRequest as ProtoLoraAdapterDownloadCompletedRequest,
 } from '@runanywhere/proto-ts/lora_options';
-import { SDKErrorCode } from '../../Foundation/SDKException';
-import { ModalityProtoAdapter, type ModalityProtoModule } from '../../Adapters/ModalityProtoAdapter';
-import { clearRunanywhereModule } from '../../runtime/EmscriptenModule';
-import { LoRA } from './RunAnywhere+LoRA';
+import { SDKErrorCode } from '../../../../src/Foundation/SDKException';
+import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
+import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
+import { LoRA } from '../../../../src/Public/Extensions/RunAnywhere+LoRA';
 
 const PROTO_BUFFER_SIZE = 16;
 const OFF_DATA = 0;

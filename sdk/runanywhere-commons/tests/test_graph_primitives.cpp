@@ -28,26 +28,26 @@ using rac::graph::StreamEdge;
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define CHECK(cond)                                                            \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
+#define CHECK(cond)                                                               \
+    do {                                                                          \
+        if (!(cond)) {                                                            \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                        \
-            return;                                                            \
-        }                                                                      \
+            g_failed++;                                                           \
+            return;                                                               \
+        }                                                                         \
     } while (0)
 
-#define TEST(name) \
-    static void test_##name();                                                 \
-    static void run_test_##name() {                                            \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
-        int before_failed = g_failed;                                          \
-        test_##name();                                                         \
-        if (g_failed == before_failed) {                                       \
-            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
-            g_passed++;                                                        \
-        }                                                                      \
-    }                                                                          \
+#define TEST(name)                                      \
+    static void test_##name();                          \
+    static void run_test_##name() {                     \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
+        int before_failed = g_failed;                   \
+        test_##name();                                  \
+        if (g_failed == before_failed) {                \
+            std::fprintf(stderr, "[  OK] %s\n", #name); \
+            g_passed++;                                 \
+        }                                               \
+    }                                                   \
     static void test_##name()
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ TEST(cancel_token_basic) {
 
 TEST(cancel_token_parent_child) {
     auto parent = std::make_shared<CancelToken>();
-    auto child  = parent->create_child();
+    auto child = parent->create_child();
     CHECK(!parent->is_cancelled());
     CHECK(!child->is_cancelled());
     parent->cancel();
@@ -81,8 +81,8 @@ TEST(cancel_token_child_born_cancelled) {
 }
 
 TEST(cancel_token_cascade_to_grandchild) {
-    auto parent     = std::make_shared<CancelToken>();
-    auto child      = parent->create_child();
+    auto parent = std::make_shared<CancelToken>();
+    auto child = parent->create_child();
     auto grandchild = child->create_child();
     parent->cancel();
     CHECK(grandchild->is_cancelled());
@@ -95,13 +95,16 @@ TEST(cancel_token_multithreaded_cancel) {
     for (int i = 0; i < 8; ++i) {
         threads.emplace_back([&, i] {
             // Half cancel, half observe.
-            if (i % 2 == 0) t->cancel();
+            if (i % 2 == 0)
+                t->cancel();
             for (int j = 0; j < 1000; ++j) {
-                if (t->is_cancelled()) observed.fetch_add(1);
+                if (t->is_cancelled())
+                    observed.fetch_add(1);
             }
         });
     }
-    for (auto& th : threads) th.join();
+    for (auto& th : threads)
+        th.join();
     CHECK(t->is_cancelled());
 }
 
@@ -152,8 +155,7 @@ TEST(ring_buffer_spsc_concurrent) {
             int x;
             if (rb.pop(x)) {
                 if (x != expected) {
-                    std::fprintf(stderr, "out-of-order: got %d expected %d\n",
-                                 x, expected);
+                    std::fprintf(stderr, "out-of-order: got %d expected %d\n", x, expected);
                     std::abort();
                 }
                 expected++;
@@ -275,7 +277,8 @@ TEST(stream_edge_close_unblocks_consumer) {
         auto r = edge.pop();
         popped.store(true);
         // Should be nullopt because we closed without pushing.
-        if (r.has_value()) std::abort();
+        if (r.has_value())
+            std::abort();
     });
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     edge.close();
@@ -287,7 +290,8 @@ TEST(stream_edge_producer_consumer_parallel) {
     StreamEdge<int> edge(4);
     const int N = 1000;
     std::thread producer([&] {
-        for (int i = 0; i < N; ++i) edge.push(i);
+        for (int i = 0; i < N; ++i)
+            edge.push(i);
         edge.close();
     });
     std::vector<int> received;
@@ -299,7 +303,8 @@ TEST(stream_edge_producer_consumer_parallel) {
     producer.join();
     consumer.join();
     CHECK(static_cast<int>(received.size()) == N);
-    for (int i = 0; i < N; ++i) CHECK(received[i] == i);
+    for (int i = 0; i < N; ++i)
+        CHECK(received[i] == i);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +330,6 @@ int main() {
     run_test_stream_edge_close_unblocks_consumer();
     run_test_stream_edge_producer_consumer_parallel();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
-                 g_passed, g_failed);
+    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

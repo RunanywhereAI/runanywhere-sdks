@@ -250,8 +250,7 @@ RAC_API rac_result_t rac_stt_get_languages(rac_handle_t handle, char** out_json)
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* audio_data,
-                                             size_t audio_size,
-                                             const rac_stt_options_t* options,
+                                             size_t audio_size, const rac_stt_options_t* options,
                                              char** out_language);
 
 /**
@@ -262,9 +261,9 @@ RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* au
  * serialized runanywhere.v1.STTOutput bytes. Native file/capture adapter
  * handles are intentionally not dereferenced by this portable ABI.
  */
-RAC_API rac_result_t rac_stt_transcribe_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
+                                                        rac_proto_buffer_t* out_result);
 
 /**
  * @brief Callback fired once per serialized runanywhere.v1.STTStreamEvent.
@@ -273,8 +272,7 @@ RAC_API rac_result_t rac_stt_transcribe_lifecycle_proto(
  * need to retain the bytes MUST copy them out.
  */
 typedef void (*rac_stt_lifecycle_stream_event_callback_fn)(const uint8_t* event_bytes,
-                                                            size_t event_size,
-                                                            void* user_data);
+                                                           size_t event_size, void* user_data);
 
 /**
  * @brief Stream transcription using the lifecycle-loaded STT model.
@@ -320,8 +318,8 @@ RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
  * @retval RAC_ERROR_NULL_POINTER           out_RASTTConfiguration is NULL.
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
  */
-RAC_API rac_result_t rac_stt_configuration_defaults_proto(
-    rac_proto_buffer_t* out_RASTTConfiguration);
+RAC_API rac_result_t
+rac_stt_configuration_defaults_proto(rac_proto_buffer_t* out_RASTTConfiguration);
 
 #ifdef __cplusplus
 }

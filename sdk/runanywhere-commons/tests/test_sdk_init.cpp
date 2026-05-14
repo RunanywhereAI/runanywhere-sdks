@@ -31,16 +31,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                              \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                      \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -52,12 +51,14 @@ using ::runanywhere::v1::SdkInitResult;
 bool serialize_phase1(SdkInitPhase1Request& request, std::vector<uint8_t>& out) {
     const size_t size = request.ByteSizeLong();
     out.assign(size, 0u);
-    if (size == 0) return true;
+    if (size == 0)
+        return true;
     return request.SerializeToArray(out.data(), static_cast<int>(out.size()));
 }
 
 bool parse_result(const rac_proto_buffer_t& buffer, SdkInitResult* result) {
-    if (buffer.status != RAC_SUCCESS || buffer.data == nullptr) return false;
+    if (buffer.status != RAC_SUCCESS || buffer.data == nullptr)
+        return false;
     return result->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
@@ -72,8 +73,7 @@ void run_phase1_development() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS, "phase1 dev returns RAC_SUCCESS");
 
     SdkInitResult result;
@@ -102,8 +102,7 @@ void run_phase1_production_validation_failure() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS, "phase1 still returns RAC_SUCCESS for typed failure");
 
     SdkInitResult result;
@@ -132,8 +131,7 @@ void run_phase1_production_success() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_sdk_init_phase1_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS, "phase1 prod-valid returns RAC_SUCCESS");
 
     SdkInitResult result;
@@ -161,8 +159,7 @@ void run_phase2_offline_mode() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_sdk_init_phase2_proto(bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_sdk_init_phase2_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS, "phase2 offline returns RAC_SUCCESS");
 
     SdkInitResult result;

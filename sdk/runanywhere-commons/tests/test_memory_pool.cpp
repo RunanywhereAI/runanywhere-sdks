@@ -31,26 +31,26 @@ using rac::graph::MemoryPool;
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define CHECK(cond)                                                            \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
+#define CHECK(cond)                                                               \
+    do {                                                                          \
+        if (!(cond)) {                                                            \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                        \
-            return;                                                            \
-        }                                                                      \
+            g_failed++;                                                           \
+            return;                                                               \
+        }                                                                         \
     } while (0)
 
-#define TEST(name)                                                             \
-    static void test_##name();                                                 \
-    static void run_test_##name() {                                            \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
-        int before_failed = g_failed;                                          \
-        test_##name();                                                         \
-        if (g_failed == before_failed) {                                       \
-            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
-            g_passed++;                                                        \
-        }                                                                      \
-    }                                                                          \
+#define TEST(name)                                      \
+    static void test_##name();                          \
+    static void run_test_##name() {                     \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
+        int before_failed = g_failed;                   \
+        test_##name();                                  \
+        if (g_failed == before_failed) {                \
+            std::fprintf(stderr, "[  OK] %s\n", #name); \
+            g_passed++;                                 \
+        }                                               \
+    }                                                   \
     static void test_##name()
 
 namespace {
@@ -61,12 +61,10 @@ struct Buffer {
     int id{0};
     std::vector<uint8_t> data;
 
-    Buffer() : data(16, 0) {
-        alive.fetch_add(1, std::memory_order_relaxed);
-    }
+    Buffer() : data(16, 0) { alive.fetch_add(1, std::memory_order_relaxed); }
     ~Buffer() { alive.fetch_sub(1, std::memory_order_relaxed); }
 
-    Buffer(const Buffer&)            = delete;
+    Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
 
     static std::atomic<int> alive;
@@ -130,7 +128,7 @@ TEST(acquire_timeout) {
 
     CHECK(h == nullptr);
     CHECK(elapsed >= std::chrono::milliseconds(60));  // accept some jitter
-    CHECK(elapsed <  std::chrono::milliseconds(500));
+    CHECK(elapsed < std::chrono::milliseconds(500));
 }
 
 // ---------------------------------------------------------------------------
@@ -138,8 +136,8 @@ TEST(acquire_timeout) {
 // ---------------------------------------------------------------------------
 
 TEST(acquire_cancel) {
-    auto pool   = MemoryPool<Buffer>::create(1);
-    auto hold   = pool->acquire();
+    auto pool = MemoryPool<Buffer>::create(1);
+    auto hold = pool->acquire();
     auto cancel = std::make_shared<CancelToken>();
 
     std::atomic<bool> returned{false};
@@ -184,9 +182,9 @@ TEST(leak_detection) {
 // ---------------------------------------------------------------------------
 
 TEST(concurrent_stress) {
-    const size_t capacity   = 8;
-    const int    thread_cnt = 8;
-    const int    per_thread = 2000;
+    const size_t capacity = 8;
+    const int thread_cnt = 8;
+    const int per_thread = 2000;
 
     auto pool = MemoryPool<Buffer>::create(capacity);
 
@@ -197,7 +195,8 @@ TEST(concurrent_stress) {
         threads.emplace_back([&] {
             for (int i = 0; i < per_thread; ++i) {
                 auto h = pool->acquire();
-                if (!h) std::abort();
+                if (!h)
+                    std::abort();
                 // Touch the buffer to prove it's writable.
                 h->id = i;
                 h->data[0] = static_cast<uint8_t>(i & 0xFF);
@@ -205,7 +204,8 @@ TEST(concurrent_stress) {
             }
         });
     }
-    for (auto& th : threads) th.join();
+    for (auto& th : threads)
+        th.join();
 
     CHECK(ops.load() == thread_cnt * per_thread);
     CHECK(pool->available() == capacity);
@@ -244,7 +244,6 @@ int main() {
     run_test_concurrent_stress();
     run_test_custom_factory();
 
-    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n",
-                 g_passed, g_failed);
+    std::fprintf(stderr, "\n%d test(s) passed, %d test(s) failed\n", g_passed, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

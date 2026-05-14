@@ -27,29 +27,30 @@ extern "C" {
 static const int k_test_plugin_sentinel = 0xCAFEBABE;
 
 #ifndef RAC_TEST_PLUGIN_FORCE_BAD_ABI
-#  define RAC_TEST_PLUGIN_ABI_VERSION RAC_PLUGIN_API_VERSION
+#define RAC_TEST_PLUGIN_ABI_VERSION RAC_PLUGIN_API_VERSION
 #else
 /* Compile-time toggle to force ABI mismatch — used by the abi-mismatch
  * test fixture build. */
-#  define RAC_TEST_PLUGIN_ABI_VERSION (RAC_PLUGIN_API_VERSION + 99u)
+#define RAC_TEST_PLUGIN_ABI_VERSION (RAC_PLUGIN_API_VERSION + 99u)
 #endif
 
 static const rac_engine_vtable_t g_test_plugin_vtable = {
     /* metadata */ {
-        .abi_version      = RAC_TEST_PLUGIN_ABI_VERSION,
-        .name             = "test_plugin",
-        .display_name     = "GAP 03 fixture",
-        .engine_version   = "0.0.0",
-        .priority         = 1,
+        .abi_version = RAC_TEST_PLUGIN_ABI_VERSION,
+        .name = "test_plugin",
+        .display_name = "GAP 03 fixture",
+        .engine_version = "0.0.0",
+        .priority = 1,
         .capability_flags = 0,
-        .runtimes         = nullptr,   /* fixture cares about routing-agnostic registration */
-        .runtimes_count   = 0,
-        .formats          = nullptr,
-        .formats_count    = 0,
+        .runtimes = nullptr, /* fixture cares about routing-agnostic registration */
+        .runtimes_count = 0,
+        .formats = nullptr,
+        .formats_count = 0,
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
-    /* llm_ops          */ reinterpret_cast<const struct rac_llm_service_ops*>(&k_test_plugin_sentinel),
+    /* llm_ops          */
+    reinterpret_cast<const struct rac_llm_service_ops*>(&k_test_plugin_sentinel),
     /* stt_ops          */ nullptr,
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
@@ -58,8 +59,16 @@ static const rac_engine_vtable_t g_test_plugin_vtable = {
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
     /* reserved_slot_0..9 */
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 /* Default visibility so dlsym can find this symbol. The entry symbol name
@@ -67,13 +76,11 @@ static const rac_engine_vtable_t g_test_plugin_vtable = {
  * entry_symbol_from_path() resolves it — see the two add_library() lines
  * in tests/CMakeLists.txt (OUTPUT_NAME runanywhere_test_plugin[_bad_abi]). */
 #ifndef RAC_TEST_PLUGIN_FORCE_BAD_ABI
-__attribute__((visibility("default")))
-RAC_PLUGIN_ENTRY_DEF(test_plugin) {
+__attribute__((visibility("default"))) RAC_PLUGIN_ENTRY_DEF(test_plugin) {
     return &g_test_plugin_vtable;
 }
 #else
-__attribute__((visibility("default")))
-RAC_PLUGIN_ENTRY_DEF(test_plugin_bad_abi) {
+__attribute__((visibility("default"))) RAC_PLUGIN_ENTRY_DEF(test_plugin_bad_abi) {
     return &g_test_plugin_vtable;
 }
 #endif

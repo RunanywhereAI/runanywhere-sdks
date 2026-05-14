@@ -9,6 +9,9 @@
 
 #include "rag_pipeline_graph.h"
 
+#include "bm25_index.h"
+#include "vector_store_usearch.h"
+
 #include <algorithm>
 #include <atomic>
 #include <memory>
@@ -17,14 +20,12 @@
 #include <unordered_set>
 #include <utility>
 
-#include "bm25_index.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/graph/graph_scheduler.hpp"
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/graph/stream_edge.hpp"
-#include "vector_store_usearch.h"
 
 #define LOG_TAG "RAG.Graph"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -77,42 +78,47 @@ fuse_results(const std::vector<SearchResult>& dense_results,
     static constexpr float kRRFConstant = 60.0f;
     static constexpr float kMaxRRFScore = 2.0f / 61.0f;
 
-    if (bm25_results.empty()) return dense_results;
+    if (bm25_results.empty())
+        return dense_results;
 
     const size_t missing_rank = top_k + 1;
 
     std::unordered_map<std::string, float> rrf_scores;
     for (size_t i = 0; i < dense_results.size(); ++i) {
-        rrf_scores[dense_results[i].id] +=
-            1.0f / (kRRFConstant + static_cast<float>(i + 1));
+        rrf_scores[dense_results[i].id] += 1.0f / (kRRFConstant + static_cast<float>(i + 1));
     }
     for (size_t i = 0; i < bm25_results.size(); ++i) {
-        rrf_scores[bm25_results[i].first] +=
-            1.0f / (kRRFConstant + static_cast<float>(i + 1));
+        rrf_scores[bm25_results[i].first] += 1.0f / (kRRFConstant + static_cast<float>(i + 1));
     }
 
-    const float missing_score =
-        1.0f / (kRRFConstant + static_cast<float>(missing_rank));
+    const float missing_score = 1.0f / (kRRFConstant + static_cast<float>(missing_rank));
 
     std::unordered_set<std::string> dense_ids;
-    for (const auto& r : dense_results) dense_ids.insert(r.id);
+    for (const auto& r : dense_results)
+        dense_ids.insert(r.id);
     std::unordered_set<std::string> bm25_ids;
-    for (const auto& r : bm25_results) bm25_ids.insert(r.first);
+    for (const auto& r : bm25_results)
+        bm25_ids.insert(r.first);
 
     for (auto& [id, score] : rrf_scores) {
-        if (dense_ids.find(id) == dense_ids.end()) score += missing_score;
-        if (bm25_ids.find(id) == bm25_ids.end()) score += missing_score;
+        if (dense_ids.find(id) == dense_ids.end())
+            score += missing_score;
+        if (bm25_ids.find(id) == bm25_ids.end())
+            score += missing_score;
     }
 
     std::unordered_map<std::string, const SearchResult*> dense_map;
-    for (const auto& r : dense_results) dense_map[r.id] = &r;
+    for (const auto& r : dense_results)
+        dense_map[r.id] = &r;
 
     std::vector<std::pair<std::string, float>> sorted_ids;
     sorted_ids.reserve(rrf_scores.size());
-    for (const auto& [id, score] : rrf_scores) sorted_ids.emplace_back(id, score);
+    for (const auto& [id, score] : rrf_scores)
+        sorted_ids.emplace_back(id, score);
     std::sort(sorted_ids.begin(), sorted_ids.end(),
               [](const auto& a, const auto& b) { return a.second > b.second; });
-    if (sorted_ids.size() > top_k) sorted_ids.resize(top_k);
+    if (sorted_ids.size() > top_k)
+        sorted_ids.resize(top_k);
 
     std::vector<SearchResult> fused;
     fused.reserve(sorted_ids.size());
@@ -145,8 +151,7 @@ fuse_results(const std::vector<SearchResult>& dense_results,
     return fused;
 }
 
-std::string build_context(const std::vector<SearchResult>& results,
-                          size_t max_context_tokens) {
+std::string build_context(const std::vector<SearchResult>& results, size_t max_context_tokens) {
     static constexpr size_t kCharsPerToken = 4;
     const size_t max_chars = max_context_tokens * kCharsPerToken;
 
@@ -155,11 +160,12 @@ std::string build_context(const std::vector<SearchResult>& results,
         const std::string& chunk_text = results[i].text;
         const size_t separator_len = (i > 0) ? 2 : 0;
         if (context.size() + separator_len + chunk_text.size() > max_chars) {
-            LOGI("Context budget reached at chunk %zu/%zu (%zu chars, limit ~%zu)",
-                 i, results.size(), context.size(), max_chars);
+            LOGI("Context budget reached at chunk %zu/%zu (%zu chars, limit ~%zu)", i,
+                 results.size(), context.size(), max_chars);
             break;
         }
-        if (i > 0) context += "\n\n";
+        if (i > 0)
+            context += "\n\n";
         context += chunk_text;
     }
     return context;
@@ -190,7 +196,8 @@ struct LLMStreamCtx {
 
 rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
     auto* ctx = static_cast<LLMStreamCtx*>(user_data);
-    if (!token || !ctx) return RAC_TRUE;
+    if (!token || !ctx)
+        return RAC_TRUE;
 
     const std::string s(token);
     {
@@ -255,20 +262,16 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     // -------------------- EmbedNode --------------------
     auto embed_node = make_primitive_node<std::string, EmbeddedQuery>(
         "RAG.Embed",
-        [embeddings_handle, embed_dim, state](std::string text,
-                                              StreamEdge<EmbeddedQuery>& out) {
+        [embeddings_handle, embed_dim, state](std::string text, StreamEdge<EmbeddedQuery>& out) {
             rac_embeddings_result_t result = {};
-            rac_result_t status = rac_embeddings_embed(embeddings_handle, text.c_str(),
-                                                       nullptr, &result);
-            if (status != RAC_SUCCESS || result.num_embeddings == 0 ||
-                !result.embeddings) {
+            rac_result_t status =
+                rac_embeddings_embed(embeddings_handle, text.c_str(), nullptr, &result);
+            if (status != RAC_SUCCESS || result.num_embeddings == 0 || !result.embeddings) {
                 LOGE("EmbedNode: embed failed (%d)", status);
                 rac_embeddings_result_free(&result);
                 std::lock_guard<std::mutex> lock(state->mu);
                 if (state->status == RAC_SUCCESS) {
-                    state->status = (status != RAC_SUCCESS)
-                                        ? status
-                                        : RAC_ERROR_PROCESSING_FAILED;
+                    state->status = (status != RAC_SUCCESS) ? status : RAC_ERROR_PROCESSING_FAILED;
                 }
                 return;
             }
@@ -276,13 +279,11 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
             EmbeddedQuery payload;
             payload.text = std::move(text);
             payload.embedding.assign(result.embeddings[0].data,
-                                     result.embeddings[0].data +
-                                         result.embeddings[0].dimension);
+                                     result.embeddings[0].data + result.embeddings[0].dimension);
             rac_embeddings_result_free(&result);
 
             if (payload.embedding.size() != embed_dim) {
-                LOGE("EmbedNode: dim mismatch (%zu vs %zu)",
-                     payload.embedding.size(), embed_dim);
+                LOGE("EmbedNode: dim mismatch (%zu vs %zu)", payload.embedding.size(), embed_dim);
                 std::lock_guard<std::mutex> lock(state->mu);
                 if (state->status == RAC_SUCCESS) {
                     state->status = RAC_ERROR_PROCESSING_FAILED;
@@ -294,19 +295,19 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
 
     // -------------------- RetrieveNode --------------------
     auto retrieve_node = make_primitive_node<EmbeddedQuery, RetrievedChunks>(
-        "RAG.Retrieve",
-        [vstore, bm25, top_k, sim_thresh, state](EmbeddedQuery in,
-                                                 StreamEdge<RetrievedChunks>& out) {
+        "RAG.Retrieve", [vstore, bm25, top_k, sim_thresh, state](EmbeddedQuery in,
+                                                                 StreamEdge<RetrievedChunks>& out) {
             try {
                 auto dense = vstore->search(in.embedding, top_k, sim_thresh);
                 std::vector<std::pair<std::string, float>> bm25_results;
-                if (bm25) bm25_results = bm25->search(in.text, top_k);
+                if (bm25)
+                    bm25_results = bm25->search(in.text, top_k);
 
                 RetrievedChunks payload;
                 payload.query_text = std::move(in.text);
                 payload.results = fuse_results(dense, bm25_results, vstore, top_k);
-                LOGI("RetrieveNode: %zu dense, %zu bm25, %zu fused",
-                     dense.size(), bm25_results.size(), payload.results.size());
+                LOGI("RetrieveNode: %zu dense, %zu bm25, %zu fused", dense.size(),
+                     bm25_results.size(), payload.results.size());
                 out.push(std::move(payload));
             } catch (const std::exception& e) {
                 LOGE("RetrieveNode: %s", e.what());
@@ -320,8 +321,7 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     // -------------------- ContextAssemblyNode --------------------
     auto assemble_node = make_primitive_node<RetrievedChunks, AssembledPrompt>(
         "RAG.Assemble",
-        [max_ctx_tokens, prompt_tmpl,
-         state](RetrievedChunks in, StreamEdge<AssembledPrompt>& out) {
+        [max_ctx_tokens, prompt_tmpl, state](RetrievedChunks in, StreamEdge<AssembledPrompt>& out) {
             if (in.results.empty()) {
                 std::lock_guard<std::mutex> lock(state->mu);
                 state->accumulated_answer =
@@ -333,8 +333,7 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
 
             AssembledPrompt payload;
             payload.context_used = build_context(in.results, max_ctx_tokens);
-            payload.prompt =
-                format_prompt(in.query_text, payload.context_used, prompt_tmpl);
+            payload.prompt = format_prompt(in.query_text, payload.context_used, prompt_tmpl);
             payload.sources = std::move(in.results);
             {
                 std::lock_guard<std::mutex> lock(state->mu);
@@ -352,19 +351,19 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
     // accumulates into `state` directly. Pushing each token onto a typed edge
     // would add an extra hop without any real consumer downstream.
     auto llm_node = make_primitive_node<AssembledPrompt, std::string>(
-        "RAG.LLM",
-        [llm_handle, llm_options, sink_callback,
-         state](AssembledPrompt in, StreamEdge<std::string>& /*out*/) {
-            if (in.prompt.empty()) return;
+        "RAG.LLM", [llm_handle, llm_options, sink_callback,
+                    state](AssembledPrompt in, StreamEdge<std::string>& /*out*/) {
+            if (in.prompt.empty())
+                return;
 
             LLMStreamCtx ctx{state.get(), sink_callback.get()};
             rac_result_t status = rac_llm_generate_stream(
-                llm_handle, in.prompt.c_str(), &llm_options, llm_stream_trampoline,
-                &ctx);
+                llm_handle, in.prompt.c_str(), &llm_options, llm_stream_trampoline, &ctx);
             if (status != RAC_SUCCESS) {
                 LOGE("LLMNode: generate_stream failed (%d)", status);
                 std::lock_guard<std::mutex> lock(state->mu);
-                if (state->status == RAC_SUCCESS) state->status = status;
+                if (state->status == RAC_SUCCESS)
+                    state->status = status;
             }
         });
 

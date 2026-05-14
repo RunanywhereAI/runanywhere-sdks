@@ -36,8 +36,7 @@
 // test binary). The implementation lives in rac_voice_event_abi.cpp in
 // rac::voice_agent::dispatch_proto_event.
 namespace rac::voice_agent {
-void dispatch_proto_event(rac_voice_agent_handle_t       handle,
-                          const rac_voice_agent_event_t* event);
+void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event);
 }
 #endif
 
@@ -45,8 +44,8 @@ namespace {
 
 struct CapturedCall {
     std::vector<uint8_t> bytes;
-    void*                user_data = nullptr;
-    size_t               call_count = 0;
+    void* user_data = nullptr;
+    size_t call_count = 0;
 };
 
 CapturedCall g_capture;
@@ -70,19 +69,21 @@ rac_voice_agent_handle_t fake_handle() {
     return reinterpret_cast<rac_voice_agent_handle_t>(&sentinel);
 }
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if ((a) != (b)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if ((a) != (b)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 int test_invalid_handle_rejected() {
     rac_result_t rc = rac_voice_agent_set_proto_callback(nullptr, test_callback, nullptr);
@@ -118,8 +119,8 @@ int test_transcription_arm() {
     ASSERT_TRUE(g_capture.user_data == &sentinel);
 
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_user_said());
     ASSERT_EQ(decoded.user_said().text(), "hello world");
     ASSERT_TRUE(decoded.user_said().is_final());
@@ -139,8 +140,8 @@ int test_response_arm() {
     rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
 
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_assistant_token());
     ASSERT_EQ(decoded.assistant_token().text(), "the answer is 42");
     ASSERT_TRUE(decoded.assistant_token().is_final());
@@ -154,7 +155,7 @@ int test_audio_arm() {
     reset_capture();
     rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
 
-    const uint8_t pcm[8] = { 0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x80, 0xBF };
+    const uint8_t pcm[8] = {0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x80, 0xBF};
     rac_voice_agent_event_t event = {};
     event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
     event.data.audio.audio_data = pcm;
@@ -162,8 +163,8 @@ int test_audio_arm() {
     rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
 
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_audio());
     ASSERT_EQ(decoded.audio().pcm().size(), sizeof(pcm));
     ASSERT_EQ(std::memcmp(decoded.audio().pcm().data(), pcm, sizeof(pcm)), 0);
@@ -184,8 +185,8 @@ int test_vad_arm() {
     rac::voice_agent::dispatch_proto_event(fake_handle(), &start_event);
 
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_vad());
     // IDL-18: VADEvent.type is now VADStreamEventKind; speech-start/end ride
     // SPEECH_ACTIVITY, with direction on the companion is_speech bool.
@@ -199,8 +200,8 @@ int test_vad_arm() {
     rac::voice_agent::dispatch_proto_event(fake_handle(), &end_event);
 
     decoded.Clear();
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
     ASSERT_FALSE(decoded.vad().is_speech());
 
@@ -218,8 +219,8 @@ int test_error_arm() {
     rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
 
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_error());
     ASSERT_EQ(decoded.error().code(), static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
     ASSERT_EQ(decoded.error().component(), "pipeline");
@@ -241,8 +242,8 @@ int test_processed_arm() {
 
     ASSERT_EQ(g_capture.call_count, 1U);
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_metrics());
     // Per-primitive latencies are not yet captured in the C struct; the
     // implementation fills the metrics submessage with proto defaults. The
@@ -273,11 +274,11 @@ int test_wakeword_arm() {
 
     ASSERT_EQ(g_capture.call_count, 1U);
     runanywhere::v1::VoiceEvent decoded;
-    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
-                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(
+        decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_state());
     ASSERT_EQ(decoded.state().previous(), runanywhere::v1::PIPELINE_STATE_IDLE);
-    ASSERT_EQ(decoded.state().current(),  runanywhere::v1::PIPELINE_STATE_LISTENING);
+    ASSERT_EQ(decoded.state().current(), runanywhere::v1::PIPELINE_STATE_LISTENING);
 
     rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);
     return 0;
@@ -333,12 +334,17 @@ int test_seq_monotonic() {
 int main() {
     int failures = 0;
 
-#define RUN(name) do { \
-    std::printf("[ RUN  ] %s\n", #name); \
-    int rc = name(); \
-    if (rc == 0) std::printf("[  OK  ] %s\n", #name); \
-    else        { std::printf("[ FAIL ] %s\n", #name); ++failures; } \
-} while (0)
+#define RUN(name)                                \
+    do {                                         \
+        std::printf("[ RUN  ] %s\n", #name);     \
+        int rc = name();                         \
+        if (rc == 0)                             \
+            std::printf("[  OK  ] %s\n", #name); \
+        else {                                   \
+            std::printf("[ FAIL ] %s\n", #name); \
+            ++failures;                          \
+        }                                        \
+    } while (0)
 
     RUN(test_invalid_handle_rejected);
     RUN(test_set_callback_returns_correct_status);
@@ -349,8 +355,8 @@ int main() {
     RUN(test_audio_arm);
     RUN(test_vad_arm);
     RUN(test_error_arm);
-    RUN(test_processed_arm);          // Post-audit coverage gap fix.
-    RUN(test_wakeword_arm);           // Post-audit coverage gap fix.
+    RUN(test_processed_arm);  // Post-audit coverage gap fix.
+    RUN(test_wakeword_arm);   // Post-audit coverage gap fix.
     RUN(test_unregister_stops_dispatch);
     RUN(test_seq_monotonic);
 #else

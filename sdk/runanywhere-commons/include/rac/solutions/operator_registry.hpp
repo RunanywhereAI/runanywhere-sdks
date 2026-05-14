@@ -56,8 +56,7 @@ inline constexpr const char* kPayloadImageJpeg = "image/jpeg";
 inline constexpr const char* kPayloadImageWebp = "image/webp";
 inline constexpr const char* kPayloadImageRawRgb = "image/raw-rgb";
 inline constexpr const char* kPayloadImageRawRgba = "image/raw-rgba";
-inline constexpr const char* kPayloadEmbeddingVectorFloat32 =
-    "embedding.vector.float32";
+inline constexpr const char* kPayloadEmbeddingVectorFloat32 = "embedding.vector.float32";
 inline constexpr const char* kPayloadControlTerminal = "control.terminal";
 inline constexpr const char* kPayloadControlCancellation = "control.cancel";
 inline constexpr const char* kPayloadControlError = "control.error";
@@ -67,10 +66,8 @@ inline constexpr const char* kPayloadBodyRawBytes = "bytes.raw";
 inline constexpr const char* kPayloadBodyImageBytes = "image.bytes";
 inline constexpr const char* kPayloadBodyEmbeddingVector = "embedding.vector";
 inline constexpr const char* kPayloadBodyControlSignal = "control.signal";
-inline constexpr const char* kPayloadBodySdkEventProto =
-    "proto.runanywhere.v1.SDKEvent";
-inline constexpr const char* kPayloadBodyVoiceEventProto =
-    "proto.runanywhere.v1.VoiceEvent";
+inline constexpr const char* kPayloadBodySdkEventProto = "proto.runanywhere.v1.SDKEvent";
+inline constexpr const char* kPayloadBodyVoiceEventProto = "proto.runanywhere.v1.VoiceEvent";
 inline constexpr const char* kPayloadEmbeddingElementFloat32 = "float32";
 
 enum class PayloadBodyKind {
@@ -100,8 +97,8 @@ struct EmbeddingVectorBody {
 
 struct ControlSignalBody {
     PayloadControlSignalKind kind{PayloadControlSignalKind::Invalid};
-    int                      status_code{0};
-    std::string              reason{};
+    int status_code{0};
+    std::string reason{};
 };
 
 /// Portable edge payload used by the solution executor.
@@ -126,80 +123,50 @@ struct Payload {
 
     Payload() = default;
     Payload(std::string payload_type, std::string payload_bytes)
-        : Payload(std::move(payload_type), std::move(payload_bytes),
-                  PayloadBodyKind::RawBytes) {}
+        : Payload(std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::RawBytes) {}
 
-    static Payload text(std::string value,
-                        std::string payload_type = kPayloadTextUtf8);
-    static Payload audio_pcm_s16le(
-        std::string payload_bytes,
-        std::string payload_type = kPayloadAudioPcmS16Le);
+    static Payload text(std::string value, std::string payload_type = kPayloadTextUtf8);
+    static Payload audio_pcm_s16le(std::string payload_bytes,
+                                   std::string payload_type = kPayloadAudioPcmS16Le);
     static Payload image_bytes(std::string payload_bytes,
                                std::string payload_type = kPayloadImagePng);
-    static Payload embedding_vector(
-        std::vector<float> values,
-        std::string payload_type = kPayloadEmbeddingVectorFloat32);
-    static Payload control_signal(
-        PayloadControlSignalKind kind,
-        std::string reason = {},
-        int status_code = 0,
-        std::string payload_type = {});
-    static Payload terminal_control(
-        std::string reason = {},
-        int status_code = 0,
-        std::string payload_type = kPayloadControlTerminal);
-    static Payload sdk_event_proto(
-        std::string serialized_event,
-        std::string payload_type = kPayloadSdkEvent);
-    static Payload voice_event_proto(
-        std::string serialized_event,
-        std::string payload_type = kPayloadVoiceEvent);
-    static Payload typed_bytes(std::string payload_type,
-                               std::string payload_bytes);
+    static Payload embedding_vector(std::vector<float> values,
+                                    std::string payload_type = kPayloadEmbeddingVectorFloat32);
+    static Payload control_signal(PayloadControlSignalKind kind, std::string reason = {},
+                                  int status_code = 0, std::string payload_type = {});
+    static Payload terminal_control(std::string reason = {}, int status_code = 0,
+                                    std::string payload_type = kPayloadControlTerminal);
+    static Payload sdk_event_proto(std::string serialized_event,
+                                   std::string payload_type = kPayloadSdkEvent);
+    static Payload voice_event_proto(std::string serialized_event,
+                                     std::string payload_type = kPayloadVoiceEvent);
+    static Payload typed_bytes(std::string payload_type, std::string payload_bytes);
 
     const std::string& text() const noexcept { return bytes; }
     const std::vector<float>& embedding_values() const noexcept {
         return embedding_vector_body.values;
     }
-    const ControlSignalBody& control_signal() const noexcept {
-        return control_signal_body;
-    }
+    const ControlSignalBody& control_signal() const noexcept { return control_signal_body; }
     std::string& mutable_bytes() noexcept { return bytes; }
-    std::vector<float>& mutable_embedding_values() noexcept {
-        return embedding_vector_body.values;
-    }
+    std::vector<float>& mutable_embedding_values() noexcept { return embedding_vector_body.values; }
     std::size_t size() const noexcept;
     const char* body_type_id() const noexcept;
-    bool is_text() const noexcept {
-        return body_kind == PayloadBodyKind::TextUtf8;
-    }
-    bool is_audio_pcm_s16le() const noexcept {
-        return body_kind == PayloadBodyKind::AudioPcmS16Le;
-    }
-    bool is_image_bytes() const noexcept {
-        return body_kind == PayloadBodyKind::ImageBytes;
-    }
+    bool is_text() const noexcept { return body_kind == PayloadBodyKind::TextUtf8; }
+    bool is_audio_pcm_s16le() const noexcept { return body_kind == PayloadBodyKind::AudioPcmS16Le; }
+    bool is_image_bytes() const noexcept { return body_kind == PayloadBodyKind::ImageBytes; }
     bool is_embedding_vector() const noexcept {
         return body_kind == PayloadBodyKind::EmbeddingVector;
     }
-    bool is_control_signal() const noexcept {
-        return body_kind == PayloadBodyKind::ControlSignal;
-    }
-    bool is_sdk_event_proto() const noexcept {
-        return body_kind == PayloadBodyKind::SdkEventProto;
-    }
+    bool is_control_signal() const noexcept { return body_kind == PayloadBodyKind::ControlSignal; }
+    bool is_sdk_event_proto() const noexcept { return body_kind == PayloadBodyKind::SdkEventProto; }
     bool is_voice_event_proto() const noexcept {
         return body_kind == PayloadBodyKind::VoiceEventProto;
     }
     bool validate_body_contract(std::string* err = nullptr) const;
 
-private:
-    Payload(std::string payload_type,
-            std::string payload_bytes,
-            PayloadBodyKind kind)
-        : type_id(std::move(payload_type)),
-          bytes(std::move(payload_bytes)),
-          body_kind(kind) {}
+   private:
+    Payload(std::string payload_type, std::string payload_bytes, PayloadBodyKind kind)
+        : type_id(std::move(payload_type)), bytes(std::move(payload_bytes)), body_kind(kind) {}
     Payload(std::string payload_type, EmbeddingVectorBody body)
         : type_id(std::move(payload_type)),
           embedding_vector_body(std::move(body)),
@@ -212,37 +179,33 @@ private:
 
 using Item = Payload;
 
-using OperatorEdge  = rac::graph::StreamEdge<Item>;
-using OperatorNode  = rac::graph::PipelineNode<Item, Item>;
+using OperatorEdge = rac::graph::StreamEdge<Item>;
+using OperatorNode = rac::graph::PipelineNode<Item, Item>;
 
 /// Factory signature — called once per OperatorSpec. The factory owns
 /// interpretation of `spec.params()` and `spec.model_id()` and returns
 /// a fully constructed (but not yet started) pipeline node.
-using OperatorFactory = std::function<std::shared_ptr<OperatorNode>(
-    const runanywhere::v1::OperatorSpec& spec)>;
+using OperatorFactory =
+    std::function<std::shared_ptr<OperatorNode>(const runanywhere::v1::OperatorSpec& spec)>;
 
 /// Named-port adapter consumed by PipelineExecutor. Multi-port operators
 /// implement this interface directly so each EdgeSpec endpoint can bind to
 /// an independent input/output edge. Single-input/single-output
 /// OperatorFactory registrations are wrapped in a single-port adapter.
 class OperatorAdapter : public rac::graph::IPipelineNode {
-public:
+   public:
     ~OperatorAdapter() override = default;
 
-    virtual std::shared_ptr<OperatorEdge> input(
-        const std::string& port) const noexcept = 0;
-    virtual std::shared_ptr<OperatorEdge> output(
-        const std::string& port) const noexcept = 0;
-    virtual bool set_input(
-        const std::string& port,
-        std::shared_ptr<OperatorEdge> edge) noexcept = 0;
-    virtual bool set_output(
-        const std::string& port,
-        std::shared_ptr<OperatorEdge> edge) noexcept = 0;
+    virtual std::shared_ptr<OperatorEdge> input(const std::string& port) const noexcept = 0;
+    virtual std::shared_ptr<OperatorEdge> output(const std::string& port) const noexcept = 0;
+    virtual bool set_input(const std::string& port,
+                           std::shared_ptr<OperatorEdge> edge) noexcept = 0;
+    virtual bool set_output(const std::string& port,
+                            std::shared_ptr<OperatorEdge> edge) noexcept = 0;
 };
 
-using OperatorAdapterFactory = std::function<std::shared_ptr<OperatorAdapter>(
-    const runanywhere::v1::OperatorSpec& spec)>;
+using OperatorAdapterFactory =
+    std::function<std::shared_ptr<OperatorAdapter>(const runanywhere::v1::OperatorSpec& spec)>;
 
 /// Declares the named input/output ports accepted by an operator type.
 /// The executor validates EdgeSpec endpoints against this schema before
@@ -260,7 +223,7 @@ struct OperatorPortSchema {
 
 /// Process-wide operator factory table.
 class OperatorRegistry {
-public:
+   public:
     static OperatorRegistry& instance();
 
     /// Register / replace the factory for an operator type. Returns
@@ -268,12 +231,10 @@ public:
     /// std::unordered_map::insert_or_assign semantics and is surfaced
     /// so callers can detect duplicate-registration bugs in tests).
     bool register_factory(const std::string& type, OperatorFactory factory);
-    bool register_factory(const std::string& type,
-                          OperatorFactory    factory,
+    bool register_factory(const std::string& type, OperatorFactory factory,
                           OperatorPortSchema ports);
-    bool register_adapter_factory(const std::string& type,
-                                  OperatorAdapterFactory factory,
-                                  OperatorPortSchema     ports);
+    bool register_adapter_factory(const std::string& type, OperatorAdapterFactory factory,
+                                  OperatorPortSchema ports);
 
     /// Remove a factory. No-op if absent. Used by tests to reset state
     /// between scenarios.
@@ -284,20 +245,15 @@ public:
     /// the executor maps that to either invalid configuration or feature
     /// unavailable depending on whether the type is one of the known
     /// engine-backed solution primitives.
-    std::shared_ptr<OperatorNode> create(
-        const runanywhere::v1::OperatorSpec& spec) const;
-    std::shared_ptr<OperatorAdapter> create_adapter(
-        const runanywhere::v1::OperatorSpec& spec) const;
+    std::shared_ptr<OperatorNode> create(const runanywhere::v1::OperatorSpec& spec) const;
+    std::shared_ptr<OperatorAdapter>
+    create_adapter(const runanywhere::v1::OperatorSpec& spec) const;
 
     bool has_factory(const std::string& type) const noexcept;
-    bool has_input_port(const std::string& type,
-                        const std::string& port) const noexcept;
-    bool has_output_port(const std::string& type,
-                         const std::string& port) const noexcept;
-    const std::vector<std::string>& input_ports(
-        const std::string& type) const noexcept;
-    const std::vector<std::string>& output_ports(
-        const std::string& type) const noexcept;
+    bool has_input_port(const std::string& type, const std::string& port) const noexcept;
+    bool has_output_port(const std::string& type, const std::string& port) const noexcept;
+    const std::vector<std::string>& input_ports(const std::string& type) const noexcept;
+    const std::vector<std::string>& output_ports(const std::string& type) const noexcept;
     const std::string& input_port_type(const std::string& type,
                                        const std::string& port) const noexcept;
     const std::string& output_port_type(const std::string& type,
@@ -306,10 +262,10 @@ public:
     /// Wipe every factory. Intended for tests only.
     void clear() noexcept;
 
-    OperatorRegistry(const OperatorRegistry&)            = delete;
+    OperatorRegistry(const OperatorRegistry&) = delete;
     OperatorRegistry& operator=(const OperatorRegistry&) = delete;
 
-private:
+   private:
     OperatorRegistry();
 
     std::unordered_map<std::string, OperatorFactory> factories_;

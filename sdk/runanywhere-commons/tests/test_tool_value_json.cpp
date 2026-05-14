@@ -12,8 +12,8 @@
  */
 
 #include <cassert>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -29,36 +29,40 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                 \
+    do {                                                                                  \
+        if (!(cond)) {                                                                    \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
+            return 1;                                                                     \
+        }                                                                                 \
+    } while (0)
 
-#define ASSERT_EQ_INT(a, b) do { \
-    if (static_cast<long long>(a) != static_cast<long long>(b)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %lld != %lld\n", __FILE__, __LINE__, \
-                     static_cast<long long>(a), static_cast<long long>(b)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_INT(a, b)                                                                 \
+    do {                                                                                    \
+        if (static_cast<long long>(a) != static_cast<long long>(b)) {                       \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %lld != %lld\n", __FILE__, __LINE__, \
+                         static_cast<long long>(a), static_cast<long long>(b));             \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ_STR(actual, expected) do { \
-    if (std::strcmp((actual), (expected)) != 0) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
-                     __FILE__, __LINE__, (expected), (actual)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_STR(actual, expected)                                                           \
+    do {                                                                                          \
+        if (std::strcmp((actual), (expected)) != 0) {                                             \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
+                         __FILE__, __LINE__, (expected), (actual));                               \
+            return 1;                                                                             \
+        }                                                                                         \
+    } while (0)
 
-#define ASSERT_SUBSTR(haystack, needle) do { \
-    if (std::strstr((haystack), (needle)) == nullptr) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", \
-                     __FILE__, __LINE__, (needle), (haystack)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_SUBSTR(haystack, needle)                                                         \
+    do {                                                                                        \
+        if (std::strstr((haystack), (needle)) == nullptr) {                                     \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", __FILE__, \
+                         __LINE__, (needle), (haystack));                                       \
+            return 1;                                                                           \
+        }                                                                                       \
+    } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
@@ -70,8 +74,8 @@ std::string to_json(const runanywhere::v1::ToolValue& value) {
 
     rac_proto_buffer_t out{};
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_value_to_json_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+    rac_result_t rc = rac_tool_value_to_json_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                                   bytes.size(), &out);
     assert(rc == RAC_SUCCESS);
     assert(out.status == RAC_SUCCESS);
 
@@ -92,8 +96,8 @@ runanywhere::v1::ToolValue from_json(const std::string& json_text) {
 
     rac_proto_buffer_t out{};
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_value_from_json_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &out);
+    rac_result_t rc = rac_tool_value_from_json_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                                     bytes.size(), &out);
     assert(rc == RAC_SUCCESS);
     assert(out.status == RAC_SUCCESS);
 
@@ -228,8 +232,7 @@ int test_round_trip_object() {
     ASSERT_EQ_STR(out_fields.at("name").string_value().c_str(), "Alice");
     ASSERT_TRUE(out_fields.at("age").number_value() == 30.0);
     ASSERT_EQ_INT(out_fields.at("active").bool_value() ? 1 : 0, 1);
-    ASSERT_EQ_INT(out_fields.at("meta").kind_case(),
-                  runanywhere::v1::ToolValue::kNullValue);
+    ASSERT_EQ_INT(out_fields.at("meta").kind_case(), runanywhere::v1::ToolValue::kNullValue);
     ASSERT_EQ_INT(out_fields.at("tags").array_value().values_size(), 2);
     return 0;
 #endif
@@ -249,8 +252,8 @@ int main(int argc, char** argv) {
     TestCase cases[] = {
         {"round_trip_string", test_round_trip_string},
         {"round_trip_number", test_round_trip_number},
-        {"round_trip_bool",   test_round_trip_bool},
-        {"round_trip_array",  test_round_trip_array},
+        {"round_trip_bool", test_round_trip_bool},
+        {"round_trip_array", test_round_trip_array},
         {"round_trip_object", test_round_trip_object},
     };
 

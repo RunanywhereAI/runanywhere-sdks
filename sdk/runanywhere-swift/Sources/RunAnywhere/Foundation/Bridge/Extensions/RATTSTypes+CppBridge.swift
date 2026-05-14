@@ -27,15 +27,16 @@ public extension RATTSOptions {
         sampleRate: Int = 22050,
         useSSML: Bool = false
     ) {
-        var o = RATTSOptions()
-        o.voice = voice
-        o.languageCode = language
-        o.speakingRate = rate
-        o.pitch = pitch
-        o.volume = volume
-        o.audioFormat = audioFormat
-        o.enableSsml = useSSML
-        self = o
+        var options = RATTSOptions()
+        options.voice = voice
+        options.languageCode = language
+        options.speakingRate = rate
+        options.pitch = pitch
+        options.volume = volume
+        options.audioFormat = audioFormat
+        options.enableSsml = useSSML
+        options.sampleRate = Int32(sampleRate)
+        self = options
     }
 
     var rate: Float {

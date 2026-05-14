@@ -29,4 +29,6 @@ index_exclude:
 
 # Exclude from results (but still index)
 report_exclude:
-  - "Tests/**/*"
+  - "**/Tests/**/*"
+  - "**/Generated/**/*"
+  - "**/Generated/*"

@@ -31,33 +31,30 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                 \
-    do {                                                                                  \
-        if (!(cond)) {                                                                    \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__,          \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                   \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,   \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
-#define ASSERT_STR_EQ(a, b)                                                               \
-    do {                                                                                  \
-        if ((a) != (b)) {                                                                 \
-            std::fprintf(stderr,                                                          \
-                         "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
-                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),              \
-                         std::string(b).c_str());                                         \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_STR_EQ(a, b)                                                                        \
+    do {                                                                                           \
+        if ((a) != (b)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d (got=\"%s\" expected=\"%s\")\n", \
+                         #a, #b, __FILE__, __LINE__, std::string(a).c_str(),                       \
+                         std::string(b).c_str());                                                  \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -88,8 +85,7 @@ struct RegisterArgs {
     runanywhere::v1::InferenceFramework framework =
         runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
     bool has_category = false;
-    runanywhere::v1::ModelCategory category =
-        runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
+    runanywhere::v1::ModelCategory category = runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
     bool has_source = false;
     runanywhere::v1::ModelSource source = runanywhere::v1::MODEL_SOURCE_UNSPECIFIED;
 };
@@ -98,9 +94,12 @@ bool register_proto(const RegisterArgs& args, runanywhere::v1::ModelInfo* out) {
     runanywhere::v1::RegisterModelFromUrlRequest request;
     request.set_url(args.url);
     request.set_name(args.name);
-    if (args.has_framework) request.set_framework(args.framework);
-    if (args.has_category) request.set_category(args.category);
-    if (args.has_source) request.set_source(args.source);
+    if (args.has_framework)
+        request.set_framework(args.framework);
+    if (args.has_category)
+        request.set_category(args.category);
+    if (args.has_source)
+        request.set_source(args.source);
 
     std::string bytes;
     if (!request.SerializeToString(&bytes)) {
@@ -140,8 +139,7 @@ bool read_back_by_id(const std::string& id, runanywhere::v1::ModelInfo* out) {
     size_t size = 0;
     rac_result_t rc = rac_model_registry_get_proto(registry, id.c_str(), &bytes, &size);
     if (rc != RAC_SUCCESS) {
-        std::fprintf(stderr, "rac_model_registry_get_proto rc=%d for id=%s\n", rc,
-                     id.c_str());
+        std::fprintf(stderr, "rac_model_registry_get_proto rc=%d for id=%s\n", rc, id.c_str());
         return false;
     }
     bool parsed = out->ParseFromArray(bytes, static_cast<int>(size));
@@ -152,7 +150,8 @@ bool read_back_by_id(const std::string& id, runanywhere::v1::ModelInfo* out) {
 // Cleanup helper — best-effort remove by id so tests don't bleed state.
 void remove_by_id(const std::string& id) {
     rac_model_registry_handle_t registry = rac_get_model_registry();
-    if (!registry) return;
+    if (!registry)
+        return;
     (void)rac_model_registry_remove_proto(registry, id.c_str());
 }
 
@@ -223,8 +222,7 @@ int test_register_archive_round_trip() {
     ASSERT_EQ(saved.artifact_case(), runanywhere::v1::ModelInfo::kArchive);
     ASSERT_TRUE(saved.has_archive());
     ASSERT_EQ(saved.archive().type(), runanywhere::v1::ARCHIVE_TYPE_TAR_GZ);
-    ASSERT_EQ(saved.artifact_type(),
-              runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
+    ASSERT_EQ(saved.artifact_type(), runanywhere::v1::MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE);
 
     // Round-trip via registry get.
     runanywhere::v1::ModelInfo retrieved;

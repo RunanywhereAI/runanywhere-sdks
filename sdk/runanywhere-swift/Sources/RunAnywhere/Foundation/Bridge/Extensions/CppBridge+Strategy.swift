@@ -40,18 +40,6 @@ extension ArchiveType {
 // MARK: - ArchiveStructure C++ Conversion
 
 extension ArchiveStructure {
-    /// Convert to C++ archive structure.
-    /// Delegates to commons' `rac_archive_structure_from_proto`. Falls back to
-    /// `RAC_ARCHIVE_STRUCTURE_UNKNOWN` when the proto value is unrecognized
-    /// (preserves legacy hand-written behaviour for unspecified inputs).
-    func toC() -> rac_archive_structure_t {
-        var out: rac_archive_structure_t = RAC_ARCHIVE_STRUCTURE_UNKNOWN
-        guard rac_archive_structure_from_proto(Int32(self.rawValue), &out) == RAC_SUCCESS else {
-            return RAC_ARCHIVE_STRUCTURE_UNKNOWN
-        }
-        return out
-    }
-
     /// Initialize from C++ archive structure.
     /// Delegates to commons' `rac_archive_structure_to_proto`. Falls back to
     /// `.unknown` for unrecognized C values (matches legacy hand-written switch).

@@ -43,6 +43,7 @@ extension RARAGDocument {
         self.text = text
         if let metadataJSON, !metadataJSON.isEmpty,
            let data = metadataJSON.data(using: .utf8),
+           // swiftlint:disable:next avoid_any_type
            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             for (key, value) in parsed {
                 self.metadata[key] = String(describing: value)
@@ -58,9 +59,9 @@ extension RARAGQueryOptions {
     /// required question string. Question is excluded from the proto
     /// annotation because it has no semantic default (caller-supplied).
     public static func defaults(question: String) -> RARAGQueryOptions {
-        var o = RARAGQueryOptions.defaults()
-        o.question = question
-        return o
+        var options = RARAGQueryOptions.defaults()
+        options.question = question
+        return options
     }
 }
 

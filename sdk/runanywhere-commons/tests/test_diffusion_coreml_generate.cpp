@@ -1,8 +1,8 @@
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-
 #include "diffusion_coreml_backend.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 int main() {
 #if !defined(__APPLE__)
@@ -11,8 +11,9 @@ int main() {
 #else
     const char* bundle = std::getenv("RAC_TEST_COREML_DIFFUSION_BUNDLE");
     if (!bundle || bundle[0] == '\0') {
-        std::fprintf(stdout,
-                     "SKIP: set RAC_TEST_COREML_DIFFUSION_BUNDLE to a CoreML Stable Diffusion bundle\n");
+        std::fprintf(
+            stdout,
+            "SKIP: set RAC_TEST_COREML_DIFFUSION_BUNDLE to a CoreML Stable Diffusion bundle\n");
         return 0;
     }
 
@@ -67,9 +68,8 @@ int main() {
         return 1;
     }
 
-    std::fprintf(stdout, "ok: generated %dx%d RGBA image (%zu bytes), seed=%lld\n",
-                 result.width, result.height, result.image_size,
-                 static_cast<long long>(result.seed_used));
+    std::fprintf(stdout, "ok: generated %dx%d RGBA image (%zu bytes), seed=%lld\n", result.width,
+                 result.height, result.image_size, static_cast<long long>(result.seed_used));
     rac_diffusion_result_free(&result);
     rac_diffusion_coreml_destroy(impl);
     return 0;

@@ -871,10 +871,9 @@ RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
  * @return RAC_SUCCESS on success, or a negative rac_result_t on encode/
  *         decode failure / NULL out pointer.
  */
-RAC_API rac_result_t rac_model_info_make_proto(
-    const uint8_t* in_request_bytes,
-    size_t in_request_size,
-    rac_proto_buffer_t* out_proto);
+RAC_API rac_result_t rac_model_info_make_proto(const uint8_t* in_request_bytes,
+                                               size_t in_request_size,
+                                               rac_proto_buffer_t* out_proto);
 
 /**
  * @brief Probe whether a path is a directory containing at least one entry.
@@ -977,8 +976,7 @@ RAC_API rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t 
  * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
  *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
  */
-RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value,
-                                                   rac_model_category_t* out);
+RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_model_category_t* out);
 
 /**
  * @brief Convert a `rac_model_category_t` value to the proto
@@ -1138,10 +1136,9 @@ RAC_API rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t valu
  * @return RAC_SUCCESS on success, or a negative rac_result_t on
  *         encode/decode/null-pointer failure.
  */
-RAC_API rac_result_t rac_artifact_expected_files_proto(
-    const uint8_t* in_model_bytes,
-    size_t in_model_size,
-    rac_proto_buffer_t* out_proto);
+RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_bytes,
+                                                       size_t in_model_size,
+                                                       rac_proto_buffer_t* out_proto);
 
 #ifdef __cplusplus
 }

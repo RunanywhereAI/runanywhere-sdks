@@ -23,15 +23,15 @@ import {
   type LLMGenerationResult as ProtoLLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 
-import { ModalityProtoAdapter, type ModalityProtoModule } from '../../Adapters/ModalityProtoAdapter';
-import { SDKException } from '../../Foundation/SDKException';
+import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
+import { SDKException } from '../../../../src/Foundation/SDKException';
 import {
   clearRunanywhereModule,
   setRunanywhereModule,
   type EmscriptenRunanywhereModule,
-} from '../../runtime/EmscriptenModule';
-import { StructuredOutput } from './RunAnywhere+StructuredOutput';
-import { extractStructuredOutput, generateStructuredStream } from './RunAnywhere+TextGeneration';
+} from '../../../../src/runtime/EmscriptenModule';
+import { StructuredOutput } from '../../../../src/Public/Extensions/RunAnywhere+StructuredOutput';
+import { extractStructuredOutput, generateStructuredStream } from '../../../../src/Public/Extensions/RunAnywhere+TextGeneration';
 
 const PROTO_BUFFER_SIZE = 16;
 const OFF_DATA = 0;

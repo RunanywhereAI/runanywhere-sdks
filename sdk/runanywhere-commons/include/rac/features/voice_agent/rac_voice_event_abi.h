@@ -68,8 +68,7 @@ extern "C" {
  * holding onto the pointer is undefined behavior.
  */
 typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_bytes,
-                                                         size_t         event_size,
-                                                         void*          user_data);
+                                                        size_t event_size, void* user_data);
 
 /**
  * @brief Register a proto-byte event callback on a voice agent handle.
@@ -89,12 +88,12 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
  *                                           should fall back to the struct
  *                                           callback.
  */
-RAC_API rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t                  handle,
-                                                        rac_voice_agent_proto_event_callback_fn   callback,
-                                                        void*                                     user_data);
+RAC_API rac_result_t rac_voice_agent_set_proto_callback(
+    rac_voice_agent_handle_t handle, rac_voice_agent_proto_event_callback_fn callback,
+    void* user_data);
 
 #ifdef __cplusplus
-}  /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* RAC_FEATURES_VOICE_AGENT_RAC_VOICE_EVENT_ABI_H */

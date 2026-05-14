@@ -4,9 +4,9 @@
  *
  * GAP 02 Phase 8 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
  *
- * Exposes `rac_plugin_entry_llamacpp()` returning a `const rac_engine_vtable_t*`
- * filled with the existing `g_llamacpp_ops` (non-static since Phase 8) as the
- * LLM slot. All other primitive slots remain NULL.
+ * Exposes `rac_plugin_entry_llamacpp()` returning a `const
+ * rac_engine_vtable_t*` filled with the existing `g_llamacpp_ops` (non-static
+ * since Phase 8) as the LLM slot. All other primitive slots remain NULL.
  *
  * v3.0.0: this is the SOLE llama.cpp registration path. The legacy
  * `rac_backend_llamacpp_register()` function now only does
@@ -17,10 +17,10 @@
  * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_engine_manifest.h"
-#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/plugin/rac_engine_manifest.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 extern "C" {
 
@@ -58,28 +58,28 @@ static const rac_primitive_t k_llamacpp_primitives[] = {
 };
 
 static const rac_engine_manifest_t k_llamacpp_manifest = {
-    .name             = "llamacpp",
-    .display_name     = "llama.cpp",
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "runanywhere_llamacpp",
-    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority         = 100,
+    .name = "llamacpp",
+    .display_name = "llama.cpp",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_llamacpp",
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority = 100,
     .capability_flags = 0,
-    .primitives       = k_llamacpp_primitives,
-    .primitives_count = sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
-    .runtimes         = k_llamacpp_runtimes,
-    .runtimes_count   = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
-    .formats          = k_llamacpp_formats,
-    .formats_count    = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .primitives = k_llamacpp_primitives,
+    .primitives_count =
+        sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
+    .runtimes = k_llamacpp_runtimes,
+    .runtimes_count =
+        sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
+    .formats = k_llamacpp_formats,
+    .formats_count = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
-static void llamacpp_on_unload(void) {
-    rac_llamacpp_cpu_runtime_unregister();
-}
+static void llamacpp_on_unload(void) { rac_llamacpp_cpu_runtime_unregister(); }
 
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_manifest),
@@ -96,18 +96,25 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* diffusion_ops    */ nullptr,
 
     /* reserved_slot_0..9 */
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp) {
-    const rac_engine_vtable_t* vt =
-        rac_engine_entry_with_manifest(&k_llamacpp_manifest,
-                                       &g_llamacpp_engine_vtable);
-    if (vt != nullptr) {
-        (void)rac_llamacpp_cpu_runtime_register();
-    }
-    return vt;
+  const rac_engine_vtable_t *vt = rac_engine_entry_with_manifest(
+      &k_llamacpp_manifest, &g_llamacpp_engine_vtable);
+  if (vt != nullptr) {
+    (void)rac_llamacpp_cpu_runtime_register();
+  }
+  return vt;
 }
 
-}  // extern "C"
+} // extern "C"

@@ -26,7 +26,7 @@ import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
 const logger = new SDKLogger('DownloadAdapter');
 
 export interface DownloadModule extends ProtoWasmModule {
-  addFunction?(fn: (...args: number[]) => number | void, signature: string): number;
+  addFunction?(fn: (...args: number[]) => number | bigint | void, signature: string): number;
   removeFunction?(ptr: number): void;
   _rac_download_set_progress_proto_callback?(
     callbackPtr: number,

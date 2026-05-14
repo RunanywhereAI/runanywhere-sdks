@@ -29,31 +29,30 @@
 
 namespace {
 
-#define EXPECT_TRUE(_cond)                                                                  \
-    do {                                                                                    \
-        if (!(_cond)) {                                                                     \
-            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond);         \
-            return 1;                                                                       \
-        }                                                                                   \
+#define EXPECT_TRUE(_cond)                                                          \
+    do {                                                                            \
+        if (!(_cond)) {                                                             \
+            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond); \
+            return 1;                                                               \
+        }                                                                           \
     } while (0)
 
-#define EXPECT_RC(_rc_expr, _expected)                                                      \
-    do {                                                                                    \
-        rac_result_t _rc = (_rc_expr);                                                      \
-        if (_rc != (_expected)) {                                                           \
-            std::fprintf(stderr,                                                            \
-                         "FAIL @ %s:%d: rc=%d expected=%d\n",                               \
-                         __FILE__, __LINE__, _rc, (_expected));                             \
-            return 1;                                                                       \
-        }                                                                                   \
+#define EXPECT_RC(_rc_expr, _expected)                                                         \
+    do {                                                                                       \
+        rac_result_t _rc = (_rc_expr);                                                         \
+        if (_rc != (_expected)) {                                                              \
+            std::fprintf(stderr, "FAIL @ %s:%d: rc=%d expected=%d\n", __FILE__, __LINE__, _rc, \
+                         (_expected));                                                         \
+            return 1;                                                                          \
+        }                                                                                      \
     } while (0)
 
-#define EXPECT_NONEMPTY(_str)                                                               \
-    do {                                                                                    \
-        if (!(_str) || (_str)[0] == '\0') {                                                 \
-            std::fprintf(stderr, "FAIL @ %s:%d: empty/null string\n", __FILE__, __LINE__);  \
-            return 1;                                                                       \
-        }                                                                                   \
+#define EXPECT_NONEMPTY(_str)                                                              \
+    do {                                                                                   \
+        if (!(_str) || (_str)[0] == '\0') {                                                \
+            std::fprintf(stderr, "FAIL @ %s:%d: empty/null string\n", __FILE__, __LINE__); \
+            return 1;                                                                      \
+        }                                                                                  \
     } while (0)
 
 // All enum values exposed by rac_model_format_t.
@@ -68,13 +67,20 @@ constexpr rac_model_format_t kAllFormats[] = {
 
 // All enum values exposed by rac_inference_framework_t.
 constexpr rac_inference_framework_t kAllFrameworks[] = {
-    RAC_FRAMEWORK_ONNX,           RAC_FRAMEWORK_LLAMACPP,
-    RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS,
-    RAC_FRAMEWORK_FLUID_AUDIO,    RAC_FRAMEWORK_BUILTIN,
-    RAC_FRAMEWORK_NONE,           RAC_FRAMEWORK_MLX,
-    RAC_FRAMEWORK_COREML,         RAC_FRAMEWORK_WHISPERKIT_COREML,
-    RAC_FRAMEWORK_METALRT,        RAC_FRAMEWORK_GENIE,
-    RAC_FRAMEWORK_SHERPA,         RAC_FRAMEWORK_UNKNOWN,
+    RAC_FRAMEWORK_ONNX,
+    RAC_FRAMEWORK_LLAMACPP,
+    RAC_FRAMEWORK_FOUNDATION_MODELS,
+    RAC_FRAMEWORK_SYSTEM_TTS,
+    RAC_FRAMEWORK_FLUID_AUDIO,
+    RAC_FRAMEWORK_BUILTIN,
+    RAC_FRAMEWORK_NONE,
+    RAC_FRAMEWORK_MLX,
+    RAC_FRAMEWORK_COREML,
+    RAC_FRAMEWORK_WHISPERKIT_COREML,
+    RAC_FRAMEWORK_METALRT,
+    RAC_FRAMEWORK_GENIE,
+    RAC_FRAMEWORK_SHERPA,
+    RAC_FRAMEWORK_UNKNOWN,
 };
 
 // ---------------------------------------------------------------------------
@@ -212,8 +218,7 @@ int test_inference_framework_from_string_alias_inputs() {
 int test_inference_framework_from_string_unknown() {
     rac_inference_framework_t parsed = RAC_FRAMEWORK_LLAMACPP;  // sentinel
 
-    EXPECT_RC(rac_inference_framework_from_string("not_a_framework", &parsed),
-              RAC_ERROR_NOT_FOUND);
+    EXPECT_RC(rac_inference_framework_from_string("not_a_framework", &parsed), RAC_ERROR_NOT_FOUND);
     EXPECT_TRUE(parsed == RAC_FRAMEWORK_UNKNOWN);
 
     parsed = RAC_FRAMEWORK_LLAMACPP;
@@ -227,8 +232,7 @@ int test_inference_framework_from_string_unknown() {
 // NULL out-pointer rejection.
 // ---------------------------------------------------------------------------
 int test_null_out_pointer_rejection() {
-    EXPECT_RC(rac_model_format_wire_string(RAC_MODEL_FORMAT_GGUF, nullptr),
-              RAC_ERROR_NULL_POINTER);
+    EXPECT_RC(rac_model_format_wire_string(RAC_MODEL_FORMAT_GGUF, nullptr), RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_inference_framework_wire_string(RAC_FRAMEWORK_LLAMACPP, nullptr),
               RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_LLAMACPP, nullptr),

@@ -87,9 +87,9 @@ public enum CppBridge {
     ///
     /// - Parameter environment: SDK environment
     public static func initialize(environment: SDKEnvironment) {
-        let alreadyInitialized = state.withLock { s -> Bool in
-            if s.isInitialized { return true }
-            s.environment = environment
+        let alreadyInitialized = state.withLock { current -> Bool in
+            if current.isInitialized { return true }
+            current.environment = environment
             return false
         }
         guard !alreadyInitialized else { return }
@@ -132,8 +132,8 @@ public enum CppBridge {
     /// network access to function.
     @MainActor
     public static func initializeServices() {
-        let snapshot = state.withLock { s -> (alreadyDone: Bool, env: SDKEnvironment) in
-            (s.servicesInitialized, s.environment)
+        let snapshot = state.withLock { current -> (alreadyDone: Bool, env: SDKEnvironment) in
+            (current.servicesInitialized, current.environment)
         }
         guard !snapshot.alreadyDone else { return }
         let currentEnv = snapshot.env

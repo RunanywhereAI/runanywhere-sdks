@@ -32,16 +32,17 @@
 
 extern "C" {
 
-RAC_API rac_result_t rac_solution_create_from_proto(const void*            /*proto_bytes*/,
-                                                    size_t                 /*len*/,
+RAC_API rac_result_t rac_solution_create_from_proto(const void* /*proto_bytes*/, size_t /*len*/,
                                                     rac_solution_handle_t* out_handle) {
-    if (out_handle) *out_handle = nullptr;
+    if (out_handle)
+        *out_handle = nullptr;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
-RAC_API rac_result_t rac_solution_create_from_yaml(const char*            /*yaml_text*/,
+RAC_API rac_result_t rac_solution_create_from_yaml(const char* /*yaml_text*/,
                                                    rac_solution_handle_t* out_handle) {
-    if (out_handle) *out_handle = nullptr;
+    if (out_handle)
+        *out_handle = nullptr;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
@@ -57,8 +58,7 @@ RAC_API rac_result_t rac_solution_cancel(rac_solution_handle_t /*handle*/) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
-RAC_API rac_result_t rac_solution_feed(rac_solution_handle_t /*handle*/,
-                                       const char*           /*item*/) {
+RAC_API rac_result_t rac_solution_feed(rac_solution_handle_t /*handle*/, const char* /*item*/) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 

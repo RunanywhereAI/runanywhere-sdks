@@ -22,8 +22,8 @@
  *   - Verifies NULL out-pointer rejection (RAC_ERROR_NULL_POINTER).
  */
 
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
@@ -31,23 +31,22 @@
 
 namespace {
 
-#define EXPECT_TRUE(_cond)                                                                  \
-    do {                                                                                    \
-        if (!(_cond)) {                                                                     \
-            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond);         \
-            return 1;                                                                       \
-        }                                                                                   \
+#define EXPECT_TRUE(_cond)                                                          \
+    do {                                                                            \
+        if (!(_cond)) {                                                             \
+            std::fprintf(stderr, "FAIL @ %s:%d: %s\n", __FILE__, __LINE__, #_cond); \
+            return 1;                                                               \
+        }                                                                           \
     } while (0)
 
-#define EXPECT_RC(_rc_expr, _expected)                                                      \
-    do {                                                                                    \
-        rac_result_t _rc = (_rc_expr);                                                      \
-        if (_rc != (_expected)) {                                                            \
-            std::fprintf(stderr,                                                            \
-                         "FAIL @ %s:%d: rc=%d expected=%d\n",                               \
-                         __FILE__, __LINE__, _rc, (_expected));                              \
-            return 1;                                                                       \
-        }                                                                                   \
+#define EXPECT_RC(_rc_expr, _expected)                                                         \
+    do {                                                                                       \
+        rac_result_t _rc = (_rc_expr);                                                         \
+        if (_rc != (_expected)) {                                                              \
+            std::fprintf(stderr, "FAIL @ %s:%d: rc=%d expected=%d\n", __FILE__, __LINE__, _rc, \
+                         (_expected));                                                         \
+            return 1;                                                                          \
+        }                                                                                      \
     } while (0)
 
 // ---------------------------------------------------------------------------
@@ -57,41 +56,48 @@ namespace {
 
 // InferenceFramework — full proto range 0..23.
 constexpr int32_t kProtoIfwAll[] = {
-    0,  // UNSPECIFIED        → RAC_FRAMEWORK_UNKNOWN
-    1,  // ONNX               → RAC_FRAMEWORK_ONNX
-    2,  // LLAMA_CPP          → RAC_FRAMEWORK_LLAMACPP
-    3,  // FOUNDATION_MODELS  → RAC_FRAMEWORK_FOUNDATION_MODELS
-    4,  // SYSTEM_TTS         → RAC_FRAMEWORK_SYSTEM_TTS
-    5,  // FLUID_AUDIO        → RAC_FRAMEWORK_FLUID_AUDIO
-    6,  // COREML             → RAC_FRAMEWORK_COREML
-    7,  // MLX                → RAC_FRAMEWORK_MLX
-    8,  // WHISPERKIT_COREML  → RAC_FRAMEWORK_WHISPERKIT_COREML
-    9,  // METALRT            → RAC_FRAMEWORK_METALRT
-    10, // GENIE              → RAC_FRAMEWORK_GENIE
-    11, // TFLITE             → RAC_FRAMEWORK_UNKNOWN (no C case)
-    12, // EXECUTORCH         → RAC_FRAMEWORK_UNKNOWN
-    13, // MEDIAPIPE          → RAC_FRAMEWORK_UNKNOWN
-    14, // MLC                → RAC_FRAMEWORK_UNKNOWN
-    15, // PICO_LLM           → RAC_FRAMEWORK_UNKNOWN
-    16, // PIPER_TTS          → RAC_FRAMEWORK_UNKNOWN
-    17, // WHISPERKIT         → RAC_FRAMEWORK_UNKNOWN
-    18, // OPENAI_WHISPER     → RAC_FRAMEWORK_UNKNOWN
-    19, // SWIFT_TRANSFORMERS → RAC_FRAMEWORK_UNKNOWN
-    20, // BUILT_IN           → RAC_FRAMEWORK_BUILTIN
-    21, // NONE               → RAC_FRAMEWORK_NONE
-    22, // UNKNOWN            → RAC_FRAMEWORK_UNKNOWN
-    23, // SHERPA             → RAC_FRAMEWORK_SHERPA
+    0,   // UNSPECIFIED        → RAC_FRAMEWORK_UNKNOWN
+    1,   // ONNX               → RAC_FRAMEWORK_ONNX
+    2,   // LLAMA_CPP          → RAC_FRAMEWORK_LLAMACPP
+    3,   // FOUNDATION_MODELS  → RAC_FRAMEWORK_FOUNDATION_MODELS
+    4,   // SYSTEM_TTS         → RAC_FRAMEWORK_SYSTEM_TTS
+    5,   // FLUID_AUDIO        → RAC_FRAMEWORK_FLUID_AUDIO
+    6,   // COREML             → RAC_FRAMEWORK_COREML
+    7,   // MLX                → RAC_FRAMEWORK_MLX
+    8,   // WHISPERKIT_COREML  → RAC_FRAMEWORK_WHISPERKIT_COREML
+    9,   // METALRT            → RAC_FRAMEWORK_METALRT
+    10,  // GENIE              → RAC_FRAMEWORK_GENIE
+    11,  // TFLITE             → RAC_FRAMEWORK_UNKNOWN (no C case)
+    12,  // EXECUTORCH         → RAC_FRAMEWORK_UNKNOWN
+    13,  // MEDIAPIPE          → RAC_FRAMEWORK_UNKNOWN
+    14,  // MLC                → RAC_FRAMEWORK_UNKNOWN
+    15,  // PICO_LLM           → RAC_FRAMEWORK_UNKNOWN
+    16,  // PIPER_TTS          → RAC_FRAMEWORK_UNKNOWN
+    17,  // WHISPERKIT         → RAC_FRAMEWORK_UNKNOWN
+    18,  // OPENAI_WHISPER     → RAC_FRAMEWORK_UNKNOWN
+    19,  // SWIFT_TRANSFORMERS → RAC_FRAMEWORK_UNKNOWN
+    20,  // BUILT_IN           → RAC_FRAMEWORK_BUILTIN
+    21,  // NONE               → RAC_FRAMEWORK_NONE
+    22,  // UNKNOWN            → RAC_FRAMEWORK_UNKNOWN
+    23,  // SHERPA             → RAC_FRAMEWORK_SHERPA
 };
 
 // All defined C inference framework values.
 constexpr rac_inference_framework_t kCAllFrameworks[] = {
-    RAC_FRAMEWORK_ONNX,               RAC_FRAMEWORK_LLAMACPP,
-    RAC_FRAMEWORK_FOUNDATION_MODELS,  RAC_FRAMEWORK_SYSTEM_TTS,
-    RAC_FRAMEWORK_FLUID_AUDIO,        RAC_FRAMEWORK_BUILTIN,
-    RAC_FRAMEWORK_NONE,               RAC_FRAMEWORK_MLX,
-    RAC_FRAMEWORK_COREML,             RAC_FRAMEWORK_WHISPERKIT_COREML,
-    RAC_FRAMEWORK_METALRT,            RAC_FRAMEWORK_GENIE,
-    RAC_FRAMEWORK_SHERPA,             RAC_FRAMEWORK_UNKNOWN,
+    RAC_FRAMEWORK_ONNX,
+    RAC_FRAMEWORK_LLAMACPP,
+    RAC_FRAMEWORK_FOUNDATION_MODELS,
+    RAC_FRAMEWORK_SYSTEM_TTS,
+    RAC_FRAMEWORK_FLUID_AUDIO,
+    RAC_FRAMEWORK_BUILTIN,
+    RAC_FRAMEWORK_NONE,
+    RAC_FRAMEWORK_MLX,
+    RAC_FRAMEWORK_COREML,
+    RAC_FRAMEWORK_WHISPERKIT_COREML,
+    RAC_FRAMEWORK_METALRT,
+    RAC_FRAMEWORK_GENIE,
+    RAC_FRAMEWORK_SHERPA,
+    RAC_FRAMEWORK_UNKNOWN,
 };
 
 // ModelCategory — proto 0..9.
@@ -134,11 +140,8 @@ constexpr rac_model_source_t kCAllSources[] = {
 constexpr int32_t kProtoAtAll[] = {0, 1, 2, 3, 4};
 
 constexpr rac_archive_type_t kCAllArchiveTypes[] = {
-    RAC_ARCHIVE_TYPE_NONE,
-    RAC_ARCHIVE_TYPE_ZIP,
-    RAC_ARCHIVE_TYPE_TAR_BZ2,
-    RAC_ARCHIVE_TYPE_TAR_GZ,
-    RAC_ARCHIVE_TYPE_TAR_XZ,
+    RAC_ARCHIVE_TYPE_NONE,   RAC_ARCHIVE_TYPE_ZIP,    RAC_ARCHIVE_TYPE_TAR_BZ2,
+    RAC_ARCHIVE_TYPE_TAR_GZ, RAC_ARCHIVE_TYPE_TAR_XZ,
 };
 
 // ArchiveStructure — proto 0..4.
@@ -404,8 +407,7 @@ int test_invalid_proto_values() {
 int test_invalid_c_values() {
     int32_t out = -1;
 
-    EXPECT_RC(rac_inference_framework_to_proto(
-                  static_cast<rac_inference_framework_t>(12345), &out),
+    EXPECT_RC(rac_inference_framework_to_proto(static_cast<rac_inference_framework_t>(12345), &out),
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
@@ -450,16 +452,13 @@ int test_null_out_pointer_rejection() {
               RAC_ERROR_NULL_POINTER);
 
     EXPECT_RC(rac_model_format_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
-    EXPECT_RC(rac_model_format_to_proto(RAC_MODEL_FORMAT_GGUF, nullptr),
-              RAC_ERROR_NULL_POINTER);
+    EXPECT_RC(rac_model_format_to_proto(RAC_MODEL_FORMAT_GGUF, nullptr), RAC_ERROR_NULL_POINTER);
 
     EXPECT_RC(rac_model_source_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
-    EXPECT_RC(rac_model_source_to_proto(RAC_MODEL_SOURCE_REMOTE, nullptr),
-              RAC_ERROR_NULL_POINTER);
+    EXPECT_RC(rac_model_source_to_proto(RAC_MODEL_SOURCE_REMOTE, nullptr), RAC_ERROR_NULL_POINTER);
 
     EXPECT_RC(rac_archive_type_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
-    EXPECT_RC(rac_archive_type_to_proto(RAC_ARCHIVE_TYPE_ZIP, nullptr),
-              RAC_ERROR_NULL_POINTER);
+    EXPECT_RC(rac_archive_type_to_proto(RAC_ARCHIVE_TYPE_ZIP, nullptr), RAC_ERROR_NULL_POINTER);
 
     EXPECT_RC(rac_archive_structure_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_archive_structure_to_proto(RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED, nullptr),

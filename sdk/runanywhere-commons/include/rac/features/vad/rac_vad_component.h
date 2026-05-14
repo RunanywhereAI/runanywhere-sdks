@@ -247,10 +247,8 @@ RAC_API void rac_vad_component_destroy(rac_handle_t handle);
  * @param recent_max_out      Output: recent maximum energy across frames
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
-                                                      float* ambient_level_out,
-                                                      float* recent_avg_out,
-                                                      float* recent_max_out);
+RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle, float* ambient_level_out,
+                                                      float* recent_avg_out, float* recent_max_out);
 
 // =============================================================================
 // GENERATED-PROTO C ABI
@@ -262,44 +260,37 @@ RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
  * The byte buffer is valid only for the duration of the callback.
  */
 typedef void (*rac_vad_proto_stream_event_callback_fn)(const uint8_t* event_proto_bytes,
-                                                       size_t event_proto_size,
-                                                       void* user_data);
+                                                       size_t event_proto_size, void* user_data);
 
 /**
  * @brief Configure VAD from serialized runanywhere.v1.VADConfiguration bytes.
  */
-RAC_API rac_result_t rac_vad_component_configure_proto(
-    rac_handle_t handle,
-    const uint8_t* config_proto_bytes,
-    size_t config_proto_size);
+RAC_API rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
+                                                       const uint8_t* config_proto_bytes,
+                                                       size_t config_proto_size);
 
 /**
  * @brief Process float PCM samples with serialized runanywhere.v1.VADOptions.
  *
  * Returns serialized runanywhere.v1.VADResult bytes in out_result.
  */
-RAC_API rac_result_t rac_vad_component_process_proto(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
+                                                     size_t num_samples,
+                                                     const uint8_t* options_proto_bytes,
+                                                     size_t options_proto_size,
+                                                     rac_proto_buffer_t* out_result);
 
 /**
  * @brief Read VAD statistics as serialized runanywhere.v1.VADStatistics bytes.
  */
-RAC_API rac_result_t rac_vad_component_get_statistics_proto(
-    rac_handle_t handle,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_vad_component_get_statistics_proto(rac_handle_t handle,
+                                                            rac_proto_buffer_t* out_result);
 
 /**
  * @brief Register a speech activity callback that receives generated VADStreamEvent bytes.
  */
 RAC_API rac_result_t rac_vad_component_set_activity_proto_callback(
-    rac_handle_t handle,
-    rac_vad_proto_stream_event_callback_fn callback,
-    void* user_data);
+    rac_handle_t handle, rac_vad_proto_stream_event_callback_fn callback, void* user_data);
 
 #ifdef __cplusplus
 }

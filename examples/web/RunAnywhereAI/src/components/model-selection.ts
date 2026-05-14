@@ -274,7 +274,7 @@ async function startDownload(modelId: string): Promise<void> {
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
-    const model = RunAnywhere.modelRegistry.get(modelId);
+    const model = RunAnywhere.modelRegistry.getModel(modelId);
     if (!model) {
       throw new Error(`Model ${modelId} not found in registry`);
     }
@@ -322,7 +322,7 @@ async function startDownload(modelId: string): Promise<void> {
 async function loadModel(modelId: string): Promise<void> {
   setRow(modelId, { status: 'loading' });
   try {
-    const result = RunAnywhere.modelLifecycle.load({
+    const result = RunAnywhere.modelLifecycle.loadModel({
       modelId,
       forceReload: false,
       validateAvailability: true,
@@ -342,7 +342,7 @@ async function loadModel(modelId: string): Promise<void> {
 
 async function unloadModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.modelLifecycle.unload({
+    const result = RunAnywhere.modelLifecycle.unloadModel({
       modelId,
       unloadAll: false,
     });
@@ -464,7 +464,7 @@ function findLoadedModelId(): string | null {
 
 function lookupModelInfo(modelId: string): ModelInfo | null {
   try {
-    return RunAnywhere.modelRegistry.get(modelId);
+    return RunAnywhere.modelRegistry.getModel(modelId);
   } catch {
     return null;
   }
@@ -476,7 +476,7 @@ function lookupModelInfo(modelId: string): ModelInfo | null {
  */
 function hydrateRowStatesFromRegistry(): void {
   try {
-    const downloaded = RunAnywhere.modelRegistry.listDownloaded();
+    const downloaded = RunAnywhere.modelRegistry.downloadedModels();
     for (const model of downloaded?.models ?? []) {
       rowStates.set(model.id, { status: 'downloaded' });
     }

@@ -36,19 +36,19 @@ extern "C" {
 // CppBridgeDownload.kt so the JNI bridge can forward them verbatim.
 // Do not reorder without updating the Kotlin side.
 typedef enum {
-    RAC_HTTP_DL_OK                    = 0,
-    RAC_HTTP_DL_NETWORK_ERROR         = 1,
-    RAC_HTTP_DL_FILE_ERROR            = 2,
-    RAC_HTTP_DL_INSUFFICIENT_STORAGE  = 3,
-    RAC_HTTP_DL_INVALID_URL           = 4,
-    RAC_HTTP_DL_CHECKSUM_FAILED       = 5,
-    RAC_HTTP_DL_CANCELLED             = 6,
-    RAC_HTTP_DL_SERVER_ERROR          = 7,
-    RAC_HTTP_DL_TIMEOUT               = 8,
-    RAC_HTTP_DL_NETWORK_UNAVAILABLE   = 9,
-    RAC_HTTP_DL_DNS_ERROR             = 10,
-    RAC_HTTP_DL_SSL_ERROR             = 11,
-    RAC_HTTP_DL_UNKNOWN               = 99
+    RAC_HTTP_DL_OK = 0,
+    RAC_HTTP_DL_NETWORK_ERROR = 1,
+    RAC_HTTP_DL_FILE_ERROR = 2,
+    RAC_HTTP_DL_INSUFFICIENT_STORAGE = 3,
+    RAC_HTTP_DL_INVALID_URL = 4,
+    RAC_HTTP_DL_CHECKSUM_FAILED = 5,
+    RAC_HTTP_DL_CANCELLED = 6,
+    RAC_HTTP_DL_SERVER_ERROR = 7,
+    RAC_HTTP_DL_TIMEOUT = 8,
+    RAC_HTTP_DL_NETWORK_UNAVAILABLE = 9,
+    RAC_HTTP_DL_DNS_ERROR = 10,
+    RAC_HTTP_DL_SSL_ERROR = 11,
+    RAC_HTTP_DL_UNKNOWN = 99
 } rac_http_download_status_t;
 
 // =============================================================================
@@ -63,8 +63,8 @@ typedef struct {
     const rac_http_header_kv_t* headers;
     size_t header_count;
 
-    int32_t timeout_ms;            // 0 = no timeout
-    rac_bool_t follow_redirects;   // RAC_TRUE recommended
+    int32_t timeout_ms;           // 0 = no timeout
+    rac_bool_t follow_redirects;  // RAC_TRUE recommended
 
     // When > 0, resume from this byte offset (Range: bytes=N-) and
     // open the destination file in append mode. When 0, start fresh

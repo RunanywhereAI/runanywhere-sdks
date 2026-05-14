@@ -3,11 +3,10 @@
  * @brief Tests for benchmark statistical analysis
  */
 
-#include <gtest/gtest.h>
-
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <string>
 
 #include "rac/core/rac_benchmark.h"
@@ -17,7 +16,7 @@ namespace {
 
 // Helper: create a timing with known derived metric values
 rac_benchmark_timing_t make_timing(int64_t ttft_ms, int64_t prefill_ms, double decode_tps_target,
-                                    int32_t output_tokens, int64_t e2e_ms) {
+                                   int32_t output_tokens, int64_t e2e_ms) {
     rac_benchmark_timing_t timing;
     rac_benchmark_timing_init(&timing);
 

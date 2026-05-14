@@ -49,4 +49,4 @@ size_t rac_plugin_registry_snapshot_names(const char*** out_names);
 }
 #endif
 
-#endif  /* RAC_PLUGIN_REGISTRY_INTERNAL_H */
+#endif /* RAC_PLUGIN_REGISTRY_INTERNAL_H */

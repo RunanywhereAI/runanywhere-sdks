@@ -44,15 +44,24 @@ static const char* LOG_CAT = "Embeddings.Service";
 // rac/router/.
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:               return "onnx";
-        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
-        case RAC_FRAMEWORK_METALRT:            return "metalrt";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
-        case RAC_FRAMEWORK_COREML:             return "platform";
-        default:                               return nullptr;
+        case RAC_FRAMEWORK_LLAMACPP:
+            return "llamacpp";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+            return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
+        case RAC_FRAMEWORK_COREML:
+            return "platform";
+        default:
+            return nullptr;
     }
 }
 
@@ -133,15 +142,13 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     }
     if (result != RAC_SUCCESS || !vt || !vt->embedding_ops || !vt->embedding_ops->create) {
         EMBED_LOGE("rac_plugin_route failed: result=%d vt=%p emb_ops=%p create=%p hint='%s'",
-                   result, (void*)vt,
-                   vt ? (void*)vt->embedding_ops : nullptr,
+                   result, (void*)vt, vt ? (void*)vt->embedding_ops : nullptr,
                    (vt && vt->embedding_ops) ? (void*)vt->embedding_ops->create : nullptr,
                    hints.preferred_engine_name ? hints.preferred_engine_name : "(null)");
         RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
     }
-    EMBED_LOGI("Routed to plugin: %s (model_path=%s)", vt->metadata.name,
-               model_path_owned.c_str());
+    EMBED_LOGI("Routed to plugin: %s (model_path=%s)", vt->metadata.name, model_path_owned.c_str());
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
@@ -155,7 +162,8 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     auto* service =
         static_cast<rac_embeddings_service_t*>(malloc(sizeof(rac_embeddings_service_t)));
     if (!service) {
-        if (vt->embedding_ops->destroy) vt->embedding_ops->destroy(impl);
+        if (vt->embedding_ops->destroy)
+            vt->embedding_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->embedding_ops;

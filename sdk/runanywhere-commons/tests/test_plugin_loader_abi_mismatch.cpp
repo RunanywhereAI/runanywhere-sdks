@@ -20,12 +20,11 @@
 #include "rac/plugin/rac_primitive.h"
 
 #ifndef RAC_TEST_PLUGIN_BAD_ABI_PATH
-#  error "RAC_TEST_PLUGIN_BAD_ABI_PATH must be set by tests/CMakeLists.txt"
+#error "RAC_TEST_PLUGIN_BAD_ABI_PATH must be set by tests/CMakeLists.txt"
 #endif
 
 int main() {
-    std::fprintf(stdout, "test_plugin_loader_abi_mismatch: %s\n",
-                 RAC_TEST_PLUGIN_BAD_ABI_PATH);
+    std::fprintf(stdout, "test_plugin_loader_abi_mismatch: %s\n", RAC_TEST_PLUGIN_BAD_ABI_PATH);
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
     std::fprintf(stdout, "  skip: static-plugins build\n");
@@ -33,10 +32,8 @@ int main() {
 #else
     rac_result_t rc = rac_registry_load_plugin(RAC_TEST_PLUGIN_BAD_ABI_PATH);
     if (rc != RAC_ERROR_ABI_VERSION_MISMATCH) {
-        std::fprintf(stderr,
-                     "expected RAC_ERROR_ABI_VERSION_MISMATCH (%d), got %d\n",
-                     static_cast<int>(RAC_ERROR_ABI_VERSION_MISMATCH),
-                     static_cast<int>(rc));
+        std::fprintf(stderr, "expected RAC_ERROR_ABI_VERSION_MISMATCH (%d), got %d\n",
+                     static_cast<int>(RAC_ERROR_ABI_VERSION_MISMATCH), static_cast<int>(rc));
         return 1;
     }
     if (rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != nullptr) {

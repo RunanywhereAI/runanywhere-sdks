@@ -52,12 +52,12 @@ public extension RAToolValue {
         var value = RAToolValue(); value.objectValue = obj; return value
     }
 
-    var string: String? { if case .stringValue(let v)? = kind { return v }; return nil }
-    var number: Double? { if case .numberValue(let v)? = kind { return v }; return nil }
+    var string: String? { if case .stringValue(let value)? = kind { return value }; return nil }
+    var number: Double? { if case .numberValue(let value)? = kind { return value }; return nil }
     var int: Int? { number.map(Int.init) }
-    var bool: Bool? { if case .boolValue(let v)? = kind { return v }; return nil }
-    var array: [RAToolValue]? { if case .arrayValue(let v)? = kind { return v.values }; return nil }
-    var object: [String: RAToolValue]? { if case .objectValue(let v)? = kind { return v.fields }; return nil }
+    var bool: Bool? { if case .boolValue(let value)? = kind { return value }; return nil }
+    var array: [RAToolValue]? { if case .arrayValue(let value)? = kind { return value.values }; return nil }
+    var object: [String: RAToolValue]? { if case .objectValue(let value)? = kind { return value.fields }; return nil }
 
     // JSON bridge — required by IDL-13 (`argumentsJson` / `resultJson`).
     // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
@@ -103,8 +103,13 @@ public extension RAToolValue {
 // MARK: - Tool Definition Helpers
 
 public extension RAToolParameter {
-    init(name: String, type: RAToolParameterType, description: String,
-         required: Bool = true, enumValues: [String] = []) {
+    init(
+        name: String,
+        type: RAToolParameterType,
+        description: String,
+        required: Bool = true,
+        enumValues: [String] = []
+    ) {
         self.init()
         self.name = name
         self.type = type
@@ -128,10 +133,10 @@ public extension RAToolDefinition {
 
 public extension RAToolCallingOptions {
     static func defaults() -> RAToolCallingOptions {
-        var o = RAToolCallingOptions()
-        o.maxIterations = 5; o.maxToolCalls = 5; o.autoExecute = true
-        o.format = .json; o.formatHint = "default"
-        return o
+        var output = RAToolCallingOptions()
+        output.maxIterations = 5; output.maxToolCalls = 5; output.autoExecute = true
+        output.format = .json; output.formatHint = "default"
+        return output
     }
 }
 

@@ -80,10 +80,8 @@ RAC_API rac_result_t rac_lora_catalog_get_proto(rac_lora_registry_handle_t regis
  * runanywhere.v1.LoraAdapterDownloadCompletedResult bytes.
  */
 RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+    rac_lora_registry_handle_t registry, const uint8_t* request_proto_bytes,
+    size_t request_proto_size, rac_proto_buffer_t* out_result);
 
 /**
  * @brief Check LoRA compatibility from serialized runanywhere.v1.LoRAAdapterConfig bytes.
@@ -127,8 +125,7 @@ RAC_API rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
  * snapshot maintained by the C++ LoRA proto ABI.
  */
 RAC_API rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
-                                         const uint8_t* state_proto_bytes,
-                                         size_t state_proto_size,
+                                         const uint8_t* state_proto_bytes, size_t state_proto_size,
                                          rac_proto_buffer_t* out_state);
 
 /**
@@ -138,8 +135,7 @@ RAC_API rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
  * snapshot maintained by the C++ LoRA proto ABI.
  */
 RAC_API rac_result_t rac_lora_state_proto(rac_handle_t llm_component,
-                                          const uint8_t* state_proto_bytes,
-                                          size_t state_proto_size,
+                                          const uint8_t* state_proto_bytes, size_t state_proto_size,
                                           rac_proto_buffer_t* out_state);
 
 #ifdef __cplusplus

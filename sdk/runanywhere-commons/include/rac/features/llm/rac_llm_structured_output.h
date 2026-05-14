@@ -50,13 +50,13 @@ extern "C" {
  * without depending on generated headers in the C ABI.
  */
 typedef struct rac_structured_output_parse_result {
-    rac_bool_t is_valid;           /**< Whether JSON extraction and validation succeeded */
-    rac_bool_t contains_json;      /**< Whether a JSON candidate was found in the text */
-    char* parsed_json;             /**< Canonical extracted JSON string (owned) */
-    char* raw_text;                /**< Original model text (owned) */
-    char* error_message;           /**< First parse/validation error, if any (owned) */
-    char* validation_errors_json;  /**< JSON array of validation errors (owned) */
-    rac_result_t error_code;       /**< RAC_SUCCESS or validation/parse error code */
+    rac_bool_t is_valid;          /**< Whether JSON extraction and validation succeeded */
+    rac_bool_t contains_json;     /**< Whether a JSON candidate was found in the text */
+    char* parsed_json;            /**< Canonical extracted JSON string (owned) */
+    char* raw_text;               /**< Original model text (owned) */
+    char* error_message;          /**< First parse/validation error, if any (owned) */
+    char* validation_errors_json; /**< JSON array of validation errors (owned) */
+    rac_result_t error_code;      /**< RAC_SUCCESS or validation/parse error code */
 } rac_structured_output_parse_result_t;
 
 /**
@@ -87,9 +87,9 @@ rac_result_t rac_structured_output_extract_json(const char* text, char** out_jso
  * @param out_result Output parse result (free with rac_structured_output_parse_result_free)
  * @return RAC_SUCCESS on successful parse processing
  */
-RAC_API rac_result_t rac_structured_output_parse(
-    const char* text, const rac_structured_output_config_t* config,
-    rac_structured_output_parse_result_t* out_result);
+RAC_API rac_result_t rac_structured_output_parse(const char* text,
+                                                 const rac_structured_output_config_t* config,
+                                                 rac_structured_output_parse_result_t* out_result);
 
 /**
  * @brief Parse structured output from serialized generated proto bytes.
@@ -103,9 +103,9 @@ RAC_API rac_result_t rac_structured_output_parse(
  * @param out_result Owned StructuredOutputResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_structured_output_parse_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_structured_output_parse_proto(const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
 
 /**
  * @brief Generate and parse structured output from serialized generated proto bytes.
@@ -119,9 +119,9 @@ RAC_API rac_result_t rac_structured_output_parse_proto(
  * @param out_result Owned StructuredOutputResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_structured_output_generate_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_structured_output_generate_proto(const uint8_t* request_proto_bytes,
+                                                          size_t request_proto_size,
+                                                          rac_proto_buffer_t* out_result);
 
 /**
  * @brief Stream structured generation from serialized generated proto bytes.
@@ -213,9 +213,9 @@ RAC_API rac_result_t rac_structured_output_prepare_prompt(
  * @param out_result Owned StructuredOutputPromptResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_structured_output_prepare_prompt_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_structured_output_prepare_prompt_proto(const uint8_t* request_proto_bytes,
+                                                                size_t request_proto_size,
+                                                                rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get system prompt for structured output generation
@@ -232,8 +232,7 @@ RAC_API rac_result_t rac_structured_output_prepare_prompt_proto(
  *           helper used by `rac_structured_output_prepare_prompt_proto`;
  *           SDKs should call the proto API.
  */
-rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
-                                                     char** out_prompt);
+rac_result_t rac_structured_output_get_system_prompt(const char* json_schema, char** out_prompt);
 
 /**
  * @brief Validate that text contains valid structured output
@@ -260,9 +259,9 @@ rac_structured_output_validate(const char* text, const rac_structured_output_con
  * @param out_result Owned StructuredOutputValidation bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_structured_output_validate_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_structured_output_validate_proto(const uint8_t* request_proto_bytes,
+                                                          size_t request_proto_size,
+                                                          rac_proto_buffer_t* out_result);
 
 /**
  * @brief Free structured output validation result
@@ -276,8 +275,7 @@ RAC_API void rac_structured_output_validation_free(rac_structured_output_validat
  *
  * @param result Parse result to free
  */
-RAC_API void
-rac_structured_output_parse_result_free(rac_structured_output_parse_result_t* result);
+RAC_API void rac_structured_output_parse_result_free(rac_structured_output_parse_result_t* result);
 
 #ifdef __cplusplus
 }

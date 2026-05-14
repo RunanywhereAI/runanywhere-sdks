@@ -32,13 +32,12 @@ typedef struct rac_cpu_runtime_provider {
 
     /** Supported model formats. Empty means format-agnostic. */
     const uint32_t* formats;
-    size_t          formats_count;
+    size_t formats_count;
 
     rac_result_t (*create_session)(const rac_runtime_session_desc_t* desc,
                                    rac_runtime_session_t** out);
-    rac_result_t (*run_session)(rac_runtime_session_t* session,
-                                const rac_runtime_io_t* inputs, size_t n_in,
-                                rac_runtime_io_t* outputs, size_t n_out);
+    rac_result_t (*run_session)(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
+                                size_t n_in, rac_runtime_io_t* outputs, size_t n_out);
     void (*destroy_session)(rac_runtime_session_t* session);
 
     /**
@@ -61,10 +60,8 @@ typedef struct rac_cpu_runtime_provider {
      * working — the struct is zero-initialised by callers.
      */
     rac_result_t (*run_session_v2)(rac_runtime_session_t* session,
-                                   const rac_runtime_tensor_t* inputs,
-                                   size_t n_in,
-                                   rac_runtime_tensor_t* outputs,
-                                   size_t n_out);
+                                   const rac_runtime_tensor_t* inputs, size_t n_in,
+                                   rac_runtime_tensor_t* outputs, size_t n_out);
 } rac_cpu_runtime_provider_t;
 
 /**
@@ -73,8 +70,7 @@ typedef struct rac_cpu_runtime_provider {
  * Providers are copied by value; string / format-array storage must outlive the
  * provider registration, mirroring the rest of the plugin metadata ABI.
  */
-RAC_API rac_result_t rac_cpu_runtime_register_provider(
-    const rac_cpu_runtime_provider_t* provider);
+RAC_API rac_result_t rac_cpu_runtime_register_provider(const rac_cpu_runtime_provider_t* provider);
 
 /** Unregister a provider by name. NULL is ignored. */
 RAC_API void rac_cpu_runtime_unregister_provider(const char* name);
@@ -86,10 +82,9 @@ RAC_API void rac_cpu_runtime_unregister_provider(const char* name);
  * need the engine-native handle while blocking generate moves through
  * rac_runtime_vtable_t::run_session.
  */
-RAC_API rac_result_t rac_cpu_runtime_get_provider_session(
-    rac_runtime_session_t* session,
-    const char** out_provider_name,
-    rac_runtime_session_t** out_provider_session);
+RAC_API rac_result_t
+rac_cpu_runtime_get_provider_session(rac_runtime_session_t* session, const char** out_provider_name,
+                                     rac_runtime_session_t** out_provider_session);
 
 #ifdef __cplusplus
 }

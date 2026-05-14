@@ -59,7 +59,8 @@ RAC_API uint32_t rac_plugin_api_version(void);
  *   - RAC_ERROR_PLUGIN_LOAD_FAILED       - `dlopen` / `dlsym` failed
  *   - RAC_ERROR_ABI_VERSION_MISMATCH     - vtable abi_version != host's
  *   - RAC_ERROR_CAPABILITY_UNSUPPORTED   - plugin's `capability_check()` declined
- *   - RAC_ERROR_PLUGIN_DUPLICATE         - same `metadata.name` already registered with higher priority
+ *   - RAC_ERROR_PLUGIN_DUPLICATE         - same `metadata.name` already registered with higher
+ * priority
  *   - RAC_ERROR_FEATURE_NOT_AVAILABLE    - host built with RAC_STATIC_PLUGINS=ON
  *
  * On any failure, the underlying handle is `dlclose`'d before return.

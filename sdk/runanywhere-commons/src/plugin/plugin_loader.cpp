@@ -22,6 +22,8 @@
  *   `rac_plugin_entry_*` symbol that matches the suffix).
  */
 
+#include "plugin_registry_internal.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -33,26 +35,38 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_loader.h"
 
-#include "plugin_registry_internal.h"
-
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
-  #if defined(_WIN32)
-    #include <windows.h>
-    using rac_lib_handle_t = HMODULE;
-    static rac_lib_handle_t rac_dl_open(const char* p)         { return LoadLibraryA(p); }
-    static void*            rac_dl_sym(rac_lib_handle_t h, const char* s) {
-        return reinterpret_cast<void*>(GetProcAddress(h, s));
-    }
-    static void             rac_dl_close(rac_lib_handle_t h)   { FreeLibrary(h); }
-    static const char*      rac_dl_error()                      { return "LoadLibrary failed"; }
-  #else
-    #include <dlfcn.h>
-    using rac_lib_handle_t = void*;
-    static rac_lib_handle_t rac_dl_open(const char* p)         { return dlopen(p, RTLD_NOW | RTLD_LOCAL); }
-    static void*            rac_dl_sym(rac_lib_handle_t h, const char* s) { return dlsym(h, s); }
-    static void             rac_dl_close(rac_lib_handle_t h)   { dlclose(h); }
-    static const char*      rac_dl_error()                      { return dlerror(); }
-  #endif
+#if defined(_WIN32)
+#include <windows.h>
+using rac_lib_handle_t = HMODULE;
+static rac_lib_handle_t rac_dl_open(const char* p) {
+    return LoadLibraryA(p);
+}
+static void* rac_dl_sym(rac_lib_handle_t h, const char* s) {
+    return reinterpret_cast<void*>(GetProcAddress(h, s));
+}
+static void rac_dl_close(rac_lib_handle_t h) {
+    FreeLibrary(h);
+}
+static const char* rac_dl_error() {
+    return "LoadLibrary failed";
+}
+#else
+#include <dlfcn.h>
+using rac_lib_handle_t = void*;
+static rac_lib_handle_t rac_dl_open(const char* p) {
+    return dlopen(p, RTLD_NOW | RTLD_LOCAL);
+}
+static void* rac_dl_sym(rac_lib_handle_t h, const char* s) {
+    return dlsym(h, s);
+}
+static void rac_dl_close(rac_lib_handle_t h) {
+    dlclose(h);
+}
+static const char* rac_dl_error() {
+    return dlerror();
+}
+#endif
 #endif
 
 namespace {
@@ -73,18 +87,23 @@ constexpr const char* LOG_CAT = "PluginLoader";
  * file extension is the plugin name.
  */
 std::string entry_symbol_from_path(const char* path) {
-    if (path == nullptr) return {};
+    if (path == nullptr)
+        return {};
     std::string s(path);
     // Drop directory.
     auto last_sep = s.find_last_of("/\\");
-    if (last_sep != std::string::npos) s.erase(0, last_sep + 1);
+    if (last_sep != std::string::npos)
+        s.erase(0, last_sep + 1);
     // Drop "lib" prefix (POSIX shared-lib convention; harmless on Win32).
-    if (s.rfind("lib", 0) == 0) s.erase(0, 3);
+    if (s.rfind("lib", 0) == 0)
+        s.erase(0, 3);
     // Drop file extension.
     auto dot = s.find('.');
-    if (dot != std::string::npos) s.erase(dot);
+    if (dot != std::string::npos)
+        s.erase(dot);
     // Drop optional "runanywhere_" infix used by in-tree plugins.
-    if (s.rfind("runanywhere_", 0) == 0) s.erase(0, std::strlen("runanywhere_"));
+    if (s.rfind("runanywhere_", 0) == 0)
+        s.erase(0, std::strlen("runanywhere_"));
     return std::string("rac_plugin_entry_") + s;
 }
 
@@ -99,7 +118,8 @@ uint32_t rac_plugin_api_version(void) {
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
 
 rac_result_t rac_registry_load_plugin(const char* path) {
-    if (path == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (path == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     RAC_LOG_DEBUG(LOG_CAT,
                   "rac_registry_load_plugin('%s'): host built with "
                   "RAC_STATIC_PLUGINS=ON; dynamic loading is disabled. Use "
@@ -108,16 +128,15 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 
-#else  /* RAC_PLUGIN_MODE_SHARED — real dlopen path */
+#else /* RAC_PLUGIN_MODE_SHARED — real dlopen path */
 
 rac_result_t rac_registry_load_plugin(const char* path) {
-    if (path == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (path == nullptr)
+        return RAC_ERROR_NULL_POINTER;
 
     rac_lib_handle_t handle = rac_dl_open(path);
     if (handle == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT,
-                      "rac_registry_load_plugin('%s'): dlopen failed (%s)",
-                      path,
+        RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlopen failed (%s)", path,
                       rac_dl_error());
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
@@ -125,11 +144,8 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     const std::string sym = entry_symbol_from_path(path);
     void* entry_sym = rac_dl_sym(handle, sym.c_str());
     if (entry_sym == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT,
-                      "rac_registry_load_plugin('%s'): dlsym('%s') failed (%s)",
-                      path,
-                      sym.c_str(),
-                      rac_dl_error());
+        RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlsym('%s') failed (%s)", path,
+                      sym.c_str(), rac_dl_error());
         rac_dl_close(handle);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
@@ -139,8 +155,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     if (vt == nullptr || vt->metadata.name == nullptr) {
         RAC_LOG_ERROR(LOG_CAT,
                       "rac_registry_load_plugin('%s'): entry '%s' returned NULL or unnamed vtable",
-                      path,
-                      sym.c_str());
+                      path, sym.c_str());
         rac_dl_close(handle);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
@@ -150,11 +165,8 @@ rac_result_t rac_registry_load_plugin(const char* path) {
      * rac_plugin_registry.cpp). We do NOT (void)-cast the result here. */
     rac_result_t rc = rac_plugin_register(vt);
     if (rc != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT,
-                      "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
-                      path,
-                      vt->metadata.name,
-                      static_cast<int>(rc));
+        RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
+                      path, vt->metadata.name, static_cast<int>(rc));
         (void)rac_engine_manifest_detach_vtable(vt);
         rac_dl_close(handle);
         return rc;
@@ -162,18 +174,16 @@ rac_result_t rac_registry_load_plugin(const char* path) {
 
     /* Track the handle so unload can dlclose it exactly once. */
     rac_plugin_registry_set_dl_handle(vt->metadata.name, handle);
-    RAC_LOG_DEBUG(LOG_CAT,
-                  "rac_registry_load_plugin('%s'): registered '%s' from '%s'",
-                  path,
-                  vt->metadata.name,
-                  sym.c_str());
+    RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,
+                  vt->metadata.name, sym.c_str());
     return RAC_SUCCESS;
 }
 
-#endif  /* RAC_PLUGIN_MODE_STATIC */
+#endif /* RAC_PLUGIN_MODE_STATIC */
 
 rac_result_t rac_registry_unload_plugin(const char* name) {
-    if (name == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (name == nullptr)
+        return RAC_ERROR_NULL_POINTER;
 
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
     /* Take the handle BEFORE unregister so we don't lose track of it on the
@@ -197,13 +207,15 @@ size_t rac_registry_plugin_count(void) {
 }
 
 rac_result_t rac_registry_list_plugins(const char*** out_names, size_t* out_count) {
-    if (out_names == nullptr || out_count == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (out_names == nullptr || out_count == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     *out_count = rac_plugin_registry_snapshot_names(out_names);
     return RAC_SUCCESS;
 }
 
 void rac_registry_free_plugin_list(const char** names, size_t count) {
-    if (names == nullptr) return;
+    if (names == nullptr)
+        return;
     for (size_t i = 0; i < count; ++i) {
         std::free(const_cast<char*>(names[i]));
     }

@@ -7,8 +7,8 @@
  */
 
 #include <algorithm>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -23,6 +23,7 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "lora_options.pb.h"
+
 #include "rac/foundation/rac_proto_adapters.h"
 #endif
 
@@ -118,32 +119,26 @@ const void* parse_data(const uint8_t* bytes, size_t size) {
 }
 
 template <typename Message>
-rac_result_t parse_proto_message(const uint8_t* bytes,
-                                 size_t size,
-                                 const char* message_name,
-                                 Message* out,
-                                 rac_proto_buffer_t* error_out) {
+rac_result_t parse_proto_message(const uint8_t* bytes, size_t size, const char* message_name,
+                                 Message* out, rac_proto_buffer_t* error_out) {
     rac_result_t validation = rac_proto_bytes_validate(bytes, size);
     if (validation != RAC_SUCCESS) {
         std::string message = std::string(message_name) + " bytes are invalid";
-        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
-                                          message.c_str());
+        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR, message.c_str());
     }
     if (!out->ParseFromArray(parse_data(bytes, size), static_cast<int>(size))) {
         std::string message = std::string("failed to parse ") + message_name;
-        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
-                                          message.c_str());
+        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR, message.c_str());
     }
     return RAC_SUCCESS;
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize proto result");
     }
@@ -153,9 +148,7 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message,
 std::string lowercase_ascii(const std::string& value) {
     std::string lowered = value;
     std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                   [](unsigned char c) {
-                       return static_cast<char>(std::tolower(c));
-                   });
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lowered;
 }
 
@@ -177,23 +170,25 @@ void clear_completion_state(runanywhere::v1::LoraAdapterCatalogEntry* entry) {
 
 void preserve_completion_state(const runanywhere::v1::LoraAdapterCatalogEntry& from,
                                runanywhere::v1::LoraAdapterCatalogEntry* to) {
-    if (from.has_local_path()) to->set_local_path(from.local_path());
-    if (from.has_is_downloaded()) to->set_is_downloaded(from.is_downloaded());
+    if (from.has_local_path())
+        to->set_local_path(from.local_path());
+    if (from.has_is_downloaded())
+        to->set_is_downloaded(from.is_downloaded());
     if (from.has_downloaded_at_unix_ms()) {
         to->set_downloaded_at_unix_ms(from.downloaded_at_unix_ms());
     }
-    if (from.has_is_imported()) to->set_is_imported(from.is_imported());
-    if (from.has_status_message()) to->set_status_message(from.status_message());
+    if (from.has_is_imported())
+        to->set_is_imported(from.is_imported());
+    if (from.has_status_message())
+        to->set_status_message(from.status_message());
 }
 
-bool parse_snapshot(const std::string& bytes,
-                    runanywhere::v1::LoraAdapterCatalogEntry* out) {
+bool parse_snapshot(const std::string& bytes, runanywhere::v1::LoraAdapterCatalogEntry* out) {
     return out && out->ParseFromArray(bytes.data(), static_cast<int>(bytes.size()));
 }
 
-rac_result_t store_catalog_snapshot_locked(
-    rac_lora_registry_handle_t handle,
-    const runanywhere::v1::LoraAdapterCatalogEntry& entry) {
+rac_result_t store_catalog_snapshot_locked(rac_lora_registry_handle_t handle,
+                                           const runanywhere::v1::LoraAdapterCatalogEntry& entry) {
     std::string bytes;
     if (!entry.SerializeToString(&bytes)) {
         return RAC_ERROR_ENCODING_ERROR;
@@ -202,10 +197,9 @@ rac_result_t store_catalog_snapshot_locked(
     return RAC_SUCCESS;
 }
 
-runanywhere::v1::LoraAdapterCatalogEntry snapshot_from_struct_locked(
-    rac_lora_registry_handle_t handle,
-    const std::string& adapter_id,
-    const rac_lora_entry_t* entry) {
+runanywhere::v1::LoraAdapterCatalogEntry
+snapshot_from_struct_locked(rac_lora_registry_handle_t handle, const std::string& adapter_id,
+                            const rac_lora_entry_t* entry) {
     runanywhere::v1::LoraAdapterCatalogEntry snapshot;
     auto proto_it = handle->entry_proto_bytes.find(adapter_id);
     if (proto_it != handle->entry_proto_bytes.end() &&
@@ -236,8 +230,8 @@ rac_result_t store_struct_snapshot_locked(rac_lora_registry_handle_t handle,
     return store_catalog_snapshot_locked(handle, from_struct);
 }
 
-std::vector<runanywhere::v1::LoraAdapterCatalogEntry> collect_snapshots_locked(
-    rac_lora_registry_handle_t handle) {
+std::vector<runanywhere::v1::LoraAdapterCatalogEntry>
+collect_snapshots_locked(rac_lora_registry_handle_t handle) {
     std::vector<runanywhere::v1::LoraAdapterCatalogEntry> entries;
     entries.reserve(handle->entries.size());
     for (const auto& pair : handle->entries) {
@@ -248,9 +242,11 @@ std::vector<runanywhere::v1::LoraAdapterCatalogEntry> collect_snapshots_locked(
 
 bool contains_model_id(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
                        const std::string& model_id) {
-    if (model_id.empty()) return true;
+    if (model_id.empty())
+        return true;
     for (const auto& compatible_model : entry.compatible_models()) {
-        if (compatible_model == model_id) return true;
+        if (compatible_model == model_id)
+            return true;
     }
     return false;
 }
@@ -265,14 +261,16 @@ bool contains_all_tags(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
                 break;
             }
         }
-        if (!found) return false;
+        if (!found)
+            return false;
     }
     return true;
 }
 
 bool matches_search_query(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
                           const std::string& query) {
-    if (query.empty()) return true;
+    if (query.empty())
+        return true;
     const std::string needle = lowercase_ascii(query);
     if (contains_case_insensitive(entry.id(), needle) ||
         contains_case_insensitive(entry.name(), needle) ||
@@ -283,15 +281,15 @@ bool matches_search_query(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
         return true;
     }
     for (const auto& tag : entry.tags()) {
-        if (contains_case_insensitive(tag, needle)) return true;
+        if (contains_case_insensitive(tag, needle))
+            return true;
     }
     return false;
 }
 
 bool matches_catalog_query(const runanywhere::v1::LoraAdapterCatalogEntry& entry,
                            const runanywhere::v1::LoraAdapterCatalogQuery& query) {
-    if (query.has_adapter_id() && !query.adapter_id().empty() &&
-        entry.id() != query.adapter_id()) {
+    if (query.has_adapter_id() && !query.adapter_id().empty() && entry.id() != query.adapter_id()) {
         return false;
     }
     if (query.has_model_id() && !contains_model_id(entry, query.model_id())) {
@@ -301,18 +299,17 @@ bool matches_catalog_query(const runanywhere::v1::LoraAdapterCatalogEntry& entry
         !catalog_entry_is_downloaded(entry)) {
         return false;
     }
-    if (query.has_search_query() &&
-        !matches_search_query(entry, query.search_query())) {
+    if (query.has_search_query() && !matches_search_query(entry, query.search_query())) {
         return false;
     }
     return contains_all_tags(entry, query);
 }
 
-int32_t downloaded_count(
-    const std::vector<runanywhere::v1::LoraAdapterCatalogEntry>& entries) {
+int32_t downloaded_count(const std::vector<runanywhere::v1::LoraAdapterCatalogEntry>& entries) {
     int32_t count = 0;
     for (const auto& entry : entries) {
-        if (catalog_entry_is_downloaded(entry)) ++count;
+        if (catalog_entry_is_downloaded(entry))
+            ++count;
     }
     return count;
 }
@@ -523,17 +520,15 @@ rac_lora_entry_t* rac_lora_entry_copy(const rac_lora_entry_t* entry) {
 }
 
 extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* entry_proto_bytes,
-    size_t entry_proto_size,
+    rac_lora_registry_handle_t registry, const uint8_t* entry_proto_bytes, size_t entry_proto_size,
     rac_proto_buffer_t* out_entry) {
-    if (!out_entry) return RAC_ERROR_NULL_POINTER;
+    if (!out_entry)
+        return RAC_ERROR_NULL_POINTER;
 #ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)entry_proto_bytes;
     (void)entry_proto_size;
-    return rac_proto_buffer_set_error(out_entry,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_entry, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
     if (!registry) {
@@ -544,7 +539,8 @@ extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
     runanywhere::v1::LoraAdapterCatalogEntry proto;
     rac_result_t rc = parse_proto_message(entry_proto_bytes, entry_proto_size,
                                           "LoraAdapterCatalogEntry", &proto, out_entry);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
     if (proto.id().empty()) {
         return rac_proto_buffer_set_error(out_entry, RAC_ERROR_INVALID_ARGUMENT,
                                           "LoraAdapterCatalogEntry.id is required");
@@ -590,18 +586,17 @@ extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
 #endif
 }
 
-extern "C" RAC_API rac_result_t rac_lora_catalog_list_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+extern "C" RAC_API rac_result_t rac_lora_catalog_list_proto(rac_lora_registry_handle_t registry,
+                                                            const uint8_t* request_proto_bytes,
+                                                            size_t request_proto_size,
+                                                            rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)request_proto_bytes;
     (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
     if (!registry) {
@@ -611,27 +606,26 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_list_proto(
 
     runanywhere::v1::LoraAdapterCatalogListRequest request;
     rac_result_t rc = parse_proto_message(request_proto_bytes, request_proto_size,
-                                          "LoraAdapterCatalogListRequest", &request,
-                                          out_result);
-    if (rc != RAC_SUCCESS) return rc;
+                                          "LoraAdapterCatalogListRequest", &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
     const runanywhere::v1::LoraAdapterCatalogQuery* query =
         request.has_query() ? &request.query() : nullptr;
     return list_catalog_with_query(registry, query, out_result);
 #endif
 }
 
-extern "C" RAC_API rac_result_t rac_lora_catalog_query_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* query_proto_bytes,
-    size_t query_proto_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+extern "C" RAC_API rac_result_t rac_lora_catalog_query_proto(rac_lora_registry_handle_t registry,
+                                                             const uint8_t* query_proto_bytes,
+                                                             size_t query_proto_size,
+                                                             rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)query_proto_bytes;
     (void)query_proto_size;
-    return rac_proto_buffer_set_error(out_result,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
     if (!registry) {
@@ -642,23 +636,23 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_query_proto(
     runanywhere::v1::LoraAdapterCatalogQuery query;
     rac_result_t rc = parse_proto_message(query_proto_bytes, query_proto_size,
                                           "LoraAdapterCatalogQuery", &query, out_result);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
     return list_catalog_with_query(registry, &query, out_result);
 #endif
 }
 
-extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(rac_lora_registry_handle_t registry,
+                                                           const uint8_t* request_proto_bytes,
+                                                           size_t request_proto_size,
+                                                           rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)request_proto_bytes;
     (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
     if (!registry) {
@@ -668,9 +662,9 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(
 
     runanywhere::v1::LoraAdapterCatalogGetRequest request;
     rac_result_t rc = parse_proto_message(request_proto_bytes, request_proto_size,
-                                          "LoraAdapterCatalogGetRequest", &request,
-                                          out_result);
-    if (rc != RAC_SUCCESS) return rc;
+                                          "LoraAdapterCatalogGetRequest", &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
     if (request.adapter_id().empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "LoraAdapterCatalogGetRequest.adapter_id is required");
@@ -694,17 +688,15 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(
 }
 
 extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    rac_lora_registry_handle_t registry, const uint8_t* request_proto_bytes,
+    size_t request_proto_size, rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #ifndef RAC_HAVE_PROTOBUF
     (void)registry;
     (void)request_proto_bytes;
     (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
     if (!registry) {
@@ -713,10 +705,11 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
     }
 
     runanywhere::v1::LoraAdapterDownloadCompletedRequest request;
-    rac_result_t rc = parse_proto_message(request_proto_bytes, request_proto_size,
-                                          "LoraAdapterDownloadCompletedRequest",
-                                          &request, out_result);
-    if (rc != RAC_SUCCESS) return rc;
+    rac_result_t rc =
+        parse_proto_message(request_proto_bytes, request_proto_size,
+                            "LoraAdapterDownloadCompletedRequest", &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
     if (request.adapter_id().empty()) {
         return rac_proto_buffer_set_error(
             out_result, RAC_ERROR_INVALID_ARGUMENT,
@@ -743,15 +736,14 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
             snapshot_from_struct_locked(registry, request.adapter_id(), it->second);
         entry.set_local_path(request.local_path());
         entry.set_is_downloaded(true);
-        entry.set_downloaded_at_unix_ms(
-            request.has_completed_at_unix_ms()
-                ? request.completed_at_unix_ms()
-                : current_time_ms());
+        entry.set_downloaded_at_unix_ms(request.has_completed_at_unix_ms()
+                                            ? request.completed_at_unix_ms()
+                                            : current_time_ms());
         entry.set_is_imported(request.imported());
-        entry.set_status_message(request.status_message().empty()
-                                     ? (request.imported() ? "import completed"
-                                                           : "download completed")
-                                     : request.status_message());
+        entry.set_status_message(
+            request.status_message().empty()
+                ? (request.imported() ? "import completed" : "download completed")
+                : request.status_message());
         if (request.has_size_bytes() && request.size_bytes() > 0) {
             entry.set_size_bytes(request.size_bytes());
             it->second->file_size = request.size_bytes();

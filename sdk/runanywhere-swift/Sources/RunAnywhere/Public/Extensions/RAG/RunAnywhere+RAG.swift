@@ -91,6 +91,7 @@ public extension RunAnywhere {
         document.text = text
         if let metadataJSON, !metadataJSON.isEmpty,
            let data = metadataJSON.data(using: .utf8),
+           // swiftlint:disable:next avoid_any_type
            let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             for (key, value) in parsed {
                 document.metadata[key] = String(describing: value)

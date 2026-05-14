@@ -5,6 +5,9 @@
 
 #include "voice_agent_pipeline.hpp"
 
+#include "rac_voice_event_abi_internal.h"
+#include "voice_agent_internal.h"
+
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -28,9 +31,6 @@
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/graph/stream_edge.hpp"
 
-#include "rac_voice_event_abi_internal.h"
-#include "voice_agent_internal.h"
-
 namespace rac::voice_agent {
 
 namespace {
@@ -45,7 +45,7 @@ namespace {
 /// agent's outer mutex blocks the caller until the graph fully drains.
 struct AudioFrame {
     const void* data;
-    size_t      size;
+    size_t size;
 };
 
 struct Transcript {
@@ -65,8 +65,8 @@ struct SynthesizedAudio {
 /// to the sink, which composes the `RAC_VOICE_AGENT_EVENT_PROCESSED` event
 /// on the pipeline coordinator thread.
 struct ProcessedPayload {
-    std::string          transcription;
-    std::string          response;
+    std::string transcription;
+    std::string response;
     std::vector<uint8_t> wav;
 };
 
@@ -78,15 +78,15 @@ struct ProcessedPayload {
 // ---------------------------------------------------------------------------
 
 class EventDispatcher {
-public:
-    EventDispatcher(rac_voice_agent_handle_t          agent,
-                    rac_voice_agent_event_callback_fn cb,
-                    void*                             user_data) noexcept
+   public:
+    EventDispatcher(rac_voice_agent_handle_t agent, rac_voice_agent_event_callback_fn cb,
+                    void* user_data) noexcept
         : agent_(agent), cb_(cb), user_data_(user_data) {}
 
     void emit(const rac_voice_agent_event_t& event) {
         std::lock_guard<std::mutex> lock(mu_);
-        if (cb_) cb_(&event, user_data_);
+        if (cb_)
+            cb_(&event, user_data_);
         rac::voice_agent::dispatch_proto_event(agent_, &event);
     }
 
@@ -94,8 +94,7 @@ public:
     /// shadowed so the caller still gets the original failure mode.
     void record_error(rac_result_t code) {
         rac_result_t expected = RAC_SUCCESS;
-        first_error_.compare_exchange_strong(expected, code,
-                                             std::memory_order_acq_rel,
+        first_error_.compare_exchange_strong(expected, code, std::memory_order_acq_rel,
                                              std::memory_order_relaxed);
     }
 
@@ -107,17 +106,17 @@ public:
     void emit_error(rac_result_t code) {
         record_error(code);
         rac_voice_agent_event_t ev = {};
-        ev.type                    = RAC_VOICE_AGENT_EVENT_ERROR;
-        ev.data.error_code         = code;
+        ev.type = RAC_VOICE_AGENT_EVENT_ERROR;
+        ev.data.error_code = code;
         emit(ev);
     }
 
-private:
-    rac_voice_agent_handle_t          agent_;
+   private:
+    rac_voice_agent_handle_t agent_;
     rac_voice_agent_event_callback_fn cb_;
-    void*                             user_data_;
-    std::mutex                        mu_;
-    std::atomic<rac_result_t>         first_error_{RAC_SUCCESS};
+    void* user_data_;
+    std::mutex mu_;
+    std::atomic<rac_result_t> first_error_{RAC_SUCCESS};
 };
 
 // ---------------------------------------------------------------------------
@@ -128,13 +127,13 @@ private:
 // ---------------------------------------------------------------------------
 
 class VADGateNode : public rac::graph::PipelineNode<AudioFrame, AudioFrame> {
-public:
+   public:
     VADGateNode(rac_handle_t vad_handle, EventDispatcher& dispatcher)
         : PipelineNode("VAD", /*input*/ 4, /*output*/ 4),
           vad_(vad_handle),
           dispatcher_(dispatcher) {}
 
-protected:
+   protected:
     void process(AudioFrame frame, OutputEdge& out) override {
         // VAD expects float32 PCM at 16kHz. The agent ABI accepts arbitrary
         // bytes (typically int16 PCM for the request path); convert if
@@ -142,10 +141,10 @@ protected:
         // non-speech VAD event and skip the speech-active flag — the
         // downstream STT primitive will still produce its transcription.
         const size_t bytes = frame.size;
-        rac_bool_t   is_speech = RAC_FALSE;
+        rac_bool_t is_speech = RAC_FALSE;
         if (vad_ && bytes >= 2 && (bytes % sizeof(int16_t)) == 0) {
-            const int16_t* pcm   = static_cast<const int16_t*>(frame.data);
-            const size_t   count = bytes / sizeof(int16_t);
+            const int16_t* pcm = static_cast<const int16_t*>(frame.data);
+            const size_t count = bytes / sizeof(int16_t);
             std::vector<float> floats(count);
             constexpr float kInv = 1.0f / 32768.0f;
             for (size_t i = 0; i < count; ++i) {
@@ -155,8 +154,8 @@ protected:
         }
 
         rac_voice_agent_event_t ev = {};
-        ev.type                    = RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED;
-        ev.data.vad_speech_active  = is_speech;
+        ev.type = RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED;
+        ev.data.vad_speech_active = is_speech;
         dispatcher_.emit(ev);
 
         // Forward frame regardless — STT must still attempt transcription
@@ -164,8 +163,8 @@ protected:
         out.push(std::move(frame), this->cancel_token());
     }
 
-private:
-    rac_handle_t     vad_;
+   private:
+    rac_handle_t vad_;
     EventDispatcher& dispatcher_;
 };
 
@@ -174,25 +173,25 @@ private:
 // ---------------------------------------------------------------------------
 
 class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
-public:
+   public:
     STTNode(rac_handle_t stt_handle, EventDispatcher& dispatcher)
         : PipelineNode("STT", /*input*/ 4, /*output*/ 4),
           stt_(stt_handle),
           dispatcher_(dispatcher) {}
 
-protected:
+   protected:
     void process(AudioFrame frame, OutputEdge& out) override {
         rac_stt_result_t r = {};
-        rac_result_t status = rac_stt_component_transcribe(
-            stt_, frame.data, frame.size, nullptr, &r);
+        rac_result_t status =
+            rac_stt_component_transcribe(stt_, frame.data, frame.size, nullptr, &r);
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
         }
 
         rac_voice_agent_event_t ev = {};
-        ev.type                    = RAC_VOICE_AGENT_EVENT_TRANSCRIPTION;
-        ev.data.transcription      = r.text;
+        ev.type = RAC_VOICE_AGENT_EVENT_TRANSCRIPTION;
+        ev.data.transcription = r.text;
         dispatcher_.emit(ev);
 
         Transcript t{r.text ? std::string(r.text) : std::string()};
@@ -200,8 +199,8 @@ protected:
         out.push(std::move(t), this->cancel_token());
     }
 
-private:
-    rac_handle_t     stt_;
+   private:
+    rac_handle_t stt_;
     EventDispatcher& dispatcher_;
 };
 
@@ -210,25 +209,24 @@ private:
 // ---------------------------------------------------------------------------
 
 class LLMNode : public rac::graph::PipelineNode<Transcript, Response> {
-public:
+   public:
     LLMNode(rac_handle_t llm_handle, EventDispatcher& dispatcher)
         : PipelineNode("LLM", /*input*/ 4, /*output*/ 4),
           llm_(llm_handle),
           dispatcher_(dispatcher) {}
 
-protected:
+   protected:
     void process(Transcript prompt, OutputEdge& out) override {
         rac_llm_result_t r = {};
-        rac_result_t status = rac_llm_component_generate(
-            llm_, prompt.text.c_str(), nullptr, &r);
+        rac_result_t status = rac_llm_component_generate(llm_, prompt.text.c_str(), nullptr, &r);
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
         }
 
         rac_voice_agent_event_t ev = {};
-        ev.type                    = RAC_VOICE_AGENT_EVENT_RESPONSE;
-        ev.data.response           = r.text;
+        ev.type = RAC_VOICE_AGENT_EVENT_RESPONSE;
+        ev.data.response = r.text;
         dispatcher_.emit(ev);
 
         Response resp{r.text ? std::string(r.text) : std::string()};
@@ -236,8 +234,8 @@ protected:
         out.push(std::move(resp), this->cancel_token());
     }
 
-private:
-    rac_handle_t     llm_;
+   private:
+    rac_handle_t llm_;
     EventDispatcher& dispatcher_;
 };
 
@@ -248,7 +246,7 @@ private:
 // ---------------------------------------------------------------------------
 
 class TTSNode : public rac::graph::PipelineNode<Response, ProcessedPayload> {
-public:
+   public:
     TTSNode(rac_handle_t tts_handle, EventDispatcher& dispatcher,
             std::shared_ptr<std::string> last_transcription)
         : PipelineNode("TTS", /*input*/ 4, /*output*/ 4),
@@ -256,11 +254,10 @@ public:
           dispatcher_(dispatcher),
           last_transcription_(std::move(last_transcription)) {}
 
-protected:
+   protected:
     void process(Response resp, OutputEdge& out) override {
         rac_tts_result_t r = {};
-        rac_result_t status = rac_tts_component_synthesize(
-            tts_, resp.text.c_str(), nullptr, &r);
+        rac_result_t status = rac_tts_component_synthesize(tts_, resp.text.c_str(), nullptr, &r);
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
@@ -268,42 +265,38 @@ protected:
 
         std::vector<uint8_t> wav;
         if (r.audio_data != nullptr && r.audio_size > 0) {
-            void*  raw_wav  = nullptr;
+            void* raw_wav = nullptr;
             size_t raw_size = 0;
-            const int sr = r.sample_rate > 0 ? r.sample_rate
-                                             : RAC_TTS_DEFAULT_SAMPLE_RATE;
-            status = rac_audio_float32_to_wav(r.audio_data, r.audio_size,
-                                              sr, &raw_wav, &raw_size);
+            const int sr = r.sample_rate > 0 ? r.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE;
+            status = rac_audio_float32_to_wav(r.audio_data, r.audio_size, sr, &raw_wav, &raw_size);
             if (status != RAC_SUCCESS) {
                 rac_tts_result_free(&r);
                 dispatcher_.emit_error(status);
                 return;
             }
-            wav.assign(static_cast<uint8_t*>(raw_wav),
-                       static_cast<uint8_t*>(raw_wav) + raw_size);
+            wav.assign(static_cast<uint8_t*>(raw_wav), static_cast<uint8_t*>(raw_wav) + raw_size);
             std::free(raw_wav);
         }
 
         // Emit the per-stage AUDIO_SYNTHESIZED event with the WAV bytes.
         rac_voice_agent_event_t ev = {};
-        ev.type                    = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
-        ev.data.audio.audio_data   = wav.empty() ? nullptr : wav.data();
-        ev.data.audio.audio_size   = wav.size();
+        ev.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
+        ev.data.audio.audio_data = wav.empty() ? nullptr : wav.data();
+        ev.data.audio.audio_size = wav.size();
         dispatcher_.emit(ev);
 
         rac_tts_result_free(&r);
 
         ProcessedPayload payload;
-        payload.transcription = last_transcription_ ? *last_transcription_
-                                                    : std::string();
-        payload.response      = std::move(resp.text);
-        payload.wav           = std::move(wav);
+        payload.transcription = last_transcription_ ? *last_transcription_ : std::string();
+        payload.response = std::move(resp.text);
+        payload.wav = std::move(wav);
         out.push(std::move(payload), this->cancel_token());
     }
 
-private:
-    rac_handle_t                 tts_;
-    EventDispatcher&             dispatcher_;
+   private:
+    rac_handle_t tts_;
+    EventDispatcher& dispatcher_;
     std::shared_ptr<std::string> last_transcription_;
 };
 
@@ -313,32 +306,29 @@ private:
 // ---------------------------------------------------------------------------
 
 class SinkNode : public rac::graph::PipelineNode<ProcessedPayload, ProcessedPayload> {
-public:
+   public:
     SinkNode(EventDispatcher& dispatcher)
-        : PipelineNode("Sink", /*input*/ 4, /*output*/ 1),
-          dispatcher_(dispatcher) {}
+        : PipelineNode("Sink", /*input*/ 4, /*output*/ 1), dispatcher_(dispatcher) {}
 
-protected:
+   protected:
     void process(ProcessedPayload payload, OutputEdge& out) override {
         // Each event-borne pointer is owned by `payload` (and lives until
         // we return from emit()); copies are made by the dispatcher's
         // proto translation path, and the legacy struct callback also
         // does not retain pointers past the call.
         char* trans_copy = nullptr;
-        char* resp_copy  = nullptr;
+        char* resp_copy = nullptr;
         if (!payload.transcription.empty()) {
             trans_copy = static_cast<char*>(std::malloc(payload.transcription.size() + 1));
             if (trans_copy) {
-                std::memcpy(trans_copy, payload.transcription.data(),
-                            payload.transcription.size());
+                std::memcpy(trans_copy, payload.transcription.data(), payload.transcription.size());
                 trans_copy[payload.transcription.size()] = '\0';
             }
         }
         if (!payload.response.empty()) {
             resp_copy = static_cast<char*>(std::malloc(payload.response.size() + 1));
             if (resp_copy) {
-                std::memcpy(resp_copy, payload.response.data(),
-                            payload.response.size());
+                std::memcpy(resp_copy, payload.response.data(), payload.response.size());
                 resp_copy[payload.response.size()] = '\0';
             }
         }
@@ -350,13 +340,13 @@ protected:
             }
         }
 
-        rac_voice_agent_event_t ev                          = {};
-        ev.type                                              = RAC_VOICE_AGENT_EVENT_PROCESSED;
-        ev.data.result.speech_detected                       = RAC_TRUE;
-        ev.data.result.transcription                         = trans_copy;
-        ev.data.result.response                              = resp_copy;
-        ev.data.result.synthesized_audio                     = wav_copy;
-        ev.data.result.synthesized_audio_size                = wav_copy ? payload.wav.size() : 0;
+        rac_voice_agent_event_t ev = {};
+        ev.type = RAC_VOICE_AGENT_EVENT_PROCESSED;
+        ev.data.result.speech_detected = RAC_TRUE;
+        ev.data.result.transcription = trans_copy;
+        ev.data.result.response = resp_copy;
+        ev.data.result.synthesized_audio = wav_copy;
+        ev.data.result.synthesized_audio_size = wav_copy ? payload.wav.size() : 0;
         dispatcher_.emit(ev);
 
         std::free(trans_copy);
@@ -367,7 +357,7 @@ protected:
         out.push(std::move(payload), this->cancel_token());
     }
 
-private:
+   private:
     EventDispatcher& dispatcher_;
 };
 
@@ -378,17 +368,18 @@ private:
 // ---------------------------------------------------------------------------
 
 class TranscriptTapNode : public rac::graph::PipelineNode<Transcript, Transcript> {
-public:
+   public:
     TranscriptTapNode(std::shared_ptr<std::string> slot)
         : PipelineNode("Tap", /*input*/ 4, /*output*/ 4), slot_(std::move(slot)) {}
 
-protected:
+   protected:
     void process(Transcript t, OutputEdge& out) override {
-        if (slot_) *slot_ = t.text;
+        if (slot_)
+            *slot_ = t.text;
         out.push(std::move(t), this->cancel_token());
     }
 
-private:
+   private:
     std::shared_ptr<std::string> slot_;
 };
 
@@ -398,9 +389,8 @@ private:
 // VoiceAgentPipeline
 // ===========================================================================
 
-VoiceAgentPipeline::VoiceAgentPipeline(rac_voice_agent_handle_t          agent,
-                                       rac_voice_agent_event_callback_fn cb,
-                                       void*                             user_data)
+VoiceAgentPipeline::VoiceAgentPipeline(rac_voice_agent_handle_t agent,
+                                       rac_voice_agent_event_callback_fn cb, void* user_data)
     : agent_(agent), cb_(cb), user_data_(user_data) {}
 
 VoiceAgentPipeline::~VoiceAgentPipeline() {
@@ -408,8 +398,10 @@ VoiceAgentPipeline::~VoiceAgentPipeline() {
 }
 
 rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_size) {
-    if (!agent_) return RAC_ERROR_INVALID_HANDLE;
-    if (!audio_data || audio_size == 0) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!agent_)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!audio_data || audio_size == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
     std::lock_guard<std::mutex> run_lock(run_mutex_);
 
@@ -422,12 +414,11 @@ rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_s
 
     auto last_transcript = std::make_shared<std::string>();
 
-    auto vad  = std::make_shared<VADGateNode>(agent_->vad_handle, dispatcher);
-    auto stt  = std::make_shared<STTNode>(agent_->stt_handle, dispatcher);
-    auto tap  = std::make_shared<TranscriptTapNode>(last_transcript);
-    auto llm  = std::make_shared<LLMNode>(agent_->llm_handle, dispatcher);
-    auto tts  = std::make_shared<TTSNode>(agent_->tts_handle, dispatcher,
-                                          last_transcript);
+    auto vad = std::make_shared<VADGateNode>(agent_->vad_handle, dispatcher);
+    auto stt = std::make_shared<STTNode>(agent_->stt_handle, dispatcher);
+    auto tap = std::make_shared<TranscriptTapNode>(last_transcript);
+    auto llm = std::make_shared<LLMNode>(agent_->llm_handle, dispatcher);
+    auto tts = std::make_shared<TTSNode>(agent_->tts_handle, dispatcher, last_transcript);
     auto sink = std::make_shared<SinkNode>(dispatcher);
 
     scheduler->add_node(vad);
@@ -451,7 +442,7 @@ rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_s
     {
         std::lock_guard<std::mutex> state_lock(state_mutex_);
         active_scheduler_ = scheduler;
-        active_cancel_    = scheduler->root_cancel_token();
+        active_cancel_ = scheduler->root_cancel_token();
     }
 
     scheduler->start();

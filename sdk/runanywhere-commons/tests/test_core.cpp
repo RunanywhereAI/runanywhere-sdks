@@ -9,24 +9,24 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_logger.h"
-#include "rac/core/rac_audio_utils.h"
-#include "rac/core/rac_platform_adapter.h"
-
 #include <chrono>
 #include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -125,8 +125,7 @@ static TestResult test_get_version() {
 static TestResult test_error_message_known() {
     const char* msg_success = rac_error_message(RAC_SUCCESS);
     ASSERT_TRUE(msg_success != nullptr, "rac_error_message(RAC_SUCCESS) should not be NULL");
-    ASSERT_TRUE(std::strlen(msg_success) > 0,
-                "rac_error_message(RAC_SUCCESS) should not be empty");
+    ASSERT_TRUE(std::strlen(msg_success) > 0, "rac_error_message(RAC_SUCCESS) should not be empty");
 
     const char* msg_not_init = rac_error_message(RAC_ERROR_NOT_INITIALIZED);
     ASSERT_TRUE(msg_not_init != nullptr,
@@ -149,8 +148,7 @@ static TestResult test_error_message_known() {
 
 static TestResult test_error_message_unknown() {
     const char* msg = rac_error_message(static_cast<rac_result_t>(-9999));
-    ASSERT_TRUE(msg != nullptr,
-                "rac_error_message(-9999) should not be NULL (unknown code)");
+    ASSERT_TRUE(msg != nullptr, "rac_error_message(-9999) should not be NULL (unknown code)");
 
     return TEST_PASS();
 }
@@ -188,8 +186,7 @@ static TestResult test_error_details() {
 
     rac_error_clear_details();
     const char* cleared = rac_error_get_details();
-    ASSERT_TRUE(cleared == nullptr,
-                "rac_error_get_details should return NULL after clear");
+    ASSERT_TRUE(cleared == nullptr, "rac_error_get_details should return NULL after clear");
 
     return TEST_PASS();
 }
@@ -201,12 +198,10 @@ static TestResult test_error_details() {
 static TestResult test_logger_levels() {
     rac_result_t rc = rac_logger_init(RAC_LOG_DEBUG);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_logger_init should succeed");
-    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_DEBUG,
-              "min level should be DEBUG after init");
+    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_DEBUG, "min level should be DEBUG after init");
 
     rac_logger_set_min_level(RAC_LOG_WARNING);
-    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_WARNING,
-              "min level should be WARNING after set");
+    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_WARNING, "min level should be WARNING after set");
 
     rac_logger_shutdown();
     return TEST_PASS();
@@ -292,8 +287,7 @@ static TestResult test_alloc_free() {
 
     char* dup = rac_strdup("hello");
     ASSERT_TRUE(dup != nullptr, "rac_strdup(\"hello\") should return non-NULL");
-    ASSERT_TRUE(std::strcmp(dup, "hello") == 0,
-                "rac_strdup result should match original string");
+    ASSERT_TRUE(std::strcmp(dup, "hello") == 0, "rac_strdup result should match original string");
     rac_free(dup);
 
     return TEST_PASS();
@@ -317,7 +311,7 @@ static TestResult test_audio_float32_to_wav() {
     void* wav_data = nullptr;
     size_t wav_size = 0;
     rac_result_t rc = rac_audio_float32_to_wav(samples.data(), num_samples * sizeof(float),
-                                                sample_rate, &wav_data, &wav_size);
+                                               sample_rate, &wav_data, &wav_size);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_audio_float32_to_wav should succeed");
     ASSERT_TRUE(wav_data != nullptr, "wav_data should not be NULL");
     ASSERT_TRUE(wav_size > 44, "wav_size should be > 44 (WAV header)");
@@ -349,7 +343,7 @@ static TestResult test_audio_int16_to_wav() {
     void* wav_data = nullptr;
     size_t wav_size = 0;
     rac_result_t rc = rac_audio_int16_to_wav(samples.data(), num_samples * sizeof(int16_t),
-                                              sample_rate, &wav_data, &wav_size);
+                                             sample_rate, &wav_data, &wav_size);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_audio_int16_to_wav should succeed");
     ASSERT_TRUE(wav_data != nullptr, "wav_data should not be NULL");
     ASSERT_TRUE(wav_size > 44, "wav_size should be > 44 (WAV header)");

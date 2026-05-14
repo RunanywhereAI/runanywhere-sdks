@@ -35,9 +35,12 @@ static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
         // retained as a fallback route even though ONNX diffusion is not
         // supported (the router will fail cleanly with
         // RAC_ERROR_BACKEND_NOT_FOUND if neither plugin is loaded).
-        case RAC_FRAMEWORK_COREML:             return "diffusion-coreml";
-        case RAC_FRAMEWORK_ONNX:                return "onnx";
-        default:                               return nullptr;
+        case RAC_FRAMEWORK_COREML:
+            return "diffusion-coreml";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
+        default:
+            return nullptr;
     }
 }
 
@@ -157,10 +160,10 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
 
-    auto* service =
-        static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
+    auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
     if (!service) {
-        if (vt->diffusion_ops->destroy) vt->diffusion_ops->destroy(impl);
+        if (vt->diffusion_ops->destroy)
+            vt->diffusion_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->diffusion_ops;

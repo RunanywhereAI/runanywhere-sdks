@@ -40,19 +40,22 @@
 namespace {
 
 struct CallbackSlot {
-    rac_vad_stream_proto_callback_fn fn        = nullptr;
-    void*                            user_data = nullptr;
-    uint64_t                         seq       = 0;
+    rac_vad_stream_proto_callback_fn fn = nullptr;
+    void* user_data = nullptr;
+    uint64_t seq = 0;
 };
 
 struct StreamSession {
-    rac_handle_t handle    = nullptr;
-    std::string  request_id;
+    rac_handle_t handle = nullptr;
+    std::string request_id;
     std::atomic<bool> is_cancelled{false};
-    int32_t      sample_rate = 16000;
+    int32_t sample_rate = 16000;
 };
 
-std::mutex& g_mu() { static std::mutex m; return m; }
+std::mutex& g_mu() {
+    static std::mutex m;
+    return m;
+}
 
 std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_handle_t, CallbackSlot> m;
@@ -83,44 +86,44 @@ int64_t now_us() {
 namespace rac::vad {
 // Forward declaration: implemented later in this same TU. Used by
 // rac_vad_stream_feed_audio_proto() to emit FRAME events.
-void dispatch_vad_stream_event(rac_handle_t                                handle,
-                               runanywhere::v1::VADStreamEventKind         kind,
-                               const runanywhere::v1::VADResult*           result,
+void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
+                               const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const runanywhere::v1::VADStatistics*       statistics,
-                               const char*                                 error_message,
-                               int                                         error_code);
+                               const runanywhere::v1::VADStatistics* statistics,
+                               const char* error_message, int error_code);
 }  // namespace rac::vad
 #endif
 
 extern "C" {
 
-rac_result_t rac_vad_set_stream_proto_callback(rac_handle_t                     handle,
-                                                rac_vad_stream_proto_callback_fn callback,
-                                                void*                            user_data) {
-    if (handle == nullptr) return RAC_ERROR_INVALID_HANDLE;
+rac_result_t rac_vad_set_stream_proto_callback(rac_handle_t handle,
+                                               rac_vad_stream_proto_callback_fn callback,
+                                               void* user_data) {
+    if (handle == nullptr)
+        return RAC_ERROR_INVALID_HANDLE;
     std::lock_guard<std::mutex> lock(g_mu());
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
+        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
     }
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_vad_unset_stream_proto_callback(rac_handle_t handle) {
-    if (handle == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    if (handle == nullptr)
+        return RAC_ERROR_INVALID_HANDLE;
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vad_stream_start_proto(rac_handle_t   handle,
-                                         const uint8_t* options_proto_bytes,
-                                         size_t         options_proto_size,
-                                         uint64_t*      out_session_id) {
-    if (handle == nullptr) return RAC_ERROR_INVALID_HANDLE;
-    if (out_session_id == nullptr) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* options_proto_bytes,
+                                        size_t options_proto_size, uint64_t* out_session_id) {
+    if (handle == nullptr)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (out_session_id == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     if (options_proto_size > 0 && options_proto_bytes == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -132,8 +135,7 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t   handle,
 #else
     runanywhere::v1::VADOptions parsed;
     if (options_proto_size > 0 &&
-        !parsed.ParseFromArray(options_proto_bytes,
-                                static_cast<int>(options_proto_size))) {
+        !parsed.ParseFromArray(options_proto_bytes, static_cast<int>(options_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
 
@@ -153,11 +155,12 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t   handle,
 #endif
 }
 
-rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
-                                              const uint8_t* audio_bytes,
-                                              size_t         audio_size) {
-    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
-    if (audio_size > 0 && audio_bytes == nullptr) return RAC_ERROR_INVALID_ARGUMENT;
+rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t* audio_bytes,
+                                             size_t audio_size) {
+    if (session_id == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (audio_size > 0 && audio_bytes == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)audio_bytes;
@@ -169,16 +172,17 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
     // The request_id is stamped onto the dispatched event by
     // dispatch_vad_stream_event() via its own session-table lookup.
     rac_handle_t component_handle = nullptr;
-    int32_t      sample_rate      = 16000;
+    int32_t sample_rate = 16000;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
-        if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+        if (it == g_sessions().end())
+            return RAC_ERROR_INVALID_ARGUMENT;
         if (it->second.is_cancelled.load(std::memory_order_relaxed)) {
             return RAC_ERROR_INVALID_ARGUMENT;
         }
         component_handle = it->second.handle;
-        sample_rate      = it->second.sample_rate;
+        sample_rate = it->second.sample_rate;
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -203,16 +207,16 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
         samples[i] = s;
         sum_sq += static_cast<double>(s) * static_cast<double>(s);
     }
-    const float energy = num_samples > 0
-                             ? static_cast<float>(std::sqrt(sum_sq / static_cast<double>(num_samples)))
-                             : 0.0f;
+    const float energy =
+        num_samples > 0 ? static_cast<float>(std::sqrt(sum_sq / static_cast<double>(num_samples)))
+                        : 0.0f;
 
     // Forward to the VAD component. Speech-activity transitions still flow
     // through whichever activity callback is registered (energy VAD's
     // internal callback or rac_vad_component_set_activity_proto_callback).
     rac_bool_t is_speech = RAC_FALSE;
-    rac_result_t rc = rac_vad_component_process(component_handle, samples.data(),
-                                                samples.size(), &is_speech);
+    rac_result_t rc =
+        rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::VADResult err_payload;
         err_payload.set_is_speech(false);
@@ -226,15 +230,14 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
                                             runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR,
                                             /*result=*/nullptr,
                                             /*activity=*/nullptr,
-                                            /*statistics=*/nullptr,
-                                            msg, rc);
+                                            /*statistics=*/nullptr, msg, rc);
         return rc;
     }
 
     const int32_t duration_ms =
         sample_rate > 0
-            ? static_cast<int32_t>((static_cast<double>(num_samples) /
-                                    static_cast<double>(sample_rate)) * 1000.0)
+            ? static_cast<int32_t>(
+                  (static_cast<double>(num_samples) / static_cast<double>(sample_rate)) * 1000.0)
             : 0;
 
     runanywhere::v1::VADResult payload;
@@ -245,8 +248,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
     payload.set_timestamp_ms(rac_get_current_time_ms());
 
     rac::vad::dispatch_vad_stream_event(component_handle,
-                                        runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME,
-                                        &payload,
+                                        runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME, &payload,
                                         /*activity=*/nullptr,
                                         /*statistics=*/nullptr,
                                         /*error_message=*/nullptr,
@@ -256,19 +258,23 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t       session_id,
 }
 
 rac_result_t rac_vad_stream_stop_proto(uint64_t session_id) {
-    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
+    if (session_id == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(g_mu());
     auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+    if (it == g_sessions().end())
+        return RAC_ERROR_INVALID_ARGUMENT;
     g_sessions().erase(it);
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_vad_stream_cancel_proto(uint64_t session_id) {
-    if (session_id == 0) return RAC_ERROR_INVALID_ARGUMENT;
+    if (session_id == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(g_mu());
     auto it = g_sessions().find(session_id);
-    if (it == g_sessions().end()) return RAC_ERROR_INVALID_ARGUMENT;
+    if (it == g_sessions().end())
+        return RAC_ERROR_INVALID_ARGUMENT;
     it->second.is_cancelled.store(true, std::memory_order_relaxed);
     g_sessions().erase(it);
     return RAC_SUCCESS;
@@ -288,25 +294,23 @@ namespace rac::vad {
  * correlate frames. When no session is active the request_id field is left
  * empty; only the per-handle stream callback is required.
  */
-void dispatch_vad_stream_event(rac_handle_t                              handle,
-                               runanywhere::v1::VADStreamEventKind       kind,
-                               const runanywhere::v1::VADResult*         result,
+void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
+                               const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
-                               const runanywhere::v1::VADStatistics*     statistics,
-                               const char*                               error_message,
-                               int                                       error_code) {
+                               const runanywhere::v1::VADStatistics* statistics,
+                               const char* error_message, int error_code) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
-        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        if (it == g_slots().end() || it->second.fn == nullptr)
+            return;
         slot = it->second;
         seq = ++(it->second.seq);
         for (const auto& [_, session] : g_sessions()) {
-            if (session.handle == handle &&
-                !session.is_cancelled.load(std::memory_order_relaxed)) {
+            if (session.handle == handle && !session.is_cancelled.load(std::memory_order_relaxed)) {
                 request_id = session.request_id;
                 break;
             }
@@ -314,7 +318,7 @@ void dispatch_vad_stream_event(rac_handle_t                              handle,
     }
 
     thread_local runanywhere::v1::VADStreamEvent proto_event;
-    thread_local std::vector<uint8_t>            scratch;
+    thread_local std::vector<uint8_t> scratch;
 
     proto_event.Clear();
     proto_event.set_seq(seq);
@@ -340,7 +344,8 @@ void dispatch_vad_stream_event(rac_handle_t                              handle,
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
-    if (scratch.size() < needed) scratch.resize(needed);
+    if (scratch.size() < needed)
+        scratch.resize(needed);
     if (!proto_event.SerializeToArray(scratch.data(), static_cast<int>(needed))) {
         RAC_LOG_WARNING("vad", "dispatch_vad_stream_event: SerializeToArray failed");
         return;

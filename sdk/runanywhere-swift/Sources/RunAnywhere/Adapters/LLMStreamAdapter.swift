@@ -27,8 +27,8 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 import os
+import SwiftProtobuf
 
 /// AsyncStream-based wrapper over the proto-byte LLM stream ABI.
 ///
@@ -50,8 +50,8 @@ public extension HandleStreamAdapter where Handle == rac_handle_t, Event == RALL
         self.init(
             handle: handle,
             streamKey: "llm",
-            register: { h, cb, ud in rac_llm_set_stream_proto_callback(h, cb, ud) },
-            unregister: { h in _ = rac_llm_unset_stream_proto_callback(h) },
+            register: { handle, cb, ud in rac_llm_set_stream_proto_callback(handle, cb, ud) },
+            unregister: { handle in _ = rac_llm_unset_stream_proto_callback(handle) },
             isTerminalEvent: { $0.isFinal }
         )
     }

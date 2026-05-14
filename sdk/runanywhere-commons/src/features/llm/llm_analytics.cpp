@@ -247,7 +247,7 @@ rac_result_t rac_llm_analytics_track_first_token(rac_llm_analytics_handle_t hand
         static_cast<double>(tracker.first_token_time_ms - tracker.start_time_ms);
 
     RAC_LOG_DEBUG("LLM.Analytics", "First token received for %s: %.1fms", generation_id,
-              time_to_first_token_ms);
+                  time_to_first_token_ms);
 
     return RAC_SUCCESS;
 }
@@ -340,7 +340,7 @@ rac_result_t rac_llm_analytics_track_generation_failed(rac_llm_analytics_handle_
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("LLM.Analytics", "Generation failed %s: %d - %s", generation_id, error_code,
-              error_message ? error_message : "");
+                  error_message ? error_message : "");
 
     return RAC_SUCCESS;
 }
@@ -359,8 +359,8 @@ rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t handle,
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("LLM.Analytics", "LLM error in %s: %d - %s (model: %s, gen: %s)",
-              operation ? operation : "unknown", error_code, error_message ? error_message : "",
-              model_id ? model_id : "none", generation_id ? generation_id : "none");
+                  operation ? operation : "unknown", error_code, error_message ? error_message : "",
+                  model_id ? model_id : "none", generation_id ? generation_id : "none");
 
     return RAC_SUCCESS;
 }

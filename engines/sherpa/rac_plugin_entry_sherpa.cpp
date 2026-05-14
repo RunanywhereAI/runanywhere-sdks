@@ -22,8 +22,9 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE && \
-    defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) && RAC_SHERPA_SPEECH_OPS_AVAILABLE
+#if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE &&                 \
+    defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) &&                                \
+    RAC_SHERPA_SPEECH_OPS_AVAILABLE
 #define RAC_SHERPA_ROUTABLE 1
 #else
 #define RAC_SHERPA_ROUTABLE 0
@@ -39,9 +40,9 @@ extern const rac_vad_service_ops_t g_sherpa_vad_ops;
 
 static rac_result_t sherpa_capability_check(void) {
 #if RAC_SHERPA_ROUTABLE
-    return RAC_SUCCESS;
+  return RAC_SUCCESS;
 #else
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+  return RAC_ERROR_BACKEND_UNAVAILABLE;
 #endif
 }
 
@@ -62,20 +63,20 @@ static const rac_primitive_t k_sherpa_primitives[] = {
 #endif
 
 static const rac_engine_manifest_t k_sherpa_manifest = {
-    .name             = "sherpa",
-    .display_name     = "Sherpa-ONNX",
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "runanywhere_sherpa",
-    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority         =
+    .name = "sherpa",
+    .display_name = "Sherpa-ONNX",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_sherpa",
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority =
 #if RAC_SHERPA_ROUTABLE
         90,
 #else
         0,
 #endif
     .capability_flags = 0,
-    .primitives       =
+    .primitives =
 #if RAC_SHERPA_ROUTABLE
         k_sherpa_primitives,
 #else
@@ -87,32 +88,32 @@ static const rac_engine_manifest_t k_sherpa_manifest = {
 #else
         0,
 #endif
-    .runtimes         =
+    .runtimes =
 #if RAC_SHERPA_ROUTABLE
         k_sherpa_runtimes,
 #else
         nullptr,
 #endif
-    .runtimes_count   =
+    .runtimes_count =
 #if RAC_SHERPA_ROUTABLE
         sizeof(k_sherpa_runtimes) / sizeof(k_sherpa_runtimes[0]),
 #else
         0,
 #endif
-    .formats          =
+    .formats =
 #if RAC_SHERPA_ROUTABLE
         k_sherpa_formats,
 #else
         nullptr,
 #endif
-    .formats_count    =
+    .formats_count =
 #if RAC_SHERPA_ROUTABLE
         sizeof(k_sherpa_formats) / sizeof(k_sherpa_formats[0]),
 #else
         0,
 #endif
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 static const rac_engine_vtable_t g_sherpa_engine_vtable = {
@@ -121,19 +122,19 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
     /* on_unload        */ nullptr,
 
     /* llm_ops          */ nullptr,
-    /* stt_ops          */
+/* stt_ops          */
 #if RAC_SHERPA_ROUTABLE
     &g_sherpa_stt_ops,
 #else
     nullptr,
 #endif
-    /* tts_ops          */
+/* tts_ops          */
 #if RAC_SHERPA_ROUTABLE
     &g_sherpa_tts_ops,
 #else
     nullptr,
 #endif
-    /* vad_ops          */
+/* vad_ops          */
 #if RAC_SHERPA_ROUTABLE
     &g_sherpa_vad_ops,
 #else
@@ -144,16 +145,24 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(sherpa) {
-    return rac_engine_entry_with_manifest(&k_sherpa_manifest,
-                                          &g_sherpa_engine_vtable);
+  return rac_engine_entry_with_manifest(&k_sherpa_manifest,
+                                        &g_sherpa_engine_vtable);
 }
 
-}  // extern "C"
+} // extern "C"
 
 // ENG-SHERPA-03: the legacy `__attribute__((constructor))` auto-register
 // block previously lived here. It has been removed so all three active

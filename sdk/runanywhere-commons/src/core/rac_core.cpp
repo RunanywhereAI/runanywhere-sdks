@@ -99,8 +99,7 @@ rac_result_t rac_init(const rac_config_t* config) {
     }
 
     if (config == nullptr) {
-        rac::events::publish_initialization_failed(RAC_ERROR_NULL_POINTER,
-                                                   "Config is required");
+        rac::events::publish_initialization_failed(RAC_ERROR_NULL_POINTER, "Config is required");
         return RAC_ERROR_NULL_POINTER;
     }
 

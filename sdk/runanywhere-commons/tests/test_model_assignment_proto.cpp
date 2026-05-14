@@ -18,19 +18,21 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if (!((a) == (b))) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -55,8 +57,7 @@ std::string serialize_to_string(const Message& message) {
     return bytes;
 }
 
-runanywhere::v1::ModelInfo make_assignment_model(const std::string& id,
-                                                 const std::string& name) {
+runanywhere::v1::ModelInfo make_assignment_model(const std::string& id, const std::string& name) {
     runanywhere::v1::ModelInfo model;
     model.set_id(id);
     model.set_name(name);
@@ -77,8 +78,7 @@ std::string make_model_list_payload(const std::vector<runanywhere::v1::ModelInfo
     return serialize_to_string(list);
 }
 
-rac_result_t fake_assignment_http_get(const char* endpoint,
-                                      rac_bool_t requires_auth,
+rac_result_t fake_assignment_http_get(const char* endpoint, rac_bool_t requires_auth,
                                       rac_assignment_http_response_t* out_response,
                                       void* user_data) {
     auto* fake = static_cast<FakeAssignmentTransport*>(user_data);
@@ -94,12 +94,11 @@ rac_result_t fake_assignment_http_get(const char* endpoint,
         return fake->callback_result;
     }
 
-    const size_t payload_index = fake->payloads.empty()
-                                     ? 0
-                                     : std::min(static_cast<size_t>(fake->call_count - 1),
-                                                fake->payloads.size() - 1);
-    const std::string* payload =
-        fake->payloads.empty() ? nullptr : &fake->payloads[payload_index];
+    const size_t payload_index =
+        fake->payloads.empty()
+            ? 0
+            : std::min(static_cast<size_t>(fake->call_count - 1), fake->payloads.size() - 1);
+    const std::string* payload = fake->payloads.empty() ? nullptr : &fake->payloads[payload_index];
 
     out_response->result = fake->response_result;
     out_response->status_code = fake->status_code;
@@ -139,9 +138,7 @@ bool call_assignment_refresh(const runanywhere::v1::ModelRegistryRefreshRequest&
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
     const rac_result_t rc = rac_model_assignment_refresh_proto(
-        reinterpret_cast<const uint8_t*>(bytes.data()),
-        bytes.size(),
-        &buffer);
+        reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &buffer);
     if (rc != RAC_SUCCESS || buffer.status != RAC_SUCCESS || !buffer.data || !out) {
         rac_proto_buffer_free(&buffer);
         return false;
@@ -155,10 +152,10 @@ int test_cache_refresh_policy() {
     reset_assignment_state();
 
     FakeAssignmentTransport fake;
-    fake.payloads.push_back(make_model_list_payload(
-        {make_assignment_model("cpp03.cache", "Cache One")}));
-    fake.payloads.push_back(make_model_list_payload(
-        {make_assignment_model("cpp03.cache", "Cache Two")}));
+    fake.payloads.push_back(
+        make_model_list_payload({make_assignment_model("cpp03.cache", "Cache One")}));
+    fake.payloads.push_back(
+        make_model_list_payload({make_assignment_model("cpp03.cache", "Cache Two")}));
     ASSERT_TRUE(install_fake_transport(&fake));
 
     runanywhere::v1::ModelRegistryRefreshResult result;
@@ -192,8 +189,7 @@ int test_invalid_request_returns_typed_error() {
     const uint8_t invalid[] = {0x80};
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
-    const rac_result_t rc =
-        rac_model_assignment_refresh_proto(invalid, sizeof(invalid), &buffer);
+    const rac_result_t rc = rac_model_assignment_refresh_proto(invalid, sizeof(invalid), &buffer);
     ASSERT_EQ(rc, RAC_ERROR_INVALID_FORMAT);
     ASSERT_EQ(buffer.status, RAC_ERROR_INVALID_FORMAT);
     ASSERT_TRUE(buffer.data == nullptr);
@@ -244,8 +240,7 @@ int test_metadata_normalization_into_model_info() {
     ASSERT_TRUE(model.has_compatibility());
     ASSERT_EQ(model.compatibility().compatible_frameworks(0),
               runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
-    ASSERT_EQ(model.compatibility().compatible_formats(0),
-              runanywhere::v1::MODEL_FORMAT_GGUF);
+    ASSERT_EQ(model.compatibility().compatible_formats(0), runanywhere::v1::MODEL_FORMAT_GGUF);
 
     reset_assignment_state();
     return 0;
@@ -281,12 +276,14 @@ int main() {
     std::fprintf(stdout, "  skip: protobuf runtime is disabled\n");
     return 0;
 #else
-#define RUN_TEST(fn) do { \
-    std::fprintf(stdout, "[ RUN  ] %s\n", #fn); \
-    const int rc = fn(); \
-    if (rc != 0) return rc; \
-    std::fprintf(stdout, "[ OK   ] %s\n", #fn); \
-} while (0)
+#define RUN_TEST(fn)                                \
+    do {                                            \
+        std::fprintf(stdout, "[ RUN  ] %s\n", #fn); \
+        const int rc = fn();                        \
+        if (rc != 0)                                \
+            return rc;                              \
+        std::fprintf(stdout, "[ OK   ] %s\n", #fn); \
+    } while (0)
 
     RUN_TEST(test_cache_refresh_policy);
     RUN_TEST(test_invalid_request_returns_typed_error);

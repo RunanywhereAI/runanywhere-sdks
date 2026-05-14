@@ -29,7 +29,7 @@ struct rac_voice_agent {
     /// Shutdown barrier — destroy() waits for in-flight lock-free ops
     /// (e.g. `detect_speech`) to drain before tearing the agent down.
     std::atomic<bool> is_shutting_down{false};
-    std::atomic<int>  in_flight{0};
+    std::atomic<int> in_flight{0};
 
     /// True when the agent created its own component handles via
     /// `rac_voice_agent_create_standalone()`. The destructor frees them

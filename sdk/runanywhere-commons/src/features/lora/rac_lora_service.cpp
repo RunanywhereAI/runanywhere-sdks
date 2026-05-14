@@ -28,9 +28,7 @@
 #endif
 
 extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
-    rac_lora_registry_handle_t registry,
-    const uint8_t* entry_proto_bytes,
-    size_t entry_proto_size,
+    rac_lora_registry_handle_t registry, const uint8_t* entry_proto_bytes, size_t entry_proto_size,
     rac_proto_buffer_t* out_entry);
 
 namespace {
@@ -45,8 +43,7 @@ int64_t now_ms() {
 std::string event_id() {
     static std::atomic<uint64_t> counter{0};
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%lld-%llu",
-                  static_cast<long long>(now_ms()),
+    std::snprintf(buffer, sizeof(buffer), "%lld-%llu", static_cast<long long>(now_ms()),
                   static_cast<unsigned long long>(counter.fetch_add(1)));
     return buffer;
 }
@@ -97,7 +94,8 @@ TrackedLoRAState snapshot_tracked_lora_state(rac_handle_t llm_component,
 }
 
 void forget_tracked_lora_state(rac_handle_t llm_component) {
-    if (!llm_component) return;
+    if (!llm_component)
+        return;
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     tracked_lora_states().erase(llm_component);
 }
@@ -113,11 +111,9 @@ void populate_state_from_snapshot(const TrackedLoRAState& snapshot,
     state->set_has_active_adapters(!snapshot.adapters.empty());
 }
 
-void populate_tracked_state(rac_handle_t llm_component,
-                            const std::string& base_model_id,
+void populate_tracked_state(rac_handle_t llm_component, const std::string& base_model_id,
                             runanywhere::v1::LoRAState* state) {
-    populate_state_from_snapshot(snapshot_tracked_lora_state(llm_component, base_model_id),
-                                 state);
+    populate_state_from_snapshot(snapshot_tracked_lora_state(llm_component, base_model_id), state);
 }
 
 void track_lora_cleared(rac_handle_t llm_component, const std::string& base_model_id) {
@@ -126,8 +122,7 @@ void track_lora_cleared(rac_handle_t llm_component, const std::string& base_mode
     state.adapters.clear();
 }
 
-void track_lora_applied(rac_handle_t llm_component,
-                        const std::string& base_model_id,
+void track_lora_applied(rac_handle_t llm_component, const std::string& base_model_id,
                         const runanywhere::v1::LoRAAdapterInfo& info) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
@@ -153,13 +148,12 @@ void track_lora_removed_path(rac_handle_t llm_component, const std::string& base
                          state.adapters.end());
 }
 
-rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component,
-                                     const std::string& base_model_id,
-                                     const std::string& adapter_id,
-                                     std::string* out_path,
+rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component, const std::string& base_model_id,
+                                     const std::string& adapter_id, std::string* out_path,
                                      std::string* out_error) {
     if (adapter_id.empty()) {
-        if (out_error) *out_error = "LoRARemoveRequest.adapter_ids cannot contain empty ids";
+        if (out_error)
+            *out_error = "LoRARemoveRequest.adapter_ids cannot contain empty ids";
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -167,7 +161,8 @@ rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component,
     const auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
     const runanywhere::v1::LoRAAdapterInfo* match = nullptr;
     for (const auto& adapter : state.adapters) {
-        if (adapter.adapter_id() != adapter_id) continue;
+        if (adapter.adapter_id() != adapter_id)
+            continue;
         if (match) {
             if (out_error) {
                 *out_error =
@@ -180,12 +175,12 @@ rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component,
 
     if (!match) {
         if (out_error) {
-            *out_error =
-                "LoRARemoveRequest.adapter_ids contains an adapter id that is not active";
+            *out_error = "LoRARemoveRequest.adapter_ids contains an adapter id that is not active";
         }
         return RAC_ERROR_NOT_FOUND;
     }
-    if (out_path) *out_path = match->adapter_path();
+    if (out_path)
+        *out_path = match->adapter_path();
     return RAC_SUCCESS;
 }
 
@@ -195,13 +190,12 @@ void add_unique_path(std::vector<std::string>* paths, const std::string& path) {
     }
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize proto result");
     }
@@ -211,14 +205,13 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message,
 void publish_event(const runanywhere::v1::SDKEvent& event) {
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
 
-void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
-                        const char* operation, const char* error) {
+void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
+                        const char* error) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -235,19 +228,19 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
         event.set_operation_id(operation);
         cap->set_operation(operation);
     }
-    if (error) cap->set_error(error);
+    if (error)
+        cap->set_error(error);
     publish_event(event);
 }
 
 void publish_failure(rac_result_t code, const char* operation, const char* message) {
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED,
-                       operation, message && message[0] ? message : rac_error_message(code));
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED, operation,
+                       message && message[0] ? message : rac_error_message(code));
     (void)rac_sdk_event_publish_failure(code, message, "llm", operation, RAC_TRUE);
 }
 
 rac_result_t parse_config(const uint8_t* bytes, size_t size,
-                          runanywhere::v1::LoRAAdapterConfig* out,
-                          rac_proto_buffer_t* error_out) {
+                          runanywhere::v1::LoRAAdapterConfig* out, rac_proto_buffer_t* error_out) {
     if (!valid_bytes(bytes, size)) {
         return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
                                           "LoRAAdapterConfig bytes are invalid");
@@ -268,28 +261,29 @@ rac_result_t parse_message(const uint8_t* bytes, size_t size, Message* out,
                            const char* message_name, rac_proto_buffer_t* error_out) {
     if (!valid_bytes(bytes, size)) {
         std::string message = std::string(message_name) + " bytes are invalid";
-        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
-                                          message.c_str());
+        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR, message.c_str());
     }
     if (!out->ParseFromArray(parse_data(bytes, size), static_cast<int>(size))) {
         std::string message = std::string("failed to parse ") + message_name;
-        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR,
-                                          message.c_str());
+        return rac_proto_buffer_set_error(error_out, RAC_ERROR_DECODING_ERROR, message.c_str());
     }
     return RAC_SUCCESS;
 }
 
-runanywhere::v1::LoRAAdapterInfo make_info(
-    const runanywhere::v1::LoRAAdapterConfig& config, bool applied,
-    const char* error_message = nullptr, rac_result_t error_code = RAC_SUCCESS) {
+runanywhere::v1::LoRAAdapterInfo make_info(const runanywhere::v1::LoRAAdapterConfig& config,
+                                           bool applied, const char* error_message = nullptr,
+                                           rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::LoRAAdapterInfo info;
-    if (config.has_adapter_id()) info.set_adapter_id(config.adapter_id());
+    if (config.has_adapter_id())
+        info.set_adapter_id(config.adapter_id());
     info.set_adapter_path(config.adapter_path());
     info.set_scale(config.scale() > 0.0f ? config.scale() : 1.0f);
     info.set_applied(applied);
     info.set_error_code(static_cast<int32_t>(error_code));
-    if (applied) info.set_loaded_at_ms(now_ms());
-    if (error_message && error_message[0]) info.set_error_message(error_message);
+    if (applied)
+        info.set_loaded_at_ms(now_ms());
+    if (error_message && error_message[0])
+        info.set_error_message(error_message);
     return info;
 }
 
@@ -300,8 +294,7 @@ void mark_apply_error(runanywhere::v1::LoRAApplyResult* result, rac_result_t cod
     result->set_error_message(message && message[0] ? message : rac_error_message(code));
 }
 
-void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code,
-                      const char* message) {
+void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code, const char* message) {
     state->set_error_code(static_cast<int32_t>(code));
     state->set_error_message(message && message[0] ? message : rac_error_message(code));
 }
@@ -311,7 +304,8 @@ bool lora_service_loaded(rac_handle_t llm_component) {
 }
 
 const char* no_service_message() {
-    return "LoRA service is not loaded; load an LLM model before calling generated LoRA service operations";
+    return "LoRA service is not loaded; load an LLM model before calling generated LoRA service "
+           "operations";
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -339,20 +333,18 @@ void rac_lora_forget_component_state(rac_handle_t llm_component) {
 }
 
 rac_result_t rac_lora_register_proto(rac_lora_registry_handle_t registry,
-                                     const uint8_t* entry_proto_bytes,
-                                     size_t entry_proto_size,
+                                     const uint8_t* entry_proto_bytes, size_t entry_proto_size,
                                      rac_proto_buffer_t* out_entry) {
-    return rac_lora_registry_register_catalog_entry_proto(registry,
-                                                          entry_proto_bytes,
-                                                          entry_proto_size,
-                                                          out_entry);
+    return rac_lora_registry_register_catalog_entry_proto(registry, entry_proto_bytes,
+                                                          entry_proto_size, out_entry);
 }
 
 rac_result_t rac_lora_compatibility_proto(rac_handle_t llm_component,
                                           const uint8_t* config_proto_bytes,
                                           size_t config_proto_size,
                                           rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)llm_component;
     (void)config_proto_bytes;
@@ -361,12 +353,12 @@ rac_result_t rac_lora_compatibility_proto(rac_handle_t llm_component,
 #else
     runanywhere::v1::LoRAAdapterConfig config;
     rac_result_t rc = parse_config(config_proto_bytes, config_proto_size, &config, out_result);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
 
     runanywhere::v1::LoraCompatibilityResult result;
     char* error = nullptr;
-    rc = rac_llm_component_check_lora_compat(llm_component, config.adapter_path().c_str(),
-                                             &error);
+    rc = rac_llm_component_check_lora_compat(llm_component, config.adapter_path().c_str(), &error);
     result.set_is_compatible(rc == RAC_SUCCESS);
     if (rc != RAC_SUCCESS) {
         result.set_error_message(error ? error : rac_error_message(rc));
@@ -377,11 +369,10 @@ rac_result_t rac_lora_compatibility_proto(rac_handle_t llm_component,
 #endif
 }
 
-rac_result_t rac_lora_apply_proto(rac_handle_t llm_component,
-                                  const uint8_t* request_proto_bytes,
-                                  size_t request_proto_size,
-                                  rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_lora_apply_proto(rac_handle_t llm_component, const uint8_t* request_proto_bytes,
+                                  size_t request_proto_size, rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)llm_component;
     (void)request_proto_bytes;
@@ -391,7 +382,8 @@ rac_result_t rac_lora_apply_proto(rac_handle_t llm_component,
     runanywhere::v1::LoRAApplyRequest request;
     rac_result_t rc = parse_message(request_proto_bytes, request_proto_size, &request,
                                     "LoRAApplyRequest", out_result);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
 
     runanywhere::v1::LoRAApplyResult result;
     result.set_request_id(request.request_id());
@@ -459,11 +451,10 @@ rac_result_t rac_lora_apply_proto(rac_handle_t llm_component,
 #endif
 }
 
-rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
-                                   const uint8_t* request_proto_bytes,
-                                   size_t request_proto_size,
-                                   rac_proto_buffer_t* out_state) {
-    if (!out_state) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_lora_remove_proto(rac_handle_t llm_component, const uint8_t* request_proto_bytes,
+                                   size_t request_proto_size, rac_proto_buffer_t* out_state) {
+    if (!out_state)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)llm_component;
     (void)request_proto_bytes;
@@ -473,7 +464,8 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
     runanywhere::v1::LoRARemoveRequest request;
     rac_result_t rc = parse_message(request_proto_bytes, request_proto_size, &request,
                                     "LoRARemoveRequest", out_state);
-    if (rc != RAC_SUCCESS) return rc;
+    if (rc != RAC_SUCCESS)
+        return rc;
 
     runanywhere::v1::LoRAState state;
     if (!lora_service_loaded(llm_component)) {
@@ -503,8 +495,7 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
     for (const auto& adapter_id : request.adapter_ids()) {
         std::string path;
         std::string error;
-        rc = resolve_lora_id_to_path(llm_component, base_model_id, adapter_id, &path,
-                                     &error);
+        rc = resolve_lora_id_to_path(llm_component, base_model_id, adapter_id, &path, &error);
         if (rc != RAC_SUCCESS) {
             populate_tracked_state(llm_component, base_model_id, &state);
             mark_state_error(&state, rc, error.c_str());
@@ -516,8 +507,7 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
 
     for (const auto& adapter_path : request.adapter_paths()) {
         if (adapter_path.empty()) {
-            const char* message =
-                "LoRARemoveRequest.adapter_paths cannot contain empty paths";
+            const char* message = "LoRARemoveRequest.adapter_paths cannot contain empty paths";
             populate_tracked_state(llm_component, base_model_id, &state);
             mark_state_error(&state, RAC_ERROR_INVALID_ARGUMENT, message);
             publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.remove", message);
@@ -553,11 +543,10 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
 #endif
 }
 
-rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
-                                 const uint8_t* state_proto_bytes,
-                                 size_t state_proto_size,
-                                 rac_proto_buffer_t* out_state) {
-    if (!out_state) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_lora_list_proto(rac_handle_t llm_component, const uint8_t* state_proto_bytes,
+                                 size_t state_proto_size, rac_proto_buffer_t* out_state) {
+    if (!out_state)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)llm_component;
     (void)state_proto_bytes;
@@ -565,9 +554,10 @@ rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
     return feature_unavailable(out_state);
 #else
     runanywhere::v1::LoRAState request;
-    rac_result_t rc = parse_message(state_proto_bytes, state_proto_size, &request,
-                                    "LoRAState", out_state);
-    if (rc != RAC_SUCCESS) return rc;
+    rac_result_t rc =
+        parse_message(state_proto_bytes, state_proto_size, &request, "LoRAState", out_state);
+    if (rc != RAC_SUCCESS)
+        return rc;
     (void)request;
 
     runanywhere::v1::LoRAState state;
@@ -583,11 +573,10 @@ rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
 #endif
 }
 
-rac_result_t rac_lora_state_proto(rac_handle_t llm_component,
-                                  const uint8_t* state_proto_bytes,
-                                  size_t state_proto_size,
-                                  rac_proto_buffer_t* out_state) {
-    if (!out_state) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_lora_state_proto(rac_handle_t llm_component, const uint8_t* state_proto_bytes,
+                                  size_t state_proto_size, rac_proto_buffer_t* out_state) {
+    if (!out_state)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)llm_component;
     (void)state_proto_bytes;
@@ -595,8 +584,8 @@ rac_result_t rac_lora_state_proto(rac_handle_t llm_component,
     return feature_unavailable(out_state);
 #else
     runanywhere::v1::LoRAState request;
-    rac_result_t rc = parse_message(state_proto_bytes, state_proto_size, &request,
-                                    "LoRAState", out_state);
+    rac_result_t rc =
+        parse_message(state_proto_bytes, state_proto_size, &request, "LoRAState", out_state);
     if (rc != RAC_SUCCESS) {
         return rc;
     }

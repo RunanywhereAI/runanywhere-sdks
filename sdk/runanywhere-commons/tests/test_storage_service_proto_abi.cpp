@@ -6,9 +6,9 @@
 #include <cstdio>
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/descriptor.h>
-
 #include "storage_types.pb.h"
+
+#include <google/protobuf/descriptor.h>
 #endif
 
 namespace {
@@ -16,28 +16,25 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-void check_unary_rpc(const google::protobuf::ServiceDescriptor* service,
-                     const char* method_name,
-                     const char* input_type,
-                     const char* output_type) {
-    const google::protobuf::MethodDescriptor* method =
-        service->FindMethodByName(method_name);
+void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
+                     const char* input_type, const char* output_type) {
+    const google::protobuf::MethodDescriptor* method = service->FindMethodByName(method_name);
     CHECK(method != nullptr, method_name);
-    if (!method) return;
+    if (!method)
+        return;
 
     CHECK(method->input_type()->full_name() == input_type, "Storage RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "Storage RPC output type");
@@ -49,7 +46,8 @@ int test_storage_generated_service_contract() {
         runanywhere::v1::StorageInfoRequest::descriptor()->file();
     const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("Storage");
     CHECK(service != nullptr, "generated Storage service descriptor exists");
-    if (!service) return 0;
+    if (!service)
+        return 0;
 
     CHECK(service->method_count() == 4, "generated Storage service exposes four RPCs");
 

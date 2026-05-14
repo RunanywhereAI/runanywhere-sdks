@@ -34,16 +34,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -70,7 +69,8 @@ char* dup_cstr(const char* value) {
 }
 
 rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
-    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new MockLlm();
     impl->model_path = model_id;
     *out_impl = impl;
@@ -78,21 +78,22 @@ rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
 }
 
 rac_result_t mock_initialize(void* impl, const char* model_path) {
-    if (!impl || !model_path) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !model_path)
+        return RAC_ERROR_NULL_POINTER;
     auto* mock = static_cast<MockLlm*>(impl);
     mock->model_path = model_path;
     mock->initialized = true;
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate(void* impl,
-                           const char* prompt,
-                           const rac_llm_options_t* options,
+rac_result_t mock_generate(void* impl, const char* prompt, const rac_llm_options_t* options,
                            rac_llm_result_t* out_result) {
-    if (!impl || !prompt || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !prompt || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     const char* text = "<think>plan</think>final {\"ok\":true}";
     out_result->text = dup_cstr(text);
-    if (!out_result->text) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->text)
+        return RAC_ERROR_OUT_OF_MEMORY;
     out_result->prompt_tokens = 3;
     out_result->completion_tokens = options && options->max_tokens > 0 ? 12 : 10;
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
@@ -102,12 +103,10 @@ rac_result_t mock_generate(void* impl,
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_generate_stream(void* impl,
-                                  const char* prompt,
-                                  const rac_llm_options_t*,
-                                  rac_llm_stream_callback_fn callback,
-                                  void* user_data) {
-    if (!impl || !prompt || !callback) return RAC_ERROR_NULL_POINTER;
+rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_options_t*,
+                                  rac_llm_stream_callback_fn callback, void* user_data) {
+    if (!impl || !prompt || !callback)
+        return RAC_ERROR_NULL_POINTER;
     auto* mock = static_cast<MockLlm*>(impl);
     if (std::strstr(prompt, "thinking-stream") != nullptr) {
         if (callback("<think>plan</think>done", user_data) != RAC_TRUE) {
@@ -136,9 +135,7 @@ rac_result_t mock_generate_stream(void* impl,
 
     if (g_wait_for_cancel) {
         std::unique_lock<std::mutex> lock(g_stream_mutex);
-        g_stream_cv.wait_for(lock, std::chrono::seconds(2), [mock] {
-            return mock->cancelled;
-        });
+        g_stream_cv.wait_for(lock, std::chrono::seconds(2), [mock] { return mock->cancelled; });
         return RAC_ERROR_CANCELLED;
     }
 
@@ -149,7 +146,8 @@ rac_result_t mock_generate_stream(void* impl,
 }
 
 rac_result_t mock_cancel(void* impl) {
-    if (!impl) return RAC_ERROR_NULL_POINTER;
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* mock = static_cast<MockLlm*>(impl);
     {
         std::lock_guard<std::mutex> lock(g_stream_mutex);
@@ -179,8 +177,7 @@ rac_llm_service_ops_t g_mock_ops = [] {
     return ops;
 }();
 
-const uint32_t g_formats[] = {
-    static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+const uint32_t g_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
 
 rac_engine_vtable_t g_mock_vtable = [] {
     rac_engine_vtable_t v{};
@@ -197,7 +194,8 @@ rac_engine_vtable_t g_mock_vtable = [] {
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    if (out->empty()) return true;
+    if (out->empty())
+        return true;
     return message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
@@ -429,14 +427,12 @@ int test_structured_generate_proto(rac_model_registry_handle_t registry) {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc =
-        rac_structured_output_generate_proto(bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_structured_output_generate_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::StructuredOutputResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "structured generate returns parsable StructuredOutputResult");
     CHECK(result.validation().is_valid(), "structured generate validates JSON");
-    CHECK(result.parsed_json() == "{\"ok\":true}",
-          "structured generate returns parsed JSON bytes");
+    CHECK(result.parsed_json() == "{\"ok\":true}", "structured generate returns parsed JSON bytes");
     CHECK(result.error_code() == RAC_SUCCESS, "structured generate reports success code");
     rac_proto_buffer_free(&out);
     cleanup_environment();
@@ -458,8 +454,8 @@ int test_structured_stream_proto(rac_model_registry_handle_t registry) {
     CHECK(serialize(request, &bytes), "structured stream request serializes");
 
     CapturedStream capture;
-    const rac_result_t rc = rac_structured_output_generate_stream_proto(
-        bytes.data(), bytes.size(), stream_callback, &capture);
+    const rac_result_t rc = rac_structured_output_generate_stream_proto(bytes.data(), bytes.size(),
+                                                                        stream_callback, &capture);
     CHECK(rc == RAC_SUCCESS, "structured stream generation succeeds");
 
     bool saw_token = false;
@@ -469,25 +465,21 @@ int test_structured_stream_proto(rac_model_registry_handle_t registry) {
         runanywhere::v1::StructuredOutputStreamEvent event;
         CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
               "structured stream event parses");
-        CHECK(event.request_id() == "structured-req",
-              "structured stream event carries request id");
+        CHECK(event.request_id() == "structured-req", "structured stream event carries request id");
         if (event.kind() == runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN) {
             saw_token = true;
         }
-        if (event.kind() ==
-            runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON) {
+        if (event.kind() == runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON) {
             saw_partial = true;
             CHECK(event.partial_json() == "{\"ok\":true}",
                   "structured stream emits partial JSON envelope");
         }
-        if (event.kind() ==
-            runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED) {
+        if (event.kind() == runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED) {
             saw_terminal = true;
             CHECK(event.has_result(), "structured terminal carries result");
             CHECK(event.result().parsed_json() == "{\"ok\":true}",
                   "structured terminal result carries parsed JSON");
-            CHECK(event.result().validation().is_valid(),
-                  "structured terminal result validates");
+            CHECK(event.result().validation().is_valid(), "structured terminal result validates");
         }
     }
 
@@ -516,9 +508,7 @@ int test_cancel_stream(rac_model_registry_handle_t registry) {
 
     {
         std::unique_lock<std::mutex> lock(g_stream_mutex);
-        g_stream_cv.wait_for(lock, std::chrono::seconds(2), [] {
-            return g_first_token_seen;
-        });
+        g_stream_cv.wait_for(lock, std::chrono::seconds(2), [] { return g_first_token_seen; });
     }
 
     rac_proto_buffer_t cancel_event;
@@ -528,8 +518,7 @@ int test_cancel_stream(rac_model_registry_handle_t registry) {
     CHECK(cancel_rc == RAC_SUCCESS && parse_buffer(cancel_event, &event),
           "cancel returns parsable SDKEvent");
     CHECK(event.has_cancellation(), "cancel event carries CancellationEvent");
-    CHECK(event.cancellation().kind() ==
-              runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
+    CHECK(event.cancellation().kind() == runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED,
           "cancel event reports completion");
     rac_proto_buffer_free(&cancel_event);
 

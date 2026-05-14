@@ -27,16 +27,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -48,8 +47,7 @@ struct MockStt {
 template <typename T>
 bool serialize(const T& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    return out->empty() ||
-           message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+    return out->empty() || message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
 rac_result_t mock_stt_create(const char*, const char*, void** out_impl) {
@@ -62,11 +60,8 @@ rac_result_t mock_stt_initialize(void* impl, const char*) {
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_stt_stream(void* impl,
-                             const void* audio_data,
-                             size_t audio_size,
-                             const rac_stt_options_t*,
-                             rac_stt_stream_callback_t callback,
+rac_result_t mock_stt_stream(void* impl, const void* audio_data, size_t audio_size,
+                             const rac_stt_options_t*, rac_stt_stream_callback_t callback,
                              void* user_data) {
     if (!impl || !audio_data || audio_size == 0 || !callback) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -174,11 +169,11 @@ int test_stt_stream_events() {
 // -----------------------------------------------------------------------------
 
 struct MockStreamState {
-    int create_count   = 0;
-    int feed_count     = 0;
-    int destroy_count  = 0;
+    int create_count = 0;
+    int feed_count = 0;
+    int destroy_count = 0;
     int transcribe_stream_count = 0;
-    rac_handle_t last_stream    = nullptr;
+    rac_handle_t last_stream = nullptr;
 };
 
 MockStreamState g_stream_state;
@@ -200,30 +195,26 @@ rac_result_t mock_persistent_stt_info(void*, rac_stt_info_t* out_info) {
 }
 
 rac_result_t mock_persistent_stt_transcribe_stream(void*, const void*, size_t,
-                                                    const rac_stt_options_t*,
-                                                    rac_stt_stream_callback_t,
-                                                    void*) {
+                                                   const rac_stt_options_t*,
+                                                   rac_stt_stream_callback_t, void*) {
     // Counted so we can assert the per-chunk fallback path was NOT taken.
     g_stream_state.transcribe_stream_count++;
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_persistent_stt_stream_create(void* /*impl*/,
-                                                const rac_stt_options_t* /*options*/,
-                                                rac_handle_t* out_stream_handle) {
+rac_result_t mock_persistent_stt_stream_create(void* /*impl*/, const rac_stt_options_t* /*options*/,
+                                               rac_handle_t* out_stream_handle) {
     g_stream_state.create_count++;
     // Use a sentinel non-null pointer so commons recognizes the stream
     // as valid. The mock never dereferences it.
-    g_stream_state.last_stream =
-        reinterpret_cast<rac_handle_t>(static_cast<intptr_t>(0xdeadbeef));
+    g_stream_state.last_stream = reinterpret_cast<rac_handle_t>(static_cast<intptr_t>(0xdeadbeef));
     *out_stream_handle = g_stream_state.last_stream;
     return RAC_SUCCESS;
 }
 
 rac_result_t mock_persistent_stt_stream_feed(void* /*impl*/, rac_handle_t stream_handle,
-                                              const int16_t* samples, size_t count,
-                                              rac_stt_stream_callback_t callback,
-                                              void* user_data) {
+                                             const int16_t* samples, size_t count,
+                                             rac_stt_stream_callback_t callback, void* user_data) {
     (void)samples;
     (void)count;
     if (stream_handle != g_stream_state.last_stream) {
@@ -312,7 +303,7 @@ int test_stt_persistent_stream_handle() {
     CHECK(session_id != 0, "stream session id is non-zero");
 
     // Feed 100 chunks of 1ms audio at 16 kHz: 16 samples per chunk, Int16 PCM.
-    const size_t kChunksToFeed   = 100;
+    const size_t kChunksToFeed = 100;
     const size_t kSamplesPerChunk = 16;
     std::vector<int16_t> chunk(kSamplesPerChunk, 0);
     for (size_t i = 0; i < kChunksToFeed; ++i) {
@@ -325,8 +316,7 @@ int test_stt_persistent_stream_handle() {
         }
     }
 
-    CHECK(g_stream_state.create_count == 1,
-          "stream_create invoked exactly once across 100 chunks");
+    CHECK(g_stream_state.create_count == 1, "stream_create invoked exactly once across 100 chunks");
     CHECK(g_stream_state.feed_count == static_cast<int>(kChunksToFeed),
           "stream_feed_audio_chunk invoked once per chunk");
     CHECK(g_stream_state.transcribe_stream_count == 0,
@@ -335,8 +325,7 @@ int test_stt_persistent_stream_handle() {
           "every chunk emits a partial STTStreamEvent");
 
     CHECK(rac_stt_stream_stop_proto(session_id) == RAC_SUCCESS, "stream session stops");
-    CHECK(g_stream_state.destroy_count == 1,
-          "stream_destroy invoked exactly once on session stop");
+    CHECK(g_stream_state.destroy_count == 1, "stream_destroy invoked exactly once on session stop");
 
     (void)rac_stt_unset_stream_proto_callback(stt);
     rac_stt_component_destroy(stt);
@@ -380,13 +369,12 @@ int test_vad_activity_stream_event() {
 
     bool saw_started = false;
     for (const auto& event : events) {
-        saw_started =
-            saw_started ||
-            (event.kind() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY &&
-             event.has_activity() &&
-             event.activity().event_type() ==
-                 runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED &&
-             event.seq() > 0 && event.timestamp_us() > 0 && !event.request_id().empty());
+        saw_started = saw_started ||
+                      (event.kind() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY &&
+                       event.has_activity() &&
+                       event.activity().event_type() ==
+                           runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED &&
+                       event.seq() > 0 && event.timestamp_us() > 0 && !event.request_id().empty());
     }
     CHECK(saw_started, "VAD activity callback emits generated VADStreamEvent");
 

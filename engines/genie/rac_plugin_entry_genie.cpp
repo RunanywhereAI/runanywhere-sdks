@@ -21,14 +21,14 @@
 
 #include "genie_backend.h"
 
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
-#include "rac/features/llm/rac_llm_service.h"
 
-#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && \
-    defined(__ANDROID__) && \
-    defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
+#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE &&             \
+    defined(__ANDROID__) && defined(RAC_GENIE_LLM_OPS_AVAILABLE) &&            \
+    RAC_GENIE_LLM_OPS_AVAILABLE
 #define RAC_GENIE_ROUTABLE 1
 #else
 #define RAC_GENIE_ROUTABLE 0
@@ -43,80 +43,82 @@ namespace {
 // linked. Explicitly named rather than a generic lambda so stack traces
 // during debugging point at the primitive the caller tried to invoke.
 
-rac_result_t genie_llm_create(const char* /*model_id*/,
-                              const char* /*config_json*/,
-                              void** out_impl) {
-    if (out_impl) *out_impl = nullptr;
-    return genie_backend_unavailable();
+rac_result_t genie_llm_create(const char * /*model_id*/,
+                              const char * /*config_json*/, void **out_impl) {
+  if (out_impl)
+    *out_impl = nullptr;
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_initialize(void* /*impl*/, const char* /*model_path*/) {
-    return genie_backend_unavailable();
+rac_result_t genie_llm_initialize(void * /*impl*/,
+                                  const char * /*model_path*/) {
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_generate(void* /*impl*/, const char* /*prompt*/,
-                                const rac_llm_options_t* /*opts*/,
-                                rac_llm_result_t* /*out*/) {
-    return genie_backend_unavailable();
+rac_result_t genie_llm_generate(void * /*impl*/, const char * /*prompt*/,
+                                const rac_llm_options_t * /*opts*/,
+                                rac_llm_result_t * /*out*/) {
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_generate_stream(void* /*impl*/, const char* /*prompt*/,
-                                       const rac_llm_options_t* /*opts*/,
+rac_result_t genie_llm_generate_stream(void * /*impl*/, const char * /*prompt*/,
+                                       const rac_llm_options_t * /*opts*/,
                                        rac_llm_stream_callback_fn /*cb*/,
-                                       void* /*user_data*/) {
-    return genie_backend_unavailable();
+                                       void * /*user_data*/) {
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_get_info(void* /*impl*/, rac_llm_info_t* /*out*/) {
-    return genie_backend_unavailable();
+rac_result_t genie_llm_get_info(void * /*impl*/, rac_llm_info_t * /*out*/) {
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_cancel(void* /*impl*/) {
-    return genie_backend_unavailable();
+rac_result_t genie_llm_cancel(void * /*impl*/) {
+  return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_cleanup(void* /*impl*/) { return RAC_SUCCESS; }
+rac_result_t genie_llm_cleanup(void * /*impl*/) { return RAC_SUCCESS; }
 
-void genie_llm_destroy(void* /*impl*/) {
-    /* No-op: create always returned RAC_ERROR_BACKEND_UNAVAILABLE so impl
-     * is NULL. Safe to call. */
+void genie_llm_destroy(void * /*impl*/) {
+  /* No-op: create always returned RAC_ERROR_BACKEND_UNAVAILABLE so impl
+   * is NULL. Safe to call. */
 }
 
 // capability_check runs during rac_plugin_register. Reject the shell so the
 // router never sees Genie as an eligible LLM backend in public/default builds.
-// Non-Android hosts are rejected because the runtime targets Snapdragon Android.
+// Non-Android hosts are rejected because the runtime targets Snapdragon
+// Android.
 rac_result_t genie_capability_check(void) {
 #if !defined(RAC_GENIE_SDK_AVAILABLE) || !RAC_GENIE_SDK_AVAILABLE
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+  return RAC_ERROR_BACKEND_UNAVAILABLE;
 #elif !defined(__ANDROID__)
-    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+  return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #elif !defined(RAC_GENIE_LLM_OPS_AVAILABLE) || !RAC_GENIE_LLM_OPS_AVAILABLE
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+  return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
-    return RAC_SUCCESS;
+  return RAC_SUCCESS;
 #endif
 }
 
-}  // namespace
+} // namespace
 
 extern "C" const rac_llm_service_ops_t g_genie_llm_ops = {
-    .initialize                   = genie_llm_initialize,
-    .generate                     = genie_llm_generate,
-    .generate_stream              = genie_llm_generate_stream,
-    .generate_stream_with_timing  = nullptr,
-    .get_info                     = genie_llm_get_info,
-    .cancel                       = genie_llm_cancel,
-    .cleanup                      = genie_llm_cleanup,
-    .destroy                      = genie_llm_destroy,
-    .load_lora                    = nullptr,
-    .remove_lora                  = nullptr,
-    .clear_lora                   = nullptr,
-    .get_lora_info                = nullptr,
-    .inject_system_prompt         = nullptr,
-    .append_context               = nullptr,
-    .generate_from_context        = nullptr,
-    .clear_context                = nullptr,
-    .create                       = genie_llm_create,
+    .initialize = genie_llm_initialize,
+    .generate = genie_llm_generate,
+    .generate_stream = genie_llm_generate_stream,
+    .generate_stream_with_timing = nullptr,
+    .get_info = genie_llm_get_info,
+    .cancel = genie_llm_cancel,
+    .cleanup = genie_llm_cleanup,
+    .destroy = genie_llm_destroy,
+    .load_lora = nullptr,
+    .remove_lora = nullptr,
+    .clear_lora = nullptr,
+    .get_lora_info = nullptr,
+    .inject_system_prompt = nullptr,
+    .append_context = nullptr,
+    .generate_from_context = nullptr,
+    .clear_context = nullptr,
+    .create = genie_llm_create,
 };
 
 extern "C" {
@@ -128,7 +130,7 @@ static const rac_runtime_id_t k_genie_runtimes[] = {
 };
 
 static const uint32_t k_genie_formats[] = {
-    RAC_MODEL_FORMAT_ID_ONNX,  /* Genie ingests QNN-compiled ONNX bundles */
+    RAC_MODEL_FORMAT_ID_ONNX, /* Genie ingests QNN-compiled ONNX bundles */
 };
 
 static const rac_primitive_t k_genie_primitives[] = {
@@ -137,26 +139,26 @@ static const rac_primitive_t k_genie_primitives[] = {
 #endif
 
 static const rac_engine_manifest_t k_genie_manifest = {
-    .name             = "genie",
-    .display_name     =
+    .name = "genie",
+    .display_name =
 #if RAC_GENIE_ROUTABLE
         "Qualcomm Genie (NPU)",
 #else
         "Qualcomm Genie (NPU) [ops unavailable]",
 #endif
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "runanywhere_genie",
-    .availability     = RAC_ENGINE_AVAILABILITY_PRIVATE,  /* Qualcomm-only. */
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_genie",
+    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE, /* Qualcomm-only. */
     /* High priority only when the SDK-backed Android engine is eligible. */
-    .priority         =
+    .priority =
 #if RAC_GENIE_ROUTABLE
         200,
 #else
         0,
 #endif
     .capability_flags = 0,
-    .primitives       =
+    .primitives =
 #if RAC_GENIE_ROUTABLE
         k_genie_primitives,
 #else
@@ -168,32 +170,32 @@ static const rac_engine_manifest_t k_genie_manifest = {
 #else
         0,
 #endif
-    .runtimes         =
+    .runtimes =
 #if RAC_GENIE_ROUTABLE
         k_genie_runtimes,
 #else
         nullptr,
 #endif
-    .runtimes_count   =
+    .runtimes_count =
 #if RAC_GENIE_ROUTABLE
         sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
 #else
         0,
 #endif
-    .formats          =
+    .formats =
 #if RAC_GENIE_ROUTABLE
         k_genie_formats,
 #else
         nullptr,
 #endif
-    .formats_count    =
+    .formats_count =
 #if RAC_GENIE_ROUTABLE
         sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
 #else
         0,
 #endif
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 static const rac_engine_vtable_t g_genie_engine_vtable = {
@@ -201,7 +203,7 @@ static const rac_engine_vtable_t g_genie_engine_vtable = {
     /* capability_check */ genie_capability_check,
     /* on_unload        */ nullptr,
 
-    /* llm_ops          */
+/* llm_ops          */
 #if RAC_GENIE_ROUTABLE
     &g_genie_llm_ops,
 #else
@@ -215,13 +217,21 @@ static const rac_engine_vtable_t g_genie_engine_vtable = {
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(genie) {
-    return rac_engine_entry_with_manifest(&k_genie_manifest,
-                                          &g_genie_engine_vtable);
+  return rac_engine_entry_with_manifest(&k_genie_manifest,
+                                        &g_genie_engine_vtable);
 }
 
-}  // extern "C"
+} // extern "C"

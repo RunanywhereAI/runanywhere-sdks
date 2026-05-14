@@ -21,16 +21,16 @@
 // Pull in <cstddef> (and friends) BEFORE the protobuf-bearing header so newer
 // libc++ on macOS finds ::ptrdiff_t before any protobuf header references it
 // without a `std::` qualifier.
+#include "rac/foundation/rac_proto_adapters.h"
+
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-#include "rac/foundation/rac_proto_adapters.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 
@@ -38,16 +38,16 @@
 // header. The header forward-declares every proto class; the full message
 // definitions are only needed inside the adapter implementation TU. Anyone
 // editing this file should add new proto includes here, not in the header.
+#include "diffusion_options.pb.h"
+#include "embeddings_options.pb.h"
+#include "errors.pb.h"
+#include "lora_options.pb.h"
+#include "rag.pb.h"
+#include "storage_types.pb.h"
 #include "stt_options.pb.h"
 #include "tts_options.pb.h"
 #include "vad_options.pb.h"
 #include "vlm_options.pb.h"
-#include "diffusion_options.pb.h"
-#include "embeddings_options.pb.h"
-#include "rag.pb.h"
-#include "storage_types.pb.h"
-#include "lora_options.pb.h"
-#include "errors.pb.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -61,7 +61,8 @@ namespace {
 // Copy a std::string into a freshly allocated C string. Empty std::string maps
 // to nullptr so the C consumer can use the conventional "absent" sentinel.
 char* copy_string(const ::std::string& s) {
-    if (s.empty()) return nullptr;
+    if (s.empty())
+        return nullptr;
     return rac_strdup(s.c_str());
 }
 
@@ -84,7 +85,8 @@ void set_proto_string_or_empty(Setter setter, const char* src) {
 // base language code.
 
 ::runanywhere::v1::STTLanguage stt_language_from_string(const char* lang) {
-    if (!lang || !*lang) return ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
+    if (!lang || !*lang)
+        return ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
     // Take the first 2 chars, lowercase, ignore region after '-' / '_'.
     char base[3] = {0, 0, 0};
     base[0] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[0])));
@@ -92,18 +94,12 @@ void set_proto_string_or_empty(Setter setter, const char* src) {
         base[1] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[1])));
     }
     static const std::unordered_map<std::string, ::runanywhere::v1::STTLanguage> table = {
-        {"en", ::runanywhere::v1::STT_LANGUAGE_EN},
-        {"es", ::runanywhere::v1::STT_LANGUAGE_ES},
-        {"fr", ::runanywhere::v1::STT_LANGUAGE_FR},
-        {"de", ::runanywhere::v1::STT_LANGUAGE_DE},
-        {"zh", ::runanywhere::v1::STT_LANGUAGE_ZH},
-        {"ja", ::runanywhere::v1::STT_LANGUAGE_JA},
-        {"ko", ::runanywhere::v1::STT_LANGUAGE_KO},
-        {"it", ::runanywhere::v1::STT_LANGUAGE_IT},
-        {"pt", ::runanywhere::v1::STT_LANGUAGE_PT},
-        {"ar", ::runanywhere::v1::STT_LANGUAGE_AR},
-        {"ru", ::runanywhere::v1::STT_LANGUAGE_RU},
-        {"hi", ::runanywhere::v1::STT_LANGUAGE_HI},
+        {"en", ::runanywhere::v1::STT_LANGUAGE_EN}, {"es", ::runanywhere::v1::STT_LANGUAGE_ES},
+        {"fr", ::runanywhere::v1::STT_LANGUAGE_FR}, {"de", ::runanywhere::v1::STT_LANGUAGE_DE},
+        {"zh", ::runanywhere::v1::STT_LANGUAGE_ZH}, {"ja", ::runanywhere::v1::STT_LANGUAGE_JA},
+        {"ko", ::runanywhere::v1::STT_LANGUAGE_KO}, {"it", ::runanywhere::v1::STT_LANGUAGE_IT},
+        {"pt", ::runanywhere::v1::STT_LANGUAGE_PT}, {"ar", ::runanywhere::v1::STT_LANGUAGE_AR},
+        {"ru", ::runanywhere::v1::STT_LANGUAGE_RU}, {"hi", ::runanywhere::v1::STT_LANGUAGE_HI},
     };
     // Special case: literal "auto" -> AUTO.
     if (std::strncmp(lang, "auto", 4) == 0)
@@ -114,21 +110,35 @@ void set_proto_string_or_empty(Setter setter, const char* src) {
 
 const char* stt_language_to_string(::runanywhere::v1::STTLanguage e) {
     switch (e) {
-        case ::runanywhere::v1::STT_LANGUAGE_AUTO: return "auto";
-        case ::runanywhere::v1::STT_LANGUAGE_EN:   return "en";
-        case ::runanywhere::v1::STT_LANGUAGE_ES:   return "es";
-        case ::runanywhere::v1::STT_LANGUAGE_FR:   return "fr";
-        case ::runanywhere::v1::STT_LANGUAGE_DE:   return "de";
-        case ::runanywhere::v1::STT_LANGUAGE_ZH:   return "zh";
-        case ::runanywhere::v1::STT_LANGUAGE_JA:   return "ja";
-        case ::runanywhere::v1::STT_LANGUAGE_KO:   return "ko";
-        case ::runanywhere::v1::STT_LANGUAGE_IT:   return "it";
-        case ::runanywhere::v1::STT_LANGUAGE_PT:   return "pt";
-        case ::runanywhere::v1::STT_LANGUAGE_AR:   return "ar";
-        case ::runanywhere::v1::STT_LANGUAGE_RU:   return "ru";
-        case ::runanywhere::v1::STT_LANGUAGE_HI:   return "hi";
+        case ::runanywhere::v1::STT_LANGUAGE_AUTO:
+            return "auto";
+        case ::runanywhere::v1::STT_LANGUAGE_EN:
+            return "en";
+        case ::runanywhere::v1::STT_LANGUAGE_ES:
+            return "es";
+        case ::runanywhere::v1::STT_LANGUAGE_FR:
+            return "fr";
+        case ::runanywhere::v1::STT_LANGUAGE_DE:
+            return "de";
+        case ::runanywhere::v1::STT_LANGUAGE_ZH:
+            return "zh";
+        case ::runanywhere::v1::STT_LANGUAGE_JA:
+            return "ja";
+        case ::runanywhere::v1::STT_LANGUAGE_KO:
+            return "ko";
+        case ::runanywhere::v1::STT_LANGUAGE_IT:
+            return "it";
+        case ::runanywhere::v1::STT_LANGUAGE_PT:
+            return "pt";
+        case ::runanywhere::v1::STT_LANGUAGE_AR:
+            return "ar";
+        case ::runanywhere::v1::STT_LANGUAGE_RU:
+            return "ru";
+        case ::runanywhere::v1::STT_LANGUAGE_HI:
+            return "hi";
         case ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED:
-        default:                                   return "";
+        default:
+            return "";
     }
 }
 
@@ -139,41 +149,59 @@ const char* stt_language_to_string(::runanywhere::v1::STTLanguage e) {
 
 ::runanywhere::v1::AudioFormat audio_format_to_proto(rac_audio_format_enum_t c) {
     switch (c) {
-        case RAC_AUDIO_FORMAT_PCM:  return ::runanywhere::v1::AUDIO_FORMAT_PCM;
-        case RAC_AUDIO_FORMAT_WAV:  return ::runanywhere::v1::AUDIO_FORMAT_WAV;
-        case RAC_AUDIO_FORMAT_MP3:  return ::runanywhere::v1::AUDIO_FORMAT_MP3;
-        case RAC_AUDIO_FORMAT_OPUS: return ::runanywhere::v1::AUDIO_FORMAT_OPUS;
-        case RAC_AUDIO_FORMAT_AAC:  return ::runanywhere::v1::AUDIO_FORMAT_AAC;
-        case RAC_AUDIO_FORMAT_FLAC: return ::runanywhere::v1::AUDIO_FORMAT_FLAC;
+        case RAC_AUDIO_FORMAT_PCM:
+            return ::runanywhere::v1::AUDIO_FORMAT_PCM;
+        case RAC_AUDIO_FORMAT_WAV:
+            return ::runanywhere::v1::AUDIO_FORMAT_WAV;
+        case RAC_AUDIO_FORMAT_MP3:
+            return ::runanywhere::v1::AUDIO_FORMAT_MP3;
+        case RAC_AUDIO_FORMAT_OPUS:
+            return ::runanywhere::v1::AUDIO_FORMAT_OPUS;
+        case RAC_AUDIO_FORMAT_AAC:
+            return ::runanywhere::v1::AUDIO_FORMAT_AAC;
+        case RAC_AUDIO_FORMAT_FLAC:
+            return ::runanywhere::v1::AUDIO_FORMAT_FLAC;
     }
     return ::runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED;
 }
 
 rac_audio_format_enum_t audio_format_from_proto(::runanywhere::v1::AudioFormat p) {
     switch (p) {
-        case ::runanywhere::v1::AUDIO_FORMAT_PCM:       return RAC_AUDIO_FORMAT_PCM;
-        case ::runanywhere::v1::AUDIO_FORMAT_WAV:       return RAC_AUDIO_FORMAT_WAV;
-        case ::runanywhere::v1::AUDIO_FORMAT_MP3:       return RAC_AUDIO_FORMAT_MP3;
-        case ::runanywhere::v1::AUDIO_FORMAT_OPUS:      return RAC_AUDIO_FORMAT_OPUS;
-        case ::runanywhere::v1::AUDIO_FORMAT_AAC:       return RAC_AUDIO_FORMAT_AAC;
-        case ::runanywhere::v1::AUDIO_FORMAT_FLAC:      return RAC_AUDIO_FORMAT_FLAC;
-        case ::runanywhere::v1::AUDIO_FORMAT_PCM_S16LE: return RAC_AUDIO_FORMAT_PCM;
+        case ::runanywhere::v1::AUDIO_FORMAT_PCM:
+            return RAC_AUDIO_FORMAT_PCM;
+        case ::runanywhere::v1::AUDIO_FORMAT_WAV:
+            return RAC_AUDIO_FORMAT_WAV;
+        case ::runanywhere::v1::AUDIO_FORMAT_MP3:
+            return RAC_AUDIO_FORMAT_MP3;
+        case ::runanywhere::v1::AUDIO_FORMAT_OPUS:
+            return RAC_AUDIO_FORMAT_OPUS;
+        case ::runanywhere::v1::AUDIO_FORMAT_AAC:
+            return RAC_AUDIO_FORMAT_AAC;
+        case ::runanywhere::v1::AUDIO_FORMAT_FLAC:
+            return RAC_AUDIO_FORMAT_FLAC;
+        case ::runanywhere::v1::AUDIO_FORMAT_PCM_S16LE:
+            return RAC_AUDIO_FORMAT_PCM;
         // Container formats with no C enum equivalent fall through to PCM.
-        default:                                        return RAC_AUDIO_FORMAT_PCM;
+        default:
+            return RAC_AUDIO_FORMAT_PCM;
     }
 }
 
 // ---- VAD frame_length seconds <-> ms --------------------------------------
 int32_t frame_seconds_to_ms(float seconds) {
-    if (seconds <= 0.0f) return 0;
+    if (seconds <= 0.0f)
+        return 0;
     long ms = static_cast<long>(std::lround(seconds * 1000.0));
-    if (ms < 0) ms = 0;
-    if (ms > 100000) ms = 100000;
+    if (ms < 0)
+        ms = 0;
+    if (ms > 100000)
+        ms = 100000;
     return static_cast<int32_t>(ms);
 }
 
 float frame_ms_to_seconds(int32_t ms) {
-    if (ms <= 0) return RAC_VAD_DEFAULT_FRAME_LENGTH;
+    if (ms <= 0)
+        return RAC_VAD_DEFAULT_FRAME_LENGTH;
     return static_cast<float>(ms) / 1000.0f;
 }
 
@@ -183,11 +211,12 @@ float frame_ms_to_seconds(int32_t ms) {
 // STT
 // ===========================================================================
 
-bool rac_stt_config_to_proto(const rac_stt_config_t* in,
-                             ::runanywhere::v1::STTConfiguration* out) {
-    if (!in || !out) return false;
+bool rac_stt_config_to_proto(const rac_stt_config_t* in, ::runanywhere::v1::STTConfiguration* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_language(stt_language_from_string(in->language));
     out->set_sample_rate(in->sample_rate);
     // C ABI has no enable_vad — leave proto default (false).
@@ -199,19 +228,21 @@ bool rac_stt_config_to_proto(const rac_stt_config_t* in,
 
 bool rac_stt_config_from_proto(const ::runanywhere::v1::STTConfiguration& in,
                                rac_stt_config_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_STT_CONFIG_DEFAULT;
     out->model_id = copy_string(in.model_id());
     out->language = rac_strdup(stt_language_to_string(in.language()));
-    if (in.sample_rate() > 0) out->sample_rate = in.sample_rate();
+    if (in.sample_rate() > 0)
+        out->sample_rate = in.sample_rate();
     // enable_vad and audio_format on the proto have no C ABI counterparts in
     // rac_stt_config_t — drop them silently.
     return true;
 }
 
-bool rac_stt_options_to_proto(const rac_stt_options_t* in,
-                              ::runanywhere::v1::STTOptions* out) {
-    if (!in || !out) return false;
+bool rac_stt_options_to_proto(const rac_stt_options_t* in, ::runanywhere::v1::STTOptions* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     // detect_language collapses to STT_LANGUAGE_AUTO.
     if (in->detect_language) {
@@ -227,9 +258,9 @@ bool rac_stt_options_to_proto(const rac_stt_options_t* in,
     return true;
 }
 
-bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in,
-                                rac_stt_options_t* out) {
-    if (!out) return false;
+bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt_options_t* out) {
+    if (!out)
+        return false;
     *out = RAC_STT_OPTIONS_DEFAULT;
     if (in.language() == ::runanywhere::v1::STT_LANGUAGE_AUTO) {
         out->detect_language = RAC_TRUE;
@@ -245,20 +276,21 @@ bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in,
     return true;
 }
 
-bool rac_stt_word_to_proto(const rac_stt_word_t* in,
-                           ::runanywhere::v1::WordTimestamp* out) {
-    if (!in || !out) return false;
+bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTimestamp* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->text) out->set_word(in->text);
+    if (in->text)
+        out->set_word(in->text);
     out->set_start_ms(in->start_ms);
     out->set_end_ms(in->end_ms);
     out->set_confidence(in->confidence);
     return true;
 }
 
-bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in,
-                             rac_stt_word_t* out) {
-    if (!out) return false;
+bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in, rac_stt_word_t* out) {
+    if (!out)
+        return false;
     out->text = copy_string_required(in.word());
     out->start_ms = in.start_ms();
     out->end_ms = in.end_ms();
@@ -268,19 +300,21 @@ bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in,
 
 bool rac_transcription_metadata_to_proto(const rac_transcription_metadata_t* in,
                                          ::runanywhere::v1::TranscriptionMetadata* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_processing_time_ms(in->processing_time_ms);
     out->set_audio_length_ms(in->audio_length_ms);
     out->set_real_time_factor(in->real_time_factor);
     return true;
 }
 
-bool rac_transcription_metadata_from_proto(
-    const ::runanywhere::v1::TranscriptionMetadata& in,
-    rac_transcription_metadata_t* out) {
-    if (!out) return false;
+bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::TranscriptionMetadata& in,
+                                           rac_transcription_metadata_t* out) {
+    if (!out)
+        return false;
     out->model_id = copy_string(in.model_id());
     out->processing_time_ms = in.processing_time_ms();
     out->audio_length_ms = in.audio_length_ms();
@@ -288,48 +322,49 @@ bool rac_transcription_metadata_from_proto(
     return true;
 }
 
-bool rac_transcription_alternative_to_proto(
-    const rac_transcription_alternative_t* in,
-    ::runanywhere::v1::TranscriptionAlternative* out) {
-    if (!in || !out) return false;
+bool rac_transcription_alternative_to_proto(const rac_transcription_alternative_t* in,
+                                            ::runanywhere::v1::TranscriptionAlternative* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->text) out->set_text(in->text);
+    if (in->text)
+        out->set_text(in->text);
     out->set_confidence(in->confidence);
     // C ABI has no per-word breakdown for alternatives; leave proto words empty.
     return true;
 }
 
-bool rac_transcription_alternative_from_proto(
-    const ::runanywhere::v1::TranscriptionAlternative& in,
-    rac_transcription_alternative_t* out) {
-    if (!out) return false;
+bool rac_transcription_alternative_from_proto(const ::runanywhere::v1::TranscriptionAlternative& in,
+                                              rac_transcription_alternative_t* out) {
+    if (!out)
+        return false;
     out->text = copy_string_required(in.text());
     out->confidence = in.confidence();
     return true;
 }
 
-bool rac_stt_output_to_proto(const rac_stt_output_t* in,
-                             ::runanywhere::v1::STTOutput* out) {
-    if (!in || !out) return false;
+bool rac_stt_output_to_proto(const rac_stt_output_t* in, ::runanywhere::v1::STTOutput* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->text) out->set_text(in->text);
+    if (in->text)
+        out->set_text(in->text);
     out->set_language(stt_language_from_string(in->detected_language));
     out->set_confidence(in->confidence);
     for (size_t i = 0; i < in->num_word_timestamps; ++i) {
         rac_stt_word_to_proto(&in->word_timestamps[i], out->add_words());
     }
     for (size_t i = 0; i < in->num_alternatives; ++i) {
-        rac_transcription_alternative_to_proto(&in->alternatives[i],
-                                               out->add_alternatives());
+        rac_transcription_alternative_to_proto(&in->alternatives[i], out->add_alternatives());
     }
     rac_transcription_metadata_to_proto(&in->metadata, out->mutable_metadata());
     // proto STTOutput has no timestamp_ms — drop in->timestamp_ms.
     return true;
 }
 
-bool rac_stt_output_from_proto(const ::runanywhere::v1::STTOutput& in,
-                               rac_stt_output_t* out) {
-    if (!out) return false;
+bool rac_stt_output_from_proto(const ::runanywhere::v1::STTOutput& in, rac_stt_output_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.text());
     out->confidence = in.confidence();
@@ -349,8 +384,7 @@ bool rac_stt_output_from_proto(const ::runanywhere::v1::STTOutput& in,
         out->alternatives = static_cast<rac_transcription_alternative_t*>(
             rac_alloc(sizeof(rac_transcription_alternative_t) * out->num_alternatives));
         for (int i = 0; i < in.alternatives_size(); ++i) {
-            rac_transcription_alternative_from_proto(in.alternatives(i),
-                                                      &out->alternatives[i]);
+            rac_transcription_alternative_from_proto(in.alternatives(i), &out->alternatives[i]);
         }
     }
     if (in.has_metadata()) {
@@ -360,11 +394,12 @@ bool rac_stt_output_from_proto(const ::runanywhere::v1::STTOutput& in,
     return true;
 }
 
-bool rac_stt_result_to_proto(const rac_stt_result_t* in,
-                             ::runanywhere::v1::STTOutput* out) {
-    if (!in || !out) return false;
+bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTOutput* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->text) out->set_text(in->text);
+    if (in->text)
+        out->set_text(in->text);
     out->set_language(stt_language_from_string(in->detected_language));
     out->set_confidence(in->confidence);
     for (size_t i = 0; i < in->num_words; ++i) {
@@ -375,9 +410,9 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in,
     return true;
 }
 
-bool rac_stt_result_from_proto(const ::runanywhere::v1::STTOutput& in,
-                               rac_stt_result_t* out) {
-    if (!out) return false;
+bool rac_stt_result_from_proto(const ::runanywhere::v1::STTOutput& in, rac_stt_result_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.text());
     if (in.language() != ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED) {
@@ -386,8 +421,8 @@ bool rac_stt_result_from_proto(const ::runanywhere::v1::STTOutput& in,
     out->confidence = in.confidence();
     if (in.words_size() > 0) {
         out->num_words = static_cast<size_t>(in.words_size());
-        out->words = static_cast<rac_stt_word_t*>(
-            rac_alloc(sizeof(rac_stt_word_t) * out->num_words));
+        out->words =
+            static_cast<rac_stt_word_t*>(rac_alloc(sizeof(rac_stt_word_t) * out->num_words));
         for (int i = 0; i < in.words_size(); ++i) {
             rac_stt_word_from_proto(in.words(i), &out->words[i]);
         }
@@ -400,14 +435,14 @@ bool rac_stt_result_from_proto(const ::runanywhere::v1::STTOutput& in,
 // TTS
 // ===========================================================================
 
-bool rac_tts_config_to_proto(const rac_tts_config_t* in,
-                             ::runanywhere::v1::TTSConfiguration* out) {
-    if (!in || !out) return false;
+bool rac_tts_config_to_proto(const rac_tts_config_t* in, ::runanywhere::v1::TTSConfiguration* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     set_proto_string_or_empty([&](const char* v) { out->set_voice(v); }, in->voice);
-    set_proto_string_or_empty([&](const char* v) { out->set_language_code(v); },
-                              in->language);
+    set_proto_string_or_empty([&](const char* v) { out->set_language_code(v); }, in->language);
     out->set_speaking_rate(in->speaking_rate);
     out->set_pitch(in->pitch);
     out->set_volume(in->volume);
@@ -420,27 +455,31 @@ bool rac_tts_config_to_proto(const rac_tts_config_t* in,
 
 bool rac_tts_config_from_proto(const ::runanywhere::v1::TTSConfiguration& in,
                                rac_tts_config_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_TTS_CONFIG_DEFAULT;
     out->model_id = copy_string(in.model_id());
     out->voice = copy_string(in.voice());
-    if (!in.language_code().empty()) out->language = copy_string(in.language_code());
-    if (in.speaking_rate() > 0.0f) out->speaking_rate = in.speaking_rate();
-    if (in.pitch() > 0.0f) out->pitch = in.pitch();
-    if (in.volume() > 0.0f) out->volume = in.volume();
+    if (!in.language_code().empty())
+        out->language = copy_string(in.language_code());
+    if (in.speaking_rate() > 0.0f)
+        out->speaking_rate = in.speaking_rate();
+    if (in.pitch() > 0.0f)
+        out->pitch = in.pitch();
+    if (in.volume() > 0.0f)
+        out->volume = in.volume();
     out->audio_format = audio_format_from_proto(in.audio_format());
     out->use_neural_voice = in.enable_neural_voice() ? RAC_TRUE : RAC_FALSE;
     out->enable_ssml = in.enable_ssml() ? RAC_TRUE : RAC_FALSE;
     return true;
 }
 
-bool rac_tts_options_to_proto(const rac_tts_options_t* in,
-                              ::runanywhere::v1::TTSOptions* out) {
-    if (!in || !out) return false;
+bool rac_tts_options_to_proto(const rac_tts_options_t* in, ::runanywhere::v1::TTSOptions* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     set_proto_string_or_empty([&](const char* v) { out->set_voice(v); }, in->voice);
-    set_proto_string_or_empty([&](const char* v) { out->set_language_code(v); },
-                              in->language);
+    set_proto_string_or_empty([&](const char* v) { out->set_language_code(v); }, in->language);
     out->set_speaking_rate(in->rate);  // rename: rate -> speaking_rate.
     out->set_pitch(in->pitch);
     out->set_volume(in->volume);
@@ -449,15 +488,19 @@ bool rac_tts_options_to_proto(const rac_tts_options_t* in,
     return true;
 }
 
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
-                                rac_tts_options_t* out) {
-    if (!out) return false;
+bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out) {
+    if (!out)
+        return false;
     *out = RAC_TTS_OPTIONS_DEFAULT;
     out->voice = copy_string(in.voice());
-    if (!in.language_code().empty()) out->language = copy_string(in.language_code());
-    if (in.speaking_rate() > 0.0f) out->rate = in.speaking_rate();
-    if (in.pitch() > 0.0f) out->pitch = in.pitch();
-    if (in.volume() > 0.0f) out->volume = in.volume();
+    if (!in.language_code().empty())
+        out->language = copy_string(in.language_code());
+    if (in.speaking_rate() > 0.0f)
+        out->rate = in.speaking_rate();
+    if (in.pitch() > 0.0f)
+        out->pitch = in.pitch();
+    if (in.volume() > 0.0f)
+        out->volume = in.volume();
     out->audio_format = audio_format_from_proto(in.audio_format());
     out->use_ssml = in.enable_ssml() ? RAC_TRUE : RAC_FALSE;
     // sample_rate has no proto field on TTSOptions; keep default.
@@ -466,31 +509,35 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in,
 
 bool rac_tts_phoneme_timestamp_to_proto(const rac_tts_phoneme_timestamp_t* in,
                                         ::runanywhere::v1::TTSPhonemeTimestamp* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->phoneme) out->set_phoneme(in->phoneme);
+    if (in->phoneme)
+        out->set_phoneme(in->phoneme);
     out->set_start_ms(in->start_time_ms);
     out->set_end_ms(in->end_time_ms);
     return true;
 }
 
-bool rac_tts_phoneme_timestamp_from_proto(
-    const ::runanywhere::v1::TTSPhonemeTimestamp& in,
-    rac_tts_phoneme_timestamp_t* out) {
-    if (!out) return false;
+bool rac_tts_phoneme_timestamp_from_proto(const ::runanywhere::v1::TTSPhonemeTimestamp& in,
+                                          rac_tts_phoneme_timestamp_t* out) {
+    if (!out)
+        return false;
     out->phoneme = copy_string_required(in.phoneme());
     out->start_time_ms = in.start_ms();
     out->end_time_ms = in.end_ms();
     return true;
 }
 
-bool rac_tts_synthesis_metadata_to_proto(
-    const rac_tts_synthesis_metadata_t* in,
-    ::runanywhere::v1::TTSSynthesisMetadata* out) {
-    if (!in || !out) return false;
+bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
+                                         ::runanywhere::v1::TTSSynthesisMetadata* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->voice) out->set_voice_id(in->voice);
-    if (in->language) out->set_language_code(in->language);
+    if (in->voice)
+        out->set_voice_id(in->voice);
+    if (in->language)
+        out->set_language_code(in->language);
     out->set_processing_time_ms(in->processing_time_ms);
     out->set_character_count(in->character_count);
     // proto has audio_duration_ms; the C metadata struct has no such field
@@ -499,37 +546,36 @@ bool rac_tts_synthesis_metadata_to_proto(
     return true;
 }
 
-bool rac_tts_synthesis_metadata_from_proto(
-    const ::runanywhere::v1::TTSSynthesisMetadata& in,
-    rac_tts_synthesis_metadata_t* out) {
-    if (!out) return false;
+bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesisMetadata& in,
+                                           rac_tts_synthesis_metadata_t* out) {
+    if (!out)
+        return false;
     out->voice = copy_string(in.voice_id());
     out->language = copy_string(in.language_code());
     out->processing_time_ms = in.processing_time_ms();
     out->character_count = in.character_count();
     // Compute characters_per_second from processing_time_ms.
-    out->characters_per_second =
-        (in.processing_time_ms() > 0)
-            ? static_cast<float>(in.character_count()) /
-                  (static_cast<float>(in.processing_time_ms()) / 1000.0f)
-            : 0.0f;
+    out->characters_per_second = (in.processing_time_ms() > 0)
+                                     ? static_cast<float>(in.character_count()) /
+                                           (static_cast<float>(in.processing_time_ms()) / 1000.0f)
+                                     : 0.0f;
     return true;
 }
 
-bool rac_tts_output_to_proto(const rac_tts_output_t* in,
-                             ::runanywhere::v1::TTSOutput* out) {
-    if (!in || !out) return false;
+bool rac_tts_output_to_proto(const rac_tts_output_t* in, ::runanywhere::v1::TTSOutput* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     if (in->audio_data && in->audio_size > 0) {
-        out->set_audio_data(::std::string(static_cast<const char*>(in->audio_data),
-                                          in->audio_size));
+        out->set_audio_data(
+            ::std::string(static_cast<const char*>(in->audio_data), in->audio_size));
     }
     out->set_audio_format(audio_format_to_proto(in->format));
     out->set_sample_rate(0);  // C struct has no sample_rate at the output level.
     out->set_duration_ms(in->duration_ms);
     for (size_t i = 0; i < in->num_phoneme_timestamps; ++i) {
         rac_tts_phoneme_timestamp_to_proto(&in->phoneme_timestamps[i],
-                                            out->add_phoneme_timestamps());
+                                           out->add_phoneme_timestamps());
     }
     auto* meta = out->mutable_metadata();
     rac_tts_synthesis_metadata_to_proto(&in->metadata, meta);
@@ -538,9 +584,9 @@ bool rac_tts_output_to_proto(const rac_tts_output_t* in,
     return true;
 }
 
-bool rac_tts_output_from_proto(const ::runanywhere::v1::TTSOutput& in,
-                               rac_tts_output_t* out) {
-    if (!out) return false;
+bool rac_tts_output_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_output_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     if (!in.audio_data().empty()) {
         out->audio_size = in.audio_data().size();
@@ -565,13 +611,13 @@ bool rac_tts_output_from_proto(const ::runanywhere::v1::TTSOutput& in,
     return true;
 }
 
-bool rac_tts_result_to_proto(const rac_tts_result_t* in,
-                             ::runanywhere::v1::TTSOutput* out) {
-    if (!in || !out) return false;
+bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSOutput* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     if (in->audio_data && in->audio_size > 0) {
-        out->set_audio_data(::std::string(static_cast<const char*>(in->audio_data),
-                                          in->audio_size));
+        out->set_audio_data(
+            ::std::string(static_cast<const char*>(in->audio_data), in->audio_size));
     }
     out->set_audio_format(audio_format_to_proto(in->audio_format));
     out->set_sample_rate(in->sample_rate);
@@ -582,9 +628,9 @@ bool rac_tts_result_to_proto(const rac_tts_result_t* in,
     return true;
 }
 
-bool rac_tts_result_from_proto(const ::runanywhere::v1::TTSOutput& in,
-                               rac_tts_result_t* out) {
-    if (!out) return false;
+bool rac_tts_result_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_result_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     if (!in.audio_data().empty()) {
         out->audio_size = in.audio_data().size();
@@ -600,7 +646,8 @@ bool rac_tts_result_from_proto(const ::runanywhere::v1::TTSOutput& in,
 
 bool rac_tts_speak_result_to_proto(const rac_tts_speak_result_t* in,
                                    ::runanywhere::v1::TTSSpeakResult* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_audio_format(audio_format_to_proto(in->format));
     out->set_sample_rate(0);  // C struct has no sample_rate field.
@@ -614,7 +661,8 @@ bool rac_tts_speak_result_to_proto(const rac_tts_speak_result_t* in,
 
 bool rac_tts_speak_result_from_proto(const ::runanywhere::v1::TTSSpeakResult& in,
                                      rac_tts_speak_result_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->format = audio_format_from_proto(in.audio_format());
     out->duration_ms = in.duration_ms();
@@ -630,11 +678,12 @@ bool rac_tts_speak_result_from_proto(const ::runanywhere::v1::TTSSpeakResult& in
 // VAD
 // ===========================================================================
 
-bool rac_vad_config_to_proto(const rac_vad_config_t* in,
-                             ::runanywhere::v1::VADConfiguration* out) {
-    if (!in || !out) return false;
+bool rac_vad_config_to_proto(const rac_vad_config_t* in, ::runanywhere::v1::VADConfiguration* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_sample_rate(in->sample_rate);
     out->set_frame_length_ms(frame_seconds_to_ms(in->frame_length));
     out->set_threshold(in->energy_threshold);
@@ -644,19 +693,22 @@ bool rac_vad_config_to_proto(const rac_vad_config_t* in,
 
 bool rac_vad_config_from_proto(const ::runanywhere::v1::VADConfiguration& in,
                                rac_vad_config_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_VAD_CONFIG_DEFAULT;
     out->model_id = copy_string(in.model_id());
-    if (in.sample_rate() > 0) out->sample_rate = in.sample_rate();
+    if (in.sample_rate() > 0)
+        out->sample_rate = in.sample_rate();
     out->frame_length = frame_ms_to_seconds(in.frame_length_ms());
-    if (in.threshold() > 0.0f) out->energy_threshold = in.threshold();
+    if (in.threshold() > 0.0f)
+        out->energy_threshold = in.threshold();
     out->enable_auto_calibration = in.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
     return true;
 }
 
-bool rac_vad_input_to_proto_options(const rac_vad_input_t* in,
-                                    ::runanywhere::v1::VADOptions* out) {
-    if (!in || !out) return false;
+bool rac_vad_input_to_proto_options(const rac_vad_input_t* in, ::runanywhere::v1::VADOptions* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     // -1.0f sentinel ("no override") collapses to proto unset (0.0).
     if (in->energy_threshold_override > 0.0f) {
@@ -671,7 +723,8 @@ bool rac_vad_input_to_proto_options(const rac_vad_input_t* in,
 
 bool rac_vad_input_from_proto_options(const ::runanywhere::v1::VADOptions& in,
                                       rac_vad_input_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_VAD_INPUT_DEFAULT;
     if (in.threshold() > 0.0f) {
         out->energy_threshold_override = in.threshold();
@@ -683,9 +736,9 @@ bool rac_vad_input_from_proto_options(const ::runanywhere::v1::VADOptions& in,
     return true;
 }
 
-bool rac_vad_output_to_proto(const rac_vad_output_t* in,
-                             ::runanywhere::v1::VADResult* out) {
-    if (!in || !out) return false;
+bool rac_vad_output_to_proto(const rac_vad_output_t* in, ::runanywhere::v1::VADResult* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_is_speech(in->is_speech_detected == RAC_TRUE);
     out->set_energy(in->energy_level);
@@ -694,9 +747,9 @@ bool rac_vad_output_to_proto(const rac_vad_output_t* in,
     return true;
 }
 
-bool rac_vad_output_from_proto(const ::runanywhere::v1::VADResult& in,
-                               rac_vad_output_t* out) {
-    if (!out) return false;
+bool rac_vad_output_from_proto(const ::runanywhere::v1::VADResult& in, rac_vad_output_t* out) {
+    if (!out)
+        return false;
     out->is_speech_detected = in.is_speech() ? RAC_TRUE : RAC_FALSE;
     out->energy_level = in.energy();
     out->timestamp_ms = 0;  // proto carries no wall-clock timestamp; caller fills.
@@ -705,7 +758,8 @@ bool rac_vad_output_from_proto(const ::runanywhere::v1::VADResult& in,
 
 bool rac_vad_statistics_to_proto(const rac_vad_statistics_t* in,
                                  ::runanywhere::v1::VADStatistics* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_current_threshold(in->current_threshold);
     out->set_ambient_level(in->ambient_noise_level);
@@ -719,7 +773,8 @@ bool rac_vad_statistics_to_proto(const rac_vad_statistics_t* in,
 
 bool rac_vad_statistics_from_proto(const ::runanywhere::v1::VADStatistics& in,
                                    rac_vad_statistics_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->current_threshold = in.current_threshold();
     out->ambient_noise_level = in.ambient_level();
@@ -729,11 +784,11 @@ bool rac_vad_statistics_from_proto(const ::runanywhere::v1::VADStatistics& in,
     return true;
 }
 
-bool rac_speech_activity_to_proto(rac_speech_activity_t in_kind,
-                                  int64_t in_timestamp_ms,
+bool rac_speech_activity_to_proto(rac_speech_activity_t in_kind, int64_t in_timestamp_ms,
                                   int32_t in_duration_ms,
                                   ::runanywhere::v1::SpeechActivityEvent* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     out->Clear();
     switch (in_kind) {
         case RAC_SPEECH_STARTED:
@@ -755,10 +810,10 @@ bool rac_speech_activity_to_proto(rac_speech_activity_t in_kind,
 }
 
 bool rac_speech_activity_from_proto(const ::runanywhere::v1::SpeechActivityEvent& in,
-                                    rac_speech_activity_t* out_kind,
-                                    int64_t* out_timestamp_ms,
+                                    rac_speech_activity_t* out_kind, int64_t* out_timestamp_ms,
                                     int32_t* out_duration_ms) {
-    if (!out_kind) return false;
+    if (!out_kind)
+        return false;
     switch (in.event_type()) {
         case ::runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED:
             *out_kind = RAC_SPEECH_STARTED;
@@ -773,8 +828,10 @@ bool rac_speech_activity_from_proto(const ::runanywhere::v1::SpeechActivityEvent
             *out_kind = RAC_SPEECH_ONGOING;  // safest fallback; nothing to drop.
             break;
     }
-    if (out_timestamp_ms) *out_timestamp_ms = in.timestamp_ms();
-    if (out_duration_ms) *out_duration_ms = in.duration_ms();
+    if (out_timestamp_ms)
+        *out_timestamp_ms = in.timestamp_ms();
+    if (out_duration_ms)
+        *out_duration_ms = in.duration_ms();
     return true;
 }
 
@@ -782,11 +839,12 @@ bool rac_speech_activity_from_proto(const ::runanywhere::v1::SpeechActivityEvent
 // VLM
 // ===========================================================================
 
-bool rac_vlm_config_to_proto(const rac_vlm_config_t* in,
-                             ::runanywhere::v1::VLMConfiguration* out) {
-    if (!in || !out) return false;
+bool rac_vlm_config_to_proto(const rac_vlm_config_t* in, ::runanywhere::v1::VLMConfiguration* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_max_image_size_px(0);  // C struct has no max_image_size on config.
     out->set_max_tokens(in->max_tokens);
     return true;
@@ -794,19 +852,22 @@ bool rac_vlm_config_to_proto(const rac_vlm_config_t* in,
 
 bool rac_vlm_config_from_proto(const ::runanywhere::v1::VLMConfiguration& in,
                                rac_vlm_config_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_VLM_CONFIG_DEFAULT;
     out->model_id = copy_string(in.model_id());
-    if (in.max_tokens() > 0) out->max_tokens = in.max_tokens();
+    if (in.max_tokens() > 0)
+        out->max_tokens = in.max_tokens();
     return true;
 }
 
-bool rac_vlm_options_to_proto(const rac_vlm_options_t* in,
-                              const char* prompt,
+bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
                               ::runanywhere::v1::VLMGenerationOptions* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (prompt) out->set_prompt(prompt);
+    if (prompt)
+        out->set_prompt(prompt);
     out->set_max_tokens(in->max_tokens);
     out->set_temperature(in->temperature);
     out->set_top_p(in->top_p);
@@ -815,25 +876,29 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in,
 }
 
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
-                                rac_vlm_options_t* out,
-                                const char** out_prompt) {
-    if (!out) return false;
+                                rac_vlm_options_t* out, const char** out_prompt) {
+    if (!out)
+        return false;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
-    if (in.max_tokens() > 0) out->max_tokens = in.max_tokens();
-    if (in.temperature() > 0.0f) out->temperature = in.temperature();
-    if (in.top_p() > 0.0f) out->top_p = in.top_p();
+    if (in.max_tokens() > 0)
+        out->max_tokens = in.max_tokens();
+    if (in.temperature() > 0.0f)
+        out->temperature = in.temperature();
+    if (in.top_p() > 0.0f)
+        out->top_p = in.top_p();
     if (out_prompt) {
         *out_prompt = in.prompt().empty() ? nullptr : rac_strdup(in.prompt().c_str());
     }
     return true;
 }
 
-bool rac_vlm_result_to_proto(const rac_vlm_result_t* in,
-                             ::runanywhere::v1::VLMResult* out) {
-    if (!in || !out) return false;
+bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->text) out->set_text(in->text);
+    if (in->text)
+        out->set_text(in->text);
     out->set_prompt_tokens(in->prompt_tokens);
     out->set_completion_tokens(in->completion_tokens);
     out->set_total_tokens(in->total_tokens);
@@ -842,9 +907,9 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in,
     return true;
 }
 
-bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in,
-                               rac_vlm_result_t* out) {
-    if (!out) return false;
+bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in, rac_vlm_result_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->text = copy_string_required(in.text());
     out->prompt_tokens = in.prompt_tokens();
@@ -855,35 +920,37 @@ bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in,
     return true;
 }
 
-bool rac_vlm_image_to_proto(const rac_vlm_image_t* in,
-                            ::runanywhere::v1::VLMImage* out) {
-    if (!in || !out) return false;
+bool rac_vlm_image_to_proto(const rac_vlm_image_t* in, ::runanywhere::v1::VLMImage* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_width(static_cast<int32_t>(in->width));
     out->set_height(static_cast<int32_t>(in->height));
     switch (in->format) {
         case RAC_VLM_IMAGE_FORMAT_FILE_PATH:
-            if (in->file_path) out->set_file_path(in->file_path);
+            if (in->file_path)
+                out->set_file_path(in->file_path);
             out->set_format(::runanywhere::v1::VLM_IMAGE_FORMAT_FILE_PATH);
             break;
         case RAC_VLM_IMAGE_FORMAT_RGB_PIXELS:
             if (in->pixel_data && in->data_size > 0) {
-                out->set_raw_rgb(::std::string(
-                    reinterpret_cast<const char*>(in->pixel_data), in->data_size));
+                out->set_raw_rgb(
+                    ::std::string(reinterpret_cast<const char*>(in->pixel_data), in->data_size));
             }
             out->set_format(::runanywhere::v1::VLM_IMAGE_FORMAT_RAW_RGB);
             break;
         case RAC_VLM_IMAGE_FORMAT_BASE64:
-            if (in->base64_data) out->set_base64(in->base64_data);
+            if (in->base64_data)
+                out->set_base64(in->base64_data);
             out->set_format(::runanywhere::v1::VLM_IMAGE_FORMAT_BASE64);
             break;
     }
     return true;
 }
 
-bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
-                              rac_vlm_image_t* out) {
-    if (!out) return false;
+bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->width = static_cast<uint32_t>(in.width());
     out->height = static_cast<uint32_t>(in.height());
@@ -928,8 +995,7 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in,
 
 namespace {
 
-::runanywhere::v1::DiffusionScheduler diffusion_scheduler_to_proto(
-    rac_diffusion_scheduler_t s) {
+::runanywhere::v1::DiffusionScheduler diffusion_scheduler_to_proto(rac_diffusion_scheduler_t s) {
     switch (s) {
         case RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS:
             return ::runanywhere::v1::DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS;
@@ -952,8 +1018,7 @@ namespace {
     return ::runanywhere::v1::DIFFUSION_SCHEDULER_UNSPECIFIED;
 }
 
-rac_diffusion_scheduler_t diffusion_scheduler_from_proto(
-    ::runanywhere::v1::DiffusionScheduler p) {
+rac_diffusion_scheduler_t diffusion_scheduler_from_proto(::runanywhere::v1::DiffusionScheduler p) {
     switch (p) {
         case ::runanywhere::v1::DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS:
             return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
@@ -1005,8 +1070,8 @@ rac_diffusion_mode_t diffusion_mode_from_proto(::runanywhere::v1::DiffusionMode 
     }
 }
 
-::runanywhere::v1::DiffusionModelVariant diffusion_variant_to_proto(
-    rac_diffusion_model_variant_t v) {
+::runanywhere::v1::DiffusionModelVariant
+diffusion_variant_to_proto(rac_diffusion_model_variant_t v) {
     switch (v) {
         case RAC_DIFFUSION_MODEL_SD_1_5:
             return ::runanywhere::v1::DIFFUSION_MODEL_VARIANT_SD_1_5;
@@ -1024,8 +1089,8 @@ rac_diffusion_mode_t diffusion_mode_from_proto(::runanywhere::v1::DiffusionMode 
     return ::runanywhere::v1::DIFFUSION_MODEL_VARIANT_UNSPECIFIED;
 }
 
-rac_diffusion_model_variant_t diffusion_variant_from_proto(
-    ::runanywhere::v1::DiffusionModelVariant p) {
+rac_diffusion_model_variant_t
+diffusion_variant_from_proto(::runanywhere::v1::DiffusionModelVariant p) {
     switch (p) {
         case ::runanywhere::v1::DIFFUSION_MODEL_VARIANT_SD_1_5:
             return RAC_DIFFUSION_MODEL_SD_1_5;
@@ -1044,8 +1109,8 @@ rac_diffusion_model_variant_t diffusion_variant_from_proto(
     }
 }
 
-::runanywhere::v1::DiffusionTokenizerSourceKind diffusion_tokenizer_to_proto(
-    rac_diffusion_tokenizer_source_t s) {
+::runanywhere::v1::DiffusionTokenizerSourceKind
+diffusion_tokenizer_to_proto(rac_diffusion_tokenizer_source_t s) {
     switch (s) {
         case RAC_DIFFUSION_TOKENIZER_SD_1_5:
             return ::runanywhere::v1::DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15;
@@ -1059,8 +1124,8 @@ rac_diffusion_model_variant_t diffusion_variant_from_proto(
     return ::runanywhere::v1::DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED;
 }
 
-rac_diffusion_tokenizer_source_t diffusion_tokenizer_from_proto(
-    ::runanywhere::v1::DiffusionTokenizerSourceKind p) {
+rac_diffusion_tokenizer_source_t
+diffusion_tokenizer_from_proto(::runanywhere::v1::DiffusionTokenizerSourceKind p) {
     switch (p) {
         case ::runanywhere::v1::DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15:
             return RAC_DIFFUSION_TOKENIZER_SD_1_5;
@@ -1079,13 +1144,13 @@ rac_diffusion_tokenizer_source_t diffusion_tokenizer_from_proto(
 
 bool rac_diffusion_config_to_proto(const rac_diffusion_config_t* in,
                                    ::runanywhere::v1::DiffusionConfiguration* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_model_variant(diffusion_variant_to_proto(in->model_variant));
     auto* tok = out->mutable_tokenizer_source();
     tok->set_kind(diffusion_tokenizer_to_proto(in->tokenizer.source));
-    if (in->tokenizer.source == RAC_DIFFUSION_TOKENIZER_CUSTOM &&
-        in->tokenizer.custom_base_url) {
+    if (in->tokenizer.source == RAC_DIFFUSION_TOKENIZER_CUSTOM && in->tokenizer.custom_base_url) {
         tok->set_custom_path(in->tokenizer.custom_base_url);
     }
     out->set_enable_safety_checker(in->enable_safety_checker == RAC_TRUE);
@@ -1096,14 +1161,14 @@ bool rac_diffusion_config_to_proto(const rac_diffusion_config_t* in,
 
 bool rac_diffusion_config_from_proto(const ::runanywhere::v1::DiffusionConfiguration& in,
                                      rac_diffusion_config_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     *out = RAC_DIFFUSION_CONFIG_DEFAULT;
     out->model_variant = diffusion_variant_from_proto(in.model_variant());
     if (in.has_tokenizer_source()) {
         out->tokenizer.source = diffusion_tokenizer_from_proto(in.tokenizer_source().kind());
         if (in.tokenizer_source().has_custom_path()) {
-            out->tokenizer.custom_base_url =
-                copy_string(in.tokenizer_source().custom_path());
+            out->tokenizer.custom_base_url = copy_string(in.tokenizer_source().custom_path());
         }
     }
     out->enable_safety_checker = in.enable_safety_checker() ? RAC_TRUE : RAC_FALSE;
@@ -1113,10 +1178,13 @@ bool rac_diffusion_config_from_proto(const ::runanywhere::v1::DiffusionConfigura
 
 bool rac_diffusion_options_to_proto(const rac_diffusion_options_t* in,
                                     ::runanywhere::v1::DiffusionGenerationOptions* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->prompt) out->set_prompt(in->prompt);
-    if (in->negative_prompt) out->set_negative_prompt(in->negative_prompt);
+    if (in->prompt)
+        out->set_prompt(in->prompt);
+    if (in->negative_prompt)
+        out->set_negative_prompt(in->negative_prompt);
     out->set_width(in->width);
     out->set_height(in->height);
     out->set_num_inference_steps(in->steps);
@@ -1127,17 +1195,21 @@ bool rac_diffusion_options_to_proto(const rac_diffusion_options_t* in,
     return true;
 }
 
-bool rac_diffusion_options_from_proto(
-    const ::runanywhere::v1::DiffusionGenerationOptions& in,
-    rac_diffusion_options_t* out) {
-    if (!out) return false;
+bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
+                                      rac_diffusion_options_t* out) {
+    if (!out)
+        return false;
     *out = RAC_DIFFUSION_OPTIONS_DEFAULT;
     out->prompt = copy_string(in.prompt());
     out->negative_prompt = copy_string(in.negative_prompt());
-    if (in.width() > 0) out->width = in.width();
-    if (in.height() > 0) out->height = in.height();
-    if (in.num_inference_steps() > 0) out->steps = in.num_inference_steps();
-    if (in.guidance_scale() > 0.0f) out->guidance_scale = in.guidance_scale();
+    if (in.width() > 0)
+        out->width = in.width();
+    if (in.height() > 0)
+        out->height = in.height();
+    if (in.num_inference_steps() > 0)
+        out->steps = in.num_inference_steps();
+    if (in.guidance_scale() > 0.0f)
+        out->guidance_scale = in.guidance_scale();
     out->seed = in.seed();
     out->scheduler = diffusion_scheduler_from_proto(in.scheduler());
     out->mode = diffusion_mode_from_proto(in.mode());
@@ -1146,24 +1218,26 @@ bool rac_diffusion_options_from_proto(
 
 bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
                                      ::runanywhere::v1::DiffusionProgress* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_progress_percent(in->progress);
     out->set_current_step(in->current_step);
     out->set_total_steps(in->total_steps);
-    if (in->stage) out->set_stage(in->stage);
+    if (in->stage)
+        out->set_stage(in->stage);
     if (in->intermediate_image_data && in->intermediate_image_size > 0) {
-        out->set_intermediate_image_data(::std::string(
-            reinterpret_cast<const char*>(in->intermediate_image_data),
-            in->intermediate_image_size));
+        out->set_intermediate_image_data(
+            ::std::string(reinterpret_cast<const char*>(in->intermediate_image_data),
+                          in->intermediate_image_size));
     }
     return true;
 }
 
-bool rac_diffusion_progress_from_proto(
-    const ::runanywhere::v1::DiffusionProgress& in,
-    rac_diffusion_progress_t* out) {
-    if (!out) return false;
+bool rac_diffusion_progress_from_proto(const ::runanywhere::v1::DiffusionProgress& in,
+                                       rac_diffusion_progress_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->progress = in.progress_percent();
     out->current_step = in.current_step();
@@ -1172,10 +1246,8 @@ bool rac_diffusion_progress_from_proto(
     if (in.has_intermediate_image_data()) {
         out->intermediate_image_size = in.intermediate_image_data().size();
         if (out->intermediate_image_size > 0) {
-            uint8_t* buf =
-                static_cast<uint8_t*>(rac_alloc(out->intermediate_image_size));
-            std::memcpy(buf, in.intermediate_image_data().data(),
-                        out->intermediate_image_size);
+            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->intermediate_image_size));
+            std::memcpy(buf, in.intermediate_image_data().data(), out->intermediate_image_size);
             out->intermediate_image_data = buf;
         }
     }
@@ -1184,11 +1256,12 @@ bool rac_diffusion_progress_from_proto(
 
 bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
                                    ::runanywhere::v1::DiffusionResult* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     if (in->image_data && in->image_size > 0) {
-        out->set_image_data(::std::string(reinterpret_cast<const char*>(in->image_data),
-                                          in->image_size));
+        out->set_image_data(
+            ::std::string(reinterpret_cast<const char*>(in->image_data), in->image_size));
     }
     out->set_width(in->width);
     out->set_height(in->height);
@@ -1201,7 +1274,8 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
 
 bool rac_diffusion_result_from_proto(const ::runanywhere::v1::DiffusionResult& in,
                                      rac_diffusion_result_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     if (!in.image_data().empty()) {
         out->image_size = in.image_data().size();
@@ -1223,13 +1297,19 @@ bool rac_diffusion_result_from_proto(const ::runanywhere::v1::DiffusionResult& i
 
 bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
                              ::runanywhere::v1::LoraAdapterCatalogEntry* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->id) out->set_id(in->id);
-    if (in->name) out->set_name(in->name);
-    if (in->description) out->set_description(in->description);
-    if (in->download_url) out->set_url(in->download_url);
-    if (in->filename) out->set_filename(in->filename);
+    if (in->id)
+        out->set_id(in->id);
+    if (in->name)
+        out->set_name(in->name);
+    if (in->description)
+        out->set_description(in->description);
+    if (in->download_url)
+        out->set_url(in->download_url);
+    if (in->filename)
+        out->set_filename(in->filename);
     for (size_t i = 0; i < in->compatible_model_count; ++i) {
         if (in->compatible_model_ids[i]) {
             out->add_compatible_models(in->compatible_model_ids[i]);
@@ -1242,7 +1322,8 @@ bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
 
 bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry& in,
                                rac_lora_entry_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->id = copy_string(in.id());
     out->name = copy_string(in.name());
@@ -1253,8 +1334,8 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     out->default_scale = in.default_scale() > 0.0f ? in.default_scale() : 1.0f;
     if (in.compatible_models_size() > 0) {
         out->compatible_model_count = static_cast<size_t>(in.compatible_models_size());
-        out->compatible_model_ids = static_cast<char**>(
-            rac_alloc(sizeof(char*) * out->compatible_model_count));
+        out->compatible_model_ids =
+            static_cast<char**>(rac_alloc(sizeof(char*) * out->compatible_model_count));
         for (int i = 0; i < in.compatible_models_size(); ++i) {
             out->compatible_model_ids[i] = rac_strdup(in.compatible_models(i).c_str());
         }
@@ -1262,30 +1343,36 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     return true;
 }
 
-bool rac_lora_info_to_proto(const char* adapter_id, const char* adapter_path,
-                            float scale, bool applied, const char* error_message,
+bool rac_lora_info_to_proto(const char* adapter_id, const char* adapter_path, float scale,
+                            bool applied, const char* error_message,
                             ::runanywhere::v1::LoRAAdapterInfo* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     out->Clear();
-    if (adapter_id) out->set_adapter_id(adapter_id);
-    if (adapter_path) out->set_adapter_path(adapter_path);
+    if (adapter_id)
+        out->set_adapter_id(adapter_id);
+    if (adapter_path)
+        out->set_adapter_path(adapter_path);
     out->set_scale(scale);
     out->set_applied(applied);
-    if (error_message) out->set_error_message(error_message);
+    if (error_message)
+        out->set_error_message(error_message);
     return true;
 }
 
-bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
-                              char** out_adapter_id, char** out_adapter_path,
-                              float* out_scale, bool* out_applied,
+bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in, char** out_adapter_id,
+                              char** out_adapter_path, float* out_scale, bool* out_applied,
                               char** out_error_message) {
-    if (out_adapter_id) *out_adapter_id = copy_string(in.adapter_id());
-    if (out_adapter_path) *out_adapter_path = copy_string(in.adapter_path());
-    if (out_scale) *out_scale = in.scale();
-    if (out_applied) *out_applied = in.applied();
+    if (out_adapter_id)
+        *out_adapter_id = copy_string(in.adapter_id());
+    if (out_adapter_path)
+        *out_adapter_path = copy_string(in.adapter_path());
+    if (out_scale)
+        *out_scale = in.scale();
+    if (out_applied)
+        *out_applied = in.applied();
     if (out_error_message) {
-        *out_error_message = in.has_error_message() ? copy_string(in.error_message())
-                                                    : nullptr;
+        *out_error_message = in.has_error_message() ? copy_string(in.error_message()) : nullptr;
     }
     return true;
 }
@@ -1296,25 +1383,28 @@ bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
 
 bool rac_embeddings_config_to_proto(const rac_embeddings_config_t* in,
                                     ::runanywhere::v1::EmbeddingsConfiguration* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_embedding_dimension(0);  // C ABI does not carry a dimension on config.
     out->set_max_sequence_length(in->max_tokens);
     out->set_normalize(in->normalize == RAC_EMBEDDINGS_NORMALIZE_L2);
     return true;
 }
 
-bool rac_embeddings_config_from_proto(
-    const ::runanywhere::v1::EmbeddingsConfiguration& in,
-    rac_embeddings_config_t* out) {
-    if (!out) return false;
+bool rac_embeddings_config_from_proto(const ::runanywhere::v1::EmbeddingsConfiguration& in,
+                                      rac_embeddings_config_t* out) {
+    if (!out)
+        return false;
     *out = RAC_EMBEDDINGS_CONFIG_DEFAULT;
     out->model_id = copy_string(in.model_id());
-    if (in.max_sequence_length() > 0) out->max_tokens = in.max_sequence_length();
+    if (in.max_sequence_length() > 0)
+        out->max_tokens = in.max_sequence_length();
     if (in.has_normalize()) {
-        out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2
-                                        : RAC_EMBEDDINGS_NORMALIZE_NONE;
+        out->normalize =
+            in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
     }
     // pooling and preferred_framework are not on the wire — keep defaults.
     return true;
@@ -1322,7 +1412,8 @@ bool rac_embeddings_config_from_proto(
 
 bool rac_embeddings_options_to_proto(const rac_embeddings_options_t* in,
                                      ::runanywhere::v1::EmbeddingsOptions* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     // C `normalize` uses -1 sentinel for "use config default"; on the wire,
     // proto `normalize` is non-optional bool (defaults to false). Treat -1
@@ -1331,19 +1422,19 @@ bool rac_embeddings_options_to_proto(const rac_embeddings_options_t* in,
     return true;
 }
 
-bool rac_embeddings_options_from_proto(
-    const ::runanywhere::v1::EmbeddingsOptions& in,
-    rac_embeddings_options_t* out) {
-    if (!out) return false;
+bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
+                                       rac_embeddings_options_t* out) {
+    if (!out)
+        return false;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
-    out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2
-                                    : RAC_EMBEDDINGS_NORMALIZE_NONE;
+    out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
     return true;
 }
 
 bool rac_embedding_vector_to_proto(const rac_embedding_vector_t* in,
                                    ::runanywhere::v1::EmbeddingVector* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     for (size_t i = 0; i < in->dimension; ++i) {
         out->add_values(in->data[i]);
@@ -1353,7 +1444,8 @@ bool rac_embedding_vector_to_proto(const rac_embedding_vector_t* in,
 
 bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& in,
                                      rac_embedding_vector_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->dimension = static_cast<size_t>(in.values_size());
     if (out->dimension > 0) {
@@ -1367,7 +1459,8 @@ bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& i
 
 bool rac_embeddings_result_to_proto(const rac_embeddings_result_t* in,
                                     ::runanywhere::v1::EmbeddingsResult* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     for (size_t i = 0; i < in->num_embeddings; ++i) {
         rac_embedding_vector_to_proto(&in->embeddings[i], out->add_vectors());
@@ -1380,7 +1473,8 @@ bool rac_embeddings_result_to_proto(const rac_embeddings_result_t* in,
 
 bool rac_embeddings_result_from_proto(const ::runanywhere::v1::EmbeddingsResult& in,
                                       rac_embeddings_result_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->dimension = static_cast<size_t>(in.dimension());
     out->processing_time_ms = in.processing_time_ms();
@@ -1402,7 +1496,8 @@ bool rac_embeddings_result_from_proto(const ::runanywhere::v1::EmbeddingsResult&
 
 bool rac_device_storage_to_proto(const rac_device_storage_t* in,
                                  ::runanywhere::v1::DeviceStorageInfo* out) {
-    if (!in || !out) return false;
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_total_bytes(in->total_space);
     out->set_free_bytes(in->free_space);
@@ -1418,16 +1513,17 @@ bool rac_device_storage_to_proto(const rac_device_storage_t* in,
 
 bool rac_device_storage_from_proto(const ::runanywhere::v1::DeviceStorageInfo& in,
                                    rac_device_storage_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     out->total_space = in.total_bytes();
     out->free_space = in.free_bytes();
     out->used_space = in.used_bytes();
     return true;
 }
 
-bool rac_app_storage_to_proto(const rac_app_storage_t* in,
-                              ::runanywhere::v1::AppStorageInfo* out) {
-    if (!in || !out) return false;
+bool rac_app_storage_to_proto(const rac_app_storage_t* in, ::runanywhere::v1::AppStorageInfo* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_documents_bytes(in->documents_size);
     out->set_cache_bytes(in->cache_size);
@@ -1438,7 +1534,8 @@ bool rac_app_storage_to_proto(const rac_app_storage_t* in,
 
 bool rac_app_storage_from_proto(const ::runanywhere::v1::AppStorageInfo& in,
                                 rac_app_storage_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     out->documents_size = in.documents_bytes();
     out->cache_size = in.cache_bytes();
     out->app_support_size = in.app_support_bytes();
@@ -1446,29 +1543,30 @@ bool rac_app_storage_from_proto(const ::runanywhere::v1::AppStorageInfo& in,
     return true;
 }
 
-bool rac_model_storage_metrics_to_proto(
-    const rac_model_storage_metrics_t* in,
-    ::runanywhere::v1::ModelStorageMetrics* out) {
-    if (!in || !out) return false;
+bool rac_model_storage_metrics_to_proto(const rac_model_storage_metrics_t* in,
+                                        ::runanywhere::v1::ModelStorageMetrics* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
-    if (in->model_id) out->set_model_id(in->model_id);
+    if (in->model_id)
+        out->set_model_id(in->model_id);
     out->set_size_on_disk_bytes(in->size_on_disk);
     return true;
 }
 
-bool rac_model_storage_metrics_from_proto(
-    const ::runanywhere::v1::ModelStorageMetrics& in,
-    rac_model_storage_metrics_t* out) {
-    if (!out) return false;
+bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageMetrics& in,
+                                          rac_model_storage_metrics_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->model_id = copy_string(in.model_id());
     out->size_on_disk = in.size_on_disk_bytes();
     return true;
 }
 
-bool rac_storage_info_to_proto(const rac_storage_info_t* in,
-                               ::runanywhere::v1::StorageInfo* out) {
-    if (!in || !out) return false;
+bool rac_storage_info_to_proto(const rac_storage_info_t* in, ::runanywhere::v1::StorageInfo* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     rac_app_storage_to_proto(&in->app_storage, out->mutable_app());
     rac_device_storage_to_proto(&in->device_storage, out->mutable_device());
@@ -1482,10 +1580,13 @@ bool rac_storage_info_to_proto(const rac_storage_info_t* in,
 
 bool rac_storage_info_from_proto(const ::runanywhere::v1::StorageInfo& in,
                                  rac_storage_info_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
-    if (in.has_app()) rac_app_storage_from_proto(in.app(), &out->app_storage);
-    if (in.has_device()) rac_device_storage_from_proto(in.device(), &out->device_storage);
+    if (in.has_app())
+        rac_app_storage_from_proto(in.app(), &out->app_storage);
+    if (in.has_device())
+        rac_device_storage_from_proto(in.device(), &out->device_storage);
     if (in.models_size() > 0) {
         out->model_count = static_cast<size_t>(in.models_size());
         out->models = static_cast<rac_model_storage_metrics_t*>(
@@ -1498,10 +1599,10 @@ bool rac_storage_info_from_proto(const ::runanywhere::v1::StorageInfo& in,
     return true;
 }
 
-bool rac_storage_availability_to_proto(
-    const rac_storage_availability_t* in,
-    ::runanywhere::v1::StorageAvailability* out) {
-    if (!in || !out) return false;
+bool rac_storage_availability_to_proto(const rac_storage_availability_t* in,
+                                       ::runanywhere::v1::StorageAvailability* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_is_available(in->is_available == RAC_TRUE);
     out->set_required_bytes(in->required_space);
@@ -1515,17 +1616,16 @@ bool rac_storage_availability_to_proto(
     return true;
 }
 
-bool rac_storage_availability_from_proto(
-    const ::runanywhere::v1::StorageAvailability& in,
-    rac_storage_availability_t* out) {
-    if (!out) return false;
+bool rac_storage_availability_from_proto(const ::runanywhere::v1::StorageAvailability& in,
+                                         rac_storage_availability_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     out->is_available = in.is_available() ? RAC_TRUE : RAC_FALSE;
     out->required_space = in.required_bytes();
     out->available_space = in.available_bytes();
     out->has_warning = in.has_warning_message() ? RAC_TRUE : RAC_FALSE;
-    out->recommendation = in.has_recommendation() ? copy_string(in.recommendation())
-                                                  : nullptr;
+    out->recommendation = in.has_recommendation() ? copy_string(in.recommendation()) : nullptr;
     return true;
 }
 
@@ -1534,57 +1634,99 @@ bool rac_storage_availability_from_proto(
 // ===========================================================================
 
 ::runanywhere::v1::ErrorCode rac_result_to_proto_error_code(rac_result_t code) {
-    if (code == RAC_SUCCESS) return ::runanywhere::v1::ERROR_CODE_UNSPECIFIED;
+    if (code == RAC_SUCCESS)
+        return ::runanywhere::v1::ERROR_CODE_UNSPECIFIED;
     int32_t magnitude = (code < 0) ? -code : code;
     // The proto enum mirrors abs() of the C codes for the well-known ranges.
     // Use a switch on the magnitude to avoid runtime errors on out-of-bounds
     // values; unknown codes fall through to ERROR_CODE_UNKNOWN.
     switch (magnitude) {
-        case 100: return ::runanywhere::v1::ERROR_CODE_NOT_INITIALIZED;
-        case 101: return ::runanywhere::v1::ERROR_CODE_ALREADY_INITIALIZED;
-        case 102: return ::runanywhere::v1::ERROR_CODE_INITIALIZATION_FAILED;
-        case 103: return ::runanywhere::v1::ERROR_CODE_INVALID_CONFIGURATION;
-        case 104: return ::runanywhere::v1::ERROR_CODE_INVALID_API_KEY;
-        case 105: return ::runanywhere::v1::ERROR_CODE_ENVIRONMENT_MISMATCH;
-        case 106: return ::runanywhere::v1::ERROR_CODE_INVALID_PARAMETER;
-        case 110: return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_FOUND;
-        case 111: return ::runanywhere::v1::ERROR_CODE_MODEL_LOAD_FAILED;
-        case 112: return ::runanywhere::v1::ERROR_CODE_MODEL_VALIDATION_FAILED;
-        case 113: return ::runanywhere::v1::ERROR_CODE_MODEL_INCOMPATIBLE;
-        case 114: return ::runanywhere::v1::ERROR_CODE_INVALID_MODEL_FORMAT;
-        case 115: return ::runanywhere::v1::ERROR_CODE_MODEL_STORAGE_CORRUPTED;
-        case 116: return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_LOADED;
-        case 130: return ::runanywhere::v1::ERROR_CODE_GENERATION_FAILED;
-        case 131: return ::runanywhere::v1::ERROR_CODE_GENERATION_TIMEOUT;
-        case 132: return ::runanywhere::v1::ERROR_CODE_CONTEXT_TOO_LONG;
-        case 133: return ::runanywhere::v1::ERROR_CODE_TOKEN_LIMIT_EXCEEDED;
-        case 150: return ::runanywhere::v1::ERROR_CODE_NETWORK_UNAVAILABLE;
-        case 151: return ::runanywhere::v1::ERROR_CODE_NETWORK_ERROR;
-        case 153: return ::runanywhere::v1::ERROR_CODE_DOWNLOAD_FAILED;
-        case 155: return ::runanywhere::v1::ERROR_CODE_TIMEOUT;
-        case 180: return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_STORAGE;
-        case 183: return ::runanywhere::v1::ERROR_CODE_FILE_NOT_FOUND;
-        case 220: return ::runanywhere::v1::ERROR_CODE_HARDWARE_UNSUPPORTED;
-        case 221: return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_MEMORY;
-        case 230: return ::runanywhere::v1::ERROR_CODE_COMPONENT_NOT_READY;
-        case 231: return ::runanywhere::v1::ERROR_CODE_INVALID_STATE;
-        case 232: return ::runanywhere::v1::ERROR_CODE_SERVICE_NOT_AVAILABLE;
-        case 250: return ::runanywhere::v1::ERROR_CODE_VALIDATION_FAILED;
-        case 251: return ::runanywhere::v1::ERROR_CODE_INVALID_INPUT;
-        case 259: return ::runanywhere::v1::ERROR_CODE_INVALID_ARGUMENT;
-        case 260: return ::runanywhere::v1::ERROR_CODE_NULL_POINTER;
-        case 320: return ::runanywhere::v1::ERROR_CODE_AUTHENTICATION_FAILED;
-        case 380: return ::runanywhere::v1::ERROR_CODE_CANCELLED;
-        case 800: return ::runanywhere::v1::ERROR_CODE_NOT_IMPLEMENTED;
-        case 801: return ::runanywhere::v1::ERROR_CODE_FEATURE_NOT_AVAILABLE;
-        case 804: return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
-        case 805: return ::runanywhere::v1::ERROR_CODE_INTERNAL;
-        default:  return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
+        case 100:
+            return ::runanywhere::v1::ERROR_CODE_NOT_INITIALIZED;
+        case 101:
+            return ::runanywhere::v1::ERROR_CODE_ALREADY_INITIALIZED;
+        case 102:
+            return ::runanywhere::v1::ERROR_CODE_INITIALIZATION_FAILED;
+        case 103:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_CONFIGURATION;
+        case 104:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_API_KEY;
+        case 105:
+            return ::runanywhere::v1::ERROR_CODE_ENVIRONMENT_MISMATCH;
+        case 106:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_PARAMETER;
+        case 110:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_FOUND;
+        case 111:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_LOAD_FAILED;
+        case 112:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_VALIDATION_FAILED;
+        case 113:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_INCOMPATIBLE;
+        case 114:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_MODEL_FORMAT;
+        case 115:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_STORAGE_CORRUPTED;
+        case 116:
+            return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_LOADED;
+        case 130:
+            return ::runanywhere::v1::ERROR_CODE_GENERATION_FAILED;
+        case 131:
+            return ::runanywhere::v1::ERROR_CODE_GENERATION_TIMEOUT;
+        case 132:
+            return ::runanywhere::v1::ERROR_CODE_CONTEXT_TOO_LONG;
+        case 133:
+            return ::runanywhere::v1::ERROR_CODE_TOKEN_LIMIT_EXCEEDED;
+        case 150:
+            return ::runanywhere::v1::ERROR_CODE_NETWORK_UNAVAILABLE;
+        case 151:
+            return ::runanywhere::v1::ERROR_CODE_NETWORK_ERROR;
+        case 153:
+            return ::runanywhere::v1::ERROR_CODE_DOWNLOAD_FAILED;
+        case 155:
+            return ::runanywhere::v1::ERROR_CODE_TIMEOUT;
+        case 180:
+            return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_STORAGE;
+        case 183:
+            return ::runanywhere::v1::ERROR_CODE_FILE_NOT_FOUND;
+        case 220:
+            return ::runanywhere::v1::ERROR_CODE_HARDWARE_UNSUPPORTED;
+        case 221:
+            return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_MEMORY;
+        case 230:
+            return ::runanywhere::v1::ERROR_CODE_COMPONENT_NOT_READY;
+        case 231:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_STATE;
+        case 232:
+            return ::runanywhere::v1::ERROR_CODE_SERVICE_NOT_AVAILABLE;
+        case 250:
+            return ::runanywhere::v1::ERROR_CODE_VALIDATION_FAILED;
+        case 251:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_INPUT;
+        case 259:
+            return ::runanywhere::v1::ERROR_CODE_INVALID_ARGUMENT;
+        case 260:
+            return ::runanywhere::v1::ERROR_CODE_NULL_POINTER;
+        case 320:
+            return ::runanywhere::v1::ERROR_CODE_AUTHENTICATION_FAILED;
+        case 380:
+            return ::runanywhere::v1::ERROR_CODE_CANCELLED;
+        case 800:
+            return ::runanywhere::v1::ERROR_CODE_NOT_IMPLEMENTED;
+        case 801:
+            return ::runanywhere::v1::ERROR_CODE_FEATURE_NOT_AVAILABLE;
+        case 804:
+            return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
+        case 805:
+            return ::runanywhere::v1::ERROR_CODE_INTERNAL;
+        default:
+            return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
     }
 }
 
 rac_result_t rac_proto_error_code_to_result(::runanywhere::v1::ErrorCode code) {
-    if (code == ::runanywhere::v1::ERROR_CODE_UNSPECIFIED) return RAC_SUCCESS;
+    if (code == ::runanywhere::v1::ERROR_CODE_UNSPECIFIED)
+        return RAC_SUCCESS;
     int32_t magnitude = static_cast<int32_t>(code);
     return -magnitude;
 }
@@ -1637,9 +1779,9 @@ rac_error_category_t rac_proto_to_category(::runanywhere::v1::ErrorCategory cate
     }
 }
 
-bool rac_error_to_proto(const rac_error_t* in,
-                        ::runanywhere::v1::SDKError* out) {
-    if (!in || !out) return false;
+bool rac_error_to_proto(const rac_error_t* in, ::runanywhere::v1::SDKError* out) {
+    if (!in || !out)
+        return false;
     out->Clear();
     out->set_code(rac_result_to_proto_error_code(in->code));
     out->set_category(rac_category_to_proto(in->category));
@@ -1649,13 +1791,19 @@ bool rac_error_to_proto(const rac_error_t* in,
         out->set_nested_message(in->underlying_message);
     }
     auto* ctx = out->mutable_context();
-    if (in->source_file[0] != '\0') ctx->set_source_file(in->source_file);
-    if (in->source_line > 0) ctx->set_source_line(in->source_line);
-    if (in->source_function[0] != '\0') ctx->set_operation(in->source_function);
+    if (in->source_file[0] != '\0')
+        ctx->set_source_file(in->source_file);
+    if (in->source_line > 0)
+        ctx->set_source_line(in->source_line);
+    if (in->source_function[0] != '\0')
+        ctx->set_operation(in->source_function);
     auto* metadata = ctx->mutable_metadata();
-    if (in->model_id[0] != '\0') (*metadata)["model_id"] = in->model_id;
-    if (in->framework[0] != '\0') (*metadata)["framework"] = in->framework;
-    if (in->session_id[0] != '\0') (*metadata)["session_id"] = in->session_id;
+    if (in->model_id[0] != '\0')
+        (*metadata)["model_id"] = in->model_id;
+    if (in->framework[0] != '\0')
+        (*metadata)["framework"] = in->framework;
+    if (in->session_id[0] != '\0')
+        (*metadata)["session_id"] = in->session_id;
     if (in->custom_key1[0] != '\0' && in->custom_value1[0] != '\0')
         (*metadata)[in->custom_key1] = in->custom_value1;
     if (in->custom_key2[0] != '\0' && in->custom_value2[0] != '\0')
@@ -1665,9 +1813,9 @@ bool rac_error_to_proto(const rac_error_t* in,
     return true;
 }
 
-bool rac_error_from_proto(const ::runanywhere::v1::SDKError& in,
-                          rac_error_t* out) {
-    if (!out) return false;
+bool rac_error_from_proto(const ::runanywhere::v1::SDKError& in, rac_error_t* out) {
+    if (!out)
+        return false;
     std::memset(out, 0, sizeof(*out));
     if (in.has_c_abi_code()) {
         out->code = in.c_abi_code();
@@ -1683,8 +1831,7 @@ bool rac_error_from_proto(const ::runanywhere::v1::SDKError& in,
     if (in.has_context()) {
         const auto& ctx = in.context();
         if (ctx.has_source_file()) {
-            std::strncpy(out->source_file, ctx.source_file().c_str(),
-                         RAC_MAX_METADATA_STRING - 1);
+            std::strncpy(out->source_file, ctx.source_file().c_str(), RAC_MAX_METADATA_STRING - 1);
         }
         if (ctx.has_source_line()) {
             out->source_line = ctx.source_line();
@@ -1696,37 +1843,30 @@ bool rac_error_from_proto(const ::runanywhere::v1::SDKError& in,
         const auto& metadata = ctx.metadata();
         auto it = metadata.find("model_id");
         if (it != metadata.end()) {
-            std::strncpy(out->model_id, it->second.c_str(),
-                         RAC_MAX_METADATA_STRING - 1);
+            std::strncpy(out->model_id, it->second.c_str(), RAC_MAX_METADATA_STRING - 1);
         }
         it = metadata.find("framework");
         if (it != metadata.end()) {
-            std::strncpy(out->framework, it->second.c_str(),
-                         RAC_MAX_METADATA_STRING - 1);
+            std::strncpy(out->framework, it->second.c_str(), RAC_MAX_METADATA_STRING - 1);
         }
         it = metadata.find("session_id");
         if (it != metadata.end()) {
-            std::strncpy(out->session_id, it->second.c_str(),
-                         RAC_MAX_METADATA_STRING - 1);
+            std::strncpy(out->session_id, it->second.c_str(), RAC_MAX_METADATA_STRING - 1);
         }
         // Populate custom_key1..3 with any remaining unique entries.
         int slot = 1;
         for (const auto& kv : metadata) {
-            if (kv.first == "model_id" || kv.first == "framework" ||
-                kv.first == "session_id")
+            if (kv.first == "model_id" || kv.first == "framework" || kv.first == "session_id")
                 continue;
             if (slot == 1) {
                 std::strncpy(out->custom_key1, kv.first.c_str(), 63);
-                std::strncpy(out->custom_value1, kv.second.c_str(),
-                             RAC_MAX_METADATA_STRING - 1);
+                std::strncpy(out->custom_value1, kv.second.c_str(), RAC_MAX_METADATA_STRING - 1);
             } else if (slot == 2) {
                 std::strncpy(out->custom_key2, kv.first.c_str(), 63);
-                std::strncpy(out->custom_value2, kv.second.c_str(),
-                             RAC_MAX_METADATA_STRING - 1);
+                std::strncpy(out->custom_value2, kv.second.c_str(), RAC_MAX_METADATA_STRING - 1);
             } else if (slot == 3) {
                 std::strncpy(out->custom_key3, kv.first.c_str(), 63);
-                std::strncpy(out->custom_value3, kv.second.c_str(),
-                             RAC_MAX_METADATA_STRING - 1);
+                std::strncpy(out->custom_value3, kv.second.c_str(), RAC_MAX_METADATA_STRING - 1);
             } else {
                 break;
             }

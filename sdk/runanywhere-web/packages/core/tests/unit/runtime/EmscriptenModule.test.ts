@@ -1,12 +1,12 @@
 import { describe, expect, it, afterEach } from 'vitest';
 
-import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
-import { SolutionAdapter } from '../Adapters/SolutionAdapter';
+import { ModelRegistryAdapter } from '../../../src/Adapters/ModelRegistryAdapter';
+import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
   clearRunanywhereModule,
   setRunanywhereModule,
   type EmscriptenRunanywhereModule,
-} from './EmscriptenModule';
+} from '../../../src/runtime/EmscriptenModule';
 
 function fakeModule(): EmscriptenRunanywhereModule {
   const heap = new ArrayBuffer(1024);
@@ -40,9 +40,6 @@ function fakeModule(): EmscriptenRunanywhereModule {
     _rac_voice_agent_set_proto_callback: () => 0,
     _rac_llm_set_stream_proto_callback: () => 0,
     _rac_llm_unset_stream_proto_callback: () => 0,
-    _rac_llm_extract_thinking: () => 0,
-    _rac_llm_strip_thinking: () => 0,
-    _rac_llm_split_thinking_tokens: () => 0,
     _rac_solution_create_from_proto: (_bytesPtr, _bytesLen, outHandlePtr) => {
       heapU32[outHandlePtr >>> 2] = 123;
       return 0;

@@ -56,7 +56,12 @@ public class SystemFoundationModelsService {
             logger.info("Foundation Models initialized successfully")
         } catch {
             logger.error("Failed to initialize Foundation Models: \(error)")
-            throw SDKException(code: .initializationFailed, message: "Failed to initialize Foundation Models", category: .component, underlying: error)
+            throw SDKException(
+                code: .initializationFailed,
+                message: "Failed to initialize Foundation Models",
+                category: .component,
+                underlying: error
+            )
         }
         #else
         // Foundation Models framework not available
@@ -100,7 +105,11 @@ public class SystemFoundationModelsService {
             throw SDKException(code: .componentNotReady, message: "Model not ready. It may be downloading or initializing.", category: .component)
         case .unavailable(let other):
             logger.error("Foundation Models unavailable: \(String(describing: other))")
-            throw SDKException(code: .serviceNotAvailable, message: "Foundation Models unavailable: \(String(describing: other))", category: .component)
+            throw SDKException(
+                code: .serviceNotAvailable,
+                message: "Foundation Models unavailable: \(String(describing: other))",
+                category: .component
+            )
         @unknown default:
             logger.error("Unknown availability status")
             throw SDKException(code: .unknown, message: "Unknown Foundation Models availability status", category: .component)
@@ -230,7 +239,11 @@ public class SystemFoundationModelsService {
         case .exceededContextWindowSize:
             logger.error("Exceeded context window size - please reduce prompt length")
             // Foundation Models has a 4096 token context window
-            throw SDKException(code: .contextTooLong, message: "Exceeded context window size (max 4096 tokens) - please reduce prompt length", category: .component)
+            throw SDKException(
+                code: .contextTooLong,
+                message: "Exceeded context window size (max 4096 tokens) - please reduce prompt length",
+                category: .component
+            )
         default:
             logger.error("Other generation error: \(error)")
             throw SDKException(code: .generationFailed, message: "Foundation Models generation error", category: .component, underlying: error)

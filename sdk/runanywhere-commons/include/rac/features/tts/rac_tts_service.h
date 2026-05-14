@@ -201,9 +201,9 @@ RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json)
  * Commons resolves the current TTS lifecycle component and out_result receives
  * serialized runanywhere.v1.TTSOutput bytes.
  */
-RAC_API rac_result_t rac_tts_synthesize_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
+                                                        rac_proto_buffer_t* out_result);
 
 /**
  * @brief Callback fired once per serialized runanywhere.v1.TTSStreamEvent.
@@ -212,8 +212,7 @@ RAC_API rac_result_t rac_tts_synthesize_lifecycle_proto(
  * need to retain the bytes MUST copy them out.
  */
 typedef void (*rac_tts_lifecycle_stream_event_callback_fn)(const uint8_t* event_bytes,
-                                                            size_t event_size,
-                                                            void* user_data);
+                                                           size_t event_size, void* user_data);
 
 /**
  * @brief Stream synthesis using the lifecycle-loaded TTS voice/model.
@@ -292,8 +291,8 @@ RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out
  * @retval RAC_ERROR_NULL_POINTER           out_RATTSConfiguration is NULL.
  * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
  */
-RAC_API rac_result_t rac_tts_configuration_defaults_proto(
-    rac_proto_buffer_t* out_RATTSConfiguration);
+RAC_API rac_result_t
+rac_tts_configuration_defaults_proto(rac_proto_buffer_t* out_RATTSConfiguration);
 
 #ifdef __cplusplus
 }

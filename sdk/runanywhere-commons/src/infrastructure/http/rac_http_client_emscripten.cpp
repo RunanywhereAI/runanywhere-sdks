@@ -56,6 +56,8 @@
  *     `..._get_response_headers`.
  */
 
+#include "rac_http_upsert_mode.h"
+
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -70,7 +72,6 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
-#include "rac_http_upsert_mode.h"
 
 namespace {
 
@@ -324,11 +325,11 @@ rac_result_t emscripten_request_resume(void* /*user_data*/, const rac_http_reque
 // Static ops struct — must outlive any request (the transport registry
 // only stores a pointer), so file-scope storage is the right home.
 const rac_http_transport_ops_t kEmscriptenOps = {
-    /*.request_send   =*/ emscripten_request_send,
-    /*.request_stream =*/ emscripten_request_stream,
-    /*.request_resume =*/ emscripten_request_resume,
-    /*.init           =*/ nullptr,
-    /*.destroy        =*/ nullptr,
+    /*.request_send   =*/emscripten_request_send,
+    /*.request_stream =*/emscripten_request_stream,
+    /*.request_resume =*/emscripten_request_resume,
+    /*.init           =*/nullptr,
+    /*.destroy        =*/nullptr,
 };
 
 // =============================================================================
@@ -359,14 +360,11 @@ struct JsTransportState {
     // the resulting function pointer invokes the JS function with the
     // proper argument marshaling (see the sig-string contract in
     // FetchHttpTransport.ts).
-    rac_result_t (*request_send)(void*, const rac_http_request_t*,
-                                 rac_http_response_t*) = nullptr;
-    rac_result_t (*request_stream)(void*, const rac_http_request_t*,
-                                   rac_http_body_chunk_fn, void*,
+    rac_result_t (*request_send)(void*, const rac_http_request_t*, rac_http_response_t*) = nullptr;
+    rac_result_t (*request_stream)(void*, const rac_http_request_t*, rac_http_body_chunk_fn, void*,
                                    rac_http_response_t*) = nullptr;
     rac_result_t (*request_resume)(void*, const rac_http_request_t*, uint64_t,
-                                   rac_http_body_chunk_fn, void*,
-                                   rac_http_response_t*) = nullptr;
+                                   rac_http_body_chunk_fn, void*, rac_http_response_t*) = nullptr;
 };
 
 // File-scope so the registered vtable still sees the JS function
@@ -401,19 +399,18 @@ rac_result_t js_request_resume(void* user_data, const rac_http_request_t* req,
                                void* cb_user_data, rac_http_response_t* out_resp_meta) {
     auto& s = js_transport_state();
     if (s.request_resume != nullptr) {
-        return s.request_resume(user_data, req, resume_from_byte, cb, cb_user_data,
-                                out_resp_meta);
+        return s.request_resume(user_data, req, resume_from_byte, cb, cb_user_data, out_resp_meta);
     }
     return emscripten_request_resume(user_data, req, resume_from_byte, cb, cb_user_data,
                                      out_resp_meta);
 }
 
 const rac_http_transport_ops_t kJsOps = {
-    /*.request_send   =*/ js_request_send,
-    /*.request_stream =*/ js_request_stream,
-    /*.request_resume =*/ js_request_resume,
-    /*.init           =*/ nullptr,
-    /*.destroy        =*/ nullptr,
+    /*.request_send   =*/js_request_send,
+    /*.request_stream =*/js_request_stream,
+    /*.request_resume =*/js_request_resume,
+    /*.init           =*/nullptr,
+    /*.destroy        =*/nullptr,
 };
 
 }  // namespace
@@ -451,14 +448,11 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
 // =============================================================================
 
 extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
-    rac_result_t (*request_send_fp)(void*, const rac_http_request_t*,
-                                    rac_http_response_t*),
-    rac_result_t (*request_stream_fp)(void*, const rac_http_request_t*,
-                                      rac_http_body_chunk_fn, void*,
-                                      rac_http_response_t*),
+    rac_result_t (*request_send_fp)(void*, const rac_http_request_t*, rac_http_response_t*),
+    rac_result_t (*request_stream_fp)(void*, const rac_http_request_t*, rac_http_body_chunk_fn,
+                                      void*, rac_http_response_t*),
     rac_result_t (*request_resume_fp)(void*, const rac_http_request_t*, uint64_t,
-                                      rac_http_body_chunk_fn, void*,
-                                      rac_http_response_t*)) {
+                                      rac_http_body_chunk_fn, void*, rac_http_response_t*)) {
     auto& s = js_transport_state();
     s.request_send = request_send_fp;
     s.request_stream = request_stream_fp;
@@ -473,8 +467,7 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
         return rac_http_transport_register(/*ops=*/nullptr, /*user_data=*/nullptr);
     }
 
-    RAC_LOG_INFO(kTag,
-                 "Registering JS HTTP transport (send=%s, stream=%s, resume=%s)",
+    RAC_LOG_INFO(kTag, "Registering JS HTTP transport (send=%s, stream=%s, resume=%s)",
                  request_send_fp ? "JS" : "emscripten_fetch",
                  request_stream_fp ? "JS" : "emscripten_fetch",
                  request_resume_fp ? "JS" : "emscripten_fetch");

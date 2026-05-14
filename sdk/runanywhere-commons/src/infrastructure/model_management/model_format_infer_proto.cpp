@@ -46,7 +46,8 @@ const void* parse_data(const uint8_t* bytes, size_t size) {
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
@@ -72,23 +73,35 @@ std::string to_lower(const std::string& s) {
 
 bool ends_with(const std::string& s, const char* suffix) {
     const size_t suffix_len = std::strlen(suffix);
-    if (s.size() < suffix_len) return false;
+    if (s.size() < suffix_len)
+        return false;
     return s.compare(s.size() - suffix_len, suffix_len, suffix) == 0;
 }
 
 runanywhere::v1::ModelFormat format_from_suffix(const std::string& lower_url) {
     // Archives first so ".gguf.zip" → ZIP (wrapper), not GGUF.
-    if (ends_with(lower_url, ".zip")) return runanywhere::v1::MODEL_FORMAT_ZIP;
-    if (ends_with(lower_url, ".gguf")) return runanywhere::v1::MODEL_FORMAT_GGUF;
-    if (ends_with(lower_url, ".ggml")) return runanywhere::v1::MODEL_FORMAT_GGML;
-    if (ends_with(lower_url, ".onnx")) return runanywhere::v1::MODEL_FORMAT_ONNX;
-    if (ends_with(lower_url, ".ort")) return runanywhere::v1::MODEL_FORMAT_ORT;
-    if (ends_with(lower_url, ".bin")) return runanywhere::v1::MODEL_FORMAT_BIN;
-    if (ends_with(lower_url, ".tflite")) return runanywhere::v1::MODEL_FORMAT_TFLITE;
-    if (ends_with(lower_url, ".safetensors")) return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
-    if (ends_with(lower_url, ".mlmodelc")) return runanywhere::v1::MODEL_FORMAT_COREML;
-    if (ends_with(lower_url, ".mlmodel")) return runanywhere::v1::MODEL_FORMAT_MLMODEL;
-    if (ends_with(lower_url, ".mlpackage")) return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
+    if (ends_with(lower_url, ".zip"))
+        return runanywhere::v1::MODEL_FORMAT_ZIP;
+    if (ends_with(lower_url, ".gguf"))
+        return runanywhere::v1::MODEL_FORMAT_GGUF;
+    if (ends_with(lower_url, ".ggml"))
+        return runanywhere::v1::MODEL_FORMAT_GGML;
+    if (ends_with(lower_url, ".onnx"))
+        return runanywhere::v1::MODEL_FORMAT_ONNX;
+    if (ends_with(lower_url, ".ort"))
+        return runanywhere::v1::MODEL_FORMAT_ORT;
+    if (ends_with(lower_url, ".bin"))
+        return runanywhere::v1::MODEL_FORMAT_BIN;
+    if (ends_with(lower_url, ".tflite"))
+        return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with(lower_url, ".safetensors"))
+        return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
+    if (ends_with(lower_url, ".mlmodelc"))
+        return runanywhere::v1::MODEL_FORMAT_COREML;
+    if (ends_with(lower_url, ".mlmodel"))
+        return runanywhere::v1::MODEL_FORMAT_MLMODEL;
+    if (ends_with(lower_url, ".mlpackage"))
+        return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
     return runanywhere::v1::MODEL_FORMAT_UNSPECIFIED;
 }
 
@@ -154,7 +167,8 @@ runanywhere::v1::ModelFormat inner_format_from_archive_url(const std::string& lo
 extern "C" rac_result_t rac_model_format_from_url_proto(const uint8_t* request_bytes,
                                                         size_t request_size,
                                                         rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_bytes;
     (void)request_size;
@@ -167,9 +181,8 @@ extern "C" rac_result_t rac_model_format_from_url_proto(const uint8_t* request_b
     }
 
     runanywhere::v1::ModelFormatFromUrlRequest request;
-    if (request_size > 0 &&
-        !request.ParseFromArray(parse_data(request_bytes, request_size),
-                                static_cast<int>(request_size))) {
+    if (request_size > 0 && !request.ParseFromArray(parse_data(request_bytes, request_size),
+                                                    static_cast<int>(request_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse ModelFormatFromUrlRequest");
     }
@@ -205,7 +218,8 @@ extern "C" rac_result_t rac_model_format_from_url_proto(const uint8_t* request_b
 extern "C" rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_bytes,
                                                           size_t request_size,
                                                           rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_bytes;
     (void)request_size;
@@ -218,9 +232,8 @@ extern "C" rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request
     }
 
     runanywhere::v1::ArtifactInferFromUrlRequest request;
-    if (request_size > 0 &&
-        !request.ParseFromArray(parse_data(request_bytes, request_size),
-                                static_cast<int>(request_size))) {
+    if (request_size > 0 && !request.ParseFromArray(parse_data(request_bytes, request_size),
+                                                    static_cast<int>(request_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse ArtifactInferFromUrlRequest");
     }
@@ -249,8 +262,7 @@ extern "C" rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request
 
     RAC_LOG_DEBUG(LOG_CAT, "artifact_from_url: model_id=%s url=%s artifact=%d archive=%d inner=%d",
                   request.model_id().c_str(), request.url().c_str(),
-                  static_cast<int>(result.artifact_type()),
-                  static_cast<int>(result.archive_type()),
+                  static_cast<int>(result.artifact_type()), static_cast<int>(result.archive_type()),
                   static_cast<int>(result.inner_format()));
     return copy_proto(result, out_result);
 #endif

@@ -10,8 +10,7 @@
  * `setRunanywhereModule()`.
  *
  * After `LlamaCPP.register()` resolves, the public surface in
- * `@runanywhere/web` (`RunAnywhere.generate`, `RunAnywhere.generateStream`,
- * `RunAnywhere.textGeneration.*`, `RunAnywhere.toolCalling.*`,
+ * `@runanywhere/web` (`RunAnywhere.textGeneration.*`, `RunAnywhere.toolCalling.*`,
  * `RunAnywhere.structuredOutput.*`, embeddings, diffusion, VLM) flows
  * through the proto-byte adapters into the WASM module without any
  * further per-package wiring.
@@ -24,7 +23,8 @@
  *     await RunAnywhere.initialize({ environment: 'development' });
  *     await LlamaCPP.register({ acceleration: 'auto' });
  *
- *     const stream = await RunAnywhere.generateStream('Tell me a joke', {
+ *     const stream = await RunAnywhere.textGeneration.generateStream({
+ *       prompt: 'Tell me a joke',
  *       maxTokens: 256,
  *       temperature: 0.7,
  *     });

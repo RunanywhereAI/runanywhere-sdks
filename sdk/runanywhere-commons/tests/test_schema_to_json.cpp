@@ -29,39 +29,37 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                          \
-    do {                                                                                            \
-        if (!(cond)) {                                                                              \
-            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__);          \
-            return 1;                                                                               \
-        }                                                                                           \
+#define ASSERT_TRUE(cond)                                                                 \
+    do {                                                                                  \
+        if (!(cond)) {                                                                    \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
+            return 1;                                                                     \
+        }                                                                                 \
     } while (0)
 
-#define ASSERT_EQ_INT(a, b)                                                                        \
-    do {                                                                                            \
-        if ((a) != (b)) {                                                                           \
-            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__,            \
-                         static_cast<int>(a), static_cast<int>(b));                                \
-            return 1;                                                                               \
-        }                                                                                           \
+#define ASSERT_EQ_INT(a, b)                                                             \
+    do {                                                                                \
+        if ((a) != (b)) {                                                               \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__, \
+                         static_cast<int>(a), static_cast<int>(b));                     \
+            return 1;                                                                   \
+        }                                                                               \
     } while (0)
 
-#define ASSERT_EQ_STR(actual, expected)                                                            \
-    do {                                                                                            \
-        if (std::strcmp((actual), (expected)) != 0) {                                              \
-            std::fprintf(stderr,                                                                    \
-                         "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n",          \
-                         __FILE__, __LINE__, (expected), (actual));                                \
-            return 1;                                                                               \
-        }                                                                                           \
+#define ASSERT_EQ_STR(actual, expected)                                                           \
+    do {                                                                                          \
+        if (std::strcmp((actual), (expected)) != 0) {                                             \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
+                         __FILE__, __LINE__, (expected), (actual));                               \
+            return 1;                                                                             \
+        }                                                                                         \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
 // Helper: serialize a JSONSchema, run the C ABI, copy the result text into an
 // owned std::string. Returns 0 and populates *out_text on success.
-int run_schema_to_json(const ::runanywhere::v1::JSONSchema& schema,
-                       std::string* out_text) {
+int run_schema_to_json(const ::runanywhere::v1::JSONSchema& schema, std::string* out_text) {
     std::string serialized;
     if (!schema.SerializeToString(&serialized)) {
         std::fprintf(stderr, "failed to serialize JSONSchema fixture\n");
@@ -73,8 +71,8 @@ int run_schema_to_json(const ::runanywhere::v1::JSONSchema& schema,
     const rac_result_t rc = rac_structured_output_schema_to_json_proto(
         reinterpret_cast<const uint8_t*>(serialized.data()), serialized.size(), &buffer);
     if (rc != RAC_SUCCESS) {
-        std::fprintf(stderr, "schema_to_json_proto returned %d (status=%d)\n",
-                     static_cast<int>(rc), static_cast<int>(buffer.status));
+        std::fprintf(stderr, "schema_to_json_proto returned %d (status=%d)\n", static_cast<int>(rc),
+                     static_cast<int>(buffer.status));
         rac_proto_buffer_free(&buffer);
         return 1;
     }
@@ -103,7 +101,8 @@ int test_simple_object() {
         return 1;
     }
     const char* expected =
-        "{\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"],\"type\":\"object\"}";
+        "{\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"],\"type\":"
+        "\"object\"}";
     ASSERT_EQ_STR(actual.c_str(), expected);
     return 0;
 }

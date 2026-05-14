@@ -91,8 +91,9 @@ typedef struct rac_diffusion_service {
 /**
  * @brief Callback for serialized runanywhere.v1.DiffusionProgress bytes.
  */
-typedef rac_bool_t (*rac_diffusion_progress_proto_callback_fn)(
-    const uint8_t* progress_proto_bytes, size_t progress_proto_size, void* user_data);
+typedef rac_bool_t (*rac_diffusion_progress_proto_callback_fn)(const uint8_t* progress_proto_bytes,
+                                                               size_t progress_proto_size,
+                                                               void* user_data);
 
 // =============================================================================
 // PUBLIC API - Generic service functions
@@ -154,9 +155,10 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
  *
  * out_result receives serialized runanywhere.v1.DiffusionResult bytes.
  */
-RAC_API rac_result_t rac_diffusion_generate_proto(
-    rac_handle_t handle, const uint8_t* options_proto_bytes, size_t options_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_diffusion_generate_proto(rac_handle_t handle,
+                                                  const uint8_t* options_proto_bytes,
+                                                  size_t options_proto_size,
+                                                  rac_proto_buffer_t* out_result);
 
 /**
  * @brief Generate an image using the lifecycle-loaded diffusion model.
@@ -165,9 +167,9 @@ RAC_API rac_result_t rac_diffusion_generate_proto(
  * Commons resolves the current diffusion lifecycle component and out_result
  * receives serialized runanywhere.v1.DiffusionResult bytes.
  */
-RAC_API rac_result_t rac_diffusion_generate_lifecycle_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                            size_t request_proto_size,
+                                                            rac_proto_buffer_t* out_result);
 
 /**
  * @brief Generate an image with progress reporting

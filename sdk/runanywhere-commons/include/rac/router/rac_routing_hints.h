@@ -20,7 +20,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "rac/plugin/rac_primitive.h"   /* rac_runtime_id_t */
+#include "rac/plugin/rac_primitive.h" /* rac_runtime_id_t */
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,4 +70,4 @@ typedef struct rac_routing_hints {
 }
 #endif
 
-#endif  /* RAC_ROUTER_ROUTING_HINTS_H */
+#endif /* RAC_ROUTER_ROUTING_HINTS_H */

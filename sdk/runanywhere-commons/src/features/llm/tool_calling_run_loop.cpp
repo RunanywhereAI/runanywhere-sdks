@@ -23,19 +23,17 @@
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 
-#include "rac/features/llm/rac_tool_calling.h"
-
 #include <chrono>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
-
-#include "features/llm/rac_llm_lifecycle_bridge.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "tool_calling.pb.h"
@@ -140,8 +138,8 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_parse_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    rac_result_t rc = rac_tool_call_parse_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                req_bytes.size(), &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return false;
@@ -165,8 +163,8 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
     return false;
 }
 
-runanywhere::v1::ToolCallValidationResult validate_tool_call(
-    const LoopContext& ctx, const runanywhere::v1::ToolCall& tool_call) {
+runanywhere::v1::ToolCallValidationResult
+validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool_call) {
     runanywhere::v1::ToolCallValidationRequest request;
     *request.mutable_tool_call() = tool_call;
     *request.mutable_options() = build_options_snapshot(ctx);
@@ -181,8 +179,8 @@ runanywhere::v1::ToolCallValidationResult validate_tool_call(
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_validate_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    rac_result_t rc = rac_tool_call_validate_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                   req_bytes.size(), &out);
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
         result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
@@ -194,12 +192,13 @@ runanywhere::v1::ToolCallValidationResult validate_tool_call(
     return result;
 }
 
-bool run_generate_once(const LoopContext& ctx, const std::string& prompt,
-                       std::string* out_response, rac_result_t* out_rc) {
+bool run_generate_once(const LoopContext& ctx, const std::string& prompt, std::string* out_response,
+                       rac_result_t* out_rc) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
-        if (out_rc) *out_rc = rc;
+        if (out_rc)
+            *out_rc = rc;
         return false;
     }
 
@@ -220,7 +219,8 @@ bool run_generate_once(const LoopContext& ctx, const std::string& prompt,
 
     if (!ref.ops || !ref.ops->generate) {
         rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc) *out_rc = RAC_ERROR_NOT_SUPPORTED;
+        if (out_rc)
+            *out_rc = RAC_ERROR_NOT_SUPPORTED;
         return false;
     }
 
@@ -229,7 +229,8 @@ bool run_generate_once(const LoopContext& ctx, const std::string& prompt,
     if (rc != RAC_SUCCESS) {
         rac_llm_result_free(&raw);
         rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc) *out_rc = rc;
+        if (out_rc)
+            *out_rc = rc;
         return false;
     }
 
@@ -238,13 +239,14 @@ bool run_generate_once(const LoopContext& ctx, const std::string& prompt,
     }
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
-    if (out_rc) *out_rc = RAC_SUCCESS;
+    if (out_rc)
+        *out_rc = RAC_SUCCESS;
     return true;
 }
 
-void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status,
-                  const std::string& message) {
-    if (!out_result) return;
+void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std::string& message) {
+    if (!out_result)
+        return;
     runanywhere::v1::ToolCallingResult err;
     err.set_error_code(static_cast<int32_t>(status));
     err.set_error_message(message);
@@ -260,10 +262,11 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status,
 
 }  // namespace
 
-extern "C" rac_result_t rac_tool_calling_run_loop_proto(
-    const uint8_t* in_request_bytes, size_t in_size,
-    rac_tool_execute_callback_fn on_execute, void* user_data,
-    rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes,
+                                                        size_t in_size,
+                                                        rac_tool_execute_callback_fn on_execute,
+                                                        void* user_data,
+                                                        rac_proto_buffer_t* out_result) {
     if (!on_execute || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -335,15 +338,13 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(
             final_result.set_error_message("LLM generation failed");
             std::vector<uint8_t> bytes;
             serialize(final_result, &bytes);
-            rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                  out_result);
+            rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
             return rc;
         }
 
         std::string clean_text;
         runanywhere::v1::ToolCall parsed_call;
-        const bool has_call =
-            parse_tool_call_from_output(ctx, response, &clean_text, &parsed_call);
+        const bool has_call = parse_tool_call_from_output(ctx, response, &clean_text, &parsed_call);
         final_text = clean_text;
 
         if (!has_call) {
@@ -418,8 +419,10 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(
             }
             tool_result.set_error(err_msg);
         }
-        if (tool_result.started_at_ms() == 0) tool_result.set_started_at_ms(now_ms());
-        if (tool_result.completed_at_ms() == 0) tool_result.set_completed_at_ms(now_ms());
+        if (tool_result.started_at_ms() == 0)
+            tool_result.set_started_at_ms(now_ms());
+        if (tool_result.completed_at_ms() == 0)
+            tool_result.set_completed_at_ms(now_ms());
 
         rac_proto_buffer_free(&exec_out);
 
@@ -452,11 +455,9 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(
 
     std::vector<uint8_t> bytes;
     if (!serialize(final_result, &bytes)) {
-        emit_failure(out_result, RAC_ERROR_INTERNAL,
-                     "failed to serialize ToolCallingResult");
+        emit_failure(out_result, RAC_ERROR_INTERNAL, "failed to serialize ToolCallingResult");
         return RAC_ERROR_INTERNAL;
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                 out_result);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
 #endif
 }

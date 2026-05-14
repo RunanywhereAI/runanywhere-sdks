@@ -325,6 +325,14 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_modules_for_capability"
     "_rac_module_get_info"
 
+    # Plugin registry / loader
+    "_rac_plugin_api_version"
+    "_rac_registry_load_plugin"
+    "_rac_registry_unload_plugin"
+    "_rac_registry_plugin_count"
+    "_rac_registry_list_plugins"
+    "_rac_registry_free_plugin_list"
+
     # Service registry
     # v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_*
     # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
@@ -444,15 +452,6 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_llm_generate_proto"
     "_rac_llm_generate_stream_proto"
     "_rac_llm_cancel_proto"
-
-    # LLM Thinking (<think>...</think> parsing) — v3 Phase A11 / GAP 08 #6.
-    # Wrapped by sdk/runanywhere-web/packages/core/src/Features/LLM/LlmThinking.ts
-    # via ccall. Pair with -sEXPORTED_RUNTIME_METHODS=['ccall','UTF8ToString',
-    # 'stringToUTF8','_malloc','_free'] (already enabled in this target for
-    # other ccall users).
-    "_rac_llm_extract_thinking"
-    "_rac_llm_strip_thinking"
-    "_rac_llm_split_thinking_tokens"
 
     # LLM component
     "_rac_llm_component_create"
@@ -772,15 +771,20 @@ set(RAC_EXPORTED_FUNCTIONS
 
     # Environment / SDK config
     "_rac_sdk_init"
+    "_rac_sdk_init_phase1_proto"
+    "_rac_sdk_init_phase2_proto"
     "_rac_sdk_get_config"
     "_rac_sdk_get_environment"
     "_rac_sdk_is_initialized"
     "_rac_sdk_reset"
 
-    # Auth manager (read-only state query — used by RunAnywhere.isAuthenticated).
+    # Auth manager (read-only state query — used by RunAnywhere auth properties).
     # Future auth flows (authenticate/refresh) will need additional exports
     # paired with HTTP transport + secure storage wiring.
     "_rac_auth_is_authenticated"
+    "_rac_auth_get_user_id"
+    "_rac_auth_get_organization_id"
+    "_rac_state_is_device_registered"
 
     # Telemetry
     "_rac_telemetry_manager_create"
@@ -1045,7 +1049,12 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sEXPORTED_FUNCTIONS=[${RAC_EXPORTED_FUNCTIONS_STR}]"
     "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
 
-    # Allow JS function pointers (needed for platform adapter callbacks)
+    # Allow JS function pointers (needed for platform adapter callbacks).
+    # Pthread workers copy the table early, so keep enough empty slots in the
+    # initial table for addFunction() callbacks without growing it after the
+    # worker pool is live. Growing later can leave workers with stale table
+    # bounds and crash as soon as a C++ download callback fires.
+    "-sINITIAL_TABLE=16384"
     "-sALLOW_TABLE_GROWTH=1"
 
     # Filesystem
@@ -1185,16 +1194,6 @@ add_custom_command(TARGET runanywhere_wasm POST_BUILD
         "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.wasm"
     COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
 )
-
-# Also copy worker file if pthreads enabled
-if(RAC_WASM_PTHREADS)
-    add_custom_command(TARGET runanywhere_wasm POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-            "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-        COMMENT "Copying pthread worker to packages/llamacpp/wasm/"
-    )
-endif()
 
 # =============================================================================
 # SUMMARY

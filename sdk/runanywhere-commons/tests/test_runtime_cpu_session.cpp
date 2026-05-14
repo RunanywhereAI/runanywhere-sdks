@@ -12,13 +12,12 @@
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
-#define CHECK(cond, msg)                                                        \
-    do {                                                                        \
-        if (!(cond)) {                                                          \
-            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":"          \
-                      << __LINE__ << std::endl;                                 \
-            return 1;                                                           \
-        }                                                                       \
+#define CHECK(cond, msg)                                                                        \
+    do {                                                                                        \
+        if (!(cond)) {                                                                          \
+            std::cerr << "FAIL: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            return 1;                                                                           \
+        }                                                                                       \
     } while (0)
 
 namespace {
@@ -33,10 +32,12 @@ int g_v2_runs = 0;
 
 rac_result_t fake_create_session(const rac_runtime_session_desc_t* desc,
                                  rac_runtime_session_t** out) {
-    if (desc == nullptr || out == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (desc == nullptr || out == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
     auto* session = new (std::nothrow) FakeProviderSession();
-    if (session == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+    if (session == nullptr)
+        return RAC_ERROR_OUT_OF_MEMORY;
     ++g_created;
     *out = reinterpret_cast<rac_runtime_session_t*>(session);
     return RAC_SUCCESS;
@@ -51,16 +52,17 @@ const rac_runtime_io_t* find_io(const rac_runtime_io_t* ios, size_t count, const
     return nullptr;
 }
 
-rac_result_t fake_run_session(rac_runtime_session_t* session,
-                              const rac_runtime_io_t* inputs, size_t n_in,
-                              rac_runtime_io_t* outputs, size_t n_out) {
-    if (session == nullptr) return RAC_ERROR_NULL_POINTER;
-    if (inputs == nullptr || outputs == nullptr) return RAC_ERROR_NULL_POINTER;
+rac_result_t fake_run_session(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
+                              size_t n_in, rac_runtime_io_t* outputs, size_t n_out) {
+    if (session == nullptr)
+        return RAC_ERROR_NULL_POINTER;
+    if (inputs == nullptr || outputs == nullptr)
+        return RAC_ERROR_NULL_POINTER;
     auto* fake = reinterpret_cast<FakeProviderSession*>(session);
     const auto* value = find_io(inputs, n_in, "value");
     auto* result = const_cast<rac_runtime_io_t*>(find_io(outputs, n_out, "result"));
-    if (value == nullptr || result == nullptr ||
-        value->data_bytes < sizeof(int) || result->data_bytes < sizeof(int)) {
+    if (value == nullptr || result == nullptr || value->data_bytes < sizeof(int) ||
+        result->data_bytes < sizeof(int)) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     ++fake->runs;
@@ -75,15 +77,14 @@ void fake_destroy_session(rac_runtime_session_t* session) {
 
 /* V2-native provider: uses the tensor ABI directly and returns a
  * runtime-owned output buffer so we can exercise ownership transfer. */
-rac_result_t fake_run_session_v2(rac_runtime_session_t* session,
-                                 const rac_runtime_tensor_t* inputs, size_t n_in,
-                                 rac_runtime_tensor_t* outputs, size_t n_out) {
+rac_result_t fake_run_session_v2(rac_runtime_session_t* session, const rac_runtime_tensor_t* inputs,
+                                 size_t n_in, rac_runtime_tensor_t* outputs, size_t n_out) {
     if (session == nullptr || inputs == nullptr || outputs == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
-    if (n_in != 1 || n_out != 1) return RAC_ERROR_INVALID_PARAMETER;
-    if (inputs[0].dtype != RAC_RUNTIME_DTYPE_I32 ||
-        inputs[0].data == nullptr ||
+    if (n_in != 1 || n_out != 1)
+        return RAC_ERROR_INVALID_PARAMETER;
+    if (inputs[0].dtype != RAC_RUNTIME_DTYPE_I32 || inputs[0].data == nullptr ||
         inputs[0].data_bytes < sizeof(int32_t) ||
         inputs[0].memory_space != RAC_RUNTIME_MEMORY_SPACE_HOST) {
         return RAC_ERROR_INVALID_PARAMETER;
@@ -91,7 +92,8 @@ rac_result_t fake_run_session_v2(rac_runtime_session_t* session,
     ++g_v2_runs;
     const int32_t in_val = *static_cast<const int32_t*>(inputs[0].data);
     auto* owned_data = static_cast<int32_t*>(std::malloc(sizeof(int32_t)));
-    if (owned_data == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+    if (owned_data == nullptr)
+        return RAC_ERROR_OUT_OF_MEMORY;
     *owned_data = in_val * 3;
     outputs[0].data = owned_data;
     outputs[0].data_bytes = sizeof(int32_t);
@@ -152,27 +154,21 @@ int main() {
           "CPU v2 allocates destination buffer");
 
     rac_runtime_buffer_mapping_t mapping = {};
-    CHECK(cpu_v2->map_buffer(src_buffer, 0, 0, RAC_RUNTIME_MAP_WRITE, &mapping) ==
-              RAC_SUCCESS,
+    CHECK(cpu_v2->map_buffer(src_buffer, 0, 0, RAC_RUNTIME_MAP_WRITE, &mapping) == RAC_SUCCESS,
           "CPU v2 maps source buffer");
-    CHECK(mapping.data != nullptr && mapping.bytes == 16,
-          "CPU v2 map returns full buffer");
+    CHECK(mapping.data != nullptr && mapping.bytes == 16, "CPU v2 map returns full buffer");
     const unsigned char pattern[16] = {
-        0, 1, 2, 3, 4, 5, 6, 7,
-        8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
     };
     std::memcpy(mapping.data, pattern, sizeof(pattern));
-    CHECK(cpu_v2->unmap_buffer(src_buffer, &mapping) == RAC_SUCCESS,
-          "CPU v2 unmaps source buffer");
+    CHECK(cpu_v2->unmap_buffer(src_buffer, &mapping) == RAC_SUCCESS, "CPU v2 unmaps source buffer");
 
-    CHECK(cpu_v2->copy_buffer(dst_buffer, 0, src_buffer, 0, sizeof(pattern)) ==
-              RAC_SUCCESS,
+    CHECK(cpu_v2->copy_buffer(dst_buffer, 0, src_buffer, 0, sizeof(pattern)) == RAC_SUCCESS,
           "CPU v2 copies between buffers");
-    CHECK(cpu_v2->map_buffer(dst_buffer, 0, sizeof(pattern), RAC_RUNTIME_MAP_READ,
-                             &mapping) == RAC_SUCCESS,
+    CHECK(cpu_v2->map_buffer(dst_buffer, 0, sizeof(pattern), RAC_RUNTIME_MAP_READ, &mapping) ==
+              RAC_SUCCESS,
           "CPU v2 maps copied destination");
-    CHECK(std::memcmp(mapping.data, pattern, sizeof(pattern)) == 0,
-          "CPU v2 copied bytes match");
+    CHECK(std::memcmp(mapping.data, pattern, sizeof(pattern)) == 0, "CPU v2 copied bytes match");
     CHECK(cpu_v2->unmap_buffer(dst_buffer, &mapping) == RAC_SUCCESS,
           "CPU v2 unmaps destination buffer");
 
@@ -215,8 +211,7 @@ int main() {
     desc.model_path = "/tmp/fake.gguf";
 
     rac_runtime_session_t* session = nullptr;
-    CHECK(cpu->create_session(&desc, &session) == RAC_SUCCESS,
-          "create CPU provider session");
+    CHECK(cpu->create_session(&desc, &session) == RAC_SUCCESS, "create CPU provider session");
     CHECK(session != nullptr, "CPU provider session non-null");
     CHECK(g_created == 1, "provider create called");
 
@@ -267,8 +262,7 @@ int main() {
     tensor_outputs[0].rank = 1;
     tensor_outputs[0].shape_capacity = 1;
 
-    CHECK(cpu_v2->run_session_v2(session, tensor_inputs, 1, tensor_outputs, 1) ==
-              RAC_SUCCESS,
+    CHECK(cpu_v2->run_session_v2(session, tensor_inputs, 1, tensor_outputs, 1) == RAC_SUCCESS,
           "run CPU provider session through v2 tensors");
     CHECK(output == 22, "provider v2 run result");
 
@@ -298,7 +292,7 @@ int main() {
     v2_provider.formats = formats;
     v2_provider.formats_count = 1;
     v2_provider.create_session = fake_create_session;
-    v2_provider.run_session = fake_run_session;  /* fallback still present */
+    v2_provider.run_session = fake_run_session; /* fallback still present */
     v2_provider.destroy_session = fake_destroy_session;
     v2_provider.run_session_v2 = fake_run_session_v2;
     CHECK(rac_cpu_runtime_register_provider(&v2_provider) == RAC_SUCCESS,
@@ -306,14 +300,12 @@ int main() {
 
     /* Owned-outputs capability must now be advertised. */
     rac_runtime_capabilities_t caps_v2 = {};
-    CHECK(cpu->capabilities(&caps_v2) == RAC_SUCCESS,
-          "capabilities() callback with V2 provider");
+    CHECK(cpu->capabilities(&caps_v2) == RAC_SUCCESS, "capabilities() callback with V2 provider");
     CHECK((caps_v2.capability_flags & RAC_RUNTIME_CAP_OWNED_OUTPUTS) != 0,
           "CAP_OWNED_OUTPUTS advertised once a V2 provider registers");
 
     rac_runtime_session_t* v2_session = nullptr;
-    CHECK(cpu->create_session(&desc, &v2_session) == RAC_SUCCESS,
-          "create V2 CPU provider session");
+    CHECK(cpu->create_session(&desc, &v2_session) == RAC_SUCCESS, "create V2 CPU provider session");
     CHECK(v2_session != nullptr, "V2 provider session non-null");
 
     const int32_t v2_input = 5;
@@ -334,14 +326,11 @@ int main() {
     v2_outputs[0].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
 
     const int v2_runs_before = g_v2_runs;
-    CHECK(cpu_v2->run_session_v2(v2_session, v2_inputs, 1, v2_outputs, 1) ==
-              RAC_SUCCESS,
+    CHECK(cpu_v2->run_session_v2(v2_session, v2_inputs, 1, v2_outputs, 1) == RAC_SUCCESS,
           "run V2 provider through native path");
-    CHECK(g_v2_runs == v2_runs_before + 1,
-          "V2 provider callback invoked (not shimmed to V1)");
+    CHECK(g_v2_runs == v2_runs_before + 1, "V2 provider callback invoked (not shimmed to V1)");
     CHECK(v2_outputs[0].data != nullptr, "V2 output tensor carries data");
-    CHECK(v2_outputs[0].data_bytes == sizeof(int32_t),
-          "V2 output tensor reports bytes");
+    CHECK(v2_outputs[0].data_bytes == sizeof(int32_t), "V2 output tensor reports bytes");
     CHECK(v2_outputs[0].data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME,
           "V2 output preserves runtime ownership through CPU runtime");
     CHECK(*static_cast<const int32_t*>(v2_outputs[0].data) == v2_input * 3,

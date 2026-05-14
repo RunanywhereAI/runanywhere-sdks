@@ -23,8 +23,8 @@
 #include "embeddings_options.pb.h"
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
-#include "stt_options.pb.h"
 #include "storage_types.pb.h"
+#include "stt_options.pb.h"
 #include "tool_calling.pb.h"
 #include "voice_agent_service.pb.h"
 #endif
@@ -34,16 +34,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                              \
-    do {                                                                                \
-        ++test_count;                                                                   \
-        if (!(cond)) {                                                                  \
-            ++fail_count;                                                               \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__,        \
-                         __LINE__, #cond);                                             \
-        } else {                                                                        \
-            std::fprintf(stdout, "  ok:   %s\n", label);                              \
-        }                                                                               \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -86,8 +85,7 @@ bool serialize(const T& message, std::vector<uint8_t>* out) {
 
 template <typename T>
 bool parse_raw(const uint8_t* bytes, size_t size, T* out) {
-    const void* data = size == 0 ? static_cast<const void*>("")
-                                 : static_cast<const void*>(bytes);
+    const void* data = size == 0 ? static_cast<const void*>("") : static_cast<const void*>(bytes);
     return out && out->ParseFromArray(data, static_cast<int>(size));
 }
 
@@ -127,8 +125,7 @@ int test_storage_info_proto_is_active() {
 
     rac_storage_analyzer_handle_t analyzer = nullptr;
     rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_storage_analyzer_create(&callbacks, &analyzer) == RAC_SUCCESS &&
-              analyzer != nullptr,
+    CHECK(rac_storage_analyzer_create(&callbacks, &analyzer) == RAC_SUCCESS && analyzer != nullptr,
           "storage analyzer creates");
     CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
           "storage registry creates");
@@ -142,8 +139,7 @@ int test_storage_info_proto_is_active() {
     CHECK(result.success(), "storage info reports success");
     CHECK(result.info().device().total_bytes() == fixture.total,
           "storage info carries device total");
-    CHECK(result.info().device().free_bytes() == fixture.free,
-          "storage info carries device free");
+    CHECK(result.info().device().free_bytes() == fixture.free, "storage info carries device free");
 
     rac_proto_buffer_free(&out);
     rac_model_registry_destroy(registry);
@@ -215,8 +211,8 @@ int test_embeddings_create_proto_is_active() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc = rac_embeddings_create_proto(
-        request_bytes.data(), request_bytes.size(), &out);
+    const rac_result_t rc =
+        rac_embeddings_create_proto(request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "embeddings_create_proto is wired (not feature-unavailable)");
     CHECK(out.status != RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -230,13 +226,12 @@ int test_model_compatibility_check_proto_is_active() {
     runanywhere::v1::ModelCompatibilityRequest request;
     request.set_model_id("nonexistent.model.id");
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "model compatibility request serializes");
+    CHECK(serialize(request, &request_bytes), "model compatibility request serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc = rac_model_compatibility_check_proto(
-        request_bytes.data(), request_bytes.size(), &out);
+    const rac_result_t rc =
+        rac_model_compatibility_check_proto(request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "model_compatibility_check_proto is wired (not feature-unavailable)");
     CHECK(out.status != RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -249,14 +244,12 @@ int test_model_compatibility_check_proto_is_active() {
 int test_model_registry_fetch_assignments_proto_is_active() {
     runanywhere::v1::ModelRegistryFetchAssignmentsRequest request;
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "fetch assignments request serializes");
+    CHECK(serialize(request, &request_bytes), "fetch assignments request serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     const rac_result_t rc = rac_model_registry_fetch_assignments_proto(
-        request_bytes.empty() ? nullptr : request_bytes.data(),
-        request_bytes.size(), &out);
+        request_bytes.empty() ? nullptr : request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "model_registry_fetch_assignments_proto is wired (not feature-unavailable)");
     CHECK(out.status != RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -270,13 +263,12 @@ int test_model_format_from_url_proto_is_active() {
     runanywhere::v1::ModelFormatFromUrlRequest request;
     request.set_url("https://example.com/model.gguf");
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "model format from url request serializes");
+    CHECK(serialize(request, &request_bytes), "model format from url request serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc = rac_model_format_from_url_proto(
-        request_bytes.data(), request_bytes.size(), &out);
+    const rac_result_t rc =
+        rac_model_format_from_url_proto(request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "model_format_from_url_proto is wired (not feature-unavailable)");
     CHECK(out.status != RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -290,13 +282,12 @@ int test_artifact_infer_from_url_proto_is_active() {
     runanywhere::v1::ArtifactInferFromUrlRequest request;
     request.set_url("https://example.com/bundle.tar.gz");
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "artifact infer from url request serializes");
+    CHECK(serialize(request, &request_bytes), "artifact infer from url request serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc = rac_artifact_infer_from_url_proto(
-        request_bytes.data(), request_bytes.size(), &out);
+    const rac_result_t rc =
+        rac_artifact_infer_from_url_proto(request_bytes.data(), request_bytes.size(), &out);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "artifact_infer_from_url_proto is wired (not feature-unavailable)");
     CHECK(out.status != RAC_ERROR_FEATURE_NOT_AVAILABLE,
@@ -313,15 +304,13 @@ int test_voice_agent_process_turn_proto_is_active() {
     request.set_session_id("smoke-session");
     request.set_request_id("smoke-request");
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "voice agent turn request serializes");
+    CHECK(serialize(request, &request_bytes), "voice agent turn request serializes");
 
     // Intentionally call with a null handle: the API short-circuits to
     // RAC_ERROR_INVALID_ARGUMENT on invalid handle, which still proves the
     // protobuf runtime branch is compiled in (not the feature-unavailable stub).
     const rac_result_t rc = rac_voice_agent_process_turn_proto(
-        nullptr, request_bytes.data(), request_bytes.size(), discard_event_cb,
-        nullptr);
+        nullptr, request_bytes.data(), request_bytes.size(), discard_event_cb, nullptr);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "voice_agent_process_turn_proto is wired (not feature-unavailable)");
     return 0;
@@ -334,13 +323,12 @@ int test_tool_calling_session_create_proto_is_active() {
     // RAC_ERROR_INVALID_ARGUMENT from the protobuf branch, proving wiring.
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "tool calling session create request serializes");
+    CHECK(serialize(request, &request_bytes), "tool calling session create request serializes");
 
     uint64_t session_handle = 0;
     const rac_result_t rc = rac_tool_calling_session_create_proto(
-        request_bytes.empty() ? nullptr : request_bytes.data(),
-        request_bytes.size(), discard_event_cb, nullptr, &session_handle);
+        request_bytes.empty() ? nullptr : request_bytes.data(), request_bytes.size(),
+        discard_event_cb, nullptr, &session_handle);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "tool_calling_session_create_proto is wired (not feature-unavailable)");
     if (session_handle != 0) {
@@ -356,12 +344,11 @@ int test_stt_transcribe_stream_lifecycle_proto_is_active() {
     // Empty request (no audio) -- API will reject with RAC_ERROR_INVALID_ARGUMENT
     // from the protobuf branch, proving wiring (not the feature-unavailable stub).
     std::vector<uint8_t> request_bytes;
-    CHECK(serialize(request, &request_bytes),
-          "STT transcription request serializes");
+    CHECK(serialize(request, &request_bytes), "STT transcription request serializes");
 
     const rac_result_t rc = rac_stt_transcribe_stream_lifecycle_proto(
-        request_bytes.empty() ? nullptr : request_bytes.data(),
-        request_bytes.size(), discard_event_cb, nullptr);
+        request_bytes.empty() ? nullptr : request_bytes.data(), request_bytes.size(),
+        discard_event_cb, nullptr);
     CHECK(rc != RAC_ERROR_FEATURE_NOT_AVAILABLE,
           "stt_transcribe_stream_lifecycle_proto is wired (not feature-unavailable)");
     return 0;
@@ -377,10 +364,10 @@ int main() {
     std::fprintf(stdout, "  skip: protobuf runtime is disabled\n");
     return 0;
 #else
-#define RUN(name)                                                                        \
-    do {                                                                                \
-        std::fprintf(stdout, "[ RUN  ] %s\n", #name);                                  \
-        name();                                                                         \
+#define RUN(name)                                     \
+    do {                                              \
+        std::fprintf(stdout, "[ RUN  ] %s\n", #name); \
+        name();                                       \
     } while (0)
 
     RUN(test_registry_list_proto_is_active);

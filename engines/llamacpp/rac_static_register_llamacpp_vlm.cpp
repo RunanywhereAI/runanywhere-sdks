@@ -18,7 +18,7 @@
 
 #include "rac/plugin/rac_plugin_entry.h"
 
-extern "C" const rac_engine_vtable_t* rac_plugin_entry_llamacpp_vlm(void);
+extern "C" const rac_engine_vtable_t *rac_plugin_entry_llamacpp_vlm(void);
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
 RAC_STATIC_PLUGIN_REGISTER(llamacpp_vlm);

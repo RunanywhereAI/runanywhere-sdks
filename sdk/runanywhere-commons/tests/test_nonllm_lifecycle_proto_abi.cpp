@@ -35,16 +35,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -55,10 +54,12 @@ struct MockState {
 };
 
 char* dup_cstr(const char* text) {
-    if (!text) return nullptr;
+    if (!text)
+        return nullptr;
     const size_t len = std::strlen(text);
     auto* out = static_cast<char*>(std::malloc(len + 1));
-    if (!out) return nullptr;
+    if (!out)
+        return nullptr;
     std::memcpy(out, text, len + 1);
     return out;
 }
@@ -66,8 +67,7 @@ char* dup_cstr(const char* text) {
 template <typename T>
 bool serialize(const T& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    return out->empty() ||
-           message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+    return out->empty() || message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
 template <typename T>
@@ -77,7 +77,8 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
 }
 
 rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* state = new MockState();
     state->model_path = model_id ? model_id : "";
     *out_impl = state;
@@ -85,7 +86,8 @@ rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
 }
 
 rac_result_t mock_initialize_with_path(void* impl, const char* model_path) {
-    if (!impl || !model_path) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !model_path)
+        return RAC_ERROR_NULL_POINTER;
     static_cast<MockState*>(impl)->model_path = model_path;
     return RAC_SUCCESS;
 }
@@ -109,7 +111,8 @@ void mock_destroy(void* impl) {
 
 rac_result_t mock_stt_transcribe(void*, const void* audio_data, size_t audio_size,
                                  const rac_stt_options_t*, rac_stt_result_t* out_result) {
-    if (!audio_data || audio_size == 0 || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!audio_data || audio_size == 0 || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     *out_result = {};
     out_result->text = dup_cstr("hello lifecycle");
     out_result->detected_language = dup_cstr("en");
@@ -120,9 +123,10 @@ rac_result_t mock_stt_transcribe(void*, const void* audio_data, size_t audio_siz
 }
 
 rac_result_t mock_stt_transcribe_stream(void*, const void* audio_data, size_t audio_size,
-                                         const rac_stt_options_t*,
-                                         rac_stt_stream_callback_t callback, void* user_data) {
-    if (!audio_data || audio_size == 0 || !callback) return RAC_ERROR_INVALID_ARGUMENT;
+                                        const rac_stt_options_t*,
+                                        rac_stt_stream_callback_t callback, void* user_data) {
+    if (!audio_data || audio_size == 0 || !callback)
+        return RAC_ERROR_INVALID_ARGUMENT;
     callback("stream-draft", RAC_FALSE, user_data);
     callback("stream-final", RAC_TRUE, user_data);
     return RAC_SUCCESS;
@@ -130,11 +134,13 @@ rac_result_t mock_stt_transcribe_stream(void*, const void* audio_data, size_t au
 
 rac_result_t mock_tts_synthesize(void*, const char* text, const rac_tts_options_t* options,
                                  rac_tts_result_t* out_result) {
-    if (!text || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!text || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     *out_result = {};
     constexpr size_t kAudioSize = 8;
     auto* audio = static_cast<unsigned char*>(std::malloc(kAudioSize));
-    if (!audio) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!audio)
+        return RAC_ERROR_OUT_OF_MEMORY;
     for (size_t i = 0; i < kAudioSize; ++i) {
         audio[i] = static_cast<unsigned char>(text[0] + static_cast<char>(i));
     }
@@ -150,7 +156,8 @@ rac_result_t mock_tts_synthesize(void*, const char* text, const rac_tts_options_
 
 rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_samples,
                               rac_bool_t* out_is_speech) {
-    if (!impl || !samples || !out_is_speech) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !samples || !out_is_speech)
+        return RAC_ERROR_NULL_POINTER;
     const auto* state = static_cast<const MockState*>(impl);
     double sum = 0.0;
     for (size_t i = 0; i < num_samples; ++i) {
@@ -162,7 +169,8 @@ rac_result_t mock_vad_process(void* impl, const float* samples, size_t num_sampl
 }
 
 rac_result_t mock_vad_set_threshold(void* impl, float threshold) {
-    if (!impl) return RAC_ERROR_NULL_POINTER;
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
     static_cast<MockState*>(impl)->vad_threshold = threshold;
     return RAC_SUCCESS;
 }
@@ -174,7 +182,8 @@ rac_bool_t mock_vad_is_speech_active(void*) {
 rac_result_t mock_embeddings_batch(void*, const char* const* texts, size_t num_texts,
                                    const rac_embeddings_options_t*,
                                    rac_embeddings_result_t* out_result) {
-    if (!texts || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!texts || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     *out_result = {};
     out_result->num_embeddings = num_texts;
     out_result->dimension = 3;
@@ -182,12 +191,14 @@ rac_result_t mock_embeddings_batch(void*, const char* const* texts, size_t num_t
     out_result->total_tokens = static_cast<int32_t>(num_texts * 2);
     out_result->embeddings = static_cast<rac_embedding_vector_t*>(
         std::calloc(num_texts, sizeof(rac_embedding_vector_t)));
-    if (!out_result->embeddings) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->embeddings)
+        return RAC_ERROR_OUT_OF_MEMORY;
     for (size_t i = 0; i < num_texts; ++i) {
         auto& vector = out_result->embeddings[i];
         vector.dimension = out_result->dimension;
         vector.data = static_cast<float*>(std::malloc(sizeof(float) * vector.dimension));
-        if (!vector.data) return RAC_ERROR_OUT_OF_MEMORY;
+        if (!vector.data)
+            return RAC_ERROR_OUT_OF_MEMORY;
         vector.data[0] = static_cast<float>(i);
         vector.data[1] = static_cast<float>(std::strlen(texts[i]));
         vector.data[2] = 1.0f;
@@ -197,7 +208,8 @@ rac_result_t mock_embeddings_batch(void*, const char* const* texts, size_t num_t
 
 rac_result_t mock_diffusion_generate(void*, const rac_diffusion_options_t* options,
                                      rac_diffusion_result_t* out_result) {
-    if (!options || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!options || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     *out_result = {};
     out_result->width = options->width;
     out_result->height = options->height;
@@ -206,13 +218,13 @@ rac_result_t mock_diffusion_generate(void*, const rac_diffusion_options_t* optio
     out_result->error_code = RAC_SUCCESS;
     out_result->image_size = static_cast<size_t>(out_result->width * out_result->height * 4);
     out_result->image_data = static_cast<uint8_t*>(std::malloc(out_result->image_size));
-    if (!out_result->image_data) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->image_data)
+        return RAC_ERROR_OUT_OF_MEMORY;
     std::memset(out_result->image_data, 0x7f, out_result->image_size);
     return RAC_SUCCESS;
 }
 
-runanywhere::v1::ModelInfo build_model(const char* id,
-                                       runanywhere::v1::ModelCategory category) {
+runanywhere::v1::ModelInfo build_model(const char* id, runanywhere::v1::ModelCategory category) {
     runanywhere::v1::ModelInfo model;
     model.set_id(id);
     model.set_name(id);
@@ -225,19 +237,19 @@ runanywhere::v1::ModelInfo build_model(const char* id,
     return model;
 }
 
-bool register_model(rac_model_registry_handle_t registry,
-                    const runanywhere::v1::ModelInfo& model) {
+bool register_model(rac_model_registry_handle_t registry, const runanywhere::v1::ModelInfo& model) {
     std::vector<uint8_t> bytes;
     return serialize(model, &bytes) &&
-           rac_model_registry_register_proto(
-               registry, bytes.empty() ? nullptr : bytes.data(), bytes.size()) == RAC_SUCCESS;
+           rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
+                                             bytes.size()) == RAC_SUCCESS;
 }
 
 bool load_model(rac_model_registry_handle_t registry, const char* model_id) {
     runanywhere::v1::ModelLoadRequest request;
     request.set_model_id(model_id);
     std::vector<uint8_t> bytes;
-    if (!serialize(request, &bytes)) return false;
+    if (!serialize(request, &bytes))
+        return false;
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -249,8 +261,7 @@ bool load_model(rac_model_registry_handle_t registry, const char* model_id) {
     return ok;
 }
 
-rac_engine_vtable_t make_mock_vtable(rac_stt_service_ops_t* stt_ops,
-                                     rac_tts_service_ops_t* tts_ops,
+rac_engine_vtable_t make_mock_vtable(rac_stt_service_ops_t* stt_ops, rac_tts_service_ops_t* tts_ops,
                                      rac_vad_service_ops_t* vad_ops,
                                      rac_embeddings_service_ops_t* embeddings_ops,
                                      rac_diffusion_service_ops_t* diffusion_ops) {
@@ -333,25 +344,21 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     rac_model_lifecycle_reset();
     CHECK(install_mock_plugin(), "mock non-LLM lifecycle plugin registers");
 
-    CHECK(register_model(registry,
-                         build_model("lifecycle.stt",
-                                     runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION)),
+    CHECK(register_model(registry, build_model("lifecycle.stt",
+                                               runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION)),
           "STT lifecycle model registers");
-    CHECK(register_model(registry,
-                         build_model("lifecycle.tts",
-                                     runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS)),
+    CHECK(register_model(registry, build_model("lifecycle.tts",
+                                               runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS)),
           "TTS lifecycle model registers");
     CHECK(register_model(registry,
                          build_model("lifecycle.vad",
                                      runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)),
           "VAD lifecycle model registers");
-    CHECK(register_model(registry,
-                         build_model("lifecycle.embeddings",
-                                     runanywhere::v1::MODEL_CATEGORY_EMBEDDING)),
+    CHECK(register_model(registry, build_model("lifecycle.embeddings",
+                                               runanywhere::v1::MODEL_CATEGORY_EMBEDDING)),
           "embeddings lifecycle model registers");
-    CHECK(register_model(registry,
-                         build_model("lifecycle.diffusion",
-                                     runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION)),
+    CHECK(register_model(registry, build_model("lifecycle.diffusion",
+                                               runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION)),
           "diffusion lifecycle model registers");
 
     CHECK(load_model(registry, "lifecycle.stt"), "STT lifecycle model loads");
@@ -373,8 +380,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     CHECK(serialize(stt_request, &bytes), "STT lifecycle request serializes");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_stt_transcribe_lifecycle_proto(bytes.data(), bytes.size(), &out);
+    rac_result_t rc = rac_stt_transcribe_lifecycle_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::STTOutput stt_output;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stt_output),
           "STT lifecycle ABI returns STTOutput");
@@ -398,25 +404,21 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
         std::vector<uint8_t> stream_bytes;
         CHECK(serialize(stt_request, &stream_bytes), "STT lifecycle stream request serializes");
         rc = rac_stt_transcribe_stream_lifecycle_proto(stream_bytes.data(), stream_bytes.size(),
-                                                        stream_cb, &stream_events);
+                                                       stream_cb, &stream_events);
         CHECK(rc == RAC_SUCCESS, "STT lifecycle stream ABI returns success");
         CHECK(stream_events.size() == 3,
               "STT lifecycle stream ABI emits started, partial and final events");
         if (stream_events.size() == 3) {
-            CHECK(stream_events[0].kind() ==
-                      runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED &&
+            CHECK(stream_events[0].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED &&
                       stream_events[0].seq() == 1,
                   "STT lifecycle stream first event is STARTED with seq=1");
-            CHECK(stream_events[1].kind() ==
-                          runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL &&
+            CHECK(stream_events[1].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL &&
                       stream_events[1].has_partial() &&
                       stream_events[1].partial().text() == "stream-draft" &&
                       !stream_events[1].partial().is_final(),
                   "STT lifecycle stream second event is PARTIAL with draft text");
-            CHECK(stream_events[2].kind() ==
-                          runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
-                      stream_events[2].has_partial() &&
-                      stream_events[2].partial().is_final() &&
+            CHECK(stream_events[2].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
+                      stream_events[2].has_partial() && stream_events[2].partial().is_final() &&
                       stream_events[2].has_final_output() &&
                       stream_events[2].final_output().text() == "stream-final",
                   "STT lifecycle stream third event is FINAL with final text");
@@ -510,8 +512,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     rac_proto_buffer_free(&out);
 
     embeddings_request.set_model_id("other.embeddings");
-    CHECK(serialize(embeddings_request, &bytes),
-          "embeddings mismatched model request serializes");
+    CHECK(serialize(embeddings_request, &bytes), "embeddings mismatched model request serializes");
     rac_proto_buffer_init(&out);
     rc = rac_embeddings_embed_batch_lifecycle_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_ERROR_INVALID_ARGUMENT && out.status == RAC_ERROR_INVALID_ARGUMENT,
@@ -530,8 +531,7 @@ int test_portable_source_blockers() {
     CHECK(serialize(stt_request, &bytes), "STT file-uri request serializes");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_stt_transcribe_lifecycle_proto(bytes.data(), bytes.size(), &out);
+    rac_result_t rc = rac_stt_transcribe_lifecycle_proto(bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_ERROR_NOT_SUPPORTED && out.status == RAC_ERROR_NOT_SUPPORTED,
           "STT lifecycle ABI rejects native file URI source");
     rac_proto_buffer_free(&out);

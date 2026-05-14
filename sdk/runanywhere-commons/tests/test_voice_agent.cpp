@@ -11,29 +11,29 @@
  * Uses a shared global agent handle for tests 2-13 since model loading is slow.
  */
 
-#include "test_common.h"
-#include "test_config.h"
-
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
-#include "rac/backends/rac_vad_onnx.h"  // for typedefs and rac_backend_onnx_register()
-#include "rac/backends/rac_stt_onnx.h"
-#include "rac/backends/rac_tts_onnx.h"
 #include "rac_stt_sherpa.h"  // engines/sherpa: rac_stt_sherpa_* function declarations
 #include "rac_tts_sherpa.h"
 #include "rac_vad_sherpa.h"
-#include "rac/backends/rac_llm_llamacpp.h"
-#include "rac/features/voice_agent/rac_voice_agent.h"
+#include "test_common.h"
+#include "test_config.h"
 
 #include <cstring>
 #include <string>
+
+#include "rac/backends/rac_llm_llamacpp.h"
+#include "rac/backends/rac_stt_onnx.h"
+#include "rac/backends/rac_tts_onnx.h"
+#include "rac/backends/rac_vad_onnx.h"  // for typedefs and rac_backend_onnx_register()
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
 
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -76,13 +76,16 @@ static rac_config_t make_test_config() {
 
 static bool setup() {
     rac_config_t config = make_test_config();
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_onnx_register();
     rac_backend_llamacpp_register();
     return true;
 }
 
-static void teardown() { rac_shutdown(); }
+static void teardown() {
+    rac_shutdown();
+}
 
 // =============================================================================
 // Shared global agent for tests that require loaded models (2-13)
@@ -107,7 +110,8 @@ static bool ensure_global_agent(TestResult& result, const std::string& test_name
     }
 
     // If already ready, nothing to do
-    if (g_agent_ready) return true;
+    if (g_agent_ready)
+        return true;
 
     // If we already tried and failed (not due to missing models), fail
     if (g_agent_setup_attempted) {
@@ -156,7 +160,7 @@ static bool ensure_global_agent(TestResult& result, const std::string& test_name
     {
         ScopedTimer timer("load_stt_model");
         rc = rac_voice_agent_load_stt_model(g_agent, stt_path.c_str(), "whisper-tiny-en",
-                                             "Whisper Tiny EN");
+                                            "Whisper Tiny EN");
     }
     if (rc != RAC_SUCCESS) {
         result.test_name = test_name;
@@ -171,7 +175,7 @@ static bool ensure_global_agent(TestResult& result, const std::string& test_name
     {
         ScopedTimer timer("load_llm_model");
         rc = rac_voice_agent_load_llm_model(g_agent, llm_path.c_str(), "qwen3-0.6b",
-                                             "Qwen3 0.6B Q8");
+                                            "Qwen3 0.6B Q8");
     }
     if (rc != RAC_SUCCESS) {
         result.test_name = test_name;
@@ -185,9 +189,8 @@ static bool ensure_global_agent(TestResult& result, const std::string& test_name
 
     {
         ScopedTimer timer("load_tts_voice");
-        rc = rac_voice_agent_load_tts_voice(g_agent, tts_path.c_str(),
-                                             "vits-piper-en_US-lessac-medium",
-                                             "Piper TTS Lessac Medium");
+        rc = rac_voice_agent_load_tts_voice(
+            g_agent, tts_path.c_str(), "vits-piper-en_US-lessac-medium", "Piper TTS Lessac Medium");
     }
     if (rc != RAC_SUCCESS) {
         result.test_name = test_name;
@@ -245,7 +248,8 @@ static TestResult test_create_standalone() {
 
 static TestResult test_load_all_models() {
     TestResult result;
-    if (!ensure_global_agent(result, "load_all_models")) return result;
+    if (!ensure_global_agent(result, "load_all_models"))
+        return result;
 
     // If we reached here, all models loaded successfully via ensure_global_agent
     return TEST_PASS();
@@ -257,7 +261,8 @@ static TestResult test_load_all_models() {
 
 static TestResult test_is_loaded_checks() {
     TestResult result;
-    if (!ensure_global_agent(result, "is_loaded_checks")) return result;
+    if (!ensure_global_agent(result, "is_loaded_checks"))
+        return result;
 
     rac_bool_t stt_loaded = RAC_FALSE;
     rac_result_t rc = rac_voice_agent_is_stt_loaded(g_agent, &stt_loaded);
@@ -283,7 +288,8 @@ static TestResult test_is_loaded_checks() {
 
 static TestResult test_initialize_with_loaded() {
     TestResult result;
-    if (!ensure_global_agent(result, "initialize_with_loaded")) return result;
+    if (!ensure_global_agent(result, "initialize_with_loaded"))
+        return result;
 
     // Already initialized by ensure_global_agent; verify it did not fail
     // (the ensure function called rac_voice_agent_initialize_with_loaded_models)
@@ -296,7 +302,8 @@ static TestResult test_initialize_with_loaded() {
 
 static TestResult test_is_ready() {
     TestResult result;
-    if (!ensure_global_agent(result, "is_ready")) return result;
+    if (!ensure_global_agent(result, "is_ready"))
+        return result;
 
     rac_bool_t ready = RAC_FALSE;
     rac_result_t rc = rac_voice_agent_is_ready(g_agent, &ready);
@@ -312,7 +319,8 @@ static TestResult test_is_ready() {
 
 static TestResult test_get_model_ids() {
     TestResult result;
-    if (!ensure_global_agent(result, "get_model_ids")) return result;
+    if (!ensure_global_agent(result, "get_model_ids"))
+        return result;
 
     const char* stt_id = rac_voice_agent_get_stt_model_id(g_agent);
     ASSERT_TRUE(stt_id != nullptr, "STT model ID should not be NULL");
@@ -335,7 +343,8 @@ static TestResult test_get_model_ids() {
 
 static TestResult test_generate_response() {
     TestResult result;
-    if (!ensure_global_agent(result, "generate_response")) return result;
+    if (!ensure_global_agent(result, "generate_response"))
+        return result;
 
     char* response = nullptr;
     rac_result_t rc;
@@ -359,7 +368,8 @@ static TestResult test_generate_response() {
 
 static TestResult test_synthesize_speech() {
     TestResult result;
-    if (!ensure_global_agent(result, "synthesize_speech")) return result;
+    if (!ensure_global_agent(result, "synthesize_speech"))
+        return result;
 
     void* audio = nullptr;
     size_t audio_size = 0;
@@ -384,14 +394,16 @@ static TestResult test_synthesize_speech() {
 
 static TestResult test_detect_speech_silence() {
     TestResult result;
-    if (!ensure_global_agent(result, "detect_speech_silence")) return result;
+    if (!ensure_global_agent(result, "detect_speech_silence"))
+        return result;
 
     // Generate 0.5 seconds of silence at 16kHz = 8000 samples
     const size_t num_samples = 8000;
     std::vector<float> silence(num_samples, 0.0f);
 
-    rac_bool_t detected = RAC_TRUE; // default to TRUE so we can verify it becomes FALSE
-    rac_result_t rc = rac_voice_agent_detect_speech(g_agent, silence.data(), num_samples, &detected);
+    rac_bool_t detected = RAC_TRUE;  // default to TRUE so we can verify it becomes FALSE
+    rac_result_t rc =
+        rac_voice_agent_detect_speech(g_agent, silence.data(), num_samples, &detected);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_voice_agent_detect_speech should succeed");
     ASSERT_EQ(detected, RAC_FALSE, "silence should not be detected as speech");
 
@@ -404,7 +416,8 @@ static TestResult test_detect_speech_silence() {
 
 static TestResult test_transcribe_tts_audio() {
     TestResult result;
-    if (!ensure_global_agent(result, "transcribe_tts_audio")) return result;
+    if (!ensure_global_agent(result, "transcribe_tts_audio"))
+        return result;
 
     // Create a separate TTS handle to synthesize speech for transcription
     std::string tts_path = test_config::get_tts_model_path();
@@ -459,7 +472,8 @@ static TestResult test_transcribe_tts_audio() {
 
 static TestResult test_process_voice_turn_tts() {
     TestResult result;
-    if (!ensure_global_agent(result, "process_voice_turn_tts")) return result;
+    if (!ensure_global_agent(result, "process_voice_turn_tts"))
+        return result;
 
     // Create a separate TTS handle to synthesize a question
     std::string tts_path = test_config::get_tts_model_path();
@@ -472,7 +486,7 @@ static TestResult test_process_voice_turn_tts() {
     {
         ScopedTimer timer("tts_synthesize_question");
         rc = rac_tts_sherpa_synthesize(tts_handle, "What is the capital of France", nullptr,
-                                     &tts_result);
+                                       &tts_result);
     }
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_tts_sherpa_synthesize should succeed");
 
@@ -516,7 +530,8 @@ static TestResult test_process_voice_turn_tts() {
 
 static TestResult test_process_voice_turn_silence() {
     TestResult result;
-    if (!ensure_global_agent(result, "process_voice_turn_silence")) return result;
+    if (!ensure_global_agent(result, "process_voice_turn_silence"))
+        return result;
 
     // Generate 1 second of silence at 16kHz as int16
     std::vector<int16_t> silence(16000, 0);
@@ -558,14 +573,18 @@ struct StreamEventData {
 static void stream_event_callback(const rac_voice_agent_event_t* event, void* user_data) {
     auto* data = static_cast<StreamEventData*>(user_data);
     data->event_count++;
-    if (event->type == RAC_VOICE_AGENT_EVENT_TRANSCRIPTION) data->got_transcription = true;
-    if (event->type == RAC_VOICE_AGENT_EVENT_RESPONSE) data->got_response = true;
-    if (event->type == RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED) data->got_audio = true;
+    if (event->type == RAC_VOICE_AGENT_EVENT_TRANSCRIPTION)
+        data->got_transcription = true;
+    if (event->type == RAC_VOICE_AGENT_EVENT_RESPONSE)
+        data->got_response = true;
+    if (event->type == RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED)
+        data->got_audio = true;
 }
 
 static TestResult test_process_stream_events() {
     TestResult result;
-    if (!ensure_global_agent(result, "process_stream_events")) return result;
+    if (!ensure_global_agent(result, "process_stream_events"))
+        return result;
 
     // Create a separate TTS handle to synthesize input audio
     std::string tts_path = test_config::get_tts_model_path();
@@ -630,12 +649,11 @@ static TestResult test_pipeline_state_helpers() {
 
     // Test valid transition: IDLE -> LISTENING should be valid
     rac_bool_t valid = rac_audio_pipeline_is_valid_transition(RAC_AUDIO_PIPELINE_IDLE,
-                                                               RAC_AUDIO_PIPELINE_LISTENING);
+                                                              RAC_AUDIO_PIPELINE_LISTENING);
     ASSERT_EQ(valid, RAC_TRUE, "IDLE -> LISTENING should be a valid transition");
 
     // Test can_play_tts: GENERATING_RESPONSE should have a defined result
-    rac_bool_t can_play =
-        rac_audio_pipeline_can_play_tts(RAC_AUDIO_PIPELINE_GENERATING_RESPONSE);
+    rac_bool_t can_play = rac_audio_pipeline_can_play_tts(RAC_AUDIO_PIPELINE_GENERATING_RESPONSE);
     // We just verify it returns without crashing; the actual value depends on the state machine
     (void)can_play;
 

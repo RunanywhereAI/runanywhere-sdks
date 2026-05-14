@@ -6,17 +6,17 @@
  * Requires: silero_vad.onnx model at the configured path.
  */
 
+#include "rac_vad_sherpa.h"  // engines/sherpa: rac_vad_sherpa_* function declarations
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"  // for RAC_VAD_ONNX_CONFIG_DEFAULT typedefs and rac_backend_onnx_register()
-#include "rac_vad_sherpa.h"  // engines/sherpa: rac_vad_sherpa_* function declarations
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
-
 #include <cstdio>
 #include <ctime>
+
+#include "rac/backends/rac_tts_onnx.h"
+#include "rac/backends/rac_vad_onnx.h"  // for RAC_VAD_ONNX_CONFIG_DEFAULT typedefs and rac_backend_onnx_register()
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // Minimal Test Platform Adapter
@@ -127,7 +127,8 @@ static bool setup() {
     config.log_level = RAC_LOG_INFO;
     config.log_tag = "test_vad";
     config.reserved = nullptr;
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_onnx_register();
     return true;
 }
@@ -157,7 +158,8 @@ static TestResult test_create_destroy() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
 
     if (rc != RAC_SUCCESS) {
         result.passed = false;
@@ -198,7 +200,8 @@ static TestResult test_create_invalid_path() {
     if (rc == RAC_SUCCESS) {
         result.passed = false;
         result.details = "expected error for invalid path, got RAC_SUCCESS";
-        if (handle != RAC_INVALID_HANDLE) rac_vad_sherpa_destroy(handle);
+        if (handle != RAC_INVALID_HANDLE)
+            rac_vad_sherpa_destroy(handle);
         teardown();
         return result;
     }
@@ -226,7 +229,8 @@ static TestResult test_process_silence() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -247,24 +251,26 @@ static TestResult test_process_silence() {
         rc = rac_vad_sherpa_process(handle, silence.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details =
-                "rac_vad_sherpa_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
+            result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
+                             ": " + std::to_string(rc);
             rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
         }
-        if (is_speech == RAC_TRUE) ++speech_count;
+        if (is_speech == RAC_TRUE)
+            ++speech_count;
         ++total_chunks;
     }
 
-    float speech_ratio =
-        total_chunks > 0 ? static_cast<float>(speech_count) / static_cast<float>(total_chunks) : 0.0f;
+    float speech_ratio = total_chunks > 0
+                             ? static_cast<float>(speech_count) / static_cast<float>(total_chunks)
+                             : 0.0f;
 
     if (speech_ratio >= 0.10f) {
         result.passed = false;
-        result.details = "speech detection rate too high for silence: " +
-                         std::to_string(speech_count) + "/" + std::to_string(total_chunks) +
-                         " (" + std::to_string(speech_ratio * 100.0f) + "%)";
+        result.details =
+            "speech detection rate too high for silence: " + std::to_string(speech_count) + "/" +
+            std::to_string(total_chunks) + " (" + std::to_string(speech_ratio * 100.0f) + "%)";
     } else {
         result.passed = true;
         result.details = "speech frames " + std::to_string(speech_count) + "/" +
@@ -294,7 +300,8 @@ static TestResult test_process_white_noise() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -315,24 +322,26 @@ static TestResult test_process_white_noise() {
         rc = rac_vad_sherpa_process(handle, noise.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details =
-                "rac_vad_sherpa_process failed at offset " + std::to_string(offset) + ": " + std::to_string(rc);
+            result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
+                             ": " + std::to_string(rc);
             rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
         }
-        if (is_speech == RAC_TRUE) ++speech_count;
+        if (is_speech == RAC_TRUE)
+            ++speech_count;
         ++total_chunks;
     }
 
-    float speech_ratio =
-        total_chunks > 0 ? static_cast<float>(speech_count) / static_cast<float>(total_chunks) : 0.0f;
+    float speech_ratio = total_chunks > 0
+                             ? static_cast<float>(speech_count) / static_cast<float>(total_chunks)
+                             : 0.0f;
 
     // Low-amplitude noise should produce low speech detection
     result.passed = true;
     result.details = "speech frames " + std::to_string(speech_count) + "/" +
-                     std::to_string(total_chunks) + " (" +
-                     std::to_string(speech_ratio * 100.0f) + "%)";
+                     std::to_string(total_chunks) + " (" + std::to_string(speech_ratio * 100.0f) +
+                     "%)";
 
     rac_vad_sherpa_destroy(handle);
     teardown();
@@ -356,7 +365,8 @@ static TestResult test_start_stop_reset() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -404,7 +414,8 @@ static TestResult test_set_threshold() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -443,7 +454,8 @@ static TestResult test_is_speech_active() {
     }
 
     rac_handle_t handle = RAC_INVALID_HANDLE;
-    rac_result_t rc = rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
+    rac_result_t rc =
+        rac_vad_sherpa_create(model_path.c_str(), &RAC_VAD_ONNX_CONFIG_DEFAULT, &handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
@@ -458,10 +470,12 @@ static TestResult test_is_speech_active() {
     rac_bool_t is_speech = RAC_FALSE;
 
     for (size_t i = 0; i < num_chunks; ++i) {
-        rc = rac_vad_sherpa_process(handle, silence.data() + i * chunk_size, chunk_size, &is_speech);
+        rc =
+            rac_vad_sherpa_process(handle, silence.data() + i * chunk_size, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details = "process failed at chunk " + std::to_string(i) + ": " + std::to_string(rc);
+            result.details =
+                "process failed at chunk " + std::to_string(i) + ": " + std::to_string(rc);
             rac_vad_sherpa_destroy(handle);
             teardown();
             return result;
@@ -493,8 +507,10 @@ static TestResult test_vad_detects_tts_speech() {
     std::string vad_model_path = test_config::get_vad_model_path();
     std::string tts_model_path = test_config::get_tts_model_path();
 
-    if (!test_config::require_model(vad_model_path, result.test_name, result)) return result;
-    if (!test_config::require_model(tts_model_path, result.test_name, result)) return result;
+    if (!test_config::require_model(vad_model_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(tts_model_path, result.test_name, result))
+        return result;
 
     if (!setup()) {
         result.passed = false;
@@ -514,8 +530,9 @@ static TestResult test_vad_detects_tts_speech() {
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "Hello world, this is a test of voice activity detection",
-                                  nullptr, &tts_result);
+    rc = rac_tts_onnx_synthesize(tts_handle,
+                                 "Hello world, this is a test of voice activity detection", nullptr,
+                                 &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
@@ -527,8 +544,8 @@ static TestResult test_vad_detects_tts_speech() {
     // Resample TTS output from 22050Hz to 16000Hz
     const float* tts_audio = static_cast<const float*>(tts_result.audio_data);
     size_t tts_num_samples = tts_result.audio_size / sizeof(float);
-    std::vector<float> resampled = resample_linear(tts_audio, tts_num_samples,
-                                                    tts_result.sample_rate, 16000);
+    std::vector<float> resampled =
+        resample_linear(tts_audio, tts_num_samples, tts_result.sample_rate, 16000);
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
@@ -536,7 +553,8 @@ static TestResult test_vad_detects_tts_speech() {
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -555,17 +573,20 @@ static TestResult test_vad_detects_tts_speech() {
             result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
             rac_vad_sherpa_destroy(vad_handle);
-            if (tts_result.audio_data) rac_free(tts_result.audio_data);
+            if (tts_result.audio_data)
+                rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
             return result;
         }
-        if (is_speech == RAC_TRUE) ++speech_count;
+        if (is_speech == RAC_TRUE)
+            ++speech_count;
         ++total_chunks;
     }
 
-    float speech_ratio =
-        total_chunks > 0 ? static_cast<float>(speech_count) / static_cast<float>(total_chunks) : 0.0f;
+    float speech_ratio = total_chunks > 0
+                             ? static_cast<float>(speech_count) / static_cast<float>(total_chunks)
+                             : 0.0f;
 
     if (speech_ratio > 0.1f) {
         result.passed = true;
@@ -580,7 +601,8 @@ static TestResult test_vad_detects_tts_speech() {
     }
 
     rac_vad_sherpa_destroy(vad_handle);
-    if (tts_result.audio_data) rac_free(tts_result.audio_data);
+    if (tts_result.audio_data)
+        rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();
     return result;
@@ -593,8 +615,10 @@ static TestResult test_vad_mixed_speech_silence() {
     std::string vad_model_path = test_config::get_vad_model_path();
     std::string tts_model_path = test_config::get_tts_model_path();
 
-    if (!test_config::require_model(vad_model_path, result.test_name, result)) return result;
-    if (!test_config::require_model(tts_model_path, result.test_name, result)) return result;
+    if (!test_config::require_model(vad_model_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(tts_model_path, result.test_name, result))
+        return result;
 
     if (!setup()) {
         result.passed = false;
@@ -626,11 +650,11 @@ static TestResult test_vad_mixed_speech_silence() {
     // Resample TTS output to 16kHz
     const float* tts_audio = static_cast<const float*>(tts_result.audio_data);
     size_t tts_num_samples = tts_result.audio_size / sizeof(float);
-    std::vector<float> resampled = resample_linear(tts_audio, tts_num_samples,
-                                                    tts_result.sample_rate, 16000);
+    std::vector<float> resampled =
+        resample_linear(tts_audio, tts_num_samples, tts_result.sample_rate, 16000);
 
     // Build mixed audio: 0.5s silence + TTS speech + 0.5s silence
-    const size_t silence_samples = 8000; // 0.5s at 16kHz
+    const size_t silence_samples = 8000;  // 0.5s at 16kHz
     std::vector<float> leading_silence = generate_silence(silence_samples);
     std::vector<float> trailing_silence = generate_silence(silence_samples);
 
@@ -646,7 +670,8 @@ static TestResult test_vad_mixed_speech_silence() {
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -664,7 +689,8 @@ static TestResult test_vad_mixed_speech_silence() {
             result.details = "rac_vad_sherpa_process failed at offset " + std::to_string(offset) +
                              ": " + std::to_string(rc);
             rac_vad_sherpa_destroy(vad_handle);
-            if (tts_result.audio_data) rac_free(tts_result.audio_data);
+            if (tts_result.audio_data)
+                rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
             return result;
@@ -675,14 +701,16 @@ static TestResult test_vad_mixed_speech_silence() {
     // Verify pattern: some speech frames exist overall
     int total_speech = 0;
     for (bool s : frame_is_speech) {
-        if (s) ++total_speech;
+        if (s)
+            ++total_speech;
     }
 
     if (total_speech == 0) {
         result.passed = false;
         result.details = "no speech frames detected in mixed audio";
         rac_vad_sherpa_destroy(vad_handle);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -692,7 +720,8 @@ static TestResult test_vad_mixed_speech_silence() {
     size_t leading_frames = std::min(static_cast<size_t>(15), frame_is_speech.size());
     int leading_speech = 0;
     for (size_t i = 0; i < leading_frames; ++i) {
-        if (frame_is_speech[i]) ++leading_speech;
+        if (frame_is_speech[i])
+            ++leading_speech;
     }
 
     // The leading silence region should be mostly non-speech (allow some leakage)
@@ -705,29 +734,31 @@ static TestResult test_vad_mixed_speech_silence() {
 
     int middle_speech = 0;
     for (size_t i = speech_start_frame; i < speech_end_frame; ++i) {
-        if (frame_is_speech[i]) ++middle_speech;
+        if (frame_is_speech[i])
+            ++middle_speech;
     }
     bool middle_has_speech = (middle_speech > 0);
 
     if (leading_mostly_silence && middle_has_speech) {
         result.passed = true;
-        result.details = "mixed pattern OK: leading silence speech=" +
-                         std::to_string(leading_speech) + "/" + std::to_string(leading_frames) +
-                         ", middle speech=" + std::to_string(middle_speech) +
-                         ", total speech=" + std::to_string(total_speech) + "/" +
-                         std::to_string(frame_is_speech.size());
+        result.details =
+            "mixed pattern OK: leading silence speech=" + std::to_string(leading_speech) + "/" +
+            std::to_string(leading_frames) + ", middle speech=" + std::to_string(middle_speech) +
+            ", total speech=" + std::to_string(total_speech) + "/" +
+            std::to_string(frame_is_speech.size());
     } else {
         result.passed = false;
-        result.details = "pattern mismatch: leading_mostly_silence=" +
-                         std::string(leading_mostly_silence ? "true" : "false") +
-                         " (speech=" + std::to_string(leading_speech) + "/" +
-                         std::to_string(leading_frames) + "), middle_has_speech=" +
-                         std::string(middle_has_speech ? "true" : "false") +
-                         " (speech=" + std::to_string(middle_speech) + ")";
+        result.details =
+            "pattern mismatch: leading_mostly_silence=" +
+            std::string(leading_mostly_silence ? "true" : "false") +
+            " (speech=" + std::to_string(leading_speech) + "/" + std::to_string(leading_frames) +
+            "), middle_has_speech=" + std::string(middle_has_speech ? "true" : "false") +
+            " (speech=" + std::to_string(middle_speech) + ")";
     }
 
     rac_vad_sherpa_destroy(vad_handle);
-    if (tts_result.audio_data) rac_free(tts_result.audio_data);
+    if (tts_result.audio_data)
+        rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();
     return result;
@@ -740,8 +771,10 @@ static TestResult test_vad_threshold_sensitivity() {
     std::string vad_model_path = test_config::get_vad_model_path();
     std::string tts_model_path = test_config::get_tts_model_path();
 
-    if (!test_config::require_model(vad_model_path, result.test_name, result)) return result;
-    if (!test_config::require_model(tts_model_path, result.test_name, result)) return result;
+    if (!test_config::require_model(vad_model_path, result.test_name, result))
+        return result;
+    if (!test_config::require_model(tts_model_path, result.test_name, result))
+        return result;
 
     if (!setup()) {
         result.passed = false;
@@ -773,8 +806,8 @@ static TestResult test_vad_threshold_sensitivity() {
     // Resample TTS output to 16kHz
     const float* tts_audio = static_cast<const float*>(tts_result.audio_data);
     size_t tts_num_samples = tts_result.audio_size / sizeof(float);
-    std::vector<float> resampled = resample_linear(tts_audio, tts_num_samples,
-                                                    tts_result.sample_rate, 16000);
+    std::vector<float> resampled =
+        resample_linear(tts_audio, tts_num_samples, tts_result.sample_rate, 16000);
 
     // Create VAD handle
     rac_handle_t vad_handle = RAC_INVALID_HANDLE;
@@ -782,7 +815,8 @@ static TestResult test_vad_threshold_sensitivity() {
     if (rc != RAC_SUCCESS) {
         result.passed = false;
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -796,7 +830,8 @@ static TestResult test_vad_threshold_sensitivity() {
         result.passed = false;
         result.details = "set_threshold(0.1) failed: " + std::to_string(rc);
         rac_vad_sherpa_destroy(vad_handle);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -808,15 +843,17 @@ static TestResult test_vad_threshold_sensitivity() {
         rc = rac_vad_sherpa_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details = "process failed (loose) at offset " + std::to_string(offset) +
-                             ": " + std::to_string(rc);
+            result.details = "process failed (loose) at offset " + std::to_string(offset) + ": " +
+                             std::to_string(rc);
             rac_vad_sherpa_destroy(vad_handle);
-            if (tts_result.audio_data) rac_free(tts_result.audio_data);
+            if (tts_result.audio_data)
+                rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
             return result;
         }
-        if (is_speech == RAC_TRUE) ++loose_count;
+        if (is_speech == RAC_TRUE)
+            ++loose_count;
     }
 
     // Reset VAD state between runs
@@ -825,7 +862,8 @@ static TestResult test_vad_threshold_sensitivity() {
         result.passed = false;
         result.details = "rac_vad_sherpa_reset failed: " + std::to_string(rc);
         rac_vad_sherpa_destroy(vad_handle);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -837,7 +875,8 @@ static TestResult test_vad_threshold_sensitivity() {
         result.passed = false;
         result.details = "set_threshold(0.9) failed: " + std::to_string(rc);
         rac_vad_sherpa_destroy(vad_handle);
-        if (tts_result.audio_data) rac_free(tts_result.audio_data);
+        if (tts_result.audio_data)
+            rac_free(tts_result.audio_data);
         rac_tts_onnx_destroy(tts_handle);
         teardown();
         return result;
@@ -849,15 +888,17 @@ static TestResult test_vad_threshold_sensitivity() {
         rc = rac_vad_sherpa_process(vad_handle, resampled.data() + offset, chunk_size, &is_speech);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
-            result.details = "process failed (strict) at offset " + std::to_string(offset) +
-                             ": " + std::to_string(rc);
+            result.details = "process failed (strict) at offset " + std::to_string(offset) + ": " +
+                             std::to_string(rc);
             rac_vad_sherpa_destroy(vad_handle);
-            if (tts_result.audio_data) rac_free(tts_result.audio_data);
+            if (tts_result.audio_data)
+                rac_free(tts_result.audio_data);
             rac_tts_onnx_destroy(tts_handle);
             teardown();
             return result;
         }
-        if (is_speech == RAC_TRUE) ++strict_count;
+        if (is_speech == RAC_TRUE)
+            ++strict_count;
     }
 
     // Assert: loose threshold should detect at least as many speech frames as strict
@@ -872,7 +913,8 @@ static TestResult test_vad_threshold_sensitivity() {
     }
 
     rac_vad_sherpa_destroy(vad_handle);
-    if (tts_result.audio_data) rac_free(tts_result.audio_data);
+    if (tts_result.audio_data)
+        rac_free(tts_result.audio_data);
     rac_tts_onnx_destroy(tts_handle);
     teardown();
     return result;

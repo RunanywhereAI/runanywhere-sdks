@@ -41,15 +41,15 @@ export const ModelLifecycle = {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
   },
 
-  load(request: ModelLoadRequest): ModelLoadResult | null {
+  loadModel(request: ModelLoadRequest): ModelLoadResult | null {
     return requireAdapter().load(request);
   },
 
-  unload(request: ModelUnloadRequest): ModelUnloadResult | null {
+  unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
     return requireAdapter().unload(request);
   },
 
-  unloadAll(): ModelUnloadResult | null {
+  unloadAllModels(): ModelUnloadResult | null {
     return requireAdapter().unload({ modelId: '', unloadAll: true });
   },
 
@@ -64,7 +64,7 @@ export const ModelLifecycle = {
     return Boolean(current?.modelId);
   },
 
-  componentSnapshot(component: SDKComponent): ComponentLifecycleSnapshot | null {
+  componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot | null {
     return requireAdapter().componentSnapshot(component);
   },
 

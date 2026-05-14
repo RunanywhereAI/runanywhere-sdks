@@ -2,7 +2,7 @@
 
 LLM, VLM, tool calling, structured output, embeddings, and diffusion backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web) — powered by [llama.cpp](https://github.com/ggerganov/llama.cpp) compiled to WebAssembly.
 
-> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.1.0-beta.0`
+> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
 
 ## Installation
 
@@ -14,7 +14,7 @@ npm install @runanywhere/web @runanywhere/web-llamacpp
 
 ```typescript
 import { RunAnywhere } from '@runanywhere/web';
-import { LlamaCPP, TextGeneration } from '@runanywhere/web-llamacpp';
+import { LlamaCPP } from '@runanywhere/web-llamacpp';
 
 // 1. Initialize core SDK
 await RunAnywhere.initialize({ environment: 'development' });
@@ -22,13 +22,23 @@ await RunAnywhere.initialize({ environment: 'development' });
 // 2. Register the llama.cpp backend
 await LlamaCPP.register();
 
-// 3. Load a GGUF model and generate
-await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
-const result = await TextGeneration.generate('Explain quantum computing briefly.');
+// 3. Load a GGUF model and generate through the core facade
+await RunAnywhere.modelRegistry.registerModel({
+  modelId: 'qwen2.5-0.5b',
+  name: 'Qwen 2.5 0.5B',
+  localPath: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
+});
+await RunAnywhere.modelLifecycle.loadModel({ modelId: 'qwen2.5-0.5b' });
+const result = await RunAnywhere.textGeneration.generate({
+  prompt: 'Explain quantum computing briefly.',
+});
 console.log(result.text);
 
 // Stream tokens
-for await (const token of TextGeneration.generateStream('Write a haiku.')) {
+const stream = await RunAnywhere.textGeneration.generateStream({
+  prompt: 'Write a haiku.',
+});
+for await (const token of stream.stream) {
   process.stdout.write(token);
 }
 ```
@@ -37,7 +47,7 @@ for await (const token of TextGeneration.generateStream('Write a haiku.')) {
 
 | Feature | Class | Description |
 |---------|-------|-------------|
-| **Text Generation** | `TextGeneration` | LLM inference with streaming, system prompts, temperature, top-k/top-p |
+| **Text Generation** | `RunAnywhere.textGeneration` | LLM inference with streaming, system prompts, temperature, top-k/top-p |
 | **Vision Language Models** | `VLM` | Multimodal inference (image + text) via llama.cpp mtmd — runs in a Web Worker |
 | **Tool Calling** | `ToolCalling` | Function calling with typed definitions (Hermes-style and generic) |
 | **Structured Output** | `StructuredOutput` | JSON schema-guided generation |

@@ -85,8 +85,7 @@ extension CppBridge.Events {
         let opaqueValue = sdkEventSubscriptionPointers.withLock { pointers in
             pointers.removeValue(forKey: subscriptionId)
         }
-        if let opaqueValue {
-            let opaque = UnsafeMutableRawPointer(bitPattern: opaqueValue)!
+        if let opaqueValue, let opaque = UnsafeMutableRawPointer(bitPattern: opaqueValue) {
             Unmanaged<SDKEventSubscriptionBox>.fromOpaque(opaque).release()
         }
     }

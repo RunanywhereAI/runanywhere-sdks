@@ -14,6 +14,10 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "pipeline.pb.h"
+#include "sdk_events.pb.h"
+#include "solutions.pb.h"
+#include "voice_events.pb.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/solutions/config_loader.hpp"
@@ -21,51 +25,47 @@
 #include "rac/solutions/rac_solution.h"
 #include "rac/solutions/solution_converter.hpp"
 #include "rac/solutions/solution_runner.hpp"
-#include "sdk_events.pb.h"
-#include "solutions.pb.h"
-#include "voice_events.pb.h"
 
 namespace {
 
 int g_failed = 0;
 int g_passed = 0;
 
-#define CHECK(cond)                                                            \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
+#define CHECK(cond)                                                               \
+    do {                                                                          \
+        if (!(cond)) {                                                            \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                        \
-            return;                                                            \
-        }                                                                      \
+            g_failed++;                                                           \
+            return;                                                               \
+        }                                                                         \
     } while (0)
 
-#define TEST(name)                                                             \
-    static void test_##name();                                                 \
-    static void run_test_##name() {                                            \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
-        int before_failed = g_failed;                                          \
-        test_##name();                                                         \
-        if (g_failed == before_failed) {                                       \
-            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
-            g_passed++;                                                        \
-        }                                                                      \
-    }                                                                          \
+#define TEST(name)                                      \
+    static void test_##name();                          \
+    static void run_test_##name() {                     \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
+        int before_failed = g_failed;                   \
+        test_##name();                                  \
+        if (g_failed == before_failed) {                \
+            std::fprintf(stderr, "[  OK] %s\n", #name); \
+            g_passed++;                                 \
+        }                                               \
+    }                                                   \
     static void test_##name()
 
-using rac::solutions::SolutionRunner;
 using rac::solutions::Item;
 using rac::solutions::OperatorFactory;
 using rac::solutions::OperatorNode;
 using rac::solutions::OperatorPortSchema;
 using rac::solutions::OperatorRegistry;
+using rac::solutions::SolutionRunner;
 using runanywhere::v1::OperatorSpec;
 using runanywhere::v1::PipelineSpec;
 using runanywhere::v1::SolutionConfig;
 
 bool last_error_detail_contains(const std::string& needle) {
     const char* details = rac_error_get_details();
-    return details != nullptr &&
-           std::string(details).find(needle) != std::string::npos;
+    return details != nullptr && std::string(details).find(needle) != std::string::npos;
 }
 
 OperatorPortSchema make_text_schema(std::vector<std::string> inputs,
@@ -88,12 +88,10 @@ OperatorPortSchema make_audio_schema(std::vector<std::string> inputs,
     schema.input_ports = std::move(inputs);
     schema.output_ports = std::move(outputs);
     for (const auto& port : schema.input_ports) {
-        schema.input_port_types.emplace(
-            port, rac::solutions::kPayloadAudioPcmS16Le);
+        schema.input_port_types.emplace(port, rac::solutions::kPayloadAudioPcmS16Le);
     }
     for (const auto& port : schema.output_ports) {
-        schema.output_port_types.emplace(
-            port, rac::solutions::kPayloadAudioPcmS16Le);
+        schema.output_port_types.emplace(port, rac::solutions::kPayloadAudioPcmS16Le);
     }
     return schema;
 }
@@ -118,12 +116,10 @@ OperatorPortSchema make_embedding_schema(std::vector<std::string> inputs,
     schema.input_ports = std::move(inputs);
     schema.output_ports = std::move(outputs);
     for (const auto& port : schema.input_ports) {
-        schema.input_port_types.emplace(
-            port, rac::solutions::kPayloadEmbeddingVectorFloat32);
+        schema.input_port_types.emplace(port, rac::solutions::kPayloadEmbeddingVectorFloat32);
     }
     for (const auto& port : schema.output_ports) {
-        schema.output_port_types.emplace(
-            port, rac::solutions::kPayloadEmbeddingVectorFloat32);
+        schema.output_port_types.emplace(port, rac::solutions::kPayloadEmbeddingVectorFloat32);
     }
     return schema;
 }
@@ -134,12 +130,10 @@ OperatorPortSchema make_terminal_schema(std::vector<std::string> inputs,
     schema.input_ports = std::move(inputs);
     schema.output_ports = std::move(outputs);
     for (const auto& port : schema.input_ports) {
-        schema.input_port_types.emplace(
-            port, rac::solutions::kPayloadControlTerminal);
+        schema.input_port_types.emplace(port, rac::solutions::kPayloadControlTerminal);
     }
     for (const auto& port : schema.output_ports) {
-        schema.output_port_types.emplace(
-            port, rac::solutions::kPayloadControlTerminal);
+        schema.output_port_types.emplace(port, rac::solutions::kPayloadControlTerminal);
     }
     return schema;
 }
@@ -180,15 +174,12 @@ std::string make_pcm_s16le_frame() {
 
 std::string make_png_image_bytes() {
     const unsigned char bytes[] = {
-        0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au,
-        0x00u, 0x00u, 0x00u, 0x0Du, 0x49u, 0x48u, 0x44u, 0x52u,
-        0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u,
-        0x08u, 0x06u, 0x00u, 0x00u, 0x00u, 0x1Fu, 0x15u, 0xC4u,
-        0x89u, 0x00u, 0x00u, 0x00u, 0x0Au, 0x49u, 0x44u, 0x41u,
-        0x54u, 0x78u, 0x9Cu, 0x63u, 0x00u, 0x01u, 0x00u, 0x00u,
-        0x05u, 0x00u, 0x01u, 0x0Du, 0x0Au, 0x2Du, 0xB4u, 0x00u,
-        0x00u, 0x00u, 0x00u, 0x49u, 0x45u, 0x4Eu, 0x44u, 0xAEu,
-        0x42u, 0x60u, 0x82u,
+        0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au, 0x00u, 0x00u, 0x00u, 0x0Du,
+        0x49u, 0x48u, 0x44u, 0x52u, 0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u,
+        0x08u, 0x06u, 0x00u, 0x00u, 0x00u, 0x1Fu, 0x15u, 0xC4u, 0x89u, 0x00u, 0x00u, 0x00u,
+        0x0Au, 0x49u, 0x44u, 0x41u, 0x54u, 0x78u, 0x9Cu, 0x63u, 0x00u, 0x01u, 0x00u, 0x00u,
+        0x05u, 0x00u, 0x01u, 0x0Du, 0x0Au, 0x2Du, 0xB4u, 0x00u, 0x00u, 0x00u, 0x00u, 0x49u,
+        0x45u, 0x4Eu, 0x44u, 0xAEu, 0x42u, 0x60u, 0x82u,
     };
     return std::string(reinterpret_cast<const char*>(bytes), sizeof(bytes));
 }
@@ -199,10 +190,10 @@ std::string make_sdk_event_bytes() {
     event.set_timestamp_ms(1);
     event.set_category(runanywhere::v1::EVENT_CATEGORY_INITIALIZATION);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
-    event.mutable_initialization()->set_stage(
-        runanywhere::v1::INITIALIZATION_STAGE_STARTED);
+    event.mutable_initialization()->set_stage(runanywhere::v1::INITIALIZATION_STAGE_STARTED);
     std::string bytes;
-    if (!event.SerializeToString(&bytes)) return {};
+    if (!event.SerializeToString(&bytes))
+        return {};
     return bytes;
 }
 
@@ -216,129 +207,111 @@ std::string make_voice_event_bytes() {
     event.mutable_state()->set_previous(runanywhere::v1::PIPELINE_STATE_IDLE);
     event.mutable_state()->set_current(runanywhere::v1::PIPELINE_STATE_STOPPED);
     std::string bytes;
-    if (!event.SerializeToString(&bytes)) return {};
+    if (!event.SerializeToString(&bytes))
+        return {};
     return bytes;
 }
 
 class ForwardNode final : public OperatorNode {
-public:
+   public:
     explicit ForwardNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& out) override {
         out.push(std::move(item), this->cancel_token());
     }
 };
 
 class RawBytesTextEmitterNode final : public OperatorNode {
-public:
-    explicit RawBytesTextEmitterNode(std::string name)
-        : PipelineNode(std::move(name)) {}
+   public:
+    explicit RawBytesTextEmitterNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadTextUtf8,
-                                   item.text()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadTextUtf8, item.text()),
                  this->cancel_token());
     }
 };
 
 class RawBytesAudioEmitterNode final : public OperatorNode {
-public:
-    explicit RawBytesAudioEmitterNode(std::string name)
-        : PipelineNode(std::move(name)) {}
+   public:
+    explicit RawBytesAudioEmitterNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadAudioPcmS16Le,
-                                   make_pcm_s16le_frame()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadAudioPcmS16Le, make_pcm_s16le_frame()),
                  this->cancel_token());
     }
 };
 
 class RawBytesImageEmitterNode final : public OperatorNode {
-public:
-    explicit RawBytesImageEmitterNode(std::string name)
-        : PipelineNode(std::move(name)) {}
+   public:
+    explicit RawBytesImageEmitterNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadImagePng,
-                                   make_png_image_bytes()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadImagePng, make_png_image_bytes()),
                  this->cancel_token());
     }
 };
 
 class RawBytesEmbeddingEmitterNode final : public OperatorNode {
-public:
-    explicit RawBytesEmbeddingEmitterNode(std::string name)
-        : PipelineNode(std::move(name)) {}
+   public:
+    explicit RawBytesEmbeddingEmitterNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(
-                     rac::solutions::kPayloadEmbeddingVectorFloat32,
-                     "raw-float32-bytes"),
-                 this->cancel_token());
+        out.push(
+            Item::typed_bytes(rac::solutions::kPayloadEmbeddingVectorFloat32, "raw-float32-bytes"),
+            this->cancel_token());
     }
 };
 
 class RawBytesSdkEventEmitterNode final : public OperatorNode {
-public:
-    explicit RawBytesSdkEventEmitterNode(std::string name)
-        : PipelineNode(std::move(name)) {}
+   public:
+    explicit RawBytesSdkEventEmitterNode(std::string name) : PipelineNode(std::move(name)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadSdkEvent,
-                                   make_sdk_event_bytes()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadSdkEvent, make_sdk_event_bytes()),
                  this->cancel_token());
     }
 };
 
 class CountingSinkNode final : public OperatorNode {
-public:
+   public:
     CountingSinkNode(std::string name, std::shared_ptr<std::atomic<int>> count)
         : PipelineNode(std::move(name)), count_(std::move(count)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& /*out*/) override {
         count_->fetch_add(1, std::memory_order_acq_rel);
     }
 
-private:
+   private:
     std::shared_ptr<std::atomic<int>> count_;
 };
 
 class TextCaptureSinkNode final : public OperatorNode {
-public:
+   public:
     TextCaptureSinkNode(std::string name, std::shared_ptr<std::string> last)
         : PipelineNode(std::move(name)), last_(std::move(last)) {}
 
-protected:
-    void process(Item item, OutputEdge& /*out*/) override {
-        *last_ = item.text();
-    }
+   protected:
+    void process(Item item, OutputEdge& /*out*/) override { *last_ = item.text(); }
 
-private:
+   private:
     std::shared_ptr<std::string> last_;
 };
 
 OperatorFactory make_forward_factory() {
-    return [](const OperatorSpec& spec) {
-        return std::make_shared<ForwardNode>(spec.name());
-    };
+    return [](const OperatorSpec& spec) { return std::make_shared<ForwardNode>(spec.name()); };
 }
 
 void cleanup_solution_standins() {
     const char* const kTypes[] = {
-        "anomaly_detect",
-        "detect_voice",
-        "embed",
-        "generate_text",
-        "retrieve",
-        "synthesize",
-        "transcribe",
+        "anomaly_detect", "detect_voice", "embed",      "generate_text",
+        "retrieve",       "synthesize",   "transcribe",
     };
     auto& registry = OperatorRegistry::instance();
     for (const char* type : kTypes) {
@@ -347,7 +320,7 @@ void cleanup_solution_standins() {
 }
 
 class ScopedSolutionStandins {
-public:
+   public:
     ScopedSolutionStandins() {
         cleanup_solution_standins();
 
@@ -368,12 +341,12 @@ public:
 
     ~ScopedSolutionStandins() { cleanup_solution_standins(); }
 
-    ScopedSolutionStandins(const ScopedSolutionStandins&)            = delete;
+    ScopedSolutionStandins(const ScopedSolutionStandins&) = delete;
     ScopedSolutionStandins& operator=(const ScopedSolutionStandins&) = delete;
 };
 
 class ScopedTimeSeriesStandins {
-public:
+   public:
     ScopedTimeSeriesStandins() {
         cleanup_solution_standins();
 
@@ -391,24 +364,20 @@ public:
 };
 
 class ScopedFactory {
-public:
-    ScopedFactory(std::string type,
-                  OperatorFactory factory,
-                  OperatorPortSchema ports)
+   public:
+    ScopedFactory(std::string type, OperatorFactory factory, OperatorPortSchema ports)
         : type_(std::move(type)) {
         auto& registry = OperatorRegistry::instance();
         registry.unregister_factory(type_);
         registry.register_factory(type_, std::move(factory), std::move(ports));
     }
 
-    ~ScopedFactory() {
-        OperatorRegistry::instance().unregister_factory(type_);
-    }
+    ~ScopedFactory() { OperatorRegistry::instance().unregister_factory(type_); }
 
-    ScopedFactory(const ScopedFactory&)            = delete;
+    ScopedFactory(const ScopedFactory&) = delete;
     ScopedFactory& operator=(const ScopedFactory&) = delete;
 
-private:
+   private:
     std::string type_;
 };
 
@@ -495,15 +464,11 @@ TEST(feed_payload_type_mismatch_is_rejected) {
     OperatorPortSchema audio_ports;
     audio_ports.input_ports = {"in"};
     audio_ports.output_ports = {"out"};
-    audio_ports.input_port_types.emplace(
-        "in", rac::solutions::kPayloadAudioPcmS16Le);
-    audio_ports.output_port_types.emplace(
-        "out", rac::solutions::kPayloadAudioPcmS16Le);
+    audio_ports.input_port_types.emplace("in", rac::solutions::kPayloadAudioPcmS16Le);
+    audio_ports.output_port_types.emplace("out", rac::solutions::kPayloadAudioPcmS16Le);
 
-    ScopedFactory audio(
-        "cpp_graph_02a_audio_forward",
-        make_forward_factory(),
-        std::move(audio_ports));
+    ScopedFactory audio("cpp_graph_02a_audio_forward", make_forward_factory(),
+                        std::move(audio_ports));
 
     PipelineSpec spec;
     spec.set_name("audio_feed_contract");
@@ -515,28 +480,22 @@ TEST(feed_payload_type_mismatch_is_rejected) {
     CHECK(runner.start() == RAC_SUCCESS);
     CHECK(runner.feed(Item::text("not-audio")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("root input payload type"));
-    CHECK(runner.feed(Item::text("mislabeled-audio",
-                                 rac::solutions::kPayloadAudioPcmS16Le)) ==
+    CHECK(runner.feed(Item::text("mislabeled-audio", rac::solutions::kPayloadAudioPcmS16Le)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("payload body contract"));
-    CHECK(runner.feed(Item::typed_bytes(
-              rac::solutions::kPayloadAudioPcmS16Le,
-              make_pcm_s16le_frame())) == RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadAudioPcmS16Le,
+                                        make_pcm_s16le_frame())) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(runner.feed(Item::audio_pcm_s16le(std::string(1, '\0'))) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::audio_pcm_s16le(std::string(1, '\0'))) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("partial 16-bit sample"));
-    CHECK(runner.feed(Item::audio_pcm_s16le(make_pcm_s16le_frame())) ==
-          RAC_SUCCESS);
+    CHECK(runner.feed(Item::audio_pcm_s16le(make_pcm_s16le_frame())) == RAC_SUCCESS);
     runner.close_input();
     runner.wait();
 }
 
 TEST(feed_image_payload_body_contract_is_enforced) {
-    ScopedFactory image(
-        "cpp_graph_03c_image_forward",
-        make_forward_factory(),
-        make_image_schema({"in"}, {"out"}));
+    ScopedFactory image("cpp_graph_03c_image_forward", make_forward_factory(),
+                        make_image_schema({"in"}, {"out"}));
 
     PipelineSpec spec;
     spec.set_name("image_feed_contract");
@@ -548,28 +507,23 @@ TEST(feed_image_payload_body_contract_is_enforced) {
     CHECK(runner.start() == RAC_SUCCESS);
     CHECK(runner.feed(Item::text("not-image")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("root input payload type"));
-    CHECK(runner.feed(Item::text("mislabeled-image",
-                                 rac::solutions::kPayloadImagePng)) ==
+    CHECK(runner.feed(Item::text("mislabeled-image", rac::solutions::kPayloadImagePng)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("payload body contract"));
     CHECK(last_error_detail_contains("text.utf8"));
     CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadImagePng,
-                                        make_png_image_bytes())) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+                                        make_png_image_bytes())) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(runner.feed(Item::image_bytes(std::string{})) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::image_bytes(std::string{})) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("image.bytes"));
-    CHECK(runner.feed(Item::image_bytes("not-a-png")) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::image_bytes("not-a-png")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("PNG signature"));
-    CHECK(runner.feed(Item::image_bytes(make_png_image_bytes(),
-                                        rac::solutions::kPayloadTextUtf8)) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(
+        runner.feed(Item::image_bytes(make_png_image_bytes(), rac::solutions::kPayloadTextUtf8)) ==
+        RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("image.bytes"));
     CHECK(last_error_detail_contains("text.utf8"));
-    CHECK(runner.feed(Item::image_bytes(make_png_image_bytes())) ==
-          RAC_SUCCESS);
+    CHECK(runner.feed(Item::image_bytes(make_png_image_bytes())) == RAC_SUCCESS);
     runner.close_input();
     runner.wait();
 }
@@ -577,8 +531,7 @@ TEST(feed_image_payload_body_contract_is_enforced) {
 TEST(feed_text_payload_requires_text_body) {
     SolutionRunner runner(make_linear_spec());
     CHECK(runner.start() == RAC_SUCCESS);
-    CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadTextUtf8,
-                                        "raw bytes")) ==
+    CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadTextUtf8, "raw bytes")) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("payload body contract"));
     CHECK(last_error_detail_contains("bytes.raw"));
@@ -588,10 +541,8 @@ TEST(feed_text_payload_requires_text_body) {
 }
 
 TEST(feed_embedding_payload_body_contract_is_enforced) {
-    ScopedFactory embedding(
-        "cpp_graph_03d_embedding_forward",
-        make_forward_factory(),
-        make_embedding_schema({"in"}, {"vec"}));
+    ScopedFactory embedding("cpp_graph_03d_embedding_forward", make_forward_factory(),
+                            make_embedding_schema({"in"}, {"vec"}));
 
     PipelineSpec spec;
     spec.set_name("embedding_feed_contract");
@@ -601,21 +552,17 @@ TEST(feed_embedding_payload_body_contract_is_enforced) {
 
     SolutionRunner runner(spec);
     CHECK(runner.start() == RAC_SUCCESS);
-    CHECK(runner.feed(Item::text("not-embedding")) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::text("not-embedding")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("root input payload type"));
-    CHECK(runner.feed(Item::text(
-              "mislabeled-embedding",
-              rac::solutions::kPayloadEmbeddingVectorFloat32)) ==
+    CHECK(runner.feed(
+              Item::text("mislabeled-embedding", rac::solutions::kPayloadEmbeddingVectorFloat32)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("payload body contract"));
     CHECK(last_error_detail_contains("text.utf8"));
-    CHECK(runner.feed(Item::typed_bytes(
-              rac::solutions::kPayloadEmbeddingVectorFloat32,
-              "raw-float32-bytes")) == RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadEmbeddingVectorFloat32,
+                                        "raw-float32-bytes")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(runner.feed(Item::embedding_vector(std::vector<float>{})) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::embedding_vector(std::vector<float>{})) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("embedding.vector"));
     CHECK(last_error_detail_contains("empty"));
 
@@ -625,32 +572,27 @@ TEST(feed_embedding_payload_body_contract_is_enforced) {
     CHECK(last_error_detail_contains("misaligned"));
     CHECK(last_error_detail_contains("element count"));
 
-    auto wrong_element_type =
-        Item::embedding_vector(std::vector<float>{0.1f});
+    auto wrong_element_type = Item::embedding_vector(std::vector<float>{0.1f});
     wrong_element_type.embedding_vector_body.element_type_id = "float16";
-    CHECK(runner.feed(std::move(wrong_element_type)) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(std::move(wrong_element_type)) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("element type"));
     CHECK(last_error_detail_contains("float16"));
 
-    CHECK(runner.feed(Item::embedding_vector(
-              std::vector<float>{0.1f},
-              rac::solutions::kPayloadTextUtf8)) ==
+    CHECK(runner.feed(
+              Item::embedding_vector(std::vector<float>{0.1f}, rac::solutions::kPayloadTextUtf8)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("embedding.vector"));
     CHECK(last_error_detail_contains("text.utf8"));
 
-    CHECK(runner.feed(Item::embedding_vector(
-              std::vector<float>{0.1f, -0.2f, 0.3f})) == RAC_SUCCESS);
+    CHECK(runner.feed(Item::embedding_vector(std::vector<float>{0.1f, -0.2f, 0.3f})) ==
+          RAC_SUCCESS);
     runner.close_input();
     runner.wait();
 }
 
 TEST(feed_terminal_control_payload_body_contract_is_enforced) {
-    ScopedFactory terminal(
-        "cpp_graph_03e_terminal_forward",
-        make_forward_factory(),
-        make_terminal_schema({"in"}, {"out"}));
+    ScopedFactory terminal("cpp_graph_03e_terminal_forward", make_forward_factory(),
+                           make_terminal_schema({"in"}, {"out"}));
 
     PipelineSpec spec;
     spec.set_name("terminal_feed_contract");
@@ -660,21 +602,17 @@ TEST(feed_terminal_control_payload_body_contract_is_enforced) {
 
     SolutionRunner runner(spec);
     CHECK(runner.start() == RAC_SUCCESS);
-    CHECK(runner.feed(Item::text("not-terminal")) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(runner.feed(Item::text("not-terminal")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("root input payload type"));
-    CHECK(runner.feed(Item::text("mislabeled-terminal",
-                                 rac::solutions::kPayloadControlTerminal)) ==
+    CHECK(runner.feed(Item::text("mislabeled-terminal", rac::solutions::kPayloadControlTerminal)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("payload body contract"));
     CHECK(last_error_detail_contains("text.utf8"));
-    CHECK(runner.feed(Item::typed_bytes(
-              rac::solutions::kPayloadControlTerminal, "done")) ==
+    CHECK(runner.feed(Item::typed_bytes(rac::solutions::kPayloadControlTerminal, "done")) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(runner.feed(Item::control_signal(
-              rac::solutions::PayloadControlSignalKind::Cancellation,
-              "cancel", 0, rac::solutions::kPayloadControlTerminal)) ==
+    CHECK(runner.feed(Item::control_signal(rac::solutions::PayloadControlSignalKind::Cancellation,
+                                           "cancel", 0, rac::solutions::kPayloadControlTerminal)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("control.signal"));
     CHECK(last_error_detail_contains(rac::solutions::kPayloadControlCancellation));
@@ -689,10 +627,8 @@ TEST(feed_event_payload_body_contracts_are_enforced) {
     CHECK(!sdk_event.empty());
     CHECK(!voice_event.empty());
 
-    ScopedFactory sdk_forward(
-        "cpp_graph_03e_sdk_event_forward",
-        make_forward_factory(),
-        make_sdk_event_schema({"in"}, {"out"}));
+    ScopedFactory sdk_forward("cpp_graph_03e_sdk_event_forward", make_forward_factory(),
+                              make_sdk_event_schema({"in"}, {"out"}));
     PipelineSpec sdk_spec;
     sdk_spec.set_name("sdk_event_feed_contract");
     auto* sdk_op = sdk_spec.add_operators();
@@ -701,12 +637,10 @@ TEST(feed_event_payload_body_contracts_are_enforced) {
 
     SolutionRunner sdk_runner(sdk_spec);
     CHECK(sdk_runner.start() == RAC_SUCCESS);
-    CHECK(sdk_runner.feed(Item::typed_bytes(rac::solutions::kPayloadSdkEvent,
-                                            sdk_event)) ==
+    CHECK(sdk_runner.feed(Item::typed_bytes(rac::solutions::kPayloadSdkEvent, sdk_event)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(sdk_runner.feed(Item::sdk_event_proto("not-proto")) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(sdk_runner.feed(Item::sdk_event_proto("not-proto")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("SDKEvent"));
     CHECK(last_error_detail_contains("decode"));
 
@@ -714,12 +648,10 @@ TEST(feed_event_payload_body_contracts_are_enforced) {
     no_oneof.set_id("evt-no-oneof");
     std::string no_oneof_bytes;
     CHECK(no_oneof.SerializeToString(&no_oneof_bytes));
-    CHECK(sdk_runner.feed(Item::sdk_event_proto(no_oneof_bytes)) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(sdk_runner.feed(Item::sdk_event_proto(no_oneof_bytes)) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("no SDKEvent oneof payload"));
 
-    CHECK(sdk_runner.feed(Item::sdk_event_proto(
-              sdk_event, rac::solutions::kPayloadVoiceEvent)) ==
+    CHECK(sdk_runner.feed(Item::sdk_event_proto(sdk_event, rac::solutions::kPayloadVoiceEvent)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("proto.runanywhere.v1.SDKEvent"));
     CHECK(last_error_detail_contains(rac::solutions::kPayloadVoiceEvent));
@@ -727,10 +659,8 @@ TEST(feed_event_payload_body_contracts_are_enforced) {
     sdk_runner.close_input();
     sdk_runner.wait();
 
-    ScopedFactory voice_forward(
-        "cpp_graph_03e_voice_event_forward",
-        make_forward_factory(),
-        make_voice_event_schema({"in"}, {"out"}));
+    ScopedFactory voice_forward("cpp_graph_03e_voice_event_forward", make_forward_factory(),
+                                make_voice_event_schema({"in"}, {"out"}));
     PipelineSpec voice_spec;
     voice_spec.set_name("voice_event_feed_contract");
     auto* voice_op = voice_spec.add_operators();
@@ -739,21 +669,17 @@ TEST(feed_event_payload_body_contracts_are_enforced) {
 
     SolutionRunner voice_runner(voice_spec);
     CHECK(voice_runner.start() == RAC_SUCCESS);
-    CHECK(voice_runner.feed(Item::typed_bytes(
-              rac::solutions::kPayloadVoiceEvent, voice_event)) ==
+    CHECK(voice_runner.feed(Item::typed_bytes(rac::solutions::kPayloadVoiceEvent, voice_event)) ==
           RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("bytes.raw"));
-    CHECK(voice_runner.feed(Item::voice_event_proto("not-proto")) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(voice_runner.feed(Item::voice_event_proto("not-proto")) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("VoiceEvent"));
     CHECK(last_error_detail_contains("decode"));
     CHECK(voice_runner.feed(Item::voice_event_proto(
-              voice_event, rac::solutions::kPayloadSdkEvent)) ==
-          RAC_ERROR_INVALID_ARGUMENT);
+              voice_event, rac::solutions::kPayloadSdkEvent)) == RAC_ERROR_INVALID_ARGUMENT);
     CHECK(last_error_detail_contains("proto.runanywhere.v1.VoiceEvent"));
     CHECK(last_error_detail_contains(rac::solutions::kPayloadSdkEvent));
-    CHECK(voice_runner.feed(Item::voice_event_proto(voice_event)) ==
-          RAC_SUCCESS);
+    CHECK(voice_runner.feed(Item::voice_event_proto(voice_event)) == RAC_SUCCESS);
     voice_runner.close_input();
     voice_runner.wait();
 }
@@ -1090,8 +1016,7 @@ TEST(context_build_builtin_applies_prompt_template) {
     auto* ctx = spec.add_operators();
     ctx->set_name("context");
     ctx->set_type("context_build");
-    (*ctx->mutable_params())["prompt_template"] =
-        "Context:\n{context}\nQuestion:{question}";
+    (*ctx->mutable_params())["prompt_template"] = "Context:\n{context}\nQuestion:{question}";
     auto* snk = spec.add_operators();
     snk->set_name("sink");
     snk->set_type("cpp_solution_context_capture_sink");
@@ -1248,8 +1173,7 @@ TEST(retrieve_without_session_handle_fails_honestly) {
     const bool had_retrieve_before = registry.has_factory("retrieve");
     CHECK(had_retrieve_before);  // Built-in stand-in is always present.
 
-    const std::size_t registered =
-        rac::solutions::register_engine_backed_operators(registry);
+    const std::size_t registered = rac::solutions::register_engine_backed_operators(registry);
     // generate_text + transcribe + synthesize + detect_voice + embed +
     // retrieve = 6 factories.
     CHECK(registered == 6);
@@ -1261,10 +1185,8 @@ TEST(retrieve_without_session_handle_fails_honestly) {
     CHECK(in_ports[0] == "in");
     CHECK(out_ports.size() == 1);
     CHECK(out_ports[0] == "results");
-    CHECK(registry.input_port_type("retrieve", "in") ==
-          rac::solutions::kPayloadTextUtf8);
-    CHECK(registry.output_port_type("retrieve", "results") ==
-          rac::solutions::kPayloadTextUtf8);
+    CHECK(registry.input_port_type("retrieve", "in") == rac::solutions::kPayloadTextUtf8);
+    CHECK(registry.output_port_type("retrieve", "results") == rac::solutions::kPayloadTextUtf8);
 
     // Build a pipeline that drives retrieve without a session handle. The
     // operator must cancel on the first input — never silently produce a
@@ -1305,10 +1227,10 @@ TEST(retrieve_without_session_handle_fails_honestly) {
 // 14. Null / invalid handle paths.
 // ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
-    CHECK(rac_solution_start(nullptr)       == RAC_ERROR_INVALID_HANDLE);
-    CHECK(rac_solution_stop(nullptr)        == RAC_ERROR_INVALID_HANDLE);
-    CHECK(rac_solution_cancel(nullptr)      == RAC_ERROR_INVALID_HANDLE);
-    CHECK(rac_solution_feed(nullptr, "x")   == RAC_ERROR_INVALID_HANDLE);
+    CHECK(rac_solution_start(nullptr) == RAC_ERROR_INVALID_HANDLE);
+    CHECK(rac_solution_stop(nullptr) == RAC_ERROR_INVALID_HANDLE);
+    CHECK(rac_solution_cancel(nullptr) == RAC_ERROR_INVALID_HANDLE);
+    CHECK(rac_solution_feed(nullptr, "x") == RAC_ERROR_INVALID_HANDLE);
     CHECK(rac_solution_close_input(nullptr) == RAC_ERROR_INVALID_HANDLE);
     rac_solution_destroy(nullptr);  // no-op; must not crash
 

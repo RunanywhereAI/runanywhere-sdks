@@ -53,9 +53,8 @@ extern "C" {
  *
  * See file header for lifetime constraints on @p event_bytes.
  */
-typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes,
-                                                  size_t         event_size,
-                                                  void*          user_data);
+typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes, size_t event_size,
+                                                 void* user_data);
 
 /**
  * @brief Register a proto-byte stream callback on an LLM component handle.
@@ -76,9 +75,9 @@ typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes,
  *                                         frontend should fall back to
  *                                         the struct callback path.
  */
-RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    handle,
-                                                        rac_llm_stream_proto_callback_fn callback,
-                                                        void*                           user_data);
+RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t handle,
+                                                       rac_llm_stream_proto_callback_fn callback,
+                                                       void* user_data);
 
 /**
  * @brief Unregister the proto-byte stream callback for a handle.
@@ -92,7 +91,7 @@ RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t             
 RAC_API rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);
 
 #ifdef __cplusplus
-}  /* extern "C" */
+} /* extern "C" */
 #endif
 
 #endif /* RAC_FEATURES_LLM_RAC_LLM_STREAM_H */

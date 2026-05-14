@@ -3,10 +3,10 @@
  * SDK's proto-byte registry.
  *
  * After the V2 cleanup there is no `ModelManager` or app-side registration
- * facade. Models are registered directly via `RunAnywhere.modelRegistry.register(...)`
+ * facade. Models are registered directly via `RunAnywhere.modelRegistry.registerModel(...)`
  * which speaks proto bytes to the commons C++ registry. The entries here are
  * purposefully minimal: canonical `ModelInfo` proto messages populated with
- * just enough fields to drive the model-selection UI and `modelLifecycle.load()`.
+ * just enough fields to drive the model-selection UI and `modelLifecycle.loadModel()`.
  *
  * The catalog is registered best-effort — if the proto registry adapter is
  * not installed (e.g. the llamacpp WASM failed to load on a fresh dev
@@ -208,7 +208,7 @@ export function registerModelCatalog(): number {
   for (const entry of CATALOG) {
     const info = toModelInfo(entry);
     try {
-      if (RunAnywhere.modelRegistry.register(info)) {
+      if (RunAnywhere.modelRegistry.registerModel(info)) {
         registered += 1;
       } else {
         console.warn(`[model-catalog] register(${entry.id}) returned false`);

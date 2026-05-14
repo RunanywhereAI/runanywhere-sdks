@@ -185,8 +185,7 @@ RAC_API rac_result_t rac_tts_component_get_supported_languages(rac_handle_t hand
  * The byte buffer is valid only for the duration of the callback.
  */
 typedef void (*rac_tts_proto_voice_callback_fn)(const uint8_t* voice_proto_bytes,
-                                                 size_t voice_proto_size,
-                                                 void* user_data);
+                                                size_t voice_proto_size, void* user_data);
 
 /**
  * @brief Callback fired for serialized runanywhere.v1.TTSOutput stream chunks.
@@ -194,39 +193,31 @@ typedef void (*rac_tts_proto_voice_callback_fn)(const uint8_t* voice_proto_bytes
  * The byte buffer is valid only for the duration of the callback.
  */
 typedef void (*rac_tts_proto_chunk_callback_fn)(const uint8_t* output_proto_bytes,
-                                                 size_t output_proto_size,
-                                                 void* user_data);
+                                                size_t output_proto_size, void* user_data);
 
 /**
  * @brief Enumerate voices as serialized runanywhere.v1.TTSVoiceInfo messages.
  */
-RAC_API rac_result_t rac_tts_component_list_voices_proto(
-    rac_handle_t handle,
-    rac_tts_proto_voice_callback_fn callback,
-    void* user_data);
+RAC_API rac_result_t rac_tts_component_list_voices_proto(rac_handle_t handle,
+                                                         rac_tts_proto_voice_callback_fn callback,
+                                                         void* user_data);
 
 /**
  * @brief Synthesize text using serialized runanywhere.v1.TTSOptions bytes.
  *
  * Returns serialized runanywhere.v1.TTSOutput bytes in out_result.
  */
-RAC_API rac_result_t rac_tts_component_synthesize_proto(
-    rac_handle_t handle,
-    const char* text,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tts_component_synthesize_proto(rac_handle_t handle, const char* text,
+                                                        const uint8_t* options_proto_bytes,
+                                                        size_t options_proto_size,
+                                                        rac_proto_buffer_t* out_result);
 
 /**
  * @brief Stream synthesized audio chunks as serialized runanywhere.v1.TTSOutput bytes.
  */
 RAC_API rac_result_t rac_tts_component_synthesize_stream_proto(
-    rac_handle_t handle,
-    const char* text,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_tts_proto_chunk_callback_fn callback,
-    void* user_data);
+    rac_handle_t handle, const char* text, const uint8_t* options_proto_bytes,
+    size_t options_proto_size, rac_tts_proto_chunk_callback_fn callback, void* user_data);
 
 #ifdef __cplusplus
 }

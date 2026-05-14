@@ -19,35 +19,33 @@
 #include <thread>
 #include <vector>
 
-#include "rac/features/voice_agent/rac_voice_agent.h"
-
 #include "../src/features/voice_agent/voice_agent_internal.h"
 #include "../src/features/voice_agent/voice_agent_pipeline.hpp"
+#include "rac/features/voice_agent/rac_voice_agent.h"
 
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define CHECK(cond)                                                            \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
-            std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__,      \
-                         #cond);                                               \
-            g_failed++;                                                        \
-            return;                                                            \
-        }                                                                      \
+#define CHECK(cond)                                                               \
+    do {                                                                          \
+        if (!(cond)) {                                                            \
+            std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
+            g_failed++;                                                           \
+            return;                                                               \
+        }                                                                         \
     } while (0)
 
-#define TEST(name)                                                             \
-    static void test_##name();                                                 \
-    static void run_test_##name() {                                            \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
-        const int before = g_failed;                                           \
-        test_##name();                                                         \
-        if (g_failed == before) {                                              \
-            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
-            g_passed++;                                                        \
-        }                                                                      \
-    }                                                                          \
+#define TEST(name)                                      \
+    static void test_##name();                          \
+    static void run_test_##name() {                     \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
+        const int before = g_failed;                    \
+        test_##name();                                  \
+        if (g_failed == before) {                       \
+            std::fprintf(stderr, "[  OK] %s\n", #name); \
+            g_passed++;                                 \
+        }                                               \
+    }                                                   \
     static void test_##name()
 
 // ---------------------------------------------------------------------------
@@ -85,17 +83,16 @@ TEST(rejects_invalid_input) {
     rac_voice_agent agent;  // null component handles, not configured.
     rac::voice_agent::VoiceAgentPipeline pipeline(&agent, nullptr, nullptr);
 
-    CHECK(pipeline.run_once(nullptr, 0)        == RAC_ERROR_INVALID_ARGUMENT);
-    CHECK(pipeline.run_once(nullptr, 16)       == RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(pipeline.run_once(nullptr, 0) == RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(pipeline.run_once(nullptr, 16) == RAC_ERROR_INVALID_ARGUMENT);
     const std::vector<int16_t> buf(8000, 0);
-    CHECK(pipeline.run_once(buf.data(), 0)     == RAC_ERROR_INVALID_ARGUMENT);
+    CHECK(pipeline.run_once(buf.data(), 0) == RAC_ERROR_INVALID_ARGUMENT);
 }
 
 TEST(rejects_null_agent) {
     rac::voice_agent::VoiceAgentPipeline pipeline(nullptr, nullptr, nullptr);
     const std::vector<int16_t> buf(8000, 0);
-    CHECK(pipeline.run_once(buf.data(), buf.size() * sizeof(int16_t))
-          == RAC_ERROR_INVALID_HANDLE);
+    CHECK(pipeline.run_once(buf.data(), buf.size() * sizeof(int16_t)) == RAC_ERROR_INVALID_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,8 +121,7 @@ TEST(cancel_is_idempotent_when_idle) {
 TEST(error_propagates_through_pipeline) {
     rac_voice_agent agent;  // all handles null.
     EventCounter counts;
-    rac::voice_agent::VoiceAgentPipeline pipeline(&agent, counting_callback,
-                                                   &counts);
+    rac::voice_agent::VoiceAgentPipeline pipeline(&agent, counting_callback, &counts);
 
     const std::vector<int16_t> buf(160, 0);  // 10ms of silence at 16kHz.
     rac_result_t rc = pipeline.run_once(buf.data(), buf.size() * sizeof(int16_t));
@@ -149,8 +145,7 @@ TEST(error_propagates_through_pipeline) {
 TEST(external_cancel_unblocks_run) {
     rac_voice_agent agent;
     EventCounter counts;
-    rac::voice_agent::VoiceAgentPipeline pipeline(&agent, counting_callback,
-                                                   &counts);
+    rac::voice_agent::VoiceAgentPipeline pipeline(&agent, counting_callback, &counts);
 
     std::atomic<bool> done{false};
     std::thread worker([&] {
@@ -163,10 +158,10 @@ TEST(external_cancel_unblocks_run) {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     pipeline.cancel();
 
-    const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::seconds(2);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     while (!done.load(std::memory_order_acquire)) {
-        if (std::chrono::steady_clock::now() > deadline) break;
+        if (std::chrono::steady_clock::now() > deadline)
+            break;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     CHECK(done.load(std::memory_order_acquire));

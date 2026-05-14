@@ -28,22 +28,23 @@
 
 #pragma once
 
+#include "pipeline.pb.h"
+#include "solutions.pb.h"
+
 #include <memory>
 #include <mutex>
 #include <string>
 
-#include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
 #include "rac/graph/graph_scheduler.hpp"
 #include "rac/solutions/operator_registry.hpp"
-#include "solutions.pb.h"
 
 namespace rac::solutions {
 
 class PipelineExecutor;
 
 class SolutionRunner {
-public:
+   public:
     /// Build a runner from a SolutionConfig. The config is expanded to
     /// a PipelineSpec up front so invalid oneofs surface at
     /// construction time. Expansion failures set an error on the
@@ -57,7 +58,7 @@ public:
 
     ~SolutionRunner();
 
-    SolutionRunner(const SolutionRunner&)            = delete;
+    SolutionRunner(const SolutionRunner&) = delete;
     SolutionRunner& operator=(const SolutionRunner&) = delete;
 
     /// Compile + launch the pipeline. Idempotent — subsequent calls
@@ -95,19 +96,19 @@ public:
     /// Access the expanded spec (after construction).
     const runanywhere::v1::PipelineSpec& spec() const noexcept { return spec_; }
 
-private:
-    runanywhere::v1::PipelineSpec                 spec_;
-    rac_result_t                                  init_status_{RAC_SUCCESS};
+   private:
+    runanywhere::v1::PipelineSpec spec_;
+    rac_result_t init_status_{RAC_SUCCESS};
 
-    mutable std::mutex                            mu_;
-    std::unique_ptr<PipelineExecutor>             executor_;
-    std::unique_ptr<rac::graph::GraphScheduler>   scheduler_;
-    std::shared_ptr<OperatorEdge>                 root_input_;
-    std::shared_ptr<OperatorEdge>                 root_output_;
-    std::string                                   root_input_payload_type_;
-    std::string                                   root_output_payload_type_;
-    bool                                          started_{false};
-    bool                                          joined_{false};
+    mutable std::mutex mu_;
+    std::unique_ptr<PipelineExecutor> executor_;
+    std::unique_ptr<rac::graph::GraphScheduler> scheduler_;
+    std::shared_ptr<OperatorEdge> root_input_;
+    std::shared_ptr<OperatorEdge> root_output_;
+    std::string root_input_payload_type_;
+    std::string root_output_payload_type_;
+    bool started_{false};
+    bool joined_{false};
 };
 
 }  // namespace rac::solutions

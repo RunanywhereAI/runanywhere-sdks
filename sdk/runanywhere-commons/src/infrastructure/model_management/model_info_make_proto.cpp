@@ -78,24 +78,20 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
     static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty)
-                     : static_cast<const void*>(bytes);
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(),
-                                              static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize ModelInfo result");
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(),
-                                 bytes.size(), out);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,8 +154,7 @@ runanywhere::v1::ModelFormat model_format_to_proto(rac_model_format_t f) {
     return static_cast<runanywhere::v1::ModelFormat>(static_cast<int>(f));
 }
 
-runanywhere::v1::InferenceFramework inference_framework_to_proto(
-    rac_inference_framework_t f) {
+runanywhere::v1::InferenceFramework inference_framework_to_proto(rac_inference_framework_t f) {
     switch (f) {
         case RAC_FRAMEWORK_ONNX:
             return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
@@ -192,8 +187,7 @@ runanywhere::v1::InferenceFramework inference_framework_to_proto(
     }
 }
 
-rac_inference_framework_t inference_framework_from_proto(
-    runanywhere::v1::InferenceFramework f) {
+rac_inference_framework_t inference_framework_from_proto(runanywhere::v1::InferenceFramework f) {
     switch (f) {
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
             return RAC_FRAMEWORK_ONNX;
@@ -243,8 +237,7 @@ std::string url_path_extension(const std::string& url) {
     }
     // Last path component.
     size_t slash = clean.find_last_of("/\\");
-    const std::string last =
-        (slash == std::string::npos) ? clean : clean.substr(slash + 1);
+    const std::string last = (slash == std::string::npos) ? clean : clean.substr(slash + 1);
     size_t dot = last.find_last_of('.');
     if (dot == std::string::npos || dot + 1 >= last.size()) {
         return "";
@@ -348,8 +341,8 @@ extern "C" rac_bool_t rac_path_is_non_empty_directory(const char* path) {
     // the full entry array.
     if (adapter->file_list_directory) {
         size_t count = 0;
-        rac_result_t rc = adapter->file_list_directory(path, /*out_entries=*/nullptr,
-                                                       &count, adapter->user_data);
+        rac_result_t rc =
+            adapter->file_list_directory(path, /*out_entries=*/nullptr, &count, adapter->user_data);
         if (rc == RAC_SUCCESS && count > 0) {
             return RAC_TRUE;
         }
@@ -372,18 +365,16 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
                                       "protobuf support is not available");
 #else
     if (!valid_bytes(in_request_bytes, in_request_size)) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "ModelInfoMakeRequest bytes are invalid");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "ModelInfoMakeRequest bytes are invalid");
     }
 
     runanywhere::v1::ModelInfoMakeRequest request;
     if (in_request_size > 0 &&
         !request.ParseFromArray(parse_data(in_request_bytes, in_request_size),
                                 static_cast<int>(in_request_size))) {
-        return rac_proto_buffer_set_error(
-            out_proto, RAC_ERROR_DECODING_ERROR,
-            "failed to parse ModelInfoMakeRequest");
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ModelInfoMakeRequest");
     }
 
     const std::string url = request.url();
@@ -404,8 +395,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     // -------------------------------------------------------------------------
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
     if (request.has_framework() &&
-        request.framework() !=
-            runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+        request.framework() != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
         framework = inference_framework_from_proto(request.framework());
     } else {
         rac_inference_framework_t detected = RAC_FRAMEWORK_UNKNOWN;
@@ -428,10 +418,8 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     // -------------------------------------------------------------------------
     // 4) Resolve source — request override → REMOTE.
     // -------------------------------------------------------------------------
-    runanywhere::v1::ModelSource source =
-        runanywhere::v1::MODEL_SOURCE_REMOTE;
-    if (request.has_source() &&
-        request.source() != runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
+    runanywhere::v1::ModelSource source = runanywhere::v1::MODEL_SOURCE_REMOTE;
+    if (request.has_source() && request.source() != runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
         source = request.source();
     }
 
@@ -470,8 +458,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
 
     // Context length: 2048 when the category requires it, else 0. Mirrors
     // Swift's `Int32(contextLength ?? (category.requiresContextLength ? 2048 : 0))`.
-    const bool requires_ctx =
-        rac_model_category_requires_context_length(category) == RAC_TRUE;
+    const bool requires_ctx = rac_model_category_requires_context_length(category) == RAC_TRUE;
     model.set_context_length(requires_ctx ? 2048 : 0);
 
     // Thinking gating mirrors Swift: `model.supportsThinking =
@@ -486,8 +473,7 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     if (supports_thinking) {
         // Default <think>/</think> pattern. Mirrors Swift's
         // `RAThinkingTagPattern.defaultPattern`.
-        runanywhere::v1::ThinkingTagPattern* pattern =
-            model.mutable_thinking_pattern();
+        runanywhere::v1::ThinkingTagPattern* pattern = model.mutable_thinking_pattern();
         pattern->set_open_tag("<think>");
         pattern->set_close_tag("</think>");
     }
@@ -504,8 +490,8 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     //    singleFile(). artifact_type tracks the artifact branch for callers
     //    that consume the coarse classification.
     // -------------------------------------------------------------------------
-    const rac_archive_type_t archive = url.empty() ? RAC_ARCHIVE_TYPE_NONE
-                                                    : archive_type_from_url(url);
+    const rac_archive_type_t archive =
+        url.empty() ? RAC_ARCHIVE_TYPE_NONE : archive_type_from_url(url);
     if (archive != RAC_ARCHIVE_TYPE_NONE) {
         runanywhere::v1::ArchiveArtifact* artifact = model.mutable_archive();
         artifact->set_type(archive_type_to_proto(archive));
@@ -534,16 +520,14 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     bool is_downloaded = false;
     if (!local_path.empty()) {
         // local_path is set — re-check disk via platform adapter.
-        is_downloaded =
-            (rac_path_is_non_empty_directory(local_path.c_str()) == RAC_TRUE);
+        is_downloaded = (rac_path_is_non_empty_directory(local_path.c_str()) == RAC_TRUE);
         if (!is_downloaded) {
             // Single-file artifacts: file_exists is sufficient. The directory
             // probe returns FALSE for files, so consult file_exists as a
             // secondary check.
             const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
             if (adapter && adapter->file_exists &&
-                adapter->file_exists(local_path.c_str(), adapter->user_data) ==
-                    RAC_TRUE) {
+                adapter->file_exists(local_path.c_str(), adapter->user_data) == RAC_TRUE) {
                 is_downloaded = true;
             }
         }
@@ -554,11 +538,9 @@ extern "C" rac_result_t rac_model_info_make_proto(const uint8_t* in_request_byte
     RAC_LOG_DEBUG(LOG_CAT,
                   "make: url=%s id=%s name=%s fw=%d cat=%d fmt=%d "
                   "artifact_type=%d ctx=%d supports_thinking=%d",
-                  url.c_str(), id.c_str(), name.c_str(),
-                  static_cast<int>(framework), static_cast<int>(category),
-                  static_cast<int>(format),
-                  static_cast<int>(model.artifact_type()),
-                  static_cast<int>(model.context_length()),
+                  url.c_str(), id.c_str(), name.c_str(), static_cast<int>(framework),
+                  static_cast<int>(category), static_cast<int>(format),
+                  static_cast<int>(model.artifact_type()), static_cast<int>(model.context_length()),
                   static_cast<int>(supports_thinking));
 
     return copy_proto(model, out_proto);

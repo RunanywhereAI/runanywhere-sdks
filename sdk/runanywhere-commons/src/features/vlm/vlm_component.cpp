@@ -13,10 +13,10 @@
 #include <random>
 #include <string>
 
+#include "core/internal/platform_compat.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "core/internal/platform_compat.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -24,9 +24,10 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "vlm_options.pb.h"
+
 #include <limits>
 #include <vector>
-#include "vlm_options.pb.h"
 #endif
 
 static const char* LOG_CAT = "VLM.Component";
@@ -791,8 +792,7 @@ extern "C" rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
 // =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result) {
+    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -805,31 +805,28 @@ extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
         (request_proto_size == 0 || request_proto_bytes != nullptr) &&
         request_proto_size <= static_cast<size_t>(std::numeric_limits<int>::max());
     if (!bytes_ok) {
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_DECODING_ERROR,
-            "VLMLoadResolvedArtifactsRequest bytes are invalid");
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "VLMLoadResolvedArtifactsRequest bytes are invalid");
     }
 
     runanywhere::v1::VLMLoadResolvedArtifactsRequest request;
     static const char kEmpty[] = "";
-    const void* parse_src =
-        request_proto_size == 0 ? static_cast<const void*>(kEmpty)
-                                : static_cast<const void*>(request_proto_bytes);
+    const void* parse_src = request_proto_size == 0 ? static_cast<const void*>(kEmpty)
+                                                    : static_cast<const void*>(request_proto_bytes);
     if (!request.ParseFromArray(parse_src, static_cast<int>(request_proto_size))) {
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_DECODING_ERROR,
-            "failed to parse VLMLoadResolvedArtifactsRequest");
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse VLMLoadResolvedArtifactsRequest");
     }
 
     auto emit_failure = [&](rac_result_t code, const char* message) -> rac_result_t {
         runanywhere::v1::VLMLoadResolvedArtifactsResponse response;
         response.set_handle(0);
         response.set_result_code(code);
-        if (message && message[0]) response.set_error_message(message);
+        if (message && message[0])
+            response.set_error_message(message);
         const size_t size = response.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
-        if (size > 0 &&
-            !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        if (size > 0 && !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
             return rac_proto_buffer_set_error(
                 out_result, RAC_ERROR_ENCODING_ERROR,
                 "failed to serialize VLMLoadResolvedArtifactsResponse");
@@ -840,8 +837,7 @@ extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
 
     const std::string& primary = request.primary_model_path();
     if (primary.empty()) {
-        return emit_failure(RAC_ERROR_INVALID_ARGUMENT,
-                            "primary_model_path is required");
+        return emit_failure(RAC_ERROR_INVALID_ARGUMENT, "primary_model_path is required");
     }
 
     const std::string& model_id = request.model_id();
@@ -850,14 +846,12 @@ extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
     rac_handle_t service_handle = nullptr;
     rac_result_t rc = rac_vlm_create(create_id.c_str(), &service_handle);
     if (rc != RAC_SUCCESS || !service_handle) {
-        return emit_failure(rc != RAC_SUCCESS ? rc : RAC_ERROR_INTERNAL,
-                            rac_error_message(rc));
+        return emit_failure(rc != RAC_SUCCESS ? rc : RAC_ERROR_INTERNAL, rac_error_message(rc));
     }
 
-    const char* mmproj_arg =
-        request.has_mmproj_path() && !request.mmproj_path().empty()
-            ? request.mmproj_path().c_str()
-            : nullptr;
+    const char* mmproj_arg = request.has_mmproj_path() && !request.mmproj_path().empty()
+                                 ? request.mmproj_path().c_str()
+                                 : nullptr;
     rc = rac_vlm_initialize(service_handle, primary.c_str(), mmproj_arg);
     if (rc != RAC_SUCCESS) {
         rac_vlm_destroy(service_handle);
@@ -870,14 +864,11 @@ extern "C" rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
     response.set_result_code(RAC_SUCCESS);
     const size_t size = response.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !response.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         rac_vlm_destroy(service_handle);
-        return rac_proto_buffer_set_error(
-            out_result, RAC_ERROR_ENCODING_ERROR,
-            "failed to serialize VLMLoadResolvedArtifactsResponse");
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize VLMLoadResolvedArtifactsResponse");
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                 out_result);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
 #endif
 }

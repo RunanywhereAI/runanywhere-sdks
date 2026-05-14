@@ -144,10 +144,10 @@ static void platform_llm_vtable_destroy(void* impl) {
 
 // v3 Phase B7: Platform LLM `create` adapter (Apple Foundation Models).
 // Delegates to the Swift-side create callback.
-static rac_result_t platform_llm_create_impl(const char* model_id,
-                                             const char* /*config_json*/,
+static rac_result_t platform_llm_create_impl(const char* model_id, const char* /*config_json*/,
                                              void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 
     const auto* callbacks = rac_platform_llm_get_callbacks();
@@ -293,10 +293,10 @@ static void platform_tts_vtable_destroy(void* impl) {
 }
 
 // v3 Phase B7: Platform TTS `create` adapter (System TTS).
-static rac_result_t platform_tts_create_impl(const char* model_id,
-                                             const char* /*config_json*/,
+static rac_result_t platform_tts_create_impl(const char* model_id, const char* /*config_json*/,
                                              void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 
     const auto* callbacks = rac_platform_tts_get_callbacks();
@@ -504,9 +504,9 @@ static void platform_diffusion_vtable_destroy(void* impl) {
 
 // v3 Phase B7: Platform Diffusion `create` adapter (CoreML Diffusion).
 static rac_result_t platform_diffusion_create_impl(const char* model_id,
-                                                   const char* /*config_json*/,
-                                                   void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+                                                   const char* /*config_json*/, void** out_impl) {
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 
     const auto* callbacks = rac_platform_diffusion_get_callbacks();
@@ -515,8 +515,7 @@ static rac_result_t platform_diffusion_create_impl(const char* model_id,
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    RAC_LOG_INFO(LOG_CAT,
-                 "Creating CoreML Diffusion service via Swift: model=%s",
+    RAC_LOG_INFO(LOG_CAT, "Creating CoreML Diffusion service via Swift: model=%s",
                  model_id ? model_id : "(default)");
 
     rac_diffusion_platform_config_t config = {};
@@ -760,8 +759,9 @@ rac_result_t rac_backend_platform_register(void) {
     register_coreml_diffusion_entry();
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Platform backend registered successfully (module_register + "
-                          "built-in models; plugin registration via rac_plugin_entry_platform)");
+    RAC_LOG_INFO(LOG_CAT,
+                 "Platform backend registered successfully (module_register + "
+                 "built-in models; plugin registration via rac_plugin_entry_platform)");
     return RAC_SUCCESS;
 }
 

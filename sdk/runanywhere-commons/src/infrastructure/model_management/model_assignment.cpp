@@ -333,14 +333,12 @@ using runanywhere::v1::ModelRegistryRefreshRequest;
 using runanywhere::v1::ModelRegistryRefreshResult;
 using runanywhere::v1::ModelRegistryStatus;
 
-static rac_result_t assignment_proto_error(rac_proto_buffer_t* out_buffer,
-                                           rac_result_t status,
+static rac_result_t assignment_proto_error(rac_proto_buffer_t* out_buffer, rac_result_t status,
                                            const char* message) {
     if (!out_buffer) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    return rac_proto_buffer_set_error(out_buffer,
-                                      status,
+    return rac_proto_buffer_set_error(out_buffer, status,
                                       message ? message : rac_error_message(status));
 }
 
@@ -353,36 +351,29 @@ static rac_result_t serialize_assignment_proto(const ProtoMessage& message,
 
     std::string bytes;
     if (!message.SerializeToString(&bytes)) {
-        return assignment_proto_error(out_buffer,
-                                      RAC_ERROR_ENCODING_ERROR,
+        return assignment_proto_error(out_buffer, RAC_ERROR_ENCODING_ERROR,
                                       "failed to serialize model assignment proto result");
     }
-    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()),
-                                 bytes.size(),
+    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
                                  out_buffer);
 }
 
-static rac_result_t parse_assignment_refresh_request(const uint8_t* proto_bytes,
-                                                     size_t proto_size,
+static rac_result_t parse_assignment_refresh_request(const uint8_t* proto_bytes, size_t proto_size,
                                                      ModelRegistryRefreshRequest* out,
                                                      rac_proto_buffer_t* error_out) {
     if (!out) {
-        return assignment_proto_error(error_out,
-                                      RAC_ERROR_INVALID_ARGUMENT,
+        return assignment_proto_error(error_out, RAC_ERROR_INVALID_ARGUMENT,
                                       "ModelRegistryRefreshRequest output is required");
     }
 
     rac_result_t validation = rac_proto_bytes_validate(proto_bytes, proto_size);
     if (validation != RAC_SUCCESS) {
-        return assignment_proto_error(error_out,
-                                      validation,
-                                      "proto bytes are null or too large");
+        return assignment_proto_error(error_out, validation, "proto bytes are null or too large");
     }
 
     if (!out->ParseFromArray(rac_proto_bytes_data_or_empty(proto_bytes, proto_size),
                              static_cast<int>(proto_size))) {
-        return assignment_proto_error(error_out,
-                                      RAC_ERROR_INVALID_FORMAT,
+        return assignment_proto_error(error_out, RAC_ERROR_INVALID_FORMAT,
                                       "failed to parse ModelRegistryRefreshRequest");
     }
     return RAC_SUCCESS;
@@ -404,15 +395,24 @@ static bool ends_with_copy(const std::string& value, const std::string& suffix) 
 
 static ModelFormat infer_proto_format_from_path(const std::string& value) {
     const std::string lower = lower_copy(value);
-    if (ends_with_copy(lower, ".gguf")) return runanywhere::v1::MODEL_FORMAT_GGUF;
-    if (ends_with_copy(lower, ".ggml")) return runanywhere::v1::MODEL_FORMAT_GGML;
-    if (ends_with_copy(lower, ".onnx")) return runanywhere::v1::MODEL_FORMAT_ONNX;
-    if (ends_with_copy(lower, ".ort")) return runanywhere::v1::MODEL_FORMAT_ORT;
-    if (ends_with_copy(lower, ".bin")) return runanywhere::v1::MODEL_FORMAT_BIN;
-    if (ends_with_copy(lower, ".tflite")) return runanywhere::v1::MODEL_FORMAT_TFLITE;
-    if (ends_with_copy(lower, ".safetensors")) return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
-    if (ends_with_copy(lower, ".mlmodel")) return runanywhere::v1::MODEL_FORMAT_MLMODEL;
-    if (ends_with_copy(lower, ".mlpackage")) return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
+    if (ends_with_copy(lower, ".gguf"))
+        return runanywhere::v1::MODEL_FORMAT_GGUF;
+    if (ends_with_copy(lower, ".ggml"))
+        return runanywhere::v1::MODEL_FORMAT_GGML;
+    if (ends_with_copy(lower, ".onnx"))
+        return runanywhere::v1::MODEL_FORMAT_ONNX;
+    if (ends_with_copy(lower, ".ort"))
+        return runanywhere::v1::MODEL_FORMAT_ORT;
+    if (ends_with_copy(lower, ".bin"))
+        return runanywhere::v1::MODEL_FORMAT_BIN;
+    if (ends_with_copy(lower, ".tflite"))
+        return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with_copy(lower, ".safetensors"))
+        return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
+    if (ends_with_copy(lower, ".mlmodel"))
+        return runanywhere::v1::MODEL_FORMAT_MLMODEL;
+    if (ends_with_copy(lower, ".mlpackage"))
+        return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
     if (ends_with_copy(lower, ".zip") || ends_with_copy(lower, ".tar.gz") ||
         ends_with_copy(lower, ".tar.bz2") || ends_with_copy(lower, ".tar.xz")) {
         return runanywhere::v1::MODEL_FORMAT_ZIP;
@@ -522,9 +522,8 @@ static InferenceFramework proto_framework_from_struct(rac_inference_framework_t 
 
 static ModelFormat proto_format_from_struct(rac_model_format_t format) {
     const int value = static_cast<int>(format);
-    return runanywhere::v1::ModelFormat_IsValid(value)
-               ? static_cast<ModelFormat>(value)
-               : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
+    return runanywhere::v1::ModelFormat_IsValid(value) ? static_cast<ModelFormat>(value)
+                                                       : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
 }
 
 static ModelRegistryStatus effective_assignment_status(const ModelInfo& model) {
@@ -594,10 +593,10 @@ static void normalize_assignment_model(ModelInfo* model) {
     }
 
     if (model->source() == runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
-        const bool built_in = (model->has_artifact_type() &&
-                               model->artifact_type() ==
-                                   runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN) ||
-                              model->artifact_case() == ModelInfo::kBuiltIn;
+        const bool built_in =
+            (model->has_artifact_type() &&
+             model->artifact_type() == runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN) ||
+            model->artifact_case() == ModelInfo::kBuiltIn;
         model->set_source(built_in ? runanywhere::v1::MODEL_SOURCE_BUILT_IN
                                    : runanywhere::v1::MODEL_SOURCE_REMOTE);
     }
@@ -658,14 +657,12 @@ static void normalize_assignment_model(ModelInfo* model) {
         model->set_is_available(downloaded);
     }
     if (!model->has_registry_status()) {
-        model->set_registry_status(downloaded
-                                       ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
-                                       : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+        model->set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                              : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     }
 }
 
-static void overlay_existing_registry_model(ModelInfo* model,
-                                            rac_model_registry_handle_t registry,
+static void overlay_existing_registry_model(ModelInfo* model, rac_model_registry_handle_t registry,
                                             int32_t* updated_count) {
     if (!model || !registry || model->id().empty()) {
         return;
@@ -756,7 +753,7 @@ static std::vector<ModelInfo> cached_proto_models_locked() {
 }
 
 static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<ModelInfo>& models,
-                                                             int32_t* updated_count) {
+                                                              int32_t* updated_count) {
     std::vector<std::string> next_proto_cache;
     std::vector<rac_model_info_t*> next_struct_cache;
     next_proto_cache.reserve(models.size());
@@ -782,9 +779,7 @@ static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<
 
         if (registry) {
             rac_result_t rc = rac_model_registry_register_proto(
-                registry,
-                reinterpret_cast<const uint8_t*>(bytes.data()),
-                bytes.size());
+                registry, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
             if (rc != RAC_SUCCESS) {
                 free_model_vector(&next_struct_cache);
                 return rc;
@@ -812,13 +807,11 @@ static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<
 
 static std::string trim_copy(const std::string& value) {
     size_t start = 0;
-    while (start < value.size() &&
-           std::isspace(static_cast<unsigned char>(value[start]))) {
+    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
         ++start;
     }
     size_t end = value.size();
-    while (end > start &&
-           std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
         --end;
     }
     return value.substr(start, end - start);
@@ -946,8 +939,7 @@ static std::string json_unescape_string(const std::string& quoted_or_raw) {
     return out;
 }
 
-static bool assignment_json_value(const std::string& json,
-                                  const char* key,
+static bool assignment_json_value(const std::string& json, const char* key,
                                   std::string* out_value) {
     if (!key || !out_value) {
         return false;
@@ -982,8 +974,7 @@ static bool assignment_json_value(const std::string& json,
         }
 
         size_t colon = i + 1;
-        while (colon < json.size() &&
-               std::isspace(static_cast<unsigned char>(json[colon]))) {
+        while (colon < json.size() && std::isspace(static_cast<unsigned char>(json[colon]))) {
             ++colon;
         }
         if (colon >= json.size() || json[colon] != ':') {
@@ -1004,8 +995,7 @@ static bool assignment_json_value(const std::string& json,
     return false;
 }
 
-static std::string assignment_json_string_any(const std::string& json,
-                                              const char* key_a,
+static std::string assignment_json_string_any(const std::string& json, const char* key_a,
                                               const char* key_b = nullptr,
                                               const char* key_c = nullptr) {
     std::string value;
@@ -1017,10 +1007,8 @@ static std::string assignment_json_string_any(const std::string& json,
     return "";
 }
 
-static int64_t assignment_json_int_any(const std::string& json,
-                                       int64_t default_value,
-                                       const char* key_a,
-                                       const char* key_b = nullptr,
+static int64_t assignment_json_int_any(const std::string& json, int64_t default_value,
+                                       const char* key_a, const char* key_b = nullptr,
                                        const char* key_c = nullptr) {
     const std::string value = assignment_json_string_any(json, key_a, key_b, key_c);
     if (value.empty()) {
@@ -1031,9 +1019,7 @@ static int64_t assignment_json_int_any(const std::string& json,
     return end == value.c_str() ? default_value : static_cast<int64_t>(parsed);
 }
 
-static bool assignment_json_bool_any(const std::string& json,
-                                     bool default_value,
-                                     const char* key_a,
+static bool assignment_json_bool_any(const std::string& json, bool default_value, const char* key_a,
                                      const char* key_b = nullptr) {
     const std::string value = lower_copy(assignment_json_string_any(json, key_a, key_b));
     if (value.empty()) {
@@ -1086,21 +1072,23 @@ static ModelCategory category_from_assignment_token(const std::string& token) {
     if (lower == "language" || lower == "llm" || lower == "chat") {
         return runanywhere::v1::MODEL_CATEGORY_LANGUAGE;
     }
-    if (lower == "speech" || lower == "stt" || lower == "asr" ||
-        lower == "speech_recognition" || lower == "speech-recognition") {
+    if (lower == "speech" || lower == "stt" || lower == "asr" || lower == "speech_recognition" ||
+        lower == "speech-recognition") {
         return runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION;
     }
     if (lower == "tts" || lower == "speech_synthesis" || lower == "speech-synthesis") {
         return runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS;
     }
-    if (lower == "vision") return runanywhere::v1::MODEL_CATEGORY_VISION;
+    if (lower == "vision")
+        return runanywhere::v1::MODEL_CATEGORY_VISION;
     if (lower == "image_generation" || lower == "image-generation") {
         return runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION;
     }
     if (lower == "multimodal" || lower == "multi_modal") {
         return runanywhere::v1::MODEL_CATEGORY_MULTIMODAL;
     }
-    if (lower == "audio") return runanywhere::v1::MODEL_CATEGORY_AUDIO;
+    if (lower == "audio")
+        return runanywhere::v1::MODEL_CATEGORY_AUDIO;
     if (lower == "embedding" || lower == "embeddings") {
         return runanywhere::v1::MODEL_CATEGORY_EMBEDDING;
     }
@@ -1121,28 +1109,41 @@ static ModelFormat format_from_assignment_token(const std::string& token) {
                    ? static_cast<ModelFormat>(numeric)
                    : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
     }
-    if (lower == "unspecified") return runanywhere::v1::MODEL_FORMAT_UNSPECIFIED;
-    if (lower == "gguf") return runanywhere::v1::MODEL_FORMAT_GGUF;
-    if (lower == "ggml") return runanywhere::v1::MODEL_FORMAT_GGML;
-    if (lower == "onnx") return runanywhere::v1::MODEL_FORMAT_ONNX;
-    if (lower == "ort") return runanywhere::v1::MODEL_FORMAT_ORT;
-    if (lower == "bin") return runanywhere::v1::MODEL_FORMAT_BIN;
+    if (lower == "unspecified")
+        return runanywhere::v1::MODEL_FORMAT_UNSPECIFIED;
+    if (lower == "gguf")
+        return runanywhere::v1::MODEL_FORMAT_GGUF;
+    if (lower == "ggml")
+        return runanywhere::v1::MODEL_FORMAT_GGML;
+    if (lower == "onnx")
+        return runanywhere::v1::MODEL_FORMAT_ONNX;
+    if (lower == "ort")
+        return runanywhere::v1::MODEL_FORMAT_ORT;
+    if (lower == "bin")
+        return runanywhere::v1::MODEL_FORMAT_BIN;
     if (lower == "coreml" || lower == "core_ml" || lower == "mlmodelc") {
         return runanywhere::v1::MODEL_FORMAT_COREML;
     }
-    if (lower == "mlmodel") return runanywhere::v1::MODEL_FORMAT_MLMODEL;
-    if (lower == "mlpackage") return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
+    if (lower == "mlmodel")
+        return runanywhere::v1::MODEL_FORMAT_MLMODEL;
+    if (lower == "mlpackage")
+        return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
     if (lower == "qnn_context" || lower == "qnn-context") {
         return runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT;
     }
-    if (lower == "tflite") return runanywhere::v1::MODEL_FORMAT_TFLITE;
-    if (lower == "safetensors") return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
-    if (lower == "zip") return runanywhere::v1::MODEL_FORMAT_ZIP;
-    if (lower == "folder" || lower == "directory") return runanywhere::v1::MODEL_FORMAT_FOLDER;
+    if (lower == "tflite")
+        return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (lower == "safetensors")
+        return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
+    if (lower == "zip")
+        return runanywhere::v1::MODEL_FORMAT_ZIP;
+    if (lower == "folder" || lower == "directory")
+        return runanywhere::v1::MODEL_FORMAT_FOLDER;
     if (lower == "proprietary" || lower == "builtin" || lower == "built_in") {
         return runanywhere::v1::MODEL_FORMAT_PROPRIETARY;
     }
-    if (lower == "unknown") return runanywhere::v1::MODEL_FORMAT_UNKNOWN;
+    if (lower == "unknown")
+        return runanywhere::v1::MODEL_FORMAT_UNKNOWN;
     return runanywhere::v1::MODEL_FORMAT_UNKNOWN;
 }
 
@@ -1198,7 +1199,8 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
     if (lower == "coreml" || lower == "core_ml") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
-    if (lower == "mlx") return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
+    if (lower == "mlx")
+        return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
     if (lower == "fluid_audio" || lower == "fluid-audio") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO;
     }
@@ -1208,7 +1210,8 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
     if (lower == "sherpa" || lower == "sherpa_onnx" || lower == "sherpa-onnx") {
         return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
     }
-    if (lower == "tflite") return runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE;
+    if (lower == "tflite")
+        return runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE;
     return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
@@ -1222,8 +1225,7 @@ static std::vector<std::string> json_top_level_objects(const std::string& array_
     size_t pos = 1;
     while (pos < array.size()) {
         while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) ||
-                array[pos] == ',')) {
+               (std::isspace(static_cast<unsigned char>(array[pos])) || array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {
@@ -1243,8 +1245,7 @@ static std::vector<std::string> json_top_level_objects(const std::string& array_
     return objects;
 }
 
-static void add_json_string_array_to_metadata(const std::string& object,
-                                              const char* key,
+static void add_json_string_array_to_metadata(const std::string& object, const char* key,
                                               ModelInfo* model) {
     std::string array_value;
     if (!assignment_json_value(object, key, &array_value)) {
@@ -1261,8 +1262,7 @@ static void add_json_string_array_to_metadata(const std::string& object,
     size_t pos = 1;
     while (pos < array.size()) {
         while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) ||
-                array[pos] == ',')) {
+               (std::isspace(static_cast<unsigned char>(array[pos])) || array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {
@@ -1280,8 +1280,7 @@ static void add_json_string_array_to_metadata(const std::string& object,
     }
 }
 
-static bool parse_assignment_json_models(const char* data,
-                                         size_t len,
+static bool parse_assignment_json_models(const char* data, size_t len,
                                          std::vector<ModelInfo>* out_models) {
     if (!out_models || !data || len == 0) {
         return false;
@@ -1303,17 +1302,17 @@ static bool parse_assignment_json_models(const char* data,
         ModelInfo model;
         model.set_id(assignment_json_string_any(object, "id", "model_id", "modelId"));
         model.set_name(assignment_json_string_any(object, "name", "display_name", "displayName"));
-        model.set_download_url(assignment_json_string_any(
-            object, "download_url", "downloadUrl", "url"));
+        model.set_download_url(
+            assignment_json_string_any(object, "download_url", "downloadUrl", "url"));
         model.set_description(assignment_json_string_any(object, "description"));
-        model.set_download_size_bytes(assignment_json_int_any(
-            object, 0, "download_size_bytes", "download_size", "downloadSize"));
-        model.set_context_length(static_cast<int32_t>(assignment_json_int_any(
-            object, 0, "context_length", "contextLength")));
-        model.set_supports_thinking(assignment_json_bool_any(
-            object, false, "supports_thinking", "supportsThinking"));
-        model.set_supports_lora(assignment_json_bool_any(
-            object, false, "supports_lora", "supportsLora"));
+        model.set_download_size_bytes(assignment_json_int_any(object, 0, "download_size_bytes",
+                                                              "download_size", "downloadSize"));
+        model.set_context_length(static_cast<int32_t>(
+            assignment_json_int_any(object, 0, "context_length", "contextLength")));
+        model.set_supports_thinking(
+            assignment_json_bool_any(object, false, "supports_thinking", "supportsThinking"));
+        model.set_supports_lora(
+            assignment_json_bool_any(object, false, "supports_lora", "supportsLora"));
 
         const std::string category = assignment_json_string_any(object, "category");
         if (!category.empty()) {
@@ -1323,18 +1322,18 @@ static bool parse_assignment_json_models(const char* data,
         if (!format.empty()) {
             model.set_format(format_from_assignment_token(format));
         }
-        const std::string framework = assignment_json_string_any(
-            object, "preferred_framework", "preferredFramework", "framework");
+        const std::string framework = assignment_json_string_any(object, "preferred_framework",
+                                                                 "preferredFramework", "framework");
         if (!framework.empty()) {
             model.set_framework(framework_from_assignment_token(framework));
         }
-        const int64_t memory = assignment_json_int_any(
-            object, 0, "memory_required_bytes", "memory_required", "memoryRequired");
+        const int64_t memory = assignment_json_int_any(object, 0, "memory_required_bytes",
+                                                       "memory_required", "memoryRequired");
         if (memory > 0) {
             model.set_memory_required_bytes(memory);
         }
-        const std::string checksum = assignment_json_string_any(
-            object, "checksum_sha256", "checksum", "sha256");
+        const std::string checksum =
+            assignment_json_string_any(object, "checksum_sha256", "checksum", "sha256");
         if (!checksum.empty()) {
             model.set_checksum_sha256(checksum);
         }
@@ -1371,8 +1370,7 @@ static bool parse_assignment_json_models(const char* data,
     return true;
 }
 
-static rac_result_t parse_assignment_response_models(const char* data,
-                                                     size_t len,
+static rac_result_t parse_assignment_response_models(const char* data, size_t len,
                                                      std::vector<ModelInfo>* out_models,
                                                      std::string* error_message) {
     if (!out_models) {
@@ -1458,8 +1456,7 @@ static AssignmentCounts count_assignment_models(const std::vector<ModelInfo>& mo
         if (assignment_model_is_available(model)) {
             ++counts.available;
         }
-        if (effective_assignment_status(model) ==
-            runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
+        if (effective_assignment_status(model) == runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
             ++counts.errors;
         }
     }
@@ -1467,8 +1464,7 @@ static AssignmentCounts count_assignment_models(const std::vector<ModelInfo>& mo
 }
 
 static void populate_assignment_refresh_result(ModelRegistryRefreshResult* result,
-                                               std::vector<ModelInfo> models,
-                                               bool success,
+                                               std::vector<ModelInfo> models, bool success,
                                                int32_t updated_count,
                                                const std::vector<std::string>& warnings,
                                                const std::string& error_message) {
@@ -1715,15 +1711,12 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
 #ifndef RAC_HAVE_PROTOBUF
     (void)request_proto_bytes;
     (void)request_proto_size;
-    return rac_proto_buffer_set_error(out_result,
-                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf runtime is not available");
 #else
     ModelRegistryRefreshRequest request;
-    rac_result_t parse_rc = parse_assignment_refresh_request(request_proto_bytes,
-                                                             request_proto_size,
-                                                             &request,
-                                                             out_result);
+    rac_result_t parse_rc = parse_assignment_refresh_request(
+        request_proto_bytes, request_proto_size, &request, out_result);
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
     }
@@ -1745,24 +1738,18 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
             warnings.push_back("catalog_uri ignored because include_remote_catalog is false");
         }
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
+        populate_assignment_refresh_result(&result, std::move(models),
                                            /*success=*/true,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           "");
+                                           /*updated_count=*/0, warnings, "");
         return serialize_assignment_proto(result, out_result);
     }
 
     if (!force_refresh && is_cache_valid()) {
         models = cached_proto_models_locked();
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
+        populate_assignment_refresh_result(&result, std::move(models),
                                            /*success=*/true,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           "");
+                                           /*updated_count=*/0, warnings, "");
         return serialize_assignment_proto(result, out_result);
     }
 
@@ -1771,12 +1758,9 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
             "model assignment transport is not configured; remote catalog was not fetched");
         models = cached_proto_models_locked();
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
+        populate_assignment_refresh_result(&result, std::move(models),
                                            /*success=*/true,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           "");
+                                           /*updated_count=*/0, warnings, "");
         return serialize_assignment_proto(result, out_result);
     }
 
@@ -1805,12 +1789,8 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         }
 
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
-                                           success,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           error_message);
+        populate_assignment_refresh_result(&result, std::move(models), success,
+                                           /*updated_count=*/0, warnings, error_message);
         return serialize_assignment_proto(result, out_result);
     }
 
@@ -1832,19 +1812,13 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         }
 
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
-                                           success,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           error_message);
+        populate_assignment_refresh_result(&result, std::move(models), success,
+                                           /*updated_count=*/0, warnings, error_message);
         return serialize_assignment_proto(result, out_result);
     }
 
-    rac_result_t parse_models_rc = parse_assignment_response_models(response.response_body,
-                                                                    response.response_length,
-                                                                    &models,
-                                                                    &error_message);
+    rac_result_t parse_models_rc = parse_assignment_response_models(
+        response.response_body, response.response_length, &models, &error_message);
     if (parse_models_rc != RAC_SUCCESS) {
         if (!g_cached_models.empty() || !g_cached_model_proto_bytes.empty()) {
             warnings.push_back("remote assignment response was invalid; returning cache");
@@ -1857,30 +1831,21 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         }
 
         ModelRegistryRefreshResult result;
-        populate_assignment_refresh_result(&result,
-                                           std::move(models),
-                                           success,
-                                           /*updated_count=*/0,
-                                           warnings,
-                                           error_message);
+        populate_assignment_refresh_result(&result, std::move(models), success,
+                                           /*updated_count=*/0, warnings, error_message);
         return serialize_assignment_proto(result, out_result);
     }
 
     rac_result_t cache_rc = update_assignment_cache_from_proto_locked(models, &updated_count);
     if (cache_rc != RAC_SUCCESS) {
-        return assignment_proto_error(out_result,
-                                      cache_rc,
+        return assignment_proto_error(out_result, cache_rc,
                                       "failed to update model assignment cache");
     }
 
     models = cached_proto_models_locked();
     ModelRegistryRefreshResult result;
-    populate_assignment_refresh_result(&result,
-                                       std::move(models),
-                                       /*success=*/true,
-                                       updated_count,
-                                       warnings,
-                                       "");
+    populate_assignment_refresh_result(&result, std::move(models),
+                                       /*success=*/true, updated_count, warnings, "");
     return serialize_assignment_proto(result, out_result);
 #endif
 }

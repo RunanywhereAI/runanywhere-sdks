@@ -112,8 +112,7 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
  * is recycled after 32 further emissions.
  */
 typedef void (*rac_download_proto_progress_callback_fn)(const uint8_t* proto_bytes,
-                                                        size_t proto_size,
-                                                        void* user_data);
+                                                        size_t proto_size, void* user_data);
 
 /**
  * @brief Register a process-wide DownloadProgress proto callback.
@@ -130,8 +129,7 @@ RAC_API rac_result_t rac_download_set_progress_proto_callback(
  * On success, out_result contains serialized runanywhere.v1.DownloadPlanResult.
  * The caller must initialize/free out_result with rac_proto_buffer_* helpers.
  */
-RAC_API rac_result_t rac_download_plan_proto(const uint8_t* request_bytes,
-                                             size_t request_size,
+RAC_API rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, size_t request_size,
                                              rac_proto_buffer_t* out_result);
 
 /**
@@ -140,8 +138,7 @@ RAC_API rac_result_t rac_download_plan_proto(const uint8_t* request_bytes,
  * On success, out_result contains serialized runanywhere.v1.DownloadStartResult.
  * A platform HTTP adapter must already be registered.
  */
-RAC_API rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
-                                              size_t request_size,
+RAC_API rac_result_t rac_download_start_proto(const uint8_t* request_bytes, size_t request_size,
                                               rac_proto_buffer_t* out_result);
 
 /**
@@ -149,8 +146,7 @@ RAC_API rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
  *
  * On success, out_result contains serialized runanywhere.v1.DownloadCancelResult.
  */
-RAC_API rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes,
-                                               size_t request_size,
+RAC_API rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, size_t request_size,
                                                rac_proto_buffer_t* out_result);
 
 /**
@@ -159,8 +155,7 @@ RAC_API rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes,
  * On success, out_result contains serialized runanywhere.v1.DownloadResumeResult.
  * Resume reuses the original plan stored by rac_download_start_proto().
  */
-RAC_API rac_result_t rac_download_resume_proto(const uint8_t* request_bytes,
-                                               size_t request_size,
+RAC_API rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, size_t request_size,
                                                rac_proto_buffer_t* out_result);
 
 /**

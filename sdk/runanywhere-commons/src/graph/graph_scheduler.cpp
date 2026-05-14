@@ -21,7 +21,8 @@ GraphScheduler::~GraphScheduler() {
 }
 
 void GraphScheduler::add_node(std::shared_ptr<IPipelineNode> node) {
-    if (!node) return;
+    if (!node)
+        return;
     std::lock_guard<std::mutex> lock(mu_);
     nodes_.emplace_back(std::move(node));
 }
@@ -30,7 +31,8 @@ void GraphScheduler::start() {
     std::vector<std::shared_ptr<IPipelineNode>> snapshot;
     {
         std::lock_guard<std::mutex> lock(mu_);
-        if (started_) return;
+        if (started_)
+            return;
         started_ = true;
         snapshot = nodes_;
     }
@@ -45,7 +47,8 @@ void GraphScheduler::stop() {
     std::vector<std::shared_ptr<IPipelineNode>> snapshot;
     {
         std::lock_guard<std::mutex> lock(mu_);
-        if (stopped_) return;
+        if (stopped_)
+            return;
         stopped_ = true;
         snapshot = nodes_;
     }
@@ -66,7 +69,8 @@ void GraphScheduler::wait() {
 }
 
 void GraphScheduler::cancel_all() {
-    if (root_) root_->cancel();
+    if (root_)
+        root_->cancel();
     // Also close every input edge so blocked pops unblock immediately
     // instead of waiting up to the 50 ms cancel-poll timeout.
     stop();

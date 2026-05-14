@@ -24,9 +24,7 @@ rac_result_t backend_unavailable_capability_check(void) {
     return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
-rac_engine_vtable_t make_vt(const char* name,
-                            int32_t priority,
-                            rac_primitive_t primitive,
+rac_engine_vtable_t make_vt(const char* name, int32_t priority, rac_primitive_t primitive,
                             rac_result_t (*capability_check)(void) = nullptr) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
@@ -63,18 +61,18 @@ rac_engine_vtable_t make_vt(const char* name,
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label) do { \
-    ++test_count; \
-    if (!(cond)) { \
-        ++fail_count; \
-        std::fprintf(stderr, "  FAIL: %s (%s:%d) -- %s\n", label, __FILE__, __LINE__, #cond); \
-    } else { \
-        std::fprintf(stdout, "  ok:   %s\n", label); \
-    } \
-} while (0)
+#define CHECK(cond, label)                                                                        \
+    do {                                                                                          \
+        ++test_count;                                                                             \
+        if (!(cond)) {                                                                            \
+            ++fail_count;                                                                         \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) -- %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                  \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                          \
+        }                                                                                         \
+    } while (0)
 
-bool route_is(const rac::router::EngineRouter& router,
-              rac_primitive_t primitive,
+bool route_is(const rac::router::EngineRouter& router, rac_primitive_t primitive,
               const rac_engine_vtable_t* expected) {
     rac::router::RouteRequest req;
     req.primitive = primitive;
@@ -98,8 +96,7 @@ int main() {
         auto genie = make_vt("genie", 200, RAC_PRIMITIVE_GENERATE_TEXT,
                              backend_unavailable_capability_check);
 
-        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS,
-              "LLM fallback registers");
+        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS, "LLM fallback registers");
         CHECK(rac_plugin_register(&genie) == RAC_ERROR_CAPABILITY_UNSUPPORTED,
               "unavailable Genie is rejected before routing");
         CHECK(route_is(router, RAC_PRIMITIVE_GENERATE_TEXT, &fallback),
@@ -111,15 +108,12 @@ int main() {
 
     {
         auto fallback = make_vt("fallback_diffusion", 10, RAC_PRIMITIVE_DIFFUSION);
-        auto generate_unavailable =
-            make_vt("diffusion-coreml", 200, RAC_PRIMITIVE_UNSPECIFIED);
+        auto generate_unavailable = make_vt("diffusion-coreml", 200, RAC_PRIMITIVE_UNSPECIFIED);
 
-        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS,
-              "diffusion fallback registers");
+        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS, "diffusion fallback registers");
         CHECK(rac_plugin_register(&generate_unavailable) == RAC_SUCCESS,
               "generate-unavailable diffusion shell can be inspected");
-        CHECK(rac_engine_vtable_slot(&generate_unavailable,
-                                     RAC_PRIMITIVE_DIFFUSION) == nullptr,
+        CHECK(rac_engine_vtable_slot(&generate_unavailable, RAC_PRIMITIVE_DIFFUSION) == nullptr,
               "generate-unavailable diffusion shell has no diffusion slot");
         CHECK(route_is(router, RAC_PRIMITIVE_DIFFUSION, &fallback),
               "diffusion route skips CoreML shell with no generate op");
@@ -151,21 +145,18 @@ int main() {
 
     for (const auto& c : speech_cases) {
         auto fallback = make_vt(c.fallback_name, 10, c.primitive);
-        auto sherpa_shell = make_vt("sherpa", 70, RAC_PRIMITIVE_UNSPECIFIED,
-                                    backend_unavailable_capability_check);
+        auto sherpa_shell =
+            make_vt("sherpa", 70, RAC_PRIMITIVE_UNSPECIFIED, backend_unavailable_capability_check);
 
-        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS,
-              "speech fallback registers");
+        CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS, "speech fallback registers");
         CHECK(rac_plugin_register(&sherpa_shell) == RAC_ERROR_CAPABILITY_UNSUPPORTED,
               "Sherpa shell is rejected before speech ops are wired");
-        CHECK(route_is(router, c.primitive, &fallback),
-              "speech route skips Sherpa shell");
+        CHECK(route_is(router, c.primitive, &fallback), "speech route skips Sherpa shell");
 
         auto sherpa_ready = make_vt("sherpa", 90, c.primitive);
         CHECK(rac_plugin_register(&sherpa_ready) == RAC_SUCCESS,
               "Sherpa registers after real speech op is present");
-        CHECK(route_is(router, c.primitive, &sherpa_ready),
-              c.label);
+        CHECK(route_is(router, c.primitive, &sherpa_ready), c.label);
 
         cleanup("sherpa");
         cleanup(c.fallback_name);

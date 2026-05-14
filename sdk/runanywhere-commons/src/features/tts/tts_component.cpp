@@ -79,8 +79,7 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
@@ -95,8 +94,7 @@ rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize TTS proto result");
     }
@@ -167,16 +165,12 @@ rac_tts_options_t options_from_proto(const runanywhere::v1::TTSOptions& proto,
 int64_t estimate_pcm_f32_duration_ms(size_t audio_size, int32_t sample_rate) {
     const int32_t rate = sample_rate > 0 ? sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE;
     return static_cast<int64_t>((static_cast<double>(audio_size) /
-                                 static_cast<double>(sizeof(float)) /
-                                 static_cast<double>(rate)) *
+                                 static_cast<double>(sizeof(float)) / static_cast<double>(rate)) *
                                 1000.0);
 }
 
-void fill_tts_output(const rac_tts_result_t& result,
-                     const char* text,
-                     const char* voice_id,
-                     const rac_tts_options_t& options,
-                     runanywhere::v1::TTSOutput* out) {
+void fill_tts_output(const rac_tts_result_t& result, const char* text, const char* voice_id,
+                     const rac_tts_options_t& options, runanywhere::v1::TTSOutput* out) {
     if (result.audio_data && result.audio_size > 0) {
         out->set_audio_data(result.audio_data, result.audio_size);
     }
@@ -199,8 +193,7 @@ void fill_tts_output(const rac_tts_result_t& result,
     metadata->set_audio_duration_ms(result.duration_ms);
 }
 
-void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind,
-                             int64_t duration_ms,
+void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind, int64_t duration_ms,
                              rac_result_t error_code = RAC_SUCCESS) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
@@ -221,8 +214,7 @@ void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind,
 
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
     }
 }
@@ -753,10 +745,9 @@ extern "C" rac_result_t rac_tts_component_get_supported_languages(rac_handle_t h
 // GENERATED-PROTO C ABI
 // =============================================================================
 
-extern "C" rac_result_t rac_tts_component_list_voices_proto(
-    rac_handle_t handle,
-    rac_tts_proto_voice_callback_fn callback,
-    void* user_data) {
+extern "C" rac_result_t
+rac_tts_component_list_voices_proto(rac_handle_t handle, rac_tts_proto_voice_callback_fn callback,
+                                    void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
     (void)callback;
@@ -776,8 +767,8 @@ extern "C" rac_result_t rac_tts_component_list_voices_proto(
         rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service);
         if (rc != RAC_SUCCESS) {
             publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc);
-            (void)rac_sdk_event_publish_failure(rc, "TTS voice is not loaded", "tts",
-                                                "listVoices", RAC_TRUE);
+            (void)rac_sdk_event_publish_failure(rc, "TTS voice is not loaded", "tts", "listVoices",
+                                                RAC_TRUE);
             return rc;
         }
     }
@@ -785,8 +776,8 @@ extern "C" rac_result_t rac_tts_component_list_voices_proto(
     rac_tts_info_t info = {};
     rac_result_t rc = rac_tts_get_info(service, &info);
     if (rc != RAC_SUCCESS) {
-        (void)rac_sdk_event_publish_failure(rc, "TTS voice listing failed", "tts",
-                                            "listVoices", RAC_TRUE);
+        (void)rac_sdk_event_publish_failure(rc, "TTS voice listing failed", "tts", "listVoices",
+                                            RAC_TRUE);
         return rc;
     }
 
@@ -801,8 +792,7 @@ extern "C" rac_result_t rac_tts_component_list_voices_proto(
         voice.set_display_name(id);
         const size_t size = voice.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
-        if (size > 0 &&
-            !voice.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        if (size > 0 && !voice.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
             return RAC_ERROR_ENCODING_ERROR;
         }
         callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
@@ -815,8 +805,7 @@ extern "C" rac_result_t rac_tts_component_list_voices_proto(
         voice.set_display_name(loaded_voice);
         const size_t size = voice.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
-        if (size > 0 &&
-            !voice.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        if (size > 0 && !voice.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
             return RAC_ERROR_ENCODING_ERROR;
         }
         callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
@@ -826,12 +815,10 @@ extern "C" rac_result_t rac_tts_component_list_voices_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_tts_component_synthesize_proto(
-    rac_handle_t handle,
-    const char* text,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_tts_component_synthesize_proto(rac_handle_t handle, const char* text,
+                                                           const uint8_t* options_proto_bytes,
+                                                           size_t options_proto_size,
+                                                           rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -888,12 +875,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_proto(
 }
 
 extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
-    rac_handle_t handle,
-    const char* text,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
-    rac_tts_proto_chunk_callback_fn callback,
-    void* user_data) {
+    rac_handle_t handle, const char* text, const uint8_t* options_proto_bytes,
+    size_t options_proto_size, rac_tts_proto_chunk_callback_fn callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
     (void)text;
@@ -951,20 +934,17 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
         if (ctx->options.language) {
             metadata->set_language_code(ctx->options.language);
         }
-        metadata->set_character_count(ctx->text ? static_cast<int32_t>(std::strlen(ctx->text))
-                                                : 0);
+        metadata->set_character_count(ctx->text ? static_cast<int32_t>(std::strlen(ctx->text)) : 0);
         metadata->set_audio_duration_ms(output.duration_ms());
         const size_t size = output.ByteSizeLong();
         std::vector<uint8_t> bytes(size);
-        if (size == 0 ||
-            output.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        if (size == 0 || output.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
             ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
         }
     };
 
     publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED, 0);
-    rac_result_t rc =
-        rac_tts_component_synthesize_stream(handle, text, &options, bridge, &context);
+    rac_result_t rc = rac_tts_component_synthesize_stream(handle, text, &options, bridge, &context);
     if (rc != RAC_SUCCESS) {
         publish_tts_voice_event(runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED, 0, rc);
         (void)rac_sdk_event_publish_failure(rc, "TTS streaming synthesis failed", "tts",

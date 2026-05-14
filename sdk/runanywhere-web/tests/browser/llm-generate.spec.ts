@@ -13,13 +13,13 @@
  *
  * Running locally:
  *   cd sdk/runanywhere-web
- *   ./scripts/build-web.sh --build-wasm --llamacpp   # ensure WASM is built
+ *   npm run build:wasm -- --llamacpp   # ensure WASM is built
  *   cd ../../examples/web/RunAnywhereAI && npm install && npm run dev &
  *   cd -
  *   RA_RUN_LLM_E2E=1 npm run test:browser -- tests/browser/llm-generate.spec.ts
  *
  * Independent of WEB-01-VENDOR: this spec only exercises the llamacpp backend.
- * STT/TTS/VAD E2E tests are blocked on Sherpa-ONNX WASM vendoring.
+ * STT/TTS/VAD E2E tests require an ONNX-enabled RACommons WASM build.
  */
 import { test, expect } from '@playwright/test';
 
@@ -53,10 +53,11 @@ declare global {
       runtime: { active: unknown };
       modelRegistry: {
         availability(): { status: string };
-        register(info: unknown): boolean;
+        getModel(modelId: string): unknown;
+        registerModel(info: unknown): boolean;
       };
       modelLifecycle: {
-        load(request: { modelId: string; forceReload: boolean; validateAvailability: boolean }): {
+        loadModel(request: { modelId: string; forceReload: boolean; validateAvailability: boolean }): {
           success: boolean;
           errorMessage?: string;
         } | null;
@@ -77,14 +78,13 @@ declare global {
           errorMessage?: string;
         } | null;
       };
-      generateStream(
-        prompt: string,
-        options: { maxTokens?: number },
-      ): Promise<{
-        stream: AsyncIterable<string>;
-        result: Promise<unknown>;
-        cancel: () => void;
-      }>;
+      textGeneration: {
+        generateStream(options: { prompt: string; maxTokens?: number }): Promise<{
+          stream: AsyncIterable<string>;
+          result: Promise<unknown>;
+          cancel: () => void;
+        }>;
+      };
     };
   }
 }
@@ -108,8 +108,12 @@ test.describe('Web SDK LLM end-to-end', () => {
 
   test('downloads SmolLM2-360M, loads it, and streams tokens from generateStream', async ({ page }) => {
     const consoleErrors: string[] = [];
+    const pageErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
     });
 
     await page.goto('/');
@@ -140,7 +144,7 @@ test.describe('Web SDK LLM end-to-end', () => {
     expect(backendReady.isInitialized, 'SDK phase 1 initialize() must have completed').toBe(true);
     expect(
       backendReady.hasRuntimeActive,
-      'LlamaCPP backend must have registered (rebuild WASM via ./scripts/build-web.sh --build-wasm --llamacpp)',
+      'LlamaCPP backend must have registered (rebuild WASM via npm run build:wasm -- --llamacpp)',
     ).toBe(true);
     expect(
       backendReady.registryStatus,
@@ -161,12 +165,12 @@ test.describe('Web SDK LLM end-to-end', () => {
         name: 'SmolLM2 360M Q8_0',
         // Proto enum values (ModelCategory.MODEL_CATEGORY_LANGUAGE = 1,
         // ModelFormat.MODEL_FORMAT_GGUF = 1,
-        // InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP = 1,
+        // InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP = 2,
         // ModelSource.MODEL_SOURCE_REMOTE = 1). Duplicated so the spec does
         // not import proto-ts.
         category: 1,
         format: 1,
-        framework: 1,
+        framework: 2,
         downloadUrl:
           'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
         localPath: '',
@@ -180,7 +184,7 @@ test.describe('Web SDK LLM end-to-end', () => {
         updatedAtUnixMs: now,
         memoryRequiredBytes: 500_000_000,
       };
-      return ra.modelRegistry.register(info);
+      return ra.modelRegistry.registerModel(info);
     }, MODEL_ID);
     expect(catalogOk, 'model registration with proto registry must succeed').toBe(true);
 
@@ -188,8 +192,11 @@ test.describe('Web SDK LLM end-to-end', () => {
     // exercised by components/model-selection.ts).
     const startInfo = await page.evaluate((modelId) => {
       const ra = window.__RUNANYWHERE_SDK__!;
+      const model = ra.modelRegistry.getModel(modelId);
+      if (!model) return { accepted: false, taskId: '', error: 'model metadata unavailable' };
       const plan = ra.downloads.plan({
         modelId,
+        model,
         resumeExisting: false,
         availableStorageBytes: 0,
         allowMeteredNetwork: true,
@@ -215,34 +222,32 @@ test.describe('Web SDK LLM end-to-end', () => {
 
     // Poll until the download reaches a terminal state. The proto adapter
     // pipes progress from C++ (commons) back into the TS runtime.
-    await page.waitForFunction(
-      ({ modelId, taskId, completed, failed, cancelled }) => {
-        const ra = window.__RUNANYWHERE_SDK__!;
-        const progress = ra.downloads.poll({ modelId, taskId });
-        if (!progress) return false;
-        return (
-          progress.state === completed ||
-          progress.state === failed ||
-          progress.state === cancelled
-        );
-      },
-      {
-        modelId: MODEL_ID,
-        taskId: startInfo.taskId,
-        completed: DOWNLOAD_STATE_COMPLETED,
-        failed: DOWNLOAD_STATE_FAILED,
-        cancelled: DOWNLOAD_STATE_CANCELLED,
-      },
-      { timeout: DOWNLOAD_TIMEOUT_MS, polling: 1_000 },
-    );
+    let finalProgress: { state: number; overallProgress: number; errorMessage?: string } | null =
+      null;
+    const downloadDeadline = Date.now() + DOWNLOAD_TIMEOUT_MS;
+    while (Date.now() < downloadDeadline) {
+      expect(pageErrors, `page errors during download:\n${pageErrors.join('\n')}`).toHaveLength(0);
 
-    const finalProgress = await page.evaluate(
-      ({ modelId, taskId }) => {
-        const ra = window.__RUNANYWHERE_SDK__!;
-        return ra.downloads.poll({ modelId, taskId });
-      },
-      { modelId: MODEL_ID, taskId: startInfo.taskId },
-    );
+      const progress = await page.evaluate(
+        ({ modelId, taskId }) => {
+          const ra = window.__RUNANYWHERE_SDK__;
+          if (!ra?.downloads) return null;
+          return ra.downloads.poll({ modelId, taskId });
+        },
+        { modelId: MODEL_ID, taskId: startInfo.taskId },
+      );
+      if (
+        progress &&
+        (progress.state === DOWNLOAD_STATE_COMPLETED ||
+          progress.state === DOWNLOAD_STATE_FAILED ||
+          progress.state === DOWNLOAD_STATE_CANCELLED)
+      ) {
+        finalProgress = progress;
+        break;
+      }
+      await page.waitForTimeout(1_000);
+    }
+    expect(finalProgress, 'download did not reach a terminal state before timeout').not.toBeNull();
     expect(finalProgress?.state, `download failed: ${finalProgress?.errorMessage ?? ''}`).toBe(
       DOWNLOAD_STATE_COMPLETED,
     );
@@ -250,7 +255,7 @@ test.describe('Web SDK LLM end-to-end', () => {
     // Load the model into the llamacpp backend.
     const loadResult = await page.evaluate((modelId) => {
       const ra = window.__RUNANYWHERE_SDK__!;
-      return ra.modelLifecycle.load({
+      return ra.modelLifecycle.loadModel({
         modelId,
         forceReload: false,
         validateAvailability: true,
@@ -264,7 +269,7 @@ test.describe('Web SDK LLM end-to-end', () => {
     const genResult = await page.evaluate(
       async ({ prompt, maxTokens }) => {
         const ra = window.__RUNANYWHERE_SDK__!;
-        const stream = await ra.generateStream(prompt, { maxTokens });
+        const stream = await ra.textGeneration.generateStream({ prompt, maxTokens });
         const tokens: string[] = [];
         const start = performance.now();
         try {
@@ -300,6 +305,7 @@ test.describe('Web SDK LLM end-to-end', () => {
     expect(genResult.tokenCount).toBeGreaterThan(0);
     expect(genResult.concatenated.length).toBeGreaterThan(0);
     expect(genResult.resultNotNull, 'terminal result event must be delivered').toBe(true);
+    expect(pageErrors, `page errors:\n${pageErrors.join('\n')}`).toHaveLength(0);
 
     // No unexpected console errors during the whole run (warnings about WASM
     // not being built are filtered because we already asserted it is loaded).

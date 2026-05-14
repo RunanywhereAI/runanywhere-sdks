@@ -63,7 +63,7 @@ async function generate(
   prompt: string,
   options: Partial<LLMGenerationOptions> & { toolCalling?: Partial<ToolCallingOptions> } = {},
 ): Promise<LLMGenerationResult> {
-  return TextGeneration.generate({ ...options, prompt } as Partial<LLMGenerationOptions>);
+  return TextGeneration.generate({ ...options, prompt });
 }
 
 const logger = new SDKLogger('ToolCalling');

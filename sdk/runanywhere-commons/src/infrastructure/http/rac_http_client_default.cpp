@@ -27,6 +27,8 @@
  * both TUs were pulled in.
  */
 
+#include "rac_http_upsert_mode.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -36,7 +38,6 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
-#include "rac_http_upsert_mode.h"
 
 // =============================================================================
 // Internal accessor defined in rac_http_transport.cpp. Returns the

@@ -32,43 +32,48 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                 \
+    do {                                                                                  \
+        if (!(cond)) {                                                                    \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: " #cond "\n", __FILE__, __LINE__); \
+            return 1;                                                                     \
+        }                                                                                 \
+    } while (0)
 
-#define ASSERT_EQ_INT(a, b) do { \
-    if ((a) != (b)) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__, \
-                     static_cast<int>(a), static_cast<int>(b)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_INT(a, b)                                                             \
+    do {                                                                                \
+        if ((a) != (b)) {                                                               \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: %d != %d\n", __FILE__, __LINE__, \
+                         static_cast<int>(a), static_cast<int>(b));                     \
+            return 1;                                                                   \
+        }                                                                               \
+    } while (0)
 
-#define ASSERT_EQ_STR(actual, expected) do { \
-    if (std::strcmp((actual), (expected)) != 0) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
-                     __FILE__, __LINE__, (expected), (actual)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ_STR(actual, expected)                                                           \
+    do {                                                                                          \
+        if (std::strcmp((actual), (expected)) != 0) {                                             \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d\n  expected: \"%s\"\n  actual:   \"%s\"\n", \
+                         __FILE__, __LINE__, (expected), (actual));                               \
+            return 1;                                                                             \
+        }                                                                                         \
+    } while (0)
 
-#define ASSERT_SUBSTR(haystack, needle) do { \
-    if (std::strstr((haystack), (needle)) == nullptr) { \
-        std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", \
-                     __FILE__, __LINE__, (needle), (haystack)); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_SUBSTR(haystack, needle)                                                         \
+    do {                                                                                        \
+        if (std::strstr((haystack), (needle)) == nullptr) {                                     \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: '%s' not found in '%.200s'\n", __FILE__, \
+                         __LINE__, (needle), (haystack));                                       \
+            return 1;                                                                           \
+        }                                                                                       \
+    } while (0)
 
 // ---------------------------------------------------------------------------
 // 1. parse: default <tool_call>JSON</tool_call>
 // ---------------------------------------------------------------------------
 int test_parse_default_structured() {
     const char* input =
-        "let me help <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>";
+        "let me help "
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>";
     rac_tool_call_t result;
     rac_result_t rc = rac_tool_call_parse(input, &result);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
@@ -119,10 +124,10 @@ int test_parse_free_form_returns_false() {
 // 4a. format_prompt with 2 tools (default format)
 // ---------------------------------------------------------------------------
 int test_format_prompt_default_two_tools() {
-    rac_tool_parameter_t loc_param = {"location", RAC_TOOL_PARAM_STRING,
-                                      "City name", RAC_TRUE, nullptr};
-    rac_tool_parameter_t expr_param = {"expression", RAC_TOOL_PARAM_STRING,
-                                       "Math expression", RAC_TRUE, nullptr};
+    rac_tool_parameter_t loc_param = {"location", RAC_TOOL_PARAM_STRING, "City name", RAC_TRUE,
+                                      nullptr};
+    rac_tool_parameter_t expr_param = {"expression", RAC_TOOL_PARAM_STRING, "Math expression",
+                                       RAC_TRUE, nullptr};
     rac_tool_definition_t tools[2] = {
         {"get_weather", "Get weather for a city", &loc_param, 1, nullptr},
         {"calculate", "Evaluate a math expression", &expr_param, 1, nullptr},
@@ -147,7 +152,8 @@ int test_format_prompt_json_lfm2() {
         "[{\"name\":\"get_weather\",\"description\":\"Weather\",\"parameters\":[]},"
         "{\"name\":\"calculate\",\"description\":\"Math\",\"parameters\":[]}]";
     char* prompt = nullptr;
-    rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(tools_json, "lfm2", &prompt);
+    rac_result_t rc =
+        rac_tool_call_format_prompt_json_with_format_name(tools_json, "lfm2", &prompt);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(prompt != nullptr);
     ASSERT_SUBSTR(prompt, "<|tool_call_start|>");
@@ -166,9 +172,8 @@ int test_build_initial_prompt_end_to_end() {
     options.format = RAC_TOOL_FORMAT_DEFAULT;
 
     char* prompt = nullptr;
-    rac_result_t rc =
-        rac_tool_call_build_initial_prompt("what is the weather in Tokyo?", tools_json,
-                                           &options, &prompt);
+    rac_result_t rc = rac_tool_call_build_initial_prompt("what is the weather in Tokyo?",
+                                                         tools_json, &options, &prompt);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(prompt != nullptr);
     ASSERT_SUBSTR(prompt, "get_weather");
@@ -184,11 +189,8 @@ int test_build_followup_prompt_no_tools() {
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_followup_prompt(
         "what is the weather in Tokyo?",
-        /*tools_prompt*/ nullptr,
-        "get_weather",
-        "{\"temperature_c\":22,\"condition\":\"sunny\"}",
-        /*keep_tools_available*/ RAC_FALSE,
-        &prompt);
+        /*tools_prompt*/ nullptr, "get_weather", "{\"temperature_c\":22,\"condition\":\"sunny\"}",
+        /*keep_tools_available*/ RAC_FALSE, &prompt);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(prompt != nullptr);
     ASSERT_SUBSTR(prompt, "get_weather");
@@ -274,7 +276,8 @@ int test_format_name_round_trip() {
 // ---------------------------------------------------------------------------
 int test_tool_result_loop() {
     const char* input =
-        "checking <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>";
+        "checking "
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>";
     rac_tool_call_t parsed;
     rac_result_t rc = rac_tool_call_parse(input, &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
@@ -284,8 +287,8 @@ int test_tool_result_loop() {
 
     char* result_json = nullptr;
     rc = rac_tool_call_result_to_json(parsed.tool_name, RAC_TRUE,
-                                      "{\"temperature_c\":22,\"condition\":\"clear\"}",
-                                      nullptr, &result_json);
+                                      "{\"temperature_c\":22,\"condition\":\"clear\"}", nullptr,
+                                      &result_json);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(result_json != nullptr);
     ASSERT_SUBSTR(result_json, "\"toolName\":\"get_weather\"");
@@ -294,8 +297,7 @@ int test_tool_result_loop() {
 
     char* followup = nullptr;
     rc = rac_tool_call_build_followup_prompt("what is the weather in Tokyo?", nullptr,
-                                             parsed.tool_name, result_json, RAC_FALSE,
-                                             &followup);
+                                             parsed.tool_name, result_json, RAC_FALSE, &followup);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(followup != nullptr);
     ASSERT_SUBSTR(followup, "what is the weather in Tokyo?");
@@ -401,7 +403,8 @@ int test_parse_proto_round_trip() {
 #else
     runanywhere::v1::ToolParseRequest request;
     request.set_text(
-        "checking <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>");
+        "checking "
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>");
     request.mutable_options()->set_format_hint("default");
 
     std::string request_bytes;
@@ -409,16 +412,15 @@ int test_parse_proto_round_trip() {
 
     rac_proto_buffer_t result_bytes{};
     rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc = rac_tool_call_parse_proto(
-        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
-        &result_bytes);
+    const rac_result_t rc =
+        rac_tool_call_parse_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                  request_bytes.size(), &result_bytes);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::ToolParseResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.has_tool_call(), true);
     ASSERT_EQ_INT(result.tool_calls_size(), 1);
     ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "get_weather");
@@ -454,16 +456,15 @@ int test_format_prompt_proto_round_trip() {
 
     rac_proto_buffer_t result_bytes{};
     rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc = rac_tool_call_format_prompt_proto(
-        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
-        &result_bytes);
+    const rac_result_t rc =
+        rac_tool_call_format_prompt_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                          request_bytes.size(), &result_bytes);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::ToolPromptFormatResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
     ASSERT_EQ_STR(result.format_hint().c_str(), "lfm2");
     ASSERT_SUBSTR(result.formatted_prompt().c_str(), "get_weather");
@@ -507,16 +508,15 @@ int test_validate_proto_round_trip() {
 
     rac_proto_buffer_t result_bytes{};
     rac_proto_buffer_init(&result_bytes);
-    const rac_result_t rc = rac_tool_call_validate_proto(
-        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
-        &result_bytes);
+    const rac_result_t rc =
+        rac_tool_call_validate_proto(reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                     request_bytes.size(), &result_bytes);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
     ASSERT_TRUE(result_bytes.data != nullptr);
 
     runanywhere::v1::ToolCallValidationResult result;
-    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
-                                      static_cast<int>(result_bytes.size)));
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.is_valid(), true);
     ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
     ASSERT_EQ_INT(result.validation_errors_size(), 0);
@@ -542,23 +542,23 @@ int main(int argc, char** argv) {
     (void)argv;
 
     TestCase cases[] = {
-        {"parse_default_structured",    test_parse_default_structured},
-        {"parse_lfm2_structured",       test_parse_lfm2_structured},
+        {"parse_default_structured", test_parse_default_structured},
+        {"parse_lfm2_structured", test_parse_lfm2_structured},
         {"parse_free_form_returns_false", test_parse_free_form_returns_false},
         {"format_prompt_default_two_tools", test_format_prompt_default_two_tools},
-        {"format_prompt_json_lfm2",     test_format_prompt_json_lfm2},
-        {"build_initial_prompt_e2e",    test_build_initial_prompt_end_to_end},
+        {"format_prompt_json_lfm2", test_format_prompt_json_lfm2},
+        {"build_initial_prompt_e2e", test_build_initial_prompt_end_to_end},
         {"build_followup_prompt_no_tools", test_build_followup_prompt_no_tools},
         {"build_followup_prompt_keep_tools", test_build_followup_prompt_keep_tools},
         {"normalize_json_unquoted_keys", test_normalize_json_unquoted_keys},
-        {"free_functions_idempotent",   test_free_functions_idempotent},
-        {"format_name_round_trip",      test_format_name_round_trip},
-        {"tool_result_loop",            test_tool_result_loop},
+        {"free_functions_idempotent", test_free_functions_idempotent},
+        {"format_name_round_trip", test_format_name_round_trip},
+        {"tool_result_loop", test_tool_result_loop},
         {"validate_tool_call_definitions", test_validate_tool_call_definitions},
         {"validate_tool_call_json_definitions", test_validate_tool_call_json_definitions},
-        {"parse_proto_round_trip",      test_parse_proto_round_trip},
+        {"parse_proto_round_trip", test_parse_proto_round_trip},
         {"format_prompt_proto_round_trip", test_format_prompt_proto_round_trip},
-        {"validate_proto_round_trip",   test_validate_proto_round_trip},
+        {"validate_proto_round_trip", test_validate_proto_round_trip},
     };
 
     int num_cases = static_cast<int>(sizeof(cases) / sizeof(cases[0]));

@@ -71,8 +71,8 @@ extension RAModelSource: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
@@ -85,8 +85,8 @@ extension RAModelFormat: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
@@ -107,10 +107,10 @@ public extension RAModelFormat {
     /// Parse a `RAModelFormat` from a wire string. Matches case-insensitively
     /// against the proto-name `wireString` emitted by `rac_model_format_wire_string`
     /// (e.g. `MODEL_FORMAT_GGUF`).
-    static func fromWireString(_ s: String) -> RAModelFormat? {
-        let lowered = s.lowercased()
-        for f in RAModelFormat.allCases where f.wireString.lowercased() == lowered {
-            return f
+    static func fromWireString(_ raw: String) -> RAModelFormat? {
+        let lowered = raw.lowercased()
+        for format in RAModelFormat.allCases where format.wireString.lowercased() == lowered {
+            return format
         }
         return nil
     }
@@ -129,8 +129,8 @@ extension RAModelCategory: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
@@ -161,8 +161,8 @@ extension RAInferenceFramework: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
@@ -216,9 +216,9 @@ public extension RAInferenceFramework {
     /// display names, and analytics keys. Delegates to
     /// `rac_inference_framework_from_string`.
     init?(caseInsensitive string: String) {
-        var c: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
-        guard rac_inference_framework_from_string(string, &c) == RAC_SUCCESS else { return nil }
-        self = RAInferenceFramework.fromCFramework(c)
+        var cFramework: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        guard rac_inference_framework_from_string(string, &cFramework) == RAC_SUCCESS else { return nil }
+        self = RAInferenceFramework.fromCFramework(cFramework)
     }
 
     /// All known concrete cases (excludes `.UNRECOGNIZED` and `.unspecified`).
@@ -228,7 +228,7 @@ public extension RAInferenceFramework {
             .coreml, .mlx, .whisperkitCoreml, .metalrt, .genie,
             .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
             .piperTts, .whisperkit, .openaiWhisper, .swiftTransformers,
-            .builtIn, .none, .unknown,
+            .builtIn, .none, .unknown
         ]
     }
 
@@ -239,13 +239,13 @@ public extension RAInferenceFramework {
     // `.systemTts` and `.whisperkitCoreml`. Aliases below keep every existing
     // call site compiling with zero edits.
 
-    static var systemTTS: RAInferenceFramework        { .systemTts }
+    static var systemTTS: RAInferenceFramework { .systemTts }
     static var whisperKitCoreML: RAInferenceFramework { .whisperkitCoreml }
-    static var picoLLM: RAInferenceFramework          { .picoLlm }
-    static var piperTTS: RAInferenceFramework         { .piperTts }
-    static var openAIWhisper: RAInferenceFramework    { .openaiWhisper }
-    static var execuTorch: RAInferenceFramework       { .executorch }
-    static var mediaPipe: RAInferenceFramework        { .mediapipe }
+    static var picoLLM: RAInferenceFramework { .picoLlm }
+    static var piperTTS: RAInferenceFramework { .piperTts }
+    static var openAIWhisper: RAInferenceFramework { .openaiWhisper }
+    static var execuTorch: RAInferenceFramework { .executorch }
+    static var mediaPipe: RAInferenceFramework { .mediapipe }
 }
 
 extension RAThinkingTagPattern: Codable {
@@ -280,15 +280,15 @@ extension RAArchiveType: Codable {
         switch raw.lowercased() {
         case "zip":              self = .zip
         case "tar.bz2", "tbz2":  self = .tarBz2
-        case "tar.gz",  "tgz":   self = .tarGz
-        case "tar.xz",  "txz":   self = .tarXz
+        case "tar.gz", "tgz":   self = .tarGz
+        case "tar.xz", "txz":   self = .tarXz
         default:                 self = .unspecified
         }
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.fileExtension)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.fileExtension)
     }
 }
 
@@ -305,9 +305,9 @@ public extension RAArchiveType {
 
     /// Detect archive type from URL suffix via `rac_archive_type_from_path`.
     static func from(url: URL) -> RAArchiveType? {
-        var c: rac_archive_type_t = RAC_ARCHIVE_TYPE_NONE
-        guard rac_archive_type_from_path(url.path, &c) == RAC_TRUE,
-              let resolved = RAArchiveType(from: c) else { return nil }
+        var cType: rac_archive_type_t = RAC_ARCHIVE_TYPE_NONE
+        guard rac_archive_type_from_path(url.path, &cType) == RAC_TRUE,
+              let resolved = RAArchiveType(from: cType) else { return nil }
         return resolved
     }
 }
@@ -325,7 +325,7 @@ extension RAArchiveStructure: Codable {
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
-        var c = encoder.singleValueContainer()
-        try c.encode(self.wireString)
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }

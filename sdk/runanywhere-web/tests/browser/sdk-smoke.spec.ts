@@ -31,8 +31,8 @@ declare global {
     __RUNANYWHERE_SDK__?: {
       version: string;
       isInitialized: boolean;
-      isAuthenticated: () => boolean;
-      generateStream: (prompt: string) => unknown;
+      isAuthenticated: boolean;
+      textGeneration: Record<string, unknown>;
       modelRegistry: Record<string, unknown>;
       modelLifecycle: Record<string, unknown>;
       stt: Record<string, unknown>;
@@ -77,8 +77,11 @@ test.describe('Web SDK smoke test', () => {
       return {
         version: ra.version,
         isInitialized: ra.isInitialized,
-        isAuthenticated: ra.isAuthenticated(),
-        hasGenerateStream: typeof ra.generateStream === 'function',
+        isAuthenticated: ra.isAuthenticated,
+        hasTextGenerationStream:
+          typeof ra.textGeneration === 'object' &&
+          ra.textGeneration !== null &&
+          typeof ra.textGeneration.generateStream === 'function',
         hasModelRegistry: typeof ra.modelRegistry === 'object' && ra.modelRegistry !== null,
         hasModelLifecycle: typeof ra.modelLifecycle === 'object' && ra.modelLifecycle !== null,
         hasStt: typeof ra.stt === 'object' && ra.stt !== null,
@@ -100,7 +103,7 @@ test.describe('Web SDK smoke test', () => {
     expect(surface.isAuthenticated).toBe(false);
 
     // Public namespace facades must be present.
-    expect(surface.hasGenerateStream).toBe(true);
+    expect(surface.hasTextGenerationStream).toBe(true);
     expect(surface.hasModelRegistry).toBe(true);
     expect(surface.hasModelLifecycle).toBe(true);
     expect(surface.hasStt).toBe(true);
@@ -109,7 +112,7 @@ test.describe('Web SDK smoke test', () => {
 
     // No fatal console errors escaped the initialization flow. Warnings
     // about missing WASM are tolerated — those happen in fresh dev checkouts
-    // before `build-web.sh --build-wasm` runs.
+    // before `npm run build:wasm -- --llamacpp` runs.
     const fatalErrors = consoleErrors.filter((err) =>
       !err.includes('WASM') &&
       !err.includes('wasm') &&

@@ -51,12 +51,13 @@
 
 #pragma once
 
+#include "pipeline.pb.h"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
 #include "rac/graph/graph_scheduler.hpp"
 #include "rac/solutions/operator_registry.hpp"
@@ -64,7 +65,7 @@
 namespace rac::solutions {
 
 class PipelineExecutor {
-public:
+   public:
     explicit PipelineExecutor(runanywhere::v1::PipelineSpec spec);
 
     /// Compile the spec into a live `GraphScheduler`. On failure the
@@ -84,31 +85,25 @@ public:
     /// microphone capture, file streaming, or unit-testing harnesses).
     /// Returns nullptr if called before build() or when no input edges
     /// were captured.
-    std::shared_ptr<OperatorEdge> root_input_edge() const noexcept {
-        return root_input_edge_;
-    }
+    std::shared_ptr<OperatorEdge> root_input_edge() const noexcept { return root_input_edge_; }
 
     /// Terminal output edge of the last topologically-sorted operator.
     /// Useful in tests that drain the pipeline's tail; production
     /// sinks usually close silently.
-    std::shared_ptr<OperatorEdge> root_output_edge() const noexcept {
-        return root_output_edge_;
-    }
+    std::shared_ptr<OperatorEdge> root_output_edge() const noexcept { return root_output_edge_; }
 
-    const std::string& root_input_payload_type() const noexcept {
-        return root_input_payload_type_;
-    }
+    const std::string& root_input_payload_type() const noexcept { return root_input_payload_type_; }
 
     const std::string& root_output_payload_type() const noexcept {
         return root_output_payload_type_;
     }
 
-private:
-    runanywhere::v1::PipelineSpec                              spec_;
-    std::shared_ptr<OperatorEdge>                              root_input_edge_;
-    std::shared_ptr<OperatorEdge>                              root_output_edge_;
-    std::string                                                root_input_payload_type_;
-    std::string                                                root_output_payload_type_;
+   private:
+    runanywhere::v1::PipelineSpec spec_;
+    std::shared_ptr<OperatorEdge> root_input_edge_;
+    std::shared_ptr<OperatorEdge> root_output_edge_;
+    std::string root_input_payload_type_;
+    std::string root_output_payload_type_;
 };
 
 }  // namespace rac::solutions

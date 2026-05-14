@@ -22,13 +22,23 @@
 #include <cstdint>
 #include <string>
 
-#include "rac/plugin/rac_primitive.h"   /* rac_runtime_id_t */
+#include "rac/plugin/rac_primitive.h" /* rac_runtime_id_t */
 
 namespace rac {
 namespace router {
 
 enum class CpuVendor : uint8_t { Unknown = 0, Intel, Amd, Apple, Arm, Qualcomm, Other };
-enum class GpuVendor : uint8_t { Unknown = 0, Apple, Nvidia, Amd, Intel, Adreno, Mali, PowerVR, Other };
+enum class GpuVendor : uint8_t {
+    Unknown = 0,
+    Apple,
+    Nvidia,
+    Amd,
+    Intel,
+    Adreno,
+    Mali,
+    PowerVR,
+    Other
+};
 
 /**
  * Snapshot of the host's detected accelerators, memory, and identifying
@@ -48,14 +58,14 @@ struct HardwareProfile {
 
     /** Per-runtime availability flags. The router consults the matching
      *  bool for the caller's `preferred_runtime`. */
-    bool has_metal   = false;   /**< Apple Metal compute. */
-    bool has_ane     = false;   /**< Apple Neural Engine — only when chip is known good. */
-    bool has_coreml  = false;   /**< Apple Core ML runtime present. */
-    bool has_cuda    = false;   /**< NVIDIA CUDA driver + at least 1 device node. */
-    bool has_vulkan  = false;   /**< Vulkan loader + at least 1 physical device. */
-    bool has_qnn     = false;   /**< Qualcomm Hexagon (libQnnHtp + /dev/fastrpc-adsp). */
-    bool has_nnapi   = false;   /**< Android NNAPI (API level >= 27). */
-    bool has_webgpu  = false;   /**< Browser WebGPU adapter present (Emscripten only). */
+    bool has_metal = false;  /**< Apple Metal compute. */
+    bool has_ane = false;    /**< Apple Neural Engine — only when chip is known good. */
+    bool has_coreml = false; /**< Apple Core ML runtime present. */
+    bool has_cuda = false;   /**< NVIDIA CUDA driver + at least 1 device node. */
+    bool has_vulkan = false; /**< Vulkan loader + at least 1 physical device. */
+    bool has_qnn = false;    /**< Qualcomm Hexagon (libQnnHtp + /dev/fastrpc-adsp). */
+    bool has_nnapi = false;  /**< Android NNAPI (API level >= 27). */
+    bool has_webgpu = false; /**< Browser WebGPU adapter present (Emscripten only). */
 
     /**
      * Heavy probe: shells out to platform APIs (sysctl, /proc, dlopen on
@@ -86,4 +96,4 @@ struct HardwareProfile {
 }  // namespace router
 }  // namespace rac
 
-#endif  /* RAC_ROUTER_HARDWARE_PROFILE_H */
+#endif /* RAC_ROUTER_HARDWARE_PROFILE_H */

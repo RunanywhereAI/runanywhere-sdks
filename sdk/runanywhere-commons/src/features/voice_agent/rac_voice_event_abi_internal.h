@@ -26,8 +26,7 @@ namespace rac::voice_agent {
  * Safe to call from any thread that the voice agent's event dispatcher
  * runs on. Internal serialization buffers are thread_local.
  */
-void dispatch_proto_event(rac_voice_agent_handle_t       handle,
-                          const rac_voice_agent_event_t* event);
+void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event);
 
 /**
  * Fan a generated VoiceEvent message out to the proto-byte callback registered
@@ -39,4 +38,4 @@ void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
 
 }  // namespace rac::voice_agent
 
-#endif  /* RAC_FEATURES_VOICE_AGENT_RAC_VOICE_EVENT_ABI_INTERNAL_H */
+#endif /* RAC_FEATURES_VOICE_AGENT_RAC_VOICE_EVENT_ABI_INTERNAL_H */

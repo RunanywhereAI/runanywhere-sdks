@@ -58,10 +58,6 @@ extension ModelFormat {
 // MARK: - InferenceFramework C++ Conversion
 
 extension InferenceFramework {
-    /// Convert to C++ inference framework type.
-    /// Delegates to the shared `toCFramework()` defined in `ModelTypes.swift`.
-    func toC() -> rac_inference_framework_t { toCFramework() }
-
     /// Initialize from C++ inference framework type.
     /// Delegates to the shared `fromCFramework(_:)` defined in `ModelTypes.swift`.
     init(from cFramework: rac_inference_framework_t) {
@@ -110,11 +106,6 @@ extension RAModelInfo {
         apply(cArtifact: cModel.artifact_info)
         isDownloaded = isDownloadedOnDisk
         isAvailable = isAvailableForUse
-    }
-
-    private static func unixSeconds(fromUnixMillisecondsOrSeconds value: Int64) -> Int64 {
-        let absolute = value < 0 ? -value : value
-        return absolute > 10_000_000_000 ? value / 1_000 : value
     }
 
     private mutating func apply(cArtifact: rac_model_artifact_info_t) {

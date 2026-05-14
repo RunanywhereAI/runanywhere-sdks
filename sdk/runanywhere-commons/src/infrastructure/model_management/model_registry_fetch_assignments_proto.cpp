@@ -49,7 +49,8 @@ bool valid_bytes(const uint8_t* bytes, size_t size) {
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
@@ -66,7 +67,8 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t* request_bytes,
                                                                    size_t request_size,
                                                                    rac_proto_buffer_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_bytes;
     (void)request_size;
@@ -79,9 +81,8 @@ extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t
     }
 
     runanywhere::v1::ModelRegistryFetchAssignmentsRequest request;
-    if (request_size > 0 &&
-        !request.ParseFromArray(parse_data(request_bytes, request_size),
-                                static_cast<int>(request_size))) {
+    if (request_size > 0 && !request.ParseFromArray(parse_data(request_bytes, request_size),
+                                                    static_cast<int>(request_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse ModelRegistryFetchAssignmentsRequest");
     }
@@ -99,7 +100,8 @@ extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t
     rac_model_info_t** models = nullptr;
     size_t count = 0;
     rac_result_t rc = rac_model_registry_fetch_assignments(force_refresh, &models, &count);
-    if (models) rac_model_info_array_free(models, count);
+    if (models)
+        rac_model_info_array_free(models, count);
 
     if (rc != RAC_SUCCESS) {
         const char* msg = rac_error_message(rc);
@@ -119,8 +121,7 @@ extern "C" rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t
     if (registry) {
         uint8_t* list_bytes = nullptr;
         size_t list_size = 0;
-        rac_result_t list_rc =
-            rac_model_registry_list_proto(registry, &list_bytes, &list_size);
+        rac_result_t list_rc = rac_model_registry_list_proto(registry, &list_bytes, &list_size);
         if (list_rc == RAC_SUCCESS && list_bytes && list_size > 0) {
             runanywhere::v1::ModelInfoList list;
             if (list.ParseFromArray(list_bytes, static_cast<int>(list_size))) {

@@ -2,7 +2,7 @@
  * Speak Tab — V2 canonical proto-byte TTS.
  *
  * Once `ONNX.register()` resolves, the public surface in `@runanywhere/web`
- * (`RunAnywhere.synthesize`, `RunAnywhere.tts.*`) dispatches synthesis
+ * (`RunAnywhere.tts.*`) dispatches synthesis
  * through the proto-byte TTS adapter. The PCM bytes returned are played
  * through `AudioPlayback`. Until the WASM module is rebuilt with
  * `RAC_WASM_ONNX=ON`, registration fails with a typed
@@ -12,12 +12,14 @@
 
 import type { TabLifecycle } from '../app';
 import {
-  AudioPlayback,
   RunAnywhere,
-  TTSProtoAdapter,
   isSDKException,
-  tryRunanywhereModule,
 } from '@runanywhere/web';
+import { AudioPlayback } from '@runanywhere/web/browser';
+import {
+  TTSProtoAdapter,
+  tryRunanywhereModule,
+} from '@runanywhere/web/internal';
 import { ONNX } from '@runanywhere/web-onnx';
 
 let container: HTMLElement;
@@ -115,14 +117,14 @@ function renderSpeak(): void {
           <div class="docs-section">
             <h3>Synthesis</h3>
             <p class="text-secondary">
-              Real TTS calls dispatch through <code>RunAnywhere.synthesize(text, options)</code>
+              Real TTS calls dispatch through <code>RunAnywhere.tts.synthesizeAuto(text, options)</code>
               once the ONNX backend is registered against a WASM build that
               includes <code>RAC_WASM_ONNX=ON</code>. PCM samples are played via
               <code>AudioPlayback</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.modelLifecycle.load(...)</code></li>
-              <li><code>RunAnywhere.synthesize(text, { voicePath })</code></li>
+              <li><code>RunAnywhere.modelLifecycle.loadModel(...)</code></li>
+              <li><code>RunAnywhere.tts.synthesizeAuto(text, { voicePath })</code></li>
               <li><code>AudioPlayback.play(samples, sampleRate)</code></li>
             </ul>
           </div>`}
@@ -168,7 +170,7 @@ async function runSynthesize(): Promise<void> {
   renderSpeak();
 
   try {
-    const result = await RunAnywhere.synthesize(text);
+    const result = await RunAnywhere.tts.synthesizeAuto(text);
     lastDurationMs = result.durationMs ?? 0;
     const samples = pcmBytesToFloat32(result.audioData);
     const sampleRate = result.sampleRate || 22050;

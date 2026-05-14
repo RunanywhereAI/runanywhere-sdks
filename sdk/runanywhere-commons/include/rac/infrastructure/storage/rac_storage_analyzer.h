@@ -193,8 +193,7 @@ typedef rac_result_t (*rac_storage_delete_path_fn)(const char* path, int recursi
  * @return RAC_SUCCESS when the loaded state is known
  */
 typedef rac_result_t (*rac_storage_is_model_loaded_fn)(const char* model_id,
-                                                       rac_bool_t* out_is_loaded,
-                                                       void* user_data);
+                                                       rac_bool_t* out_is_loaded, void* user_data);
 
 /**
  * @brief Callback to request unloading a model before deleting storage.
@@ -299,26 +298,25 @@ RAC_API rac_result_t rac_storage_analyzer_check_available(
  * @param out_buffer Output: owned serialized StorageInfoResult bytes
  * @return RAC_SUCCESS when out_buffer contains a result proto, or an ABI/setup error
  */
-RAC_API rac_result_t rac_storage_analyzer_info_proto(
-    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer);
+RAC_API rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handle,
+                                                     rac_model_registry_handle_t registry_handle,
+                                                     const uint8_t* request_proto_bytes,
+                                                     size_t request_proto_size,
+                                                     rac_proto_buffer_t* out_buffer);
 
 /**
  * @brief Check storage availability and return serialized StorageAvailabilityResult bytes.
  */
 RAC_API rac_result_t rac_storage_analyzer_availability_proto(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer);
+    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_buffer);
 
 /**
  * @brief Build a safe delete plan and return serialized StorageDeletePlan bytes.
  */
 RAC_API rac_result_t rac_storage_analyzer_delete_plan_proto(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer);
+    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_buffer);
 
 /**
  * @brief Execute or dry-run a storage delete request and return StorageDeleteResult bytes.
@@ -328,10 +326,11 @@ RAC_API rac_result_t rac_storage_analyzer_delete_plan_proto(
  * ids or a typed plan/result unless the request explicitly allows the platform
  * delete adapter to run.
  */
-RAC_API rac_result_t rac_storage_analyzer_delete_proto(
-    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer);
+RAC_API rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t handle,
+                                                       rac_model_registry_handle_t registry_handle,
+                                                       const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_buffer);
 
 /**
  * @brief Calculate size at a path (file or directory)

@@ -39,12 +39,12 @@ namespace router {
  * to int. 0 = no format hint.
  */
 struct RouteRequest {
-    rac_primitive_t   primitive            = RAC_PRIMITIVE_UNSPECIFIED;
-    uint32_t          format               = 0;          /* runanywhere.v1.ModelFormat or 0 */
-    std::size_t       estimated_memory_bytes = 0;
-    std::string_view  pinned_engine        = {};         /* hard pin by metadata.name */
-    rac_runtime_id_t  preferred_runtime    = RAC_RUNTIME_UNSPECIFIED;
-    bool              no_fallback          = false;      /* honored only when pinned_engine set */
+    rac_primitive_t primitive = RAC_PRIMITIVE_UNSPECIFIED;
+    uint32_t format = 0; /* runanywhere.v1.ModelFormat or 0 */
+    std::size_t estimated_memory_bytes = 0;
+    std::string_view pinned_engine = {}; /* hard pin by metadata.name */
+    rac_runtime_id_t preferred_runtime = RAC_RUNTIME_UNSPECIFIED;
+    bool no_fallback = false; /* honored only when pinned_engine set */
 };
 
 /**
@@ -69,7 +69,7 @@ struct RouteResult {
  * outside the lock so concurrent registrations don't block routing.
  */
 class EngineRouter {
-public:
+   public:
     explicit EngineRouter(const HardwareProfile& profile);
 
     /** Pick the single best plugin. */
@@ -79,7 +79,7 @@ public:
      *  Useful for debugging + the C ABI introspection wrapper. */
     std::vector<RouteResult> route_all(const RouteRequest& req) const;
 
-private:
+   private:
     /** Score a single plugin against `req`. Negative = ineligible (hard reject). */
     int score(const rac_engine_vtable_t& vt, const RouteRequest& req) const;
 
@@ -92,4 +92,4 @@ private:
 }  // namespace router
 }  // namespace rac
 
-#endif  /* RAC_ROUTER_ENGINE_ROUTER_H */
+#endif /* RAC_ROUTER_ENGINE_ROUTER_H */

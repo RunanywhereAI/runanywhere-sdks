@@ -20,13 +20,13 @@
  *
  * Runner: Vitest. Invoke with:
  *
- *     npx vitest run src/Adapters/__tests__/VoiceAgentStreamAdapter.fanout.test.ts
+ *     npx vitest run tests/unit/Adapters/VoiceAgentStreamAdapter.fanout.test.ts
  */
 
 import { test, expect } from 'vitest';
 
 import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
-import { __testing__ } from '../VoiceAgentStreamAdapter';
+import { __testing__ } from '../../../src/Adapters/VoiceAgentStreamAdapter';
 import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 
 // -----------------------------------------------------------------------------
@@ -50,9 +50,6 @@ interface FakeModule {
   addFunction: (fn: (...a: number[]) => number | void, sig: string) => number;
   removeFunction: (ptr: number) => void;
   _rac_voice_agent_set_proto_callback: (h: number, cb: number, ud: number) => number;
-  _rac_llm_extract_thinking: (...a: number[]) => number;
-  _rac_llm_strip_thinking: (...a: number[]) => number;
-  _rac_llm_split_thinking_tokens: (...a: number[]) => number;
   HEAP32: Int32Array;
   HEAPU32: Uint32Array;
   _malloc: (n: number) => number;
@@ -116,9 +113,6 @@ function makeFakeModule(opts: {
       return rc;
     },
 
-    _rac_llm_extract_thinking: () => 0,
-    _rac_llm_strip_thinking: () => 0,
-    _rac_llm_split_thinking_tokens: () => 0,
     _malloc: () => 0,
     _free: () => { /* noop */ },
     UTF8ToString: () => '',

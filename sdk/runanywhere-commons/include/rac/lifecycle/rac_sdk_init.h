@@ -74,8 +74,7 @@ extern "C" {
  * phase=ONE and success=true. On failure (validation, parse, or state init):
  * success=false and the SDKError sub-message is populated.
  */
-RAC_API rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
-                                               size_t in_size,
+RAC_API rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t in_size,
                                                rac_proto_buffer_t* out_RASdkInitResult);
 
 /**
@@ -106,8 +105,7 @@ RAC_API rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes,
  * The request envelope is reserved for future hints (force_refresh,
  * skip_device_registration). Today an empty proto is the canonical input.
  */
-RAC_API rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes,
-                                               size_t in_size,
+RAC_API rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t in_size,
                                                rac_proto_buffer_t* out_RASdkInitResult);
 
 /**

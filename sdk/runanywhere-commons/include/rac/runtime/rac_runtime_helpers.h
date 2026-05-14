@@ -43,19 +43,17 @@ using free_buffer_fn = void (*)(rac_runtime_buffer_t*);
  * `free_buffer` MAY be NULL — buffer slots with RUNTIME ownership are leaked,
  *  matching the historical behavior when a runtime has no buffer allocator.
  */
-inline void rac_runtime_release_tensor(rac_runtime_tensor_t* tensor,
-                                       free_buffer_fn free_buffer) {
-    if (tensor == nullptr) return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->data != nullptr) {
+inline void rac_runtime_release_tensor(rac_runtime_tensor_t* tensor, free_buffer_fn free_buffer) {
+    if (tensor == nullptr)
+        return;
+    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data != nullptr) {
         std::free(tensor->data);
     }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->shape != nullptr) {
+    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape != nullptr) {
         std::free(tensor->shape);
     }
-    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-        tensor->buffer != nullptr && free_buffer != nullptr) {
+    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->buffer != nullptr &&
+        free_buffer != nullptr) {
         free_buffer(tensor->buffer);
     }
     *tensor = rac_runtime_tensor_t{};
@@ -74,10 +72,8 @@ inline void rac_runtime_release_tensor(rac_runtime_tensor_t* tensor,
  *   - `RAC_ERROR_INVALID_PARAMETER` if any offset/size is out of range.
  *   - `RAC_SUCCESS` otherwise.
  */
-inline rac_result_t rac_runtime_copy_buffer(void* dst, size_t dst_capacity,
-                                            size_t dst_offset,
-                                            const void* src, size_t src_capacity,
-                                            size_t src_offset,
+inline rac_result_t rac_runtime_copy_buffer(void* dst, size_t dst_capacity, size_t dst_offset,
+                                            const void* src, size_t src_capacity, size_t src_offset,
                                             size_t bytes) {
     if (dst == nullptr || src == nullptr) {
         return RAC_ERROR_NULL_POINTER;
@@ -89,8 +85,7 @@ inline rac_result_t rac_runtime_copy_buffer(void* dst, size_t dst_capacity,
         return RAC_ERROR_INVALID_PARAMETER;
     }
     std::memmove(static_cast<unsigned char*>(dst) + dst_offset,
-                 static_cast<const unsigned char*>(src) + src_offset,
-                 bytes);
+                 static_cast<const unsigned char*>(src) + src_offset, bytes);
     return RAC_SUCCESS;
 }
 

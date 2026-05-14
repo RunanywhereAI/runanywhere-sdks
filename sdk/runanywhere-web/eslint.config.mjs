@@ -19,6 +19,7 @@ export default tseslint.config(
       '**/emsdk/**',
       '**/a.out.js',
       '**/*.d.ts',
+      '**/*.test-d.ts',
       '**/__tests__/**',
       // Bundler-facing JS proxy files (re-export TS sources for worker URLs).
       'packages/llamacpp/src/workers/*.js',
@@ -31,7 +32,13 @@ export default tseslint.config(
       parserOptions: {
         // Use the TS-ESLint project service so each package's tsconfig.json
         // is resolved automatically across the workspace packages.
-        projectService: true,
+        projectService: {
+          allowDefaultProject: [
+            'packages/core/tests/unit/Adapters/*.test.ts',
+            'packages/core/tests/unit/Public/Extensions/*.test.ts',
+            'packages/core/tests/unit/runtime/*.test.ts',
+          ],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

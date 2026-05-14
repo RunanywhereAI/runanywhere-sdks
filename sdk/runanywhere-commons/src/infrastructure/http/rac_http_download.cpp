@@ -29,8 +29,6 @@
  *      `DownloadError` enum byte-for-byte.
  */
 
-#include "rac/infrastructure/http/rac_http_download.h"
-
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -43,6 +41,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/http/rac_http_download.h"
 
 namespace fs = std::filesystem;
 
@@ -73,7 +72,9 @@ const uint32_t kSha256K[64] = {
     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 
-inline uint32_t rotr(uint32_t x, uint32_t n) { return (x >> n) | (x << (32 - n)); }
+inline uint32_t rotr(uint32_t x, uint32_t n) {
+    return (x >> n) | (x << (32 - n));
+}
 
 void sha256_transform(sha256_ctx* ctx, const uint8_t* data) {
     uint32_t w[64];
@@ -179,12 +180,16 @@ std::string bytes_to_hex(const uint8_t* bytes, size_t n) {
 }
 
 bool iequals(const std::string& a, const std::string& b) {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size())
+        return false;
     for (size_t i = 0; i < a.size(); ++i) {
         char ca = a[i], cb = b[i];
-        if (ca >= 'A' && ca <= 'Z') ca = static_cast<char>(ca + 32);
-        if (cb >= 'A' && cb <= 'Z') cb = static_cast<char>(cb + 32);
-        if (ca != cb) return false;
+        if (ca >= 'A' && ca <= 'Z')
+            ca = static_cast<char>(ca + 32);
+        if (cb >= 'A' && cb <= 'Z')
+            cb = static_cast<char>(cb + 32);
+        if (ca != cb)
+            return false;
     }
     return true;
 }
@@ -195,8 +200,8 @@ bool iequals(const std::string& a, const std::string& b) {
 
 struct dl_ctx {
     std::ofstream* out_file;
-    sha256_ctx* hasher;     // null when not hashing
-    bool hashing;           // convenience
+    sha256_ctx* hasher;  // null when not hashing
+    bool hashing;        // convenience
     uint64_t bytes_written;
     uint64_t resume_prefix;
 
@@ -245,38 +250,43 @@ rac_bool_t on_chunk(const uint8_t* chunk, size_t chunk_len, uint64_t /*total_wri
 
 rac_http_download_status_t map_rac_error(rac_result_t rc, int32_t http_status) {
     if (rc == RAC_SUCCESS) {
-        if (http_status >= 400 && http_status < 600) return RAC_HTTP_DL_SERVER_ERROR;
+        if (http_status >= 400 && http_status < 600)
+            return RAC_HTTP_DL_SERVER_ERROR;
         return RAC_HTTP_DL_OK;
     }
-    if (rc == RAC_ERROR_INVALID_ARGUMENT) return RAC_HTTP_DL_INVALID_URL;
-    if (rc == RAC_ERROR_TIMEOUT) return RAC_HTTP_DL_TIMEOUT;
-    if (rc == RAC_ERROR_CANCELLED) return RAC_HTTP_DL_CANCELLED;
-    if (rc == RAC_ERROR_NETWORK_ERROR) return RAC_HTTP_DL_NETWORK_ERROR;
+    if (rc == RAC_ERROR_INVALID_ARGUMENT)
+        return RAC_HTTP_DL_INVALID_URL;
+    if (rc == RAC_ERROR_TIMEOUT)
+        return RAC_HTTP_DL_TIMEOUT;
+    if (rc == RAC_ERROR_CANCELLED)
+        return RAC_HTTP_DL_CANCELLED;
+    if (rc == RAC_ERROR_NETWORK_ERROR)
+        return RAC_HTTP_DL_NETWORK_ERROR;
     return RAC_HTTP_DL_UNKNOWN;
 }
 
 }  // namespace
 
-extern "C" rac_http_download_status_t rac_http_download_execute(
-    const rac_http_download_request_t* req, rac_http_download_progress_fn progress_cb,
-    void* progress_user_data, int32_t* out_http_status) {
-
-    if (out_http_status) *out_http_status = 0;
+extern "C" rac_http_download_status_t
+rac_http_download_execute(const rac_http_download_request_t* req,
+                          rac_http_download_progress_fn progress_cb, void* progress_user_data,
+                          int32_t* out_http_status) {
+    if (out_http_status)
+        *out_http_status = 0;
 
     if (!req || !req->url || !req->destination_path) {
 #ifdef __ANDROID__
-        __android_log_print(ANDROID_LOG_ERROR, "rac_http_dl",
-                            "INVALID_URL early-return: req=%p url=%p dest=%p",
-                            static_cast<const void*>(req),
-                            req ? static_cast<const void*>(req->url) : nullptr,
-                            req ? static_cast<const void*>(req->destination_path) : nullptr);
+        __android_log_print(
+            ANDROID_LOG_ERROR, "rac_http_dl", "INVALID_URL early-return: req=%p url=%p dest=%p",
+            static_cast<const void*>(req), req ? static_cast<const void*>(req->url) : nullptr,
+            req ? static_cast<const void*>(req->destination_path) : nullptr);
 #endif
         return RAC_HTTP_DL_INVALID_URL;
     }
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "rac_http_dl",
-                        "rac_http_download_execute: url=[%s] dest=[%s]",
-                        req->url, req->destination_path);
+                        "rac_http_download_execute: url=[%s] dest=[%s]", req->url,
+                        req->destination_path);
 #endif
 
     // ---- Ensure destination directory exists -----------------------
@@ -345,7 +355,8 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
                 size_t chunk = static_cast<size_t>(std::min<uint64_t>(buf.size(), remaining));
                 in.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(chunk));
                 std::streamsize read_n = in.gcount();
-                if (read_n <= 0) break;
+                if (read_n <= 0)
+                    break;
                 sha256_update(&hasher, buf.data(), static_cast<size_t>(read_n));
                 remaining -= static_cast<uint64_t>(read_n);
             }
@@ -381,7 +392,8 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
     }
 
     int32_t http_status = resp_meta.status;
-    if (out_http_status) *out_http_status = http_status;
+    if (out_http_status)
+        *out_http_status = http_status;
 #ifdef __ANDROID__
     __android_log_print(ANDROID_LOG_INFO, "rac_http_dl",
                         "request_stream returned: rc=%d http_status=%d bytes_written=%llu",

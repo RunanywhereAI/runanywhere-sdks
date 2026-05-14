@@ -3,7 +3,7 @@
  *
  * Speech-to-text namespace — mirrors Swift's `RunAnywhere+STT.swift`.
  * Provides `RunAnywhere.stt.*` capability surface for owning STT component
- * handles plus a top-level `RunAnywhere.transcribe(audio, options)` ergonomic
+ * handles plus a `RunAnywhere.stt.transcribeAuto(audio, options)` ergonomic
  * shortcut.
  *
  * The proto-byte adapters (`STTProtoAdapter`) take a numeric `handle` argument
@@ -187,6 +187,8 @@ export interface TranscribeOptions extends Partial<STTOptions> {
 }
 
 export const STT = {
+  transcribeAuto: transcribe,
+
   /**
    * Returns true when the WASM module is loaded with both the proto-byte
    * STT exports AND the component lifecycle exports (create / load_model /
@@ -293,7 +295,7 @@ export async function transcribe(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): Promise<STTOutput> {
-  const module = requireSTTModule('RunAnywhere.transcribe');
+  const module = requireSTTModule('RunAnywhere.stt.transcribeAuto');
   let modelPath = options?.modelPath;
   let modelId = options?.modelId;
   let modelName: string | undefined;
@@ -301,7 +303,7 @@ export async function transcribe(
   if (!modelPath) {
     if (!ModelLifecycle.supportsNativeLifecycle()) {
       throw SDKException.backendNotAvailable(
-        'RunAnywhere.transcribe',
+        'RunAnywhere.stt.transcribeAuto',
         'No modelPath provided and the model lifecycle proto adapter is not installed.',
       );
     }
@@ -309,7 +311,7 @@ export async function transcribe(
     if (!current?.modelId) {
       throw SDKException.componentNotReady(
         'stt',
-        'No STT model is loaded. Call ModelLifecycle.load(...) before RunAnywhere.transcribe().',
+        'No STT model is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.stt.transcribeAuto().',
       );
     }
     modelPath = current.resolvedPath || current.modelId;

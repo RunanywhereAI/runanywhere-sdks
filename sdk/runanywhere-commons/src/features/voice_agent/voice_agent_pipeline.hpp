@@ -48,17 +48,16 @@ class GraphScheduler;
 namespace rac::voice_agent {
 
 class VoiceAgentPipeline {
-public:
+   public:
     /// `agent` owns the component handles the nodes call into. The
     /// pipeline does not take ownership; the caller (the agent) must
     /// outlive every active run_once() invocation.
-    VoiceAgentPipeline(rac_voice_agent_handle_t          agent,
-                       rac_voice_agent_event_callback_fn cb,
-                       void*                             user_data);
+    VoiceAgentPipeline(rac_voice_agent_handle_t agent, rac_voice_agent_event_callback_fn cb,
+                       void* user_data);
 
     ~VoiceAgentPipeline();
 
-    VoiceAgentPipeline(const VoiceAgentPipeline&)            = delete;
+    VoiceAgentPipeline(const VoiceAgentPipeline&) = delete;
     VoiceAgentPipeline& operator=(const VoiceAgentPipeline&) = delete;
 
     /// Build the DAG, push the audio buffer, drain events to the
@@ -71,20 +70,20 @@ public:
     /// does not deadlock on a stalled stage.
     void cancel();
 
-private:
-    rac_voice_agent_handle_t                  agent_;
-    rac_voice_agent_event_callback_fn         cb_;
-    void*                                     user_data_;
+   private:
+    rac_voice_agent_handle_t agent_;
+    rac_voice_agent_event_callback_fn cb_;
+    void* user_data_;
 
     /// Serializes run_once(); the agent already holds an outer mutex so
     /// this is defense-in-depth.
-    std::mutex                                run_mutex_;
+    std::mutex run_mutex_;
 
     /// Set during run_once() so cancel() can reach the live graph.
     /// Reset to nullptr on return; protected by `state_mutex_`.
-    std::mutex                                state_mutex_;
+    std::mutex state_mutex_;
     std::shared_ptr<rac::graph::GraphScheduler> active_scheduler_;
-    std::shared_ptr<rac::graph::CancelToken>    active_cancel_;
+    std::shared_ptr<rac::graph::CancelToken> active_cancel_;
 };
 
 }  // namespace rac::voice_agent

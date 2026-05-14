@@ -59,8 +59,7 @@ rac_result_t copy_string_to_buffer(const char* value, char* out_path, size_t pat
     return RAC_SUCCESS;
 }
 
-rac_model_info_t make_resolution_model(const char* model_id,
-                                       rac_inference_framework_t framework,
+rac_model_info_t make_resolution_model(const char* model_id, rac_inference_framework_t framework,
                                        rac_artifact_type_kind_t artifact_kind,
                                        rac_archive_type_t archive_type) {
     rac_model_info_t model{};
@@ -79,9 +78,8 @@ rac_result_t resolve_default_model_path(rac_inference_framework_t framework, con
     if (!artifact_root || !out_resolution) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
-    rac_model_info_t model = make_resolution_model(model_id, framework,
-                                                   RAC_ARTIFACT_KIND_MULTI_FILE,
-                                                   RAC_ARCHIVE_TYPE_NONE);
+    rac_model_info_t model = make_resolution_model(
+        model_id, framework, RAC_ARTIFACT_KIND_MULTI_FILE, RAC_ARCHIVE_TYPE_NONE);
     return rac_model_paths_resolve_artifact(&model, artifact_root, nullptr, out_resolution);
 }
 
@@ -223,8 +221,8 @@ rac_result_t rac_model_strategy_find_path(rac_inference_framework_t framework, c
         rac_result_t rc =
             resolve_default_model_path(framework, model_id, model_folder, &resolution);
         if (rc != RAC_SUCCESS) {
-            RAC_LOG_DEBUG(LOG_CAT, "Default path resolution failed for framework %d: %d",
-                          framework, rc);
+            RAC_LOG_DEBUG(LOG_CAT, "Default path resolution failed for framework %d: %d", framework,
+                          rc);
             return rc;
         }
         rc = copy_string_to_buffer(resolution.primary_model_path, out_path, path_size);
@@ -248,11 +246,10 @@ rac_result_t rac_model_strategy_detect(rac_inference_framework_t framework,
         memset(out_details, 0, sizeof(*out_details));
 
         rac_model_path_resolution_t resolution{};
-        rac_result_t rc =
-            resolve_default_model_path(framework, nullptr, model_folder, &resolution);
+        rac_result_t rc = resolve_default_model_path(framework, nullptr, model_folder, &resolution);
         if (rc != RAC_SUCCESS) {
-            RAC_LOG_DEBUG(LOG_CAT, "Default model detection failed for framework %d: %d",
-                          framework, rc);
+            RAC_LOG_DEBUG(LOG_CAT, "Default model detection failed for framework %d: %d", framework,
+                          rc);
             return rc;
         }
 
@@ -365,8 +362,8 @@ rac_result_t rac_model_strategy_post_process(rac_inference_framework_t framework
             options.archive_type_hint = config->archive_type;
             rac_extraction_result_t extraction{};
             rac_result_t extract_rc =
-                rac_extract_archive_native(downloaded_path, config->destination_folder,
-                                           &options, nullptr, nullptr, &extraction);
+                rac_extract_archive_native(downloaded_path, config->destination_folder, &options,
+                                           nullptr, nullptr, &extraction);
             if (extract_rc != RAC_SUCCESS) {
                 return extract_rc;
             }
@@ -379,8 +376,7 @@ rac_result_t rac_model_strategy_post_process(rac_inference_framework_t framework
             should_extract ? RAC_ARTIFACT_KIND_ARCHIVE : RAC_ARTIFACT_KIND_SINGLE_FILE,
             config->archive_type);
         rac_result_t rc =
-            rac_model_paths_resolve_artifact(&model, artifact_root.c_str(), nullptr,
-                                             &resolution);
+            rac_model_paths_resolve_artifact(&model, artifact_root.c_str(), nullptr, &resolution);
         if (rc != RAC_SUCCESS) {
             rac_model_path_resolution_free(&resolution);
             return rc;

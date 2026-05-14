@@ -17,19 +17,21 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if (!((a) == (b))) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 rac_model_registry_handle_t create_registry() {
     rac_model_registry_handle_t registry = nullptr;
@@ -41,8 +43,7 @@ rac_model_registry_handle_t create_registry() {
 
 #ifdef RAC_HAVE_PROTOBUF
 
-runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id,
-                                                  const std::string& name,
+runanywhere::v1::ModelInfo build_full_model_proto(const std::string& id, const std::string& name,
                                                   const std::string& local_path) {
     runanywhere::v1::ModelInfo model;
     model.set_id(id);
@@ -131,16 +132,12 @@ runanywhere::v1::ModelInfo build_minimal_update_proto(const std::string& id,
     return model;
 }
 
-runanywhere::v1::ModelInfo build_query_model(const std::string& id,
-                                             const std::string& name,
-                                             runanywhere::v1::ModelCategory category,
-                                             runanywhere::v1::ModelFormat format,
-                                             runanywhere::v1::InferenceFramework framework,
-                                             bool downloaded,
-                                             bool available,
-                                             int64_t size_bytes,
-                                             runanywhere::v1::ModelSource source =
-                                                 runanywhere::v1::MODEL_SOURCE_REMOTE) {
+runanywhere::v1::ModelInfo
+build_query_model(const std::string& id, const std::string& name,
+                  runanywhere::v1::ModelCategory category, runanywhere::v1::ModelFormat format,
+                  runanywhere::v1::InferenceFramework framework, bool downloaded, bool available,
+                  int64_t size_bytes,
+                  runanywhere::v1::ModelSource source = runanywhere::v1::MODEL_SOURCE_REMOTE) {
     runanywhere::v1::ModelInfo model;
     model.set_id(id);
     model.set_name(name);
@@ -155,9 +152,8 @@ runanywhere::v1::ModelInfo build_query_model(const std::string& id,
     model.set_description(name + " searchable description");
     model.mutable_metadata()->add_tags(name);
     model.set_source(source);
-    model.set_registry_status(downloaded
-                                  ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
-                                  : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    model.set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                         : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
     model.set_is_downloaded(downloaded);
     model.set_is_available(available);
     return model;
@@ -172,8 +168,7 @@ bool serialize(const runanywhere::v1::ModelInfo& model, std::vector<uint8_t>* ou
     return true;
 }
 
-bool serialize_message(const google::protobuf::MessageLite& message,
-                       std::vector<uint8_t>* out) {
+bool serialize_message(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     std::string bytes;
     if (!out || !message.SerializeToString(&bytes)) {
         return false;
@@ -198,8 +193,7 @@ bool register_model_proto(rac_model_registry_handle_t registry,
            rac_model_registry_register_proto(registry, bytes.data(), bytes.size()) == RAC_SUCCESS;
 }
 
-bool get_model_proto(rac_model_registry_handle_t registry,
-                     const char* model_id,
+bool get_model_proto(rac_model_registry_handle_t registry, const char* model_id,
                      runanywhere::v1::ModelInfo* out) {
     uint8_t* bytes = nullptr;
     size_t size = 0;
@@ -212,12 +206,11 @@ bool get_model_proto(rac_model_registry_handle_t registry,
     return parsed;
 }
 
-bool list_model_proto(rac_model_registry_handle_t registry,
-                      runanywhere::v1::ModelInfoList* out) {
+bool list_model_proto(rac_model_registry_handle_t registry, runanywhere::v1::ModelInfoList* out) {
     uint8_t* bytes = nullptr;
     size_t size = 0;
-    if (rac_model_registry_list_proto(registry, &bytes, &size) != RAC_SUCCESS ||
-        bytes == nullptr || !out) {
+    if (rac_model_registry_list_proto(registry, &bytes, &size) != RAC_SUCCESS || bytes == nullptr ||
+        !out) {
         return false;
     }
     bool parsed = out->ParseFromArray(bytes, static_cast<int>(size));
@@ -235,8 +228,8 @@ bool query_model_proto(rac_model_registry_handle_t registry,
 
     uint8_t* bytes = nullptr;
     size_t size = 0;
-    if (rac_model_registry_query_proto(registry, query_bytes.data(), query_bytes.size(),
-                                       &bytes, &size) != RAC_SUCCESS ||
+    if (rac_model_registry_query_proto(registry, query_bytes.data(), query_bytes.size(), &bytes,
+                                       &size) != RAC_SUCCESS ||
         bytes == nullptr || !out) {
         return false;
     }
@@ -340,10 +333,9 @@ int test_full_field_round_trip_proto() {
         build_full_model_proto("llama.test", "Original", "/models/llama.test");
     std::vector<uint8_t> original_bytes;
     ASSERT_TRUE(serialize(original, &original_bytes));
-    ASSERT_EQ(rac_model_registry_register_proto(registry,
-                                                original_bytes.data(),
-                                                original_bytes.size()),
-              RAC_SUCCESS);
+    ASSERT_EQ(
+        rac_model_registry_register_proto(registry, original_bytes.data(), original_bytes.size()),
+        RAC_SUCCESS);
 
     rac_model_info_t* struct_model = nullptr;
     ASSERT_EQ(rac_model_registry_get(registry, "llama.test", &struct_model), RAC_SUCCESS);
@@ -383,10 +375,8 @@ int test_full_field_round_trip_proto() {
     ASSERT_TRUE(decoded.has_multi_file());
     ASSERT_EQ(decoded.multi_file().files_size(), 1);
     ASSERT_EQ(decoded.multi_file().files(0).checksum(), "sha256:part");
-    ASSERT_EQ(decoded.multi_file().files(0).role(),
-              runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
-    ASSERT_EQ(decoded.acceleration_preference(),
-              runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
+    ASSERT_EQ(decoded.multi_file().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+    ASSERT_EQ(decoded.acceleration_preference(), runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
     ASSERT_EQ(decoded.routing_policy(), runanywhere::v1::ROUTING_POLICY_PREFER_LOCAL);
 
     runanywhere::v1::ModelInfoList list;
@@ -411,11 +401,9 @@ int test_expanded_proto_fields_survive_struct_state_updates() {
 
     rac_proto_buffer_t registered;
     rac_proto_buffer_init(&registered);
-    ASSERT_EQ(rac_model_registry_register_proto_buffer(registry,
-                                                       bytes.data(),
-                                                       bytes.size(),
-                                                       &registered),
-              RAC_SUCCESS);
+    ASSERT_EQ(
+        rac_model_registry_register_proto_buffer(registry, bytes.data(), bytes.size(), &registered),
+        RAC_SUCCESS);
     runanywhere::v1::ModelInfo registered_model;
     ASSERT_TRUE(parse_and_free_buffer(&registered, &registered_model));
     ASSERT_EQ(registered_model.format(), runanywhere::v1::MODEL_FORMAT_TFLITE);
@@ -443,8 +431,7 @@ int test_expanded_proto_fields_survive_struct_state_updates() {
     ASSERT_TRUE(decoded.has_metadata());
     ASSERT_EQ(decoded.metadata().tags_size(), 1);
     ASSERT_TRUE(decoded.has_compatibility());
-    ASSERT_EQ(decoded.compatibility().compatible_formats(0),
-              runanywhere::v1::MODEL_FORMAT_TFLITE);
+    ASSERT_EQ(decoded.compatibility().compatible_formats(0), runanywhere::v1::MODEL_FORMAT_TFLITE);
     ASSERT_TRUE(decoded.has_registry_status());
     ASSERT_EQ(decoded.registry_status(), runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED);
     ASSERT_TRUE(decoded.has_last_used_at_unix_ms());
@@ -469,13 +456,10 @@ int test_update_preserves_proto_only_fields() {
         build_full_model_proto("llama.test", "Original", "/models/llama.test");
     ASSERT_TRUE(register_model_proto(registry, original));
 
-    runanywhere::v1::ModelInfo update =
-        build_minimal_update_proto("llama.test", "Updated");
+    runanywhere::v1::ModelInfo update = build_minimal_update_proto("llama.test", "Updated");
     std::vector<uint8_t> update_bytes;
     ASSERT_TRUE(serialize(update, &update_bytes));
-    ASSERT_EQ(rac_model_registry_update_proto(registry,
-                                              update_bytes.data(),
-                                              update_bytes.size()),
+    ASSERT_EQ(rac_model_registry_update_proto(registry, update_bytes.data(), update_bytes.size()),
               RAC_SUCCESS);
     runanywhere::v1::ModelInfo decoded;
     ASSERT_TRUE(get_model_proto(registry, "llama.test", &decoded));
@@ -486,8 +470,7 @@ int test_update_preserves_proto_only_fields() {
     ASSERT_TRUE(decoded.has_metadata());
     ASSERT_EQ(decoded.metadata().tags_size(), 2);
     ASSERT_TRUE(decoded.has_expected_files());
-    ASSERT_EQ(decoded.expected_files().files(0).role(),
-              runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
+    ASSERT_EQ(decoded.expected_files().files(0).role(), runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER);
     ASSERT_TRUE(decoded.has_multi_file());
     ASSERT_EQ(decoded.multi_file().files(0).checksum(), "sha256:part");
     ASSERT_TRUE(decoded.has_is_downloaded());
@@ -503,25 +486,20 @@ int test_query_filters_and_downloaded_list_proto() {
 
     ASSERT_TRUE(register_model_proto(
         registry,
-        build_query_model("alpha.chat", "Alpha Chat",
-                          runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
+        build_query_model("alpha.chat", "Alpha Chat", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
                           runanywhere::v1::MODEL_FORMAT_GGUF,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
-                          true, true, 100)));
+                          runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP, true, true, 100)));
     ASSERT_TRUE(register_model_proto(
         registry,
         build_query_model("beta.speech", "Beta Speech",
                           runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
                           runanywhere::v1::MODEL_FORMAT_ONNX,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA,
-                          false, false, 200)));
+                          runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA, false, false, 200)));
     ASSERT_TRUE(register_model_proto(
         registry,
-        build_query_model("gamma.embed", "Gamma Embed",
-                          runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
+        build_query_model("gamma.embed", "Gamma Embed", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
                           runanywhere::v1::MODEL_FORMAT_ONNX,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_ONNX,
-                          false, true, 50)));
+                          runanywhere::v1::INFERENCE_FRAMEWORK_ONNX, false, true, 50)));
 
     runanywhere::v1::ModelInfoList list;
     runanywhere::v1::ModelQuery query;
@@ -597,28 +575,21 @@ int test_query_source_filter_and_sorting_proto() {
 
     ASSERT_TRUE(register_model_proto(
         registry,
-        build_query_model("alpha.remote", "Zulu Remote",
-                          runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
+        build_query_model("alpha.remote", "Zulu Remote", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
                           runanywhere::v1::MODEL_FORMAT_GGUF,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP,
-                          false, true, 300,
+                          runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP, false, true, 300,
                           runanywhere::v1::MODEL_SOURCE_REMOTE)));
     ASSERT_TRUE(register_model_proto(
-        registry,
-        build_query_model("beta.local", "Mango Local",
-                          runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
-                          runanywhere::v1::MODEL_FORMAT_ONNX,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_ONNX,
-                          true, true, 100,
-                          runanywhere::v1::MODEL_SOURCE_LOCAL)));
+        registry, build_query_model(
+                      "beta.local", "Mango Local", runanywhere::v1::MODEL_CATEGORY_LANGUAGE,
+                      runanywhere::v1::MODEL_FORMAT_ONNX, runanywhere::v1::INFERENCE_FRAMEWORK_ONNX,
+                      true, true, 100, runanywhere::v1::MODEL_SOURCE_LOCAL)));
     ASSERT_TRUE(register_model_proto(
-        registry,
-        build_query_model("zeta.local", "Aardvark Local",
-                          runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
-                          runanywhere::v1::MODEL_FORMAT_ONNX,
-                          runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA,
-                          true, true, 200,
-                          runanywhere::v1::MODEL_SOURCE_LOCAL)));
+        registry, build_query_model("zeta.local", "Aardvark Local",
+                                    runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION,
+                                    runanywhere::v1::MODEL_FORMAT_ONNX,
+                                    runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA, true, true, 200,
+                                    runanywhere::v1::MODEL_SOURCE_LOCAL)));
 
     runanywhere::v1::ModelInfoList list;
     runanywhere::v1::ModelQuery query;
@@ -662,14 +633,12 @@ int test_remove_proto() {
     ASSERT_TRUE(registry != nullptr);
 
     ASSERT_TRUE(register_model_proto(
-        registry,
-        build_full_model_proto("llama.test", "Original", "/models/llama.test")));
+        registry, build_full_model_proto("llama.test", "Original", "/models/llama.test")));
 
     ASSERT_EQ(rac_model_registry_remove_proto(registry, "llama.test"), RAC_SUCCESS);
     uint8_t* missing_bytes = nullptr;
     size_t missing_size = 0;
-    ASSERT_EQ(rac_model_registry_get_proto(registry, "llama.test",
-                                           &missing_bytes, &missing_size),
+    ASSERT_EQ(rac_model_registry_get_proto(registry, "llama.test", &missing_bytes, &missing_size),
               RAC_ERROR_NOT_FOUND);
     ASSERT_TRUE(missing_bytes == nullptr);
     ASSERT_EQ(missing_size, 0U);
@@ -698,9 +667,7 @@ int test_canonical_result_shapes_and_typed_errors() {
     ASSERT_TRUE(serialize_message(import_request, &import_bytes));
     rac_proto_buffer_t import_buffer;
     rac_proto_buffer_init(&import_buffer);
-    ASSERT_EQ(rac_model_registry_import_proto(registry,
-                                              import_bytes.data(),
-                                              import_bytes.size(),
+    ASSERT_EQ(rac_model_registry_import_proto(registry, import_bytes.data(), import_bytes.size(),
                                               &import_buffer),
               RAC_SUCCESS);
     runanywhere::v1::ModelImportResult import_result;
@@ -745,10 +712,8 @@ int test_canonical_result_shapes_and_typed_errors() {
     ASSERT_TRUE(serialize_message(discovery_request, &discovery_bytes));
     rac_proto_buffer_t discovery_buffer;
     rac_proto_buffer_init(&discovery_buffer);
-    ASSERT_EQ(rac_model_registry_discover_proto(registry,
-                                                discovery_bytes.data(),
-                                                discovery_bytes.size(),
-                                                &discovery_buffer),
+    ASSERT_EQ(rac_model_registry_discover_proto(registry, discovery_bytes.data(),
+                                                discovery_bytes.size(), &discovery_buffer),
               RAC_SUCCESS);
     runanywhere::v1::ModelDiscoveryResult discovery_result;
     ASSERT_TRUE(parse_and_free_buffer(&discovery_buffer, &discovery_result));
@@ -765,9 +730,7 @@ int test_canonical_result_shapes_and_typed_errors() {
     ASSERT_TRUE(serialize_message(refresh_request, &refresh_bytes));
     rac_proto_buffer_t refresh_buffer;
     rac_proto_buffer_init(&refresh_buffer);
-    ASSERT_EQ(rac_model_registry_refresh_proto(registry,
-                                               refresh_bytes.data(),
-                                               refresh_bytes.size(),
+    ASSERT_EQ(rac_model_registry_refresh_proto(registry, refresh_bytes.data(), refresh_bytes.size(),
                                                &refresh_buffer),
               RAC_SUCCESS);
     runanywhere::v1::ModelRegistryRefreshResult refresh_result;
@@ -779,9 +742,7 @@ int test_canonical_result_shapes_and_typed_errors() {
 
     rac_proto_buffer_t delete_buffer;
     rac_proto_buffer_init(&delete_buffer);
-    ASSERT_EQ(rac_model_registry_remove_proto_buffer(registry,
-                                                     "import.test",
-                                                     &delete_buffer),
+    ASSERT_EQ(rac_model_registry_remove_proto_buffer(registry, "import.test", &delete_buffer),
               RAC_SUCCESS);
     runanywhere::v1::ModelDeleteResult delete_result;
     ASSERT_TRUE(parse_and_free_buffer(&delete_buffer, &delete_result));
@@ -792,11 +753,9 @@ int test_canonical_result_shapes_and_typed_errors() {
     const uint8_t invalid[] = {0xff, 0xff, 0xff};
     rac_proto_buffer_t error_buffer;
     rac_proto_buffer_init(&error_buffer);
-    ASSERT_EQ(rac_model_registry_list_models_proto(registry,
-                                                   invalid,
-                                                   sizeof(invalid),
-                                                   &error_buffer),
-              RAC_ERROR_INVALID_FORMAT);
+    ASSERT_EQ(
+        rac_model_registry_list_models_proto(registry, invalid, sizeof(invalid), &error_buffer),
+        RAC_ERROR_INVALID_FORMAT);
     ASSERT_EQ(error_buffer.status, RAC_ERROR_INVALID_FORMAT);
     ASSERT_TRUE(error_buffer.data == nullptr);
     ASSERT_TRUE(error_buffer.error_message != nullptr);
@@ -807,10 +766,8 @@ int test_canonical_result_shapes_and_typed_errors() {
     std::vector<uint8_t> missing_update_bytes;
     ASSERT_TRUE(serialize(missing_update, &missing_update_bytes));
     rac_proto_buffer_init(&error_buffer);
-    ASSERT_EQ(rac_model_registry_update_proto_buffer(registry,
-                                                     missing_update_bytes.data(),
-                                                     missing_update_bytes.size(),
-                                                     &error_buffer),
+    ASSERT_EQ(rac_model_registry_update_proto_buffer(registry, missing_update_bytes.data(),
+                                                     missing_update_bytes.size(), &error_buffer),
               RAC_ERROR_NOT_FOUND);
     ASSERT_EQ(error_buffer.status, RAC_ERROR_NOT_FOUND);
     ASSERT_TRUE(error_buffer.data == nullptr);
@@ -824,13 +781,10 @@ int test_update_missing_and_invalid_bytes() {
     rac_model_registry_handle_t registry = create_registry();
     ASSERT_TRUE(registry != nullptr);
 
-    runanywhere::v1::ModelInfo missing =
-        build_minimal_update_proto("missing.test", "Missing");
+    runanywhere::v1::ModelInfo missing = build_minimal_update_proto("missing.test", "Missing");
     std::vector<uint8_t> missing_bytes;
     ASSERT_TRUE(serialize(missing, &missing_bytes));
-    ASSERT_EQ(rac_model_registry_update_proto(registry,
-                                              missing_bytes.data(),
-                                              missing_bytes.size()),
+    ASSERT_EQ(rac_model_registry_update_proto(registry, missing_bytes.data(), missing_bytes.size()),
               RAC_ERROR_NOT_FOUND);
 
     const uint8_t invalid[] = {0xff, 0xff, 0xff};
@@ -839,8 +793,7 @@ int test_update_missing_and_invalid_bytes() {
 
     uint8_t* out_bytes = reinterpret_cast<uint8_t*>(0x1);
     size_t out_size = 99;
-    ASSERT_EQ(rac_model_registry_register_proto(registry, nullptr, 0),
-              RAC_ERROR_INVALID_ARGUMENT);
+    ASSERT_EQ(rac_model_registry_register_proto(registry, nullptr, 0), RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_EQ(rac_model_registry_get_proto(registry, nullptr, &out_bytes, &out_size),
               RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_EQ(rac_model_registry_list_proto(registry, nullptr, &out_size),
@@ -849,18 +802,17 @@ int test_update_missing_and_invalid_bytes() {
     runanywhere::v1::ModelQuery query;
     std::vector<uint8_t> query_bytes;
     ASSERT_TRUE(serialize_query(query, &query_bytes));
-    ASSERT_EQ(rac_model_registry_query_proto(registry, nullptr, 0,
-                                             &out_bytes, &out_size),
+    ASSERT_EQ(rac_model_registry_query_proto(registry, nullptr, 0, &out_bytes, &out_size),
               RAC_SUCCESS);
     ASSERT_TRUE(out_bytes != nullptr);
     rac_model_registry_proto_free(out_bytes);
     out_bytes = reinterpret_cast<uint8_t*>(0x1);
     out_size = 99;
-    ASSERT_EQ(rac_model_registry_query_proto(registry, invalid, sizeof(invalid),
-                                             &out_bytes, &out_size),
-              RAC_ERROR_INVALID_FORMAT);
-    ASSERT_EQ(rac_model_registry_query_proto(registry, query_bytes.data(),
-                                             query_bytes.size(), nullptr, &out_size),
+    ASSERT_EQ(
+        rac_model_registry_query_proto(registry, invalid, sizeof(invalid), &out_bytes, &out_size),
+        RAC_ERROR_INVALID_FORMAT);
+    ASSERT_EQ(rac_model_registry_query_proto(registry, query_bytes.data(), query_bytes.size(),
+                                             nullptr, &out_size),
               RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_EQ(rac_model_registry_list_downloaded_proto(registry, nullptr, &out_size),
               RAC_ERROR_INVALID_ARGUMENT);
@@ -894,12 +846,17 @@ int test_proto_abi_reports_unavailable_without_protobuf() {
 int main() {
     int failures = 0;
 
-#define RUN(name) do { \
-    std::printf("[ RUN  ] %s\n", #name); \
-    int rc = name(); \
-    if (rc == 0) std::printf("[  OK  ] %s\n", #name); \
-    else        { std::printf("[ FAIL ] %s\n", #name); ++failures; } \
-} while (0)
+#define RUN(name)                                \
+    do {                                         \
+        std::printf("[ RUN  ] %s\n", #name);     \
+        int rc = name();                         \
+        if (rc == 0)                             \
+            std::printf("[  OK  ] %s\n", #name); \
+        else {                                   \
+            std::printf("[ FAIL ] %s\n", #name); \
+            ++failures;                          \
+        }                                        \
+    } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
     RUN(test_full_field_round_trip_proto);

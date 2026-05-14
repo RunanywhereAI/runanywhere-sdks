@@ -28,6 +28,10 @@ export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
 export type { StructuredOutputResult };
 
+export type TextGenerationOptions = Partial<LLMGenerationOptions> & {
+  prompt: string;
+};
+
 // ---------------------------------------------------------------------------
 // Schema type accepted by the canonical structured-output verbs.
 // ---------------------------------------------------------------------------
@@ -215,7 +219,7 @@ export async function* generateStructuredStream(
     ...options,
     prompt,
     jsonSchema: schema.jsonSchema,
-  } as Partial<LLMGenerationOptions> & { prompt: string });
+  });
   yield extractStructuredOutput(
     result.text || result.jsonOutput || result.structuredOutputValidation?.extractedJson || '',
     schema,
@@ -256,10 +260,9 @@ export function extractStructuredOutput(
 // ---------------------------------------------------------------------------
 
 export const TextGeneration = {
-  async generate(options: Partial<LLMGenerationOptions>): Promise<LLMGenerationResult> {
-    const prompt = (options as { prompt?: string }).prompt ?? '';
+  async generate(options: TextGenerationOptions): Promise<LLMGenerationResult> {
     const adapter = requireProtoLLM('TextGeneration.generate');
-    const result = adapter.generate(buildLLMGenerateRequest(prompt, options, false));
+    const result = adapter.generate(buildLLMGenerateRequest(options.prompt, options, false));
     if (!result) {
       throw SDKException.backendNotAvailable(
         'TextGeneration.generate',
@@ -269,10 +272,9 @@ export const TextGeneration = {
     return result;
   },
 
-  async generateStream(options: Partial<LLMGenerationOptions>): Promise<LLMStreamingResult> {
-    const prompt = (options as { prompt?: string }).prompt ?? '';
+  async generateStream(options: TextGenerationOptions): Promise<LLMStreamingResult> {
     const adapter = requireProtoLLM('TextGeneration.generateStream');
-    const events = adapter.generateStream(buildLLMGenerateRequest(prompt, options, true));
+    const events = adapter.generateStream(buildLLMGenerateRequest(options.prompt, options, true));
     return streamingResultFromEvents(events, () => {
       adapter.cancel();
     });
@@ -282,7 +284,7 @@ export const TextGeneration = {
     const result = await TextGeneration.generate({
       ...(options ?? {}),
       prompt,
-    } as Partial<LLMGenerationOptions> & { prompt: string });
+    });
     return result.text;
   },
 

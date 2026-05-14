@@ -41,18 +41,14 @@ namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(
-            out, RAC_ERROR_ENCODING_ERROR,
-            "failed to serialize TTSConfiguration defaults");
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize TTSConfiguration defaults");
     }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(),
-                                 bytes.size(), out);
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -63,15 +59,14 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message,
 // PUBLIC API
 // =============================================================================
 
-extern "C" rac_result_t rac_tts_configuration_defaults_proto(
-    rac_proto_buffer_t* out_RATTSConfiguration) {
+extern "C" rac_result_t
+rac_tts_configuration_defaults_proto(rac_proto_buffer_t* out_RATTSConfiguration) {
     if (!out_RATTSConfiguration) {
         return RAC_ERROR_NULL_POINTER;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
-    return rac_proto_buffer_set_error(
-        out_RATTSConfiguration, RAC_ERROR_FEATURE_NOT_AVAILABLE,
-        "protobuf support is not available");
+    return rac_proto_buffer_set_error(out_RATTSConfiguration, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
 #else
     runanywhere::v1::TTSConfiguration cfg;
     // model_id defaults to empty string (proto zero value).

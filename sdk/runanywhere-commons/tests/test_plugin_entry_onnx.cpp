@@ -17,8 +17,12 @@ int main() {
     std::fprintf(stdout, "test_plugin_entry_onnx\n");
 
     const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
-    if (vt == nullptr) { return 1; }
-    if (vt->metadata.abi_version != RAC_PLUGIN_API_VERSION) { return 1; }
+    if (vt == nullptr) {
+        return 1;
+    }
+    if (vt->metadata.abi_version != RAC_PLUGIN_API_VERSION) {
+        return 1;
+    }
 
     if (vt->embedding_ops == nullptr) {
         std::fprintf(stderr, "embedding_ops is NULL\n");
@@ -32,24 +36,33 @@ int main() {
     rac_plugin_register(vt);
 
     // ONNX owns embeddings after Sherpa speech extraction.
-    if (rac_plugin_find(RAC_PRIMITIVE_EMBED) != vt) { return 1; }
+    if (rac_plugin_find(RAC_PRIMITIVE_EMBED) != vt) {
+        return 1;
+    }
 
     // LLM / VLM / speech primitives must remain off ONNX.
-    if (rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != nullptr) { return 1; }
-    if (rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE)   != nullptr) { return 1; }
-    if (rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE)   != nullptr) { return 1; }
-    if (rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE) != nullptr) { return 1; }
+    if (rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != nullptr) {
+        return 1;
+    }
+    if (rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE) != nullptr) {
+        return 1;
+    }
+    if (rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE) != nullptr) {
+        return 1;
+    }
+    if (rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE) != nullptr) {
+        return 1;
+    }
 
     const rac_engine_manifest_t* manifest = rac_engine_manifest_find("onnx");
-    if (manifest == nullptr ||
-        manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
-        manifest->primitives_count != 1 ||
-        manifest->primitives[0] != RAC_PRIMITIVE_EMBED) {
+    if (manifest == nullptr || manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
+        manifest->primitives_count != 1 || manifest->primitives[0] != RAC_PRIMITIVE_EMBED) {
         std::fprintf(stderr, "ONNX manifest was not published correctly\n");
         return 1;
     }
 
     rac_plugin_unregister("onnx");
-    std::fprintf(stdout, "  ok: embedding slot populated, speech slots null, registry round-trip ok\n");
+    std::fprintf(stdout,
+                 "  ok: embedding slot populated, speech slots null, registry round-trip ok\n");
     return 0;
 }

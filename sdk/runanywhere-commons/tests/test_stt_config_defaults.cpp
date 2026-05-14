@@ -10,8 +10,8 @@
  * source of truth governs the values.
  */
 
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 #include "rac/core/rac_error.h"
@@ -25,22 +25,20 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                 \
-    do {                                                                                  \
-        if (!(cond)) {                                                                    \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__,          \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                   \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,   \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -83,8 +81,7 @@ int test_stt_configuration_defaults_null_out() {
 
 int main(int /*argc*/, char** /*argv*/) {
 #ifndef RAC_HAVE_PROTOBUF
-    std::printf(
-        "SKIP: RAC_HAVE_PROTOBUF not defined; STT config defaults tests skipped.\n");
+    std::printf("SKIP: RAC_HAVE_PROTOBUF not defined; STT config defaults tests skipped.\n");
     return 0;
 #else
     struct TestCase {
@@ -92,10 +89,8 @@ int main(int /*argc*/, char** /*argv*/) {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {"stt_configuration_defaults_match_swift",
-         test_stt_configuration_defaults_match_swift},
-        {"stt_configuration_defaults_null_out",
-         test_stt_configuration_defaults_null_out},
+        {"stt_configuration_defaults_match_swift", test_stt_configuration_defaults_match_swift},
+        {"stt_configuration_defaults_null_out", test_stt_configuration_defaults_null_out},
     };
 
     int failures = 0;
@@ -114,8 +109,7 @@ int main(int /*argc*/, char** /*argv*/) {
         std::fprintf(stderr, "\n%d test(s) failed.\n", failures);
         return 1;
     }
-    std::printf("\nAll %zu test(s) passed.\n",
-                sizeof(kTests) / sizeof(kTests[0]));
+    std::printf("\nAll %zu test(s) passed.\n", sizeof(kTests) / sizeof(kTests[0]));
     return 0;
 #endif
 }

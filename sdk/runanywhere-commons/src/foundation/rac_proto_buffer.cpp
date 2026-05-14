@@ -50,8 +50,7 @@ void rac_proto_buffer_init(rac_proto_buffer_t* buffer) {
     reset_fields(buffer);
 }
 
-rac_result_t rac_proto_buffer_copy(const uint8_t* data,
-                                   size_t size,
+rac_result_t rac_proto_buffer_copy(const uint8_t* data, size_t size,
                                    rac_proto_buffer_t* out_buffer) {
     if (!out_buffer) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -84,8 +83,7 @@ rac_result_t rac_proto_buffer_copy(const uint8_t* data,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_proto_buffer_take_data(rac_proto_buffer_t* buffer,
-                                        uint8_t** data_out,
+rac_result_t rac_proto_buffer_take_data(rac_proto_buffer_t* buffer, uint8_t** data_out,
                                         size_t* size_out) {
     if (!buffer || !data_out || !size_out) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -108,8 +106,7 @@ rac_result_t rac_proto_buffer_take_data(rac_proto_buffer_t* buffer,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_proto_buffer_set_error(rac_proto_buffer_t* buffer,
-                                        rac_result_t status,
+rac_result_t rac_proto_buffer_set_error(rac_proto_buffer_t* buffer, rac_result_t status,
                                         const char* error_message) {
     if (!buffer || RAC_SUCCEEDED(status)) {
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -134,9 +131,7 @@ void rac_proto_buffer_free(rac_proto_buffer_t* buffer) {
     release_fields(buffer);
 }
 
-rac_result_t rac_proto_buffer_copy_to_raw(const uint8_t* data,
-                                          size_t size,
-                                          uint8_t** data_out,
+rac_result_t rac_proto_buffer_copy_to_raw(const uint8_t* data, size_t size, uint8_t** data_out,
                                           size_t* size_out) {
     if (!data_out || !size_out) {
         return RAC_ERROR_INVALID_ARGUMENT;

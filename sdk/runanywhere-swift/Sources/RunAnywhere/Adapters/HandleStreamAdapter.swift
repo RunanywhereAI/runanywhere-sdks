@@ -48,8 +48,8 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 import os
+import SwiftProtobuf
 
 /// Generic AsyncStream wrapper for proto-byte streaming C ABIs that
 /// follow the `(handle, callback, userData) -> rac_result_t` shape.
@@ -83,18 +83,12 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
 
     private final class HandleFanOut: HandleStreamFanOutEntry {
         // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
-        private struct FanOutState {
-            var continuations: [UUID: AsyncStream<Event>.Continuation] = [:]
-            var userPtr: UnsafeMutableRawPointer?
-            var installed: Bool = false
-        }
-
         private let handle: Handle
         private let storeKey: HandleStreamStoreKey
         private let register: Register
         private let unregister: Unregister
         private let isTerminalEvent: IsTerminalEvent?
-        private let state = OSAllocatedUnfairLock<FanOutState>(initialState: FanOutState())
+        private let state = OSAllocatedUnfairLock<HandleFanOutState<Event>>(initialState: HandleFanOutState<Event>())
 
         init(
             handle: Handle,
@@ -126,9 +120,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         func detach(_ id: UUID) {
-            let shouldTearDown = state.withLock { s -> Bool in
-                s.continuations.removeValue(forKey: id)
-                return s.continuations.isEmpty
+            let shouldTearDown = state.withLock { lockedState -> Bool in
+                lockedState.continuations.removeValue(forKey: id)
+                return lockedState.continuations.isEmpty
             }
 
             if shouldTearDown {
@@ -185,10 +179,10 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         private func broadcast(_ event: Event) {
             let isFinal = isTerminalEvent?(event) ?? false
 
-            let snapshot: [AsyncStream<Event>.Continuation] = state.withLock { s in
-                let values = Array(s.continuations.values)
+            let snapshot: [AsyncStream<Event>.Continuation] = state.withLock { lockedState in
+                let values = Array(lockedState.continuations.values)
                 if isFinal {
-                    s.continuations.removeAll()
+                    lockedState.continuations.removeAll()
                 }
                 return values
             }
@@ -206,9 +200,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         private func finishAll() {
-            let snapshot: [AsyncStream<Event>.Continuation] = state.withLock { s in
-                let values = Array(s.continuations.values)
-                s.continuations.removeAll()
+            let snapshot: [AsyncStream<Event>.Continuation] = state.withLock { lockedState in
+                let values = Array(lockedState.continuations.values)
+                lockedState.continuations.removeAll()
                 return values
             }
 
@@ -219,12 +213,12 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         func tearDown() {
-            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { s in
-                guard s.installed else { return nil }
+            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { lockedState in
+                guard lockedState.installed else { return nil }
                 unregister(handle)
-                s.installed = false
-                let ptr = s.userPtr
-                s.userPtr = nil
+                lockedState.installed = false
+                let ptr = lockedState.userPtr
+                lockedState.userPtr = nil
                 return ptr
             }
 
@@ -238,10 +232,12 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     // MARK: - Static fan-out registry
 
     // Global because Swift forbids generic stored statics. The single
+    // swiftlint:disable:next avoid_any_object
     // `[StoreKey: AnyObject]` lock backs every instantiation of this
     // generic. `streamKey` partitions the dictionary so two
     // specialisations cannot collide even if their `Handle.hashValue`
     // happens to match.
+    // swiftlint:disable:next avoid_any_object
     private static var fanOuts: OSAllocatedUnfairLock<[HandleStreamStoreKey: AnyObject]> {
         HandleStreamAdapterRegistry.shared.fanOuts
     }
@@ -270,7 +266,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
     }
 
-    fileprivate static func removeFanOut(for key: HandleStreamStoreKey) {
+    private static func removeFanOut(for key: HandleStreamStoreKey) {
         fanOuts.withLock { _ = $0.removeValue(forKey: key) }
     }
 
@@ -357,6 +353,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
 
 // MARK: - Non-generic supporting types
 
+// swiftlint:disable avoid_any_object
 /// Type-erased entry point invoked from the `@convention(c)`
 /// trampoline. Concrete `HandleFanOut` instances conform; dispatching
 /// through this protocol breaks the generic-parameter capture that
@@ -365,15 +362,27 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
 private protocol HandleStreamFanOutEntry: AnyObject {
     func deliverBytes(_ bytesPtr: UnsafePointer<UInt8>?, _ bytesLen: Int)
 }
+// swiftlint:enable avoid_any_object
 
 /// Composite key partitioning the global fan-out store. The
 /// `streamKey` distinguishes adapters that share the same `Handle`
 /// type but address different C registration ABIs (e.g. a future
 /// per-handle adapter that registers two unrelated streams against
 /// the same `rac_handle_t`).
-fileprivate struct HandleStreamStoreKey: Hashable, Sendable {
+private struct HandleStreamStoreKey: Hashable, Sendable {
+    // periphery:ignore
     let streamKey: String
+    // periphery:ignore
     let handleHash: Int
+}
+
+/// Mutable state guarded by `HandleFanOut`'s `OSAllocatedUnfairLock`.
+/// Lifted to file scope so the nested-type depth limit imposed by
+/// SwiftLint's `nesting` rule is respected.
+private struct HandleFanOutState<Event: Message> {
+    var continuations: [UUID: AsyncStream<Event>.Continuation] = [:]
+    var userPtr: UnsafeMutableRawPointer?
+    var installed: Bool = false
 }
 
 /// Holds the lock that backs every `HandleStreamAdapter` instantiation.
@@ -382,6 +391,7 @@ fileprivate struct HandleStreamStoreKey: Hashable, Sendable {
 /// specialisation's entries disjoint inside the shared dictionary.
 private final class HandleStreamAdapterRegistry: @unchecked Sendable {
     static let shared = HandleStreamAdapterRegistry()
+    // swiftlint:disable:next avoid_any_object
     let fanOuts = OSAllocatedUnfairLock<[HandleStreamStoreKey: AnyObject]>(initialState: [:])
 
     private init() {}

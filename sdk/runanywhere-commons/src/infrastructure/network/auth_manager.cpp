@@ -81,9 +81,8 @@ static void publish_auth_success_event(const rac_auth_response_t* response, bool
 
 static void publish_auth_failure_event(const char* message, bool refresh) {
     rac::events::publish_auth_failed(RAC_ERROR_AUTHENTICATION_FAILED,
-                                     message ? message : "Authentication failed",
-                                     "runanywhere", "sdk",
-                                     refresh ? "auth.refresh" : "auth.authenticate");
+                                     message ? message : "Authentication failed", "runanywhere",
+                                     "sdk", refresh ? "auth.refresh" : "auth.authenticate");
 }
 
 // =============================================================================

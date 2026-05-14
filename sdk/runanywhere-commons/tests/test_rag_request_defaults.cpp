@@ -16,8 +16,8 @@
  *   - Negative paths: NULL out pointer, malformed bytes.
  */
 
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -33,33 +33,29 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond)                                                                 \
-    do {                                                                                  \
-        if (!(cond)) {                                                                    \
-            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__,          \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
     } while (0)
 
-#define ASSERT_EQ(a, b)                                                                   \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__,   \
-                         __LINE__);                                                       \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
-#define ASSERT_FLOAT_EQ(a, b)                                                             \
-    do {                                                                                  \
-        if (!((a) == (b))) {                                                              \
-            std::fprintf(stderr,                                                          \
-                         "ASSERT FAILED: %s == %s @ %s:%d (got=%f expected=%f)\n", #a,    \
-                         #b, __FILE__, __LINE__,                                          \
-                         static_cast<double>(a), static_cast<double>(b));                 \
-            return 1;                                                                     \
-        }                                                                                 \
+#define ASSERT_FLOAT_EQ(a, b)                                                                      \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d (got=%f expected=%f)\n", #a, #b, \
+                         __FILE__, __LINE__, static_cast<double>(a), static_cast<double>(b));      \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -210,8 +206,7 @@ int test_rag_defaults_malformed_input_bytes() {
     static const uint8_t kGarbage[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
-    rac_result_t rc = rac_rag_request_with_defaults_proto(
-        kGarbage, sizeof(kGarbage), &buffer);
+    rac_result_t rc = rac_rag_request_with_defaults_proto(kGarbage, sizeof(kGarbage), &buffer);
     ASSERT_EQ(rc, RAC_ERROR_DECODING_ERROR);
     rac_proto_buffer_free(&buffer);
     return 0;
@@ -223,8 +218,7 @@ int test_rag_defaults_malformed_input_bytes() {
 
 int main(int /*argc*/, char** /*argv*/) {
 #ifndef RAC_HAVE_PROTOBUF
-    std::printf(
-        "SKIP: RAC_HAVE_PROTOBUF not defined; RAG request defaults tests skipped.\n");
+    std::printf("SKIP: RAC_HAVE_PROTOBUF not defined; RAG request defaults tests skipped.\n");
     return 0;
 #else
     struct TestCase {
@@ -234,15 +228,11 @@ int main(int /*argc*/, char** /*argv*/) {
     static const TestCase kTests[] = {
         {"rag_defaults_with_empty_input", test_rag_defaults_with_empty_input},
         {"rag_defaults_with_inbound_ids", test_rag_defaults_with_inbound_ids},
-        {"rag_defaults_with_numeric_overrides",
-         test_rag_defaults_with_numeric_overrides},
-        {"rag_defaults_with_optional_strings",
-         test_rag_defaults_with_optional_strings},
+        {"rag_defaults_with_numeric_overrides", test_rag_defaults_with_numeric_overrides},
+        {"rag_defaults_with_optional_strings", test_rag_defaults_with_optional_strings},
         {"rag_defaults_null_out", test_rag_defaults_null_out},
-        {"rag_defaults_invalid_input_bytes",
-         test_rag_defaults_invalid_input_bytes},
-        {"rag_defaults_malformed_input_bytes",
-         test_rag_defaults_malformed_input_bytes},
+        {"rag_defaults_invalid_input_bytes", test_rag_defaults_invalid_input_bytes},
+        {"rag_defaults_malformed_input_bytes", test_rag_defaults_malformed_input_bytes},
     };
 
     int failures = 0;
@@ -261,8 +251,7 @@ int main(int /*argc*/, char** /*argv*/) {
         std::fprintf(stderr, "\n%d test(s) failed.\n", failures);
         return 1;
     }
-    std::printf("\nAll %zu test(s) passed.\n",
-                sizeof(kTests) / sizeof(kTests[0]));
+    std::printf("\nAll %zu test(s) passed.\n", sizeof(kTests) / sizeof(kTests[0]));
     return 0;
 #endif
 }

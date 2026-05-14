@@ -96,8 +96,7 @@ RAC_API size_t rac_audio_wav_header_size(void);
  * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER on NULL inputs or
  *         zero count.
  */
-RAC_API rac_result_t rac_audio_compute_level_db(const float* samples, size_t count,
-                                                float* out_db);
+RAC_API rac_result_t rac_audio_compute_level_db(const float* samples, size_t count, float* out_db);
 
 #ifdef __cplusplus
 }

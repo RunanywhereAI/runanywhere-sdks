@@ -252,7 +252,7 @@ void rac_diffusion_model_registry_init(void) {
 
     // Log available models for current platform
     uint32_t platform = detect_current_platform();
-    const char* platform_name = "Unknown";
+    const char* platform_name;
 #if defined(__APPLE__)
 #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
     platform_name = "iOS";

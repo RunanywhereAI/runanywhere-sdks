@@ -16,8 +16,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {

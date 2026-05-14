@@ -45,14 +45,14 @@ public extension RASTTOptions {
         enableTimestamps: Bool = true,
         vocabularyFilter: [String] = []
     ) {
-        var o = RASTTOptions()
-        o.language = detectLanguage ? .auto : RASTTOptions.languageFromString(language)
-        o.enablePunctuation = enablePunctuation
-        o.enableDiarization = enableDiarization
-        o.maxSpeakers = Int32(maxSpeakers)
-        o.enableWordTimestamps = enableTimestamps
-        o.vocabularyList = vocabularyFilter
-        self = o
+        var options = RASTTOptions()
+        options.language = detectLanguage ? .auto : RASTTOptions.languageFromString(language)
+        options.enablePunctuation = enablePunctuation
+        options.enableDiarization = enableDiarization
+        options.maxSpeakers = Int32(maxSpeakers)
+        options.enableWordTimestamps = enableTimestamps
+        options.vocabularyList = vocabularyFilter
+        self = options
     }
 
     static func languageFromString(_ raw: String) -> RASTTLanguage {

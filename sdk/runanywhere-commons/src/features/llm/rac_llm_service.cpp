@@ -39,15 +39,24 @@ static const char* LOG_CAT = "LLM.Service";
 // in rac/router/. Returning NULL = no pin (router picks by format/priority).
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:               return "onnx";
-        case RAC_FRAMEWORK_SHERPA:             return "sherpa";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
-        case RAC_FRAMEWORK_METALRT:            return "metalrt";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
-        case RAC_FRAMEWORK_COREML:             return "platform";
-        default:                               return nullptr;
+        case RAC_FRAMEWORK_LLAMACPP:
+            return "llamacpp";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:
+            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+            return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
+        case RAC_FRAMEWORK_COREML:
+            return "platform";
+        default:
+            return nullptr;
     }
 }
 
@@ -127,16 +136,15 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
 
     const rac_engine_vtable_t* vt = nullptr;
     result = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT,
-                              /*format=*/0,  /* no format hint; rely on framework pin */
+                              /*format=*/0, /* no format hint; rely on framework pin */
                               &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
         model_info = nullptr;
     }
     if (result != RAC_SUCCESS || !vt || !vt->llm_ops || !vt->llm_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d (vt=%p, llm_ops.create=%p)",
-                      result, (const void*)vt,
-                      vt ? (const void*)vt->llm_ops : nullptr);
+        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d (vt=%p, llm_ops.create=%p)", result,
+                      (const void*)vt, vt ? (const void*)vt->llm_ops : nullptr);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
@@ -152,7 +160,8 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     // Wrap impl in rac_llm_service_t (the generic vtable + impl handle).
     auto* service = static_cast<rac_llm_service_t*>(malloc(sizeof(rac_llm_service_t)));
     if (!service) {
-        if (vt->llm_ops->destroy) vt->llm_ops->destroy(impl);
+        if (vt->llm_ops->destroy)
+            vt->llm_ops->destroy(impl);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     service->ops = vt->llm_ops;
@@ -168,8 +177,8 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
         const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
         char props[128];
         snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("llm.backend.created", RAC_EVENT_CATEGORY_LLM,
-                        RAC_EVENT_DESTINATION_ALL, props);
+        rac_event_track("llm.backend.created", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
+                        props);
     }
 
     ALOGD("LLM service created successfully");

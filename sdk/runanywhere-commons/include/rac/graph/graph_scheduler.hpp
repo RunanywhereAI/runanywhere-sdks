@@ -42,13 +42,12 @@
 namespace rac::graph {
 
 class GraphScheduler {
-public:
-    explicit GraphScheduler(
-        size_t thread_pool_size = std::thread::hardware_concurrency());
+   public:
+    explicit GraphScheduler(size_t thread_pool_size = std::thread::hardware_concurrency());
 
     ~GraphScheduler();
 
-    GraphScheduler(const GraphScheduler&)            = delete;
+    GraphScheduler(const GraphScheduler&) = delete;
     GraphScheduler& operator=(const GraphScheduler&) = delete;
 
     /// Register a node. Nodes must be added before `start()`. Not thread-safe
@@ -60,36 +59,31 @@ public:
     /// is what gives us backpressure without extra bridge threads. Must be
     /// called before start().
     template <typename ProdIn, typename Mid, typename ConsOut>
-    void connect(PipelineNode<ProdIn, Mid>& producer,
-                 PipelineNode<Mid,  ConsOut>& consumer) {
+    void connect(PipelineNode<ProdIn, Mid>& producer, PipelineNode<Mid, ConsOut>& consumer) {
         consumer.set_input(producer.output());
     }
 
     /// Overload that wires a PipelineNode into a SplitNode input.
     template <typename ProdIn, typename T>
-    void connect(PipelineNode<ProdIn, T>& producer,
-                 SplitNode<T>& split) {
+    void connect(PipelineNode<ProdIn, T>& producer, SplitNode<T>& split) {
         split.set_input(producer.output());
     }
 
     /// Overload that wires a SplitNode output into a consumer PipelineNode.
     template <typename T, typename ConsOut>
-    void connect(SplitNode<T>& split, size_t split_out_idx,
-                 PipelineNode<T, ConsOut>& consumer) {
+    void connect(SplitNode<T>& split, size_t split_out_idx, PipelineNode<T, ConsOut>& consumer) {
         consumer.set_input(split.output(split_out_idx));
     }
 
     /// Overload that wires a producer into one of a MergeNode's inputs.
     template <typename ProdIn, typename T>
-    void connect(PipelineNode<ProdIn, T>& producer,
-                 MergeNode<T>& merge, size_t merge_in_idx) {
+    void connect(PipelineNode<ProdIn, T>& producer, MergeNode<T>& merge, size_t merge_in_idx) {
         merge.set_input(merge_in_idx, producer.output());
     }
 
     /// Overload that wires a MergeNode output into a consumer PipelineNode.
     template <typename T, typename ConsOut>
-    void connect(MergeNode<T>& merge,
-                 PipelineNode<T, ConsOut>& consumer) {
+    void connect(MergeNode<T>& merge, PipelineNode<T, ConsOut>& consumer) {
         consumer.set_input(merge.output());
     }
 
@@ -121,13 +115,13 @@ public:
     /// helper threads that must shut down with the graph).
     std::shared_ptr<CancelToken> root_cancel_token() const { return root_; }
 
-private:
-    const size_t                                   thread_pool_size_;
-    std::shared_ptr<CancelToken>                   root_;
-    mutable std::mutex                             mu_;
-    std::vector<std::shared_ptr<IPipelineNode>>    nodes_;
-    bool                                           started_{false};
-    bool                                           stopped_{false};
+   private:
+    const size_t thread_pool_size_;
+    std::shared_ptr<CancelToken> root_;
+    mutable std::mutex mu_;
+    std::vector<std::shared_ptr<IPipelineNode>> nodes_;
+    bool started_{false};
+    bool stopped_{false};
 };
 
 }  // namespace rac::graph

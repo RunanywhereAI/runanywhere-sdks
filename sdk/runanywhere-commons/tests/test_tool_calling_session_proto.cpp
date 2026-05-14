@@ -30,20 +30,22 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__);          \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                      \
-        }                                                                                     \
+#define CHECK(cond, label)                                                           \
+    do {                                                                             \
+        ++test_count;                                                                \
+        if (!(cond)) {                                                               \
+            ++fail_count;                                                            \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d)\n", label, __FILE__, __LINE__); \
+        } else {                                                                     \
+            std::fprintf(stdout, "  ok:   %s\n", label);                             \
+        }                                                                            \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-struct MockLlm { std::string model_path; };
+struct MockLlm {
+    std::string model_path;
+};
 
 std::mutex g_responses_mutex;
 std::vector<std::string> g_responses;
@@ -52,24 +54,29 @@ int g_generate_calls = 0;
 char* dup_cstr(const char* value) {
     const size_t len = std::strlen(value);
     char* out = static_cast<char*>(std::malloc(len + 1));
-    if (!out) return nullptr;
+    if (!out)
+        return nullptr;
     std::memcpy(out, value, len + 1);
     return out;
 }
 
 rac_result_t mock_create(const char* model_id, const char*, void** out_impl) {
-    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new MockLlm();
     impl->model_path = model_id;
     *out_impl = impl;
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_initialize(void*, const char*) { return RAC_SUCCESS; }
+rac_result_t mock_initialize(void*, const char*) {
+    return RAC_SUCCESS;
+}
 
 rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
                            rac_llm_result_t* out_result) {
-    if (!out_result) return RAC_ERROR_NULL_POINTER;
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
     std::string response;
     {
         std::lock_guard<std::mutex> lg(g_responses_mutex);
@@ -82,7 +89,8 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
         }
     }
     out_result->text = dup_cstr(response.c_str());
-    if (!out_result->text) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!out_result->text)
+        return RAC_ERROR_OUT_OF_MEMORY;
     out_result->prompt_tokens = 3;
     out_result->completion_tokens = 5;
     out_result->total_tokens = 8;
@@ -92,9 +100,15 @@ rac_result_t mock_generate(void*, const char*, const rac_llm_options_t*,
     return RAC_SUCCESS;
 }
 
-rac_result_t mock_cancel(void*) { return RAC_SUCCESS; }
-rac_result_t mock_cleanup(void*) { return RAC_SUCCESS; }
-void mock_destroy(void* impl) { delete static_cast<MockLlm*>(impl); }
+rac_result_t mock_cancel(void*) {
+    return RAC_SUCCESS;
+}
+rac_result_t mock_cleanup(void*) {
+    return RAC_SUCCESS;
+}
+void mock_destroy(void* impl) {
+    delete static_cast<MockLlm*>(impl);
+}
 
 rac_llm_service_ops_t g_mock_ops = [] {
     rac_llm_service_ops_t ops{};
@@ -107,8 +121,7 @@ rac_llm_service_ops_t g_mock_ops = [] {
     return ops;
 }();
 
-const uint32_t g_formats[] = {
-    static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+const uint32_t g_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
 
 rac_engine_vtable_t g_mock_vtable = [] {
     rac_engine_vtable_t v{};
@@ -125,7 +138,8 @@ rac_engine_vtable_t g_mock_vtable = [] {
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    if (out->empty()) return true;
+    if (out->empty())
+        return true;
     return message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
@@ -170,10 +184,10 @@ void cleanup_environment() {
 
 bool load_mock_llm() {
     cleanup_environment();
-    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS) return false;
+    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
+        return false;
 
-    if (!g_registry &&
-        (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {
+    if (!g_registry && (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {
         return false;
     }
 
@@ -188,7 +202,8 @@ bool load_mock_llm() {
     runanywhere::v1::ModelLoadRequest load;
     load.set_model_id("toolsession.llm");
     std::vector<uint8_t> load_bytes;
-    if (!serialize(load, &load_bytes)) return false;
+    if (!serialize(load, &load_bytes))
+        return false;
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -208,25 +223,28 @@ struct EventSink {
         std::lock_guard<std::mutex> lg(mu);
         int count = 0;
         for (const auto& ev : events) {
-            if (ev.kind_case() == kind) ++count;
+            if (ev.kind_case() == kind)
+                ++count;
         }
         return count;
     }
 
-    const runanywhere::v1::ToolCallingSessionEvent* find_first(
-        runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
+    const runanywhere::v1::ToolCallingSessionEvent*
+    find_first(runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
         std::lock_guard<std::mutex> lg(mu);
         for (const auto& ev : events) {
-            if (ev.kind_case() == kind) return &ev;
+            if (ev.kind_case() == kind)
+                return &ev;
         }
         return nullptr;
     }
 
-    const runanywhere::v1::ToolCallingSessionEvent* find_last(
-        runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
+    const runanywhere::v1::ToolCallingSessionEvent*
+    find_last(runanywhere::v1::ToolCallingSessionEvent::KindCase kind) {
         std::lock_guard<std::mutex> lg(mu);
         for (auto it = events.rbegin(); it != events.rend(); ++it) {
-            if (it->kind_case() == kind) return &*it;
+            if (it->kind_case() == kind)
+                return &*it;
         }
         return nullptr;
     }
@@ -253,20 +271,24 @@ runanywhere::v1::ToolDefinition make_weather_tool() {
     return tool;
 }
 
-runanywhere::v1::ToolCallingSessionCreateRequest make_request(
-    const std::string& prompt, uint32_t max_iterations = 0) {
+runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string& prompt,
+                                                              uint32_t max_iterations = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
     request.set_max_tokens(64);
     request.set_temperature(0.5f);
     *request.add_tools() = make_weather_tool();
     request.set_format_hint("default");
-    if (max_iterations > 0) request.set_max_iterations(max_iterations);
+    if (max_iterations > 0)
+        request.set_max_iterations(max_iterations);
     return request;
 }
 
 int test_session_emits_tool_call() {
-    if (!load_mock_llm()) { std::fprintf(stderr, "FAIL: mock LLM load\n"); return 1; }
+    if (!load_mock_llm()) {
+        std::fprintf(stderr, "FAIL: mock LLM load\n");
+        return 1;
+    }
     set_responses({
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
     });
@@ -277,8 +299,8 @@ int test_session_emits_tool_call() {
     CHECK(serialize(request, &bytes), "serialize create request");
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                            sink_callback, &sink, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
     CHECK(handle != 0, "handle non-zero");
 
@@ -301,7 +323,8 @@ int test_session_emits_tool_call() {
 }
 
 int test_step_with_result_emits_final() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     set_responses({
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
         "The weather in Tokyo is sunny, 25C.",
@@ -313,8 +336,8 @@ int test_step_with_result_emits_final() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                            sink_callback, &sink, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -323,7 +346,8 @@ int test_step_with_result_emits_final() {
     runanywhere::v1::ToolCallingSessionStepWithResultRequest step;
     step.set_session_handle(handle);
     const auto* tool_ev = sink.find_first(EvCase::kToolCall);
-    if (tool_ev) step.set_tool_call_id(tool_ev->tool_call().id());
+    if (tool_ev)
+        step.set_tool_call_id(tool_ev->tool_call().id());
     step.set_result_json("{\"temp\":25,\"condition\":\"sunny\"}");
     std::vector<uint8_t> step_bytes;
     serialize(step, &step_bytes);
@@ -353,7 +377,8 @@ int test_step_with_result_emits_final() {
 }
 
 int test_iteration_cap_respected() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     set_responses({
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"A\"}}</tool_call>",
         "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"B\"}}</tool_call>",
@@ -366,8 +391,8 @@ int test_iteration_cap_respected() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                            sink_callback, &sink, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create RAC_SUCCESS");
 
     using EvCase = runanywhere::v1::ToolCallingSessionEvent::KindCase;
@@ -390,12 +415,10 @@ int test_iteration_cap_respected() {
     rc = rac_tool_calling_session_step_with_result_proto(step_bytes.data(), step_bytes.size());
     CHECK(rc == RAC_SUCCESS, "second step resumed");
 
-    CHECK(sink.count_kind(EvCase::kFinalResult) == 1,
-          "final emitted after max_iterations");
+    CHECK(sink.count_kind(EvCase::kFinalResult) == 1, "final emitted after max_iterations");
     const auto* final_ev = sink.find_first(EvCase::kFinalResult);
     if (final_ev) {
-        CHECK(final_ev->final_result().iterations_used() == 2,
-              "iterations_used == max_iterations");
+        CHECK(final_ev->final_result().iterations_used() == 2, "iterations_used == max_iterations");
     }
 
     rac_tool_calling_session_destroy_proto(handle);
@@ -404,7 +427,8 @@ int test_iteration_cap_respected() {
 }
 
 int test_destroy_clears_state() {
-    if (!load_mock_llm()) return 1;
+    if (!load_mock_llm())
+        return 1;
     set_responses({"plain text no tool call"});
     EventSink sink;
     auto request = make_request("hello");
@@ -412,8 +436,8 @@ int test_destroy_clears_state() {
     serialize(request, &bytes);
 
     uint64_t handle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        bytes.data(), bytes.size(), sink_callback, &sink, &handle);
+    rac_result_t rc = rac_tool_calling_session_create_proto(bytes.data(), bytes.size(),
+                                                            sink_callback, &sink, &handle);
     CHECK(rc == RAC_SUCCESS, "session_create succeeds");
     CHECK(handle != 0, "handle non-zero");
 
@@ -441,7 +465,7 @@ int test_destroy_clears_state() {
 
 #endif
 
-}
+}  // namespace
 
 int main() {
     std::fprintf(stdout, "test_tool_calling_session_proto\n");
@@ -453,7 +477,10 @@ int main() {
     test_step_with_result_emits_final();
     test_iteration_cap_respected();
     test_destroy_clears_state();
-    if (g_registry) { rac_model_registry_destroy(g_registry); g_registry = nullptr; }
+    if (g_registry) {
+        rac_model_registry_destroy(g_registry);
+        g_registry = nullptr;
+    }
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 #endif

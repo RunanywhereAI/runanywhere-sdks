@@ -272,9 +272,9 @@ async function initializeSDK(): Promise<void> {
     });
 
     // Attempt to restore previously chosen local storage directory.
-    const localRestored = await RunAnywhere.restoreLocalStorage();
+    const localRestored = await RunAnywhere.storage.restoreLocalStorage();
     if (localRestored) {
-      console.log('[RunAnywhere] Local storage restored:', RunAnywhere.localStorageDirectoryName);
+      console.log('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
     }
 
     // Register the llamacpp WASM backend. This is best-effort: if the
@@ -296,7 +296,7 @@ async function initializeSDK(): Promise<void> {
 
     console.log(
       '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
-      '| storage backend:', RunAnywhere.storageBackend,
+      '| storage backend:', RunAnywhere.storage.backend,
     );
 
     showAccelerationBadge(activeAcceleration);

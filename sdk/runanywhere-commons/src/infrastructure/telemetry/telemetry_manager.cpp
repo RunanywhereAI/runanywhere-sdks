@@ -425,7 +425,7 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         // Development: Immediate flush for real-time debugging
         should_flush = true;
         RAC_LOG_DEBUG("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
-                  queue_size);
+                      queue_size);
     } else {
         // Production: Flush based on batch size or timeout
         // (completion events are handled in rac_telemetry_manager_track_analytics)
@@ -433,20 +433,20 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
             should_flush = true;
             RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                      queue_size, manager->BATCH_SIZE_PRODUCTION);
+                          queue_size, manager->BATCH_SIZE_PRODUCTION);
         }
         // Flush if timeout reached (5 seconds since last flush)
         else if (manager->last_flush_time_ms > 0 &&
                  (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
             should_flush = true;
             RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
-                      current_time - manager->last_flush_time_ms);
+                          current_time - manager->last_flush_time_ms);
         }
         // First flush: start the timer by flushing immediately if we have events
         else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
             should_flush = true;
             RAC_LOG_DEBUG("Telemetry", "Production: first flush to start timer (queue size: %zu)",
-                      queue_size);
+                          queue_size);
         }
     }
 
@@ -770,8 +770,8 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
             if (result == RAC_SUCCESS && json) {
                 // WARN: Log production telemetry payload for debugging (first 500 chars)
                 RAC_LOG_DEBUG("Telemetry",
-                          "Sending production telemetry (modality=%s, %zu bytes): %.500s",
-                          modality.c_str(), json_len, json);
+                              "Sending production telemetry (modality=%s, %zu bytes): %.500s",
+                              modality.c_str(), json_len, json);
                 manager->http_callback(manager->http_user_data, endpoint, json, json_len,
                                        RAC_TRUE  // Production always requires auth
                 );
@@ -813,7 +813,7 @@ void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_b
         RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
     } else {
         RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",
-                    error_message ? error_message : "unknown");
+                        error_message ? error_message : "unknown");
     }
 
     // Could parse response and handle retries here if needed

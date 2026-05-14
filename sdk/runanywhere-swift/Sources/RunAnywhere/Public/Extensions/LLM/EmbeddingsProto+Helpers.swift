@@ -29,7 +29,7 @@ extension RAEmbeddingVector {
 
     private static func l2(_ values: [Float]) -> Float {
         var sumSquares: Float = 0
-        for v in values { sumSquares += v * v }
+        for value in values { sumSquares += value * value }
         return sumSquares.squareRoot()
     }
 }

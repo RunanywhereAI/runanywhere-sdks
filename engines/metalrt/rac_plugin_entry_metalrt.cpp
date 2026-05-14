@@ -14,16 +14,17 @@
  * validation accepts both routable and stub builds.
  */
 
-#include "rac/plugin/rac_engine_manifest.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
-#include "rac/core/rac_error.h"
+#include "rac/plugin/rac_engine_manifest.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(__APPLE__) && defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
+#if defined(__APPLE__) && defined(RAC_METALRT_ENGINE_AVAILABLE) &&             \
+    RAC_METALRT_ENGINE_AVAILABLE
 #define RAC_METALRT_ROUTABLE 1
 #else
 #define RAC_METALRT_ROUTABLE 0
@@ -38,11 +39,11 @@ extern const rac_vlm_service_ops_t g_metalrt_vlm_ops;
 
 static rac_result_t metalrt_capability_check(void) {
 #if !defined(__APPLE__)
-    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+  return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #elif defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
-    return RAC_SUCCESS;
+  return RAC_SUCCESS;
 #else
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+  return RAC_ERROR_BACKEND_UNAVAILABLE;
 #endif
 }
 
@@ -55,7 +56,7 @@ static const rac_runtime_id_t k_metalrt_runtimes[] = {
 static const uint32_t k_metalrt_formats[] = {
     RAC_MODEL_FORMAT_ID_COREML,
     RAC_MODEL_FORMAT_ID_MLPACKAGE,
-    RAC_MODEL_FORMAT_ID_GGUF,  /* for the LLM ops slot */
+    RAC_MODEL_FORMAT_ID_GGUF, /* for the LLM ops slot */
 };
 
 static const rac_primitive_t k_metalrt_primitives[] = {
@@ -67,25 +68,25 @@ static const rac_primitive_t k_metalrt_primitives[] = {
 #endif
 
 static const rac_engine_manifest_t k_metalrt_manifest = {
-    .name             = "metalrt",
-    .display_name     =
+    .name = "metalrt",
+    .display_name =
 #if RAC_METALRT_ROUTABLE
         "MetalRT",
 #else
         "MetalRT [ops unavailable]",
 #endif
-    .version          = nullptr,
-    .package_owner    = "runanywhere",
-    .package_name     = "runanywhere_metalrt",
-    .availability     = RAC_ENGINE_AVAILABILITY_PRIVATE,  /* Apple-only. */
-    .priority         =
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_metalrt",
+    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE, /* Apple-only. */
+    .priority =
 #if RAC_METALRT_ROUTABLE
-        120,  /* Highest — hand-tuned Metal shaders. */
+        120, /* Highest — hand-tuned Metal shaders. */
 #else
         0,
 #endif
     .capability_flags = 0,
-    .primitives       =
+    .primitives =
 #if RAC_METALRT_ROUTABLE
         k_metalrt_primitives,
 #else
@@ -97,32 +98,32 @@ static const rac_engine_manifest_t k_metalrt_manifest = {
 #else
         0,
 #endif
-    .runtimes         =
+    .runtimes =
 #if RAC_METALRT_ROUTABLE
         k_metalrt_runtimes,
 #else
         nullptr,
 #endif
-    .runtimes_count   =
+    .runtimes_count =
 #if RAC_METALRT_ROUTABLE
         sizeof(k_metalrt_runtimes) / sizeof(k_metalrt_runtimes[0]),
 #else
         0,
 #endif
-    .formats          =
+    .formats =
 #if RAC_METALRT_ROUTABLE
         k_metalrt_formats,
 #else
         nullptr,
 #endif
-    .formats_count    =
+    .formats_count =
 #if RAC_METALRT_ROUTABLE
         sizeof(k_metalrt_formats) / sizeof(k_metalrt_formats[0]),
 #else
         0,
 #endif
-    .reserved_0       = 0,
-    .reserved_1       = 0,
+    .reserved_0 = 0,
+    .reserved_1 = 0,
 };
 
 static const rac_engine_vtable_t g_metalrt_engine_vtable = {
@@ -130,19 +131,19 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
     /* capability_check */ metalrt_capability_check,
     /* on_unload        */ nullptr,
 
-    /* llm_ops          */
+/* llm_ops          */
 #if RAC_METALRT_ROUTABLE
     &g_metalrt_llm_ops,
 #else
     nullptr,
 #endif
-    /* stt_ops          */
+/* stt_ops          */
 #if RAC_METALRT_ROUTABLE
     &g_metalrt_stt_ops,
 #else
     nullptr,
 #endif
-    /* tts_ops          */
+/* tts_ops          */
 #if RAC_METALRT_ROUTABLE
     &g_metalrt_tts_ops,
 #else
@@ -151,7 +152,7 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
     /* rerank_ops       */ nullptr,
-    /* vlm_ops          */
+/* vlm_ops          */
 #if RAC_METALRT_ROUTABLE
     &g_metalrt_vlm_ops,
 #else
@@ -159,13 +160,21 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
 #endif
     /* diffusion_ops    */ nullptr,
 
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(metalrt) {
-    return rac_engine_entry_with_manifest(&k_metalrt_manifest,
-                                          &g_metalrt_engine_vtable);
+  return rac_engine_entry_with_manifest(&k_metalrt_manifest,
+                                        &g_metalrt_engine_vtable);
 }
 
-}  // extern "C"
+} // extern "C"

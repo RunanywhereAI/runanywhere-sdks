@@ -11,10 +11,10 @@
 #include <cstring>
 #include <string>
 
+#include "../../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "../../infrastructure/http/rac_http_internal.h"
 
 // Platform-specific file existence check
 #ifdef _WIN32
@@ -231,8 +231,8 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
     rac_http_download_request_t dl_req{};
     dl_req.url = url;
     dl_req.destination_path = output_path;
-    dl_req.timeout_ms = 0;              // library default (same as old async path)
-    dl_req.follow_redirects = RAC_TRUE; // HuggingFace serves via redirects
+    dl_req.timeout_ms = 0;               // library default (same as old async path)
+    dl_req.follow_redirects = RAC_TRUE;  // HuggingFace serves via redirects
     dl_req.resume_from_byte = 0;
     dl_req.expected_sha256_hex = nullptr;
 
@@ -242,8 +242,7 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
                                   nullptr /* no user data */, &http_status);
 
     if (status != RAC_HTTP_DL_OK) {
-        RAC_LOG_ERROR("Diffusion.Tokenizer",
-                      "HTTP download failed: status=%d http=%d url=%s",
+        RAC_LOG_ERROR("Diffusion.Tokenizer", "HTTP download failed: status=%d http=%d url=%s",
                       static_cast<int>(status), static_cast<int>(http_status), url);
         // Map the rac_http_download_status_t back to an rac_result_t so the
         // caller contract (return type is rac_result_t) stays intact.

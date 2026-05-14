@@ -137,8 +137,7 @@ typedef struct rac_vlm_service {
  * lifecycle is also published on the canonical SDKEvent stream.
  */
 typedef rac_bool_t (*rac_vlm_stream_proto_callback_fn)(const uint8_t* event_proto_bytes,
-                                                       size_t event_proto_size,
-                                                       void* user_data);
+                                                       size_t event_proto_size, void* user_data);
 
 /**
  * @brief Callback for generated VLM stream events.
@@ -146,10 +145,9 @@ typedef rac_bool_t (*rac_vlm_stream_proto_callback_fn)(const uint8_t* event_prot
  * The callback receives serialized runanywhere.v1.VLMStreamEvent bytes emitted
  * by lifecycle-owned generated VLM stream processing.
  */
-typedef rac_bool_t (*rac_vlm_stream_event_proto_callback_fn)(
-    const uint8_t* event_proto_bytes,
-    size_t event_proto_size,
-    void* user_data);
+typedef rac_bool_t (*rac_vlm_stream_event_proto_callback_fn)(const uint8_t* event_proto_bytes,
+                                                             size_t event_proto_size,
+                                                             void* user_data);
 
 // =============================================================================
 // PUBLIC API - Generic service functions
@@ -198,8 +196,7 @@ RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t*
  * options_proto_bytes must encode runanywhere.v1.VLMGenerationOptions. The
  * result buffer receives serialized runanywhere.v1.VLMResult bytes.
  */
-RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle,
-                                           const uint8_t* image_proto_bytes,
+RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
                                            size_t image_proto_size,
                                            const uint8_t* options_proto_bytes,
                                            size_t options_proto_size,
@@ -230,8 +227,7 @@ RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_i
 RAC_API rac_result_t rac_vlm_process_stream_proto(
     rac_handle_t handle, const uint8_t* image_proto_bytes, size_t image_proto_size,
     const uint8_t* options_proto_bytes, size_t options_proto_size,
-    rac_vlm_stream_proto_callback_fn callback, void* user_data,
-    rac_proto_buffer_t* out_result);
+    rac_vlm_stream_proto_callback_fn callback, void* user_data, rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information
@@ -276,11 +272,10 @@ RAC_API rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes,
  * runanywhere.v1.VLMStreamEvent bytes including token deltas and exactly one
  * terminal event.
  */
-RAC_API rac_result_t rac_vlm_stream_proto(
-    const uint8_t* request_proto_bytes,
-    size_t request_proto_size,
-    rac_vlm_stream_event_proto_callback_fn callback,
-    void* user_data);
+RAC_API rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes,
+                                          size_t request_proto_size,
+                                          rac_vlm_stream_event_proto_callback_fn callback,
+                                          void* user_data);
 
 /**
  * @brief Cancel lifecycle-owned VLM generation and return a cancellation event.

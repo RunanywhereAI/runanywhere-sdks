@@ -132,12 +132,12 @@ typedef struct rac_tool_call {
  * contract without depending on generated headers in the C ABI.
  */
 typedef struct rac_tool_call_validation {
-    rac_bool_t is_valid;              /**< Whether the call matches a known tool definition */
-    char* validation_errors_json;     /**< JSON array of validation error strings (owned) */
-    char* matched_tool_json;          /**< Matched tool definition as JSON object (owned) */
-    char* normalized_arguments_json;  /**< Canonical arguments JSON object (owned) */
-    char* error_message;              /**< First validation error, if any (owned) */
-    rac_result_t error_code;          /**< RAC_SUCCESS or a validation error code */
+    rac_bool_t is_valid;             /**< Whether the call matches a known tool definition */
+    char* validation_errors_json;    /**< JSON array of validation error strings (owned) */
+    char* matched_tool_json;         /**< Matched tool definition as JSON object (owned) */
+    char* normalized_arguments_json; /**< Canonical arguments JSON object (owned) */
+    char* error_message;             /**< First validation error, if any (owned) */
+    rac_result_t error_code;         /**< RAC_SUCCESS or a validation error code */
 } rac_tool_call_validation_t;
 
 /**
@@ -217,9 +217,9 @@ RAC_API rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
  * @param out_result Owned ToolParseResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_tool_call_parse_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_bytes,
+                                               size_t request_proto_size,
+                                               rac_proto_buffer_t* out_result);
 
 /**
  * @brief Validate a parsed tool call against local tool definitions
@@ -255,8 +255,8 @@ RAC_API rac_result_t rac_tool_call_validate(const rac_tool_call_t* call,
  * @return RAC_SUCCESS on successful validation processing
  */
 RAC_API rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
-                                                const char* tools_json,
-                                                rac_tool_call_validation_t* out_validation);
+                                                 const char* tools_json,
+                                                 rac_tool_call_validation_t* out_validation);
 
 /**
  * @brief Validate a tool call from serialized generated proto bytes.
@@ -270,9 +270,9 @@ RAC_API rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
  * @param out_result Owned ToolCallValidationResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_tool_call_validate_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tool_call_validate_proto(const uint8_t* request_proto_bytes,
+                                                  size_t request_proto_size,
+                                                  rac_proto_buffer_t* out_result);
 
 /**
  * @brief Free tool call validation result
@@ -380,8 +380,8 @@ rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out
  *           only. SDKs must call `rac_tool_call_format_prompt_proto`.
  */
 rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
-                                                         rac_tool_call_format_t format,
-                                                         char** out_prompt);
+                                                          rac_tool_call_format_t format,
+                                                          char** out_prompt);
 
 /**
  * @brief Format tools from JSON array string with format specified by name
@@ -398,8 +398,8 @@ rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json
  *           only. SDKs must call `rac_tool_call_format_prompt_proto`.
  */
 rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
-                                                              const char* format_name,
-                                                              char** out_prompt);
+                                                               const char* format_name,
+                                                               char** out_prompt);
 
 /**
  * @brief Build the initial prompt with tools and user query
@@ -416,8 +416,7 @@ rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools
  *           only. SDKs should compose the prompt through
  *           `rac_tool_call_format_prompt_proto`.
  */
-rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
-                                                const char* tools_json,
+rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt, const char* tools_json,
                                                 const rac_tool_calling_options_t* options,
                                                 char** out_prompt);
 
@@ -439,9 +438,11 @@ rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
  *           only. SDKs should maintain tool-calling sessions through
  *           `rac_tool_call_*_proto`.
  */
-rac_result_t rac_tool_call_build_followup_prompt(
-    const char* original_user_prompt, const char* tools_prompt, const char* tool_name,
-    const char* tool_result_json, rac_bool_t keep_tools_available, char** out_prompt);
+rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_prompt,
+                                                 const char* tools_prompt, const char* tool_name,
+                                                 const char* tool_result_json,
+                                                 rac_bool_t keep_tools_available,
+                                                 char** out_prompt);
 
 /**
  * @brief Format tool prompts from serialized generated proto bytes.
@@ -456,9 +457,9 @@ rac_result_t rac_tool_call_build_followup_prompt(
  * @param out_result Owned ToolPromptFormatResult bytes or typed error.
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
 
 // =============================================================================
 // JSON UTILITY API - All JSON handling happens here
@@ -491,7 +492,7 @@ rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_norma
  *           helper; SDKs should use generated proto messages.
  */
 rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
-                                              size_t num_definitions, char** out_json);
+                                               size_t num_definitions, char** out_json);
 
 /**
  * @brief Serialize a tool result to JSON
@@ -507,8 +508,8 @@ rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* defi
  *           helper; SDKs should use generated proto messages.
  */
 rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
-                                         const char* result_json,
-                                         const char* error_message, char** out_json);
+                                          const char* result_json, const char* error_message,
+                                          char** out_json);
 
 // =============================================================================
 // TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
@@ -532,10 +533,9 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
  * @param out_string_proto    Owned serialized ToolValueJSON on success.
  * @return RAC_SUCCESS when out_string_proto carries a serialized result.
  */
-RAC_API rac_result_t rac_tool_value_to_json_proto(
-    const uint8_t* in_tool_value_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_string_proto);
+RAC_API rac_result_t rac_tool_value_to_json_proto(const uint8_t* in_tool_value_bytes,
+                                                  size_t in_size,
+                                                  rac_proto_buffer_t* out_string_proto);
 
 /**
  * @brief Parse a JSON string into a runanywhere.v1.ToolValue proto.
@@ -549,24 +549,20 @@ RAC_API rac_result_t rac_tool_value_to_json_proto(
  * @param out_tool_value   Owned serialized ToolValue on success.
  * @return RAC_SUCCESS when out_tool_value carries a serialized result.
  */
-RAC_API rac_result_t rac_tool_value_from_json_proto(
-    const uint8_t* in_string_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_tool_value);
+RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_bytes, size_t in_size,
+                                                    rac_proto_buffer_t* out_tool_value);
 
 // =============================================================================
 // TOOL CALLING SESSION (Wave D-4) - Native orchestration state machine
 // =============================================================================
 
 typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
-                                                            size_t         event_size,
-                                                            void*          user_data);
+                                                           size_t event_size, void* user_data);
 
-RAC_API rac_result_t rac_tool_calling_session_create_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_tool_calling_session_event_callback_fn callback,
-    void* user_data,
-    uint64_t* out_session_handle);
+RAC_API rac_result_t
+rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                                      rac_tool_calling_session_event_callback_fn callback,
+                                      void* user_data, uint64_t* out_session_handle);
 
 RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size);
@@ -605,11 +601,10 @@ RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_han
  * Returning anything other than RAC_SUCCESS terminates the loop and
  * surfaces a failed ToolResult with the error code in out_result.
  */
-typedef rac_result_t (*rac_tool_execute_callback_fn)(
-    const uint8_t* in_tool_call_bytes,
-    size_t in_size,
-    rac_proto_buffer_t* out_tool_result_bytes,
-    void* user_data);
+typedef rac_result_t (*rac_tool_execute_callback_fn)(const uint8_t* in_tool_call_bytes,
+                                                     size_t in_size,
+                                                     rac_proto_buffer_t* out_tool_result_bytes,
+                                                     void* user_data);
 
 /**
  * @brief Run the full tool-calling loop in commons.
@@ -633,12 +628,11 @@ typedef rac_result_t (*rac_tool_execute_callback_fn)(
  * @return RAC_SUCCESS when out_result carries a serialized result; a negative
  *         rac_result_t on failure (out_result also carries the status text).
  */
-RAC_API rac_result_t rac_tool_calling_run_loop_proto(
-    const uint8_t* in_request_bytes,
-    size_t in_size,
-    rac_tool_execute_callback_fn on_execute,
-    void* user_data,
-    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes,
+                                                     size_t in_size,
+                                                     rac_tool_execute_callback_fn on_execute,
+                                                     void* user_data,
+                                                     rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

@@ -12,19 +12,21 @@
 
 namespace {
 
-#define ASSERT_TRUE(cond) do { \
-    if (!(cond)) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_TRUE(cond)                                                                   \
+    do {                                                                                    \
+        if (!(cond)) {                                                                      \
+            std::fprintf(stderr, "ASSERT FAILED: %s @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                       \
+        }                                                                                   \
+    } while (0)
 
-#define ASSERT_EQ(a, b) do { \
-    if (!((a) == (b))) { \
-        std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
-        return 1; \
-    } \
-} while (0)
+#define ASSERT_EQ(a, b)                                                                            \
+    do {                                                                                           \
+        if (!((a) == (b))) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAILED: %s == %s @ %s:%d\n", #a, #b, __FILE__, __LINE__); \
+            return 1;                                                                              \
+        }                                                                                          \
+    } while (0)
 
 int test_null_input_handling() {
     rac_proto_buffer_t buffer;
@@ -49,9 +51,9 @@ int test_borrowed_input_validation_and_empty_parse_data() {
     ASSERT_TRUE(rac_proto_bytes_data_or_empty(nullptr, 0) != nullptr);
 
     ASSERT_EQ(rac_proto_bytes_validate(nullptr, 1), RAC_ERROR_INVALID_ARGUMENT);
-    ASSERT_EQ(rac_proto_bytes_validate(bytes,
-                                       static_cast<size_t>(std::numeric_limits<int>::max()) + 1U),
-              RAC_ERROR_INVALID_ARGUMENT);
+    ASSERT_EQ(
+        rac_proto_bytes_validate(bytes, static_cast<size_t>(std::numeric_limits<int>::max()) + 1U),
+        RAC_ERROR_INVALID_ARGUMENT);
     return 0;
 }
 
@@ -205,8 +207,7 @@ int test_raw_compatibility_helper() {
 
     out = const_cast<uint8_t*>(bytes);
     size = 7;
-    ASSERT_EQ(rac_proto_buffer_copy_to_raw(nullptr, 1, &out, &size),
-              RAC_ERROR_INVALID_ARGUMENT);
+    ASSERT_EQ(rac_proto_buffer_copy_to_raw(nullptr, 1, &out, &size), RAC_ERROR_INVALID_ARGUMENT);
     ASSERT_TRUE(out == nullptr);
     ASSERT_EQ(size, 0U);
     return 0;
@@ -252,12 +253,17 @@ int test_stream_callback_payload_contract_compiles() {
 int main() {
     int failures = 0;
 
-#define RUN(name) do { \
-    std::printf("[ RUN  ] %s\n", #name); \
-    int rc = name(); \
-    if (rc == 0) std::printf("[  OK  ] %s\n", #name); \
-    else        { std::printf("[ FAIL ] %s\n", #name); ++failures; } \
-} while (0)
+#define RUN(name)                                \
+    do {                                         \
+        std::printf("[ RUN  ] %s\n", #name);     \
+        int rc = name();                         \
+        if (rc == 0)                             \
+            std::printf("[  OK  ] %s\n", #name); \
+        else {                                   \
+            std::printf("[ FAIL ] %s\n", #name); \
+            ++failures;                          \
+        }                                        \
+    } while (0)
 
     RUN(test_null_input_handling);
     RUN(test_borrowed_input_validation_and_empty_parse_data);

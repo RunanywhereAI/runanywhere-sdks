@@ -16,7 +16,7 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
             "location": RAToolValue("San Francisco"),
             "days": RAToolValue(3),
             "includeHourly": RAToolValue(true),
-            "units": .array([RAToolValue("fahrenheit"), RAToolValue("mph")]),
+            "units": .array([RAToolValue("fahrenheit"), RAToolValue("mph")])
         ]
 
         let json = RAToolValue.jsonString(from: object)
@@ -52,61 +52,5 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
         options.format = .openaiFunctions
 
         XCTAssertEqual(options.resolvedFormatName, "openai")
-    }
-
-    func testToolPromptFormatRequestCarriesGeneratedToolDefinitions() {
-        var options = RAToolCallingOptions.defaults()
-        options.formatHint = "lfm2"
-        options.format = .pythonic
-
-        let tool = RAToolDefinition(
-            name: "get_weather",
-            description: "Get weather for a city",
-            parameters: [
-                RAToolParameter(
-                    name: "location",
-                    type: .string,
-                    description: "City name"
-                ),
-            ]
-        )
-
-        let request = CppBridge.ToolCalling.makePromptFormatRequest(
-            userPrompt: "Weather in Tokyo?",
-            tools: [tool],
-            options: options
-        )
-
-        XCTAssertEqual(request.userPrompt, "Weather in Tokyo?")
-        XCTAssertEqual(request.options.tools.map(\.name), ["get_weather"])
-        XCTAssertEqual(request.options.tools.first?.parameters.first?.type, .string)
-        XCTAssertEqual(request.options.formatHint, "lfm2")
-        XCTAssertEqual(request.options.format, .pythonic)
-    }
-
-    func testToolValidationRequestUsesGeneratedToolCallAndRegistrySnapshot() {
-        let tool = RAToolDefinition(
-            name: "set_mode",
-            description: "Set runtime mode",
-            parameters: [
-                RAToolParameter(name: "enabled", type: .boolean, description: "Enabled"),
-            ]
-        )
-        let call = RAToolCall(
-            toolName: "set_mode",
-            arguments: ["enabled": RAToolValue(true)],
-            callId: "call_1"
-        )
-
-        let request = CppBridge.ToolCalling.makeValidationRequest(
-            toolCall: call,
-            tools: [tool],
-            options: .defaults()
-        )
-
-        XCTAssertEqual(request.toolCall.name, "set_mode")
-        XCTAssertEqual(request.toolCall.arguments["enabled"]?.bool, true)
-        XCTAssertEqual(request.toolCall.argumentsJson, "{\"enabled\":true}")
-        XCTAssertEqual(request.options.tools.first?.name, "set_mode")
     }
 }

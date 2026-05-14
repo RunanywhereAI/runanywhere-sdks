@@ -67,8 +67,7 @@ std::string status_message(rac_result_t status, const char* fallback) {
     return std::string(message);
 }
 
-rac_result_t copy_string_to_proto_buffer(const std::string& bytes,
-                                         rac_proto_buffer_t* out_buffer) {
+rac_result_t copy_string_to_proto_buffer(const std::string& bytes, rac_proto_buffer_t* out_buffer) {
     return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
                                  out_buffer);
 }
@@ -97,8 +96,7 @@ rac_result_t serialize_to_buffer(const ProtoMessage& message, rac_proto_buffer_t
 }
 
 template <typename Request>
-bool parse_request_or_empty(const uint8_t* request_proto_bytes,
-                            size_t request_proto_size,
+bool parse_request_or_empty(const uint8_t* request_proto_bytes, size_t request_proto_size,
                             Request* out_request) {
     if (!out_request) {
         return false;
@@ -109,8 +107,7 @@ bool parse_request_or_empty(const uint8_t* request_proto_bytes,
     if (!request_proto_bytes) {
         return false;
     }
-    return out_request->ParseFromArray(request_proto_bytes,
-                                       static_cast<int>(request_proto_size));
+    return out_request->ParseFromArray(request_proto_bytes, static_cast<int>(request_proto_size));
 }
 
 bool append_model_ids_from_request(const runanywhere::v1::StorageDeletePlanRequest& request,
@@ -126,8 +123,8 @@ bool append_model_ids_from_request(const runanywhere::v1::StorageDeletePlanReque
     return !out_ids->empty();
 }
 
-std::vector<std::string> ordered_model_ids_from_request(
-    const runanywhere::v1::StorageDeleteRequest& request) {
+std::vector<std::string>
+ordered_model_ids_from_request(const runanywhere::v1::StorageDeleteRequest& request) {
     std::vector<std::string> ids;
     std::unordered_set<std::string> seen;
     for (const auto& id : request.model_ids()) {
@@ -138,8 +135,7 @@ std::vector<std::string> ordered_model_ids_from_request(
     return ids;
 }
 
-int64_t model_metric_size(rac_storage_analyzer_handle_t handle,
-                          const rac_model_info_t* model,
+int64_t model_metric_size(rac_storage_analyzer_handle_t handle, const rac_model_info_t* model,
                           const char* path_to_use) {
     if (!handle || !model) {
         return 0;
@@ -151,8 +147,7 @@ int64_t model_metric_size(rac_storage_analyzer_handle_t handle,
     return clamp_non_negative(model->download_size);
 }
 
-bool known_loaded_state(rac_storage_analyzer_handle_t handle,
-                        const char* model_id,
+bool known_loaded_state(rac_storage_analyzer_handle_t handle, const char* model_id,
                         bool* out_is_loaded) {
     if (!handle || !model_id || !out_is_loaded || !handle->callbacks.is_model_loaded) {
         return false;
@@ -180,8 +175,7 @@ bool path_exists_if_callback_present(rac_storage_analyzer_handle_t handle, const
 }
 
 void add_warning_once(runanywhere::v1::StorageDeletePlan* plan,
-                      std::unordered_set<std::string>* seen_warnings,
-                      const std::string& warning) {
+                      std::unordered_set<std::string>* seen_warnings, const std::string& warning) {
     if (!plan || warning.empty()) {
         return;
     }
@@ -191,8 +185,7 @@ void add_warning_once(runanywhere::v1::StorageDeletePlan* plan,
 }
 
 void add_warning_once(runanywhere::v1::StorageDeleteResult* result,
-                      std::unordered_set<std::string>* seen_warnings,
-                      const std::string& warning) {
+                      std::unordered_set<std::string>* seen_warnings, const std::string& warning) {
     if (!result || warning.empty()) {
         return;
     }
@@ -224,9 +217,7 @@ struct DeletePlanOptions {
 
 using DirectoryPathFn = rac_result_t (*)(char*, size_t);
 
-bool resolve_storage_directory(DirectoryPathFn path_fn,
-                               const char* label,
-                               std::string* out_path,
+bool resolve_storage_directory(DirectoryPathFn path_fn, const char* label, std::string* out_path,
                                runanywhere::v1::StorageDeletePlan* plan,
                                std::unordered_set<std::string>* seen_warnings) {
     if (!path_fn || !out_path) {
@@ -235,8 +226,8 @@ bool resolve_storage_directory(DirectoryPathFn path_fn,
     char path[1024];
     rac_result_t result = path_fn(path, sizeof(path));
     if (RAC_FAILED(result)) {
-        std::string message = std::string("Unable to resolve ") +
-                              (label ? label : "storage") + " directory";
+        std::string message =
+            std::string("Unable to resolve ") + (label ? label : "storage") + " directory";
         add_warning_once(plan, seen_warnings, status_message(result, message.c_str()));
         return false;
     }
@@ -244,11 +235,8 @@ bool resolve_storage_directory(DirectoryPathFn path_fn,
     return true;
 }
 
-void add_directory_candidate(rac_storage_analyzer_handle_t handle,
-                             DirectoryPathFn path_fn,
-                             const char* storage_key,
-                             const char* label,
-                             int priority,
+void add_directory_candidate(rac_storage_analyzer_handle_t handle, DirectoryPathFn path_fn,
+                             const char* storage_key, const char* label, int priority,
                              std::vector<DeleteCandidateRow>* rows,
                              runanywhere::v1::StorageDeletePlan* plan,
                              std::unordered_set<std::string>* seen_warnings) {
@@ -282,10 +270,8 @@ void add_directory_candidate(rac_storage_analyzer_handle_t handle,
 }
 
 void add_model_candidate_from_info(rac_storage_analyzer_handle_t handle,
-                                   const rac_model_info_t* current,
-                                   const std::string& requested_id,
-                                   bool allow_loaded_models,
-                                   std::vector<DeleteCandidateRow>* rows,
+                                   const rac_model_info_t* current, const std::string& requested_id,
+                                   bool allow_loaded_models, std::vector<DeleteCandidateRow>* rows,
                                    runanywhere::v1::StorageDeletePlan* plan,
                                    std::unordered_set<std::string>* seen_warnings) {
     if (!handle || !current || !rows) {
@@ -334,12 +320,9 @@ void add_model_candidate_from_info(rac_storage_analyzer_handle_t handle,
 }
 
 std::vector<DeleteCandidateRow> collect_model_delete_candidates(
-    rac_storage_analyzer_handle_t handle,
-    rac_model_registry_handle_t registry_handle,
-    const std::unordered_set<std::string>& requested_ids,
-    bool has_requested_ids,
-    const DeletePlanOptions& options,
-    runanywhere::v1::StorageDeletePlan* plan,
+    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+    const std::unordered_set<std::string>& requested_ids, bool has_requested_ids,
+    const DeletePlanOptions& options, runanywhere::v1::StorageDeletePlan* plan,
     std::unordered_set<std::string>* seen_warnings) {
     std::vector<DeleteCandidateRow> rows;
 
@@ -379,40 +362,37 @@ std::vector<DeleteCandidateRow> collect_model_delete_candidates(
                 std::strlen(current->local_path) == 0) {
                 continue;
             }
-            add_model_candidate_from_info(handle, current, current->id,
-                                          options.allow_loaded_models, &rows, plan,
-                                          seen_warnings);
+            add_model_candidate_from_info(handle, current, current->id, options.allow_loaded_models,
+                                          &rows, plan, seen_warnings);
         }
         rac_model_info_array_free(models, model_count);
     }
 
     if (options.oldest_first) {
-        std::sort(rows.begin(), rows.end(), [](const DeleteCandidateRow& lhs,
-                                               const DeleteCandidateRow& rhs) {
-            if (lhs.last_used != rhs.last_used) {
-                return lhs.last_used < rhs.last_used;
-            }
-            return lhs.model_id < rhs.model_id;
-        });
+        std::sort(rows.begin(), rows.end(),
+                  [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
+                      if (lhs.last_used != rhs.last_used) {
+                          return lhs.last_used < rhs.last_used;
+                      }
+                      return lhs.model_id < rhs.model_id;
+                  });
     } else {
-        std::sort(rows.begin(), rows.end(), [](const DeleteCandidateRow& lhs,
-                                               const DeleteCandidateRow& rhs) {
-            if (lhs.reclaimable_bytes != rhs.reclaimable_bytes) {
-                return lhs.reclaimable_bytes > rhs.reclaimable_bytes;
-            }
-            return lhs.model_id < rhs.model_id;
-        });
+        std::sort(rows.begin(), rows.end(),
+                  [](const DeleteCandidateRow& lhs, const DeleteCandidateRow& rhs) {
+                      if (lhs.reclaimable_bytes != rhs.reclaimable_bytes) {
+                          return lhs.reclaimable_bytes > rhs.reclaimable_bytes;
+                      }
+                      return lhs.model_id < rhs.model_id;
+                  });
     }
 
     return rows;
 }
 
-runanywhere::v1::StorageDeletePlan build_delete_plan(
-    rac_storage_analyzer_handle_t handle,
-    rac_model_registry_handle_t registry_handle,
-    const std::unordered_set<std::string>& requested_ids,
-    bool has_requested_ids,
-    const DeletePlanOptions& options) {
+runanywhere::v1::StorageDeletePlan
+build_delete_plan(rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+                  const std::unordered_set<std::string>& requested_ids, bool has_requested_ids,
+                  const DeletePlanOptions& options) {
     runanywhere::v1::StorageDeletePlan plan;
     plan.set_required_bytes(clamp_non_negative(options.required_bytes));
 
@@ -424,8 +404,8 @@ runanywhere::v1::StorageDeletePlan build_delete_plan(
     }
 
     if (options.include_cache) {
-        add_directory_candidate(handle, rac_model_paths_get_cache_directory, "cache", "Cache",
-                                0, &rows, &plan, &warnings);
+        add_directory_candidate(handle, rac_model_paths_get_cache_directory, "cache", "Cache", 0,
+                                &rows, &plan, &warnings);
     }
     if (options.include_download_partials) {
         add_directory_candidate(handle, rac_model_paths_get_temp_directory, "temp", "Temp", 1,
@@ -518,8 +498,7 @@ void populate_storage_event_envelope(runanywhere::v1::SDKEvent* event,
     event->set_source("cpp");
 }
 
-void populate_storage_error(runanywhere::v1::SDKError* error,
-                            rac_result_t code,
+void populate_storage_error(runanywhere::v1::SDKError* error, rac_result_t code,
                             const std::string& message) {
     if (!error || code == RAC_SUCCESS) {
         return;
@@ -536,8 +515,7 @@ void populate_storage_error(runanywhere::v1::SDKError* error,
     error->set_retryable(false);
 }
 
-runanywhere::v1::ErrorSeverity storage_event_severity(rac_result_t error_code,
-                                                      int warning_count) {
+runanywhere::v1::ErrorSeverity storage_event_severity(rac_result_t error_code, int warning_count) {
     if (error_code != RAC_SUCCESS) {
         return runanywhere::v1::ERROR_SEVERITY_ERROR;
     }
@@ -552,8 +530,7 @@ void publish_storage_sdk_event(const runanywhere::v1::SDKEvent& event) {
     if (!event.SerializeToString(&bytes)) {
         return;
     }
-    (void)rac_sdk_event_publish_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
-                                      bytes.size());
+    (void)rac_sdk_event_publish_proto(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size());
 }
 
 void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result,
@@ -563,8 +540,8 @@ void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
     runanywhere::v1::SDKEvent event;
-    populate_storage_event_envelope(
-        &event, storage_event_severity(error_code, result.warnings_size()));
+    populate_storage_event_envelope(&event,
+                                    storage_event_severity(error_code, result.warnings_size()));
     auto* storage = event.mutable_storage_lifecycle();
     storage->set_kind(runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED);
     storage->set_bytes(result.info().total_models_bytes());
@@ -576,20 +553,18 @@ void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result
     publish_storage_sdk_event(event);
 }
 
-void publish_storage_availability_event(
-    const runanywhere::v1::StorageAvailabilityResult& result,
-    rac_result_t error_code) {
+void publish_storage_availability_event(const runanywhere::v1::StorageAvailabilityResult& result,
+                                        rac_result_t error_code) {
     const bool failed = !result.success();
     if (failed && error_code == RAC_SUCCESS) {
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
     runanywhere::v1::SDKEvent event;
-    populate_storage_event_envelope(
-        &event, storage_event_severity(error_code, result.warnings_size()));
+    populate_storage_event_envelope(&event,
+                                    storage_event_severity(error_code, result.warnings_size()));
     auto* storage = event.mutable_storage_lifecycle();
     storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED
-                             : runanywhere::v1::
-                                   STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED);
+                             : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED);
     storage->set_bytes(result.availability().available_bytes());
     storage->mutable_availability_result()->CopyFrom(result);
     if (failed) {
@@ -606,12 +581,11 @@ void publish_storage_delete_plan_event(const runanywhere::v1::StorageDeletePlan&
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
     runanywhere::v1::SDKEvent event;
-    populate_storage_event_envelope(
-        &event, storage_event_severity(error_code, plan.warnings_size()));
+    populate_storage_event_envelope(&event,
+                                    storage_event_severity(error_code, plan.warnings_size()));
     auto* storage = event.mutable_storage_lifecycle();
     storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED
-                             : runanywhere::v1::
-                                   STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED);
+                             : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED);
     storage->set_bytes(plan.reclaimable_bytes());
     storage->mutable_delete_plan()->CopyFrom(plan);
     if (failed) {
@@ -628,16 +602,14 @@ void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteRes
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
     runanywhere::v1::SDKEvent event;
-    populate_storage_event_envelope(
-        &event, storage_event_severity(error_code, result.warnings_size()));
+    populate_storage_event_envelope(&event,
+                                    storage_event_severity(error_code, result.warnings_size()));
     auto* storage = event.mutable_storage_lifecycle();
     if (result.dry_run() && result.success()) {
-        storage->set_kind(
-            runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED);
+        storage->set_kind(runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED);
     } else {
         storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED
-                                 : runanywhere::v1::
-                                       STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED);
+                                 : runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED);
     }
     if (result.deleted_model_ids_size() == 1) {
         storage->set_model_id(result.deleted_model_ids(0));
@@ -652,30 +624,25 @@ void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteRes
 }
 
 rac_result_t finish_info_result(const runanywhere::v1::StorageInfoResult& result,
-                                rac_result_t error_code,
-                                rac_proto_buffer_t* out_buffer) {
+                                rac_result_t error_code, rac_proto_buffer_t* out_buffer) {
     publish_storage_info_event(result, error_code);
     return serialize_to_buffer(result, out_buffer);
 }
 
-rac_result_t finish_availability_result(
-    const runanywhere::v1::StorageAvailabilityResult& result,
-    rac_result_t error_code,
-    rac_proto_buffer_t* out_buffer) {
+rac_result_t finish_availability_result(const runanywhere::v1::StorageAvailabilityResult& result,
+                                        rac_result_t error_code, rac_proto_buffer_t* out_buffer) {
     publish_storage_availability_event(result, error_code);
     return serialize_to_buffer(result, out_buffer);
 }
 
 rac_result_t finish_delete_plan(const runanywhere::v1::StorageDeletePlan& plan,
-                                rac_result_t error_code,
-                                rac_proto_buffer_t* out_buffer) {
+                                rac_result_t error_code, rac_proto_buffer_t* out_buffer) {
     publish_storage_delete_plan_event(plan, error_code);
     return serialize_to_buffer(plan, out_buffer);
 }
 
 rac_result_t finish_delete_result(const runanywhere::v1::StorageDeleteResult& result,
-                                  rac_result_t error_code,
-                                  rac_proto_buffer_t* out_buffer) {
+                                  rac_result_t error_code, rac_proto_buffer_t* out_buffer) {
     publish_storage_delete_result_event(result, error_code);
     return serialize_to_buffer(result, out_buffer);
 }
@@ -1012,8 +979,8 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
             metrics->set_size_on_disk_bytes(clamp_non_negative(model.size_on_disk));
             if (model.model_id && model.model_id[0]) {
                 rac_model_info_t* registry_model = nullptr;
-                if (RAC_SUCCEEDED(rac_model_registry_get(registry_handle, model.model_id,
-                                                         &registry_model)) &&
+                if (RAC_SUCCEEDED(
+                        rac_model_registry_get(registry_handle, model.model_id, &registry_model)) &&
                     registry_model) {
                     if (registry_model->last_used > 0) {
                         metrics->set_last_used_ms(registry_model->last_used);
@@ -1031,10 +998,11 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
 #endif
 }
 
-rac_result_t rac_storage_analyzer_availability_proto(
-    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer) {
+rac_result_t rac_storage_analyzer_availability_proto(rac_storage_analyzer_handle_t handle,
+                                                     rac_model_registry_handle_t registry_handle,
+                                                     const uint8_t* request_proto_bytes,
+                                                     size_t request_proto_size,
+                                                     rac_proto_buffer_t* out_buffer) {
 #ifndef RAC_HAVE_PROTOBUF
     (void)handle;
     (void)registry_handle;
@@ -1062,8 +1030,8 @@ rac_result_t rac_storage_analyzer_availability_proto(
 
     int64_t required = clamp_non_negative(request.required_bytes());
     if (request.safety_margin() > 0.0) {
-        required = static_cast<int64_t>(static_cast<double>(required) *
-                                        (1.0 + request.safety_margin()));
+        required =
+            static_cast<int64_t>(static_cast<double>(required) * (1.0 + request.safety_margin()));
     }
 
     if (request.include_existing_model_bytes() && !request.model_id().empty()) {
@@ -1073,8 +1041,8 @@ rac_result_t rac_storage_analyzer_availability_proto(
         } else {
             rac_model_storage_metrics_t metrics;
             rac_result_t metric_result = rac_storage_analyzer_get_model_metrics(
-                handle, registry_handle, request.model_id().c_str(),
-                RAC_FRAMEWORK_UNKNOWN, &metrics);
+                handle, registry_handle, request.model_id().c_str(), RAC_FRAMEWORK_UNKNOWN,
+                &metrics);
             if (RAC_SUCCEEDED(metric_result)) {
                 required -= clamp_non_negative(metrics.size_on_disk);
                 if (required < 0) {
@@ -1099,9 +1067,9 @@ rac_result_t rac_storage_analyzer_availability_proto(
     const int64_t shortfall = required > available ? required - available : 0;
     availability->set_shortfall_bytes(shortfall);
     availability->set_required_to_available_ratio(
-        available > 0 ? static_cast<float>(static_cast<double>(required) /
-                                           static_cast<double>(available))
-                      : (required > 0 ? 1.0f : 0.0f));
+        available > 0
+            ? static_cast<float>(static_cast<double>(required) / static_cast<double>(available))
+            : (required > 0 ? 1.0f : 0.0f));
     result_proto.set_success(true);
 
     if (available < required) {
@@ -1141,10 +1109,11 @@ rac_result_t rac_storage_analyzer_availability_proto(
 #endif
 }
 
-rac_result_t rac_storage_analyzer_delete_plan_proto(
-    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_proto_buffer_t* out_buffer) {
+rac_result_t rac_storage_analyzer_delete_plan_proto(rac_storage_analyzer_handle_t handle,
+                                                    rac_model_registry_handle_t registry_handle,
+                                                    const uint8_t* request_proto_bytes,
+                                                    size_t request_proto_size,
+                                                    rac_proto_buffer_t* out_buffer) {
 #ifndef RAC_HAVE_PROTOBUF
     (void)handle;
     (void)registry_handle;
@@ -1219,8 +1188,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
     }
 
     std::vector<std::string> requested_ids = ordered_model_ids_from_request(request);
-    std::unordered_set<std::string> seen_requested_ids(requested_ids.begin(),
-                                                       requested_ids.end());
+    std::unordered_set<std::string> seen_requested_ids(requested_ids.begin(), requested_ids.end());
     if (requested_ids.empty() && request.has_plan()) {
         for (const auto& candidate : request.plan().candidates()) {
             if (!candidate.model_id().empty() &&
@@ -1242,8 +1210,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         return finish_delete_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
-    std::unordered_map<std::string, const runanywhere::v1::StorageDeleteCandidate*>
-        plan_candidates;
+    std::unordered_map<std::string, const runanywhere::v1::StorageDeleteCandidate*> plan_candidates;
     if (request.has_plan()) {
         for (const auto& candidate : request.plan().candidates()) {
             if (!candidate.model_id().empty()) {
@@ -1313,8 +1280,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
             continue;
         }
 
-        if (request.delete_files() &&
-            !path_exists_if_callback_present(handle, model->local_path)) {
+        if (request.delete_files() && !path_exists_if_callback_present(handle, model->local_path)) {
             result_proto.add_failed_model_ids(id);
             add_warning_once(&result_proto, &warnings, "Model path is missing: " + id);
             had_failure = true;
@@ -1324,8 +1290,7 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         }
 
         int64_t model_size = model_metric_size(handle, model, model->local_path);
-        if (request.delete_files() && !request.dry_run() &&
-            !request.allow_platform_delete()) {
+        if (request.delete_files() && !request.dry_run() && !request.allow_platform_delete()) {
             result_proto.add_skipped_model_ids(id);
             add_warning_once(&result_proto, &warnings,
                              "Model file deletion requires platform adapter execution: " + id);

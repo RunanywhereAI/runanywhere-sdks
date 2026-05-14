@@ -13,7 +13,7 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
     func testLoadResultResolvesPrimaryAndVisionProjectorByRole() {
         let result = makeLoadResult(artifacts: [
             descriptor(role: .visionProjector, localPath: "/models/qwen/mmproj.gguf"),
-            descriptor(role: .primaryModel, localPath: "/models/qwen/model.gguf"),
+            descriptor(role: .primaryModel, localPath: "/models/qwen/model.gguf")
         ])
 
         XCTAssertEqual(result.resolvedPrimaryModelPath, "/models/qwen/model.gguf")
@@ -27,7 +27,7 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
         result.modelID = "qwen-vl"
         result.resolvedArtifacts = [
             descriptor(role: .primaryModel, localPath: "/models/qwen/model.gguf"),
-            descriptor(role: .visionProjector, localPath: "/models/qwen/mmproj.gguf"),
+            descriptor(role: .visionProjector, localPath: "/models/qwen/mmproj.gguf")
         ]
 
         XCTAssertEqual(result.resolvedPrimaryModelPath, "/models/qwen/model.gguf")
@@ -36,7 +36,7 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
 
     func testRoleHelpersDoNotFallBackToResolvedPathOrDescriptorNames() {
         var result = makeLoadResult(artifacts: [
-            descriptor(role: .primaryModel, localPath: "", filename: "model.gguf"),
+            descriptor(role: .primaryModel, localPath: "", filename: "model.gguf")
         ])
         result.resolvedPath = "/models/qwen/model.gguf"
 
@@ -60,14 +60,14 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
             category: .embedding,
             artifacts: [
                 descriptor(role: .primaryModel, localPath: "/models/minilm/model.onnx"),
-                descriptor(role: .vocabulary, localPath: "/models/minilm/vocab.txt"),
+                descriptor(role: .vocabulary, localPath: "/models/minilm/vocab.txt")
             ]
         )
         let llm = makeLoadResult(
             modelId: "tinyllama",
             category: .language,
             artifacts: [
-                descriptor(role: .primaryModel, localPath: "/models/tinyllama/model.gguf"),
+                descriptor(role: .primaryModel, localPath: "/models/tinyllama/model.gguf")
             ]
         )
 

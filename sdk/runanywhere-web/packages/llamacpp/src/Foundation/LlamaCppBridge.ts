@@ -14,6 +14,7 @@
  */
 
 import {
+  completeNativePhase1ForModule,
   HTTPAdapter,
   ModelRegistryAdapter,
   SDKException,
@@ -23,7 +24,7 @@ import {
   setRunanywhereModule,
   type AccelerationMode,
   type EmscriptenRunanywhereModule,
-} from '@runanywhere/web';
+} from '@runanywhere/web/internal';
 
 import { PlatformAdapter } from './PlatformAdapter';
 
@@ -254,6 +255,7 @@ export class LlamaCppBridge {
 
       // Initialize RACommons core within this WASM module
       await this._initRACommons(this._platformAdapter.getAdapterPtr());
+      completeNativePhase1ForModule(this._module);
 
       // Register the llama.cpp backend (and the VLM variant if available).
       await this._registerBackend();

@@ -19,8 +19,6 @@
  * SINGLE SOURCE OF TRUTH: the loop lives here. No per-SDK duplication.
  */
 
-#include "rac/features/llm/rac_tool_calling.h"
-
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -31,12 +29,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
-
-#include "features/llm/rac_llm_lifecycle_bridge.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
@@ -120,8 +118,7 @@ std::shared_ptr<ToolCallingSession> lookup_session(uint64_t handle) {
     return it == reg.sessions.end() ? nullptr : it->second;
 }
 
-void emit_event(ToolCallingSession& session,
-                runanywhere::v1::ToolCallingSessionEvent event) {
+void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSessionEvent event) {
     event.set_seq(++session.seq);
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
@@ -129,13 +126,11 @@ void emit_event(ToolCallingSession& session,
         event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()));
     }
     if (session.callback) {
-        session.callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                         session.user_data);
+        session.callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), session.user_data);
     }
 }
 
-void emit_error_event(ToolCallingSession& session, int32_t c_abi_code,
-                      const std::string& message) {
+void emit_error_event(ToolCallingSession& session, int32_t c_abi_code, const std::string& message) {
     runanywhere::v1::SDKError sdk_error;
     sdk_error.set_message(message);
     sdk_error.set_c_abi_code(c_abi_code);
@@ -164,8 +159,8 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
     emit_event(session, std::move(event));
 }
 
-void emit_llm_chunk(ToolCallingSession& session, const std::string& text,
-                    bool is_final, const std::string& finish_reason) {
+void emit_llm_chunk(ToolCallingSession& session, const std::string& text, bool is_final,
+                    const std::string& finish_reason) {
     runanywhere::v1::LLMStreamEvent stream;
     stream.set_seq(session.seq + 1);
     stream.set_timestamp_us(now_us());
@@ -186,15 +181,13 @@ void emit_llm_chunk(ToolCallingSession& session, const std::string& text,
     emit_event(session, std::move(event));
 }
 
-void emit_tool_call_event(ToolCallingSession& session,
-                          const runanywhere::v1::ToolCall& call) {
+void emit_tool_call_event(ToolCallingSession& session, const runanywhere::v1::ToolCall& call) {
     runanywhere::v1::ToolCallingSessionEvent event;
     *event.mutable_tool_call() = call;
     emit_event(session, std::move(event));
 }
 
-runanywhere::v1::ToolCallingOptions build_options_snapshot(
-    const ToolCallingSession& session) {
+runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSession& session) {
     runanywhere::v1::ToolCallingOptions options = session.tool_options;
     options.set_format_hint(session.format_hint);
     options.set_max_iterations(static_cast<int32_t>(session.max_iterations));
@@ -272,8 +265,7 @@ std::string build_followup_prompt(const ToolCallingSession& session,
     return result.formatted_prompt();
 }
 
-bool parse_tool_call_from_output(const ToolCallingSession& session,
-                                 const std::string& llm_output,
+bool parse_tool_call_from_output(const ToolCallingSession& session, const std::string& llm_output,
                                  std::string* out_clean_text,
                                  runanywhere::v1::ToolCall* out_tool_call) {
     runanywhere::v1::ToolParseRequest request;
@@ -290,8 +282,8 @@ bool parse_tool_call_from_output(const ToolCallingSession& session,
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_parse_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    rac_result_t rc = rac_tool_call_parse_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                req_bytes.size(), &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return false;
@@ -315,9 +307,8 @@ bool parse_tool_call_from_output(const ToolCallingSession& session,
     return false;
 }
 
-runanywhere::v1::ToolCallValidationResult validate_tool_call(
-    const ToolCallingSession& session,
-    const runanywhere::v1::ToolCall& tool_call) {
+runanywhere::v1::ToolCallValidationResult
+validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::ToolCall& tool_call) {
     runanywhere::v1::ToolCallValidationRequest request;
     *request.mutable_tool_call() = tool_call;
     *request.mutable_options() = build_options_snapshot(session);
@@ -334,29 +325,28 @@ runanywhere::v1::ToolCallValidationResult validate_tool_call(
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_validate_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    rac_result_t rc = rac_tool_call_validate_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                   req_bytes.size(), &out);
 
     runanywhere::v1::ToolCallValidationResult result;
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
         result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
-        result.set_error_message(
-            out.error_message ? out.error_message : "validation proto call failed");
+        result.set_error_message(out.error_message ? out.error_message
+                                                   : "validation proto call failed");
     }
     rac_proto_buffer_free(&out);
     return result;
 }
 
-bool run_generate_once(const ToolCallingSession& session,
-                       const std::string& prompt,
-                       std::string* out_response,
-                       rac_result_t* out_rc) {
+bool run_generate_once(const ToolCallingSession& session, const std::string& prompt,
+                       std::string* out_response, rac_result_t* out_rc) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
-        if (out_rc) *out_rc = rc;
+        if (out_rc)
+            *out_rc = rc;
         return false;
     }
 
@@ -371,15 +361,15 @@ bool run_generate_once(const ToolCallingSession& session,
         options.top_p = session.top_p;
     }
     options.streaming_enabled = RAC_FALSE;
-    options.system_prompt =
-        session.system_prompt.empty() ? nullptr : session.system_prompt.c_str();
+    options.system_prompt = session.system_prompt.empty() ? nullptr : session.system_prompt.c_str();
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
 
     rac_llm_result_t raw{};
     if (!ref.ops || !ref.ops->generate) {
         rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc) *out_rc = RAC_ERROR_NOT_SUPPORTED;
+        if (out_rc)
+            *out_rc = RAC_ERROR_NOT_SUPPORTED;
         return false;
     }
 
@@ -387,7 +377,8 @@ bool run_generate_once(const ToolCallingSession& session,
     if (rc != RAC_SUCCESS) {
         rac_llm_result_free(&raw);
         rac::llm::release_lifecycle_llm(&ref);
-        if (out_rc) *out_rc = rc;
+        if (out_rc)
+            *out_rc = rc;
         return false;
     }
 
@@ -396,21 +387,20 @@ bool run_generate_once(const ToolCallingSession& session,
     }
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
-    if (out_rc) *out_rc = RAC_SUCCESS;
+    if (out_rc)
+        *out_rc = RAC_SUCCESS;
     return true;
 }
 
 void run_generate_loop(ToolCallingSession& session) {
     while (session.iteration < session.max_iterations) {
         session.iteration++;
-        RAC_LOG_DEBUG(kTag, "iteration %u/%u", session.iteration,
-                      session.max_iterations);
+        RAC_LOG_DEBUG(kTag, "iteration %u/%u", session.iteration, session.max_iterations);
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(session, session.current_prompt, &response, &rc)) {
-            emit_error_event(session, static_cast<int32_t>(rc),
-                             "LLM generation failed");
+            emit_error_event(session, static_cast<int32_t>(rc), "LLM generation failed");
             session.state = SessionState::kFailed;
             return;
         }
@@ -481,11 +471,10 @@ void run_generate_loop(ToolCallingSession& session) {
 
 }  // namespace
 
-extern "C" rac_result_t rac_tool_calling_session_create_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size,
-    rac_tool_calling_session_event_callback_fn callback,
-    void* user_data,
-    uint64_t* out_session_handle) {
+extern "C" rac_result_t
+rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                                      rac_tool_calling_session_event_callback_fn callback,
+                                      void* user_data, uint64_t* out_session_handle) {
     if (!callback || !out_session_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -503,8 +492,7 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
 
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     if (request_proto_size > 0 &&
-        !request.ParseFromArray(request_proto_bytes,
-                                static_cast<int>(request_proto_size))) {
+        !request.ParseFromArray(request_proto_bytes, static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
     if (request.prompt().empty()) {
@@ -555,8 +543,9 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_tool_calling_session_step_with_result_proto(
-    const uint8_t* request_proto_bytes, size_t request_proto_size) {
+extern "C" rac_result_t
+rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_bytes,
+                                                size_t request_proto_size) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_proto_bytes;
     (void)request_proto_size;
@@ -568,8 +557,7 @@ extern "C" rac_result_t rac_tool_calling_session_step_with_result_proto(
 
     runanywhere::v1::ToolCallingSessionStepWithResultRequest request;
     if (request_proto_size > 0 &&
-        !request.ParseFromArray(request_proto_bytes,
-                                static_cast<int>(request_proto_size))) {
+        !request.ParseFromArray(request_proto_bytes, static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
 
@@ -580,15 +568,14 @@ extern "C" rac_result_t rac_tool_calling_session_step_with_result_proto(
 
     std::lock_guard<std::mutex> session_lock(session->mu);
     if (session->state != SessionState::kWaitingForTool) {
-        RAC_LOG_WARNING(kTag,
-                        "step_with_result called in state %d (expected kWaitingForTool)",
+        RAC_LOG_WARNING(kTag, "step_with_result called in state %d (expected kWaitingForTool)",
                         static_cast<int>(session->state));
         return RAC_ERROR_INVALID_STATE;
     }
 
     runanywhere::v1::ToolResult tr;
     tr.set_tool_call_id(request.tool_call_id().empty() ? session->pending_tool_call_id
-                                                        : request.tool_call_id());
+                                                       : request.tool_call_id());
     tr.set_name(session->pending_tool_name);
     const bool has_error = request.has_error() && !request.error().empty();
     if (has_error) {
@@ -596,7 +583,7 @@ extern "C" rac_result_t rac_tool_calling_session_step_with_result_proto(
         tr.set_success(false);
     } else {
         tr.set_result_json(request.result_json().empty() ? std::string("{}")
-                                                          : request.result_json());
+                                                         : request.result_json());
         tr.set_success(true);
     }
     tr.set_call_id(tr.tool_call_id());

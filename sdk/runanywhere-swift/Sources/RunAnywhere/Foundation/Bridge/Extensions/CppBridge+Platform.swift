@@ -13,8 +13,6 @@ import Foundation
 
 extension CppBridge {
 
-    // swiftlint:disable type_body_length
-
     /// Bridge for platform-native services (Foundation Models, System TTS)
     ///
     /// This bridge connects the C++ platform backend to Swift implementations.
@@ -362,6 +360,4 @@ extension CppBridge {
             return systemTTSService
         }
     }
-
-    // swiftlint:enable type_body_length
 }

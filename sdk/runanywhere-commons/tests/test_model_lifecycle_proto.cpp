@@ -3,9 +3,9 @@
  * @brief Proto-byte model lifecycle ABI tests.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -13,11 +13,11 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -30,16 +30,15 @@ namespace {
 int test_count = 0;
 int fail_count = 0;
 
-#define CHECK(cond, label)                                                                    \
-    do {                                                                                      \
-        ++test_count;                                                                         \
-        if (!(cond)) {                                                                        \
-            ++fail_count;                                                                     \
-            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
-                         #cond);                                                             \
-        } else {                                                                              \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
-        }                                                                                     \
+#define CHECK(cond, label)                                                                       \
+    do {                                                                                         \
+        ++test_count;                                                                            \
+        if (!(cond)) {                                                                           \
+            ++fail_count;                                                                        \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
+        } else {                                                                                 \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        }                                                                                        \
     } while (0)
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -72,7 +71,8 @@ int g_vlm_cleanup_count = 0;
 int g_vlm_destroy_count = 0;
 
 rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl) {
-    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new DummyLlm();
     impl->model_path = model_id;
     *out_impl = impl;
@@ -81,7 +81,8 @@ rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl
 }
 
 rac_result_t dummy_llm_initialize(void* impl, const char* model_path) {
-    if (!impl || !model_path) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !model_path)
+        return RAC_ERROR_NULL_POINTER;
     auto* dummy = static_cast<DummyLlm*>(impl);
     dummy->initialized = true;
     dummy->model_path = model_path;
@@ -100,7 +101,8 @@ void dummy_llm_destroy(void* impl) {
 }
 
 rac_result_t dummy_vlm_create(const char* model_id, const char* config_json, void** out_impl) {
-    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = new DummyVlm();
     impl->create_model_path = model_id;
     impl->create_config_json = config_json ? config_json : "";
@@ -112,7 +114,8 @@ rac_result_t dummy_vlm_create(const char* model_id, const char* config_json, voi
 }
 
 rac_result_t dummy_vlm_initialize(void* impl, const char* model_path, const char* mmproj_path) {
-    if (!impl || !model_path) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !model_path)
+        return RAC_ERROR_NULL_POINTER;
     auto* dummy = static_cast<DummyVlm*>(impl);
     dummy->initialized = true;
     dummy->initialize_model_path = model_path;
@@ -135,7 +138,8 @@ void dummy_vlm_destroy(void* impl) {
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
     out->resize(message.ByteSizeLong());
-    if (out->empty()) return true;
+    if (out->empty())
+        return true;
     return message.SerializeToArray(out->data(), static_cast<int>(out->size()));
 }
 
@@ -160,7 +164,8 @@ bool poll_sdk_event(runanywhere::v1::SDKEvent* out) {
 bool poll_component_event(runanywhere::v1::ComponentLifecycleState expected_state) {
     for (int i = 0; i < 16; ++i) {
         runanywhere::v1::SDKEvent event;
-        if (!poll_sdk_event(&event)) return false;
+        if (!poll_sdk_event(&event))
+            return false;
         if (event.has_component_lifecycle() &&
             event.component_lifecycle().current_state() == expected_state) {
             return true;
@@ -184,16 +189,16 @@ runanywhere::v1::ModelInfo build_llm_model() {
 
 std::filesystem::path make_temp_dir(const char* prefix) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    std::filesystem::path dir =
-        std::filesystem::temp_directory_path() /
-        (std::string(prefix) + "-" + std::to_string(stamp));
+    std::filesystem::path dir = std::filesystem::temp_directory_path() /
+                                (std::string(prefix) + "-" + std::to_string(stamp));
     std::filesystem::create_directories(dir);
     return dir;
 }
 
 bool write_file(const std::filesystem::path& path, const std::string& contents) {
     std::ofstream out(path, std::ios::binary);
-    if (!out.is_open()) return false;
+    if (!out.is_open())
+        return false;
     out << contents;
     return out.good();
 }
@@ -223,16 +228,14 @@ runanywhere::v1::ModelInfo build_vlm_model(const std::filesystem::path& root) {
     return model;
 }
 
-bool register_model(rac_model_registry_handle_t registry,
-                    const runanywhere::v1::ModelInfo& model) {
+bool register_model(rac_model_registry_handle_t registry, const runanywhere::v1::ModelInfo& model) {
     std::vector<uint8_t> bytes;
     return serialize(model, &bytes) &&
-           rac_model_registry_register_proto(
-               registry, bytes.empty() ? nullptr : bytes.data(), bytes.size()) == RAC_SUCCESS;
+           rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
+                                             bytes.size()) == RAC_SUCCESS;
 }
 
-rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops,
-                                          const uint32_t* formats) {
+rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops, const uint32_t* formats) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
     v.metadata.name = "llamacpp";
@@ -245,8 +248,7 @@ rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops,
     return v;
 }
 
-rac_engine_vtable_t make_dummy_vlm_vtable(rac_vlm_service_ops_t* ops,
-                                          const uint32_t* formats) {
+rac_engine_vtable_t make_dummy_vlm_vtable(rac_vlm_service_ops_t* ops, const uint32_t* formats) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
     v.metadata.name = "llamacpp_vlm";
@@ -259,9 +261,9 @@ rac_engine_vtable_t make_dummy_vlm_vtable(rac_vlm_service_ops_t* ops,
     return v;
 }
 
-bool has_artifact_role(const google::protobuf::RepeatedPtrField<runanywhere::v1::ModelFileDescriptor>& artifacts,
-                       runanywhere::v1::ModelFileRole role,
-                       const std::string& path) {
+bool has_artifact_role(
+    const google::protobuf::RepeatedPtrField<runanywhere::v1::ModelFileDescriptor>& artifacts,
+    runanywhere::v1::ModelFileRole role, const std::string& path) {
     for (const auto& artifact : artifacts) {
         if (artifact.role() == role && artifact.local_path() == path) {
             return true;
@@ -337,8 +339,7 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     ops.cleanup = dummy_llm_cleanup;
     ops.destroy = dummy_llm_destroy;
 
-    const uint32_t formats[] = {
-        static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
     auto vtable = make_dummy_llm_vtable(&ops, formats);
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "dummy lifecycle plugin registers");
     CHECK(register_model(registry, build_llm_model()), "load-success model registers");
@@ -402,8 +403,7 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     CHECK(unload_result.unloaded_model_ids_size() == 1 &&
               unload_result.unloaded_model_ids(0) == "lifecycle.llm",
           "unload reports unloaded id");
-    CHECK(g_cleanup_count == 1 && g_destroy_count == 1,
-          "unload calls backend cleanup and destroy");
+    CHECK(g_cleanup_count == 1 && g_destroy_count == 1, "unload calls backend cleanup and destroy");
     rac_proto_buffer_free(&out);
     CHECK(poll_component_event(runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED),
           "unload emits not-loaded lifecycle event");
@@ -411,8 +411,7 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     rac_proto_buffer_init(&out);
     rc = rac_component_lifecycle_snapshot_proto(
         static_cast<uint32_t>(runanywhere::v1::SDK_COMPONENT_LLM), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot),
-          "post-unload snapshot parses");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot), "post-unload snapshot parses");
     CHECK(snapshot.state() == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
           "post-unload snapshot reports not loaded");
     rac_proto_buffer_free(&out);
@@ -443,8 +442,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     ops.cleanup = dummy_vlm_cleanup;
     ops.destroy = dummy_vlm_destroy;
 
-    const uint32_t formats[] = {
-        static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
     auto vtable = make_dummy_vlm_vtable(&ops, formats);
     (void)rac_plugin_unregister("llamacpp_vlm");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "dummy VLM lifecycle plugin registers");
@@ -466,8 +464,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     CHECK(load_result.resolved_path() == primary_path.string(),
           "VLM load resolved_path selects primary artifact");
     CHECK(has_artifact_role(load_result.resolved_artifacts(),
-                            runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL,
-                            primary_path.string()),
+                            runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL, primary_path.string()),
           "VLM load exposes primary artifact role");
     CHECK(has_artifact_role(load_result.resolved_artifacts(),
                             runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR,
@@ -487,8 +484,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     std::vector<uint8_t> current_bytes;
     CHECK(serialize(current, &current_bytes), "VLM current request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_model_lifecycle_current_model_proto(
-        current_bytes.data(), current_bytes.size(), &out);
+    rc = rac_model_lifecycle_current_model_proto(current_bytes.data(), current_bytes.size(), &out);
     runanywhere::v1::CurrentModelResult current_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &current_result),
           "VLM current returns parsable CurrentModelResult");

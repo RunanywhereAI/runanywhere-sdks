@@ -105,8 +105,7 @@ static archive_kind detect_archive_kind_from_bytes(const unsigned char* bytes, s
     // ZIP: local file header, empty archive end-of-central-directory, or
     // spanned/split archive marker.
     if (size >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B &&
-        ((bytes[2] == 0x03 && bytes[3] == 0x04) ||
-         (bytes[2] == 0x05 && bytes[3] == 0x06) ||
+        ((bytes[2] == 0x03 && bytes[3] == 0x04) || (bytes[2] == 0x05 && bytes[3] == 0x06) ||
          (bytes[2] == 0x07 && bytes[3] == 0x08))) {
         return archive_kind::zip;
     }
@@ -122,8 +121,8 @@ static archive_kind detect_archive_kind_from_bytes(const unsigned char* bytes, s
     }
 
     // XZ (tar.xz): \xFD7zXZ\x00
-    if (size >= 6 && bytes[0] == 0xFD && bytes[1] == 0x37 && bytes[2] == 0x7A &&
-        bytes[3] == 0x58 && bytes[4] == 0x5A && bytes[5] == 0x00) {
+    if (size >= 6 && bytes[0] == 0xFD && bytes[1] == 0x37 && bytes[2] == 0x7A && bytes[3] == 0x58 &&
+        bytes[4] == 0x5A && bytes[5] == 0x00) {
         return archive_kind::tar_xz;
     }
 
@@ -275,8 +274,8 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 
     archive_kind detected_kind = detect_archive_kind_from_file(archive_path);
     archive_kind explicit_hint_kind = kind_from_archive_type(opts.archive_type_hint);
-    if (detected_kind != archive_kind::unknown &&
-        explicit_hint_kind != archive_kind::unknown && detected_kind != explicit_hint_kind) {
+    if (detected_kind != archive_kind::unknown && explicit_hint_kind != archive_kind::unknown &&
+        detected_kind != explicit_hint_kind) {
         RAC_LOG_ERROR(kLogTag, "Archive type mismatch for %s: detected %s, expected %s",
                       archive_path, archive_kind_name(detected_kind),
                       archive_kind_name(explicit_hint_kind));
@@ -482,11 +481,13 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
     return status;
 }
 
-rac_result_t rac_extract_model_archive_native(
-    const char* archive_path, const char* destination_dir, const rac_model_info_t* model_info,
-    const char* expected_primary_sha256, const rac_extraction_options_t* options,
-    rac_extraction_progress_fn progress_callback, void* user_data,
-    rac_model_extraction_result_t* out_result) {
+rac_result_t rac_extract_model_archive_native(const char* archive_path, const char* destination_dir,
+                                              const rac_model_info_t* model_info,
+                                              const char* expected_primary_sha256,
+                                              const rac_extraction_options_t* options,
+                                              rac_extraction_progress_fn progress_callback,
+                                              void* user_data,
+                                              rac_model_extraction_result_t* out_result) {
     if (!archive_path || !destination_dir || !model_info || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -503,9 +504,9 @@ rac_result_t rac_extract_model_archive_native(
         out_result->archive_type = model_info->artifact_info.archive_type;
     }
 
-    rac_result_t rc = rac_extract_archive_native(archive_path, destination_dir, options,
-                                                 progress_callback, user_data,
-                                                 &out_result->extraction);
+    rac_result_t rc =
+        rac_extract_archive_native(archive_path, destination_dir, options, progress_callback,
+                                   user_data, &out_result->extraction);
     if (RAC_FAILED(rc)) {
         return rc;
     }

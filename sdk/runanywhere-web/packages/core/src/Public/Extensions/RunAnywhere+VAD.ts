@@ -3,7 +3,7 @@
  *
  * Voice activity detection namespace — mirrors Swift's `RunAnywhere+VAD.swift`.
  * Provides `RunAnywhere.vad.*` capability surface for owning VAD component
- * handles plus a top-level `RunAnywhere.detectVoice(audio, options)` shortcut.
+ * handles plus a `RunAnywhere.vad.detectVoiceAuto(audio, options)` shortcut.
  *
  * The proto-byte adapters (`VADProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_vad_component_create()` followed by
@@ -329,7 +329,7 @@ export async function detectVoice(
   audio: Float32Array,
   options?: DetectVoiceOptions,
 ): Promise<VADResult> {
-  const module = requireVADModule('RunAnywhere.detectVoice');
+  const module = requireVADModule('RunAnywhere.vad.detectVoiceAuto');
   let modelPath = options?.modelPath;
   let modelId = options?.modelId;
   let modelName: string | undefined;

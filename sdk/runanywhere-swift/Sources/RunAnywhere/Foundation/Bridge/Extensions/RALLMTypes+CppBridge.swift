@@ -33,18 +33,18 @@ public extension RALLMGenerationOptions {
         systemPrompt: String? = nil,
         structuredOutput: RAStructuredOutputOptions? = nil
     ) {
-        var o = RALLMGenerationOptions()
-        o.maxTokens = Int32(maxTokens)
-        o.temperature = temperature
-        o.topP = topP
-        o.topK = Int32(topK)
-        o.repetitionPenalty = repetitionPenalty
-        o.stopSequences = stopSequences
-        o.streamingEnabled = streamingEnabled
-        o.preferredFramework = preferredFramework
-        if let p = systemPrompt { o.systemPrompt = p }
-        if let so = structuredOutput { o.structuredOutput = so }
-        self = o
+        var options = RALLMGenerationOptions()
+        options.maxTokens = Int32(maxTokens)
+        options.temperature = temperature
+        options.topP = topP
+        options.topK = Int32(topK)
+        options.repetitionPenalty = repetitionPenalty
+        options.stopSequences = stopSequences
+        options.streamingEnabled = streamingEnabled
+        options.preferredFramework = preferredFramework
+        if let prompt = systemPrompt { options.systemPrompt = prompt }
+        if let so = structuredOutput { options.structuredOutput = so }
+        self = options
     }
 
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
@@ -98,10 +98,10 @@ public extension RALLMGenerationResult {
 
 public extension RAThinkingTagPattern {
     static var defaultPattern: RAThinkingTagPattern {
-        var p = RAThinkingTagPattern()
-        p.openTag = "<think>"
-        p.closeTag = "</think>"
-        return p
+        var proto = RAThinkingTagPattern()
+        proto.openTag = "<think>"
+        proto.closeTag = "</think>"
+        return proto
     }
 }
 

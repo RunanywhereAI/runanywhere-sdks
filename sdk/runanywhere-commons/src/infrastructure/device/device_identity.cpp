@@ -11,8 +11,6 @@
  * the next process can short-circuit on the cache hit.
  */
 
-#include "rac/infrastructure/device/rac_device_identity.h"
-
 #include <cstring>
 #include <mutex>
 #include <random>
@@ -22,6 +20,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/device/rac_device_identity.h"
 
 namespace {
 
@@ -51,16 +50,21 @@ std::string generate_uuid_v4() {
     std::stringstream ss;
     ss << std::hex;
 
-    for (int i = 0; i < 8; ++i) ss << dis(gen);
+    for (int i = 0; i < 8; ++i)
+        ss << dis(gen);
     ss << '-';
-    for (int i = 0; i < 4; ++i) ss << dis(gen);
+    for (int i = 0; i < 4; ++i)
+        ss << dis(gen);
     ss << "-4";  // version 4
-    for (int i = 0; i < 3; ++i) ss << dis(gen);
+    for (int i = 0; i < 3; ++i)
+        ss << dis(gen);
     ss << '-';
     ss << (8 + dis(gen) % 4);  // variant: 10xx -> hex digit 8/9/a/b
-    for (int i = 0; i < 3; ++i) ss << dis(gen);
+    for (int i = 0; i < 3; ++i)
+        ss << dis(gen);
     ss << '-';
-    for (int i = 0; i < 12; ++i) ss << dis(gen);
+    for (int i = 0; i < 12; ++i)
+        ss << dis(gen);
 
     return ss.str();
 }
@@ -96,8 +100,7 @@ std::string try_vendor_id(const rac_platform_adapter_t* adapter) {
     }
 
     char buffer[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {0};
-    rac_result_t rc =
-        adapter->get_vendor_id(buffer, sizeof(buffer), adapter->user_data);
+    rac_result_t rc = adapter->get_vendor_id(buffer, sizeof(buffer), adapter->user_data);
     if (rc != RAC_SUCCESS) {
         return std::string();
     }

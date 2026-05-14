@@ -49,8 +49,8 @@ namespace rac::graph {
 
 template <typename T>
 class MemoryPool : public std::enable_shared_from_this<MemoryPool<T>> {
-public:
-    using Handle  = std::shared_ptr<T>;
+   public:
+    using Handle = std::shared_ptr<T>;
     using Factory = std::function<std::unique_ptr<T>()>;
 
     /// Factory — always prefer this over constructing directly. Returns a
@@ -61,15 +61,13 @@ public:
 
     static std::shared_ptr<MemoryPool<T>> create(size_t capacity, Factory factory) {
         // Uses the public ctor; private ctor would require a passkey idiom.
-        return std::shared_ptr<MemoryPool<T>>(
-            new MemoryPool<T>(capacity, std::move(factory)));
+        return std::shared_ptr<MemoryPool<T>>(new MemoryPool<T>(capacity, std::move(factory)));
     }
 
     /// Public so clients that don't need the auto-recycle deleter behaviour
     /// (e.g. single-shot tests) can still construct on the stack. In that
     /// case callers must ensure the pool outlives every outstanding handle.
-    explicit MemoryPool(size_t capacity)
-        : MemoryPool(capacity, default_factory) {}
+    explicit MemoryPool(size_t capacity) : MemoryPool(capacity, default_factory) {}
 
     MemoryPool(size_t capacity, Factory factory)
         : capacity_(capacity), factory_(std::move(factory)) {
@@ -81,7 +79,7 @@ public:
 
     ~MemoryPool() = default;
 
-    MemoryPool(const MemoryPool&)            = delete;
+    MemoryPool(const MemoryPool&) = delete;
     MemoryPool& operator=(const MemoryPool&) = delete;
 
     /// Block until a buffer is free, or `cancel` fires. Returns nullptr on
@@ -89,7 +87,8 @@ public:
     Handle acquire(CancelToken* cancel = nullptr) {
         std::unique_lock<std::mutex> lock(mu_);
         while (pool_.empty()) {
-            if (cancel && cancel->is_cancelled()) return nullptr;
+            if (cancel && cancel->is_cancelled())
+                return nullptr;
             // Timed wait so late-arriving cancels are observed within 50ms
             // without requiring the canceller to also notify this cv.
             cv_.wait_for(lock, std::chrono::milliseconds(50));
@@ -99,14 +98,13 @@ public:
 
     /// Like `acquire()` but bounded by `timeout`. Returns nullptr on timeout
     /// or cancel.
-    Handle acquire_for(std::chrono::milliseconds timeout,
-                       CancelToken* cancel = nullptr) {
+    Handle acquire_for(std::chrono::milliseconds timeout, CancelToken* cancel = nullptr) {
         std::unique_lock<std::mutex> lock(mu_);
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (pool_.empty()) {
-            if (cancel && cancel->is_cancelled()) return nullptr;
-            if (cv_.wait_until(lock, deadline) == std::cv_status::timeout
-                && pool_.empty()) {
+            if (cancel && cancel->is_cancelled())
+                return nullptr;
+            if (cv_.wait_until(lock, deadline) == std::cv_status::timeout && pool_.empty()) {
                 return nullptr;
             }
         }
@@ -116,7 +114,8 @@ public:
     /// Non-blocking. Returns nullptr if the pool is empty.
     Handle try_acquire() {
         std::lock_guard<std::mutex> lock(mu_);
-        if (pool_.empty()) return nullptr;
+        if (pool_.empty())
+            return nullptr;
         return take_locked();
     }
 
@@ -132,10 +131,8 @@ public:
 
     size_t capacity() const noexcept { return capacity_; }
 
-private:
-    static std::unique_ptr<T> default_factory() {
-        return std::make_unique<T>();
-    }
+   private:
+    static std::unique_ptr<T> default_factory() { return std::make_unique<T>(); }
 
     /// Caller holds `mu_`. Pops one buffer off the free list and wraps it in
     /// a shared_ptr whose deleter returns the raw pointer to the pool — or,
@@ -169,10 +166,10 @@ private:
         cv_.notify_one();
     }
 
-    const size_t                    capacity_;
-    Factory                         factory_;
-    mutable std::mutex              mu_;
-    std::condition_variable         cv_;
+    const size_t capacity_;
+    Factory factory_;
+    mutable std::mutex mu_;
+    std::condition_variable cv_;
     std::vector<std::unique_ptr<T>> pool_;
 };
 

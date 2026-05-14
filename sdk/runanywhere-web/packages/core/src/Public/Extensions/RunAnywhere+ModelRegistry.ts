@@ -32,31 +32,31 @@ export const ModelRegistry = {
     return requireAdapter().refresh(options);
   },
 
-  register(model: ModelInfo): boolean {
+  registerModel(model: ModelInfo): boolean {
     return requireAdapter().register(model);
   },
 
-  update(model: ModelInfo): boolean {
+  updateModel(model: ModelInfo): boolean {
     return requireAdapter().update(model);
   },
 
-  get(modelId: string): ModelInfo | null {
+  getModel(modelId: string): ModelInfo | null {
     return requireAdapter().get(modelId);
   },
 
-  list(): ModelInfoList | null {
+  listModels(): ModelInfoList | null {
     return requireAdapter().list();
   },
 
-  query(query: ModelQuery): ModelInfoList | null {
+  queryModels(query: ModelQuery): ModelInfoList | null {
     return requireAdapter().query(query);
   },
 
-  listDownloaded(): ModelInfoList | null {
+  downloadedModels(): ModelInfoList | null {
     return requireAdapter().listDownloaded();
   },
 
-  remove(modelId: string): boolean {
+  removeModel(modelId: string): boolean {
     return requireAdapter().remove(modelId);
   },
 };

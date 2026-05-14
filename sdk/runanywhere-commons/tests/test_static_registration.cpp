@@ -32,26 +32,37 @@ extern "C" {
 
 static const rac_engine_vtable_t g_test_static_vtable = {
     /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "test_static",
-        .display_name     = "GAP 03 static-register fixture",
-        .engine_version   = "0.0.0",
-        .priority         = 1,
+        .abi_version = RAC_PLUGIN_API_VERSION,
+        .name = "test_static",
+        .display_name = "GAP 03 static-register fixture",
+        .engine_version = "0.0.0",
+        .priority = 1,
         .capability_flags = 0,
-        .runtimes         = nullptr,
-        .runtimes_count   = 0,
-        .formats          = nullptr,
-        .formats_count    = 0,
+        .runtimes = nullptr,
+        .runtimes_count = 0,
+        .formats = nullptr,
+        .formats_count = 0,
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
     /* llm_ops          */ reinterpret_cast<const struct rac_llm_service_ops*>(&k_sentinel_static),
-    /* stt_ops          */ nullptr, /* tts_ops          */ nullptr,
-    /* vad_ops          */ nullptr, /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr, /* vlm_ops          */ nullptr,
+    /* stt_ops          */ nullptr,
+    /* tts_ops          */ nullptr,
+    /* vad_ops          */ nullptr,
+    /* embedding_ops    */ nullptr,
+    /* rerank_ops       */ nullptr,
+    /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
 };
 
 RAC_PLUGIN_ENTRY_DEF(test_static) {
@@ -70,12 +81,14 @@ int main() {
     rac_registry_list_plugins(&names, &n);
     bool found = false;
     for (size_t i = 0; i < n; ++i) {
-        if (std::strcmp(names[i], "test_static") == 0) found = true;
+        if (std::strcmp(names[i], "test_static") == 0)
+            found = true;
     }
     rac_registry_free_plugin_list(names, n);
     if (!found) {
-        std::fprintf(stderr,
-                     "test_static not in registry at main() — RAC_STATIC_PLUGIN_REGISTER did not run\n");
+        std::fprintf(
+            stderr,
+            "test_static not in registry at main() — RAC_STATIC_PLUGIN_REGISTER did not run\n");
         return 1;
     }
     std::fprintf(stdout, "  ok: static-register fired before main()\n");
