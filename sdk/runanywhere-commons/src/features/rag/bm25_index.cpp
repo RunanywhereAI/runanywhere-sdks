@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 #include <unordered_set>
 
 #include "rac/core/rac_logger.h"
@@ -15,8 +16,7 @@
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 // =============================================================================
 // Tokenizer — split on whitespace, strip leading/trailing punctuation, lowercase
@@ -275,5 +275,4 @@ std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& 
     return scored;
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

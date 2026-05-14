@@ -177,8 +177,7 @@ class DartBridgeLoraRegistry {
   static void setMarkDownloadCompletedProtoForTesting(
     LoraAdapterDownloadCompletedResult Function(
       LoraAdapterDownloadCompletedRequest,
-    )?
-        override,
+    )? override,
   ) {
     _markDownloadCompletedForTesting = override;
   }

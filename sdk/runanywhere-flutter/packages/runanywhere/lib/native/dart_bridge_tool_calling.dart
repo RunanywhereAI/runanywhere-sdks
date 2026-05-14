@@ -73,8 +73,7 @@ class DartBridgeToolCalling {
   ToolCallValidationResult validate(ToolCallValidationRequest request) {
     final fn = RacNative.bindings.rac_tool_call_validate_proto;
     if (fn == null) {
-      throw UnsupportedError(
-          'rac_tool_call_validate_proto is unavailable');
+      throw UnsupportedError('rac_tool_call_validate_proto is unavailable');
     }
     return DartBridgeProtoUtils.callRequest<ToolCallValidationResult>(
       request: request,
@@ -133,8 +132,8 @@ class DartBridgeToolCalling {
     }
 
     final controller = StreamController<ToolCallingSessionEvent>.broadcast();
-    final nativeCb = ffi
-        .NativeCallable<RacToolCallingSessionEventCallbackNative>.listener((
+    final nativeCb =
+        ffi.NativeCallable<RacToolCallingSessionEventCallbackNative>.listener((
       ffi.Pointer<ffi.Uint8> bytesPtr,
       int bytesLen,
       ffi.Pointer<ffi.Void> _,

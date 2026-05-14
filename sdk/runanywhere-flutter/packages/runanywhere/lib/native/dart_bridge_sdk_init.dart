@@ -130,8 +130,7 @@ class DartBridgeSdkInit {
   /// Look up `rac_sdk_retry_http_proto` — owned output buffer only.
   static int Function(ffi.Pointer<RacProtoBuffer>) _lookupOut(String symbol) {
     final lib = PlatformLoader.loadCommons();
-    return lib.lookupFunction<
-        ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>),
+    return lib.lookupFunction<ffi.Int32 Function(ffi.Pointer<RacProtoBuffer>),
         int Function(ffi.Pointer<RacProtoBuffer>)>(symbol);
   }
 

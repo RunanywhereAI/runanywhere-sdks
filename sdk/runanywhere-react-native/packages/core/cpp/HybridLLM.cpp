@@ -1,9 +1,9 @@
 /**
  * HybridLLM.cpp
  *
- * Bridges rac_llm_set_stream_proto_callback through Nitro so the
- * TypeScript LLMStreamAdapter can consume canonical LLMStreamEvent proto
- * bytes instead of relying on a stale, unregistered HybridObject.
+ * Bridges `rac_llm_set_stream_proto_callback` through Nitro so the
+ * TypeScript `RunAnywhere.generateStream` consumer can decode canonical
+ * `LLMStreamEvent` proto bytes from the raw `ArrayBuffer` callbacks.
  */
 
 #include "HybridLLM.hpp"

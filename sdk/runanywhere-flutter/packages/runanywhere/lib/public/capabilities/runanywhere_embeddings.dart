@@ -5,7 +5,8 @@
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
-import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
+import 'package:runanywhere/generated/component_types.pbenum.dart'
+    show ComponentLifecycleState;
 import 'package:runanywhere/generated/embeddings_options.pb.dart'
     show EmbeddingsOptions, EmbeddingsRequest, EmbeddingsResult;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;

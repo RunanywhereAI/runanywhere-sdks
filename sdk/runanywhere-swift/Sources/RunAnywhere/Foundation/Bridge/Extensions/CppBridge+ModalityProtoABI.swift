@@ -167,7 +167,9 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     /// - Returns: An `AsyncStream<Event>` that yields decoded events as the C
     ///   callback fires and finishes when the C call returns.
     /// - Throws: Errors raised by `request.serializedData()`.
-    // swiftlint:disable:next unused_declaration
+    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
+    // excludes from analysis; the analyzer therefore cannot see them.
+    // swiftlint:disable unused_declaration
     static func runRequestStream<Request: Message>(
         request: Request,
         category: String,
@@ -205,6 +207,7 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
             }
         }
     }
+    // swiftlint:enable unused_declaration
 }
 
 private final class ProtoProgressContext<Event: Message>: @unchecked Sendable {

@@ -4,7 +4,6 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-
 /// LlamaCPP config struct matching rac_llm_llamacpp_config_t
 base class RacLlmLlamacppConfigStruct extends Struct {
   @Int32()

@@ -89,7 +89,6 @@ final class RacStructuredOutputValidationStruct extends Struct {
 // RAG Pipeline API Types
 // =============================================================================
 
-
 // RAG Backend Registration
 // rac_result_t rac_backend_rag_register(void)
 typedef RacBackendRagRegisterNative = Int32 Function();
@@ -111,11 +110,8 @@ typedef RacFmDeletePathNative = Int32 Function(
     Pointer<Utf8>, Int32, Pointer<Void>);
 
 /// Callback: list_directory(path, out_entries, out_count, user_data) -> rac_result_t
-typedef RacFmListDirectoryNative = Int32 Function(
-    Pointer<Utf8>,
-    Pointer<Pointer<Pointer<Utf8>>>,
-    Pointer<Size>,
-    Pointer<Void>);
+typedef RacFmListDirectoryNative = Int32 Function(Pointer<Utf8>,
+    Pointer<Pointer<Pointer<Utf8>>>, Pointer<Size>, Pointer<Void>);
 
 /// Callback: free_entries(entries, count, user_data)
 typedef RacFmFreeEntriesNative = Void Function(

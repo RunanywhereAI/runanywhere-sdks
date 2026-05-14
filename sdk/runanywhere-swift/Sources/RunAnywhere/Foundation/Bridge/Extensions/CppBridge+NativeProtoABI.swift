@@ -154,7 +154,9 @@ enum NativeProtoABI {
     /// `invokeProto`/`invoke`/`invokeBytes` helpers scattered across the
     /// bridge layer (see `gaps/gaps/simplification/swift-bridge-duplication.md`
     /// §1 Pattern A).
-    // swiftlint:disable:next unused_declaration
+    // Usages live in `Sources/RunAnywhere/Generated/`, which `.swiftlint.yml`
+    // excludes from analysis; the analyzer therefore cannot see them.
+    // swiftlint:disable unused_declaration
     static func invoke<Ctx, Request: Message, Response: Message>(
         _ request: Request,
         on context: Ctx,
@@ -176,4 +178,5 @@ enum NativeProtoABI {
         }
         return try decode(responseType, from: outBuffer)
     }
+    // swiftlint:enable unused_declaration
 }

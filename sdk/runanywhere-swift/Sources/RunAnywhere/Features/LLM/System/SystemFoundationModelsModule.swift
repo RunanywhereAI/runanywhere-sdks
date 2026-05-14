@@ -74,8 +74,10 @@ public enum SystemFoundationModels {
     }
 
     #if canImport(FoundationModels)
+    // Called from inside `#if canImport(FoundationModels)`; swiftlint-analyze
+    // does not evaluate conditional compilation so it reports this as unused.
+    // swiftlint:disable unused_declaration
     @available(iOS 26.0, macOS 26.0, *)
-    // swiftlint:disable:next unused_declaration
     private static func foundationModelsRuntimeUnavailableReason() -> String? {
         switch SystemLanguageModel.default.availability {
         case .available:
@@ -92,5 +94,6 @@ public enum SystemFoundationModels {
             return "Apple Foundation Models availability is unknown on this OS version."
         }
     }
+    // swiftlint:enable unused_declaration
     #endif
 }

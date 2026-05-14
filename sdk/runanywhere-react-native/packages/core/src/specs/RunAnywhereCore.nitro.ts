@@ -467,7 +467,8 @@ export interface RunAnywhereCore extends HybridObject<{
    * Get the native LLM-component handle as a JS number. Pass to
    * `LLM.subscribeProtoEvents(handle, ...)` to subscribe to streaming
    * events. Mirrors `getVoiceAgentHandle()` — exposes the underlying
-   * `rac_llm_handle_t` so the `LLMStreamAdapter` pattern works.
+   * `rac_llm_handle_t` so streaming consumers (e.g.
+   * `RunAnywhere.generateStream`) can wire proto-byte callbacks directly.
    *
    * @returns handle as number (0 if LLM component not yet allocated).
    */

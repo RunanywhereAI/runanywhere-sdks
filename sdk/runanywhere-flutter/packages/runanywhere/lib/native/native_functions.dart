@@ -205,12 +205,14 @@ abstract class NativeFunctions {
   ) voiceAgentSetProtoCallback = _lib.lookupFunction<
       Int32 Function(
         RacHandle,
-        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<
+            NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
         Pointer<Void>,
       ),
       int Function(
         RacHandle,
-        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<
+            NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
         Pointer<Void>,
       )>('rac_voice_agent_set_proto_callback');
 
@@ -235,15 +237,15 @@ abstract class NativeFunctions {
 
   static final int Function(Pointer<Void>, int, Pointer<RacHandle>)
       solutionCreateFromProto = _lib.lookupFunction<
-              Int32 Function(Pointer<Void>, IntPtr, Pointer<RacHandle>),
-              int Function(Pointer<Void>, int, Pointer<RacHandle>)>(
-          'rac_solution_create_from_proto');
+          Int32 Function(Pointer<Void>, IntPtr, Pointer<RacHandle>),
+          int Function(Pointer<Void>, int,
+              Pointer<RacHandle>)>('rac_solution_create_from_proto');
 
   static final int Function(Pointer<Utf8>, Pointer<RacHandle>)
       solutionCreateFromYaml = _lib.lookupFunction<
-              Int32 Function(Pointer<Utf8>, Pointer<RacHandle>),
-              int Function(Pointer<Utf8>, Pointer<RacHandle>)>(
-          'rac_solution_create_from_yaml');
+          Int32 Function(Pointer<Utf8>, Pointer<RacHandle>),
+          int Function(Pointer<Utf8>,
+              Pointer<RacHandle>)>('rac_solution_create_from_yaml');
 
   static final int Function(RacHandle) solutionStart =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(

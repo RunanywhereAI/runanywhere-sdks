@@ -189,15 +189,12 @@ export const SettingsScreen: React.FC = () => {
   const [totalRAMBytes, setTotalRAMBytes] = useState<number>(0);
   const [cpuCores, setCpuCores] = useState<number>(0);
 
-  const [_capabilities, setCapabilities] = useState<number[]>([]);
-  const [_backendInfoData, setBackendInfoData] = useState<
-    Record<string, unknown>
-  >({});
-  const [_isSTTLoaded, setIsSTTLoaded] = useState(false);
-  const [_isTTSLoaded, setIsTTSLoaded] = useState(false);
-  const [_isTextLoaded, setIsTextLoaded] = useState(false);
-  const [_isVADLoaded, setIsVADLoaded] = useState(false);
-  const [_memoryUsage, _setMemoryUsage] = useState(0); // Model catalog state
+  const [, setBackendInfoData] = useState<Record<string, unknown>>({});
+  const [, setIsSTTLoaded] = useState(false);
+  const [, setIsTTSLoaded] = useState(false);
+  const [, setIsTextLoaded] = useState(false);
+  const [, setIsVADLoaded] = useState(false);
+  // Model catalog state
 
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [downloadingModels, setDownloadingModels] = useState<

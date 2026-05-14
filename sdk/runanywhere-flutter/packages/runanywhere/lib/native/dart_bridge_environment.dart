@@ -413,7 +413,8 @@ class DartBridgeDevConfig {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final getUrl = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+      final getUrl = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
         'rac_dev_config_get_supabase_url',
       );
 
@@ -433,7 +434,8 @@ class DartBridgeDevConfig {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final getKey = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+      final getKey = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
         'rac_dev_config_get_supabase_key',
       );
 
@@ -451,13 +453,15 @@ class DartBridgeDevConfig {
   static String? get buildToken {
     try {
       final lib = PlatformLoader.loadCommons();
-      final hasBuildToken = lib.lookupFunction<Bool Function(), bool Function()>(
+      final hasBuildToken =
+          lib.lookupFunction<Bool Function(), bool Function()>(
         'rac_dev_config_has_build_token',
       );
 
       if (!hasBuildToken()) return null;
 
-      final getToken = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+      final getToken = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
         'rac_dev_config_get_build_token',
       );
 
@@ -475,7 +479,8 @@ class DartBridgeDevConfig {
   static String? get sentryDSN {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getDsn = lib.lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+      final getDsn = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
         'rac_dev_config_get_sentry_dsn',
       );
 

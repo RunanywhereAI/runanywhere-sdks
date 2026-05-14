@@ -124,14 +124,17 @@ class LlamaCppBindings {
     // VLM backend registration - from RABackendLlamaCPP
     try {
       _registerVlm = _lib.lookupFunction<RacBackendLlamacppVlmRegisterNative,
-          RacBackendLlamacppVlmRegisterDart>('rac_backend_llamacpp_vlm_register');
+              RacBackendLlamacppVlmRegisterDart>(
+          'rac_backend_llamacpp_vlm_register');
     } catch (_) {
       _registerVlm = null;
     }
 
     try {
-      _unregisterVlm = _lib.lookupFunction<RacBackendLlamacppVlmUnregisterNative,
-          RacBackendLlamacppVlmUnregisterDart>('rac_backend_llamacpp_vlm_unregister');
+      _unregisterVlm = _lib.lookupFunction<
+              RacBackendLlamacppVlmUnregisterNative,
+              RacBackendLlamacppVlmUnregisterDart>(
+          'rac_backend_llamacpp_vlm_unregister');
     } catch (_) {
       _unregisterVlm = null;
     }

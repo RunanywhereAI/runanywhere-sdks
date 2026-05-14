@@ -349,8 +349,7 @@ private enum ResponseWriter {
 /// blocks until completion, and writes the result back into the C
 /// response struct. Two entry points: `send` (buffered body) and
 /// `stream` (per-chunk callback).
-// swiftlint:disable:next unused_declaration
-private enum RequestExecutor {
+private enum RequestExecutor { // swiftlint:disable:this unused_declaration
 
     static func send(
         req: rac_http_request_t,

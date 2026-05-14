@@ -123,7 +123,8 @@ class _EnumMapperCache {
   _EnumMapperCache._();
   static final _EnumMapperCache instance = _EnumMapperCache._();
 
-  final Map<String, _RacEnumMapperDart?> _cache = <String, _RacEnumMapperDart?>{};
+  final Map<String, _RacEnumMapperDart?> _cache =
+      <String, _RacEnumMapperDart?>{};
 
   _RacEnumMapperDart? lookup(String symbol) {
     if (_cache.containsKey(symbol)) return _cache[symbol];

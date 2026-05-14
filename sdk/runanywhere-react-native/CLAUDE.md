@@ -111,7 +111,7 @@ Layer 5: Pre-built C++ Libraries (runanywhere-commons)
 
 **HTTP transport vtable pattern**: `rac_http_transport_ops_t` is a C struct of function pointers in `librac_commons.so`. On iOS, `URLSessionHttpTransport` registers URLSession-based callbacks. On Android, `RunAnywhereCorePackage`'s companion `init` block calls `racHttpTransportRegisterOkHttp()` which installs OkHttp via JNI. This must happen before any native HTTP request.
 
-**Proto-byte streaming**: `HybridLLM` and `HybridVoiceAgent` expose `subscribeProtoEvents(handle, onBytes, onDone, onError)` returning an unsubscribe function. The TypeScript `LLMStreamAdapter` and `VoiceAgentStreamAdapter` convert these raw `ArrayBuffer` callbacks into `AsyncIterable<LLMStreamEvent | VoiceEvent>` by decoding protobuf bytes.
+**Proto-byte streaming**: `HybridLLM` and `HybridVoiceAgent` expose `subscribeProtoEvents(handle, onBytes, onDone, onError)` returning an unsubscribe function. LLM streaming is consumed directly inside `RunAnywhere+TextGeneration` (no separate adapter); voice-agent streaming is wrapped by `VoiceAgentStreamAdapter` into an `AsyncIterable<VoiceEvent>` by decoding protobuf bytes.
 
 **Hermes async iteration constraint**: Hermes does not support `for await...of` with NitroModules custom async iterables. Always use manual `iterator.next()` loops:
 ```typescript
@@ -129,7 +129,7 @@ while (!result.done) {
 
 **NitroModules bootstrap**: `initializeNitroModulesGlobally()` in `native/NitroModulesGlobalInit.ts` guards against double-install via module-level singletons. Calls `NativeModules.NitroModules.install()` once.
 
-**Native module singletons**: `getNativeCoreModule()` in `native/NativeRunAnywhereCore.ts` lazily creates the `HybridRunAnywhereCore` instance via `createHybridObject('RunAnywhereCore')` and caches it module-level.
+**Native module singletons**: `requireNativeModule()` / `isNativeModuleAvailable()` in `native/NativeRunAnywhereCore.ts` lazily create the `HybridRunAnywhereCore` instance via `createHybridObject('RunAnywhereCore')` and cache it module-level. These are the only exports from `packages/core/src/native`.
 
 **`RunAnywhere.initialize(options)` sequence** (`Public/RunAnywhere.ts:222`):
 1. Validate API key (non-dev environments)
@@ -157,11 +157,11 @@ Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/Ru
 
 ### Event System
 
-`RunAnywhere.subscribeSDKEvents(...)` is the consumer event surface. Native events flow through `subscribeSDKEventsProto`, arrive as proto bytes, and are decoded into generated `SDKEvent` messages. Audio-session internals may publish local events, but SDK event observation should stay on the native proto-byte stream.
+`RunAnywhere.subscribeSDKEvents(...)` is the consumer event surface. Native events flow through `subscribeSDKEventsProto`, arrive as proto bytes, and are decoded into generated `SDKEvent` messages. There are no JS-side event sinks anymore — all SDK event observation goes through the native proto-byte stream.
 
 ### Logging
 
-`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared` which routes to `ConsoleLogDestination` and `EventLogDestination`. Pre-built category instances: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
+`SDKLogger` (`Foundation/Logging/Logger/SDKLogger.ts`) delegates to `LoggingManager.shared`, which fans logs out to its registered `LogDestination`s. Default destination is the console; opt-in destinations (e.g. `SentryDestination`) are registered with `RunAnywhere.addLogDestination(...)`. Verbosity / Sentry fan-out is controlled via `RunAnywhere.configureLogging(...)`, `setLogLevel(...)`, `setLocalLoggingEnabled(...)`, and `setSentryLoggingEnabled(...)`. Pre-built category instances live in `SDKLogger`: `.shared`, `.llm`, `.stt`, `.tts`, `.download`, `.models`, `.core`, `.vad`, `.network`, `.events`, `.archive`.
 
 On iOS, Swift `SDKLogger` uses `OSLog` with subsystem `com.runanywhere.reactnative`. The ObjC `RNSDKLoggerBridge` lets C code route logs through Swift. SwiftLint rules (`.swiftlint.yml`) enforce that all logging goes through `SDKLogger` — `print()`, `NSLog()`, `os_log()` are banned at error severity.
 
@@ -229,9 +229,8 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 | `packages/core/src/Public/RunAnywhere.ts` | Main SDK facade (~100+ methods) |
 | `packages/core/src/specs/RunAnywhereCore.nitro.ts` | Complete native C++ interface contract (~60 methods) |
 | `packages/core/src/native/NitroModulesGlobalInit.ts` | NitroModules singleton installation guard |
-| `packages/core/src/native/NativeRunAnywhereCore.ts` | Native module singleton + device info and platform adapters |
-| `packages/core/src/Public/Events/RunAnywhere+SDKEvents.ts` | Native proto-byte SDK event subscription |
-| `packages/core/src/Adapters/LLMStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for LLM tokens |
+| `packages/core/src/native/NativeRunAnywhereCore.ts` | `requireNativeModule()` / `isNativeModuleAvailable()` accessors |
+| `packages/core/src/Public/Extensions/Events/RunAnywhere+SDKEvents.ts` | Native proto-byte SDK event subscription |
 | `packages/core/src/Adapters/VoiceAgentStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for voice events |
 | `packages/core/src/Foundation/Errors/SDKException.ts` | Sole throwable type with static factories |
 | `packages/core/cpp/HybridRunAnywhereCore.cpp` | C++ implementation (split into +Extension files) |

@@ -72,10 +72,10 @@ RAC_API void rac_sdk_event_clear_queue(void);
 
 namespace rac::events {
 
-rac_result_t publish_initialization_started(void);
-rac_result_t publish_initialization_completed(void);
+rac_result_t publish_initialization_started();
+rac_result_t publish_initialization_completed();
 rac_result_t publish_initialization_failed(rac_result_t error_code, const char* message);
-rac_result_t publish_shutdown(void);
+rac_result_t publish_shutdown();
 rac_result_t publish_device_registered(const char* device_id);
 rac_result_t publish_device_registration_failed(rac_result_t error_code, const char* message);
 rac_result_t publish_device_registration_state_changed(bool registered);

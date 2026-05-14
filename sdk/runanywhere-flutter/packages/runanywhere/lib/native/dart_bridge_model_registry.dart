@@ -403,7 +403,8 @@ class DartBridgeModelRegistry {
       );
     }
     try {
-      return DartBridgeProtoUtils.callRequestWithHandle<model_pb.ModelImportResult>(
+      return DartBridgeProtoUtils.callRequestWithHandle<
+          model_pb.ModelImportResult>(
         handle: handle,
         request: request,
         invoke: fn,
@@ -660,7 +661,8 @@ class DartBridgeModelFormat {
           'rac_artifact_infer_from_url_proto unavailable; returning null');
       return null;
     }
-    return DartBridgeProtoUtils.callRequest<model_pb.ArtifactInferFromUrlResult>(
+    return DartBridgeProtoUtils.callRequest<
+        model_pb.ArtifactInferFromUrlResult>(
       request: model_pb.ArtifactInferFromUrlRequest(url: url, modelId: modelId),
       invoke: fn,
       decode: model_pb.ArtifactInferFromUrlResult.fromBuffer,
@@ -689,7 +691,8 @@ class DartBridgeModelFormat {
 
     if (_isBuiltIn(model)) {
       return model.deepCopy()
-        ..artifactType = model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
+        ..artifactType =
+            model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
         ..builtIn = true;
     }
 
@@ -707,8 +710,8 @@ class DartBridgeModelFormat {
           type: inference.archiveType ==
                   model_pb.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED
               ? (inference.artifactType ==
-                      model_pb.ModelArtifactType
-                          .MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+                      model_pb
+                          .ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
                   ? model_pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ
                   : model_pb.ArchiveType.ARCHIVE_TYPE_ZIP)
               : inference.archiveType,
@@ -727,7 +730,8 @@ class DartBridgeModelFormat {
 
   model_pb.ModelInfo _asSingleFile(model_pb.ModelInfo model) {
     return model.deepCopy()
-      ..artifactType = model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
+      ..artifactType =
+          model_pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
       ..singleFile = model_pb.SingleFileArtifact();
   }
 
@@ -883,4 +887,3 @@ base class RacModelInfoStruct extends Struct {
   external Pointer<Utf8> localPath;
   external Pointer<Utf8> version;
 }
-

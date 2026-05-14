@@ -6,7 +6,8 @@
 //  Fully isolated from Swift async context to avoid AVFoundation conflicts
 //
 
-import AVFoundation
+// AVSpeechSynthesizer/AVAudioSession come from AVFoundation submodules; swiftlint-analyze does not trace this.
+import AVFoundation // swiftlint:disable:this unused_import
 
 // MARK: - System TTS Service
 

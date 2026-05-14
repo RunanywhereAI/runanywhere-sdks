@@ -113,9 +113,12 @@ class DartBridgeVoiceAgent {
     }
   }
 
-  bool get isSTTLoaded => _checkComponentLoaded(NativeFunctions.voiceAgentIsSTTLoaded);
-  bool get isLLMLoaded => _checkComponentLoaded(NativeFunctions.voiceAgentIsLLMLoaded);
-  bool get isTTSLoaded => _checkComponentLoaded(NativeFunctions.voiceAgentIsTTSLoaded);
+  bool get isSTTLoaded =>
+      _checkComponentLoaded(NativeFunctions.voiceAgentIsSTTLoaded);
+  bool get isLLMLoaded =>
+      _checkComponentLoaded(NativeFunctions.voiceAgentIsLLMLoaded);
+  bool get isTTSLoaded =>
+      _checkComponentLoaded(NativeFunctions.voiceAgentIsTTSLoaded);
 
   bool _checkComponentLoaded(int Function(RacHandle, Pointer<Int32>) fn) {
     if (_handle == null) return false;
@@ -312,8 +315,7 @@ class DartBridgeVoiceAgent {
       ..onListen = () async {
         try {
           final handle = await getHandle();
-          final fn =
-              RacNative.bindings.rac_voice_agent_process_turn_proto;
+          final fn = RacNative.bindings.rac_voice_agent_process_turn_proto;
           if (fn == null) {
             controller.addError(UnsupportedError(
                 'rac_voice_agent_process_turn_proto is unavailable'));
@@ -372,8 +374,7 @@ class DartBridgeVoiceAgent {
     final handle = await getHandle();
     final fn = RacNative.bindings.rac_voice_agent_transcribe_proto;
     if (fn == null) {
-      throw UnsupportedError(
-          'rac_voice_agent_transcribe_proto is unavailable');
+      throw UnsupportedError('rac_voice_agent_transcribe_proto is unavailable');
     }
     final request = voice_agent_pb.VoiceAgentTranscribeProtoRequest(
       audioData: audioData,

@@ -2,7 +2,6 @@
 
 import 'dart:ffi';
 
-
 /// STT ONNX config struct matching rac_stt_onnx_config_t
 base class RacSttOnnxConfigStruct extends Struct {
   @Int32()
@@ -48,4 +47,3 @@ base class RacVadOnnxConfigStruct extends Struct {
   @Int32()
   external int numThreads;
 }
-

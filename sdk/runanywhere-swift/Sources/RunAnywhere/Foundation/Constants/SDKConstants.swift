@@ -1,4 +1,3 @@
-
 /// SDK-wide constants (metadata only)
 /// Capability-specific constants are in their respective capabilities:
 /// - LLMConstants (LLM capability)

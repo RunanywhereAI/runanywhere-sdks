@@ -485,16 +485,14 @@ typedef RacToolCallingSessionEventCallbackNative = ffi.Void Function(
 typedef RacToolCallingSessionCreateProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
-  ffi.Pointer<
-      ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+  ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
   ffi.Pointer<ffi.Void>,
   ffi.Pointer<ffi.Uint64>,
 );
 typedef RacToolCallingSessionCreateProtoDart = int Function(
   ffi.Pointer<ffi.Uint8>,
   int,
-  ffi.Pointer<
-      ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+  ffi.Pointer<ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
   ffi.Pointer<ffi.Void>,
   ffi.Pointer<ffi.Uint64>,
 );
@@ -572,16 +570,14 @@ typedef RacVoiceAgentProcessTurnProto2Native = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
-  ffi.Pointer<
-      ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
   ffi.Pointer<ffi.Void>,
 );
 typedef RacVoiceAgentProcessTurnProto2Dart = int Function(
   ffi.Pointer<ffi.Void>,
   ffi.Pointer<ffi.Uint8>,
   int,
-  ffi.Pointer<
-      ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+  ffi.Pointer<ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
   ffi.Pointer<ffi.Void>,
 );
 
@@ -1438,8 +1434,7 @@ class RacBindings {
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_lora_catalog_query_proto'),
         ),
-        rac_lora_catalog_get_proto =
-            _lookupOptional<RacHandleBytesToProtoDart>(
+        rac_lora_catalog_get_proto = _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_lora_catalog_get_proto'),
         ),

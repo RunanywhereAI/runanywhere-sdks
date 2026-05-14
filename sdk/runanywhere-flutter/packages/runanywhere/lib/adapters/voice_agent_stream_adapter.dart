@@ -150,7 +150,9 @@ class _VoiceHandleFanOut {
     final cb = _nativeCb;
     if (cb == null) return;
     RacNative.bindings.rac_voice_agent_set_proto_callback(
-      _handle, ffi.nullptr, ffi.nullptr,
+      _handle,
+      ffi.nullptr,
+      ffi.nullptr,
     );
     cb.close();
     _nativeCb = null;

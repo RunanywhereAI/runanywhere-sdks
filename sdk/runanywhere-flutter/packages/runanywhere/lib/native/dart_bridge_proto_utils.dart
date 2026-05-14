@@ -9,6 +9,7 @@ import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
+
 class DartBridgeProtoUtils {
   DartBridgeProtoUtils._();
 

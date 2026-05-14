@@ -125,4 +125,3 @@ class DartBridgeSolutions {
     return fn(h);
   }
 }
-

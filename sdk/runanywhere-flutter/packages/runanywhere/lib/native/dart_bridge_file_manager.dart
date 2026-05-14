@@ -42,16 +42,14 @@ class DartBridgeFileManager {
     _callbacksPtr = calloc<RacFileCallbacksStruct>();
     final cb = _callbacksPtr!;
 
-    cb.ref.createDirectory =
-        Pointer.fromFunction<RacFmCreateDirectoryNative>(
-            _createDirectoryCallback, _errorDirectoryCreationFailed);
+    cb.ref.createDirectory = Pointer.fromFunction<RacFmCreateDirectoryNative>(
+        _createDirectoryCallback, _errorDirectoryCreationFailed);
     cb.ref.deletePath = Pointer.fromFunction<RacFmDeletePathNative>(
         _deletePathCallback, _errorDeleteFailed);
-    cb.ref.listDirectory =
-        Pointer.fromFunction<RacFmListDirectoryNative>(
-            _listDirectoryCallback, _errorFileNotFound);
-    cb.ref.freeEntries = Pointer.fromFunction<RacFmFreeEntriesNative>(
-        _freeEntriesCallback);
+    cb.ref.listDirectory = Pointer.fromFunction<RacFmListDirectoryNative>(
+        _listDirectoryCallback, _errorFileNotFound);
+    cb.ref.freeEntries =
+        Pointer.fromFunction<RacFmFreeEntriesNative>(_freeEntriesCallback);
     cb.ref.pathExists = Pointer.fromFunction<RacFmPathExistsNative>(
         _pathExistsCallback, _falseReturn);
     cb.ref.getFileSize = Pointer.fromFunction<RacFmGetFileSizeNative>(
@@ -84,8 +82,9 @@ class DartBridgeFileManager {
   static bool createDirectoryStructure() {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return false;
-    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
-        int Function(Pointer<RacFileCallbacksStruct>)>(
+    final fn = lib.lookupFunction<
+            Int32 Function(Pointer<RacFileCallbacksStruct>),
+            int Function(Pointer<RacFileCallbacksStruct>)>(
         'rac_file_manager_create_directory_structure');
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
@@ -117,9 +116,8 @@ class DartBridgeFileManager {
     if (lib == null || _callbacksPtr == null) return 0;
     final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Int64>),
-        int Function(
-            Pointer<RacFileCallbacksStruct>, Pointer<Int64>)>(
-        'rac_file_manager_models_storage_used');
+        int Function(Pointer<RacFileCallbacksStruct>,
+            Pointer<Int64>)>('rac_file_manager_models_storage_used');
 
     final sizePtr = calloc<Int64>();
     try {
@@ -134,9 +132,10 @@ class DartBridgeFileManager {
   static bool clearCache() {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return false;
-    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
-        int Function(Pointer<RacFileCallbacksStruct>)>(
-        'rac_file_manager_clear_cache');
+    final fn = lib.lookupFunction<
+        Int32 Function(Pointer<RacFileCallbacksStruct>),
+        int Function(
+            Pointer<RacFileCallbacksStruct>)>('rac_file_manager_clear_cache');
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
 
@@ -144,9 +143,10 @@ class DartBridgeFileManager {
   static bool clearTemp() {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return false;
-    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
-        int Function(Pointer<RacFileCallbacksStruct>)>(
-        'rac_file_manager_clear_temp');
+    final fn = lib.lookupFunction<
+        Int32 Function(Pointer<RacFileCallbacksStruct>),
+        int Function(
+            Pointer<RacFileCallbacksStruct>)>('rac_file_manager_clear_temp');
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
 
@@ -156,9 +156,8 @@ class DartBridgeFileManager {
     if (lib == null || _callbacksPtr == null) return 0;
     final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Int64>),
-        int Function(
-            Pointer<RacFileCallbacksStruct>, Pointer<Int64>)>(
-        'rac_file_manager_cache_size');
+        int Function(Pointer<RacFileCallbacksStruct>,
+            Pointer<Int64>)>('rac_file_manager_cache_size');
 
     final sizePtr = calloc<Int64>();
     try {
@@ -183,7 +182,8 @@ class DartBridgeFileManager {
     const bufSize = 1024;
     final outPath = calloc<Uint8>(bufSize).cast<Utf8>();
     try {
-      final result = fn(_callbacksPtr!, modelIdPtr, framework, outPath, bufSize);
+      final result =
+          fn(_callbacksPtr!, modelIdPtr, framework, outPath, bufSize);
       if (result != RacResultCode.success) return null;
       return outPath.toDartString();
     } finally {
@@ -199,9 +199,12 @@ class DartBridgeFileManager {
     final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
             Pointer<Int32>, Pointer<Int32>),
-        int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
-            Pointer<Int32>, Pointer<Int32>)>(
-        'rac_file_manager_model_folder_exists');
+        int Function(
+            Pointer<RacFileCallbacksStruct>,
+            Pointer<Utf8>,
+            int,
+            Pointer<Int32>,
+            Pointer<Int32>)>('rac_file_manager_model_folder_exists');
 
     final modelIdPtr = modelId.toNativeUtf8();
     final existsPtr = calloc<Int32>();
@@ -226,9 +229,12 @@ class DartBridgeFileManager {
     final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
             Pointer<Int32>, Pointer<Int32>),
-        int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
-            Pointer<Int32>, Pointer<Int32>)>(
-        'rac_file_manager_model_folder_exists');
+        int Function(
+            Pointer<RacFileCallbacksStruct>,
+            Pointer<Utf8>,
+            int,
+            Pointer<Int32>,
+            Pointer<Int32>)>('rac_file_manager_model_folder_exists');
 
     final modelIdPtr = modelId.toNativeUtf8();
     final existsPtr = calloc<Int32>();
@@ -248,10 +254,10 @@ class DartBridgeFileManager {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return null;
     final fn = lib.lookupFunction<
-        Int32 Function(
-            Pointer<RacFileCallbacksStruct>, Pointer<RacFileManagerStorageInfoStruct>),
-        int Function(Pointer<RacFileCallbacksStruct>,
-            Pointer<RacFileManagerStorageInfoStruct>)>(
+            Int32 Function(Pointer<RacFileCallbacksStruct>,
+                Pointer<RacFileManagerStorageInfoStruct>),
+            int Function(Pointer<RacFileCallbacksStruct>,
+                Pointer<RacFileManagerStorageInfoStruct>)>(
         'rac_file_manager_get_storage_info');
 
     final infoPtr = calloc<RacFileManagerStorageInfoStruct>();
@@ -273,14 +279,15 @@ class DartBridgeFileManager {
 
   /// Check storage availability via C++ rac_file_manager_check_storage.
   /// Returns full availability result including warnings and recommendations.
-  static NativeStorageAvailability? checkStorageAvailability(int requiredBytes) {
+  static NativeStorageAvailability? checkStorageAvailability(
+      int requiredBytes) {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return null;
     final fn = lib.lookupFunction<
-        Int32 Function(Pointer<RacFileCallbacksStruct>, Int64,
-            Pointer<RacStorageAvailabilityStruct>),
-        int Function(Pointer<RacFileCallbacksStruct>, int,
-            Pointer<RacStorageAvailabilityStruct>)>(
+            Int32 Function(Pointer<RacFileCallbacksStruct>, Int64,
+                Pointer<RacStorageAvailabilityStruct>),
+            int Function(Pointer<RacFileCallbacksStruct>, int,
+                Pointer<RacStorageAvailabilityStruct>)>(
         'rac_file_manager_check_storage');
 
     final availPtr = calloc<RacStorageAvailabilityStruct>();
@@ -313,15 +320,13 @@ class DartBridgeFileManager {
     final lib = _lib();
     if (lib == null || _callbacksPtr == null) return false;
     final fn = lib.lookupFunction<
-        Int32 Function(
-            Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32),
+        Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32),
         int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>,
             int)>('rac_file_manager_delete_model');
 
     final modelIdPtr = modelId.toNativeUtf8();
     try {
-      return fn(_callbacksPtr!, modelIdPtr, framework) ==
-          RacResultCode.success;
+      return fn(_callbacksPtr!, modelIdPtr, framework) == RacResultCode.success;
     } finally {
       calloc.free(modelIdPtr);
     }

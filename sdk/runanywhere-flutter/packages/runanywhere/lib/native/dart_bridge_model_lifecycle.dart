@@ -12,6 +12,7 @@ import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     as sdk_events_enum;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
+
 /// Proto-backed model/component lifecycle bridge.
 ///
 /// This is the Flutter binding for `rac_model_lifecycle_*_proto` and keeps the
@@ -243,4 +244,3 @@ class DartBridgeModelLifecycle {
     return 'code=$code status=${out.ref.status}';
   }
 }
-

@@ -2,14 +2,15 @@
  * LLM Nitrogen Spec
  *
  * Mirrors `VoiceAgent.nitro.ts`. Exposes the Nitro-backed proto-byte LLM
- * stream callback ABI used by `LLMStreamAdapter.ts`. The C++ side
+ * stream callback ABI consumed directly by
+ * `RunAnywhere+TextGeneration` (no separate adapter class). The C++ side
  * (`HybridLLM.{cpp,hpp}`) wires this into `rac_llm_set_stream_proto_callback`
  * (commons C ABI). Cancellation goes back through the returned unsubscribe
  * function which clears the callback slot via
  * `rac_llm_set_stream_proto_callback(handle, NULL, NULL)`.
  *
- * Matches the Web `LLMStreamAdapter` pattern (Emscripten Module callback)
- * and the Swift `LLMStreamAdapter` pattern (CRACommons proto callback).
+ * Matches the Swift CRACommons proto callback pattern: subscribers decode
+ * `runanywhere.v1.LLMStreamEvent` from the raw bytes inline.
  */
 import type { HybridObject } from 'react-native-nitro-modules';
 

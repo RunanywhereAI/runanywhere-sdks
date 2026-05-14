@@ -6,7 +6,8 @@
 //  Plays WAV audio data from TTS synthesis.
 //
 
-import AVFoundation
+// AVAudioPlayer/AVAudioSession come from AVFoundation submodules; swiftlint-analyze does not trace this.
+import AVFoundation // swiftlint:disable:this unused_import
 
 /// Manages audio playback for TTS services.
 ///

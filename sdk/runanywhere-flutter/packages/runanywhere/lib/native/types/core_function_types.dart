@@ -107,7 +107,8 @@ typedef RacLlmComponentIsLoadedDart = int Function(RacHandle handle);
 /// const char* rac_llm_component_get_model_id(rac_handle_t handle)
 typedef RacLlmComponentGetModelIdNative = Pointer<Utf8> Function(
     RacHandle handle);
-typedef RacLlmComponentGetModelIdDart = Pointer<Utf8> Function(RacHandle handle);
+typedef RacLlmComponentGetModelIdDart = Pointer<Utf8> Function(
+    RacHandle handle);
 
 /// rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt, const rac_llm_options_t* options, rac_llm_result_t* out_result)
 typedef RacLlmComponentGenerateNative = Int32 Function(

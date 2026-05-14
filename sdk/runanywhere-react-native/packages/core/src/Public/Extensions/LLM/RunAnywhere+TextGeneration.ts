@@ -137,12 +137,12 @@ export async function generate(
  * `RunAnywhere.generateStream(_ request: RALLMGenerateRequest)`.
  *
  * Wire-up: events are pushed by C++ via the proto-byte callback registered
- * by `LLMStreamAdapter` against the LLM handle returned by
- * `RunAnywhereCore.getLLMHandle()`.
+ * directly here (through `LLM.subscribeProtoEvents`) against the LLM
+ * handle returned by `RunAnywhereCore.getLLMHandle()`.
  *
  * The native generation is kicked off lazily once the consumer starts
  * iterating; cancellation propagates back through `for-await break` →
- * `iterator.return()` → adapter unsubscribe → `cancelGeneration()`.
+ * `iterator.return()` → unsubscribe → `cancelGeneration()`.
  */
 export function generateStream(
   request: LLMGenerateRequest,
