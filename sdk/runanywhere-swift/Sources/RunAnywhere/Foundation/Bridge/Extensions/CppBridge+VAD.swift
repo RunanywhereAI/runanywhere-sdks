@@ -16,7 +16,6 @@
 //
 
 import CRACommons
-import Foundation
 
 // MARK: - VAD Component Bridge
 

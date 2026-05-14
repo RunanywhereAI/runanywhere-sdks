@@ -1,16 +1,12 @@
 /**
  * Foundation/Errors
  *
- * Wave 2 cleanup: legacy `SDKError` / `ErrorCode` / `ErrorCategory` /
- * `ErrorContext` modules have been deleted. The canonical proto-encoded
- * error shape lives in `@runanywhere/proto-ts/errors` and the throwable
- * wrapper is `SDKException` (this file's only export). Consumers MUST
- * use `SDKException` for all SDK-throw sites and `ErrorCode` /
- * `ErrorCategory` from `@runanywhere/proto-ts/errors` for code-level
- * dispatch.
+ * `SDKException` (this folder) is the only throwable in `@runanywhere/core`.
+ * The proto-encoded `SDKError`, `ErrorCode`, `ErrorCategory`, and
+ * `ErrorContext` types live in `@runanywhere/proto-ts/errors`; we re-export
+ * them here so consumers have a single import surface.
  */
 
-// Canonical proto error types (re-exported for ergonomic access).
 export type {
   ErrorContext,
   SDKError as SDKErrorProto,
@@ -20,7 +16,6 @@ export {
   ErrorCode,
 } from '@runanywhere/proto-ts/errors';
 
-// SDKException — the only RN throwable wrapper around the proto.
 export {
   SDKException,
   isSDKException,

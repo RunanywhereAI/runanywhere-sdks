@@ -5,7 +5,6 @@
 //  Extension for configuring logging
 //
 
-import Foundation
 
 extension RunAnywhere {
 

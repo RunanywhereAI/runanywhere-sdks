@@ -38,11 +38,12 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        const bool check_result = static_cast<bool>(cond);                                       \
+        if (check_result) {                                                                      \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -216,7 +217,8 @@ rac_result_t mock_diffusion_generate(void*, const rac_diffusion_options_t* optio
     out_result->seed_used = options->seed >= 0 ? options->seed : 42;
     out_result->generation_time_ms = 33;
     out_result->error_code = RAC_SUCCESS;
-    out_result->image_size = static_cast<size_t>(out_result->width * out_result->height * 4);
+    out_result->image_size = static_cast<size_t>(out_result->width) *
+                             static_cast<size_t>(out_result->height) * 4U;
     out_result->image_data = static_cast<uint8_t*>(std::malloc(out_result->image_size));
     if (!out_result->image_data)
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -552,22 +554,30 @@ int test_portable_source_blockers() {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_nonllm_lifecycle_proto_abi\n");
+    try {
+        std::fprintf(stdout, "test_nonllm_lifecycle_proto_abi\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: non-LLM lifecycle proto ABI tests (no protobuf)\n");
-    return 0;
+        std::fprintf(stdout, "  skip: non-LLM lifecycle proto ABI tests (no protobuf)\n");
+        return 0;
 #else
-    rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
-          "model registry creates");
+        rac_model_registry_handle_t registry = nullptr;
+        CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
+              "model registry creates");
 
-    test_lifecycle_proto_operations(registry);
-    test_portable_source_blockers();
+        test_lifecycle_proto_operations(registry);
+        test_portable_source_blockers();
 
-    rac_model_lifecycle_reset();
-    rac_plugin_unregister("onnx");
-    rac_model_registry_destroy(registry);
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        rac_model_lifecycle_reset();
+        rac_plugin_unregister("onnx");
+        rac_model_registry_destroy(registry);
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "FATAL: uncaught unknown exception\n");
+        return 1;
+    }
 }

@@ -81,8 +81,8 @@ std::string generate_event_id() {
 
 std::string lowercase(const char* value) {
     std::string out = value ? value : "";
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(out, out.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -219,9 +219,12 @@ void populate_error(runanywhere::v1::SDKError* error, rac_result_t code, const c
                     bool retryable = false) {
     const int32_t c_code = static_cast<int32_t>(code);
     const int32_t abs_code = c_code < 0 ? -c_code : c_code;
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange): proto enum range
+    // is validated by the protobuf reflection layer; abs_code is normalized from
+    // rac_result_t and may legitimately exceed declared enum values for forward compat.
     error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
     error->set_category(error_category_for_code(code));
-    error->set_message(message && message[0] ? message : rac_error_message(code));
+    error->set_message(message != nullptr && message[0] != '\0' ? message : rac_error_message(code));
     error->set_c_abi_code(c_code);
     error->set_timestamp_ms(static_cast<int64_t>(current_time_ms()));
     error->set_severity(severity);
@@ -293,15 +296,15 @@ void rac_event_unsubscribe(uint64_t subscription_id) {
     std::lock_guard<std::mutex> lock(g_event_mutex);
 
     auto remove_from = [subscription_id](std::vector<Subscription>& subs) {
-        auto it = std::remove_if(subs.begin(), subs.end(), [subscription_id](Subscription& s) {
+        auto removed = std::ranges::remove_if(subs, [subscription_id](Subscription& s) {
             if (s.id == subscription_id) {
                 s.alive->store(false);
                 return true;
             }
             return false;
         });
-        if (it != subs.end()) {
-            subs.erase(it, subs.end());
+        if (removed.begin() != subs.end()) {
+            subs.erase(removed.begin(), subs.end());
             return true;
         }
         return false;
@@ -442,15 +445,15 @@ void rac_sdk_event_unsubscribe(uint64_t subscription_id) {
     }
 
     std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
-    auto it = std::remove_if(g_sdk_event_subscriptions.begin(), g_sdk_event_subscriptions.end(),
-                             [subscription_id](SDKEventSubscription& sub) {
-                                 if (sub.id == subscription_id) {
-                                     sub.alive->store(false);
-                                     return true;
-                                 }
-                                 return false;
-                             });
-    g_sdk_event_subscriptions.erase(it, g_sdk_event_subscriptions.end());
+    auto removed = std::ranges::remove_if(g_sdk_event_subscriptions,
+                                          [subscription_id](SDKEventSubscription& sub) {
+                                              if (sub.id == subscription_id) {
+                                                  sub.alive->store(false);
+                                                  return true;
+                                              }
+                                              return false;
+                                          });
+    g_sdk_event_subscriptions.erase(removed.begin(), g_sdk_event_subscriptions.end());
 }
 
 rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t proto_size) {
@@ -509,7 +512,7 @@ rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code, const char* 
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_FAILURE,
                       runanywhere::v1::ERROR_SEVERITY_ERROR, sdk_component);
-    if (operation && operation[0]) {
+    if (operation != nullptr && operation[0] != '\0') {
         event.set_operation_id(operation);
     }
     const bool is_recoverable = recoverable == RAC_TRUE;
@@ -540,10 +543,9 @@ void rac_sdk_event_clear_queue(void) {
 
 }  // extern "C"
 
-namespace rac {
-namespace events {
+namespace rac::events {
 
-rac_result_t publish_initialization_started(void) {
+rac_result_t publish_initialization_started() {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
@@ -555,7 +557,7 @@ rac_result_t publish_initialization_started(void) {
 #endif
 }
 
-rac_result_t publish_initialization_completed(void) {
+rac_result_t publish_initialization_completed() {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_INITIALIZATION,
@@ -586,7 +588,7 @@ rac_result_t publish_initialization_failed(rac_result_t error_code, const char* 
 #endif
 }
 
-rac_result_t publish_shutdown(void) {
+rac_result_t publish_shutdown() {
 #if defined(RAC_HAVE_PROTOBUF)
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_SHUTDOWN,
@@ -656,7 +658,7 @@ rac_result_t publish_auth_succeeded(const char* subject_id, const char* provider
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
                       runanywhere::v1::ERROR_SEVERITY_INFO);
-    if (operation && operation[0]) {
+    if (operation != nullptr && operation[0] != '\0') {
         event.set_operation_id(operation);
     }
     auto* auth = event.mutable_auth();
@@ -667,7 +669,7 @@ rac_result_t publish_auth_succeeded(const char* subject_id, const char* provider
         auth->set_subject_id(subject_id);
     if (scope)
         auth->set_scope(scope);
-    if (device_id && device_id[0]) {
+    if (device_id != nullptr && device_id[0] != '\0') {
         (*event.mutable_properties())["device_id"] = device_id;
     }
     return publish_message(event);
@@ -688,7 +690,7 @@ rac_result_t publish_auth_token_refreshed(const char* subject_id, const char* pr
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
                       runanywhere::v1::ERROR_SEVERITY_INFO);
-    if (operation && operation[0]) {
+    if (operation != nullptr && operation[0] != '\0') {
         event.set_operation_id(operation);
     }
     auto* auth = event.mutable_auth();
@@ -699,7 +701,7 @@ rac_result_t publish_auth_token_refreshed(const char* subject_id, const char* pr
         auth->set_subject_id(subject_id);
     if (scope)
         auth->set_scope(scope);
-    if (device_id && device_id[0]) {
+    if (device_id != nullptr && device_id[0] != '\0') {
         (*event.mutable_properties())["device_id"] = device_id;
     }
     return publish_message(event);
@@ -719,7 +721,7 @@ rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, c
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
                       runanywhere::v1::ERROR_SEVERITY_ERROR);
-    if (operation && operation[0]) {
+    if (operation != nullptr && operation[0] != '\0') {
         event.set_operation_id(operation);
     }
     auto* auth = event.mutable_auth();
@@ -819,8 +821,7 @@ rac_result_t publish_route_failed(rac_primitive_t primitive, rac_result_t error_
 #endif
 }
 
-}  // namespace events
-}  // namespace rac
+}  // namespace rac::events
 
 // =============================================================================
 // INTERNAL RESET (for testing)

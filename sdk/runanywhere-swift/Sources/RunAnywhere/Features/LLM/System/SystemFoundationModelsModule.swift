@@ -9,8 +9,6 @@
 //  provides the Swift service implementation that the C++ backend calls.
 //
 
-import CRACommons
-import Foundation
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
@@ -77,6 +75,7 @@ public enum SystemFoundationModels {
 
     #if canImport(FoundationModels)
     @available(iOS 26.0, macOS 26.0, *)
+    // swiftlint:disable:next unused_declaration
     private static func foundationModelsRuntimeUnavailableReason() -> String? {
         switch SystemLanguageModel.default.availability {
         case .available:

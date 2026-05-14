@@ -9,9 +9,7 @@
 
 namespace rac::graph {
 
-GraphScheduler::GraphScheduler(size_t thread_pool_size)
-    : thread_pool_size_(thread_pool_size == 0 ? 1u : thread_pool_size),
-      root_(std::make_shared<CancelToken>()) {}
+GraphScheduler::GraphScheduler(size_t /*thread_pool_size*/) : root_(std::make_shared<CancelToken>()) {}
 
 GraphScheduler::~GraphScheduler() {
     // Best-effort shutdown so a graph that's dropped mid-run doesn't leave

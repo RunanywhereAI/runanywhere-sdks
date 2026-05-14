@@ -7,7 +7,6 @@
 //  which provides automatic telemetry for every registered STT backend.
 //
 
-import CRACommons
 import Foundation
 
 // MARK: - STT Operations

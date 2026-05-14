@@ -23,20 +23,6 @@ fun interface NativeDownloadProgressListener {
 }
 
 /**
- * Listener for diffusion image generation progress. Invoked from the
- * native generate worker on every step. The progressBytes argument is
- * a serialized `runanywhere.v1.DiffusionProgress` proto.
- *
- * Return `false` to cancel generation; the native runner will stop
- * scheduling further steps and return a `RAC_ERROR_CANCELLED` result.
- *
- * Round 1 KOTLIN (G-A4): mirrors the Swift CRACommons callback shape.
- */
-fun interface NativeDiffusionProgressListener {
-    fun onProgress(progressBytes: ByteArray): Boolean
-}
-
-/**
  * Listener for native proto-byte callbacks. The byte array is an owned copy of
  * the native callback payload and is safe to decode or dispatch asynchronously.
  */

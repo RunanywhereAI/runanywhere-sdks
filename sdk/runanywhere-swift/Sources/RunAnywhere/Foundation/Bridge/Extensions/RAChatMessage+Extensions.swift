@@ -5,8 +5,6 @@
 //  Extensions for proto-generated chat types.
 //
 
-import Foundation
-import SwiftProtobuf
 
 // MARK: - MessageRole convenience
 

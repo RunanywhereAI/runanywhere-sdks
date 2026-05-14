@@ -12,8 +12,6 @@
 //
 
 import CRACommons
-import Foundation
-import SwiftProtobuf
 
 extension CppBridge {
 

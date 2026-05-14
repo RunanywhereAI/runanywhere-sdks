@@ -396,20 +396,23 @@ int main(int /*argc*/, char** /*argv*/) {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {"top_level_expected_files_short_circuit", test_top_level_expected_files_short_circuit},
-        {"single_file_with_explicit_manifest", test_single_file_with_explicit_manifest},
-        {"single_file_with_pattern_shorthand", test_single_file_with_pattern_shorthand},
-        {"zip_archive_with_explicit_manifest", test_zip_archive_with_explicit_manifest},
-        {"tar_gz_archive_with_pattern_shorthand", test_tar_gz_archive_with_pattern_shorthand},
-        {"multi_file_descriptors", test_multi_file_descriptors},
-        {"multi_file_empty_descriptors", test_multi_file_empty_descriptors},
-        {"no_artifact_default", test_no_artifact_default},
-        {"built_in_artifact_default", test_built_in_artifact_default},
-        {"custom_strategy_id_default", test_custom_strategy_id_default},
-        {"empty_model_bytes_returns_empty_manifest", test_empty_model_bytes_returns_empty_manifest},
-        {"null_out_pointer", test_null_out_pointer},
-        {"invalid_input_bytes", test_invalid_input_bytes},
-        {"malformed_input_bytes", test_malformed_input_bytes},
+        {.name = "top_level_expected_files_short_circuit",
+         .fn = test_top_level_expected_files_short_circuit},
+        {.name = "single_file_with_explicit_manifest", .fn = test_single_file_with_explicit_manifest},
+        {.name = "single_file_with_pattern_shorthand", .fn = test_single_file_with_pattern_shorthand},
+        {.name = "zip_archive_with_explicit_manifest", .fn = test_zip_archive_with_explicit_manifest},
+        {.name = "tar_gz_archive_with_pattern_shorthand",
+         .fn = test_tar_gz_archive_with_pattern_shorthand},
+        {.name = "multi_file_descriptors", .fn = test_multi_file_descriptors},
+        {.name = "multi_file_empty_descriptors", .fn = test_multi_file_empty_descriptors},
+        {.name = "no_artifact_default", .fn = test_no_artifact_default},
+        {.name = "built_in_artifact_default", .fn = test_built_in_artifact_default},
+        {.name = "custom_strategy_id_default", .fn = test_custom_strategy_id_default},
+        {.name = "empty_model_bytes_returns_empty_manifest",
+         .fn = test_empty_model_bytes_returns_empty_manifest},
+        {.name = "null_out_pointer", .fn = test_null_out_pointer},
+        {.name = "invalid_input_bytes", .fn = test_invalid_input_bytes},
+        {.name = "malformed_input_bytes", .fn = test_malformed_input_bytes},
     };
 
     int failures = 0;

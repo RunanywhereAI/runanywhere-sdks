@@ -18,6 +18,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "core/internal/platform_compat.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
@@ -60,7 +61,7 @@ static std::string create_temp_dir(const std::string& suffix) {
         std::cerr << "Failed to create temp dir: " << tmpl << "\n";
         return "";
     }
-    return std::string(result);
+    return {result};
 #endif
 }
 
@@ -469,7 +470,7 @@ std::vector<uint8_t> fake_payload(size_t n) {
 }
 
 struct FakeTransport {
-    std::vector<uint8_t> payload = fake_payload(256 * 1024);
+    std::vector<uint8_t> payload = fake_payload(static_cast<size_t>(256) * 1024);
     int sleep_ms_per_chunk = 0;
 };
 
@@ -554,22 +555,22 @@ std::string serialize_msg(const google::protobuf::MessageLite& msg) {
 }
 
 bool parse_plan(const rac_proto_buffer_t& buffer, rav1::DownloadPlanResult* out) {
-    return out && buffer.status == RAC_SUCCESS && buffer.data &&
+    return out != nullptr && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
 bool parse_start(const rac_proto_buffer_t& buffer, rav1::DownloadStartResult* out) {
-    return out && buffer.status == RAC_SUCCESS && buffer.data &&
+    return out != nullptr && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
 bool parse_cancel(const rac_proto_buffer_t& buffer, rav1::DownloadCancelResult* out) {
-    return out && buffer.status == RAC_SUCCESS && buffer.data &&
+    return out != nullptr && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
 bool parse_resume(const rac_proto_buffer_t& buffer, rav1::DownloadResumeResult* out) {
-    return out && buffer.status == RAC_SUCCESS && buffer.data &&
+    return out != nullptr && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
@@ -626,7 +627,7 @@ bool poll_progress(const std::string& task_id, rav1::DownloadProgress* out_progr
     rac_proto_buffer_init(&buffer);
     rac_result_t rc = rac_download_progress_poll_proto(
         reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), &buffer);
-    bool ok = rc == RAC_SUCCESS && buffer.status == RAC_SUCCESS && buffer.data &&
+    bool ok = rc == RAC_SUCCESS && buffer.status == RAC_SUCCESS && buffer.data != nullptr &&
               out_progress->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
     rac_proto_buffer_free(&buffer);
     return ok;
@@ -989,7 +990,7 @@ static TestResult test_proto_cancel_resume() {
         std::ifstream partial(plan.files(0).destination_path(), std::ios::binary | std::ios::ate);
         partial_size = partial.good() ? static_cast<int64_t>(partial.tellg()) : 0;
     }
-    ASSERT_TRUE(partial_size > 0 && partial_size < static_cast<int64_t>(fake.payload.size()),
+    ASSERT_TRUE(partial_size > 0 && std::cmp_less(partial_size, fake.payload.size()),
                 "Cancel should leave partial bytes for resume");
 
     rav1::DownloadResumeRequest stale_resume;
@@ -1080,44 +1081,52 @@ static TestResult test_proto_failed_transfer_no_stale_completion() {
 // =============================================================================
 
 int main(int argc, char** argv) {
-    TestSuite suite("download_orchestrator");
+    try {
+        TestSuite suite("download_orchestrator");
 
-    // rac_download_requires_extraction
-    suite.add("requires_extraction_tar_gz", test_requires_extraction_tar_gz);
-    suite.add("requires_extraction_tar_bz2", test_requires_extraction_tar_bz2);
-    suite.add("requires_extraction_zip", test_requires_extraction_zip);
-    suite.add("requires_extraction_no_archive", test_requires_extraction_no_archive);
-    suite.add("requires_extraction_url_with_query", test_requires_extraction_url_with_query);
+        // rac_download_requires_extraction
+        suite.add("requires_extraction_tar_gz", test_requires_extraction_tar_gz);
+        suite.add("requires_extraction_tar_bz2", test_requires_extraction_tar_bz2);
+        suite.add("requires_extraction_zip", test_requires_extraction_zip);
+        suite.add("requires_extraction_no_archive", test_requires_extraction_no_archive);
+        suite.add("requires_extraction_url_with_query", test_requires_extraction_url_with_query);
 
-    // rac_find_model_path_after_extraction
-    suite.add("find_model_single_gguf", test_find_model_single_gguf);
-    suite.add("find_model_nested_gguf", test_find_model_nested_gguf);
-    suite.add("find_model_nested_directory", test_find_model_nested_directory);
-    suite.add("find_model_directory_based_onnx", test_find_model_directory_based_onnx);
-    suite.add("find_model_skips_hidden_files", test_find_model_skips_hidden_files);
-    suite.add("find_model_unknown_structure", test_find_model_unknown_structure);
-    suite.add("find_model_empty_dir", test_find_model_empty_dir);
-    suite.add("find_model_null_args", test_find_model_null_args);
+        // rac_find_model_path_after_extraction
+        suite.add("find_model_single_gguf", test_find_model_single_gguf);
+        suite.add("find_model_nested_gguf", test_find_model_nested_gguf);
+        suite.add("find_model_nested_directory", test_find_model_nested_directory);
+        suite.add("find_model_directory_based_onnx", test_find_model_directory_based_onnx);
+        suite.add("find_model_skips_hidden_files", test_find_model_skips_hidden_files);
+        suite.add("find_model_unknown_structure", test_find_model_unknown_structure);
+        suite.add("find_model_empty_dir", test_find_model_empty_dir);
+        suite.add("find_model_null_args", test_find_model_null_args);
 
-    // rac_download_compute_destination
-    suite.add("compute_destination_needs_base_dir", test_compute_destination_needs_base_dir);
-    suite.add("compute_destination_archive", test_compute_destination_archive);
-    suite.add("compute_destination_null_args", test_compute_destination_null_args);
+        // rac_download_compute_destination
+        suite.add("compute_destination_needs_base_dir", test_compute_destination_needs_base_dir);
+        suite.add("compute_destination_archive", test_compute_destination_archive);
+        suite.add("compute_destination_null_args", test_compute_destination_null_args);
 
 #ifdef RAC_HAVE_PROTOBUF
-    // proto-byte workflow ABI
-    suite.add("proto_plan_single_file", test_proto_plan_single_file);
-    suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
-    suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
-    suite.add("proto_plan_rejects_invalid_existing_bytes",
-              test_proto_plan_rejects_invalid_existing_bytes);
-    suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
-    suite.add("proto_start_progress_callback_complete",
-              test_proto_start_progress_callback_complete);
-    suite.add("proto_cancel_resume", test_proto_cancel_resume);
-    suite.add("proto_failed_transfer_no_stale_completion",
-              test_proto_failed_transfer_no_stale_completion);
+        // proto-byte workflow ABI
+        suite.add("proto_plan_single_file", test_proto_plan_single_file);
+        suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
+        suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
+        suite.add("proto_plan_rejects_invalid_existing_bytes",
+                  test_proto_plan_rejects_invalid_existing_bytes);
+        suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
+        suite.add("proto_start_progress_callback_complete",
+                  test_proto_start_progress_callback_complete);
+        suite.add("proto_cancel_resume", test_proto_cancel_resume);
+        suite.add("proto_failed_transfer_no_stale_completion",
+                  test_proto_failed_transfer_no_stale_completion);
 #endif
 
-    return suite.run(argc, argv);
+        return suite.run(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "FATAL: uncaught unknown exception\n");
+        return 1;
+    }
 }

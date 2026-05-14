@@ -1,11 +1,11 @@
 /**
  * RunAnywhere+StructuredOutput.ts
  *
- * Structured output extension for JSON schema-guided generation. Wave 2:
- * aligned to proto-canonical structured-output shapes
- * (`@runanywhere/proto-ts/structured_output`).
+ * Structured output extension for JSON schema-guided generation. All shapes
+ * come from `@runanywhere/proto-ts/structured_output`; commons owns the
+ * generation/parse/prepare-prompt run loop through proto-byte methods.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+StructuredOutput.swift
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+StructuredOutput.swift`.
  */
 
 import {
@@ -41,8 +41,8 @@ import { generate as generateText } from './RunAnywhere+TextGeneration';
 // Types re-exported for callers
 // ============================================================================
 
-// StructuredOutputResult and JSONSchema are re-exported from proto-ts (no
-// local duplicates per §15 Iron Rule 2).
+// StructuredOutputResult and JSONSchema come from `@runanywhere/proto-ts`;
+// no RN-local duplicates.
 
 const logger = new SDKLogger('RunAnywhere.StructuredOutput');
 let requestCounter = 0;

@@ -26,9 +26,6 @@
 //  callback via `onTermination` (handled inside `HandleStreamAdapter`).
 
 import CRACommons
-import Foundation
-import os
-import SwiftProtobuf
 
 /// AsyncStream-based wrapper over the proto-byte LLM stream ABI.
 ///

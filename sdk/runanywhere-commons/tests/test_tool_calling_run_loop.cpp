@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -214,7 +215,7 @@ bool load_mock_llm() {
     rac_result_t rc =
         rac_model_lifecycle_load_proto(g_registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    bool ok = rc == RAC_SUCCESS && out.data && out.size > 0 &&
+    bool ok = rc == RAC_SUCCESS && out.data != nullptr && out.size > 0 &&
               result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
     rac_proto_buffer_free(&out);
     return ok;
@@ -323,10 +324,11 @@ int test_no_tool_call_completes_immediately() {
     rac_result_t rc =
         rac_tool_calling_run_loop_proto(bytes.data(), bytes.size(), executor_callback, &exec, &out);
     CHECK(rc == RAC_SUCCESS, "run_loop returns RAC_SUCCESS");
-    CHECK(out.data != nullptr && out.size > 0, "out has bytes");
+    const bool has_bytes = out.data != nullptr && out.size > 0;
+    CHECK(has_bytes, "out has bytes");
 
     runanywhere::v1::ToolCallingResult result;
-    if (out.data && out.size > 0) {
+    if (out.data != nullptr && out.size > 0) {
         result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     CHECK(result.is_complete() == true, "is_complete true");
@@ -346,7 +348,7 @@ int test_one_tool_call_then_final_text() {
     if (!load_mock_llm())
         return 1;
     set_responses({
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"Tokyo"}}</tool_call>)",
         "The weather in Tokyo is sunny, 25C.",
     });
 
@@ -357,7 +359,7 @@ int test_one_tool_call_then_final_text() {
     ExecutorState exec;
     {
         std::lock_guard<std::mutex> lg(exec.mu);
-        exec.result_jsons.push_back("{\"temp\":25,\"condition\":\"sunny\"}");
+        exec.result_jsons.emplace_back(R"({"temp":25,"condition":"sunny"})");
     }
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
@@ -394,9 +396,9 @@ int test_max_iterations_capped() {
     // forces the loop to stop after two parses (executor invoked twice when
     // both responses are tool calls).
     set_responses({
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"A\"}}</tool_call>",
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"B\"}}</tool_call>",
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"C\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"A"}}</tool_call>)",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"B"}}</tool_call>)",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"location":"C"}}</tool_call>)",
     });
 
     auto request = make_request("weather everywhere", /*max_iterations=*/2);
@@ -431,7 +433,7 @@ int test_validation_failure_short_circuits() {
     // Tool name that is NOT in the request's tool list should fail validation
     // before the executor is invoked.
     set_responses({
-        "<tool_call>{\"tool\":\"unknown_tool\",\"arguments\":{}}</tool_call>",
+        R"(<tool_call>{"tool":"unknown_tool","arguments":{}}</tool_call>)",
     });
 
     auto request = make_request("call missing tool");
@@ -480,21 +482,29 @@ int test_null_arguments_return_null_pointer() {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_tool_calling_run_loop\n");
+    try {
+        std::fprintf(stdout, "test_tool_calling_run_loop\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: no protobuf\n");
-    return 0;
+        std::fprintf(stdout, "  skip: no protobuf\n");
+        return 0;
 #else
-    test_null_arguments_return_null_pointer();
-    test_no_tool_call_completes_immediately();
-    test_one_tool_call_then_final_text();
-    test_max_iterations_capped();
-    test_validation_failure_short_circuits();
-    if (g_registry) {
-        rac_model_registry_destroy(g_registry);
-        g_registry = nullptr;
-    }
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        test_null_arguments_return_null_pointer();
+        test_no_tool_call_completes_immediately();
+        test_one_tool_call_then_final_text();
+        test_max_iterations_capped();
+        test_validation_failure_short_circuits();
+        if (g_registry) {
+            rac_model_registry_destroy(g_registry);
+            g_registry = nullptr;
+        }
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "test_tool_calling_run_loop: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "test_tool_calling_run_loop: uncaught exception\n");
+        return 1;
+    }
 }

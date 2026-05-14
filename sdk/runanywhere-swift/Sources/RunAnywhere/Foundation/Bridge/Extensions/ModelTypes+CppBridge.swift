@@ -7,7 +7,6 @@
 //
 
 import CRACommons
-import Foundation
 
 // MARK: - ModelCategory C++ Conversion
 

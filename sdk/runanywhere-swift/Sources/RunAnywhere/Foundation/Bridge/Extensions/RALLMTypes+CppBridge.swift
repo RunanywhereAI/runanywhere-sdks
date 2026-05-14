@@ -5,7 +5,6 @@
 //  C-bridge extensions on proto-generated RA* LLM types.
 //
 
-import CRACommons
 import Foundation
 
 // MARK: - RALLMGenerationOptions: C-bridge + convenience

@@ -18,7 +18,6 @@
 //
 
 import CRACommons
-import Foundation
 
 extension CppBridge {
 

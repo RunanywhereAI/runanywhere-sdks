@@ -1,10 +1,11 @@
 /**
  * RunAnywhere+RAG.ts
  *
- * RAG (Retrieval-Augmented Generation) pipeline extension. Wave 2:
- * aligned to proto-canonical RAG shapes (`@runanywhere/proto-ts/rag`).
+ * RAG (Retrieval-Augmented Generation) pipeline extension. All shapes come
+ * from `@runanywhere/proto-ts/rag`; commons owns the embedding,
+ * vector-store, and query pipeline.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift`.
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';

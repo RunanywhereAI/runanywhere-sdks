@@ -54,10 +54,6 @@ static const char* FORMAT_NAMES[] = {
     "LFM2 (Liquid)",  // RAC_TOOL_FORMAT_LFM2
 };
 
-// Legacy alias for backward compatibility
-static const char* TOOL_CALL_START_TAG = TAG_DEFAULT_START;
-static const char* TOOL_CALL_END_TAG = TAG_DEFAULT_END;
-
 // Standard keys for tool name (case-insensitive matching)
 static const char* TOOL_NAME_KEYS[] = {"tool",   "name",   "function", "func",
                                        "method", "action", "command",  nullptr};

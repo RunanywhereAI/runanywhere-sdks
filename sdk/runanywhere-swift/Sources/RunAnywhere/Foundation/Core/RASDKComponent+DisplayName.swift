@@ -5,7 +5,6 @@
 //  Human-readable display name for the proto-generated RASDKComponent enum.
 //
 
-import Foundation
 
 public extension RASDKComponent {
     var displayName: String {

@@ -5,7 +5,6 @@
 //  C-bridge extensions on proto-generated RA* STT types.
 //
 
-import CRACommons
 import Foundation
 
 // MARK: - RASTTConfiguration

@@ -6,7 +6,6 @@
 //
 
 import CRACommons
-import Foundation
 
 private enum HardwareProtoABI {
     typealias SetPreference = @convention(c) (CInt) -> rac_result_t

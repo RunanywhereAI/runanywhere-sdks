@@ -4,6 +4,12 @@
 //
 //  Focused tests for generated RA* structured-output helpers.
 //
+//  Untyped dictionaries from `JSONSerialization.jsonObject` are unavoidable
+//  here — the helpers cast its return value to inspect parsed JSON in
+//  assertions. The `avoid_any_type` rule is silenced for this file only.
+//
+
+// swiftlint:disable avoid_any_type
 
 import Foundation
 import XCTest
@@ -125,3 +131,5 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 }
+
+// swiftlint:enable avoid_any_type

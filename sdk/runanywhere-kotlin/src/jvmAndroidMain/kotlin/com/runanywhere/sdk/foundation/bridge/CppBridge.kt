@@ -14,7 +14,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
@@ -504,11 +503,6 @@ object CppBridge {
             }
 
             // Step 2: Model assignment registration removed.
-            // Native commons owns assignment fetch; legacy CppBridgeModelAssignment
-            // JSON adapter was deleted in the dead-code wave.
-
-            // Register platform services callbacks
-            CppBridgePlatform.register()
 
             // Flush any queued telemetry events now that HTTP should be configured.
             // In demo/default development mode, no usable external config is expected.
@@ -668,11 +662,6 @@ object CppBridge {
 
             // Cancel any pending async operations
             sdkScope.cancel()
-
-            // Unregister Phase 2 services (reverse order)
-            if (CppBridgeState.servicesInitialized) {
-                CppBridgePlatform.unregister()
-            }
 
             // Unregister Phase 1 core extensions (reverse order)
             CppBridgeDevice.unregister()

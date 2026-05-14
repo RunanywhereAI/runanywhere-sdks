@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -42,11 +43,12 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        const bool rac_check_result = static_cast<bool>(cond);                                   \
+        if (rac_check_result) {                                                                  \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -849,15 +851,23 @@ int main() {
     std::fprintf(stdout, "  skip: advanced modality proto ABI tests (no protobuf)\n");
     return 0;
 #else
-    test_missing_component_and_parse_error();
-    test_vlm_process_stream_events();
-    test_vlm_companion_resolution();
-    test_embeddings_mocked_result();
-    test_diffusion_progress_cancel_and_unsupported();
-    test_rag_ingest_query_mocked_path();
-    test_rag_unknown_embedding_model_id_fails();
-    test_rag_missing_embedding_model_id_fails();
-    test_lora_register_compat_apply_remove_clear();
+    try {
+        test_missing_component_and_parse_error();
+        test_vlm_process_stream_events();
+        test_vlm_companion_resolution();
+        test_embeddings_mocked_result();
+        test_diffusion_progress_cancel_and_unsupported();
+        test_rag_ingest_query_mocked_path();
+        test_rag_unknown_embedding_model_id_fails();
+        test_rag_missing_embedding_model_id_fails();
+        test_lora_register_compat_apply_remove_clear();
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "FATAL: uncaught unknown exception\n");
+        return 1;
+    }
 
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;

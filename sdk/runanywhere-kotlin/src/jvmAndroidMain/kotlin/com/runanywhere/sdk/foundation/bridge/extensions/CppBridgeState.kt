@@ -13,10 +13,10 @@
  *     consumer call site.
  *
  *  2. Persisted backend state accessors — environment, base URL, API
- *     key, device ID, device-registration flag, plus init/shutdown and
- *     `clearAuth`. These read/write the global `rac_sdk_state` (non-auth
- *     state) and `rac_auth_manager` (auth state) singletons via the
- *     `racState*` / `racAuth*` JNI thunks.
+ *     key, device ID, device-registration flag, plus init/shutdown.
+ *     These read/write the global `rac_sdk_state` (non-auth state) and
+ *     `rac_auth_manager` (auth state) singletons via the `racState*` /
+ *     `racAuth*` JNI thunks.
  *
  * Mirrors iOS source of truth:
  *   sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/
@@ -206,18 +206,6 @@ object CppBridgeState {
     // ════════════════════════════════════════════════════════════════════
     // Auth state (delegated to rac_auth_manager)
     // ════════════════════════════════════════════════════════════════════
-
-    /**
-     * Clear all authentication state — both in-memory tokens and any
-     * persisted secure-storage entries (when secure storage callbacks
-     * are wired into `rac_auth_init`).
-     *
-     * Mirrors Swift's `CppBridge.State.clearAuth()`.
-     */
-    fun clearAuth() {
-        RunAnywhereBridge.racAuthClear()
-        logger.debug("Auth state cleared")
-    }
 
     // ════════════════════════════════════════════════════════════════════
     // Runtime-gate helpers

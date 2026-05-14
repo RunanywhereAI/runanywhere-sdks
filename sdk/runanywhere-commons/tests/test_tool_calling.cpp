@@ -167,7 +167,7 @@ int test_format_prompt_json_lfm2() {
 // ---------------------------------------------------------------------------
 int test_build_initial_prompt_end_to_end() {
     const char* tools_json =
-        "[{\"name\":\"get_weather\",\"description\":\"Weather\",\"parameters\":[]}]";
+        R"([{"name":"get_weather","description":"Weather","parameters":[]}])";
     rac_tool_calling_options_t options = RAC_TOOL_CALLING_OPTIONS_DEFAULT;
     options.format = RAC_TOOL_FORMAT_DEFAULT;
 
@@ -189,7 +189,7 @@ int test_build_followup_prompt_no_tools() {
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_followup_prompt(
         "what is the weather in Tokyo?",
-        /*tools_prompt*/ nullptr, "get_weather", "{\"temperature_c\":22,\"condition\":\"sunny\"}",
+        /*tools_prompt*/ nullptr, "get_weather", R"({"temperature_c":22,"condition":"sunny"})",
         /*keep_tools_available*/ RAC_FALSE, &prompt);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(prompt != nullptr);
@@ -222,7 +222,7 @@ int test_build_followup_prompt_keep_tools() {
 // 7. normalize_json: unquoted keys become quoted
 // ---------------------------------------------------------------------------
 int test_normalize_json_unquoted_keys() {
-    const char* input = "{tool: \"get_weather\", arguments: {location: \"Tokyo\"}}";
+    const char* input = R"({tool: "get_weather", arguments: {location: "Tokyo"}})";
     char* out = nullptr;
     rac_result_t rc = rac_tool_call_normalize_json(input, &out);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
@@ -242,7 +242,7 @@ int test_free_functions_idempotent() {
     for (int i = 0; i < 100; ++i) {
         rac_tool_call_t result;
         rac_result_t rc = rac_tool_call_parse(
-            "<tool_call>{\"tool\":\"t\",\"arguments\":{\"k\":\"v\"}}</tool_call>", &result);
+            R"(<tool_call>{"tool":"t","arguments":{"k":"v"}}</tool_call>)", &result);
         ASSERT_EQ_INT(rc, RAC_SUCCESS);
         rac_tool_call_free(&result);
         // Double-free check: second call must be a no-op now that pointers are NULL.
@@ -287,7 +287,7 @@ int test_tool_result_loop() {
 
     char* result_json = nullptr;
     rc = rac_tool_call_result_to_json(parsed.tool_name, RAC_TRUE,
-                                      "{\"temperature_c\":22,\"condition\":\"clear\"}", nullptr,
+                                      R"({"temperature_c":22,"condition":"clear"})", nullptr,
                                       &result_json);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(result_json != nullptr);
@@ -317,7 +317,7 @@ int test_validate_tool_call_definitions() {
     rac_tool_parameter_t params[2] = {
         {"location", RAC_TOOL_PARAM_STRING, "City name", RAC_TRUE, nullptr},
         {"unit", RAC_TOOL_PARAM_STRING, "Temperature unit", RAC_FALSE,
-         "[\"celsius\",\"fahrenheit\"]"},
+         R"(["celsius","fahrenheit"])"},
     };
     rac_tool_definition_t tools[1] = {
         {"get_weather", "Get weather for a city", params, 2, "weather"},
@@ -341,7 +341,7 @@ int test_validate_tool_call_definitions() {
     rac_tool_call_free(&parsed);
 
     rc = rac_tool_call_parse(
-        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"unit\":\"kelvin\"}}</tool_call>",
+        R"(<tool_call>{"tool":"get_weather","arguments":{"unit":"kelvin"}}</tool_call>)",
         &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     rc = rac_tool_call_validate(&parsed, tools, 1, &validation);
@@ -485,7 +485,7 @@ int test_validate_proto_round_trip() {
     runanywhere::v1::ToolCallValidationRequest request;
     auto* call = request.mutable_tool_call();
     call->set_name("set_mode");
-    call->set_arguments_json("{\"enabled\":true,\"mode\":\"safe\"}");
+    call->set_arguments_json(R"({"enabled":true,"mode":"safe"})");
 
     auto* options = request.mutable_options();
     options->set_require_json_arguments(true);
@@ -542,23 +542,24 @@ int main(int argc, char** argv) {
     (void)argv;
 
     TestCase cases[] = {
-        {"parse_default_structured", test_parse_default_structured},
-        {"parse_lfm2_structured", test_parse_lfm2_structured},
-        {"parse_free_form_returns_false", test_parse_free_form_returns_false},
-        {"format_prompt_default_two_tools", test_format_prompt_default_two_tools},
-        {"format_prompt_json_lfm2", test_format_prompt_json_lfm2},
-        {"build_initial_prompt_e2e", test_build_initial_prompt_end_to_end},
-        {"build_followup_prompt_no_tools", test_build_followup_prompt_no_tools},
-        {"build_followup_prompt_keep_tools", test_build_followup_prompt_keep_tools},
-        {"normalize_json_unquoted_keys", test_normalize_json_unquoted_keys},
-        {"free_functions_idempotent", test_free_functions_idempotent},
-        {"format_name_round_trip", test_format_name_round_trip},
-        {"tool_result_loop", test_tool_result_loop},
-        {"validate_tool_call_definitions", test_validate_tool_call_definitions},
-        {"validate_tool_call_json_definitions", test_validate_tool_call_json_definitions},
-        {"parse_proto_round_trip", test_parse_proto_round_trip},
-        {"format_prompt_proto_round_trip", test_format_prompt_proto_round_trip},
-        {"validate_proto_round_trip", test_validate_proto_round_trip},
+        {.name = "parse_default_structured", .fn = test_parse_default_structured},
+        {.name = "parse_lfm2_structured", .fn = test_parse_lfm2_structured},
+        {.name = "parse_free_form_returns_false", .fn = test_parse_free_form_returns_false},
+        {.name = "format_prompt_default_two_tools", .fn = test_format_prompt_default_two_tools},
+        {.name = "format_prompt_json_lfm2", .fn = test_format_prompt_json_lfm2},
+        {.name = "build_initial_prompt_e2e", .fn = test_build_initial_prompt_end_to_end},
+        {.name = "build_followup_prompt_no_tools", .fn = test_build_followup_prompt_no_tools},
+        {.name = "build_followup_prompt_keep_tools", .fn = test_build_followup_prompt_keep_tools},
+        {.name = "normalize_json_unquoted_keys", .fn = test_normalize_json_unquoted_keys},
+        {.name = "free_functions_idempotent", .fn = test_free_functions_idempotent},
+        {.name = "format_name_round_trip", .fn = test_format_name_round_trip},
+        {.name = "tool_result_loop", .fn = test_tool_result_loop},
+        {.name = "validate_tool_call_definitions", .fn = test_validate_tool_call_definitions},
+        {.name = "validate_tool_call_json_definitions",
+         .fn = test_validate_tool_call_json_definitions},
+        {.name = "parse_proto_round_trip", .fn = test_parse_proto_round_trip},
+        {.name = "format_prompt_proto_round_trip", .fn = test_format_prompt_proto_round_trip},
+        {.name = "validate_proto_round_trip", .fn = test_validate_proto_round_trip},
     };
 
     int num_cases = static_cast<int>(sizeof(cases) / sizeof(cases[0]));

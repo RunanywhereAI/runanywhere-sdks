@@ -33,11 +33,12 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        const bool check_result = static_cast<bool>(cond);                                       \
+        if (check_result) {                                                                      \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -522,23 +523,31 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_model_lifecycle_proto\n");
+    try {
+        std::fprintf(stdout, "test_model_lifecycle_proto\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: model lifecycle proto tests (no protobuf)\n");
-    return 0;
+        std::fprintf(stdout, "  skip: model lifecycle proto tests (no protobuf)\n");
+        return 0;
 #else
-    rac_model_registry_handle_t registry = nullptr;
-    CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
-          "model registry creates");
+        rac_model_registry_handle_t registry = nullptr;
+        CHECK(rac_model_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
+              "model registry creates");
 
-    test_parse_error(registry);
-    test_model_missing(registry);
-    test_unsupported_route(registry);
-    test_success_current_snapshot_unload_events(registry);
-    test_vlm_lifecycle_resolved_artifacts(registry);
+        test_parse_error(registry);
+        test_model_missing(registry);
+        test_unsupported_route(registry);
+        test_success_current_snapshot_unload_events(registry);
+        test_vlm_lifecycle_resolved_artifacts(registry);
 
-    rac_model_registry_destroy(registry);
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        rac_model_registry_destroy(registry);
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: uncaught exception: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        std::fprintf(stderr, "FATAL: uncaught unknown exception\n");
+        return 1;
+    }
 }

@@ -6,8 +6,6 @@
 //
 
 import CRACommons
-import Foundation
-import SwiftProtobuf
 
 private enum ModelLifecycleProtoABI {
     typealias Load = @convention(c) (

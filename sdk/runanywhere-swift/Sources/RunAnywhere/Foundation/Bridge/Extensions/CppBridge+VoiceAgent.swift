@@ -6,7 +6,6 @@
 //
 
 import CRACommons
-import Foundation
 
 // MARK: - VoiceAgent Component Bridge
 

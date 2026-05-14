@@ -78,14 +78,6 @@ internal actual fun shutdownPlatformBridge() {
     logger.info("CppBridge shutdown complete")
 }
 
-/**
- * Configure telemetry base URL.
- * This should be called before SDK initialization if using a custom backend URL.
- */
-fun configureTelemetryBaseUrl(baseUrl: String) {
-    CppBridgeTelemetry.setBaseUrl(baseUrl)
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Auth + device-state actuals — route directly through `rac_auth_*` and
 // CppBridgeDevice thunks. No Kotlin-side cache.

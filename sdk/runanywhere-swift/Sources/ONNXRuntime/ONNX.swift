@@ -7,7 +7,6 @@
 //
 
 import CRACommons
-import Foundation
 import ONNXBackend
 import RunAnywhere
 

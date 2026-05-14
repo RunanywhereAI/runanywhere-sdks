@@ -12,7 +12,6 @@
 //
 
 import CRACommons
-import Foundation
 
 // MARK: - STT Component Bridge
 

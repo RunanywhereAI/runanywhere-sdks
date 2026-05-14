@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -45,11 +46,11 @@ int fail_count = 0;
 #define CHECK(cond, label)                                                                       \
     do {                                                                                         \
         ++test_count;                                                                            \
-        if (!(cond)) {                                                                           \
+        if ((cond)) {                                                                            \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
+        } else {                                                                                 \
             ++fail_count;                                                                        \
             std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__, #cond); \
-        } else {                                                                                 \
-            std::fprintf(stdout, "  ok:   %s\n", label);                                         \
         }                                                                                        \
     } while (0)
 
@@ -573,7 +574,7 @@ int test_mocked_tts() {
     auto chunk_cb = [](const uint8_t* data, size_t size, void* user_data) {
         auto* count = static_cast<int*>(user_data);
         runanywhere::v1::TTSOutput output;
-        if (output.ParseFromArray(data, static_cast<int>(size)) && output.audio_data().size() > 0) {
+        if (output.ParseFromArray(data, static_cast<int>(size)) && !output.audio_data().empty()) {
             ++(*count);
         }
     };
@@ -895,7 +896,7 @@ int test_voice_agent_d7_synthesize_speech_proto() {
     runanywhere::v1::TTSOutput result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "D-7 synthesize_speech_proto returns TTSOutput");
-    CHECK(result.audio_data().size() > 0, "D-7 TTSOutput carries audio bytes");
+    CHECK(!result.audio_data().empty(), "D-7 TTSOutput carries audio bytes");
     CHECK(result.is_final(), "D-7 TTSOutput is_final=true");
     rac_proto_buffer_free(&out);
     rac_voice_agent_destroy(agent);
@@ -919,27 +920,35 @@ int test_voice_agent_d7_component_create_destroy_proto() {
 }  // namespace
 
 int main() {
-    std::fprintf(stdout, "test_speech_proto_abi\n");
+    try {
+        std::fprintf(stdout, "test_speech_proto_abi\n");
 #if !defined(RAC_HAVE_PROTOBUF)
-    std::fprintf(stdout, "  skip: speech proto ABI tests (no protobuf)\n");
-    return 0;
+        std::fprintf(stdout, "  skip: speech proto ABI tests (no protobuf)\n");
+        return 0;
 #else
-    test_stt_generated_service_contract();
-    test_tts_generated_service_contract();
-    test_vad_generated_service_contract();
-    install_mock_plugin();
-    test_parse_failure_and_missing_component();
-    test_mocked_stt();
-    test_mocked_tts();
-    test_mocked_vad_and_activity();
-    test_voice_agent_proto_sequence_and_component_failure();
-    test_voice_agent_d7_process_turn_proto_full_flow();
-    test_voice_agent_d7_transcribe_proto();
-    test_voice_agent_d7_synthesize_speech_proto();
-    test_voice_agent_d7_component_create_destroy_proto();
-    rac_plugin_unregister("llamacpp");
-    rac_plugin_unregister("onnx");
-    std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
-    return fail_count == 0 ? 0 : 1;
+        test_stt_generated_service_contract();
+        test_tts_generated_service_contract();
+        test_vad_generated_service_contract();
+        install_mock_plugin();
+        test_parse_failure_and_missing_component();
+        test_mocked_stt();
+        test_mocked_tts();
+        test_mocked_vad_and_activity();
+        test_voice_agent_proto_sequence_and_component_failure();
+        test_voice_agent_d7_process_turn_proto_full_flow();
+        test_voice_agent_d7_transcribe_proto();
+        test_voice_agent_d7_synthesize_speech_proto();
+        test_voice_agent_d7_component_create_destroy_proto();
+        rac_plugin_unregister("llamacpp");
+        rac_plugin_unregister("onnx");
+        std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
+        return fail_count == 0 ? 0 : 1;
 #endif
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "fatal: unhandled exception: %s\n", e.what());
+        return 2;
+    } catch (...) {
+        std::fprintf(stderr, "fatal: unhandled non-std exception\n");
+        return 2;
+    }
 }

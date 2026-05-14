@@ -12,7 +12,6 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 
 // MARK: - Typealias
 

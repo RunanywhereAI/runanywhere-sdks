@@ -29,7 +29,6 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 
 // MARK: - Typealiases to proto-generated enums
 

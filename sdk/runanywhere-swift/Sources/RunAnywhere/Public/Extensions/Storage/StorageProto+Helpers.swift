@@ -51,13 +51,13 @@ extension RAAppStorageInfo {
 
 extension RAStorageInfo {
     public static let empty: RAStorageInfo = {
-        var s = RAStorageInfo()
-        s.app = RAAppStorageInfo()
-        s.device = RADeviceStorageInfo()
-        s.models = []
-        s.totalModels = 0
-        s.totalModelsBytes = 0
-        return s
+        var info = RAStorageInfo()
+        info.app = RAAppStorageInfo()
+        info.device = RADeviceStorageInfo()
+        info.models = []
+        info.totalModels = 0
+        info.totalModelsBytes = 0
+        return info
     }()
 
     public var totalModelsSizeBytes: Int64 {
@@ -142,11 +142,11 @@ extension RAStorageAvailability {
         availableBytes: Int64,
         recommendation: String? = nil
     ) -> RAStorageAvailability {
-        var s = RAStorageAvailability()
-        s.isAvailable = isAvailable
-        s.requiredBytes = requiredBytes
-        s.availableBytes = availableBytes
-        if let rec = recommendation { s.recommendation = rec }
-        return s
+        var availability = RAStorageAvailability()
+        availability.isAvailable = isAvailable
+        availability.requiredBytes = requiredBytes
+        availability.availableBytes = availableBytes
+        if let rec = recommendation { availability.recommendation = rec }
+        return availability
     }
 }

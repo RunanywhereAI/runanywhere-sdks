@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
-#include <random>
 #include <string>
 
 #include "core/internal/platform_compat.h"
@@ -85,17 +84,6 @@ static int32_t estimate_tokens(const char* text) {
     const size_t len = strlen(text);
     const int32_t tokens = static_cast<int32_t>((len + 3) / 4);
     return tokens > 0 ? tokens : 1;
-}
-
-/**
- * Generate a unique ID for generation tracking.
- */
-static std::string generate_unique_id() {
-    static thread_local std::mt19937 gen(std::random_device{}());
-    std::uniform_int_distribution<uint32_t> dis;
-    char buffer[32];
-    snprintf(buffer, sizeof(buffer), "vlm_%08x%08x", dis(gen), dis(gen));
-    return std::string(buffer);
 }
 
 // =============================================================================

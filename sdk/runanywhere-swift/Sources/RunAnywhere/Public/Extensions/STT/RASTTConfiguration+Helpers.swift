@@ -10,7 +10,6 @@
 //  rac_min / rac_max annotations in idl/stt_options.proto.
 //
 
-import Foundation
 
 // MARK: - RASTTLanguage
 //

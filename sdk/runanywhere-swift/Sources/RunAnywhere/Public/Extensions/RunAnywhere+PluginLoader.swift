@@ -46,8 +46,6 @@ public extension RunAnywhere {
     /// Backed by the `rac_registry_*` C ABI.
     struct PluginLoaderNamespace: Sendable {
 
-        fileprivate init() {}
-
         /// Compile-time plugin API version this build of `RACommons` was built
         /// against. Gate on this before loading third-party plugin binaries.
         public var apiVersion: UInt32 {
@@ -105,12 +103,12 @@ public extension RunAnywhere {
             var names: UnsafeMutablePointer<UnsafePointer<CChar>?>?
             var count: Int = 0
             let rc = rac_registry_list_plugins(&names, &count)
-            guard rc == RAC_SUCCESS, let n = names else { return [] }
-            defer { rac_registry_free_plugin_list(n, count) }
+            guard rc == RAC_SUCCESS, let buffer = names else { return [] }
+            defer { rac_registry_free_plugin_list(buffer, count) }
             var out: [String] = []
             out.reserveCapacity(count)
             for i in 0..<count {
-                if let cstr = n[i] {
+                if let cstr = buffer[i] {
                     out.append(String(cString: cstr))
                 }
             }

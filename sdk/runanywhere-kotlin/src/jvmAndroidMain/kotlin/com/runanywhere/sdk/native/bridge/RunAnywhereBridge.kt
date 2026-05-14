@@ -155,10 +155,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
 
-    // PENDING — wired for future feature (lifecycle-style cancel; Kotlin currently routes through racLlmCancelProto)
-    @JvmStatic
-    external fun racLlmComponentCancel(handle: Long): Int
-
     // ========================================================================
     // LLM GENERATED-PROTO ABI (rac_llm_service.h)
     // ========================================================================
@@ -495,26 +491,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
 
-    /**
-     * Convert Int16 PCM audio data to WAV format.
-     *
-     * @param pcmData Int16 PCM audio data (raw bytes)
-     * @param sampleRate Sample rate in Hz
-     * @return WAV file data as ByteArray, or null on error
-     */
-    // UTILITY — used from JNI helpers but not directly from Kotlin
-    @JvmStatic
-    external fun racAudioInt16ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
-
-    /**
-     * Get the WAV header size in bytes.
-     *
-     * @return WAV header size (always 44 bytes for standard PCM WAV)
-     */
-    // UTILITY — used from JNI helpers but not directly from Kotlin
-    @JvmStatic
-    external fun racAudioWavHeaderSize(): Int
-
     // ========================================================================
     // DEVICE MANAGER (rac_device_manager.h)
     // Mirrors Swift SDK's CppBridge+Device.swift
@@ -540,27 +516,6 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racDeviceManagerRegisterIfNeeded(environment: Int, buildToken: String?): Int
-
-    /**
-     * Check if device is registered.
-     */
-    // PENDING — wired for future feature (no current Kotlin caller; covered by racDeviceManagerSetCallbacks state)
-    @JvmStatic
-    external fun racDeviceManagerIsRegistered(): Boolean
-
-    /**
-     * Clear device registration status.
-     */
-    // PENDING — wired for future feature (no current Kotlin caller)
-    @JvmStatic
-    external fun racDeviceManagerClearRegistration()
-
-    /**
-     * Get the current device ID.
-     */
-    // PENDING — wired for future feature (Kotlin uses CppBridgeDevice.getDeviceId / racAuthGetDeviceId)
-    @JvmStatic
-    external fun racDeviceManagerGetDeviceId(): String?
 
     // ========================================================================
     // TELEMETRY MANAGER (rac_telemetry_manager.h)
@@ -883,16 +838,8 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift
     // ========================================================================
 
-    // PENDING — wired for future feature (parser exposed for downstream tool-call UX work)
-    @JvmStatic
-    external fun racToolCallParseProto(requestProto: ByteArray): ByteArray?
-
     @JvmStatic
     external fun racToolCallFormatPromptProto(requestProto: ByteArray): ByteArray?
-
-    // PENDING — wired for future feature (schema validation exposed for downstream tool-call UX work)
-    @JvmStatic
-    external fun racToolCallValidateProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // FILE MANAGER (rac_file_manager.h)
@@ -1016,36 +963,6 @@ object RunAnywhereBridge {
     /** Process one voice turn and return serialized VoiceAgentResult bytes. */
     @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
 
-    /**
-     * Wave D-7 / KOT-11: Full-session voice-agent turn. Accepts serialized
-     * VoiceAgentTurnRequest bytes (request_id, session_id, session_config,
-     * metadata, audio_data + encoding) and emits a canonical VoiceEvent
-     * stream through the listener. Returns rac_result_t.
-     */
-    // PENDING — wired for future feature (Kotlin currently uses racVoiceAgentProcessVoiceTurnProto)
-    @JvmStatic
-    external fun racVoiceAgentProcessTurnProto(
-        handle: Long,
-        requestBytes: ByteArray,
-        listener: NativeProtoProgressListener,
-    ): Int
-
-    /**
-     * Wave D-7 / KOT-11: Transcribe via the voice-agent's STT component.
-     * Accepts serialized VoiceAgentTranscribeRequest; returns VoiceAgentTranscribeResult bytes.
-     */
-    // PENDING — wired for future feature (Kotlin currently routes through STT component thunks)
-    @JvmStatic
-    external fun racVoiceAgentTranscribeProto(handle: Long, requestBytes: ByteArray): ByteArray?
-
-    /**
-     * Wave D-7 / KOT-11: Synthesize via the voice-agent's TTS component.
-     * Accepts serialized VoiceAgentSynthesizeSpeechRequest; returns VoiceAgentSynthesizeSpeechResult bytes.
-     */
-    // PENDING — wired for future feature (Kotlin currently routes through TTS component thunks)
-    @JvmStatic
-    external fun racVoiceAgentSynthesizeSpeechProto(handle: Long, requestBytes: ByteArray): ByteArray?
-
     // ========================================================================
     // TOOL-CALLING SESSION (rac_tool_calling.h — Wave D-4 / KOT-08)
     // ========================================================================
@@ -1124,13 +1041,7 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racEmbeddingsCreate(modelId: String): Long
 
-    // PENDING — wired for future feature (Kotlin currently uses racEmbeddingsCreate only)
-    @JvmStatic external fun racEmbeddingsCreateWithConfig(modelId: String, configJson: String?): Long
-
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
-
-    // PENDING — wired for future feature (no explicit destroy call from Kotlin yet)
-    @JvmStatic external fun racEmbeddingsDestroy(handle: Long)
 
     // ========================================================================
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
@@ -1332,19 +1243,6 @@ object RunAnywhereBridge {
     /** Reset auth state (clears in-memory tokens + IDs). */
     @JvmStatic external fun racAuthReset()
 
-    /** Clear all auth state including secure storage (if wired). */
-    // PENDING — wired for future feature (no current Kotlin caller; covered by racAuthReset for in-memory state)
-    @JvmStatic external fun racAuthClear()
-
-    /** Restore tokens from secure storage. Returns 0 on success, -1 if
-     *  not found or storage callbacks not wired. */
-    // PENDING — wired for future feature (secure-storage rehydration path; not yet wired in Kotlin)
-    @JvmStatic external fun racAuthLoadStoredTokens(): Int
-
-    /** Persist current tokens to secure storage. Returns 0 on success. */
-    // PENDING — wired for future feature (secure-storage persistence path; not yet wired in Kotlin)
-    @JvmStatic external fun racAuthSaveTokens(): Int
-
     @JvmStatic external fun racAuthIsAuthenticated(): Boolean
 
     @JvmStatic external fun racAuthNeedsRefresh(): Boolean
@@ -1426,12 +1324,6 @@ object RunAnywhereBridge {
     // `runanywhere.v1.FrameworksForCapabilityResponse`. Replaces the local
     // SDKComponent → ModelCategory → framework mapping that used to live in
     // Kotlin.
-
-    /** Resolve the ordered list of frameworks that can serve a given SDKComponent.
-     *  Input: serialized FrameworksForCapabilityRequest.
-     *  Output: serialized FrameworksForCapabilityResponse, or null on failure. */
-    // PENDING — wired for future feature (capability → framework query not yet driven from Kotlin)
-    @JvmStatic external fun racRouterFrameworksForCapabilityProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // HARDWARE ACCELERATORS (Swift-alignment Phase 1 — Group A)
@@ -1699,22 +1591,6 @@ object RunAnywhereBridge {
 
     /** Get the model-assignments endpoint path (env-independent). */
     @JvmStatic external fun racEndpointModelAssignments(): String?
-
-    // ========================================================================
-    // MODEL ASSIGNMENT (Swift-alignment Phase 1 — Group I)
-    // ========================================================================
-
-    /** Register the model-assignment callback bridge. Returns 0 on success. */
-    @JvmStatic external fun racModelAssignmentSetCallbacks(cb: Any): Int
-
-    /** Fetch model assignments from the backend. Returns rac_result_t. */
-    @JvmStatic external fun racModelAssignmentFetch(forceRefresh: Boolean): Int
-
-    /** Filter cached assignments by framework. Returns serialized ModelInfoList bytes, or null. */
-    @JvmStatic external fun racModelAssignmentGetByFramework(framework: Int): ByteArray?
-
-    /** Filter cached assignments by model category. Returns serialized ModelInfoList bytes, or null. */
-    @JvmStatic external fun racModelAssignmentGetByCategory(category: Int): ByteArray?
 
     // ========================================================================
     // CONSTANTS

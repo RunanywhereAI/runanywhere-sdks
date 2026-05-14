@@ -69,7 +69,7 @@ int test_extract_object_from_mixed_text() {
 int test_extract_array_with_braces_in_string() {
     char* json = nullptr;
     const rac_result_t rc = rac_structured_output_extract_json(
-        "answer [{\"text\":\"brace } inside\"}]", &json, nullptr);
+        R"(answer [{"text":"brace } inside"}])", &json, nullptr);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(json != nullptr);
     ASSERT_EQ_STR(json, "[{\"text\":\"brace } inside\"}]");
@@ -123,7 +123,7 @@ int test_parse_result_schema_validation() {
 
     rac_structured_output_parse_result_t parsed{};
     rac_result_t rc =
-        rac_structured_output_parse("result {\"status\":\"ok\",\"count\":2}", &config, &parsed);
+        rac_structured_output_parse(R"(result {"status":"ok","count":2})", &config, &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(parsed.is_valid, RAC_TRUE);
     ASSERT_EQ_INT(parsed.contains_json, RAC_TRUE);
@@ -132,7 +132,7 @@ int test_parse_result_schema_validation() {
     ASSERT_SUBSTR(parsed.validation_errors_json, "[]");
     rac_structured_output_parse_result_free(&parsed);
 
-    rc = rac_structured_output_parse("{\"count\":\"two\",\"extra\":true}", &config, &parsed);
+    rc = rac_structured_output_parse(R"({"count":"two","extra":true})", &config, &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_INT(parsed.is_valid, RAC_FALSE);
     ASSERT_TRUE(parsed.parsed_json != nullptr);
@@ -146,7 +146,7 @@ int test_parse_result_schema_validation() {
 #if defined(RAC_HAVE_PROTOBUF)
 int test_parse_proto_uses_generated_contract() {
     runanywhere::v1::StructuredOutputParseRequest request;
-    request.set_text("answer {\"status\":\"ok\",\"count\":2}");
+    request.set_text(R"(answer {"status":"ok","count":2})");
     request.mutable_options()->set_json_schema(
         "{\"type\":\"object\",\"required\":[\"status\"],\"properties\":{"
         "\"status\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},"
@@ -211,7 +211,7 @@ int test_prepare_prompt_proto_uses_generated_contract() {
 
 int test_validate_proto_uses_generated_contract() {
     runanywhere::v1::StructuredOutputValidationRequest request;
-    request.set_text("answer {\"status\":\"ok\"}");
+    request.set_text(R"(answer {"status":"ok"})");
     auto* schema = request.mutable_options()->mutable_schema();
     schema->set_type(runanywhere::v1::JSON_SCHEMA_TYPE_OBJECT);
     schema->add_required("status");
@@ -247,7 +247,7 @@ int test_validate_proto_uses_generated_contract() {
 
 int test_prepare_prompt_and_system_prompt() {
     rac_structured_output_config_t config = RAC_STRUCTURED_OUTPUT_DEFAULT;
-    config.json_schema = "{\"type\":\"object\"}";
+    config.json_schema = R"({"type":"object"})";
     config.include_schema_in_prompt = RAC_TRUE;
 
     char* prepared = nullptr;
@@ -277,26 +277,29 @@ struct TestCase {
 
 int main() {
     TestCase cases[] = {
-        {"extract_object_from_mixed_text", test_extract_object_from_mixed_text},
-        {"extract_array_with_braces_in_string", test_extract_array_with_braces_in_string},
-        {"extract_skips_invalid_candidate", test_extract_skips_invalid_candidate},
-        {"validate_success_and_failure", test_validate_success_and_failure},
-        {"parse_result_schema_validation", test_parse_result_schema_validation},
+        {.name = "extract_object_from_mixed_text", .fn = test_extract_object_from_mixed_text},
+        {.name = "extract_array_with_braces_in_string",
+         .fn = test_extract_array_with_braces_in_string},
+        {.name = "extract_skips_invalid_candidate", .fn = test_extract_skips_invalid_candidate},
+        {.name = "validate_success_and_failure", .fn = test_validate_success_and_failure},
+        {.name = "parse_result_schema_validation", .fn = test_parse_result_schema_validation},
 #if defined(RAC_HAVE_PROTOBUF)
-        {"parse_proto_uses_generated_contract", test_parse_proto_uses_generated_contract},
-        {"prepare_prompt_proto_uses_generated_contract",
-         test_prepare_prompt_proto_uses_generated_contract},
-        {"validate_proto_uses_generated_contract", test_validate_proto_uses_generated_contract},
+        {.name = "parse_proto_uses_generated_contract",
+         .fn = test_parse_proto_uses_generated_contract},
+        {.name = "prepare_prompt_proto_uses_generated_contract",
+         .fn = test_prepare_prompt_proto_uses_generated_contract},
+        {.name = "validate_proto_uses_generated_contract",
+         .fn = test_validate_proto_uses_generated_contract},
 #endif
-        {"prepare_prompt_and_system_prompt", test_prepare_prompt_and_system_prompt},
+        {.name = "prepare_prompt_and_system_prompt", .fn = test_prepare_prompt_and_system_prompt},
     };
 
     int failed = 0;
     const int count = static_cast<int>(sizeof(cases) / sizeof(cases[0]));
-    for (int i = 0; i < count; ++i) {
-        std::printf("[structured_output] %s ... ", cases[i].name);
+    for (const auto& test_case : cases) {
+        std::printf("[structured_output] %s ... ", test_case.name);
         std::fflush(stdout);
-        const int rc = cases[i].fn();
+        const int rc = test_case.fn();
         if (rc == 0) {
             std::printf("OK\n");
         } else {

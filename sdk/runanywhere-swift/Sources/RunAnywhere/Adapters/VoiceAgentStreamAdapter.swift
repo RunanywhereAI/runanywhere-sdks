@@ -24,9 +24,6 @@
 //  (handled inside `HandleStreamAdapter`).
 
 import CRACommons
-import Foundation
-import os
-import SwiftProtobuf
 
 /// AsyncStream-based wrapper over the GAP 09 proto-byte voice agent ABI.
 ///

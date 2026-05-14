@@ -5,7 +5,6 @@
 //  Log destination that sends logs to Sentry for error tracking
 //
 
-import Foundation
 import Sentry
 
 /// Log destination that sends warning+ logs to Sentry

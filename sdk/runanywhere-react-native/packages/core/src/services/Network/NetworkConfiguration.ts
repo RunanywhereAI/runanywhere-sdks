@@ -1,182 +1,22 @@
 /**
  * NetworkConfiguration.ts
  *
- * Network configuration types and utilities. HTTP transport lives entirely in
- * native code (rac_http_client_*) — this module only defines the
- * configuration shape consumed by the SDK facade.
+ * Tiny set of call-site validators used when building the Phase 1 init
+ * payload. The HTTP transport, retry logic, telemetry, auth, and device
+ * registration all live in native commons (`rac_http_*`); JavaScript only
+ * needs to refuse obviously-broken inputs before crossing the bridge.
  */
-
-import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-
-export { SDKEnvironment };
-
-/**
- * Network configuration options for SDK initialization
- */
-export interface NetworkConfig {
-  /**
-   * Base URL for API requests
-   * - Production: Railway endpoint (e.g., "https://api.runanywhere.ai")
-   * - Development: Can be left empty if supabase config is provided
-   */
-  baseURL?: string;
-
-  /**
-   * API key for authentication
-   * - Production: RunAnywhere API key
-   * - Development: Build token
-   */
-  apiKey: string;
-
-  /**
-   * SDK environment
-   * @default SDKEnvironment.Production
-   */
-  environment?: SDKEnvironment;
-
-  /**
-   * Supabase configuration for development mode
-   * When provided in development mode, SDK makes calls directly to Supabase
-   */
-  supabase?: {
-    url: string;
-    anonKey: string;
-  };
-
-  /**
-   * Request timeout in milliseconds
-   * @default 30000
-   */
-  timeoutMs?: number;
-}
-
-/**
- * Default production base URL
- */
-export const DEFAULT_BASE_URL = 'https://api.runanywhere.ai';
-
-/**
- * Default timeout in milliseconds
- */
-export const DEFAULT_TIMEOUT_MS = 30000;
 
 const PLACEHOLDER_PATTERN = /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i;
 
-/**
- * True for empty values and template strings such as
- * `YOUR_SUPABASE_PROJECT_URL`.
- */
-export function looksLikePlaceholder(value?: string | null): boolean {
+/** Default base URL when the app does not override it. */
+export const DEFAULT_BASE_URL = 'https://api.runanywhere.ai';
+
+function looksLikePlaceholder(value?: string | null): boolean {
   return !value || value.trim().length === 0 || PLACEHOLDER_PATTERN.test(value);
 }
 
-/**
- * Validate external HTTP endpoints before handing them to native transport.
- */
-export function isUsableHttpUrl(value?: string | null): boolean {
-  if (looksLikePlaceholder(value)) {
-    return false;
-  }
-
-  const trimmed = value!.trim();
-  if (!/^https?:\/\//i.test(trimmed)) {
-    return false;
-  }
-
-  const withoutScheme = trimmed.replace(/^https?:\/\//i, '');
-  const host = withoutScheme.split(/[/?#]/, 1)[0];
-  return host.length > 0 && !/[\s<>]/.test(host);
-}
-
+/** Reject empty values and template strings such as `YOUR_API_KEY`. */
 export function isUsableCredential(value?: string | null): boolean {
   return !looksLikePlaceholder(value);
 }
-
-export function hasUsableBackendConfig(options: {
-  baseURL?: string | null;
-  apiKey?: string | null;
-}): boolean {
-  return isUsableHttpUrl(options.baseURL) && isUsableCredential(options.apiKey);
-}
-
-export function hasUsableSupabaseConfig(options: {
-  supabaseURL?: string | null;
-  supabaseKey?: string | null;
-}): boolean {
-  return (
-    isUsableHttpUrl(options.supabaseURL) &&
-    isUsableCredential(options.supabaseKey)
-  );
-}
-
-/**
- * Create network configuration from SDK init options
- */
-export function createNetworkConfig(options: {
-  apiKey: string;
-  baseURL?: string;
-  environment?: 'development' | 'staging' | 'production';
-  supabaseURL?: string;
-  supabaseKey?: string;
-  timeoutMs?: number;
-}): NetworkConfig {
-  let environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-  if (options.environment === 'development') {
-    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-  } else if (options.environment === 'staging') {
-    environment = SDKEnvironment.SDK_ENVIRONMENT_STAGING;
-  }
-
-  const supabase =
-    hasUsableSupabaseConfig({
-      supabaseURL: options.supabaseURL,
-      supabaseKey: options.supabaseKey,
-    })
-      ? {
-          url: options.supabaseURL!.trim(),
-          anonKey: options.supabaseKey!.trim(),
-      }
-      : undefined;
-
-  const trimmedBaseURL = options.baseURL?.trim();
-  const baseURL =
-    trimmedBaseURL && trimmedBaseURL.length > 0
-      ? isUsableHttpUrl(trimmedBaseURL)
-        ? trimmedBaseURL
-        : undefined
-      : DEFAULT_BASE_URL;
-
-  return {
-    baseURL,
-    apiKey: isUsableCredential(options.apiKey) ? options.apiKey.trim() : '',
-    environment,
-    supabase,
-    timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
-  };
-}
-
-/**
- * Get environment name string
- */
-export function getEnvironmentName(env: SDKEnvironment): string {
-  switch (env) {
-    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-      return 'development';
-    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-      return 'staging';
-    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-      return 'production';
-    default:
-      return 'unknown';
-  }
-}
-
-export function isDevelopment(env: SDKEnvironment): boolean {
-  return env === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-}
-
-export function isProduction(env: SDKEnvironment): boolean {
-  return env === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-}
-
-export default NetworkConfig;

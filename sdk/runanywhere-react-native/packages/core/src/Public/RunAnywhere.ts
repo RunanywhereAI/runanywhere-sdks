@@ -11,7 +11,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { initializeNitroModulesGlobally } from '../native/NitroModulesGlobalInit';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
-import { SDKConstants } from '../Foundation/Constants';
+import { SDKConstants } from '../Foundation/Constants/SDKConstants';
 import {
   DEFAULT_BASE_URL,
   isUsableCredential,

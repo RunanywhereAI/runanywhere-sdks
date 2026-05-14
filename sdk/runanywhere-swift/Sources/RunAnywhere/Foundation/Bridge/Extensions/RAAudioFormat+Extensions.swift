@@ -13,9 +13,6 @@
 //  compatibility.
 //
 
-import CRACommons
-import Foundation
-import SwiftProtobuf
 
 // MARK: - Codable (wire format = lowercase short name)
 //

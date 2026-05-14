@@ -20,6 +20,7 @@
 #include <map>
 #include <mutex>
 #include <new>
+#include <ranges>
 #include <string>
 #include <utility>
 #include <vector>
@@ -131,7 +132,7 @@ static void free_model_info(rac_model_info_t* model) {
             if (model->tags[i])
                 free(model->tags[i]);
         }
-        free(model->tags);
+        free(static_cast<void*>(model->tags));
     }
 
     free(model);
@@ -457,7 +458,7 @@ copy_string_array_from_proto(const google::protobuf::RepeatedPtrField<std::strin
             for (size_t j = 0; j < i; ++j) {
                 free(const_cast<char*>(values[j]));
             }
-            free(values);
+            free(static_cast<void*>(values));
             return false;
         }
     }
@@ -1258,14 +1259,14 @@ static void sort_query_results(const ModelQuery& query, std::vector<ModelInfo>* 
         query.has_sort_order() &&
         query.sort_order() == runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING;
 
-    std::sort(models->begin(), models->end(),
-              [sort_field, descending](const ModelInfo& lhs, const ModelInfo& rhs) {
-                  int result = compare_models_by_sort_field(lhs, rhs, sort_field);
-                  if (result == 0) {
-                      return lhs.id() < rhs.id();
-                  }
-                  return descending ? result > 0 : result < 0;
-              });
+    std::ranges::sort(*models,
+                      [sort_field, descending](const ModelInfo& lhs, const ModelInfo& rhs) {
+                          int result = compare_models_by_sort_field(lhs, rhs, sort_field);
+                          if (result == 0) {
+                              return lhs.id() < rhs.id();
+                          }
+                          return descending ? result > 0 : result < 0;
+                      });
 }
 
 static void append_query_results_locked(rac_model_registry_handle_t handle, const ModelQuery& query,
@@ -1365,7 +1366,7 @@ static bool path_matches_roots(const std::string& path,
         return true;
     }
     for (const std::string& root : roots) {
-        if (root.empty() || path.find(root) == 0) {
+        if (root.empty() || path.starts_with(root)) {
             return true;
         }
     }
@@ -1384,8 +1385,7 @@ static std::string basename_from_path(const std::string& path) {
 }
 
 static bool ends_with(const std::string& value, const std::string& suffix) {
-    return value.size() >= suffix.size() &&
-           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+    return value.ends_with(suffix);
 }
 
 static std::string strip_known_model_extension(const std::string& basename) {
@@ -1515,7 +1515,7 @@ static std::filesystem::path canonical_model_folder_for(const std::string& model
     if (rc != RAC_SUCCESS) {
         return fs::path{};
     }
-    return fs::path(buffer);
+    return {buffer};
 }
 
 // Attempt to link a single registry entry to its canonical on-disk folder.
@@ -1535,7 +1535,7 @@ static bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t ha
         return false;
     }
     const char* base = rac_model_paths_get_base_dir();
-    if (!base || !*base) {
+    if (!base || *base == '\0') {
         return false;
     }
     const std::filesystem::path folder = canonical_model_folder_for(model->id, model->framework);
@@ -1577,7 +1577,7 @@ static int32_t reconcile_registry_with_filesystem_locked(rac_model_registry_hand
         return 0;
     }
     const char* base = rac_model_paths_get_base_dir();
-    if (!base || !*base) {
+    if (!base || *base == '\0') {
         return 0;
     }
 
@@ -1678,8 +1678,9 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         // This prevents registerModel() (which always passes localPath=nil) from
         // overwriting a localPath that was set by download completion or discovery.
         const char* existing_local_path = it->second->local_path;
-        bool should_preserve_path = existing_local_path && strlen(existing_local_path) > 0 &&
-                                    (!model->local_path || strlen(model->local_path) == 0);
+        bool should_preserve_path =
+            (existing_local_path != nullptr) && strlen(existing_local_path) > 0 &&
+            (model->local_path == nullptr || strlen(model->local_path) == 0);
 
         // Store a deep copy of the incoming model
         rac_model_info_t* copy = deep_copy_model(model);
@@ -1779,7 +1780,7 @@ rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
         if (model->local_path) {
             std::string model_path(model->local_path);
             // Check if search path starts with model's local_path
-            if (search_path.find(model_path) == 0 || model_path.find(search_path) == 0) {
+            if (search_path.starts_with(model_path) || model_path.starts_with(search_path)) {
                 *out_model = deep_copy_model(model);
                 if (!*out_model) {
                     return RAC_ERROR_OUT_OF_MEMORY;
@@ -1821,7 +1822,7 @@ rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t handle,
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -1873,7 +1874,7 @@ rac_result_t rac_model_registry_get_by_frameworks(rac_model_registry_handle_t ha
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -1967,7 +1968,7 @@ rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle_t handl
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -2829,15 +2830,14 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
         RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
         RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
         RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
-    constexpr size_t kFrameworkCount = sizeof(frameworks) / sizeof(frameworks[0]);
 
     int32_t linked = 0;
     std::vector<rac_directory_entry_t> framework_entries;
     std::vector<rac_directory_entry_t> model_entries;
 
-    for (size_t f = 0; f < kFrameworkCount; ++f) {
+    for (const rac_inference_framework_t framework : frameworks) {
         char framework_dir[1024];
-        if (rac_model_paths_get_framework_directory(frameworks[f], framework_dir,
+        if (rac_model_paths_get_framework_directory(framework, framework_dir,
                                                     sizeof(framework_dir)) != RAC_SUCCESS) {
             continue;
         }
@@ -3079,18 +3079,18 @@ rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_mode
 // Returns "" if the basename has no '.' or starts with '.' (hidden file).
 static std::string extension_from_path(const char* path) {
     if (!path)
-        return std::string();
+        return {};
     std::string s(path);
     size_t slash = s.find_last_of('/');
     std::string base = (slash == std::string::npos) ? s : s.substr(slash + 1);
     if (base.empty() || base.front() == '.')
-        return std::string();
+        return {};
     size_t dot = base.find_last_of('.');
     if (dot == std::string::npos || dot + 1 >= base.size())
-        return std::string();
+        return {};
     std::string ext = base.substr(dot + 1);
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(ext, ext.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return ext;
 }
 

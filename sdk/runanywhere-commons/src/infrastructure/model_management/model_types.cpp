@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
+#include <ranges>
 #include <string>
 
 #include "rac/core/rac_logger.h"
@@ -46,7 +47,7 @@ rac_bool_t rac_archive_type_from_path(const char* url_path, rac_archive_type_t* 
 
     // Convert to lowercase for comparison
     std::string path(url_path);
-    std::transform(path.begin(), path.end(), path.begin(), ::tolower);
+    std::ranges::transform(path, path.begin(), ::tolower);
 
     // Check suffixes (mirrors Swift's ArchiveType.from(url:))
     if (path.rfind(".tar.bz2") != std::string::npos || path.rfind(".tbz2") != std::string::npos) {
@@ -643,7 +644,7 @@ rac_bool_t rac_model_detect_format_from_extension(const char* extension,
 
     // Convert to lowercase for comparison
     std::string ext(extension);
-    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    std::ranges::transform(ext, ext.begin(), ::tolower);
 
     // Ported from Swift RegistryService.detectFormatFromExtension() (lines 330-338)
     if (ext == "onnx") {
@@ -796,8 +797,8 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
     if (!ext.empty() && ext.front() == '.') {
         ext.erase(ext.begin());
     }
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(ext, ext.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
     if (ext.empty()) {
         return RAC_SUCCESS;  // *out already RAC_FALSE
@@ -872,7 +873,7 @@ void rac_model_generate_id(const char* url, char* out_id, size_t max_len) {
         size_t dot_pos = filename.rfind('.');
         if (dot_pos != std::string::npos && dot_pos < filename.size() - 1) {
             std::string ext = filename.substr(dot_pos + 1);
-            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            std::ranges::transform(ext, ext.begin(), ::tolower);
 
             for (const auto& known_extension : known_extensions) {
                 if (ext == known_extension) {
@@ -951,8 +952,8 @@ rac_result_t rac_model_id_from_url(const char* url, char* out, size_t out_size) 
             break;
         }
         std::string ext = filename.substr(dot_pos + 1);
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
+        std::ranges::transform(ext, ext.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
         for (const char* known : kKnownExtensions) {
             if (ext == known) {
                 filename.resize(dot_pos);
@@ -993,9 +994,9 @@ void rac_model_generate_name(const char* url, char* out_name, size_t max_len) {
     }
 
     // Replace underscores and dashes with spaces (Swift lines 322-323)
-    for (size_t i = 0; i < filename.size(); i++) {
-        if (filename[i] == '_' || filename[i] == '-') {
-            filename[i] = ' ';
+    for (char& ch : filename) {
+        if (ch == '_' || ch == '-') {
+            ch = ' ';
         }
     }
 
@@ -1016,8 +1017,8 @@ static bool contains_case_insensitive(const char* haystack, const char* needle) 
 
     std::string h(haystack);
     std::string n(needle);
-    std::transform(h.begin(), h.end(), h.begin(), ::tolower);
-    std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+    std::ranges::transform(h, h.begin(), ::tolower);
+    std::ranges::transform(n, n.begin(), ::tolower);
 
     return h.find(n) != std::string::npos;
 }
@@ -1168,7 +1169,7 @@ void rac_model_info_free(rac_model_info_t* model) {
         for (size_t i = 0; i < model->tag_count; i++) {
             free(model->tags[i]);
         }
-        free(model->tags);
+        free(static_cast<void*>(model->tags));
     }
 
     free(model);
@@ -1180,7 +1181,7 @@ void rac_model_info_array_free(rac_model_info_t** models, size_t count) {
     for (size_t i = 0; i < count; i++) {
         rac_model_info_free(models[i]);
     }
-    free(models);
+    free(static_cast<void*>(models));
 }
 
 rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {

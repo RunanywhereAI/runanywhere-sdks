@@ -7,7 +7,6 @@
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
-import CRACommons
 import Foundation
 
 // MARK: - VAD Operations

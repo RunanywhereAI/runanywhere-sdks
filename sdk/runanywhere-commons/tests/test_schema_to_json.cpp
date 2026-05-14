@@ -101,8 +101,7 @@ int test_simple_object() {
         return 1;
     }
     const char* expected =
-        "{\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"],\"type\":"
-        "\"object\"}";
+        R"({"properties":{"name":{"type":"string"}},"required":["name"],"type":"object"})";
     ASSERT_EQ_STR(actual.c_str(), expected);
     return 0;
 }
@@ -155,7 +154,7 @@ int test_array_root() {
     if (run_schema_to_json(schema, &actual) != 0) {
         return 1;
     }
-    const char* expected = "{\"items\":{\"type\":\"string\"},\"type\":\"array\"}";
+    const char* expected = R"({"items":{"type":"string"},"type":"array"})";
     ASSERT_EQ_STR(actual.c_str(), expected);
     return 0;
 }
@@ -224,13 +223,13 @@ int test_raw_json_passthrough() {
     ::runanywhere::v1::JSONSchema schema;
     // Intentionally non-canonical: extra whitespace, mixed key order. Swift
     // returns this verbatim without re-canonicalization.
-    schema.set_raw_json("  { \"type\": \"object\", \"x\": 1 }  ");
+    schema.set_raw_json(R"(  { "type": "object", "x": 1 }  )");
 
     std::string actual;
     if (run_schema_to_json(schema, &actual) != 0) {
         return 1;
     }
-    ASSERT_EQ_STR(actual.c_str(), "  { \"type\": \"object\", \"x\": 1 }  ");
+    ASSERT_EQ_STR(actual.c_str(), R"(  { "type": "object", "x": 1 }  )");
     return 0;
 }
 
@@ -249,20 +248,20 @@ int main() {
     return 0;
 #else
     TestCase cases[] = {
-        {"simple_object", test_simple_object},
-        {"nested_object", test_nested_object},
-        {"array_root", test_array_root},
-        {"property_with_enum", test_property_with_enum},
-        {"ref_and_definitions", test_ref_and_definitions},
-        {"raw_json_passthrough", test_raw_json_passthrough},
+        {.name = "simple_object", .fn = test_simple_object},
+        {.name = "nested_object", .fn = test_nested_object},
+        {.name = "array_root", .fn = test_array_root},
+        {.name = "property_with_enum", .fn = test_property_with_enum},
+        {.name = "ref_and_definitions", .fn = test_ref_and_definitions},
+        {.name = "raw_json_passthrough", .fn = test_raw_json_passthrough},
     };
 
     int failed = 0;
     const int count = static_cast<int>(sizeof(cases) / sizeof(cases[0]));
-    for (int i = 0; i < count; ++i) {
-        std::printf("[schema_to_json] %s ... ", cases[i].name);
+    for (const auto& test_case : cases) {
+        std::printf("[schema_to_json] %s ... ", test_case.name);
         std::fflush(stdout);
-        const int rc = cases[i].fn();
+        const int rc = test_case.fn();
         if (rc == 0) {
             std::printf("OK\n");
         } else {

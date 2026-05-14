@@ -38,8 +38,7 @@
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_runtime_registry.h"
 
-namespace rac {
-namespace router {
+namespace rac::router {
 
 namespace {
 
@@ -150,14 +149,14 @@ bool has_registered_declared_runtime(const rac_engine_vtable_t& vt) {
     if (vt.metadata.runtimes == nullptr || vt.metadata.runtimes_count == 0)
         return true;
     for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-        if (rac_runtime_is_registered(vt.metadata.runtimes[i]))
+        if (rac_runtime_is_registered(vt.metadata.runtimes[i]) != 0)
             return true;
     }
     return false;
 }
 
 bool preferred_runtime_registered(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
-    return declares_runtime(vt, runtime) && rac_runtime_is_registered(runtime);
+    return declares_runtime(vt, runtime) && rac_runtime_is_registered(runtime) != 0;
 }
 
 bool matches_model_format(const rac_engine_vtable_t& vt, uint32_t format) {
@@ -235,7 +234,8 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
 RouteResult EngineRouter::route(const RouteRequest& req) const {
     auto candidates = snapshot_for_primitive(req.primitive);
     if (candidates.empty()) {
-        return RouteResult{nullptr, -1, "no plugin serves this primitive"};
+        return RouteResult{
+            .vtable = nullptr, .score = -1, .rejection_reason = "no plugin serves this primitive"};
     }
 
     /* Score every candidate. */
@@ -265,22 +265,27 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     }
     if (scored.empty()) {
         if (!req.pinned_engine.empty() && req.no_fallback) {
-            return RouteResult{nullptr, -1,
-                               std::string("pinned engine '") + std::string(req.pinned_engine) +
-                                   "' not registered; no_fallback=true"};
+            return RouteResult{.vtable = nullptr,
+                               .score = -1,
+                               .rejection_reason = std::string("pinned engine '") +
+                                                   std::string(req.pinned_engine) +
+                                                   "' not registered; no_fallback=true"};
         }
         if (any_runtime_reject && !any_other_reject) {
-            return RouteResult{nullptr, -1,
-                               "no registered runtime satisfies any candidate "
-                               "engine's declared runtimes"};
+            return RouteResult{.vtable = nullptr,
+                               .score = -1,
+                               .rejection_reason = "no registered runtime satisfies any candidate "
+                                                   "engine's declared runtimes"};
         }
-        return RouteResult{nullptr, -1, "no eligible plugin (all hard-rejected)"};
+        return RouteResult{.vtable = nullptr,
+                           .score = -1,
+                           .rejection_reason = "no eligible plugin (all hard-rejected)"};
     }
 
     /* Stable sort: score desc, priority desc (tiebreak), name asc (final tiebreak).
      * Determinism is required by the spec — same RouteRequest in same process
      * MUST yield same winner across 1000 calls. */
-    std::sort(scored.begin(), scored.end(), [](const Scored& a, const Scored& b) {
+    std::ranges::sort(scored, [](const Scored& a, const Scored& b) {
         if (a.score != b.score)
             return a.score > b.score;
         if (a.vt->metadata.priority != b.vt->metadata.priority) {
@@ -289,7 +294,8 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
         return std::strcmp(a.vt->metadata.name, b.vt->metadata.name) < 0;
     });
 
-    return RouteResult{scored.front().vt, scored.front().score, {}};
+    return RouteResult{
+        .vtable = scored.front().vt, .score = scored.front().score, .rejection_reason = {}};
 }
 
 std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const {
@@ -300,12 +306,12 @@ std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const 
         if (vt == nullptr)
             continue;
         int s = score(*vt, req);
-        out.push_back(RouteResult{vt, s, {}});
+        out.push_back(RouteResult{.vtable = vt, .score = s, .rejection_reason = {}});
     }
-    std::sort(out.begin(), out.end(),
-              [](const RouteResult& a, const RouteResult& b) { return a.score > b.score; });
+    std::ranges::sort(out, [](const RouteResult& a, const RouteResult& b) {
+        return a.score > b.score;
+    });
     return out;
 }
 
-}  // namespace router
-}  // namespace rac
+}  // namespace rac::router

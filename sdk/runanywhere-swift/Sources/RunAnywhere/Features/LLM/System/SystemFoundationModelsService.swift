@@ -6,7 +6,6 @@
 //  Requires iOS 26+ / macOS 26+.
 //
 
-import Foundation
 
 // Import FoundationModels with conditional compilation
 #if canImport(FoundationModels)

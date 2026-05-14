@@ -15,7 +15,6 @@
 
 import CRACommons
 import Foundation
-import os
 import SwiftProtobuf
 
 // MARK: - C symbol tables (custom methods only)
@@ -113,7 +112,8 @@ private enum RAGSessionProtoABI {
 /// trampoline can only see non-generic types (Swift forbids generic captures
 /// in `@convention(c)` closures), so we bridge through this protocol and let
 /// dynamic dispatch reach the generic body in `ProtoStreamContext.yield`.
-protocol ProtoStreamYielder: AnyObject {
+/// Class-only so the trampoline can recover the instance via `Unmanaged`.
+protocol ProtoStreamYielder: AnyObject {  // swiftlint:disable:this avoid_any_object
     func yield(bytes: UnsafePointer<UInt8>?, size: Int)
 }
 
@@ -167,6 +167,7 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     /// - Returns: An `AsyncStream<Event>` that yields decoded events as the C
     ///   callback fires and finishes when the C call returns.
     /// - Throws: Errors raised by `request.serializedData()`.
+    // swiftlint:disable:next unused_declaration
     static func runRequestStream<Request: Message>(
         request: Request,
         category: String,
@@ -425,4 +426,3 @@ extension CppBridge {
     /// `Generated/ModalityProtoABI+Generated.swift`.
     public enum EmbeddingsProto {}
 }
-

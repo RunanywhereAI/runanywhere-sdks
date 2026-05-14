@@ -212,7 +212,11 @@ static void validate_json_against_schema(const json& value, const json& schema,
                 }
                 const std::string name = required_name.get<std::string>();
                 if (!value.contains(name)) {
-                    errors->push_back(path + "." + name + " is required");
+                    std::string message = path;
+                    message += ".";
+                    message += name;
+                    message += " is required";
+                    errors->push_back(std::move(message));
                 }
             }
         }
@@ -226,7 +230,7 @@ static void validate_json_against_schema(const json& value, const json& schema,
 
         const auto additional_it = schema.find("additionalProperties");
         if (additional_it != schema.end() && additional_it->is_boolean() &&
-            additional_it->get<bool>() == false) {
+            !additional_it->get<bool>()) {
             for (auto it = value.begin(); it != value.end(); ++it) {
                 if (!properties.contains(it.key())) {
                     errors->push_back(path + "." + it.key() + " is not allowed");
@@ -467,7 +471,7 @@ json_schema_from_options(const runanywhere::v1::StructuredOutputOptions& options
     if (options.has_schema()) {
         return json_schema_proto_to_json(options.schema()).dump();
     }
-    return std::string();
+    return {};
 }
 
 struct ProtoStructuredOutputConfig {
@@ -638,10 +642,10 @@ static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
         event.set_request_id(ctx->request_id);
     }
     event.set_kind(kind);
-    if (token && token[0]) {
+    if (token != nullptr && token[0] != '\0') {
         event.set_token(token);
     }
-    if (partial_json && partial_json[0]) {
+    if (partial_json != nullptr && partial_json[0] != '\0') {
         event.set_partial_json(partial_json);
     }
     if (result) {
@@ -650,7 +654,7 @@ static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
             *event.mutable_validation() = result->validation();
         }
     }
-    if (error_message && error_message[0]) {
+    if (error_message != nullptr && error_message[0] != '\0') {
         event.set_error_message(error_message);
     }
     event.set_error_code(static_cast<int32_t>(error_code));
@@ -734,7 +738,8 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
                           : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
     const char* message = nullptr;
     if (!transport_ok) {
-        message = finish_reason && finish_reason[0] ? finish_reason : rac_error_message(status);
+        message = finish_reason != nullptr && finish_reason[0] != '\0' ? finish_reason
+                                                                       : rac_error_message(status);
     } else if (!validation_ok && result.has_error_message()) {
         message = result.error_message().c_str();
     }
@@ -983,7 +988,7 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
         "Remember: Output ONLY the JSON %s, nothing else.";
 
     size_t needed =
-        snprintf(NULL, 0, format, root_name, start_token, end_token, schema, root_name) + 1;
+        snprintf(nullptr, 0, format, root_name, start_token, end_token, schema, root_name) + 1;
     char* result = static_cast<char*>(malloc(needed));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -1048,7 +1053,7 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
         "\n"
         "Remember: Output ONLY the JSON %s, nothing else.";
 
-    size_t needed = snprintf(NULL, 0, format, original_prompt, root_name, schema, start_token,
+    size_t needed = snprintf(nullptr, 0, format, original_prompt, root_name, schema, start_token,
                              end_token, root_name) +
                     1;
     char* result = static_cast<char*>(malloc(needed));
@@ -1078,7 +1083,7 @@ static void init_parse_result(rac_structured_output_parse_result_t* result) {
 }
 
 static bool text_contains_json_marker(const char* text) {
-    return text && (strchr(text, '{') != nullptr || strchr(text, '[') != nullptr);
+    return text != nullptr && (strchr(text, '{') != nullptr || strchr(text, '[') != nullptr);
 }
 
 static rac_result_t set_parse_errors(rac_structured_output_parse_result_t* out_result,
@@ -1121,9 +1126,9 @@ rac_structured_output_parse(const char* text, const rac_structured_output_config
     const rac_result_t extract_result =
         rac_structured_output_extract_json(text, &extracted, nullptr);
     if (extract_result != RAC_SUCCESS || !extracted) {
-        errors.push_back(out_result->contains_json == RAC_TRUE
-                             ? "JSON candidate failed to parse"
-                             : "No valid JSON found in the response");
+        errors.emplace_back(out_result->contains_json == RAC_TRUE
+                                ? "JSON candidate failed to parse"
+                                : "No valid JSON found in the response");
         out_result->is_valid = RAC_FALSE;
         return set_parse_errors(out_result, errors, RAC_ERROR_INVALID_FORMAT);
     }
@@ -1132,7 +1137,7 @@ rac_structured_output_parse(const char* text, const rac_structured_output_config
     json parsed;
     if (!parse_json_value(extracted, &parsed)) {
         free(extracted);
-        errors.push_back("Extracted JSON failed to parse");
+        errors.emplace_back("Extracted JSON failed to parse");
         out_result->is_valid = RAC_FALSE;
         return set_parse_errors(out_result, errors, RAC_ERROR_INVALID_FORMAT);
     }
@@ -1144,10 +1149,10 @@ rac_structured_output_parse(const char* text, const rac_structured_output_config
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    if (config && config->json_schema && config->json_schema[0]) {
+    if (config != nullptr && config->json_schema != nullptr && config->json_schema[0] != '\0') {
         json schema;
         if (!parse_json_value(config->json_schema, &schema) || !schema.is_object()) {
-            errors.push_back("JSON schema is invalid");
+            errors.emplace_back("JSON schema is invalid");
         } else {
             validate_json_against_schema(parsed, schema, "$", &errors);
         }

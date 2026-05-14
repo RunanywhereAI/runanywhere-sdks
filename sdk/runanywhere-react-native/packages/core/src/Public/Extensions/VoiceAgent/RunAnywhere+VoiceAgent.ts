@@ -1,12 +1,11 @@
 /**
  * RunAnywhere+VoiceAgent.ts
  *
- * Voice Agent extension for the full voice pipeline. Wave 2: aligned to
- * proto-canonical voice agent shapes
- * (`@runanywhere/proto-ts/voice_agent_service` and
- * `@runanywhere/proto-ts/voice_events`).
+ * Voice agent (full VAD → STT → LLM → TTS) extension. All shapes come from
+ * `@runanywhere/proto-ts/voice_agent_service` and
+ * `@runanywhere/proto-ts/voice_events`; commons owns the pipeline.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent.swift
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent.swift`.
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';

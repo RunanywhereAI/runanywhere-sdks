@@ -12,7 +12,6 @@
 
 import CRACommons
 import Foundation
-import SwiftProtobuf
 
 // MARK: - Native ABI bindings (P2-T4 / P2-T7)
 

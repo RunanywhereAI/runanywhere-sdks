@@ -445,21 +445,22 @@ int main(int /*argc*/, char** /*argv*/) {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {"make_gguf_single_file", test_make_gguf_single_file},
-        {"make_onnx_single_file", test_make_onnx_single_file},
-        {"make_mlmodelc_single_file", test_make_mlmodelc_single_file},
-        {"make_safetensors_single_file", test_make_safetensors_single_file},
-        {"make_tar_gz_archive", test_make_tar_gz_archive},
-        {"make_zip_archive", test_make_zip_archive},
-        {"make_multi_file_inferred", test_make_multi_file_inferred},
-        {"make_request_overrides", test_make_request_overrides},
-        {"path_probe_with_callback", test_path_probe_with_callback},
-        {"path_probe_fallback_to_list_directory", test_path_probe_fallback_to_list_directory},
-        {"path_probe_no_callbacks", test_path_probe_no_callbacks},
-        {"path_probe_null_path", test_path_probe_null_path},
-        {"null_out_pointer", test_null_out_pointer},
-        {"invalid_input_bytes", test_invalid_input_bytes},
-        {"empty_request_default_result", test_empty_request_default_result},
+        {.name = "make_gguf_single_file", .fn = test_make_gguf_single_file},
+        {.name = "make_onnx_single_file", .fn = test_make_onnx_single_file},
+        {.name = "make_mlmodelc_single_file", .fn = test_make_mlmodelc_single_file},
+        {.name = "make_safetensors_single_file", .fn = test_make_safetensors_single_file},
+        {.name = "make_tar_gz_archive", .fn = test_make_tar_gz_archive},
+        {.name = "make_zip_archive", .fn = test_make_zip_archive},
+        {.name = "make_multi_file_inferred", .fn = test_make_multi_file_inferred},
+        {.name = "make_request_overrides", .fn = test_make_request_overrides},
+        {.name = "path_probe_with_callback", .fn = test_path_probe_with_callback},
+        {.name = "path_probe_fallback_to_list_directory",
+         .fn = test_path_probe_fallback_to_list_directory},
+        {.name = "path_probe_no_callbacks", .fn = test_path_probe_no_callbacks},
+        {.name = "path_probe_null_path", .fn = test_path_probe_null_path},
+        {.name = "null_out_pointer", .fn = test_null_out_pointer},
+        {.name = "invalid_input_bytes", .fn = test_invalid_input_bytes},
+        {.name = "empty_request_default_result", .fn = test_empty_request_default_result},
     };
 
     int failures = 0;

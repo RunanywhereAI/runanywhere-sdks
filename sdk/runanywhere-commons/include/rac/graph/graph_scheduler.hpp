@@ -116,7 +116,6 @@ class GraphScheduler {
     std::shared_ptr<CancelToken> root_cancel_token() const { return root_; }
 
    private:
-    const size_t thread_pool_size_;
     std::shared_ptr<CancelToken> root_;
     mutable std::mutex mu_;
     std::vector<std::shared_ptr<IPipelineNode>> nodes_;

@@ -13,6 +13,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "rac/core/rac_core.h"
@@ -66,7 +67,7 @@ static bool is_cache_valid() {
     auto now = std::chrono::steady_clock::now();
     auto elapsed =
         std::chrono::duration_cast<std::chrono::seconds>(now - g_last_fetch_time).count();
-    return elapsed < g_cache_timeout_seconds;
+    return std::cmp_less(elapsed, g_cache_timeout_seconds);
 }
 
 // Simple JSON string extraction (finds "key": "value" or "key": number)
@@ -76,7 +77,7 @@ static std::string json_get_string(const std::string& json, const std::string& k
     if (pos == std::string::npos)
         return "";
 
-    pos = json.find(":", pos);
+    pos = json.find(':', pos);
     if (pos == std::string::npos)
         return "";
 
@@ -312,7 +313,7 @@ static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& 
             for (size_t j = 0; j < i; j++) {
                 rac_model_info_free((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -389,8 +390,7 @@ static std::string lower_copy(const std::string& input) {
 }
 
 static bool ends_with_copy(const std::string& value, const std::string& suffix) {
-    return value.size() >= suffix.size() &&
-           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+    return value.ends_with(suffix);
 }
 
 static ModelFormat infer_proto_format_from_path(const std::string& value) {
@@ -807,11 +807,11 @@ static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<
 
 static std::string trim_copy(const std::string& value) {
     size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
+    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start])) != 0) {
         ++start;
     }
     size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
+    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
         --end;
     }
     return value.substr(start, end - start);
@@ -974,7 +974,7 @@ static bool assignment_json_value(const std::string& json, const char* key,
         }
 
         size_t colon = i + 1;
-        while (colon < json.size() && std::isspace(static_cast<unsigned char>(json[colon]))) {
+        while (colon < json.size() && std::isspace(static_cast<unsigned char>(json[colon])) != 0) {
             ++colon;
         }
         if (colon >= json.size() || json[colon] != ':') {
@@ -982,7 +982,7 @@ static bool assignment_json_value(const std::string& json, const char* key,
         }
         size_t value_start = colon + 1;
         while (value_start < json.size() &&
-               std::isspace(static_cast<unsigned char>(json[value_start]))) {
+               std::isspace(static_cast<unsigned char>(json[value_start])) != 0) {
             ++value_start;
         }
         const size_t value_end = json_value_end(json, value_start);
@@ -1224,8 +1224,8 @@ static std::vector<std::string> json_top_level_objects(const std::string& array_
 
     size_t pos = 1;
     while (pos < array.size()) {
-        while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) || array[pos] == ',')) {
+        while (pos < array.size() && (std::isspace(static_cast<unsigned char>(array[pos])) != 0 ||
+                                      array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {
@@ -1261,8 +1261,8 @@ static void add_json_string_array_to_metadata(const std::string& object, const c
     }
     size_t pos = 1;
     while (pos < array.size()) {
-        while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) || array[pos] == ',')) {
+        while (pos < array.size() && (std::isspace(static_cast<unsigned char>(array[pos])) != 0 ||
+                                      array[pos] == ',')) {
             ++pos;
         }
         if (pos >= array.size() || array[pos] == ']') {
@@ -1567,7 +1567,7 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     RAC_LOG_INFO(LOG_CAT, msg);
 
     // Check cache first
-    if (!force_refresh && is_cache_valid()) {
+    if (force_refresh == RAC_FALSE && is_cache_valid()) {
         snprintf(msg, sizeof(msg), "Returning cached model assignments (%zu models)",
                  g_cached_models.size());
         RAC_LOG_INFO(LOG_CAT, msg);
@@ -1735,7 +1735,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
     if (!include_remote) {
         models = cached_proto_models_locked();
         if (!request.catalog_uri().empty()) {
-            warnings.push_back("catalog_uri ignored because include_remote_catalog is false");
+            warnings.emplace_back("catalog_uri ignored because include_remote_catalog is false");
         }
         ModelRegistryRefreshResult result;
         populate_assignment_refresh_result(&result, std::move(models),
@@ -1754,7 +1754,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
     }
 
     if (!g_callbacks.http_get) {
-        warnings.push_back(
+        warnings.emplace_back(
             "model assignment transport is not configured; remote catalog was not fetched");
         models = cached_proto_models_locked();
         ModelRegistryRefreshResult result;
@@ -1779,7 +1779,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
                             ? response.error_message
                             : rac_error_message(error_code);
         if (!g_cached_models.empty() || !g_cached_model_proto_bytes.empty()) {
-            warnings.push_back("remote assignment refresh failed; returning cached assignments");
+            warnings.emplace_back("remote assignment refresh failed; returning cached assignments");
             warnings.push_back(error_message);
             models = cached_proto_models_locked();
             error_message.clear();
@@ -1802,7 +1802,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         }
         error_message = oss.str();
         if (!g_cached_models.empty() || !g_cached_model_proto_bytes.empty()) {
-            warnings.push_back("remote assignment refresh returned HTTP error; returning cache");
+            warnings.emplace_back("remote assignment refresh returned HTTP error; returning cache");
             warnings.push_back(error_message);
             models = cached_proto_models_locked();
             error_message.clear();
@@ -1821,7 +1821,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         response.response_body, response.response_length, &models, &error_message);
     if (parse_models_rc != RAC_SUCCESS) {
         if (!g_cached_models.empty() || !g_cached_model_proto_bytes.empty()) {
-            warnings.push_back("remote assignment response was invalid; returning cache");
+            warnings.emplace_back("remote assignment response was invalid; returning cache");
             warnings.push_back(error_message);
             models = cached_proto_models_locked();
             error_message.clear();

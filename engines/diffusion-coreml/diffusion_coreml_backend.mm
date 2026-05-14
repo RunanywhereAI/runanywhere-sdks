@@ -194,6 +194,9 @@ NSString* resolve_feature_name(MLModel* model,
         std::string configured = config.get(key, "");
         if (!configured.empty()) {
             NSString* name = ns(configured);
+            if (!name) {
+                continue;
+            }
             MLFeatureDescription* desc = [descs objectForKey:name];
             if (desc && (expected_type == MLFeatureTypeInvalid || desc.type == expected_type)) {
                 return name;
@@ -203,6 +206,9 @@ NSString* resolve_feature_name(MLModel* model,
 
     for (const std::string& candidate : candidates) {
         NSString* name = ns(candidate);
+        if (!name) {
+            continue;
+        }
         MLFeatureDescription* desc = [descs objectForKey:name];
         if (desc && (expected_type == MLFeatureTypeInvalid || desc.type == expected_type)) {
             return name;
@@ -268,9 +274,9 @@ size_t shape_count(const std::vector<NSInteger>& shape) {
 MLMultiArray* make_multiarray(const std::vector<NSInteger>& shape,
                               MLMultiArrayDataType data_type) {
     NSError* err = nil;
-    MLMultiArray* array = [[MLMultiArray alloc] initWithShape:make_shape(shape)
-                                                     dataType:data_type
-                                                        error:&err];
+    MLMultiArray* array = [[[MLMultiArray alloc] initWithShape:make_shape(shape)
+                                                      dataType:data_type
+                                                         error:&err] autorelease];
     if (!array) {
         RAC_LOG_ERROR(kLogCat, "MLMultiArray allocation failed: %s",
                       err ? [[err localizedDescription] UTF8String] : "unknown");
@@ -305,7 +311,7 @@ bool run_prediction(MLModel* model,
                     std::string* out_error) {
     NSError* err = nil;
     MLDictionaryFeatureProvider* provider =
-        [[MLDictionaryFeatureProvider alloc] initWithDictionary:features error:&err];
+        [[[MLDictionaryFeatureProvider alloc] initWithDictionary:features error:&err] autorelease];
     if (!provider) {
         if (out_error) {
             *out_error = err ? [[err localizedDescription] UTF8String]
@@ -480,7 +486,11 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
 
     NSMutableDictionary<NSString*, MLFeatureValue*>* features = [NSMutableDictionary dictionary];
     if (string_input) {
-        [features setObject:[MLFeatureValue featureValueWithString:ns(prompt ? prompt : "")]
+        NSString* prompt_string = ns(prompt ? prompt : "");
+        if (!prompt_string) {
+            prompt_string = @"";
+        }
+        [features setObject:[MLFeatureValue featureValueWithString:prompt_string]
                      forKey:string_input];
     } else {
         NSString* ids_name = resolve_feature_name(
@@ -1202,8 +1212,9 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
         NSString* dir = rac_coreml_find_resource_dir([NSString stringWithUTF8String:model_path],
                                                      @"Unet");
         BOOL is_dir = NO;
-        if (![[NSFileManager defaultManager] fileExistsAtPath:dir
-                                                isDirectory:&is_dir]
+        if (!dir
+            || ![[NSFileManager defaultManager] fileExistsAtPath:dir
+                                                    isDirectory:&is_dir]
             || !is_dir) {
             RAC_LOG_ERROR(kLogCat, "Model path missing / not a directory: %s",
                           model_path);

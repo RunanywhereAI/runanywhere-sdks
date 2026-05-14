@@ -7,7 +7,6 @@
 //
 
 import CRACommons
-import Foundation
 import LlamaCPPBackend
 import os.log
 import RunAnywhere

@@ -26,8 +26,6 @@ public extension RunAnywhere {
     /// `CppBridge.LoraRegistry` (catalog ops).
     struct LoRA: Sendable {
 
-        private init() {}
-
         // MARK: Runtime Operations
 
         /// Apply one or more LoRA adapters to the currently loaded model.

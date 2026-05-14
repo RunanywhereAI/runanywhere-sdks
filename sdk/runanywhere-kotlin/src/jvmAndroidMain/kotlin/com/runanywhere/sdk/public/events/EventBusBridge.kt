@@ -13,7 +13,6 @@
 package com.runanywhere.sdk.public.events
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
-import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -87,7 +86,7 @@ internal actual fun stopNativeSubscription() {
 
 internal actual fun publishToNative(event: SDKEvent): Boolean {
     return try {
-        CppBridgeSDKEventStream.publish(event) == CommonsErrorCode.RAC_SUCCESS
+        CppBridgeSDKEventStream.publish(event) == 0
     } catch (_: UnsatisfiedLinkError) {
         false
     } catch (e: Throwable) {

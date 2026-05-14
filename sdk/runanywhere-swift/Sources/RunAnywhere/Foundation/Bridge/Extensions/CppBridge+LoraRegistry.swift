@@ -5,7 +5,6 @@
 // LoRA catalog proto-byte ABI.
 
 import CRACommons
-import Foundation
 
 extension CppBridge {
 

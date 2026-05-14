@@ -1,24 +1,15 @@
 /**
  * RunAnywhere+ToolCalling.ts
  *
- * Tool Calling extension for LLM.
- * Allows LLMs to request external actions (API calls, device functions, etc.)
+ * Tool calling for LLM. The native run loop and prompt formatting live in
+ * commons (`rac_tool_calling_run_loop_proto`); TypeScript only owns the
+ * registry of JS callbacks and the per-call executor trampoline.
  *
- * ARCHITECTURE:
- * - C++ commons handles: parsing <tool_call> tags and prompt formatting
- * - TypeScript handles: tool registration, executor storage, and JS execution adapters
- *
- * Wave-4 §15 cleanup: Canonical tool-calling shapes now come from
- * `@runanywhere/proto-ts/tool_calling`. RN-only helpers (`ToolExecutor`,
- * `RegisteredTool`) — which carry a JS-side function reference and so cannot
- * round-trip through proto — are declared inline below.
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/RunAnywhere+ToolCalling.swift`.
  */
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
-import {
-  requireNativeModule,
-  isNativeModuleAvailable,
-} from '../../../native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   ToolParameterType,
@@ -26,12 +17,6 @@ import {
   ToolResult,
   ToolCallingResult,
   ToolCallingOptions,
-  ToolParseRequest,
-  ToolParseResult,
-  ToolPromptFormatRequest,
-  ToolPromptFormatResult,
-  ToolCallValidationRequest,
-  ToolCallValidationResult,
   ToolCallingSessionCreateRequest,
   type ToolDefinition,
   type ToolParameter,
@@ -43,11 +28,6 @@ import {
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
-// =============================================================================
-// RN-LOCAL HELPERS (no proto equivalent — function references can't round-trip
-// through wire format).
-// =============================================================================
-
 /**
  * Function type for tool executors. Receives the parsed JSON arguments
  * (decoded from `ToolCall.argumentsJson`) and returns a JSON-serialisable
@@ -57,16 +37,12 @@ export type ToolExecutor = (
   args: Record<string, unknown>
 ) => Promise<Record<string, unknown>>;
 
-/**
- * A registered tool with its proto-canonical definition and JS executor.
- */
+/** A registered tool with its proto-canonical definition and JS executor. */
 export interface RegisteredTool {
   definition: ToolDefinition;
   executor: ToolExecutor;
 }
 
-// Re-export proto-canonical tool-calling types so consumers of this
-// extension keep a single import surface.
 export type {
   ToolDefinition,
   ToolParameter,
@@ -75,89 +51,14 @@ export type {
   ToolCallingOptions,
   ToolCallingResult,
   ToolCallingSessionCreateRequest,
-  ToolParseRequest,
-  ToolParseResult,
-  ToolPromptFormatRequest,
-  ToolPromptFormatResult,
-  ToolCallValidationRequest,
-  ToolCallValidationResult,
 };
 export { ToolParameterType };
 
-// =============================================================================
-// PRIVATE STATE - Stores registered tools and executors
-// =============================================================================
-
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
-type ProtoBridgeMethod = (requestBytes: ArrayBuffer) => Promise<ArrayBuffer>;
-
-function toBridgeException(operation: string, error: unknown): SDKException {
-  if (error instanceof SDKException) {
-    return error;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  if (/not available|unavailable|not implemented|missing/i.test(message)) {
-    return SDKException.notImplemented(`${operation}: ${message}`);
-  }
-  return SDKException.unknown(
-    `${operation}: ${message}`,
-    error instanceof Error ? error : undefined
-  );
-}
-
-function requireNativeProtoMethod(
-  methodName: string,
-  operation: string
-): ProtoBridgeMethod {
-  if (!isNativeModuleAvailable()) {
-    throw SDKException.notImplemented(
-      `${operation}: Native module not available`
-    );
-  }
-
-  const native = requireNativeModule();
-  const method = (native as unknown as Record<string, unknown>)[methodName];
-  if (typeof method !== 'function') {
-    throw SDKException.notImplemented(
-      `${operation}: native method ${methodName} is unavailable`
-    );
-  }
-
-  return method.bind(native) as ProtoBridgeMethod;
-}
-
-async function callNativeProto(
-  methodName: string,
-  requestBytes: ArrayBuffer,
-  operation: string
-): Promise<Uint8Array> {
-  try {
-    const method = requireNativeProtoMethod(methodName, operation);
-    const responseBytes = await method(requestBytes);
-    const bytes = arrayBufferToBytes(responseBytes);
-    if (bytes.byteLength === 0) {
-      throw SDKException.unknown(
-        `${operation}: native bridge returned an empty proto result`
-      );
-    }
-    return bytes;
-  } catch (error) {
-    throw toBridgeException(operation, error);
-  }
-}
-
-// =============================================================================
-// TOOL REGISTRATION
-// =============================================================================
-
 /**
- * Register a tool that the LLM can use.
- *
- * @param definition Proto-canonical `ToolDefinition` (name, description,
- *   parameters using `ToolParameterType` enum values, optional category).
- * @param executor JS function that executes the tool. Receives parsed
- *   arguments and returns a JSON-serialisable result.
+ * Register a tool the LLM can call. The executor is invoked from the native
+ * run loop whenever the model produces a matching tool call.
  */
 export function registerTool(
   definition: ToolDefinition,
@@ -168,149 +69,26 @@ export function registerTool(
   return Promise.resolve();
 }
 
-/**
- * Unregister a tool
- */
 export function unregisterTool(toolName: string): Promise<void> {
   registeredTools.delete(toolName);
   return Promise.resolve();
 }
 
-/**
- * Get all registered tool definitions
- */
 export function getRegisteredTools(): Promise<ToolDefinition[]> {
   return Promise.resolve(
     Array.from(registeredTools.values()).map((t) => t.definition)
   );
 }
 
-/**
- * Clear all registered tools
- */
 export function clearTools(): Promise<void> {
   registeredTools.clear();
   return Promise.resolve();
 }
 
-// =============================================================================
-// C++ BRIDGE CALLS - Single Source of Truth
-// =============================================================================
-
 /**
- * Parse LLM output for tool calls using the native proto-byte bridge.
- *
- * JS owns only generated proto-ts serialization here; the portable parser
- * and generated result semantics are implemented in native C++ over the
- * commons `rac_tool_call_*` C ABI.
- */
-async function parseToolCallFromOutput(
-  llmOutput: string,
-  options?: Partial<ToolCallingOptions>
-): Promise<ToolParseResult> {
-  const request = ToolParseRequest.fromPartial({
-    text: llmOutput,
-    options: options ? ToolCallingOptions.fromPartial(options) : undefined,
-  });
-  const responseBytes = await callNativeProto(
-    'toolParseProto',
-    bytesToArrayBuffer(ToolParseRequest.encode(request).finish()),
-    'parseToolCall'
-  );
-  return ToolParseResult.decode(responseBytes);
-}
-
-async function parseToolCallViaCpp(llmOutput: string): Promise<{
-  text: string;
-  toolCall: ToolCall | null;
-}> {
-  const result = await parseToolCallFromOutput(llmOutput);
-  if (!result.hasToolCall || result.toolCalls.length === 0) {
-    return { text: result.remainingText || llmOutput, toolCall: null };
-  }
-  return {
-    text: result.remainingText || '',
-    toolCall: result.toolCalls[0] ?? null,
-  };
-}
-
-async function formatToolPromptViaCpp(
-  request: ToolPromptFormatRequest
-): Promise<ToolPromptFormatResult> {
-  const responseBytes = await callNativeProto(
-    'toolFormatPromptProto',
-    bytesToArrayBuffer(ToolPromptFormatRequest.encode(request).finish()),
-    'formatToolPrompt'
-  );
-  const result = ToolPromptFormatResult.decode(responseBytes);
-  if (result.errorMessage) {
-    throw SDKException.unknown(result.errorMessage);
-  }
-  return result;
-}
-
-/**
- * Format tool definitions for LLM prompt (async version)
- * Uses generated proto bytes at the RN boundary and C++ commons for portable
- * prompt semantics.
- *
- * @param tools - Tool definitions (defaults to registered tools)
- * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
- */
-async function formatToolsForPromptAsync(tools?: ToolDefinition[], format?: string): Promise<string> {
-  const toolsToFormat = tools || await getRegisteredTools();
-  const toolFormat = format?.toLowerCase() || 'default';
-
-  if (toolsToFormat.length === 0) {
-    return '';
-  }
-
-  const result = await formatToolPromptViaCpp(ToolPromptFormatRequest.fromPartial({
-    options: ToolCallingOptions.fromPartial({
-      tools: toolsToFormat,
-      formatHint: toolFormat,
-    }),
-  }));
-  return result.formattedPrompt;
-}
-
-/**
- * Validate a parsed tool call against the generated tool registry snapshot.
- *
- * The JS layer only serializes the generated request and supplies the current
- * registered tool definitions. Commons owns validation and argument
- * normalization semantics.
- */
-async function validateToolCall(
-  toolCall: ToolCall,
-  options?: Partial<ToolCallingOptions>
-): Promise<ToolCallValidationResult> {
-  const tools = options?.tools ?? await getRegisteredTools();
-  const request = ToolCallValidationRequest.fromPartial({
-    toolCall,
-    options: ToolCallingOptions.fromPartial({
-      ...options,
-      tools,
-    }),
-  });
-  const responseBytes = await callNativeProto(
-    'toolValidateProto',
-    bytesToArrayBuffer(ToolCallValidationRequest.encode(request).finish()),
-    'validateToolCall'
-  );
-  return ToolCallValidationResult.decode(responseBytes);
-}
-
-// =============================================================================
-// TOOL EXECUTION (TypeScript - needs JS APIs)
-// =============================================================================
-
-/**
- * Execute a tool call.
- *
- * Reads the proto `ToolCall.argumentsJson` payload, decodes it, runs the
- * registered executor, and returns a proto `ToolResult` with the executor
- * output JSON-encoded into `resultJson` (or `error` populated on failure).
+ * Execute a single parsed tool call against the registry. Used by
+ * `generateWithTools` as the native-callback trampoline and exposed for
+ * tests / hosts that want to drive tool execution manually.
  */
 export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   const tool = registeredTools.get(toolCall.name);
@@ -350,7 +128,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   try {
     logger.debug(`Executing tool: ${toolCall.name}`);
     const result = await tool.executor(parsedArgs);
-
     return ToolResult.fromPartial({
       toolCallId: toolCall.id,
       name: toolCall.name,
@@ -362,7 +139,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Tool execution failed: ${errorMessage}`);
-
     return ToolResult.fromPartial({
       toolCallId: toolCall.id,
       name: toolCall.name,
@@ -375,62 +151,10 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
   }
 }
 
-// =============================================================================
-// MAIN API: GENERATE WITH TOOLS
-// =============================================================================
-
 /**
- * Build initial prompt using C++ bridge.
- */
-async function buildInitialPromptViaCpp(
-  userPrompt: string,
-  tools: ToolDefinition[],
-  options?: Partial<ToolCallingOptions>
-): Promise<string> {
-  const formatHint = (options?.formatHint || 'default').toLowerCase();
-  const result = await formatToolPromptViaCpp(ToolPromptFormatRequest.fromPartial({
-    userPrompt,
-    options: ToolCallingOptions.fromPartial({
-      ...options,
-      tools,
-      formatHint,
-      maxToolCalls: options?.maxToolCalls ?? options?.maxIterations ?? 5,
-      autoExecute: options?.autoExecute ?? true,
-      temperature: options?.temperature ?? 0.7,
-      maxTokens: options?.maxTokens ?? 1024,
-    }),
-  }));
-  return result.formattedPrompt;
-}
-
-/**
- * Build follow-up prompt using the native proto-byte bridge.
- */
-async function buildFollowupPromptViaCpp(
-  originalPrompt: string,
-  tools: ToolDefinition[],
-  toolResult: ToolResult,
-  keepToolsAvailable: boolean,
-  formatHint: string
-): Promise<string> {
-  const result = await formatToolPromptViaCpp(ToolPromptFormatRequest.fromPartial({
-    userPrompt: originalPrompt,
-    options: ToolCallingOptions.fromPartial({
-      tools,
-      keepToolsAvailable,
-      formatHint,
-    }),
-    toolResults: [toolResult],
-  }));
-  return result.formattedPrompt;
-}
-
-/**
- * Generate a response with tool calling support.
- *
- * C++ owns the run loop through `rac_tool_calling_run_loop_proto`.
- * React Native only supplies the current registry snapshot and a JS executor
- * callback for host-owned side effects.
+ * Generate a response with tool calling. Commons owns the multi-iteration
+ * run loop through `rac_tool_calling_run_loop_proto`; this function only
+ * forwards the request and supplies the JS executor trampoline.
  */
 export async function generateWithTools(
   prompt: string,
@@ -454,7 +178,7 @@ export async function generateWithTools(
     );
   }
 
-  const tools = options?.tools ?? await getRegisteredTools();
+  const tools = options?.tools ?? (await getRegisteredTools());
   const formatHint = (options?.formatHint || 'default').toLowerCase();
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,

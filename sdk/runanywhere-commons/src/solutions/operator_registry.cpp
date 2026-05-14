@@ -413,23 +413,31 @@ class SinglePortOperatorAdapter final : public OperatorAdapter {
     }
 
     bool set_input(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
-        if (!can_bind_input(port))
+        try {
+            if (!can_bind_input(port))
+                return false;
+            if (bound_input_ && *bound_input_ != port)
+                return false;
+            bound_input_ = port;
+            node_->set_input(std::move(edge));
+            return true;
+        } catch (...) {
             return false;
-        if (bound_input_ && *bound_input_ != port)
-            return false;
-        bound_input_ = port;
-        node_->set_input(std::move(edge));
-        return true;
+        }
     }
 
     bool set_output(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
-        if (!can_bind_output(port))
+        try {
+            if (!can_bind_output(port))
+                return false;
+            if (bound_output_ && *bound_output_ != port)
+                return false;
+            bound_output_ = port;
+            node_->set_output(std::move(edge));
+            return true;
+        } catch (...) {
             return false;
-        if (bound_output_ && *bound_output_ != port)
-            return false;
-        bound_output_ = port;
-        node_->set_output(std::move(edge));
-        return true;
+        }
     }
 
    private:
@@ -468,16 +476,15 @@ class SinglePortOperatorAdapter final : public OperatorAdapter {
 }  // namespace
 
 Payload Payload::text(std::string value, std::string payload_type) {
-    return Payload(std::move(payload_type), std::move(value), PayloadBodyKind::TextUtf8);
+    return {std::move(payload_type), std::move(value), PayloadBodyKind::TextUtf8};
 }
 
 Payload Payload::audio_pcm_s16le(std::string payload_bytes, std::string payload_type) {
-    return Payload(std::move(payload_type), std::move(payload_bytes),
-                   PayloadBodyKind::AudioPcmS16Le);
+    return {std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::AudioPcmS16Le};
 }
 
 Payload Payload::image_bytes(std::string payload_bytes, std::string payload_type) {
-    return Payload(std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::ImageBytes);
+    return {std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::ImageBytes};
 }
 
 Payload Payload::embedding_vector(std::vector<float> values, std::string payload_type) {
@@ -485,7 +492,7 @@ Payload Payload::embedding_vector(std::vector<float> values, std::string payload
     body.element_type_id = kPayloadEmbeddingElementFloat32;
     body.element_count = values.size();
     body.values = std::move(values);
-    return Payload(std::move(payload_type), std::move(body));
+    return {std::move(payload_type), std::move(body)};
 }
 
 Payload Payload::control_signal(PayloadControlSignalKind kind, std::string reason, int status_code,
@@ -499,7 +506,7 @@ Payload Payload::control_signal(PayloadControlSignalKind kind, std::string reaso
         payload_type = control_payload_type_for(kind);
     }
 
-    return Payload(std::move(payload_type), std::move(body));
+    return {std::move(payload_type), std::move(body)};
 }
 
 Payload Payload::terminal_control(std::string reason, int status_code, std::string payload_type) {
@@ -508,17 +515,15 @@ Payload Payload::terminal_control(std::string reason, int status_code, std::stri
 }
 
 Payload Payload::sdk_event_proto(std::string serialized_event, std::string payload_type) {
-    return Payload(std::move(payload_type), std::move(serialized_event),
-                   PayloadBodyKind::SdkEventProto);
+    return {std::move(payload_type), std::move(serialized_event), PayloadBodyKind::SdkEventProto};
 }
 
 Payload Payload::voice_event_proto(std::string serialized_event, std::string payload_type) {
-    return Payload(std::move(payload_type), std::move(serialized_event),
-                   PayloadBodyKind::VoiceEventProto);
+    return {std::move(payload_type), std::move(serialized_event), PayloadBodyKind::VoiceEventProto};
 }
 
 Payload Payload::typed_bytes(std::string payload_type, std::string payload_bytes) {
-    return Payload(std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::RawBytes);
+    return {std::move(payload_type), std::move(payload_bytes), PayloadBodyKind::RawBytes};
 }
 
 std::size_t Payload::size() const noexcept {

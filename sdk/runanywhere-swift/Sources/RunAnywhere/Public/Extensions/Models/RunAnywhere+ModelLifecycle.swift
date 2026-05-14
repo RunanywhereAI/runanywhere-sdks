@@ -19,7 +19,6 @@
 //  actor — there is now nothing to mirror.
 //
 
-import Foundation
 
 public extension RunAnywhere {
     static func loadModel(_ request: RAModelLoadRequest) async -> RAModelLoadResult {

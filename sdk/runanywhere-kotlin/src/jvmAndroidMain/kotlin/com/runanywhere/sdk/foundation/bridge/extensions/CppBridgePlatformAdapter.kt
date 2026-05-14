@@ -10,7 +10,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
@@ -163,7 +162,7 @@ object CppBridgePlatformAdapter {
             }
 
             val result = RunAnywhereBridge.racSetPlatformAdapter(this)
-            if (result != CommonsErrorCode.RAC_SUCCESS) {
+            if (result != 0) {
                 logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
                 return
             }

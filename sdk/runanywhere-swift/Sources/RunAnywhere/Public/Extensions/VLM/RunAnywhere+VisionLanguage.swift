@@ -10,7 +10,6 @@
 //
 
 import CRACommons
-import Foundation
 
 // C struct with raw pointers — safe to send across concurrency boundaries
 // because the backing Data (rgbData) is kept alive alongside it.

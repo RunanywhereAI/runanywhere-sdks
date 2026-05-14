@@ -5,8 +5,6 @@
 //  C-bridge extensions on proto-generated RA* VAD types.
 //
 
-import CRACommons
-import Foundation
 
 // MARK: - RAVADConfiguration
 

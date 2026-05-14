@@ -2,13 +2,11 @@
  * SDKException.ts
  *
  * Throwable wrapper around the proto-encoded `SDKError` payload generated
- * from `sdk/proto/errors.proto`. Wave 2 mandate: this is the ONLY
- * throwable type in the SDK. All call sites must `throw new SDKException(...)`
- * or use one of the static factory methods (`SDKException.notInitialized`,
- * etc.).
+ * from `idl/errors.proto`. This is the only throwable type the SDK raises:
+ * call sites must `throw new SDKException(...)` directly or use one of the
+ * static factory methods (`SDKException.notInitialized`, etc.).
  *
- * Reference: sdk/proto/errors.proto
- *            @runanywhere/proto-ts/errors
+ * Reference: idl/errors.proto, @runanywhere/proto-ts/errors.
  */
 
 import {

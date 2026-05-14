@@ -154,6 +154,7 @@ enum NativeProtoABI {
     /// `invokeProto`/`invoke`/`invokeBytes` helpers scattered across the
     /// bridge layer (see `gaps/gaps/simplification/swift-bridge-duplication.md`
     /// §1 Pattern A).
+    // swiftlint:disable:next unused_declaration
     static func invoke<Ctx, Request: Message, Response: Message>(
         _ request: Request,
         on context: Ctx,

@@ -16,7 +16,6 @@
 //
 
 import CRACommons
-import Darwin
 import Foundation
 import SwiftProtobuf
 

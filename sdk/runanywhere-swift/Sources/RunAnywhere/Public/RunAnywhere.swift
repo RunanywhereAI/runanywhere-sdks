@@ -17,10 +17,8 @@
 //    * Telemetry flush + model discovery (deferred — handles owned by SDK)
 //
 
-import Combine
 import Foundation
 #if os(iOS) || os(tvOS) || os(watchOS)
-import UIKit
 #endif
 
 /// The RunAnywhere SDK - Single entry point for on-device AI

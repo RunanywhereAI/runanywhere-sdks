@@ -5,7 +5,6 @@
 //  Public proto-backed model registry API.
 //
 
-import Foundation
 
 public extension RunAnywhere {
     static func listModels(_ request: RAModelListRequest = RAModelListRequest()) async -> RAModelListResult {

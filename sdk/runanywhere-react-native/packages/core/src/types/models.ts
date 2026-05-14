@@ -47,7 +47,4 @@ export interface SDKInitOptions {
    * Production/staging apps must provide this via option or env var.
    */
   buildToken?: string;
-
-  /** Enable debug logging */
-  debug?: boolean;
 }

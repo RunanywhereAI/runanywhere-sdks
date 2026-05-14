@@ -9,7 +9,6 @@
 // serialized-proto ABI. Apple-only device facts used by registration and
 // telemetry remain in Swift platform adapters.
 
-import Foundation
 
 public extension RAHardwareProfile {
     var hasNeuralEngine: Bool {
@@ -29,8 +28,6 @@ public extension RunAnywhere {
 
     /// Stateless namespace exposing generated-proto hardware results from the C++ bridge.
     struct Hardware: Sendable {
-
-        private init() {}
 
         // MARK: - Canonical Methods
 

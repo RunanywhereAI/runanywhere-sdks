@@ -48,7 +48,7 @@ std::vector<uint8_t> serialize_format_request(const std::string& url) {
     if (!req.SerializeToString(&bytes)) {
         return {};
     }
-    return std::vector<uint8_t>(bytes.begin(), bytes.end());
+    return {bytes.begin(), bytes.end()};
 }
 
 std::vector<uint8_t> serialize_artifact_request(const std::string& url,
@@ -62,21 +62,21 @@ std::vector<uint8_t> serialize_artifact_request(const std::string& url,
     if (!req.SerializeToString(&bytes)) {
         return {};
     }
-    return std::vector<uint8_t>(bytes.begin(), bytes.end());
+    return {bytes.begin(), bytes.end()};
 }
 
 bool parse_format_result(const rac_proto_buffer_t& buffer,
                          runanywhere::v1::ModelFormatFromUrlResult* out) {
-    if (!out || buffer.status != RAC_SUCCESS || !buffer.data) {
-        return buffer.size == 0 && out && out->ParseFromArray(nullptr, 0);
+    if (out == nullptr || buffer.status != RAC_SUCCESS || buffer.data == nullptr) {
+        return buffer.size == 0 && out != nullptr && out->ParseFromArray(nullptr, 0);
     }
     return out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
 bool parse_artifact_result(const rac_proto_buffer_t& buffer,
                            runanywhere::v1::ArtifactInferFromUrlResult* out) {
-    if (!out || buffer.status != RAC_SUCCESS || !buffer.data) {
-        return buffer.size == 0 && out && out->ParseFromArray(nullptr, 0);
+    if (out == nullptr || buffer.status != RAC_SUCCESS || buffer.data == nullptr) {
+        return buffer.size == 0 && out != nullptr && out->ParseFromArray(nullptr, 0);
     }
     return out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
@@ -90,12 +90,17 @@ int test_format_from_url_single_file_formats() {
         runanywhere::v1::ModelFormat expected;
     };
     static const Case kCases[] = {
-        {"https://example.test/llama-7b.Q4_K_M.gguf", runanywhere::v1::MODEL_FORMAT_GGUF},
-        {"https://example.test/whisper-base.en.onnx", runanywhere::v1::MODEL_FORMAT_ONNX},
-        {"https://example.test/silero.ort", runanywhere::v1::MODEL_FORMAT_ORT},
-        {"https://example.test/ggml-model.bin", runanywhere::v1::MODEL_FORMAT_BIN},
-        {"/local/path/model.safetensors", runanywhere::v1::MODEL_FORMAT_SAFETENSORS},
-        {"/local/path/model.mlmodelc", runanywhere::v1::MODEL_FORMAT_COREML},
+        {.url = "https://example.test/llama-7b.Q4_K_M.gguf",
+         .expected = runanywhere::v1::MODEL_FORMAT_GGUF},
+        {.url = "https://example.test/whisper-base.en.onnx",
+         .expected = runanywhere::v1::MODEL_FORMAT_ONNX},
+        {.url = "https://example.test/silero.ort", .expected = runanywhere::v1::MODEL_FORMAT_ORT},
+        {.url = "https://example.test/ggml-model.bin",
+         .expected = runanywhere::v1::MODEL_FORMAT_BIN},
+        {.url = "/local/path/model.safetensors",
+         .expected = runanywhere::v1::MODEL_FORMAT_SAFETENSORS},
+        {.url = "/local/path/model.mlmodelc",
+         .expected = runanywhere::v1::MODEL_FORMAT_COREML},
     };
     for (const auto& c : kCases) {
         auto req = serialize_format_request(c.url);
@@ -216,10 +221,11 @@ int test_artifact_tar_gz_archive() {
     };
     static const Case kCases[] = {
         // Sherpa-ONNX / Whisper .tar.gz → inner ONNX.
-        {"https://example.test/sherpa-onnx-whisper-base.en.tar.gz",
-         runanywhere::v1::MODEL_FORMAT_ONNX},
+        {.url = "https://example.test/sherpa-onnx-whisper-base.en.tar.gz",
+         .expected_inner = runanywhere::v1::MODEL_FORMAT_ONNX},
         // .tgz suffix is also recognized.
-        {"https://example.test/zipformer-en-2025.tgz", runanywhere::v1::MODEL_FORMAT_ONNX},
+        {.url = "https://example.test/zipformer-en-2025.tgz",
+         .expected_inner = runanywhere::v1::MODEL_FORMAT_ONNX},
     };
     for (const auto& c : kCases) {
         auto req = serialize_artifact_request(c.url);
@@ -349,17 +355,18 @@ int main() {
         int (*fn)();
     };
     static const TestCase kTests[] = {
-        {"format_from_url_single_file_formats", test_format_from_url_single_file_formats},
-        {"format_from_url_archives", test_format_from_url_archives},
-        {"format_from_url_unknown", test_format_from_url_unknown},
-        {"format_from_url_with_query_string", test_format_from_url_with_query_string},
-        {"artifact_single_file", test_artifact_single_file},
-        {"artifact_tar_gz_archive", test_artifact_tar_gz_archive},
-        {"artifact_zip_archive", test_artifact_zip_archive},
-        {"artifact_tar_bz2_archive", test_artifact_tar_bz2_archive},
-        {"empty_request_default_result", test_empty_request_default_result},
-        {"null_out_pointer", test_null_out_pointer},
-        {"invalid_input_bytes", test_invalid_input_bytes},
+        {.name = "format_from_url_single_file_formats",
+         .fn = test_format_from_url_single_file_formats},
+        {.name = "format_from_url_archives", .fn = test_format_from_url_archives},
+        {.name = "format_from_url_unknown", .fn = test_format_from_url_unknown},
+        {.name = "format_from_url_with_query_string", .fn = test_format_from_url_with_query_string},
+        {.name = "artifact_single_file", .fn = test_artifact_single_file},
+        {.name = "artifact_tar_gz_archive", .fn = test_artifact_tar_gz_archive},
+        {.name = "artifact_zip_archive", .fn = test_artifact_zip_archive},
+        {.name = "artifact_tar_bz2_archive", .fn = test_artifact_tar_bz2_archive},
+        {.name = "empty_request_default_result", .fn = test_empty_request_default_result},
+        {.name = "null_out_pointer", .fn = test_null_out_pointer},
+        {.name = "invalid_input_bytes", .fn = test_invalid_input_bytes},
     };
 
     int failures = 0;
