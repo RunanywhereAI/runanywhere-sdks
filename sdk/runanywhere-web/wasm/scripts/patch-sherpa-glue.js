@@ -138,21 +138,50 @@ if (noderawfsThrow.test(src)) {
 // ---------------------------------------------------------------------------
 // Patch 4: Skip NODERAWFS FS patching
 // ---------------------------------------------------------------------------
-// Emscripten generates:
+// Older Emscripten generated:
 //   var VFS={...FS};for(var _key in NODERAWFS){FS[_key]=_wrapNodeError(NODERAWFS[_key])}
+// Emscripten 5.x generates:
+//   for(const[key,value]of Object.entries(NODERAWFS)){FS[key]=_wrapNodeError(value)}
+//   for(const[key,value]of Object.entries(NODERAWFS_stream_funcs)){
+//       FS[key]=_wrapNodeStreamFunc(value,...)}
 //
-// This overwrites FS methods with NODERAWFS (Node.js filesystem) wrappers.
-// In the browser we want to keep the standard MEMFS-based FS methods.
+// Either form overwrites MEMFS-backed FS methods with NODERAWFS (Node.js
+// `fs.*`) wrappers, which then crash in the browser with
+// `Cannot read properties of undefined (reading 'writeFileSync')` because
+// `var fs=require("node:fs")` is guarded behind `if(ENVIRONMENT_IS_NODE)`
+// (which we patched to false).
 
-const noderawfsFS =
+const noderawfsLegacy =
   /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/;
+const noderawfs5x =
+  /for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}/g;
+const noderawfs5xStreamFuncs =
+  /for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,[^}]*\)\}/g;
 
-if (noderawfsFS.test(src)) {
+let patch4Applied = false;
+if (noderawfsLegacy.test(src)) {
   src = src.replace(
-    noderawfsFS,
-    '/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+    noderawfsLegacy,
+    '/* PATCHED: legacy NODERAWFS FS patching skipped for browser (using MEMFS) */',
   );
-  console.log('  ✓ Patch 4: NODERAWFS FS patching → skipped (MEMFS preserved)');
+  console.log('  ✓ Patch 4a: legacy NODERAWFS FS patching → skipped');
+  patch4Applied = true;
+}
+if (noderawfs5x.test(src)) {
+  src = src.replace(noderawfs5x, '/* PATCHED: 5.x NODERAWFS FS patching skipped for browser */');
+  console.log('  ✓ Patch 4b: Emscripten 5.x NODERAWFS FS patching → skipped');
+  patch4Applied = true;
+}
+if (noderawfs5xStreamFuncs.test(src)) {
+  src = src.replace(
+    noderawfs5xStreamFuncs,
+    '/* PATCHED: 5.x NODERAWFS_stream_funcs patching skipped for browser */',
+  );
+  console.log('  ✓ Patch 4c: Emscripten 5.x NODERAWFS_stream_funcs patching → skipped');
+  patch4Applied = true;
+}
+
+if (patch4Applied) {
   patchCount++;
 } else {
   console.log('  ⚠ Patch 4: NODERAWFS FS patching not found (may not exist in this version)');
