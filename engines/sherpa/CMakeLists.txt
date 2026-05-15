@@ -328,7 +328,7 @@ elseif(EMSCRIPTEN)
         set(SHERPA_ONNX_DEPS
             "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
             "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
-            "kissfft-float"
+            "kissfft-float" "ssentencepiece_core"
             # Optional TTS deps (may be absent):
             "piper_phonemize" "espeak-ng" "ucd"
         )

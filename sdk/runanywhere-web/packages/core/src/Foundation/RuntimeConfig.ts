@@ -31,10 +31,20 @@ export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
  * the acceleration switch. Should be idempotent.
  */
 export type RuntimeAccelerationSwitcher = (mode: 'cpu' | 'webgpu') => Promise<void>;
+export type RuntimeModelLoadPreparation = (context: {
+  request: unknown;
+  model: unknown | null;
+}) => Promise<void>;
+export type RuntimeModelLoadFailureRecovery = (context: {
+  request: unknown;
+  error: unknown;
+}) => Promise<boolean>;
 
 let _preferred: RuntimeAccelerationMode = 'auto';
 let _activeMode: 'cpu' | 'webgpu' | null = null;
 let _switcher: RuntimeAccelerationSwitcher | null = null;
+let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
+let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
 
 /**
  * Public `RunAnywhere.runtime` capability object.
@@ -91,4 +101,41 @@ export function setAccelerationSwitcher(fn: RuntimeAccelerationSwitcher | null):
  */
 export function setActiveAccelerationMode(mode: 'cpu' | 'webgpu' | null): void {
   _activeMode = mode;
+}
+
+export function setModelLoadPreparation(fn: RuntimeModelLoadPreparation | null): void {
+  _modelLoadPreparation = fn;
+}
+
+export async function prepareModelLoad(context: {
+  request: unknown;
+  model: unknown | null;
+}): Promise<void> {
+  if (!_modelLoadPreparation) return;
+  try {
+    await _modelLoadPreparation(context);
+  } catch (error) {
+    logger.warning(
+      `model-load preparation failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+export function setModelLoadFailureRecovery(fn: RuntimeModelLoadFailureRecovery | null): void {
+  _modelLoadFailureRecovery = fn;
+}
+
+export async function recoverModelLoadFailure(context: {
+  request: unknown;
+  error: unknown;
+}): Promise<boolean> {
+  if (!_modelLoadFailureRecovery) return false;
+  try {
+    return await _modelLoadFailureRecovery(context);
+  } catch (error) {
+    logger.warning(
+      `model-load recovery failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return false;
+  }
 }

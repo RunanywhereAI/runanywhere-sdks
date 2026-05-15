@@ -4,7 +4,7 @@
  * Re-landed against the Swift-shaped `RunAnywhere.processImage(...)` facade
  * and the core `VideoCapture` helper. Flow is:
  *
- *   1. User downloads + loads a VLM (e.g. SmolVLM 500M) via the shared
+ *   1. User downloads + loads a VLM (e.g. SmolVLM2 256M) via the shared
  *      model selection sheet (download + `modelLifecycle.load`).
  *   2. User starts the camera — `VideoCapture` attaches its `<video>` to
  *      the preview container.
@@ -20,6 +20,7 @@ import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
   VLMImageFormat,
+  VLMModelFamily,
   isSDKException,
   type VLMGenerationOptions,
   type VLMImage,
@@ -32,7 +33,7 @@ import {
   openSheet,
 } from '../components/model-selection';
 
-const VLM_MODEL_ID = 'smolvlm-500m-instruct-q8_0';
+const VLM_MODEL_ID = 'smolvlm2-256m-video-instruct-q8_0';
 const DEFAULT_PROMPT = 'Describe what you see in this image.';
 const CAPTURE_DIMENSION = 384;
 
@@ -269,7 +270,7 @@ async function onAnalyze(): Promise<void> {
     maxImageSize: CAPTURE_DIMENSION,
     nThreads: 0,
     useGpu: false,
-    modelFamily: 0,
+    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_SMOLVLM,
     customChatTemplate: undefined,
     imageMarkerOverride: undefined,
     seed: 0,

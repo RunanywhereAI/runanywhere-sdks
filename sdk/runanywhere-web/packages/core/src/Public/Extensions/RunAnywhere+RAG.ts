@@ -593,6 +593,9 @@ function unavailableCapabilities(): RAGProviderCapabilities {
 }
 
 export const RAG = {
+  setProvider: setRAGProvider,
+  createNativeProvider: createRAGNativeProvider,
+  setSessionHandle: setRAGSessionHandle,
   availability: getRAGAvailability,
   isAvailable: isRAGAvailable,
   capabilities: ragGetCapabilities,

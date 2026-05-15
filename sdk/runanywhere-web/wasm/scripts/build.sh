@@ -36,11 +36,10 @@ VLM="OFF"
 WHISPERCPP="OFF"
 ONNX="OFF"
 WEBGPU="OFF"
-# RAG (USearch vector search + ONNX embeddings) is force-OFF on Emscripten
-# in `sdk/runanywhere-commons/CMakeLists.txt` because FetchONNXRuntime.cmake
-# does not ship a WASM binary distribution. Flip this to ON once a real
-# ONNX Runtime WASM build is vendored (tracked by TODO(v0.21)).
+# RAG (USearch vector search + ONNX embeddings) is opt-in on Emscripten and
+# requires vendored ONNX Runtime WASM static archives.
 RAG="OFF"
+ONNX_REQUESTED="OFF"
 CLEAN=false
 
 # Parse arguments
@@ -74,6 +73,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --onnx)
             ONNX="ON"
+            ONNX_REQUESTED="ON"
             shift
             ;;
         --rag)
@@ -89,9 +89,12 @@ while [[ $# -gt 0 ]]; do
         --all-backends)
             LLAMACPP="ON"
             VLM="ON"
+            ONNX="ON"
+            ONNX_REQUESTED="ON"
+            RAG="ON"
             # WhisperCPP excluded: v1.8.2 GGML API is incompatible with llama.cpp b8011+.
-            # STT/TTS/VAD are registered through the unified RACommons ONNX backend.
-            # ONNX excluded: requires native ONNX Runtime headers (not available for WASM).
+            # STT/TTS/VAD/RAG are registered through the unified RACommons ONNX/Sherpa
+            # backend once the WASM static archives are vendored.
             shift
             ;;
         --clean)
@@ -111,7 +114,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
             echo "  --rag            Include RAG (requires ONNX Runtime WASM + Sherpa archives)"
             echo "  --webgpu         Enable WebGPU GPU acceleration (produces racommons-webgpu variant)"
-            echo "  --all-backends   Enable WASM-compatible backends (llama.cpp + VLM)"
+            echo "  --all-backends   Enable all Web backends (llama.cpp + VLM + ONNX/Sherpa + RAG)"
             echo "  --clean          Clean build directory before building"
             echo "  --help           Show this help"
             exit 0
@@ -166,12 +169,23 @@ fi
 
 rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm" "${WASM_DIR}/a.out.js" "${WASM_DIR}/a.out.wasm"
 
-if [ "$RAG" = "ON" ]; then
-    if [ ! -f "${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a" ]; then
-        echo "ERROR: --rag requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
-        echo "       Build or vendor ONNX Runtime WASM static archives before enabling Web RAG."
+ORT_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+SHERPA_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
+
+if [ "$RAG" = "ON" ] || [ "$ONNX" = "ON" ]; then
+    if [ ! -f "${ORT_WASM_ARCHIVE}" ]; then
+        echo "ERROR: Web ONNX/RAG requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+        echo "       Build or vendor ONNX Runtime WASM static archives first:"
+        echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
         exit 1
     fi
+fi
+
+if [ "$ONNX_REQUESTED" = "ON" ] && [ ! -f "${SHERPA_WASM_ARCHIVE}" ]; then
+    echo "ERROR: --onnx requires sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
+    echo "       Build or vendor Sherpa-ONNX WASM static archives first:"
+    echo "       sdk/runanywhere-web/wasm/scripts/vendor-sherpa-onnx-wasm.sh"
+    exit 1
 fi
 
 # Create build directory
@@ -185,6 +199,14 @@ if [ "$PTHREADS" = "ON" ]; then
         -DCMAKE_C_FLAGS="-pthread"
         -DCMAKE_CXX_FLAGS="-pthread"
     )
+fi
+
+CMAKE_LINK_ARGS=()
+if [ "$ONNX" = "ON" ]; then
+    # Vendored ONNX Runtime WASM static archives include protobuf objects.
+    # RACommons also links generated-proto support, so allow duplicate archive
+    # members at the final wasm-ld step while resolving ONNX/Sherpa/RAG builds.
+    CMAKE_LINK_ARGS=(-DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-multiple-definition")
 fi
 
 # Configure the single-root CMake build with Emscripten
@@ -206,9 +228,11 @@ emcmake cmake \
     -DRAC_WASM_VLM="${VLM}" \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
     -DRAC_WASM_ONNX="${ONNX}" \
+    -DRAC_RUNTIME_ONNXRT="${ONNX}" \
     -DRAC_WASM_WEBGPU="${WEBGPU}" \
     -DRAC_BACKEND_RAG="${RAG}" \
-    "${CMAKE_THREAD_ARGS[@]}"
+    ${CMAKE_THREAD_ARGS[@]+"${CMAKE_THREAD_ARGS[@]}"} \
+    ${CMAKE_LINK_ARGS[@]+"${CMAKE_LINK_ARGS[@]}"}
 
 # Build
 echo ""

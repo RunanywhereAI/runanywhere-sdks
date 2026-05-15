@@ -402,7 +402,16 @@ bool SherpaSTT::load_model(const std::string &model_path,
   RAC_LOG_INFO("Sherpa.STT", "Creating SherpaOnnxOfflineRecognizer (%s)...",
                is_nemo_ctc ? "NeMo CTC" : "Whisper");
 
-  sherpa_recognizer_ = SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
+  try {
+    sherpa_recognizer_ = SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
+  } catch (const std::exception &e) {
+    RAC_LOG_ERROR("Sherpa.STT", "SherpaOnnxCreateOfflineRecognizer threw: %s",
+                  e.what());
+    return false;
+  } catch (...) {
+    RAC_LOG_ERROR("Sherpa.STT", "SherpaOnnxCreateOfflineRecognizer threw");
+    return false;
+  }
 
   if (!sherpa_recognizer_) {
     RAC_LOG_ERROR("Sherpa.STT", "Failed to create SherpaOnnxOfflineRecognizer");
@@ -1322,7 +1331,16 @@ bool SherpaVAD::load_model(const std::string &model_path,
     vad_config.silero_vad.threshold = config["energy_threshold"].get<float>();
   }
 
-  sherpa_vad_ = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
+  try {
+    sherpa_vad_ = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
+  } catch (const std::exception &e) {
+    RAC_LOG_ERROR("Sherpa.VAD", "SherpaOnnxCreateVoiceActivityDetector threw: %s",
+                  e.what());
+    return false;
+  } catch (...) {
+    RAC_LOG_ERROR("Sherpa.VAD", "SherpaOnnxCreateVoiceActivityDetector threw");
+    return false;
+  }
   if (!sherpa_vad_) {
     RAC_LOG_ERROR("Sherpa.VAD", "Failed to create Silero VAD detector from: %s",
                   model_path.c_str());

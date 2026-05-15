@@ -8,13 +8,15 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking Web SDK call coverage"
-# After the V2 cleanup the legacy ModelManager / TextGeneration / VLMWorkerBridge
-# facades were deleted. The example app currently exercises the canonical Phase
-# 1 init + persistent-storage chooser flow (`RunAnywhere.initialize`,
-# `RunAnywhere.restoreLocalStorage`, `RunAnywhere.chooseLocalStorageDirectory`)
-# while the proto-byte backend bridges are wired up in a follow-up.
-grep -R -E "RunAnywhere\.(initialize|restoreLocalStorage|chooseLocalStorageDirectory|requestLocalStorageAccess)|RunAnywhere\.solutions\.run|RAG\.(query|ingest|getStatistics)" \
+# The example app should stay on the Swift-shaped root facade for app workflows;
+# backend internals live under @runanywhere/web/internal.
+grep -R -E "RunAnywhere\.(initialize|downloadModel|loadModel|generateStream|processImage|transcribe|synthesize|detectVoiceActivity|ragIngest|ragQuery|chooseLocalStorageDirectory|requestLocalStorageAccess|solutions\.run)" \
     src >/dev/null
+
+if grep -R -E "ModelManager|TextGeneration|VLMWorkerBridge|visionLanguage\.loadModel" src >/dev/null; then
+  echo "Found stale Web SDK API usage in the example app" >&2
+  exit 1
+fi
 
 echo "==> Building Web sample"
 npm run build

@@ -2,11 +2,11 @@
  * Model Catalog — registers a small fixed catalog of known models with the
  * SDK's proto-byte registry.
  *
- * After the V2 cleanup there is no `ModelManager` or app-side registration
- * facade. Models are registered directly via `RunAnywhere.modelRegistry.registerModel(...)`
- * which speaks proto bytes to the commons C++ registry. The entries here are
+ * After the V2 cleanup there is no app-side registration facade. Models are
+ * registered directly via `RunAnywhere.modelRegistry.registerModel(...)`, which
+ * speaks proto bytes to the commons C++ registry. The entries here are
  * purposefully minimal: canonical `ModelInfo` proto messages populated with
- * just enough fields to drive the model-selection UI and `modelLifecycle.loadModel()`.
+ * just enough fields to drive the model-selection UI and `RunAnywhere.loadModel()`.
  *
  * The catalog is registered best-effort — if the proto registry adapter is
  * not installed (e.g. the llamacpp WASM failed to load on a fresh dev
@@ -42,6 +42,7 @@ export interface CatalogEntry {
   downloadUrl: string;
   downloadSizeBytes: number;
   memoryRequiredBytes: number;
+  artifactType?: ModelArtifactType;
   contextLength?: number;
   supportsThinking?: boolean;
   files?: readonly CatalogFileEntry[];
@@ -136,29 +137,29 @@ const CATALOG: readonly CatalogEntry[] = [
 
   // ---------- Multimodal (VLM) ----------
   {
-    id: 'smolvlm-500m-instruct-q8_0',
-    name: 'SmolVLM 500M Instruct Q8_0',
-    description: 'Smallest vision-language model; runs in the WASM build.',
+    id: 'smolvlm2-256m-video-instruct-q8_0',
+    name: 'SmolVLM2 256M Video Instruct Q8_0',
+    description: 'Small vision-language model with primary GGUF and mmproj sidecar.',
     category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
-      'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
-    downloadSizeBytes: 636_275_712,
-    memoryRequiredBytes: 700_000_000,
+      'https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+    downloadSizeBytes: 278_828_032,
+    memoryRequiredBytes: 420_000_000,
     contextLength: 2048,
     files: [
       {
-        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
-        filename: 'SmolVLM-500M-Instruct-Q8_0.gguf',
+        url: 'https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+        filename: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-        sizeBytes: 436_806_912,
+        sizeBytes: 175_056_352,
       },
       {
-        url: 'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-f16.gguf',
-        filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        url: 'https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+        filename: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
         role: ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
-        sizeBytes: 199_468_800,
+        sizeBytes: 103_771_680,
       },
     ],
   },
@@ -169,12 +170,13 @@ const CATALOG: readonly CatalogEntry[] = [
     name: 'Whisper Tiny English',
     description: 'English speech-to-text via sherpa-onnx.',
     category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
       'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
     downloadSizeBytes: 74_000_000,
     memoryRequiredBytes: 105_000_000,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
   // ---------- Speech Synthesis (TTS) ----------
@@ -183,26 +185,55 @@ const CATALOG: readonly CatalogEntry[] = [
     name: 'Piper TTS US English (Lessac)',
     description: 'Piper VITS text-to-speech, medium quality.',
     category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-    framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
       'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
     downloadSizeBytes: 60_000_000,
     memoryRequiredBytes: 65_000_000,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   },
 
   // ---------- VAD ----------
   {
-    id: 'silero-vad-v5',
-    name: 'Silero VAD v5',
+    id: 'silero-vad',
+    name: 'Silero VAD',
     description: 'Lightweight voice activity detector.',
     category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
     framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
-      'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
+      'https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.onnx',
     downloadSizeBytes: 2_100_000,
     memoryRequiredBytes: 5_000_000,
+  },
+
+  // ---------- Embeddings / RAG ----------
+  {
+    id: 'all-minilm-l6-v2',
+    name: 'All MiniLM L6 v2',
+    description: 'Small ONNX embedding model used by the native RAG pipeline.',
+    category: ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    format: ModelFormat.MODEL_FORMAT_ONNX,
+    downloadUrl:
+      'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+    downloadSizeBytes: 25_500_000,
+    memoryRequiredBytes: 25_500_000,
+    files: [
+      {
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+        filename: 'model.onnx',
+        role: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+        sizeBytes: 22_700_000,
+      },
+      {
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+        filename: 'vocab.txt',
+        role: ModelFileRole.MODEL_FILE_ROLE_VOCABULARY,
+        sizeBytes: 232_000,
+      },
+    ],
   },
 ];
 
@@ -309,7 +340,7 @@ function toModelInfo(entry: CatalogEntry): ModelInfo {
         },
       }
       : {
-        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+        artifactType: entry.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
       }),
   };
 }

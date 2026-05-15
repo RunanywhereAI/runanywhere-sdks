@@ -28,10 +28,16 @@ export {
   Runtime,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
+  setModelLoadPreparation,
+  prepareModelLoad,
+  setModelLoadFailureRecovery,
+  recoverModelLoadFailure,
 } from './Foundation/RuntimeConfig';
 export type {
   RuntimeAccelerationMode,
   RuntimeAccelerationSwitcher,
+  RuntimeModelLoadPreparation,
+  RuntimeModelLoadFailureRecovery,
 } from './Foundation/RuntimeConfig';
 export type { AccelerationMode } from './Foundation/WASMBridge';
 
@@ -93,8 +99,6 @@ export type {
   ModalityProtoModule,
   ProtoEventHandler,
 } from './Adapters/ModalityProtoAdapter';
-export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
-export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 
@@ -135,7 +139,6 @@ export {
   setVisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 export type {
-  VisionLanguageLoadModelRequest,
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 

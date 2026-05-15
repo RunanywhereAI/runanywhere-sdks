@@ -3,9 +3,11 @@
  * @brief Canonical model lifecycle C ABI over generated proto bytes.
  */
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -413,6 +415,12 @@ ModelFileRole proto_file_role_from_resolved(rac_resolved_model_file_role_t role)
     }
 }
 
+struct ModelArtifactResolution {
+    std::string resolved_path;
+    std::string mmproj_path;
+    std::vector<ModelFileDescriptor> artifacts;
+};
+
 std::string resolved_path_for_model(const ModelInfo& model) {
     if (!model.local_path().empty()) {
         return model.local_path();
@@ -423,6 +431,202 @@ std::string resolved_path_for_model(const ModelInfo& model) {
 std::string basename_of_path(const std::string& path) {
     const size_t pos = path.find_last_of("/\\");
     return pos == std::string::npos ? path : path.substr(pos + 1);
+}
+
+std::string lowercase_ascii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+bool path_has_extension(const std::string& path, const char* extension) {
+    if (!extension) {
+        return false;
+    }
+    const std::string lower_path = lowercase_ascii(path);
+    const std::string lower_extension = "." + lowercase_ascii(extension);
+    return lower_path.size() >= lower_extension.size() &&
+           lower_path.compare(lower_path.size() - lower_extension.size(), lower_extension.size(),
+                              lower_extension) == 0;
+}
+
+bool path_matches_proto_format(const std::string& path, ModelFormat format) {
+    switch (format) {
+        case runanywhere::v1::MODEL_FORMAT_GGUF:
+            return path_has_extension(path, "gguf");
+        case runanywhere::v1::MODEL_FORMAT_GGML:
+            return path_has_extension(path, "ggml");
+        case runanywhere::v1::MODEL_FORMAT_ONNX:
+            return path_has_extension(path, "onnx");
+        case runanywhere::v1::MODEL_FORMAT_ORT:
+            return path_has_extension(path, "ort");
+        case runanywhere::v1::MODEL_FORMAT_BIN:
+        case runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT:
+            return path_has_extension(path, "bin");
+        case runanywhere::v1::MODEL_FORMAT_MLMODEL:
+            return path_has_extension(path, "mlmodel");
+        case runanywhere::v1::MODEL_FORMAT_MLPACKAGE:
+            return path_has_extension(path, "mlpackage");
+        case runanywhere::v1::MODEL_FORMAT_TFLITE:
+            return path_has_extension(path, "tflite");
+        case runanywhere::v1::MODEL_FORMAT_SAFETENSORS:
+            return path_has_extension(path, "safetensors");
+        case runanywhere::v1::MODEL_FORMAT_ZIP:
+            return path_has_extension(path, "zip");
+        case runanywhere::v1::MODEL_FORMAT_COREML:
+            return path_has_extension(path, "mlmodelc") || path_has_extension(path, "mlmodel") ||
+                   path_has_extension(path, "mlpackage");
+        case runanywhere::v1::MODEL_FORMAT_UNSPECIFIED:
+        case runanywhere::v1::MODEL_FORMAT_UNKNOWN:
+        default:
+            return path_has_extension(path, "gguf") || path_has_extension(path, "ggml") ||
+                   path_has_extension(path, "onnx") || path_has_extension(path, "ort") ||
+                   path_has_extension(path, "bin") || path_has_extension(path, "mlmodel") ||
+                   path_has_extension(path, "mlpackage") ||
+                   path_has_extension(path, "mlmodelc") || path_has_extension(path, "tflite") ||
+                   path_has_extension(path, "safetensors") || path_has_extension(path, "zip");
+    }
+}
+
+bool path_is_absolute(const std::string& path) {
+    return !path.empty() &&
+           (path[0] == '/' || path[0] == '\\' ||
+            (path.size() > 1 && std::isalpha(static_cast<unsigned char>(path[0])) &&
+             path[1] == ':'));
+}
+
+std::string join_model_path(const std::string& root, const std::string& relative_or_absolute) {
+    if (relative_or_absolute.empty()) {
+        return "";
+    }
+    if (path_is_absolute(relative_or_absolute) || root.empty()) {
+        return relative_or_absolute;
+    }
+    if (root.back() == '/' || root.back() == '\\') {
+        return root + relative_or_absolute;
+    }
+    return root + "/" + relative_or_absolute;
+}
+
+std::string descriptor_relative_path(const ModelFileDescriptor& file) {
+    if (file.has_destination_path() && !file.destination_path().empty()) {
+        return file.destination_path();
+    }
+    if (file.has_relative_path() && !file.relative_path().empty()) {
+        return file.relative_path();
+    }
+    if (!file.filename().empty()) {
+        return file.filename();
+    }
+    return "";
+}
+
+bool descriptor_is_mmproj(const ModelFileDescriptor& file) {
+    if (file.role() == runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR) {
+        return true;
+    }
+    const std::string name = lowercase_ascii(descriptor_relative_path(file));
+    return name.find("mmproj") != std::string::npos || name.find("mm-proj") != std::string::npos ||
+           name.find("vision-projector") != std::string::npos ||
+           name.find("vision_projector") != std::string::npos ||
+           name.find("multimodal_projector") != std::string::npos ||
+           name.find("multi-modal-projector") != std::string::npos;
+}
+
+void append_synthesized_artifact(const ModelFileDescriptor& source, const std::string& root,
+                                 std::vector<ModelFileDescriptor>* artifacts) {
+    if (!artifacts) {
+        return;
+    }
+    const std::string rel = descriptor_relative_path(source);
+    if (rel.empty()) {
+        return;
+    }
+    const std::string absolute = join_model_path(root, rel);
+    for (const ModelFileDescriptor& existing : *artifacts) {
+        if (existing.has_local_path() && existing.local_path() == absolute) {
+            return;
+        }
+    }
+
+    ModelFileDescriptor descriptor;
+    descriptor.CopyFrom(source);
+    if (!descriptor.has_relative_path() || descriptor.relative_path().empty()) {
+        descriptor.set_relative_path(rel);
+    }
+    if (!descriptor.has_destination_path() || descriptor.destination_path().empty()) {
+        descriptor.set_destination_path(rel);
+    }
+    if (descriptor.filename().empty()) {
+        descriptor.set_filename(basename_of_path(rel));
+    }
+    descriptor.set_local_path(absolute);
+    artifacts->push_back(std::move(descriptor));
+}
+
+void synthesize_artifact_resolution_from_descriptors(const ModelInfo& model,
+                                                     const std::string& artifact_root,
+                                                     ModelArtifactResolution* out) {
+    if (!out || artifact_root.empty()) {
+        return;
+    }
+    const bool can_set_primary = out->resolved_path.empty() || out->resolved_path == artifact_root;
+
+    auto visit_descriptor = [&](const ModelFileDescriptor& file) {
+        append_synthesized_artifact(file, artifact_root, &out->artifacts);
+        const std::string rel = descriptor_relative_path(file);
+        if (rel.empty()) {
+            return;
+        }
+        const std::string absolute = join_model_path(artifact_root, rel);
+        if (file.role() == runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL &&
+            can_set_primary) {
+            out->resolved_path = absolute;
+        }
+        if (descriptor_is_mmproj(file) && out->mmproj_path.empty()) {
+            out->mmproj_path = absolute;
+        }
+    };
+
+    if (model.has_multi_file()) {
+        for (const ModelFileDescriptor& file : model.multi_file().files()) {
+            visit_descriptor(file);
+        }
+    }
+    if (model.has_expected_files()) {
+        for (const ModelFileDescriptor& file : model.expected_files().files()) {
+            visit_descriptor(file);
+        }
+    }
+
+    if (can_set_primary && out->resolved_path == artifact_root) {
+        auto select_primary_candidate = [&](const ModelFileDescriptor& file) {
+            if (descriptor_is_mmproj(file)) {
+                return;
+            }
+            const std::string rel = descriptor_relative_path(file);
+            if (!rel.empty() && path_matches_proto_format(rel, model.format())) {
+                out->resolved_path = join_model_path(artifact_root, rel);
+            }
+        };
+        if (model.has_multi_file()) {
+            for (const ModelFileDescriptor& file : model.multi_file().files()) {
+                if (out->resolved_path != artifact_root) {
+                    break;
+                }
+                select_primary_candidate(file);
+            }
+        }
+        if (out->resolved_path == artifact_root && model.has_expected_files()) {
+            for (const ModelFileDescriptor& file : model.expected_files().files()) {
+                if (out->resolved_path != artifact_root) {
+                    break;
+                }
+                select_primary_candidate(file);
+            }
+        }
+    }
 }
 
 std::string json_escape(const std::string& value) {
@@ -625,12 +829,6 @@ struct ProtoModelPathBridge {
     }
 };
 
-struct ModelArtifactResolution {
-    std::string resolved_path;
-    std::string mmproj_path;
-    std::vector<ModelFileDescriptor> artifacts;
-};
-
 ModelFileDescriptor descriptor_from_resolved_file(const rac_resolved_model_file_t& file) {
     ModelFileDescriptor descriptor;
     if (file.relative_path) {
@@ -662,6 +860,7 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
     if (out.resolved_path.empty()) {
         return out;
     }
+    const std::string artifact_root = out.resolved_path;
 
     ProtoModelPathBridge bridge(model);
     rac_model_path_resolution_t resolution = {};
@@ -681,6 +880,10 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
         out.artifacts.push_back(descriptor_from_resolved_file(resolution.files[i]));
     }
     rac_model_path_resolution_free(&resolution);
+
+    if (model.has_multi_file() || model.has_expected_files()) {
+        synthesize_artifact_resolution_from_descriptors(model, artifact_root, &out);
+    }
     return out;
 }
 

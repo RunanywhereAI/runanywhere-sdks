@@ -102,6 +102,12 @@ interface CreateModuleOptions {
 }
 type CreateModuleFn = (options?: CreateModuleOptions) => Promise<LlamaCppModule>;
 
+interface WebGPUAdapterLike {
+  features?: {
+    has(name: string): boolean;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // LlamaCppBridge — singleton WASM loader
 // ---------------------------------------------------------------------------
@@ -207,9 +213,15 @@ export class LlamaCppBridge {
   private async _doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     logger.info('Loading LlamaCpp WASM module...');
     try {
-      const useWebGPU =
-        acceleration === 'webgpu' ||
-        (acceleration === 'auto' && (await LlamaCppBridge.detectWebGPUWithJSPI()));
+      const webgpuAvailable = acceleration !== 'cpu'
+        ? await LlamaCppBridge.detectWebGPUWithJSPI()
+        : false;
+      if (acceleration === 'webgpu' && !webgpuAvailable) {
+        logger.warning(
+          'WebGPU acceleration was requested, but this browser adapter is missing required WebGPU/JSPI/shader-f16 support. Falling back to CPU.',
+        );
+      }
+      const useWebGPU = acceleration !== 'cpu' && webgpuAvailable;
       this._accelerationMode = useWebGPU ? 'webgpu' : 'cpu';
 
       const moduleUrl = useWebGPU
@@ -232,7 +244,7 @@ export class LlamaCppBridge {
 
       this._module = await createModule({
         print: (text) => logger.info(text),
-        printErr: (text) => logger.error(text),
+        printErr: (text) => logger.info(text),
         locateFile: (path) => baseUrl + path,
       });
 
@@ -430,9 +442,12 @@ export class LlamaCppBridge {
   private static async detectWebGPUWithJSPI(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
     try {
-      const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+      const gpu = (navigator as Navigator & {
+        gpu?: { requestAdapter(): Promise<WebGPUAdapterLike | null> };
+      }).gpu;
       const adapter = await gpu?.requestAdapter();
       if (!adapter) return false;
+      if (!adapter.features?.has('shader-f16')) return false;
       const wasm = WebAssembly as unknown as { promising?: unknown; Suspending?: unknown };
       return typeof WebAssembly !== 'undefined' && 'promising' in wasm && 'Suspending' in wasm;
     } catch {

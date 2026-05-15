@@ -872,6 +872,30 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
     out->set_temperature(in->temperature);
     out->set_top_p(in->top_p);
     out->set_top_k(0);  // C ABI has no top_k on rac_vlm_options_t.
+    out->set_streaming_enabled(in->streaming_enabled == RAC_TRUE);
+    if (in->max_image_size > 0)
+        out->set_max_image_size(in->max_image_size);
+    if (in->n_threads > 0)
+        out->set_n_threads(in->n_threads);
+    out->set_use_gpu(in->use_gpu == RAC_TRUE);
+    switch (in->model_family) {
+        case RAC_VLM_MODEL_FAMILY_QWEN2_VL:
+            out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_QWEN2_VL);
+            break;
+        case RAC_VLM_MODEL_FAMILY_SMOLVLM:
+            out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_SMOLVLM);
+            break;
+        case RAC_VLM_MODEL_FAMILY_LLAVA:
+            out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_LLAVA);
+            break;
+        case RAC_VLM_MODEL_FAMILY_CUSTOM:
+            out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_CUSTOM);
+            break;
+        case RAC_VLM_MODEL_FAMILY_AUTO:
+        default:
+            out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_AUTO);
+            break;
+    }
     return true;
 }
 
@@ -887,6 +911,31 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         out->temperature = in.temperature();
     if (in.top_p() > 0.0f)
         out->top_p = in.top_p();
+    out->streaming_enabled = in.streaming_enabled() ? RAC_TRUE : RAC_FALSE;
+    if (in.max_image_size() > 0)
+        out->max_image_size = in.max_image_size();
+    if (in.n_threads() > 0)
+        out->n_threads = in.n_threads();
+    out->use_gpu = in.use_gpu() ? RAC_TRUE : RAC_FALSE;
+    switch (in.model_family()) {
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_QWEN2_VL:
+            out->model_family = RAC_VLM_MODEL_FAMILY_QWEN2_VL;
+            break;
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_SMOLVLM:
+            out->model_family = RAC_VLM_MODEL_FAMILY_SMOLVLM;
+            break;
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_LLAVA:
+            out->model_family = RAC_VLM_MODEL_FAMILY_LLAVA;
+            break;
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_CUSTOM:
+            out->model_family = RAC_VLM_MODEL_FAMILY_CUSTOM;
+            break;
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_AUTO:
+        case ::runanywhere::v1::VLM_MODEL_FAMILY_UNSPECIFIED:
+        default:
+            out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
+            break;
+    }
     if (out_prompt) {
         *out_prompt = in.prompt().empty() ? nullptr : rac_strdup(in.prompt().c_str());
     }

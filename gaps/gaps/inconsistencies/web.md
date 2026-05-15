@@ -17,7 +17,7 @@ No backwards compatibility is required. Prefer deletion over deprecated aliases.
 - LLM is the strongest Web modality: browser download, C++ lifecycle load, and real generation passed in the current validation with `RA_RUN_LLM_E2E=1 npm run test:browser -- tests/browser/llm-generate.spec.ts`.
 - The root `RunAnywhere` facade now exposes the Swift-shaped flat methods for lifecycle, registry, downloads, LLM, structured output, STT, TTS, VAD, VLM, RAG, and VoiceAgent. Lower-level namespaces remain for backend packages and handle-oriented internals.
 - The example app no longer imports `@runanywhere/web/internal` in the modality views checked during this pass. Model download/load, chat generation, VLM analysis, and RAG document/query actions now prefer root flat methods where Web exposes them.
-- VLM is closer than the old docs said: the catalog declares primary GGUF plus mmproj sidecar, CPU and WebGPU llama artifacts export VLM symbols, and the public path is `RunAnywhere.loadModel(...)` -> `RunAnywhere.processImage(...)` through the lifecycle provider. Current blocker is runtime proof: WebGPU VLM E2E now fails during `RunAnywhere.loadModel(...)` with `RuntimeError: unreachable` in `racommons-llamacpp-webgpu.wasm`; the earlier CPU path timed out after prompt preparation.
+- VLM is closer than the old docs said: the catalog declares primary GGUF plus mmproj sidecar, CPU and WebGPU llama artifacts export VLM symbols, and the public path is `RunAnywhere.loadModel(...)` -> `RunAnywhere.processImage(...)` through the lifecycle provider. Current blocker is runtime proof: Chrome/WebGPU VLM E2E loads the primary model and mmproj successfully, then `RunAnywhere.processImage(...)` times out after 60s in CLIP image encoding after `encoding image slice...`.
 - STT/TTS/model-backed VAD are blocked by artifacts, not TypeScript naming. `sdk/runanywhere-commons/third_party/onnxruntime-wasm` and `sdk/runanywhere-commons/third_party/sherpa-onnx-wasm` only contain `.gitkeep`, so `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` are absent.
 - RAG is blocked because `rac_rag_*` exports are absent and embeddings depend on ONNX Runtime WASM.
 - VoiceAgent is blocked until STT, VAD, LLM, and TTS can all be loaded and exercised in the browser.
@@ -47,11 +47,18 @@ Fix: after ONNX/Sherpa archives exist, download/load STT, TTS, and Silero VAD mo
 
 ### WEB-ALIGN-004: VLM inference fails current WebGPU E2E
 
-Resolved since the prior stale doc: multi-file SmolVLM metadata exists, VLM symbols exist in CPU/WebGPU artifacts, and lifecycle-owned `RunAnywhere.processImage` exists. Remaining issue: CPU VLM timed out after prompt preparation; WebGPU/JSPI was rebuilt with proto exports and now aborts in a real browser/Playwright workflow.
+Resolved since the prior stale doc: multi-file SmolVLM2 metadata exists, VLM symbols exist in CPU/WebGPU artifacts, lifecycle-owned `RunAnywhere.processImage` exists, and shared C++ now synthesizes primary GGUF/mmproj artifact paths from multi-file descriptors when Web filesystem scanning is unreliable.
 
-Current result: `RA_RUN_VLM_E2E=1 npm run test:browser -- tests/browser/vlm-generate.spec.ts` fails during `RunAnywhere.loadModel(...)` with `RuntimeError: unreachable` in `racommons-llamacpp-webgpu.wasm`. Playwright captured the trace under `sdk/runanywhere-web/test-results/vlm-generate-Web-SDK-VLM-e-1670b-proj-and-processes-an-image-chromium/`.
+Current result: `RA_RUN_VLM_E2E=1 npm run test:browser -- tests/browser/vlm-generate.spec.ts --trace on` uses installed Chrome (`channel: chrome`) and fails after 1.2 minutes because `RunAnywhere.processImage(...)` does not resolve within the 60s generation timeout. The trace shows:
 
-Fix: debug the WebGPU lifecycle load abort inside the llama/VLM backend, keep CPU fallback diagnostics, and only mark PASS after primary+mmproj model load and image inference return real text in a browser.
+- WebGPU selected successfully: Chrome 147, Apple/Metal WebGPU adapter, 4095 MiB reported free.
+- Primary path resolved to `/opfs/RunAnywhere/Models/LlamaCpp/smolvlm2-256m-video-instruct-q8_0/SmolVLM2-256M-Video-Instruct-Q8_0.gguf`.
+- mmproj path resolved to `/opfs/RunAnywhere/Models/LlamaCpp/smolvlm2-256m-video-instruct-q8_0/mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf`.
+- Primary model and vision projector both load; trace logs `Vision projector loaded successfully` and `VLM model loaded`.
+- Inference reaches `[v3-prep] Prompt ready` and then `encoding image slice...`; no token decode logs appear before timeout.
+- Trace path: `sdk/runanywhere-web/test-results/vlm-generate-Web-SDK-VLM-e-e4e42-proj-and-processes-an-image-chromium/trace.zip`.
+
+Fix: debug the WebGPU CLIP image-encoding path after prompt preparation, keep CPU fallback diagnostics, and only mark PASS after primary+mmproj model load and image inference return real text in a browser.
 
 ### WEB-ALIGN-005: RAG cannot run in the current Web artifact
 
@@ -94,11 +101,11 @@ Fix: use `test_workflows/instructions/web` and store exact PASS/BLOCKED evidence
 | Area | Status | Current evidence |
 | --- | --- | --- |
 | LLM | PASS | Current real browser LLM E2E downloads SmolLM2-360M, loads it, and streams tokens through `RunAnywhere.generateStream`. |
-| Model registry/lifecycle/downloads | Partial PASS | C++ proto path exists and flat facade exists; VLM multi-file path needs current browser proof. |
+| Model registry/lifecycle/downloads | Partial PASS | C++ proto path exists and flat facade exists; SmolVLM2 multi-file path now resolves primary+mmproj correctly in browser, but VLM inference still times out in image encode. |
 | STT | Blocked | `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` absent; no real transcription possible. |
 | TTS | Blocked | ONNX/Sherpa/Piper Web archives absent; no real synthesis possible. |
 | VAD | Blocked | Model-backed Silero path depends on ONNX/Sherpa exports; no energy fallback should be counted as Swift parity. |
-| VLM | Blocked | Multi-file metadata and VLM symbols exist; WebGPU E2E aborts during `RunAnywhere.loadModel(...)` with `RuntimeError: unreachable`; CPU path timed out after prompt prep. |
+| VLM | Blocked | Multi-file metadata and VLM symbols exist; Chrome/WebGPU E2E loads primary+mmproj, then times out after 60s at CLIP `encoding image slice...` before token decode. |
 | RAG | Blocked | `rac_rag_*` exports missing; embeddings require ONNX Runtime WASM. |
 | VoiceAgent | Blocked | Depends on STT/VAD/LLM/TTS all being real and loaded. |
 | Tool calling | Partial | Surface/export exists; C++ run-loop E2E pending. |
@@ -157,8 +164,8 @@ Each item is intentionally small enough for one agent. Agents must stay inside t
 ### VLM
 
 33. Inspect WebGPU artifact for `rac_vlm_process_proto` JSPI wrapping.
-34. Debug the current WebGPU `RunAnywhere.loadModel(...)` abort in `racommons-llamacpp-webgpu.wasm`.
-35. Re-run SmolVLM download/load/process E2E with clean browser state after the lifecycle load fix.
+34. Debug the current WebGPU CLIP image-encoding timeout after `[v3-prep] Prompt ready`.
+35. Re-run SmolVLM2 download/load/process E2E with clean browser state after the image-encoding fix.
 36. If WebGPU VLM passes, update status from partial to PASS with report path.
 37. Remove stale worker-only documentation if lifecycle provider remains the canonical VLM path.
 

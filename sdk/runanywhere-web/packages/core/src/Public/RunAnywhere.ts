@@ -39,7 +39,7 @@ import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
-import { Runtime } from '../Foundation/RuntimeConfig';
+import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG';
@@ -692,6 +692,15 @@ export const RunAnywhere = {
         `Model metadata for '${request.modelId}' is not registered.`,
       );
     }
+    await prepareModelLoad({
+      request: {
+        modelId: request.modelId,
+        category: model.category,
+        framework: model.framework,
+      },
+      model,
+    });
+    ModelRegistryCapability.registerModel(model);
 
     const plan = DownloadsCapability.plan({
       modelId: request.modelId,

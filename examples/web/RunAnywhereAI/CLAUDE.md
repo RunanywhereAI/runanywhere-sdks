@@ -20,13 +20,13 @@ npm run dev -- --host 127.0.0.1
 
 | Tab | View File | Current SDK Surface |
 | --- | --- | --- |
-| Chat | `views/chat.ts` | `RunAnywhere.textGeneration.generateStream`, `RunAnywhere.toolCalling` |
-| Vision | `views/vision.ts` | `VideoCapture`, `RunAnywhere.visionLanguage` |
-| Voice | `views/voice.ts` | `RunAnywhere.voiceAgent`, `AudioCapture`, stream adapters |
-| Transcribe | `views/transcribe.ts` | `AudioCapture`, `RunAnywhere.stt.transcribeAuto`, internal STT adapter readiness |
-| Speak | `views/speak.ts` | `RunAnywhere.tts.synthesizeAuto`, `AudioPlayback`, internal TTS adapter readiness |
-| Documents | `views/documents.ts` | `RunAnywhere.rag` |
-| Storage | `views/storage.ts` | `RunAnywhere.storage`, `RunAnywhere.modelRegistry`, `RunAnywhere.modelLifecycle` |
+| Chat | `views/chat.ts` | `RunAnywhere.generateStream`, `RunAnywhere.generateWithTools` |
+| Vision | `views/vision.ts` | `VideoCapture`, `RunAnywhere.loadModel`, `RunAnywhere.visionLanguage.loadCurrentModel`, `RunAnywhere.processImage` |
+| Voice | `views/voice.ts` | Placeholder until STT/VAD/TTS ONNX/Sherpa artifacts are linked |
+| Transcribe | `views/transcribe.ts` | `AudioCapture`, `RunAnywhere.transcribe` once ONNX/Sherpa artifacts are linked |
+| Speak | `views/speak.ts` | `RunAnywhere.synthesize`, `AudioPlayback` once ONNX/Sherpa artifacts are linked |
+| Documents | `views/documents.ts` | `RunAnywhere.ragIngest`, `RunAnywhere.ragQuery`, RAG diagnostics |
+| Storage | `views/storage.ts` | `RunAnywhere.storage`, `RunAnywhere.modelRegistry`, `RunAnywhere.loadModel` |
 | Solutions | `views/solutions.ts` | `RunAnywhere.solutions` |
 | Settings | `views/settings.ts` | local UI settings |
 

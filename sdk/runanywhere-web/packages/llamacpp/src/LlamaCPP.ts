@@ -35,9 +35,16 @@ import {
   completeDeferredServicesInitialization,
   setAccelerationSwitcher,
   setActiveAccelerationMode,
+  setModelLoadPreparation,
+  setModelLoadFailureRecovery,
   setVisionLanguageProvider,
   SDKLogger,
 } from '@runanywhere/web/internal';
+import {
+  ModelCategory,
+  type ModelInfo,
+  type ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { LifecycleVLMProvider } from './Infrastructure/LifecycleVLMProvider';
 
@@ -48,6 +55,55 @@ const MODULE_ID = 'llamacpp';
 let _isRegistered = false;
 let _registeringPromise: Promise<void> | null = null;
 const lifecycleVLMProvider = new LifecycleVLMProvider();
+
+function modelLoadCategory(request: unknown, model: unknown): ModelCategory | undefined {
+  const requestCategory = (request as Partial<ModelLoadRequest> | null)?.category;
+  if (requestCategory !== undefined) return requestCategory;
+  return (model as Partial<ModelInfo> | null)?.category;
+}
+
+function isVisionModelCategory(category: unknown): boolean {
+  return category === ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
+    category === ModelCategory.MODEL_CATEGORY_VISION;
+}
+
+function modelIdFromLoadRequest(request: unknown): string {
+  return String((request as Partial<ModelLoadRequest> | null)?.modelId ?? '').toLowerCase();
+}
+
+function shouldPrepareCpuForModelLoad(
+  bridge: LlamaCppBridge,
+  request: unknown,
+  model: unknown,
+): request is ModelLoadRequest {
+  if (bridge.accelerationMode !== 'webgpu') return false;
+  const modelId = modelIdFromLoadRequest(request);
+  if (!modelId) return false;
+  if (!isVisionModelCategory(modelLoadCategory(request, model))) return false;
+  return modelId.includes('qwen');
+}
+
+function shouldFallbackWebGPUModelLoad(
+  bridge: LlamaCppBridge,
+  request: unknown,
+  error: unknown,
+): request is ModelLoadRequest {
+  if (bridge.accelerationMode !== 'webgpu') return false;
+  const loadRequest = request as Partial<ModelLoadRequest> | null;
+  if (!loadRequest?.modelId) return false;
+  if (
+    loadRequest.category !== undefined &&
+    loadRequest.category !== ModelCategory.MODEL_CATEGORY_MULTIMODAL &&
+    loadRequest.category !== ModelCategory.MODEL_CATEGORY_VISION
+  ) {
+    return false;
+  }
+  // Emscripten can throw either Error instances, RuntimeError instances, or
+  // opaque C++ exception objects depending on how the wasm trap crosses JSPI.
+  // Once we know the failed request is a WebGPU model load for an uncategorized
+  // or VLM/Vision request, retrying on CPU is the safest recovery path.
+  return Boolean(error);
+}
 
 export interface LlamaCPPRegisterOptions {
   /** Hardware acceleration strategy. Defaults to `'auto'` (WebGPU if available, otherwise CPU). */
@@ -117,6 +173,23 @@ export const LlamaCPP = {
           await bridge.switchToAcceleration(mode);
           setActiveAccelerationMode(bridge.accelerationMode);
         });
+        setModelLoadPreparation(async ({ request, model }) => {
+          if (!shouldPrepareCpuForModelLoad(bridge, request, model)) return;
+          logger.warning(
+            `WebGPU VLM load is not stable for ${request.modelId}; loading with the CPU WASM artifact.`,
+          );
+          await bridge.switchToAcceleration('cpu');
+          setActiveAccelerationMode(bridge.accelerationMode);
+        });
+        setModelLoadFailureRecovery(async ({ request, error }) => {
+          if (!shouldFallbackWebGPUModelLoad(bridge, request, error)) return false;
+          logger.warning(
+            `WebGPU model load failed for ${request.modelId}; retrying with the CPU WASM artifact.`,
+          );
+          await bridge.switchToAcceleration('cpu');
+          setActiveAccelerationMode(bridge.accelerationMode);
+          return true;
+        });
 
         await bridge.ensureLoaded(options.acceleration ?? 'auto');
 
@@ -143,6 +216,8 @@ export const LlamaCPP = {
     if (!_isRegistered) return;
     setAccelerationSwitcher(null);
     setActiveAccelerationMode(null);
+    setModelLoadPreparation(null);
+    setModelLoadFailureRecovery(null);
     setVisionLanguageProvider(null);
     LlamaCppBridge.shared.shutdown();
     _isRegistered = false;

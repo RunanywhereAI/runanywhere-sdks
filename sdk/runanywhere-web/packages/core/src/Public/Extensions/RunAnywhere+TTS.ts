@@ -11,7 +11,7 @@
  * example app and external consumers never have to touch raw exports.
  */
 
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { AudioFormat, ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   type TTSOptions,
   type TTSOutput,
@@ -301,7 +301,10 @@ export async function synthesize(
         'No voicePath provided and the model lifecycle proto adapter is not installed.',
       );
     }
-    const current = ModelLifecycle.currentModel({ includeModelMetadata: true });
+    const current = ModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      includeModelMetadata: true,
+    });
     if (!current?.modelId) {
       throw SDKException.componentNotReady(
         'tts',

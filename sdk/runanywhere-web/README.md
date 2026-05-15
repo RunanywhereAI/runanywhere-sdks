@@ -12,7 +12,7 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 
 > **Beta (v0.1.0)** -- This is an early release for testing and feedback. The API surface is stable but may change before v1.0. Not yet recommended for production deployments without thorough testing.
 
-> **Current runtime status:** LLM is the only fully exercised browser E2E path in the current Web artifacts. VLM is in active validation after the WebGPU/JSPI rebuild. STT, TTS, model-backed VAD, RAG, and VoiceAgent are blocked until ONNX Runtime and Sherpa-ONNX WASM static archives are present in `sdk/runanywhere-commons/third_party/*-wasm` and the unified RACommons WASM artifact exports the required backend symbols.
+> **Current runtime status:** LLM is the only fully exercised browser E2E path in the current Web artifacts. VLM downloads and loads SmolVLM2 primary GGUF plus mmproj through the shared lifecycle, but Chrome/WebGPU inference is still blocked: `RunAnywhere.processImage(...)` reaches CLIP `encoding image slice...` and times out before token decode. STT, TTS, model-backed VAD, RAG, and VoiceAgent are blocked until ONNX Runtime and Sherpa-ONNX WASM static archives are present in `sdk/runanywhere-commons/third_party/*-wasm` and the unified RACommons WASM artifact exports the required backend symbols.
 
 ---
 
@@ -230,32 +230,31 @@ Note: `LLMGenerationOptions` is the proto-generated type for LLM generation para
 ```typescript
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
 import { LlamaCPP } from '@runanywhere/web-llamacpp';
-import { ONNX } from '@runanywhere/web-onnx';
 
 await RunAnywhere.initialize({
   environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
   debug: true,
 });
 await LlamaCPP.register({ acceleration: 'auto' });
-await ONNX.register();
+// ONNX.register() is currently a shell until ONNX/Sherpa WASM archives are vendored.
 ```
 
 ### 2. Text Generation (LLM)
 
 ```typescript
 await RunAnywhere.modelRegistry.registerModel({
-  modelId: 'qwen2.5-0.5b',
+  id: 'qwen2.5-0.5b',
   name: 'Qwen 2.5 0.5B',
   localPath: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
 });
-await RunAnywhere.modelLifecycle.loadModel({ modelId: 'qwen2.5-0.5b' });
+await RunAnywhere.loadModel({ modelId: 'qwen2.5-0.5b' });
 
-const result = await RunAnywhere.textGeneration.generate({
+const result = await RunAnywhere.generate({
   prompt: 'Explain quantum computing briefly.',
 });
 console.log(result.text);
 
-const stream = await RunAnywhere.textGeneration.generateStream({
+const stream = await RunAnywhere.generateStream({
   prompt: 'Write a haiku about code.',
 });
 for await (const token of stream.stream) {
@@ -266,41 +265,25 @@ for await (const token of stream.stream) {
 ### 3. Speech-to-Text (STT)
 
 ```typescript
-const stt = RunAnywhere.stt.create();
-try {
-  RunAnywhere.stt.loadModel(stt, '/models/whisper-tiny/model.onnx', 'whisper-tiny');
-  const result = RunAnywhere.stt.transcribe(stt, audioFloat32Array, { sampleRate: 16000 });
-  console.log(result.text);
-} finally {
-  RunAnywhere.stt.destroy(stt);
-}
+// Blocked in current artifacts: requires ONNX/Sherpa WASM static archives.
+const result = await RunAnywhere.transcribe(audioFloat32Array, { sampleRate: 16000 });
+console.log(result.text);
 ```
 
 ### 4. Text-to-Speech (TTS)
 
 ```typescript
-const tts = RunAnywhere.tts.create();
-try {
-  RunAnywhere.tts.loadVoice(tts, '/models/piper-en.onnx', 'piper-en');
-  const result = RunAnywhere.tts.synthesize(tts, 'Hello from RunAnywhere!');
-  console.log(result.sampleRate, result.audioData.length);
-} finally {
-  RunAnywhere.tts.destroy(tts);
-}
+// Blocked in current artifacts: requires ONNX/Sherpa/Piper WASM static archives.
+const result = await RunAnywhere.synthesize('Hello from RunAnywhere!');
+console.log(result.sampleRate, result.audioData.length);
 ```
 
 ### 5. Voice Activity Detection (VAD)
 
 ```typescript
-const vad = RunAnywhere.vad.create();
-try {
-  RunAnywhere.vad.configure(vad, { sampleRate: 16000 });
-  RunAnywhere.vad.initialize(vad);
-  const result = RunAnywhere.vad.process(vad, audioChunk);
-  console.log(result.isSpeech);
-} finally {
-  RunAnywhere.vad.destroy(vad);
-}
+// Blocked in current artifacts: model-backed Silero VAD requires ONNX/Sherpa WASM.
+const result = await RunAnywhere.detectVoiceActivity(audioChunk, { sampleRate: 16000 });
+console.log(result.isSpeech);
 ```
 
 ### 6. Vision Language Model (VLM)
@@ -308,16 +291,12 @@ try {
 ```typescript
 import { VLMImageFormat, VLMModelFamily } from '@runanywhere/web';
 
-await RunAnywhere.visionLanguage.loadModel({
-  modelId: 'qwen2-vl',
-  modelName: 'Qwen2 VL',
-  modelFilename: 'qwen2-vl.gguf',
-  mmprojFilename: 'mmproj.gguf',
-  modelData,
-  mmprojData,
-});
+await RunAnywhere.modelRegistry.registerModel(smolVLM2ModelInfo);
+await RunAnywhere.downloadModel({ modelId: 'smolvlm2-256m-video-instruct-q8_0' });
+await RunAnywhere.loadModel({ modelId: 'smolvlm2-256m-video-instruct-q8_0' });
+await RunAnywhere.visionLanguage.loadCurrentModel();
 
-const result = await RunAnywhere.visionLanguage.processImage(
+const result = await RunAnywhere.processImage(
   { format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB, rawRgb: pixelData, width: 256, height: 256 },
   {
     prompt: 'Describe this image.',
@@ -339,6 +318,8 @@ const result = await RunAnywhere.visionLanguage.processImage(
 );
 console.log(result.text);
 ```
+
+Current VLM validation status: Chrome/WebGPU loads SmolVLM2 and mmproj, then times out in CLIP image encoding before token decode. Treat real VLM inference as `BLOCKED` until that path returns text in browser E2E.
 
 ---
 
@@ -698,7 +679,7 @@ The SDK uses typed errors with error codes:
 import { SDKException, SDKErrorCode } from '@runanywhere/web';
 
 try {
-  await RunAnywhere.textGeneration.generate({ prompt: 'Hello' });
+  await RunAnywhere.generate({ prompt: 'Hello' });
 } catch (err) {
   if (err instanceof SDKException) {
     switch (err.code) {
@@ -807,11 +788,11 @@ Yes for the current LLM/VLM path: GGUF-format models compatible with llama.cpp c
 
 **Fix:** Use smaller quantized models (Q4_0 instead of Q8_0). Close other browser tabs. On mobile, models larger than 1 GB may exceed available memory.
 
-### VLM inference is slow
+### VLM inference times out during image encoding
 
-**Cause:** CLIP image encoding is computationally expensive in WASM.
+**Cause:** Current Chrome/WebGPU validation reaches CLIP `encoding image slice...` after prompt preparation and does not return before the 60s E2E timeout.
 
-**Fix:** Use smaller capture dimensions (256x256 is recommended) and prefer the WebGPU artifact in a JSPI-capable browser. Current lifecycle VLM inference uses the shared C++ lifecycle provider; CPU VLM can be extremely slow.
+**Fix:** Treat VLM real inference as blocked until the WebGPU CLIP image-encoding path is fixed. Use smaller capture dimensions while debugging and keep Playwright traces from `RA_RUN_VLM_E2E=1 npm run test:browser -- tests/browser/vlm-generate.spec.ts --trace on`.
 
 ### OPFS storage not persisting
 

@@ -17,7 +17,7 @@
  *   - `RunAnywhere.downloadModel(...)` — download with progress callback
  *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
  *
- * No legacy `ModelManager`, `ModelRegistry` (JS), or `ExtensionPoint` usage.
+ * No legacy app-side registries or extension-point routing.
  */
 
 import type { ModelInfo } from '@runanywhere/web';

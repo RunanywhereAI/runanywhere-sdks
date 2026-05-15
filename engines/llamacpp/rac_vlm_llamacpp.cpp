@@ -559,6 +559,7 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     text.parse_special = true;
 
     const mtmd_bitmap *bitmaps[] = {bitmap};
+    RAC_LOG_INFO(LOG_CAT, "[v3-prep] tokenizing image/text chunks");
     int32_t tokenize_result =
         mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
 
@@ -571,11 +572,14 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     }
 
     llama_pos new_n_past = 0;
+    RAC_LOG_INFO(LOG_CAT, "[v3-prep] evaluating image/text chunks");
     int32_t eval_result = mtmd_helper_eval_chunks(
         backend->mtmd_ctx, backend->ctx, chunks, 0, 0,
         backend->config.batch_size > 0 ? backend->config.batch_size
                                        : kDefaultBatchSize,
         true, &new_n_past);
+    RAC_LOG_INFO(LOG_CAT, "[v3-prep] image/text chunks evaluated rc=%d n_past=%d",
+                 eval_result, (int)new_n_past);
 
     mtmd_bitmap_free(bitmap);
     mtmd_input_chunks_free(chunks);
@@ -799,8 +803,19 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   if (mmproj_path && mmproj_path[0]) {
     mtmd_context_params mparams = mtmd_context_params_default();
     // Force CPU for vision encoder too when model requires CPU (M-RoPE)
+#ifdef __EMSCRIPTEN__
+    if (backend->config.use_gpu_vision && !force_cpu) {
+      RAC_LOG_WARNING(
+          LOG_CAT,
+          "Web VLM vision encoder is forced to CPU; WebGPU CLIP image encoding "
+          "is not stable in current llama.cpp/mtmd builds");
+    }
+    mparams.use_gpu = false;
+    mparams.n_threads = 1;
+#else
     mparams.use_gpu = force_cpu ? false : backend->config.use_gpu_vision;
     mparams.n_threads = n_threads;
+#endif
     mparams.print_timings = false;
     mparams.warmup = true;
 

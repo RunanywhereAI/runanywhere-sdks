@@ -11,6 +11,7 @@ import type {
   VLMImage,
   VLMResult,
 } from '@runanywhere/proto-ts/vlm_options';
+import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
 import {
   ModelCategory,
   type CurrentModelResult,
@@ -19,19 +20,9 @@ import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import { SDKException } from '../../Foundation/SDKException';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
-export interface VisionLanguageLoadModelRequest {
-  modelId: string;
-  modelName: string;
-  modelFilename: string;
-  mmprojFilename: string;
-  modelData: ArrayBuffer;
-  mmprojData: ArrayBuffer;
-}
-
 export interface VisionLanguageProvider {
   readonly isInitialized: boolean;
   readonly isModelLoaded: boolean;
-  loadModel?(request: VisionLanguageLoadModelRequest): Promise<void>;
   loadCurrentModel?(currentModel: CurrentModelResult): Promise<void>;
   unloadModel?(): Promise<void>;
   processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult>;
@@ -60,17 +51,6 @@ export const VisionLanguage = {
 
   get isModelLoaded(): boolean {
     return provider?.isModelLoaded ?? false;
-  },
-
-  async loadModel(request: VisionLanguageLoadModelRequest): Promise<void> {
-    const active = requireProvider('visionLanguage.loadModel');
-    if (!active.loadModel) {
-      throw SDKException.backendNotAvailable(
-        'visionLanguage.loadModel',
-        'The active Web vision-language provider does not expose model loading.',
-      );
-    }
-    await active.loadModel(request);
   },
 
   async loadCurrentModel(): Promise<void> {
@@ -105,7 +85,10 @@ export const VisionLanguage = {
   },
 
   processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult> {
-    return requireProvider('visionLanguage.processImage').processImage(image, options);
+    return requireProvider('visionLanguage.processImage').processImage(
+      image,
+      normalizeVLMGenerationOptions(options, false),
+    );
   },
 
   async processImageStream(
@@ -119,7 +102,7 @@ export const VisionLanguage = {
         'The active Web vision-language provider does not expose streaming.',
       );
     }
-    return active.processImageStream(image, options);
+    return active.processImageStream(image, normalizeVLMGenerationOptions(options, true));
   },
 
   async cancelVLMGeneration(): Promise<void> {
@@ -128,3 +111,29 @@ export const VisionLanguage = {
 };
 
 export type VisionLanguageCapability = typeof VisionLanguage;
+
+function normalizeVLMGenerationOptions(
+  options: VLMGenerationOptions,
+  streamingEnabled: boolean,
+): VLMGenerationOptions {
+  return {
+    prompt: options.prompt ?? '',
+    maxTokens: options.maxTokens > 0 ? options.maxTokens : 2048,
+    temperature: options.temperature > 0 ? options.temperature : 0.7,
+    topP: options.topP > 0 ? options.topP : 0.9,
+    topK: options.topK ?? 0,
+    stopSequences: options.stopSequences ?? [],
+    streamingEnabled,
+    systemPrompt: options.systemPrompt,
+    maxImageSize: options.maxImageSize ?? 0,
+    nThreads: options.nThreads ?? 0,
+    useGpu: options.useGpu ?? true,
+    modelFamily: options.modelFamily || VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
+    customChatTemplate: options.customChatTemplate,
+    imageMarkerOverride: options.imageMarkerOverride,
+    seed: options.seed ?? 0,
+    repetitionPenalty: options.repetitionPenalty > 0 ? options.repetitionPenalty : 1,
+    minP: options.minP ?? 0,
+    emitImageEmbeddings: options.emitImageEmbeddings ?? false,
+  };
+}

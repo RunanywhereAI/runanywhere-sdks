@@ -12,10 +12,6 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./vlm-worker": {
-      "import": "./dist/workers/vlm-worker.js",
-      "types": "./dist/workers/vlm-worker.d.ts"
-    },
     "./wasm/*": "./wasm/*"
   },
   "files": [

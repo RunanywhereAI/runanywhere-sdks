@@ -36,7 +36,6 @@ export type {
   VADStatistics,
 } from './Public/Extensions/RunAnywhere+VAD';
 export type {
-  VisionLanguageLoadModelRequest,
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 export type {

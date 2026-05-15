@@ -13,6 +13,9 @@
  */
 
 import {
+  ModelCategory,
+} from '@runanywhere/proto-ts/model_types';
+import {
   type VADConfiguration,
   type VADOptions,
   type VADResult,
@@ -236,10 +239,7 @@ export const VAD = {
     return Boolean(module._rac_vad_component_is_initialized(handle));
   },
 
-  /**
-   * Load a Silero (or other ONNX) VAD model into the component. Optional —
-   * the energy-based VAD path needs only `configure` + `initialize`.
-   */
+  /** Load a Silero (or other ONNX) VAD model into the component. */
   loadModel(handle: number, modelPath: string, modelId?: string, modelName?: string): void {
     const module = requireVADModule('VAD.loadModel');
     callLoadModel(module, handle, modelPath, modelId, modelName);
@@ -351,7 +351,10 @@ export async function detectVoice(
   let modelName: string | undefined;
 
   if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({ includeModelMetadata: true });
+    const current = ModelLifecycle.currentModel({
+      category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      includeModelMetadata: true,
+    });
     if (current?.modelId) {
       modelPath = current.resolvedPath || current.modelId;
       modelId = current.modelId;

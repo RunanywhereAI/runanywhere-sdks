@@ -16,6 +16,7 @@ import {
   ensureExports,
   missingExports,
   modalityLogger as logger,
+  streamCallback,
   withOptionalCallback,
   type ModalityProtoModule,
   type ProtoEventHandler,
@@ -130,6 +131,50 @@ export class VLMProtoAdapter {
     ));
   }
 
+  streamEvents(
+    handle: number,
+    image: ProtoVLMImage,
+    options: ProtoVLMGenerationOptions,
+  ): AsyncIterable<ProtoSDKEvent> {
+    if (!ensureExports(this.module, 'vlm.processImageStream', ['_rac_vlm_process_stream_proto'])) {
+      return emptyStream();
+    }
+    const imageBytes = VLMImage.encode(image).finish();
+    const optionsBytes = VLMGenerationOptions.encode({ ...options, streamingEnabled: true }).finish();
+    const bridge = this.bridge();
+    return streamCallback(
+      this.module,
+      SDKEvent,
+      'rac_vlm_process_stream_proto',
+      (callbackPtr) => {
+        const result = bridge.withHeapBytes(imageBytes, (imagePtr, imageSize) => (
+          bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
+            bridge.callResultProto(
+              VLMResult,
+              (outResult) => this.module._rac_vlm_process_stream_proto!(
+                handle,
+                imagePtr,
+                imageSize,
+                optionsPtr,
+                optionsSize,
+                callbackPtr,
+                0,
+                outResult,
+              ),
+              'rac_vlm_process_stream_proto',
+            )
+          ))
+        ));
+        return result ? 0 : -903;
+      },
+      undefined,
+      () => {
+        this.cancel(handle);
+      },
+      true,
+    );
+  }
+
   cancel(handle: number): boolean {
     if (!ensureExports(this.module, 'vlm.cancel', ['_rac_vlm_cancel_proto'])) return false;
     const rc = this.module._rac_vlm_cancel_proto!(handle);
@@ -170,4 +215,16 @@ export class VLMProtoAdapter {
       outResult,
     );
   }
+}
+
+function emptyStream<T>(): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T> {
+      return {
+        next(): Promise<IteratorResult<T>> {
+          return Promise.resolve({ value: undefined as T, done: true });
+        },
+      };
+    },
+  };
 }

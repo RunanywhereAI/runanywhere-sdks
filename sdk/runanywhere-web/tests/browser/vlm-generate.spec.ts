@@ -1,22 +1,22 @@
 /**
  * Browser VLM E2E.
  *
- * Opt-in because SmolVLM pulls a primary GGUF plus mmproj sidecar
- * (~636 MB total). The test drives the same Swift-shaped public path as the
+ * Opt-in because SmolVLM2 pulls a primary GGUF plus mmproj sidecar
+ * (~279 MB total). The test drives the same Swift-shaped public path as the
  * example app: download -> RunAnywhere.loadModel -> visionLanguage.loadCurrentModel
  * -> RunAnywhere.processImage.
  */
 import { test, expect } from '@playwright/test';
 
-const MODEL_ID = 'smolvlm-500m-instruct-q8_0';
+const MODEL_ID = 'smolvlm2-256m-video-instruct-q8_0';
 const PRIMARY_URL =
-  'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf';
+  'https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/SmolVLM2-256M-Video-Instruct-Q8_0.gguf';
 const MMPROJ_URL =
-  'https://huggingface.co/runanywhere/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-f16.gguf';
+  'https://huggingface.co/ggml-org/SmolVLM2-256M-Video-Instruct-GGUF/resolve/main/mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf';
 
 const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const LOAD_TIMEOUT_MS = 120_000;
-const GENERATE_TIMEOUT_MS = 180_000;
+const GENERATE_TIMEOUT_MS = 5 * 60 * 1000;
 
 const DOWNLOAD_STATE_COMPLETED = 5;
 const DOWNLOAD_STATE_FAILED = 6;
@@ -36,7 +36,10 @@ declare global {
     __RUNANYWHERE_AI_READY__?: AppReadinessSnapshot;
     __RUNANYWHERE_SDK__?: {
       isInitialized: boolean;
-      runtime: { active: unknown };
+      runtime: {
+        active: unknown;
+        setAcceleration(mode: 'cpu' | 'webgpu'): Promise<void>;
+      };
       modelRegistry: {
         availability(): { status: string };
         getModel(modelId: string): unknown;
@@ -94,15 +97,15 @@ function syntheticImage(): {
   sizeBytes: number;
   metadata: Record<string, string>;
 } {
-  const width = 64;
-  const height = 64;
+  const width = 1;
+  const height = 1;
   const rawRgb = new Uint8Array(width * height * 3);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const offset = (y * width + x) * 3;
-      rawRgb[offset] = x < width / 2 ? 255 : 0;
-      rawRgb[offset + 1] = y < height / 2 ? 255 : 0;
-      rawRgb[offset + 2] = x >= width / 2 ? 255 : 32;
+      rawRgb[offset] = 255;
+      rawRgb[offset + 1] = 0;
+      rawRgb[offset + 2] = 0;
     }
   }
   return {
@@ -111,21 +114,39 @@ function syntheticImage(): {
     height,
     format: 4,
     mediaType: 'image/rgb',
-    name: 'synthetic-quadrants',
+    name: 'synthetic-red-pixel',
     sizeBytes: rawRgb.byteLength,
     metadata: {},
   };
 }
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(label)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 test.describe('Web SDK VLM end-to-end', () => {
   test.skip(
     !shouldRunVLMEndToEnd,
-    'VLM E2E is opt-in (set RA_RUN_VLM_E2E=1). SmolVLM primary+mmproj is ~636 MB.',
+    'VLM E2E is opt-in (set RA_RUN_VLM_E2E=1). SmolVLM2 primary+mmproj is ~279 MB.',
   );
 
   test.setTimeout(DOWNLOAD_TIMEOUT_MS + LOAD_TIMEOUT_MS + GENERATE_TIMEOUT_MS + 30_000);
 
-  test('downloads SmolVLM, loads primary+mmproj, and processes an image', async ({ page }) => {
+  test('downloads SmolVLM2, loads primary+mmproj, and processes an image', async ({ page }) => {
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];
     page.on('console', (msg) => {
@@ -152,6 +173,15 @@ test.describe('Web SDK VLM end-to-end', () => {
       null,
       { timeout: 30_000 },
     );
+    await page.evaluate(() => window.__RUNANYWHERE_SDK__!.runtime.setAcceleration('webgpu'));
+    await page.waitForFunction(
+      () => {
+        const active = window.__RUNANYWHERE_SDK__?.runtime.active;
+        return active === 'webgpu' || active === 'cpu';
+      },
+      null,
+      { timeout: 30_000 },
+    );
 
     const registered = await page.evaluate(
       ({ modelId, primaryUrl, mmprojUrl }) => {
@@ -160,13 +190,13 @@ test.describe('Web SDK VLM end-to-end', () => {
         const now = Date.now();
         return ra.modelRegistry.registerModel({
           id: modelId,
-          name: 'SmolVLM 500M Instruct Q8_0',
+          name: 'SmolVLM2 256M Video Instruct Q8_0',
           category: 6,
           format: 1,
           framework: 2,
           downloadUrl: primaryUrl,
           localPath: '',
-          downloadSizeBytes: 636_275_712,
+          downloadSizeBytes: 278_828_032,
           contextLength: 2048,
           supportsThinking: false,
           supportsLora: false,
@@ -174,27 +204,27 @@ test.describe('Web SDK VLM end-to-end', () => {
           source: 1,
           createdAtUnixMs: now,
           updatedAtUnixMs: now,
-          memoryRequiredBytes: 700_000_000,
+          memoryRequiredBytes: 420_000_000,
           artifactType: 7,
           multiFile: {
             files: [
               {
                 url: primaryUrl,
-                filename: 'SmolVLM-500M-Instruct-Q8_0.gguf',
-                relativePath: 'SmolVLM-500M-Instruct-Q8_0.gguf',
-                destinationPath: 'SmolVLM-500M-Instruct-Q8_0.gguf',
+                filename: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                relativePath: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                destinationPath: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
                 isRequired: true,
                 role: 1,
-                sizeBytes: 436_806_912,
+                sizeBytes: 175_056_352,
               },
               {
                 url: mmprojUrl,
-                filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
-                relativePath: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
-                destinationPath: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+                filename: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                relativePath: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                destinationPath: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
                 isRequired: true,
                 role: 3,
-                sizeBytes: 199_468_800,
+                sizeBytes: 103_771_680,
               },
             ],
           },
@@ -202,30 +232,30 @@ test.describe('Web SDK VLM end-to-end', () => {
             files: [
               {
                 url: primaryUrl,
-                filename: 'SmolVLM-500M-Instruct-Q8_0.gguf',
-                relativePath: 'SmolVLM-500M-Instruct-Q8_0.gguf',
-                destinationPath: 'SmolVLM-500M-Instruct-Q8_0.gguf',
+                filename: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                relativePath: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                destinationPath: 'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
                 isRequired: true,
                 role: 1,
-                sizeBytes: 436_806_912,
+                sizeBytes: 175_056_352,
               },
               {
                 url: mmprojUrl,
-                filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
-                relativePath: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
-                destinationPath: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+                filename: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                relativePath: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+                destinationPath: 'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
                 isRequired: true,
                 role: 3,
-                sizeBytes: 199_468_800,
+                sizeBytes: 103_771_680,
               },
             ],
             rootDirectory: modelId,
             requiredPatterns: [
-              'SmolVLM-500M-Instruct-Q8_0.gguf',
-              'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+              'SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
+              'mmproj-SmolVLM2-256M-Video-Instruct-Q8_0.gguf',
             ],
             optionalPatterns: [],
-            description: 'SmolVLM primary model and mmproj sidecar',
+            description: 'SmolVLM2 primary model and mmproj sidecar',
           },
         });
       },
@@ -305,28 +335,32 @@ test.describe('Web SDK VLM end-to-end', () => {
       timeout: LOAD_TIMEOUT_MS,
     });
 
-    const result = await page.evaluate(
-      async ({ image, options }) => window.__RUNANYWHERE_SDK__!.processImage(image, options),
-      {
-        image: syntheticImage(),
-        options: {
-          prompt: 'Describe the simple colored square in one short sentence.',
-          maxTokens: 32,
-          temperature: 0.2,
-          topP: 0.9,
-          topK: 40,
-          stopSequences: [],
-          streamingEnabled: false,
-          maxImageSize: 64,
-          nThreads: 0,
-          useGpu: true,
-          modelFamily: 0,
-          seed: 0,
-          repetitionPenalty: 1.1,
-          minP: 0.05,
-          emitImageEmbeddings: false,
+    const result = await withTimeout(
+      page.evaluate(
+        async ({ image, options }) => window.__RUNANYWHERE_SDK__!.processImage(image, options),
+        {
+          image: syntheticImage(),
+          options: {
+            prompt: 'Color?',
+            maxTokens: 1,
+            temperature: 0.2,
+            topP: 0.9,
+            topK: 1,
+            stopSequences: [],
+            streamingEnabled: false,
+            maxImageSize: 1,
+            nThreads: 4,
+            useGpu: true,
+            modelFamily: 3,
+            seed: 0,
+            repetitionPenalty: 1.1,
+            minP: 0.05,
+            emitImageEmbeddings: false,
+          },
         },
-      },
+      ),
+      GENERATE_TIMEOUT_MS,
+      `RunAnywhere.processImage did not resolve within ${GENERATE_TIMEOUT_MS}ms`,
     );
     expect(result.text.trim().length, 'VLM response text must be non-empty').toBeGreaterThan(0);
     expect(result.completionTokens, 'VLM should emit completion tokens').toBeGreaterThan(0);

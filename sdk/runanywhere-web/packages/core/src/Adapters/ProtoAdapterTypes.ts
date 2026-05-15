@@ -282,6 +282,7 @@ export function streamCallback<T>(
   call: (callbackPtr: number) => number,
   stopWhen?: (event: T) => boolean,
   onCancel?: () => void,
+  callbackReturnsBool = false,
 ): AsyncIterable<T> {
   return {
     [Symbol.asyncIterator](): AsyncIterator<T> {
@@ -338,15 +339,17 @@ export function streamCallback<T>(
           return;
         }
 
-        callbackPtr = module.addFunction((bytesPtr: number, size: number): void => {
-          if (!bytesPtr || size <= 0) return;
+        callbackPtr = module.addFunction((bytesPtr: number, size: number): CallbackResult => {
+          if (!bytesPtr || size <= 0) return callbackReturnsBool ? 1 : undefined;
           try {
             const bytes = module.HEAPU8!.slice(bytesPtr, bytesPtr + size);
             emit(codec.decode(bytes));
+            return callbackReturnsBool ? 1 : undefined;
           } catch (error) {
             fail(error);
+            return callbackReturnsBool ? 0 : undefined;
           }
-        }, 'viii');
+        }, callbackSignature(callbackReturnsBool));
 
         callActive = true;
         try {

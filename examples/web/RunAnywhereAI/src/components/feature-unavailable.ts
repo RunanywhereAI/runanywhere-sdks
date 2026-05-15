@@ -1,12 +1,11 @@
 /**
  * Feature Unavailable Placeholder
  *
- * Renders a consistent "feature pending V2 backend wiring" panel for views
- * that depended on legacy SDK APIs (ModelManager, ExtensionPoint, STT/TTS/VAD
- * facades). After the V2 dead-code purge those facades were deleted; the
- * replacement is a thin proto-byte WASM bridge that backend packages will
- * install once the new wiring lands. Until then the example app loads the
- * Phase 1 SDK init flow but refuses to dispatch inference verbs.
+ * Renders a consistent "feature pending backend artifacts" panel for views
+ * whose Swift-shaped public facade exists but whose Web WASM backend is not
+ * shippable yet. The replacement path is the proto-byte WASM bridge installed
+ * by backend packages; until the relevant artifacts are present, the example
+ * app keeps the tab interactive but refuses to dispatch inference verbs.
  */
 
 export interface FeatureUnavailableOptions {
@@ -39,14 +38,11 @@ export function renderFeatureUnavailable(host: HTMLElement, options: FeatureUnav
       <h2>${escape(options.title)} is not wired up</h2>
       <p class="feature-unavailable__description">${escape(options.description)}</p>
       <p class="feature-unavailable__hint">
-        After the V2 SDK cleanup the legacy <code>ModelManager</code>,
-        <code>ExtensionPoint</code>, and provider registry were removed. The
-        replacement is a proto-byte WASM bridge installed by the backend
-        packages. The LLM backend is fully wired via
-        <code>LlamaCPP.register()</code>. The ONNX backend bridge
-        (<code>SherpaONNXBridge</code>) is wired but depends on the WASM
-        module being built with <code>RAC_WASM_ONNX=ON</code> (tracked by
-        CPP-13) — until then STT/TTS/VAD views surface this placeholder.
+        The app uses the Swift-shaped <code>RunAnywhere</code> root facade.
+        LLM and VLM route through the llama.cpp proto-byte WASM bridge. The
+        ONNX/Sherpa bridge is wired but depends on vendored WASM static
+        archives and a build with <code>RAC_WASM_ONNX=ON</code>, so STT/TTS/VAD
+        views surface this placeholder until those artifacts are present.
       </p>
       <p class="feature-unavailable__hint">This view normally consumes:</p>
       <ul class="feature-unavailable__list">${requirementList}</ul>

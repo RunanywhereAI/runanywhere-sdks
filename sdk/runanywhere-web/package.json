@@ -13,6 +13,9 @@
     "build:wasm": "cd wasm && ./scripts/build.sh",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
     "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
+    "vendor:wasm:onnxruntime": "wasm/scripts/vendor-onnxruntime-wasm.sh",
+    "vendor:wasm:sherpa": "wasm/scripts/vendor-sherpa-onnx-wasm.sh",
+    "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
     "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
@@ -20,7 +23,7 @@
     "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
     "test": "npm run test -w packages/core",
     "test:browser": "playwright test",
-    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/onnx/wasm/sherpa packages/core/wasm wasm/build"
+    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/core/wasm wasm/build wasm/build-webgpu"
   },
   "engines": {
     "node": ">=18.0.0"

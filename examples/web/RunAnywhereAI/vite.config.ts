@@ -16,7 +16,6 @@ const webCoreInternalSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/pack
 const webCoreBrowserSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/browser.ts');
 const llamacppSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/index.ts');
 const onnxSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/src/index.ts');
-const vlmWorkerSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts');
 
 // Local source alias for proto-ts keeps the example on package-root import
 // paths while avoiding direct `dist/*` imports in application code/config.
@@ -67,7 +66,6 @@ export default defineConfig({
       // Ensure all packages resolve to the same source modules during development.
       // Without this, package-root imports can resolve to dist/ and create
       // duplicate singletons while the demo runs against local source.
-      { find: /^@runanywhere\/web-llamacpp\/vlm-worker(.*)$/, replacement: `${vlmWorkerSrc}$1` },
       { find: /^@runanywhere\/web-llamacpp$/, replacement: llamacppSrc },
       { find: /^@runanywhere\/web-onnx$/, replacement: onnxSrc },
       { find: /^@runanywhere\/web\/internal$/, replacement: webCoreInternalSrc },

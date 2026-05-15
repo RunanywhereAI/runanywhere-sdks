@@ -14,10 +14,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 const webgpuArgs = [
   '--enable-unsafe-webgpu',
-  '--enable-features=SharedArrayBuffer,WebAssemblyJSPI',
+  '--enable-features=SharedArrayBuffer,WebAssemblyJSPI,WebAssemblyStackSwitching,WebGPUDeveloperFeatures',
   '--js-flags=--experimental-wasm-stack-switching',
 ];
 const enableWebGPU = process.env.RA_RUN_VLM_E2E === '1' || process.env.RA_ENABLE_WEBGPU_BROWSER === '1';
+const browserChannel = process.env.RA_BROWSER_CHANNEL
+  ?? (process.env.RA_RUN_VLM_E2E === '1' ? 'chrome' : undefined);
 
 export default defineConfig({
   testDir: './tests/browser',
@@ -30,6 +32,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    channel: browserChannel,
     launchOptions: enableWebGPU ? { args: webgpuArgs } : undefined,
     // COOP/COEP headers are set by the example app's Vite config, so the
     // test pages inherit cross-origin isolation automatically.

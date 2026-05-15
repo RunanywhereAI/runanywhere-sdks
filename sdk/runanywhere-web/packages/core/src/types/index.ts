@@ -87,10 +87,10 @@ export function applyLLMGenerationDefaults(
 // VLM — proto-ts canonical types + Web-only browser shapes
 // ---------------------------------------------------------------------------
 // VLMImage, VLMGenerationOptions, and VLMResult are re-exported as runtime
-// values (not `export type`) because backends call `.encode()` / `.decode()`
-// on them for worker IPC (see VLMWorkerBridge). ts-proto generates a dual
-// interface + const for each message, so the runtime export still carries
-// the full type shape as well.
+// values (not `export type`) because the lifecycle VLM adapter calls
+// `.encode()` / `.decode()` on them. ts-proto generates a dual interface +
+// const for each message, so the runtime export still carries the full type
+// shape as well.
 export {
   VLMImage,
   VLMGenerationOptions,

@@ -340,10 +340,10 @@ bool rac_vlm_config_to_proto(const rac_vlm_config_t* in, ::runanywhere::v1::VLMC
 bool rac_vlm_config_from_proto(const ::runanywhere::v1::VLMConfiguration& in,
                                rac_vlm_config_t* out);
 
-// VLM proto VLMGenerationOptions is a subset of the C ABI rac_vlm_options_t
-// (only prompt + max_tokens + sampling). Other C-side fields (system_prompt,
-// stop_sequences, n_threads, model_family, etc.) are NOT carried on this
-// proto by design — they remain backend-private knobs.
+// VLM proto VLMGenerationOptions carries the C ABI's scalar runtime fields.
+// Owned strings such as system_prompt, stop_sequences, and custom templates are
+// intentionally excluded here until the public C struct has a companion free
+// helper for adapter-owned option allocations.
 bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt /*can be NULL*/,
                               ::runanywhere::v1::VLMGenerationOptions* out);
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,

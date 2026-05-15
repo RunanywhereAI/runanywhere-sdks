@@ -40,15 +40,3 @@ export { LlamaCPP, autoRegister } from './LlamaCPP';
 export type { LlamaCPPRegisterOptions } from './LlamaCPP';
 export { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 export type { LlamaCppModule } from './Foundation/LlamaCppBridge';
-
-// Off-main-thread VLM runtime — apps that need to dispatch vision inference
-// directly (e.g. example apps that own the camera capture loop) can call
-// `VLMWorkerBridge.shared.process(image, options)` after a VLM model has been
-// loaded into the worker.
-export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
-export type {
-  VLMWorkerCommand,
-  VLMWorkerResponse,
-  VLMLoadModelParams,
-  ProgressListener,
-} from './Infrastructure/VLMWorkerBridge';

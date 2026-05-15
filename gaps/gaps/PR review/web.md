@@ -97,7 +97,7 @@ Current evidence report: `test_workflows/logs/20260514-160224-web-swift-alignmen
 - ONNX/Sherpa WASM static archives are absent, so STT/TTS/model-backed VAD cannot pass.
 - RAG exports are absent and embeddings depend on ONNX Runtime WASM.
 - VoiceAgent remains blocked behind STT/VAD/TTS runtime readiness.
-- VLM currently fails WebGPU browser E2E during `RunAnywhere.loadModel(...)` with `RuntimeError: unreachable` in `racommons-llamacpp-webgpu.wasm`.
+- VLM currently fails Chrome/WebGPU browser E2E after successful primary+mmproj load: `RunAnywhere.processImage(...)` reaches CLIP `encoding image slice...` and does not resolve within the 60s generation timeout. Trace: `sdk/runanywhere-web/test-results/vlm-generate-Web-SDK-VLM-e-e4e42-proj-and-processes-an-image-chromium/trace.zip`.
 - Tool-calling and structured-output C++ ownership need browser E2E proof.
 - Browser E2E evidence is current and passing for LLM only; it is not complete for all exposed modalities.
 - Package dry-run/symbol checks are not yet part of the Web validation gate.

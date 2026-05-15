@@ -40,9 +40,8 @@ import {
  *      backend packages (e.g. `@runanywhere/web-llamacpp`) pass their own
  *      Emscripten module instance directly — the global `runanywhereModule`
  *      singleton is only used when no module is supplied (test harnesses
- *      / future single-module deployments). Mirrors `LLMStreamAdapter`'s
- *      ctor shape so multi-WASM apps (llamacpp + onnx) don't collapse
- *      into the last-registered-wins singleton.
+ *      / future single-module deployments), so multi-WASM apps (llamacpp +
+ *      onnx) don't collapse into the last-registered-wins singleton.
  *
  *   2. `new VoiceAgentStreamAdapter(transport)` — custom transport path
  *      for unit tests that inject a fake transport satisfying the

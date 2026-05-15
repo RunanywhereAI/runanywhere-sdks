@@ -24,6 +24,8 @@ const RAC_OK = 0;
 const RAC_ERROR_FILE_NOT_FOUND = -182;
 const RAC_ERROR_FILE_WRITE_FAILED = -183;
 const RAC_ERROR_PLATFORM = -180;
+const RAC_ERROR_INVALID_ARGUMENT = -2;
+const RAC_DIRECTORY_ENTRY_NAME_MAX = 512;
 
 interface CallbackPtrs {
   fileExists: number;
@@ -34,8 +36,12 @@ interface CallbackPtrs {
   secureSet: number;
   secureDelete: number;
   log: number;
+  trackError: number;
   nowMs: number;
   getMemoryInfo: number;
+  fileListDirectory: number;
+  isNonEmptyDirectory: number;
+  getVendorId: number;
 }
 
 export class PlatformAdapter {
@@ -76,8 +82,12 @@ export class PlatformAdapter {
       secureSet: this.registerSecureSet(),
       secureDelete: this.registerSecureDelete(),
       log: this.registerLog(),
+      trackError: this.registerTrackError(),
       nowMs: this.registerNowMs(),
       getMemoryInfo: this.registerGetMemoryInfo(),
+      fileListDirectory: this.registerFileListDirectory(),
+      isNonEmptyDirectory: this.registerIsNonEmptyDirectory(),
+      getVendorId: this.registerGetVendorId(),
     };
 
     // Runtime struct offsets — each helper must be exported by
@@ -104,9 +114,7 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + getOffset('secure_set'), this.callbacks.secureSet, '*');
     m.setValue(this.adapterPtr + getOffset('secure_delete'), this.callbacks.secureDelete, '*');
     m.setValue(this.adapterPtr + getOffset('log'), this.callbacks.log, '*');
-    // track_error (optional) → null. Web does not forward platform errors
-    // into Sentry today; leaving NULL preserves the commons null-check path.
-    m.setValue(this.adapterPtr + getOffset('track_error'), 0, '*');
+    m.setValue(this.adapterPtr + getOffset('track_error'), this.callbacks.trackError, '*');
     m.setValue(this.adapterPtr + getOffset('now_ms'), this.callbacks.nowMs, '*');
     m.setValue(this.adapterPtr + getOffset('get_memory_info'), this.callbacks.getMemoryInfo, '*');
     // http_download (optional) → null. The HTTPAdapter / FetchHttpTransport
@@ -115,6 +123,9 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + getOffset('http_download_cancel'), 0, '*');
     // extract_archive — native libarchive is compiled into WASM.
     m.setValue(this.adapterPtr + getOffset('extract_archive'), 0, '*');
+    m.setValue(this.adapterPtr + getOffset('file_list_directory'), this.callbacks.fileListDirectory, '*');
+    m.setValue(this.adapterPtr + getOffset('is_non_empty_directory'), this.callbacks.isNonEmptyDirectory, '*');
+    m.setValue(this.adapterPtr + getOffset('get_vendor_id'), this.callbacks.getVendorId, '*');
     // user_data
     m.setValue(this.adapterPtr + getOffset('user_data'), 0, '*');
 
@@ -286,6 +297,19 @@ export class PlatformAdapter {
     }, 'viiii');
   }
 
+  /** void (*)(const char* error_json, void* user_data) */
+  private registerTrackError(): number {
+    const m = this.m;
+    return m.addFunction((errorJsonPtr: number, _userData: number) => {
+      try {
+        const errorJson = m.UTF8ToString(errorJsonPtr);
+        logger.error(`Native error tracked: ${errorJson}`);
+      } catch (error) {
+        logger.error(`Native error tracking failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }, 'vii');
+  }
+
   /** int64_t (*)(void* user_data) */
   private registerNowMs(): number {
     const m = this.m;
@@ -322,6 +346,75 @@ export class PlatformAdapter {
       }
     }, 'iii');
   }
+
+  /**
+   * rac_result_t (*)(const char* dir_path, rac_directory_entry_t* out_entries,
+   *                  size_t* in_out_count, void* user_data)
+   */
+  private registerFileListDirectory(): number {
+    const m = this.m;
+    return m.addFunction((dirPathPtr: number, outEntriesPtr: number, countPtr: number, _userData: number) => {
+      try {
+        if (!m.FS || !countPtr) return RAC_ERROR_INVALID_ARGUMENT;
+        const dirPath = m.UTF8ToString(dirPathPtr);
+        const entries = listDirectoryEntries(m, dirPath);
+        if (!entries) return RAC_ERROR_FILE_NOT_FOUND;
+
+        if (!outEntriesPtr) {
+          m.setValue(countPtr, entries.length, 'i32');
+          return RAC_OK;
+        }
+
+        const capacity = m.getValue(countPtr, 'i32') >>> 0;
+        const count = Math.min(capacity, entries.length);
+        const layout = directoryEntryLayout(m);
+        for (let i = 0; i < count; i += 1) {
+          const entryPtr = outEntriesPtr + i * layout.size;
+          const entry = entries[i];
+          const namePtr = entryPtr + layout.nameOffset;
+          const safeName = entry.name.slice(0, RAC_DIRECTORY_ENTRY_NAME_MAX - 1);
+          m.stringToUTF8(safeName, namePtr, RAC_DIRECTORY_ENTRY_NAME_MAX);
+          m.setValue(entryPtr + layout.isDirOffset, entry.isDir ? 1 : 0, 'i32');
+          setI64(m, entryPtr + layout.sizeBytesOffset, entry.sizeBytes);
+        }
+        m.setValue(countPtr, count, 'i32');
+        return RAC_OK;
+      } catch (error) {
+        logger.warning(`file_list_directory failed: ${error instanceof Error ? error.message : String(error)}`);
+        return RAC_ERROR_PLATFORM;
+      }
+    }, 'iiiii');
+  }
+
+  /** rac_bool_t (*)(const char* path, void* user_data) */
+  private registerIsNonEmptyDirectory(): number {
+    const m = this.m;
+    return m.addFunction((pathPtr: number, _userData: number) => {
+      try {
+        if (!m.FS) return 0;
+        const path = m.UTF8ToString(pathPtr);
+        const entries = listDirectoryEntries(m, path);
+        return entries && entries.length > 0 ? 1 : 0;
+      } catch {
+        return 0;
+      }
+    }, 'iii');
+  }
+
+  /** rac_result_t (*)(char* out_buffer, size_t buffer_size, void* user_data) */
+  private registerGetVendorId(): number {
+    const m = this.m;
+    return m.addFunction((outBufferPtr: number, bufferSize: number, _userData: number) => {
+      try {
+        if (!outBufferPtr || bufferSize < 37) return RAC_ERROR_INVALID_ARGUMENT;
+        const vendorId = stableVendorId();
+        m.stringToUTF8(vendorId, outBufferPtr, bufferSize);
+        return RAC_OK;
+      } catch {
+        return RAC_ERROR_PLATFORM;
+      }
+    }, 'iiii');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -342,4 +435,104 @@ function readBytes(m: LlamaCppModule, srcPtr: number, length: number): Uint8Arra
   const out = new Uint8Array(length);
   for (let i = 0; i < length; i++) out[i] = m.getValue(srcPtr + i, 'i8') & 0xff;
   return out;
+}
+
+interface DirectoryEntryInfo {
+  name: string;
+  isDir: boolean;
+  sizeBytes: number;
+}
+
+interface DirectoryEntryLayout {
+  size: number;
+  nameOffset: number;
+  isDirOffset: number;
+  sizeBytesOffset: number;
+}
+
+interface EmscriptenFS {
+  analyzePath(path: string): { exists: boolean };
+  readFile(path: string): Uint8Array;
+  writeFile(path: string, data: Uint8Array): void;
+  unlink(path: string): void;
+  mkdir?(path: string): void;
+  readdir?(path: string): string[];
+  stat?(path: string): { mode?: number; size?: number };
+  isDir?(mode: number): boolean;
+}
+
+function fsOf(m: LlamaCppModule): EmscriptenFS | undefined {
+  return m.FS as EmscriptenFS | undefined;
+}
+
+function joinPath(parent: string, name: string): string {
+  if (parent.endsWith('/')) return `${parent}${name}`;
+  return `${parent}/${name}`;
+}
+
+function listDirectoryEntries(m: LlamaCppModule, dirPath: string): DirectoryEntryInfo[] | null {
+  const fs = fsOf(m);
+  if (!fs?.readdir) return null;
+  const analyzed = fs.analyzePath(dirPath);
+  if (!analyzed.exists) return null;
+  const names = fs.readdir(dirPath).filter((name) => name !== '.' && name !== '..' && !name.startsWith('.'));
+  return names.map((name) => {
+    const path = joinPath(dirPath, name);
+    const stat = fs.stat?.(path);
+    const isDir = typeof stat?.mode === 'number' && typeof fs.isDir === 'function'
+      ? fs.isDir(stat.mode)
+      : false;
+    return {
+      name,
+      isDir,
+      sizeBytes: isDir ? 0 : stat?.size ?? 0,
+    };
+  });
+}
+
+function directoryEntryLayout(m: LlamaCppModule): DirectoryEntryLayout {
+  const record = m as unknown as Record<string, unknown>;
+  const required = (name: string): number => {
+    const fn = record[name];
+    if (typeof fn !== 'function') {
+      throw new Error(`WASM module missing ${name}`);
+    }
+    return (fn as () => number)();
+  };
+  return {
+    size: required('_rac_wasm_sizeof_directory_entry'),
+    nameOffset: required('_rac_wasm_offsetof_directory_entry_name'),
+    isDirOffset: required('_rac_wasm_offsetof_directory_entry_is_dir'),
+    sizeBytesOffset: required('_rac_wasm_offsetof_directory_entry_size_bytes'),
+  };
+}
+
+function setI64(m: LlamaCppModule, ptr: number, value: number): void {
+  const low = value >>> 0;
+  const high = Math.floor(value / 0x100000000) >>> 0;
+  m.setValue(ptr, low, 'i32');
+  m.setValue(ptr + 4, high, 'i32');
+}
+
+function stableVendorId(): string {
+  const key = 'rac_sdk_vendor_id';
+  try {
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+  } catch {
+    /* ignore */
+  }
+  const generated = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  try {
+    localStorage.setItem(key, generated);
+  } catch {
+    /* ignore */
+  }
+  return generated;
 }

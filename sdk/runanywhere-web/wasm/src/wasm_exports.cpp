@@ -347,8 +347,30 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_http_download_cancel
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_extract_archive(void) {
     return (int)offsetof(rac_platform_adapter_t, extract_archive);
 }
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_list_directory(void) {
+    return (int)offsetof(rac_platform_adapter_t, file_list_directory);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_is_non_empty_directory(void) {
+    return (int)offsetof(rac_platform_adapter_t, is_non_empty_directory);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_get_vendor_id(void) {
+    return (int)offsetof(rac_platform_adapter_t, get_vendor_id);
+}
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_user_data(void) {
     return (int)offsetof(rac_platform_adapter_t, user_data);
+}
+
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_directory_entry(void) {
+    return (int)sizeof(rac_directory_entry_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_directory_entry_name(void) {
+    return (int)offsetof(rac_directory_entry_t, name);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_directory_entry_is_dir(void) {
+    return (int)offsetof(rac_directory_entry_t, is_dir);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_directory_entry_size_bytes(void) {
+    return (int)offsetof(rac_directory_entry_t, size_bytes);
 }
 
 // ---- rac_config_t (platform_adapter field) ----

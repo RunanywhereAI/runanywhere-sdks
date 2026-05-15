@@ -12,6 +12,8 @@ import type {
 } from '@runanywhere/proto-ts/sdk_events';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
+import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 
 export type {
   CurrentModelRequest,
@@ -45,8 +47,22 @@ export const ModelLifecycle = {
     return requireAdapter().load(request);
   },
 
-  loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
-    return requireAdapter().loadAsync(request);
+  async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
+    const modelSnapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
+    await prepareModelLoad({ request, model: modelSnapshot });
+    if (modelSnapshot) {
+      ModelRegistry.registerModel(modelSnapshot);
+    }
+    try {
+      return await requireAdapter().loadAsync(request);
+    } catch (error) {
+      const recovered = await recoverModelLoadFailure({ request, error });
+      if (!recovered) throw error;
+      if (modelSnapshot) {
+        ModelRegistry.registerModel(modelSnapshot);
+      }
+      return requireAdapter().loadAsync(request);
+    }
   },
 
   unloadModel(request: ModelUnloadRequest): ModelUnloadResult | null {
@@ -85,3 +101,11 @@ export const ModelLifecycle = {
     return requireAdapter().reset();
   },
 };
+
+function safeGetModelSnapshot(modelId: string) {
+  try {
+    return ModelRegistry.getModel(modelId);
+  } catch {
+    return null;
+  }
+}

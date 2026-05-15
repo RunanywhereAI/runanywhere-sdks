@@ -4,10 +4,10 @@
 
 ### A. App Load and SDK Initialization
 
-1. Navigate to the app — verify all 7 tabs render (Chat, Vision, Voice, Transcribe, Speak, Storage, Settings)
-2. Verify the CPU badge appears in top-right (proves WASM loaded)
+1. Navigate to the app — verify all bottom tabs render (Chat, Vision, Voice, Transcribe, Speak, Docs, Storage, Solutions, Settings)
+2. Verify the runtime badge appears in top-right (`CPU` or `WebGPU`, proving the WASM backend loaded)
 3. Check console for SDK initialization logs: "RunAnywhere Web SDK initialized successfully"
-4. Check console for backend registration: "LlamaCpp backend registered", "ONNX backend registered"
+4. Check console for backend registration: "LlamaCpp backend registered"; ONNX/Sherpa registration is blocked until WASM static archives are vendored
 5. Verify no JavaScript errors in console (exclude expected WASM warnings)
 
 ### B. Model Registry and Catalog
@@ -128,38 +128,21 @@
 
 ### P. Voice Tab — Pipeline Setup
 
-1. Navigate to Voice — verify 3 setup cards render (STT, LLM, TTS)
-2. Verify each card shows step number (1, 2, 3)
-3. Verify each card shows "Select" status initially
-4. Verify "Start Voice Assistant" button is disabled until all 3 models selected
-5. Click STT card — verify model selection sheet opens with STT models
-6. Click LLM card — verify model selection sheet opens with LLM models
-7. Click TTS card — verify model selection sheet opens with TTS models
-8. Verify back button is present (returns to setup from voice interface)
+1. Navigate to Voice — verify the feature-unavailable placeholder renders
+2. Verify the placeholder explains ONNX/Sherpa artifact requirements
+3. Verify there are no console/page errors
 
 ### Q. Transcribe Tab — Mode Controls
 
-1. Navigate to Transcribe — verify Batch mode is selected by default
-2. Verify mode description matches Batch ("Record audio, then transcribe")
-3. Click Live mode — verify it activates and description updates
-4. Click Batch mode — verify it reactivates
-5. Verify mic button renders with "Tap to record" text
-6. Verify waveform animation area renders
-7. Verify level bars (20 bars) render
-8. Verify result area renders (initially hidden/empty)
-9. Verify status badge area renders
-10. Verify model selector in toolbar shows "Select STT Model"
+1. Navigate to Transcribe — verify backend status shows ONNX unavailable
+2. Verify the placeholder or disabled flow explains that `RunAnywhere.transcribe` requires `RAC_WASM_ONNX=ON`
+3. Verify no real transcription is marked PASS until ONNX/Sherpa exports exist
 
 ### R. Speak Tab — Controls
 
-1. Navigate to Speak — verify textarea with placeholder "Enter text to speak..." renders
-2. Verify "Surprise me" button renders
-3. Click "Surprise me" — verify textarea fills with random text
-4. Verify speed slider renders with default 1.0x
-5. Adjust speed slider — verify display value updates (0.5x–2.0x)
-6. Verify Speak button renders
-7. Verify model selector in toolbar shows "Select TTS Model"
-8. Click Speak with empty text — verify error message appears
+1. Navigate to Speak — verify backend status shows ONNX unavailable
+2. Verify the placeholder or disabled flow explains that `RunAnywhere.synthesize` requires `RAC_WASM_ONNX=ON`
+3. Verify no real synthesis is marked PASS until ONNX/Sherpa/Piper exports exist
 
 ### S. Model-Switch Banner
 
