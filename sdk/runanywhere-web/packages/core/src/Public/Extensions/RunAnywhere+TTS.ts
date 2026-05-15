@@ -30,6 +30,10 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import {
+  getSpeechProvider,
+  hasSpeechProviderTTS,
+} from './SpeechProvider';
 
 export type { TTSOptions, TTSOutput, TTSVoiceInfo };
 
@@ -289,30 +293,50 @@ export async function synthesize(
   text: string,
   options?: SynthesizeOptions,
 ): Promise<TTSOutput> {
-  const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
   let voicePath = options?.voicePath;
   let voiceId = options?.voiceId;
   let voiceName: string | undefined;
 
-  if (!voicePath) {
-    if (!ModelLifecycle.supportsNativeLifecycle()) {
-      throw SDKException.backendNotAvailable(
-        'RunAnywhere.tts.synthesizeAuto',
-        'No voicePath provided and the model lifecycle proto adapter is not installed.',
-      );
-    }
+  if (!voicePath && ModelLifecycle.supportsNativeLifecycle()) {
     const current = ModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       includeModelMetadata: true,
     });
-    if (!current?.modelId) {
-      throw SDKException.componentNotReady(
-        'tts',
-        'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
+    if (current?.modelId) {
+      voicePath = current.resolvedPath || current.modelId;
+      voiceId = current.modelId;
+    }
+  }
+
+  // Provider-first dispatch: route through standalone Sherpa (or any
+  // other registered SpeechProvider) when present, otherwise fall back
+  // to the proto-byte path.
+  if (hasSpeechProviderTTS()) {
+    const provider = getSpeechProvider()!;
+    if (voicePath && (typeof provider.isTTSLoaded !== 'function' || !provider.isTTSLoaded())) {
+      if (typeof provider.loadTTS !== 'function') {
+        throw SDKException.backendNotAvailable(
+          'RunAnywhere.tts.synthesizeAuto',
+          `SpeechProvider "${provider.id}" does not implement loadTTS.`,
+        );
+      }
+      await provider.loadTTS({ id: voiceId ?? voicePath, path: voicePath, name: voiceName });
+    }
+    if (typeof provider.synthesize !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.tts.synthesizeAuto',
+        `SpeechProvider "${provider.id}" does not implement synthesize.`,
       );
     }
-    voicePath = current.resolvedPath || current.modelId;
-    voiceId = current.modelId;
+    return provider.synthesize({ text, options });
+  }
+
+  const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
+  if (!voicePath) {
+    throw SDKException.componentNotReady(
+      'tts',
+      'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
+    );
   }
 
   const handle = callCreate(module);

@@ -32,6 +32,10 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import {
+  getSpeechProvider,
+  hasSpeechProviderSTT,
+} from './SpeechProvider';
 
 export type { STTOptions, STTOutput, STTPartialResult };
 
@@ -307,30 +311,57 @@ export async function transcribe(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): Promise<STTOutput> {
-  const module = requireSTTModule('RunAnywhere.stt.transcribeAuto');
   let modelPath = options?.modelPath;
   let modelId = options?.modelId;
   let modelName: string | undefined;
 
-  if (!modelPath) {
-    if (!ModelLifecycle.supportsNativeLifecycle()) {
-      throw SDKException.backendNotAvailable(
-        'RunAnywhere.stt.transcribeAuto',
-        'No modelPath provided and the model lifecycle proto adapter is not installed.',
-      );
-    }
+  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
     const current = ModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       includeModelMetadata: true,
     });
-    if (!current?.modelId) {
-      throw SDKException.componentNotReady(
-        'stt',
-        'No STT model is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.stt.transcribeAuto().',
+    if (current?.modelId) {
+      modelPath = current.resolvedPath || current.modelId;
+      modelId = current.modelId;
+    }
+  }
+
+  // Provider-first dispatch: when a SpeechProvider is registered (e.g.
+  // standalone Sherpa via @runanywhere/web-onnx) and supports STT, route
+  // through it. Falls back to the proto-byte adapter otherwise.
+  if (hasSpeechProviderSTT()) {
+    const provider = getSpeechProvider()!;
+    if (modelPath && (typeof provider.isSTTLoaded !== 'function' || !provider.isSTTLoaded())) {
+      if (typeof provider.loadSTT !== 'function') {
+        throw SDKException.backendNotAvailable(
+          'RunAnywhere.stt.transcribeAuto',
+          `SpeechProvider "${provider.id}" does not implement loadSTT.`,
+        );
+      }
+      await provider.loadSTT({ id: modelId ?? modelPath, path: modelPath, name: modelName });
+    }
+    if (typeof provider.transcribe !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.stt.transcribeAuto',
+        `SpeechProvider "${provider.id}" does not implement transcribe.`,
       );
     }
-    modelPath = current.resolvedPath || current.modelId;
-    modelId = current.modelId;
+    const samples = audio instanceof Float32Array
+      ? audio
+      : new Float32Array(audio.buffer, audio.byteOffset, audio.byteLength / 4);
+    return provider.transcribe({
+      audio: samples,
+      sampleRate: options?.sampleRate ?? 16000,
+      options,
+    });
+  }
+
+  const module = requireSTTModule('RunAnywhere.stt.transcribeAuto');
+  if (!modelPath) {
+    throw SDKException.componentNotReady(
+      'stt',
+      'No STT model is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.stt.transcribeAuto().',
+    );
   }
 
   const handle = callCreate(module);

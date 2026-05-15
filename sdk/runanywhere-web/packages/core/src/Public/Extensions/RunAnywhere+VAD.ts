@@ -35,6 +35,10 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { VADProtoAdapter, type ProtoEventHandler } from '../../Adapters/ModalityProtoAdapter';
 import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import {
+  getSpeechProvider,
+  hasSpeechProviderVAD,
+} from './SpeechProvider';
 
 export type { VADConfiguration, VADOptions, VADResult, VADStatistics, SpeechActivityEvent };
 
@@ -340,12 +344,17 @@ export const VAD = {
 /**
  * Top-level ergonomic shortcut: auto-creates a handle, applies default config,
  * runs `process`, and destroys the handle.
+ *
+ * If a `SpeechProvider` is registered (e.g. by `@runanywhere/web-onnx`'s
+ * standalone Sherpa bridge) and supports VAD, dispatch through it instead
+ * of the proto-byte path. This is the production path while the unified
+ * `racommons-llamacpp.wasm` Sherpa link remains blocked by the Emscripten
+ * exception-trampoline mismatch.
  */
 export async function detectVoice(
   audio: Float32Array,
   options?: DetectVoiceOptions,
 ): Promise<VADResult> {
-  const module = requireVADModule('RunAnywhere.vad.detectVoiceAuto');
   let modelPath = options?.modelPath;
   let modelId = options?.modelId;
   let modelName: string | undefined;
@@ -360,6 +369,33 @@ export async function detectVoice(
       modelId = current.modelId;
     }
   }
+
+  if (hasSpeechProviderVAD()) {
+    const provider = getSpeechProvider()!;
+    if (modelPath && (typeof provider.isVADLoaded !== 'function' || !provider.isVADLoaded())) {
+      if (typeof provider.loadVAD !== 'function') {
+        throw SDKException.backendNotAvailable(
+          'RunAnywhere.vad.detectVoiceAuto',
+          `SpeechProvider "${provider.id}" does not implement loadVAD.`,
+        );
+      }
+      await provider.loadVAD({ id: modelId ?? modelPath, path: modelPath, name: modelName });
+    }
+    if (typeof provider.detectVoiceActivity !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.vad.detectVoiceAuto',
+        `SpeechProvider "${provider.id}" does not implement detectVoiceActivity.`,
+      );
+    }
+    return provider.detectVoiceActivity({
+      audio,
+      sampleRate: options?.config?.sampleRate ?? 16000,
+      config: options?.config,
+      options,
+    });
+  }
+
+  const module = requireVADModule('RunAnywhere.vad.detectVoiceAuto');
   if (!modelPath) {
     throw SDKException.componentNotReady(
       'vad',

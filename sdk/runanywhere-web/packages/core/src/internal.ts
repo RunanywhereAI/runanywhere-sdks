@@ -142,5 +142,23 @@ export type {
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 
+export {
+  getSpeechProvider,
+  hasSpeechProviderSTT,
+  hasSpeechProviderTTS,
+  hasSpeechProviderVAD,
+  setSpeechProvider,
+} from './Public/Extensions/SpeechProvider';
+export type {
+  SpeechProvider,
+  SpeechProviderDetectVoiceInput,
+  SpeechProviderModelHandle,
+  SpeechProviderSTTLoadRequest,
+  SpeechProviderSynthesizeInput,
+  SpeechProviderTTSLoadRequest,
+  SpeechProviderTranscribeInput,
+  SpeechProviderVADLoadRequest,
+} from './Public/Extensions/SpeechProvider';
+
 export { SolutionAdapter, SolutionHandle } from './Adapters/SolutionAdapter';
 export type { SolutionRunInput } from './Adapters/SolutionAdapter';
