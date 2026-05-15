@@ -48,8 +48,8 @@ emcmake cmake \
   -B "${BUILD_DIR}" \
   -S "${SRC_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-pthread -fexceptions" \
-  -DCMAKE_CXX_FLAGS="-pthread -fexceptions" \
+  -DCMAKE_C_FLAGS="-fexceptions" \
+  -DCMAKE_CXX_FLAGS="-fexceptions" \
   -DCMAKE_EXE_LINKER_FLAGS="-fexceptions" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fexceptions" \
   -DBUILD_SHARED_LIBS=OFF \

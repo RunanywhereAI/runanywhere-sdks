@@ -59,7 +59,6 @@ set +e
   --config "${BUILD_CONFIG}" \
   --build_wasm_static_lib \
   --enable_wasm_simd \
-  --enable_wasm_threads \
   --skip_tests \
   --disable_rtti \
   --use_preinstalled_eigen \
