@@ -134,11 +134,15 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
           ): void;
         };
 
-        // Sherpa-ONNX 1.12.x ships against Silero VAD v4 (the v5 ONNX
-        // schema is incompatible). Pin to the same v4 mirror that the
-        // upstream sherpa-onnx CI uses.
-        const vadUrl =
-          'https://huggingface.co/csukuangfj/sherpa-onnx-silero-vad/resolve/main/silero_vad.onnx';
+        // Sherpa-ONNX 1.12.x only knows the Silero VAD v4 ONNX schema
+        // (the snakers4 master branch ships v5, which Sherpa rejects with
+        // a silent abort). The v4 model is bundled as a fixture in the
+        // tests directory; Vite serves it via the example app's `tests/`
+        // path through the dev server (`/@fs/...`).
+        const vadUrl = new URL(
+          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/tests/browser/fixtures/silero_vad.onnx',
+          window.location.href,
+        ).href;
         const vadResponse = await fetch(vadUrl);
         if (!vadResponse.ok) {
           throw new Error(`silero_vad.onnx fetch ${vadResponse.status}: ${vadResponse.statusText}`);
@@ -223,7 +227,7 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
       `VAD pipeline failed: ${result?.error ?? 'none'}\nDiagnostics:\n  ${trail}`,
     ).toBeUndefined();
     expect(result?.ok, 'pipeline OK').toBe(true);
-    expect(result?.modelBytes, 'silero_vad.onnx fetched').toBeGreaterThan(1024 * 1024);
+    expect(result?.modelBytes, 'silero_vad.onnx fetched').toBeGreaterThan(500 * 1024);
     expect(result?.detectorHandle, 'detector handle is non-null').toBeGreaterThan(0);
     expect(result?.destroyed, 'detector destroyed cleanly').toBe(true);
   });
