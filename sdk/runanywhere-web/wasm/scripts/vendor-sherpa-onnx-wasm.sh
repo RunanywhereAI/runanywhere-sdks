@@ -49,7 +49,7 @@ emcmake cmake \
   -S "${SRC_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS="-pthread -fexceptions" \
-  -DCMAKE_CXX_FLAGS="-pthread -fexceptions -frtti" \
+  -DCMAKE_CXX_FLAGS="-pthread -fexceptions" \
   -DCMAKE_EXE_LINKER_FLAGS="-fexceptions" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fexceptions" \
   -DBUILD_SHARED_LIBS=OFF \

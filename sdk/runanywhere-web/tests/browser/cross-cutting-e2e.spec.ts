@@ -44,14 +44,16 @@ declare global {
         preparePrompt(
           prompt: string,
           options?: { jsonSchema?: string; includeSchemaInPrompt?: boolean },
-        ): { promptText?: string; errorCode?: number };
+        ): { preparedPrompt?: string; errorCode?: number };
         validate(
           text: string,
           options?: { jsonSchema?: string },
         ): { isValid: boolean; errorMessage?: string; parsedJson?: Uint8Array };
       };
       lora: {
-        state(): { loadedAdapters: unknown[]; hasActiveAdapters: boolean; errorCode: number };
+        supportsNative(): boolean;
+        supportsNativeCatalog(): boolean;
+        missingExports(): string[];
       };
       hardware: {
         getProfile(): {
@@ -67,7 +69,7 @@ declare global {
         supportsNativeAnalyzer(): boolean;
       };
       sdkEvents: {
-        poll(input: { maxEvents: number; clear: boolean }): { events: unknown[] };
+        poll(): unknown | null;
       };
     };
   }
@@ -148,7 +150,9 @@ test.describe('Cross-cutting Web SDK proto-byte facades', () => {
       };
 
       const lora = {
-        state: sdk.lora.state(),
+        supportsNative: sdk.lora.supportsNative(),
+        supportsNativeCatalog: sdk.lora.supportsNativeCatalog(),
+        missingExports: sdk.lora.missingExports(),
       };
 
       const hardware = {
@@ -163,9 +167,15 @@ test.describe('Cross-cutting Web SDK proto-byte facades', () => {
         supportsNativeAnalyzer: sdk.storage.supportsNativeAnalyzer(),
       };
 
-      const sdkEvents = sdk.sdkEvents.poll({ maxEvents: 16, clear: false });
+      let sdkEventsPolled = false;
+      try {
+        sdk.sdkEvents.poll();
+        sdkEventsPolled = true;
+      } catch {
+        sdkEventsPolled = false;
+      }
 
-      return { toolCalling, structured, lora, hardware, storage, sdkEvents, version: sdk.version };
+      return { toolCalling, structured, lora, hardware, storage, sdkEventsPolled, version: sdk.version };
     }, PERSON_SCHEMA);
 
     expect(result.version, 'SDK version exposed').toMatch(/^[0-9]+\./);
@@ -176,11 +186,12 @@ test.describe('Cross-cutting Web SDK proto-byte facades', () => {
     expect(result.toolCalling.parsed.toolCalls[0]?.name).toBe('get_weather');
 
     expect(result.structured.supportsProto, 'structured output proto exports').toBe(true);
-    expect((result.structured.prompt.promptText ?? '').length, 'structured prompt non-empty').toBeGreaterThan(0);
+    expect((result.structured.prompt.preparedPrompt ?? '').length, 'structured prompt non-empty').toBeGreaterThan(0);
     expect(result.structured.validation.isValid, 'JSON validates against schema').toBe(true);
 
-    expect(result.lora.state.errorCode, 'LoRA state errorCode = 0').toBe(0);
-    expect(Array.isArray(result.lora.state.loadedAdapters)).toBe(true);
+    expect(typeof result.lora.supportsNative).toBe('boolean');
+    expect(typeof result.lora.supportsNativeCatalog).toBe('boolean');
+    expect(Array.isArray(result.lora.missingExports)).toBe(true);
 
     expect(result.hardware.chip.length, 'chip name non-empty').toBeGreaterThan(0);
     expect(result.hardware.accelerationMode.length, 'acceleration mode non-empty').toBeGreaterThan(0);
@@ -190,7 +201,7 @@ test.describe('Cross-cutting Web SDK proto-byte facades', () => {
     expect(typeof result.storage.isLocalStorageSupported).toBe('boolean');
     expect(typeof result.storage.supportsNativeAnalyzer).toBe('boolean');
 
-    expect(Array.isArray(result.sdkEvents.events), 'sdkEvents.poll returns events array').toBe(true);
+    expect(result.sdkEventsPolled, 'sdkEvents.poll returns without throwing').toBe(true);
 
     const fatalErrors = consoleErrors.filter((err) => !err.includes('NO_COLOR'));
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
