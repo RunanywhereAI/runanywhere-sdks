@@ -1,0 +1,81 @@
+diff --git a/sherpa-onnx/c-api/c-api.cc b/sherpa-onnx/c-api/c-api.cc
+index 1958be8..72ac5ba 100644
+--- a/sherpa-onnx/c-api/c-api.cc
++++ b/sherpa-onnx/c-api/c-api.cc
+@@ -588,10 +588,21 @@ const SherpaOnnxOfflineRecognizer *SherpaOnnxCreateOfflineRecognizer(
+     return nullptr;
+   }
+ 
+-  SherpaOnnxOfflineRecognizer *recognizer = new SherpaOnnxOfflineRecognizer;
+-
+-  recognizer->impl =
+-      std::make_unique<sherpa_onnx::OfflineRecognizer>(recognizer_config);
++  SherpaOnnxOfflineRecognizer *recognizer = nullptr;
++  try {
++    recognizer = new SherpaOnnxOfflineRecognizer;
++    recognizer->impl =
++        std::make_unique<sherpa_onnx::OfflineRecognizer>(recognizer_config);
++  } catch (const std::exception &e) {
++    SHERPA_ONNX_LOGE("SherpaOnnxCreateOfflineRecognizer threw std::exception: %s",
++                     e.what());
++    delete recognizer;
++    return nullptr;
++  } catch (...) {
++    SHERPA_ONNX_LOGE("SherpaOnnxCreateOfflineRecognizer threw unknown exception");
++    delete recognizer;
++    return nullptr;
++  }
+ 
+   return recognizer;
+ }
+@@ -1131,9 +1142,23 @@ const SherpaOnnxVoiceActivityDetector *SherpaOnnxCreateVoiceActivityDetector(
+     return nullptr;
+   }
+ 
+-  SherpaOnnxVoiceActivityDetector *p = new SherpaOnnxVoiceActivityDetector;
+-  p->impl = std::make_unique<sherpa_onnx::VoiceActivityDetector>(
+-      vad_config, buffer_size_in_seconds);
++  SherpaOnnxVoiceActivityDetector *p = nullptr;
++  try {
++    p = new SherpaOnnxVoiceActivityDetector;
++    p->impl = std::make_unique<sherpa_onnx::VoiceActivityDetector>(
++        vad_config, buffer_size_in_seconds);
++  } catch (const std::exception &e) {
++    SHERPA_ONNX_LOGE(
++        "SherpaOnnxCreateVoiceActivityDetector threw std::exception: %s",
++        e.what());
++    delete p;
++    return nullptr;
++  } catch (...) {
++    SHERPA_ONNX_LOGE(
++        "SherpaOnnxCreateVoiceActivityDetector threw unknown exception");
++    delete p;
++    return nullptr;
++  }
+ 
+   return p;
+ }
+@@ -1318,9 +1343,20 @@ const SherpaOnnxOfflineTts *SherpaOnnxCreateOfflineTts(
+     return nullptr;
+   }
+ 
+-  SherpaOnnxOfflineTts *tts = new SherpaOnnxOfflineTts;
+-
+-  tts->impl = std::make_unique<sherpa_onnx::OfflineTts>(tts_config);
++  SherpaOnnxOfflineTts *tts = nullptr;
++  try {
++    tts = new SherpaOnnxOfflineTts;
++    tts->impl = std::make_unique<sherpa_onnx::OfflineTts>(tts_config);
++  } catch (const std::exception &e) {
++    SHERPA_ONNX_LOGE("SherpaOnnxCreateOfflineTts threw std::exception: %s",
++                     e.what());
++    delete tts;
++    return nullptr;
++  } catch (...) {
++    SHERPA_ONNX_LOGE("SherpaOnnxCreateOfflineTts threw unknown exception");
++    delete tts;
++    return nullptr;
++  }
+ 
+   return tts;
+ }

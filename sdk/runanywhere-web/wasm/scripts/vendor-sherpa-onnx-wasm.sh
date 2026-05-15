@@ -25,6 +25,22 @@ if [ ! -d "${SRC_DIR}/.git" ]; then
     https://github.com/k2-fsa/sherpa-onnx.git "${SRC_DIR}"
 fi
 
+# Apply RACommons patches. Wraps the C API constructors
+# (CreateOfflineRecognizer / CreateOfflineTts / CreateVoiceActivityDetector)
+# in try/catch so std::exception thrown from inside ORT or Eigen surfaces as
+# `nullptr` + a logged error instead of a raw `CppException` crossing the
+# WASM/JS boundary.
+PATCH_DIR="${WASM_DIR}/patches"
+SHERPA_PATCH="${PATCH_DIR}/sherpa-onnx-c-api-try-catch.patch"
+if [ -f "${SHERPA_PATCH}" ]; then
+  if ! git -C "${SRC_DIR}" apply --reverse --check "${SHERPA_PATCH}" >/dev/null 2>&1; then
+    echo "Applying Sherpa patch: ${SHERPA_PATCH}"
+    git -C "${SRC_DIR}" apply "${SHERPA_PATCH}"
+  else
+    echo "Sherpa patch already applied: ${SHERPA_PATCH}"
+  fi
+fi
+
 export SHERPA_ONNXRUNTIME_INCLUDE_DIR="${ORT_DIR}/include"
 export SHERPA_ONNXRUNTIME_LIB_DIR="${ORT_DIR}/lib"
 
@@ -32,8 +48,10 @@ emcmake cmake \
   -B "${BUILD_DIR}" \
   -S "${SRC_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-pthread" \
-  -DCMAKE_CXX_FLAGS="-pthread" \
+  -DCMAKE_C_FLAGS="-pthread -fexceptions" \
+  -DCMAKE_CXX_FLAGS="-pthread -fexceptions -frtti" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fexceptions" \
+  -DCMAKE_SHARED_LINKER_FLAGS="-fexceptions" \
   -DBUILD_SHARED_LIBS=OFF \
   -DSHERPA_ONNX_ENABLE_BINARY=OFF \
   -DSHERPA_ONNX_ENABLE_TESTS=OFF \

@@ -21,6 +21,22 @@ if [ ! -d "${SRC_DIR}/.git" ]; then
     https://github.com/microsoft/onnxruntime.git "${SRC_DIR}"
 fi
 
+# Apply RACommons patches. Currently we patch
+# `core/framework/session_options.h` so per-session threadpools default to
+# `true` even on WASM+pthreads builds, which prevents
+# `InferenceSession::ConstructorCommon` from throwing when Sherpa-ONNX
+# creates a fresh `Ort::Env` per session.
+PATCH_DIR="${WASM_DIR}/patches"
+ORT_PATCH="${PATCH_DIR}/onnxruntime-per-session-threads.patch"
+if [ -f "${ORT_PATCH}" ]; then
+  if ! git -C "${SRC_DIR}" apply --reverse --check "${ORT_PATCH}" >/dev/null 2>&1; then
+    echo "Applying ORT patch: ${ORT_PATCH}"
+    git -C "${SRC_DIR}" apply "${ORT_PATCH}"
+  else
+    echo "ORT patch already applied: ${ORT_PATCH}"
+  fi
+fi
+
 if [ ! -d "${EIGEN_SRC_DIR}/.git" ]; then
   rm -rf "${EIGEN_SRC_DIR}"
   mkdir -p "${EIGEN_SRC_DIR}"
@@ -32,6 +48,12 @@ fi
 
 cd "${SRC_DIR}"
 
+# Force regeneration of the bundled archive so that incremental rebuilds
+# (e.g. after editing core/framework/session_options.h) actually pick up the
+# new object files. Without this the bundling_target is treated as already
+# satisfied by CMake and the stale archive ships unchanged.
+rm -f "${ORT_BUILD_DIR}/libonnxruntime_webassembly.a"
+
 set +e
 ./build.sh \
   --config "${BUILD_CONFIG}" \
@@ -39,8 +61,6 @@ set +e
   --enable_wasm_simd \
   --enable_wasm_threads \
   --skip_tests \
-  --minimal_build \
-  --disable_wasm_exception_catching \
   --disable_rtti \
   --use_preinstalled_eigen \
   --eigen_path "${EIGEN_SRC_DIR}" \
