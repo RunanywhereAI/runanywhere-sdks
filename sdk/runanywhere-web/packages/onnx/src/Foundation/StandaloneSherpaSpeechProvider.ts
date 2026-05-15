@@ -48,6 +48,7 @@ import {
   type StandaloneSherpaModule,
 } from './StandaloneSherpaModule';
 import {
+  ensureEspeakVoiceFiles,
   ensureParentDirs,
   stageBytes,
   stageFromCommonsFs,
@@ -185,8 +186,30 @@ class StandaloneSherpaSpeechProvider implements SpeechProvider {
     logger.debug(
       `Standalone Sherpa TTS resolved layout: model=${vits.modelPath} tokens=${vits.tokensPath} dataDir=${vits.dataDir ?? '<none>'}`,
     );
+
+    // Piper VITS bundles ship lang/<family>/<voice> but only voices/!v/, so
+    // espeak-ng's runtime fails to resolve voice IDs like `en-us`. Mirror
+    // every lang/ voice descriptor flat under voices/<voice> before
+    // constructing the TTS handle. Mirrors the C++
+    // `ensure_espeak_voice_files` shim from
+    // `engines/sherpa/sherpa_backend.cpp`.
+    if (vits.dataDir) {
+      try {
+        const result = ensureEspeakVoiceFiles(module, vits.dataDir);
+        logger.info(
+          `Standalone Sherpa TTS ensure_espeak_voice_files: copied=${result.copied} skipped=${result.skipped} errors=${result.errors} (${result.voices.length} voices total)`,
+        );
+      } catch (err) {
+        logger.warning(
+          `ensure_espeak_voice_files failed (continuing — TTS may still construct): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
     const tts = new StandaloneSherpaTts(module);
-    tts.load({ vits, numThreads: 1, provider: 'cpu' });
+    await tts.load({ vits, numThreads: 1, provider: 'cpu' });
     this.tts = tts;
     this.ttsModelId = request.id;
     logger.info(`Standalone Sherpa TTS ready for "${request.id}" (${stagedDir})`);

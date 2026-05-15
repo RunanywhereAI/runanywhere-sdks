@@ -15,6 +15,8 @@
 
 import { SDKLogger } from '@runanywhere/web/internal';
 
+import { setSherpaUpstreamHelperBase } from './SherpaUpstreamHelpers';
+
 const logger = new SDKLogger('StandaloneSherpa');
 
 // ---------------------------------------------------------------------------
@@ -191,6 +193,12 @@ export async function getStandaloneSherpaModule(
     );
 
     const baseUrl = wasmUrl.substring(0, wasmUrl.lastIndexOf('/') + 1);
+    // Make sure SherpaUpstreamHelpers fetches sherpa-onnx-{asr,tts,vad}.js
+    // from the same directory as the WASM binary. Otherwise its
+    // `import.meta.url`-based default produces a Vite path that 404s in
+    // the test environment, surfacing as `SyntaxError: Unexpected token '<'`
+    // when we try to import an HTML error page as a JS module.
+    setSherpaUpstreamHelperBase(baseUrl);
 
     const module = await factory({
       noFSInit: true,

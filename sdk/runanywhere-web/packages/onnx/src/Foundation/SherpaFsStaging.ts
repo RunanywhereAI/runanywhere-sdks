@@ -204,3 +204,144 @@ export function ensureParentDirs(module: StandaloneSherpaModule, dirPath: string
 export function clearStagedTracking(module: StandaloneSherpaModule): void {
   _staged.delete(module);
 }
+
+// ---------------------------------------------------------------------------
+// espeak-ng voice-file shim
+// ---------------------------------------------------------------------------
+//
+// Background: Piper VITS tarballs (and several other Sherpa-bundled
+// espeak-ng-data drops) ship the per-language voice descriptors at
+// `espeak-ng-data/lang/<family>/<voice>` instead of the flat
+// `espeak-ng-data/voices/<voice>` layout that espeak-ng itself expects when
+// `espeakRATE` calls `LoadVoice(name)`. espeak's runtime is supposed to walk
+// `lang/` itself, but the build that sherpa-onnx links against fails to do
+// so on certain platforms (this is a long-standing iOS / WASM regression
+// that the RACommons sherpa_backend.cpp has been working around for months).
+//
+// This helper mirrors the C++ `ensure_espeak_voice_files` writer in
+// `engines/sherpa/sherpa_backend.cpp`: it walks `lang/` and copies every
+// regular file found into `voices/<lowercase-basename>`. After this runs,
+// `_SherpaOnnxCreateOfflineTts` can resolve the active voice (e.g. `en-us`,
+// `en`, `de`) without relying on the broken espeak resolver.
+
+interface VoiceShimResult {
+  copied: number;
+  skipped: number;
+  errors: number;
+  voices: string[];
+}
+
+/**
+ * Ensure every `espeak-ng-data/lang/**` voice descriptor has a flat copy at
+ * `espeak-ng-data/voices/<lowercase-basename>` in the standalone Sherpa
+ * MEMFS. Files are sourced from the RACommons MEMFS (where the V2 download
+ * orchestrator extracted the tarball). Idempotent — already-present voice
+ * files are left alone and counted as `skipped`.
+ */
+export function ensureEspeakVoiceFiles(
+  module: StandaloneSherpaModule,
+  espeakDataDir: string,
+): VoiceShimResult {
+  const commons = tryRunanywhereModule() as CommonsFsModule | null;
+  if (!commons?.FS) {
+    throw new Error(
+      `ensureEspeakVoiceFiles: cannot run shim for "${espeakDataDir}" — RACommons FS not installed.`,
+    );
+  }
+  const langDir = `${espeakDataDir}/lang`;
+  const voicesDir = `${espeakDataDir}/voices`;
+
+  const langStat = safeStat(commons, langDir);
+  if (!langStat || !isDirectoryPath(commons, langDir, langStat.mode)) {
+    throw new Error(
+      `ensureEspeakVoiceFiles: lang/ directory not found at "${langDir}" in commons MEMFS.`,
+    );
+  }
+  // Make sure the destination tree exists in the Sherpa MEMFS.
+  ensureParentDirs(module, voicesDir);
+
+  const stagedVoiceNames = new Set<string>();
+  let copied = 0;
+  let skipped = 0;
+  let errors = 0;
+  const writeIfMissing = (parent: string, basename: string, data: Uint8Array): void => {
+    const lower = basename.toLowerCase();
+    const target = `${parent}/${lower}`;
+    if (stagedVoiceNames.has(lower)) {
+      skipped += 1;
+      return;
+    }
+    try {
+      stageBytes(module, parent, lower, data);
+      stagedVoiceNames.add(lower);
+      copied += 1;
+    } catch (err) {
+      errors += 1;
+      logger.warning(
+        `ensureEspeakVoiceFiles: failed to stage "${target}": ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  };
+
+  const familyEntries = readChildrenSafe(commons, langDir);
+  for (const family of familyEntries) {
+    if (family.startsWith('.')) continue;
+    const familyPath = `${langDir}/${family}`;
+    const familyStat = safeStat(commons, familyPath);
+    if (!familyStat) continue;
+
+    if (!isDirectoryPath(commons, familyPath, familyStat.mode)) {
+      // Direct voice file at lang/<voice>.
+      try {
+        const bytes = commons.FS.readFile(familyPath);
+        writeIfMissing(voicesDir, family, bytes);
+      } catch (err) {
+        errors += 1;
+        logger.warning(
+          `ensureEspeakVoiceFiles: failed to read ${familyPath}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+      continue;
+    }
+
+    // family is a directory like lang/gmw/ — walk one level deep.
+    const voiceFiles = readChildrenSafe(commons, familyPath);
+    for (const voice of voiceFiles) {
+      if (voice.startsWith('.')) continue;
+      const voicePath = `${familyPath}/${voice}`;
+      const voiceStat = safeStat(commons, voicePath);
+      if (!voiceStat || isDirectoryPath(commons, voicePath, voiceStat.mode)) continue;
+      try {
+        const bytes = commons.FS.readFile(voicePath);
+        writeIfMissing(voicesDir, voice, bytes);
+      } catch (err) {
+        errors += 1;
+        logger.warning(
+          `ensureEspeakVoiceFiles: failed to read ${voicePath}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+  }
+
+  return {
+    copied,
+    skipped,
+    errors,
+    voices: Array.from(stagedVoiceNames).sort(),
+  };
+}
+
+function readChildrenSafe(commons: CommonsFsModule, path: string): string[] {
+  if (!commons.FS) return [];
+  try {
+    return commons.FS.readdir(path).filter((n) => n !== '.' && n !== '..');
+  } catch {
+    return [];
+  }
+}

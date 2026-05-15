@@ -97,3 +97,57 @@ const ASR_EXPORTS = [
 export function loadSherpaASRHelpers(): Promise<SherpaASRHelpers> {
   return loadHelper<SherpaASRHelpers>('sherpa-onnx-asr.js', ASR_EXPORTS);
 }
+
+// ---------------------------------------------------------------------------
+// TTS helpers (sherpa-onnx-tts.js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors the upstream `OfflineTtsConfig` shape consumed by
+ * `initSherpaOnnxOfflineTtsConfig`. The helper expects nested model-specific
+ * configs under `offlineTtsModelConfig`. Optional sub-configs default to
+ * empty/disabled inside the helper.
+ */
+export interface UpstreamTtsConfig {
+  offlineTtsModelConfig: {
+    offlineTtsVitsModelConfig: {
+      model: string;
+      lexicon?: string;
+      tokens: string;
+      dataDir?: string;
+      noiseScale?: number;
+      noiseScaleW?: number;
+      lengthScale?: number;
+    };
+    numThreads?: number;
+    debug?: number;
+    provider?: string;
+  };
+  ruleFsts?: string;
+  ruleFars?: string;
+  maxNumSentences?: number;
+  silenceScale?: number;
+}
+
+export interface SherpaTTSHelpers {
+  freeConfig: (handle: SherpaConfigHandle, module: StandaloneSherpaModule) => void;
+  initSherpaOnnxOfflineTtsConfig: (
+    config: UpstreamTtsConfig,
+    module: StandaloneSherpaModule,
+  ) => SherpaConfigHandle;
+}
+
+const TTS_EXPORTS = [
+  'freeConfig',
+  'initSherpaOnnxOfflineTtsConfig',
+  'initSherpaOnnxOfflineTtsModelConfig',
+  'initSherpaOnnxOfflineTtsVitsModelConfig',
+  'initSherpaOnnxOfflineTtsMatchaModelConfig',
+  'initSherpaOnnxOfflineTtsKokoroModelConfig',
+  'initSherpaOnnxOfflineTtsKittenModelConfig',
+  'initSherpaOnnxOfflineTtsZipVoiceModelConfig',
+] as const;
+
+export function loadSherpaTTSHelpers(): Promise<SherpaTTSHelpers> {
+  return loadHelper<SherpaTTSHelpers>('sherpa-onnx-tts.js', TTS_EXPORTS);
+}
