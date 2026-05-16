@@ -20,9 +20,15 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val ttsLogger = SDKLogger.tts
@@ -92,15 +98,50 @@ actual fun RunAnywhere.synthesizeStream(
             return@callbackFlow
         }
 
-        try {
-            CppBridgeTTS.synthesizeStream(text, options) { output ->
-                trySend(output)
-                true
+        // Cancellation flag observed by the native chunk callback: once the
+        // Flow channel is closed (collector cancelled or completed), the
+        // listener returns false so the native synthesizer stops emitting.
+        val cancelled = AtomicBoolean(false)
+
+        // Run the synchronous native streaming call on the IO dispatcher so
+        // the collector coroutine remains free to be cancelled. awaitClose
+        // fires when the collector cancels and we ask the lifecycle stop
+        // ABI to interrupt the native side; the launched task then exits
+        // when racTtsSynthesizeStreamLifecycleProto returns.
+        val driver = CoroutineScope(Dispatchers.IO).launch {
+            try {
+                CppBridgeTTS.synthesizeStream(text, options) { output ->
+                    if (cancelled.get() || isClosedForSend) {
+                        false
+                    } else {
+                        trySend(output)
+                        true
+                    }
+                }
+            } catch (t: Throwable) {
+                ttsLogger.warn("synthesizeStream errored: ${t.message}")
+            } finally {
+                close()
             }
-        } finally {
-            close()
         }
-        awaitClose()
+
+        awaitClose {
+            cancelled.set(true)
+            // Best-effort: ask the lifecycle TTS stack to stop emitting.
+            // withContext(NonCancellable) so this still runs even when the
+            // outer coroutine is in cancelling state. The driver coroutine
+            // then unblocks once the native stream returns.
+            driver.cancel()
+            CoroutineScope(NonCancellable).launch {
+                withContext(NonCancellable) {
+                    try {
+                        CppBridgeTTS.stop()
+                    } catch (t: Throwable) {
+                        ttsLogger.debug("CppBridgeTTS.stop() failed: ${t.message}")
+                    }
+                }
+            }
+        }
     }
 
 actual suspend fun RunAnywhere.stopSynthesis() {

@@ -119,6 +119,45 @@ function coerceAudio(audio: Uint8Array | Float32Array): Uint8Array {
 }
 
 /**
+ * Decode a Uint8Array of little-endian PCM16 audio into normalized Float32
+ * samples in the range [-1, 1]. Used by the SpeechProvider path which expects
+ * Float32 samples — never reinterpret the underlying buffer as Float32 because
+ * the byte offset/length need not be 4-aligned and the bytes are not IEEE754.
+ */
+function decodePcm16ToFloat32(audio: Uint8Array): Float32Array {
+  const usableBytes = audio.byteLength - (audio.byteLength % 2);
+  const sampleCount = usableBytes / 2;
+  const out = new Float32Array(sampleCount);
+  const view = new DataView(audio.buffer, audio.byteOffset, usableBytes);
+  for (let i = 0; i < sampleCount; i += 1) {
+    out[i] = view.getInt16(i * 2, true) / 0x8000;
+  }
+  return out;
+}
+
+/**
+ * Convert a public-API audio buffer into the Float32 sample format expected by
+ * SpeechProvider implementations. Float32Array passes through unchanged; the
+ * Uint8Array branch interprets bytes according to options.audioFormat (PCM16
+ * is the documented default for STT).
+ */
+function audioToFloat32Samples(
+  audio: Uint8Array | Float32Array,
+  options: TranscribeOptions | undefined,
+): Float32Array {
+  if (audio instanceof Float32Array) return audio;
+  const format = options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM;
+  if (format !== AudioFormat.AUDIO_FORMAT_PCM) {
+    throw SDKException.backendNotAvailable(
+      'RunAnywhere.stt.transcribeAuto',
+      `SpeechProvider path only supports PCM16 Uint8Array input; got audioFormat=${format}. ` +
+        `Pass a Float32Array of normalized samples or use the proto-byte adapter path.`,
+    );
+  }
+  return decodePcm16ToFloat32(audio);
+}
+
+/**
  * Allocate the `out_handle` slot, run the create call, read the handle back.
  * Returns the numeric component handle on success.
  */
@@ -346,9 +385,7 @@ export async function transcribe(
         `SpeechProvider "${provider.id}" does not implement transcribe.`,
       );
     }
-    const samples = audio instanceof Float32Array
-      ? audio
-      : new Float32Array(audio.buffer, audio.byteOffset, audio.byteLength / 4);
+    const samples = audioToFloat32Samples(audio, options);
     return provider.transcribe({
       audio: samples,
       sampleRate: options?.sampleRate ?? 16000,

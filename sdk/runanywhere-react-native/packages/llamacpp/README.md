@@ -32,8 +32,12 @@ Android native libraries are packaged by the React Native package.
 ## Usage
 
 ```typescript
-import { RunAnywhere, InferenceFramework, ModelCategory } from '@runanywhere/core';
-import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
+import { RunAnywhere } from '@runanywhere/core';
+import {
+  InferenceFramework,
+  ModelCategory,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 
 await RunAnywhere.initialize();

@@ -19,6 +19,8 @@ import 'package:runanywhere/generated/tts_options.pb.dart'
         TTSStreamEvent,
         TTSSynthesisRequest,
         TTSVoiceInfo;
+import 'package:runanywhere/generated/tts_options.pbenum.dart'
+    show TTSStreamEventKind;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -155,6 +157,7 @@ class DartBridgeTTS {
 
     final controller = StreamController<TTSStreamEvent>(sync: false);
     NativeCallable<RacTtsStreamEventCallbackNative>? callback;
+    var sawTerminalEvent = false;
 
     Future<void> run() async {
       final bytes = request.writeToBuffer();
@@ -171,7 +174,11 @@ class DartBridgeTTS {
           }
           try {
             final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            controller.add(TTSStreamEvent.fromBuffer(copy));
+            final event = TTSStreamEvent.fromBuffer(copy);
+            sawTerminalEvent = sawTerminalEvent ||
+                event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
+                event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
+            controller.add(event);
           } catch (e, st) {
             controller.addError(e, st);
             unawaited(controller.close());
@@ -183,6 +190,18 @@ class DartBridgeTTS {
           callback!.nativeFunction,
           nullptr,
         );
+        // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
+        // `rac_tts_synthesize_stream_lifecycle_proto` is a blocking
+        // synchronous FFI call. While it runs the main isolate's event loop
+        // is frozen, so NativeCallable.listener invocations queue up but do
+        // not execute. The terminal COMPLETED/ERROR event therefore arrives
+        // ASYNCHRONOUSLY after `fn()` returns. Yield to the event loop a
+        // few times so queued callbacks can drain before deciding whether
+        // to force-close the controller; otherwise subscribers receive an
+        // empty stream even though native emitted started/audio/final.
+        for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
         if (rc != RAC_SUCCESS && !controller.isClosed) {
           controller.addError(StateError(
             'rac_tts_synthesize_stream_lifecycle_proto failed: '
@@ -200,6 +219,17 @@ class DartBridgeTTS {
     }
 
     controller.onCancel = () {
+      // Best-effort: ask commons to stop lifecycle synthesis so native CPU
+      // isn't burned for a Dart subscriber that has already gone away.
+      // RunAnywhereTTS.stopSynthesis() routes through the same ABI; mirror
+      // its semantics here so cancelling the public stream subscription
+      // also stops the underlying lifecycle work. Errors are swallowed so
+      // cancellation remains best-effort.
+      try {
+        stopLifecycleProto();
+      } catch (e) {
+        _logger.debug('stopLifecycleProto on stream cancel failed: $e');
+      }
       callback?.close();
       callback = null;
     };

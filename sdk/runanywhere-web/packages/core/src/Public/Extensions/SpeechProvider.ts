@@ -1,21 +1,31 @@
 /**
- * SpeechProvider — pluggable speech (STT/TTS/VAD) backend interface.
+ * SpeechProvider — INTERNAL/EXPERIMENTAL pluggable speech (STT/TTS/VAD)
+ * backend escape hatch. NOT a stable public API.
  *
- * The V2 architecture's preferred path for STT/TTS/VAD is the proto-byte
- * RACommons C ABI (`STTProtoAdapter`/`TTSProtoAdapter`/`VADProtoAdapter`)
- * exposed by the unified `racommons-llamacpp.wasm` artifact. That path
- * still hits a deep Emscripten exception-trampoline mismatch when the
- * vendored ORT + Sherpa static archives are linked into the unified
- * module, so a working speech artifact is provided by the standalone
- * `sherpa-onnx.wasm` module that `@runanywhere/web-onnx` builds via
- * `wasm/scripts/build-sherpa-onnx.sh` (the same path `main` ships).
+ * @internal @experimental
+ *
+ * The V2 architecture's canonical path for STT/TTS/VAD is the proto-byte
+ * RACommons C ABI (`STTProtoAdapter` / `TTSProtoAdapter` /
+ * `VADProtoAdapter`) exposed by the unified `racommons-llamacpp.wasm`
+ * artifact. That path still hits a deep Emscripten exception-trampoline
+ * mismatch when the vendored ORT + Sherpa static archives are linked into
+ * the unified module, so a working speech artifact is currently provided
+ * by the standalone `sherpa-onnx.wasm` module that `@runanywhere/web-onnx`
+ * builds via `wasm/scripts/build-sherpa-onnx.sh`.
  *
  * To keep the public Swift-shaped facade verbs
  * (`RunAnywhere.transcribe` / `synthesize` / `detectVoiceActivity`)
- * working without app-side branching, backend packages register a
- * `SpeechProvider` here. The `RunAnywhere+STT` / `+TTS` / `+VAD` facades
- * dispatch through the registered provider when present and fall back to
- * the proto-byte adapters when no provider is installed.
+ * working without app-side branching during that migration, backend
+ * packages register a `SpeechProvider` through this escape hatch and the
+ * `RunAnywhere+STT` / `+TTS` / `+VAD` facades dispatch through the
+ * registered provider before falling back to the proto-byte adapters.
+ *
+ * REMOVAL CONTRACT (DUPLICATE-ABSTRACTIONS-AND-SOLID-001):
+ *   This module is a temporary escape hatch and MUST be removed once the
+ *   unified `racommons-llamacpp.wasm` build passes its STT/TTS/VAD smoke
+ *   tests with ORT + Sherpa linked in. Do NOT design new SDK features
+ *   around the SpeechProvider routing layer; new speech behavior belongs
+ *   in the proto-byte adapter contract.
  *
  * The provider operates on opaque model identifiers — the SDK already
  * downloaded and extracted the model into the local storage backend
@@ -119,6 +129,13 @@ export interface SpeechProvider {
   synthesize?(input: SpeechProviderSynthesizeInput): Promise<TTSOutput>;
   /** Run VAD against the most recently loaded model. */
   detectVoiceActivity?(input: SpeechProviderDetectVoiceInput): Promise<VADResult>;
+
+  /**
+   * Optional dispose hook. Called by `RunAnywhere.shutdown()` so the provider
+   * can release any backend module/component handles it owns. Implementations
+   * should be idempotent and safe to call before any load.
+   */
+  dispose?(): Promise<void> | void;
 }
 
 let _activeProvider: SpeechProvider | null = null;
@@ -126,6 +143,20 @@ let _activeProvider: SpeechProvider | null = null;
 /** Install a speech provider. Pass `null` to clear. */
 export function setSpeechProvider(provider: SpeechProvider | null): void {
   _activeProvider = provider;
+}
+
+/**
+ * Tear down the active speech provider, invoking `dispose()` if it exists,
+ * then clearing the singleton slot. Safe to call when no provider is set.
+ * Any error thrown by `dispose()` is caught and surfaced to the caller via
+ * the returned promise so SDK shutdown can still complete.
+ */
+export async function disposeSpeechProvider(): Promise<void> {
+  const provider = _activeProvider;
+  _activeProvider = null;
+  if (provider && typeof provider.dispose === 'function') {
+    await provider.dispose();
+  }
 }
 
 export function getSpeechProvider(): SpeechProvider | null {

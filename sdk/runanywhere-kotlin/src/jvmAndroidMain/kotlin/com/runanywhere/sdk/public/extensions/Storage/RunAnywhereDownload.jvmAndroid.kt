@@ -8,6 +8,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.DownloadStartRequest
@@ -20,9 +21,11 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 
 private val downloadLogger = SDKLogger("RunAnywhere.Download")
 
@@ -89,22 +92,59 @@ actual fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress>
                 task_id = startResult.task_id,
             )
 
-        while (true) {
-            delay(250)
-            val progress = CppBridgeDownload.pollProgress(subscribeRequest) ?: continue
-            emit(progress)
-            if (isTerminal(progress)) {
-                if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
-                    throw SDKException.operation(
-                        "Download failed for ${model.id}: ${progress.error_message.ifBlank { "unknown error" }}",
-                    )
+        // Track whether the C-side download reached a terminal state. When
+        // the Flow collector cancels (UI lifecycle, timeout, `take(n)`) before
+        // a terminal poll, the finally block fires `rac_download_cancel_proto`
+        // so the detached native worker stops instead of leaking bandwidth,
+        // battery, and file handles. Mirrors Swift parity for download Flow
+        // ownership: the public Flow owns the lifetime of the native task.
+        var reachedTerminal = false
+        try {
+            while (true) {
+                delay(250)
+                val progress = CppBridgeDownload.pollProgress(subscribeRequest) ?: continue
+                emit(progress)
+                if (isTerminal(progress)) {
+                    reachedTerminal = true
+                    if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
+                        throw SDKException.operation(
+                            "Download failed for ${model.id}: ${progress.error_message.ifBlank { "unknown error" }}",
+                        )
+                    }
+                    if (progress.state == DownloadState.DOWNLOAD_STATE_CANCELLED) {
+                        throw SDKException.invalidArgument("Download cancelled: ${model.id}")
+                    }
+                    // DOWNLOAD_STATE_COMPLETED — persist into registry.
+                    persistDownloadCompletion(model, progress)
+                    return@flow
                 }
-                if (progress.state == DownloadState.DOWNLOAD_STATE_CANCELLED) {
-                    throw SDKException.invalidArgument("Download cancelled: ${model.id}")
+            }
+        } finally {
+            if (!reachedTerminal) {
+                // withContext(NonCancellable) so the cancellation native
+                // hand-off still runs even when the outer coroutine is in
+                // cancelling state. Preserve resume bytes (delete_partial=false)
+                // so a later download can pick up where this one left off.
+                withContext(NonCancellable) {
+                    try {
+                        CppBridgeDownload.cancel(
+                            DownloadCancelRequest(
+                                task_id = startResult.task_id,
+                                model_id = startResult.model_id.ifBlank { model.id },
+                                delete_partial_bytes = false,
+                            ),
+                        )
+                        downloadLogger.info(
+                            "Download cancelled by collector for ${model.id} " +
+                                "(task=${startResult.task_id})",
+                        )
+                    } catch (e: Throwable) {
+                        downloadLogger.warn(
+                            "Failed to cancel native download for ${model.id} " +
+                                "(task=${startResult.task_id}): ${e.message}",
+                        )
+                    }
                 }
-                // DOWNLOAD_STATE_COMPLETED — persist into registry.
-                persistDownloadCompletion(model, progress)
-                return@flow
             }
         }
     }

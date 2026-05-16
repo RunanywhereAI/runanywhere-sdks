@@ -131,6 +131,18 @@ static rac_handle_t getGlobalLLMHandle() {
     return g_llm_component_handle;
 }
 
+// HOTSPOT-RN-CORE-001: the public RunAnywhere v2 path loads the LLM via
+// `rac_model_lifecycle_load_proto`, which populates the commons lifecycle
+// registry but NOT this RN bridge's `g_llm_component_handle`. If we hand an
+// unloaded handle to the LoRA proto ABI, commons returns the typed
+// "LoRA service is not loaded" result and LoRA looks broken on RN even
+// though plain generation works (rac_llm_generate_*_proto acquire the
+// lifecycle-owned handle internally).
+//
+// As a stop-gap until the commons LoRA proto ABI grows a handleless variant
+// or exposes a lifecycle-owned LLM accessor, refuse the call early with a
+// clear log line so callers see an actionable error instead of a confusing
+// "no LoRA service" result. See followups/hotspot-rn-core-001-followup-cpp.json.
 static std::shared_ptr<ArrayBuffer> callLoraRequestProto(
     const std::vector<uint8_t>& bytes,
     const char* symbolName,
@@ -139,6 +151,14 @@ static std::shared_ptr<ArrayBuffer> callLoraRequestProto(
     auto fn = proto_compat::symbol<proto_compat::LoRARequestProtoFn>(symbolName);
     if (!handle || !fn) {
         LOGE("%s: LLM handle or %s unavailable", operation, symbolName);
+        return emptyVoiceProtoBuffer();
+    }
+    if (rac_llm_component_is_loaded(handle) != RAC_TRUE) {
+        LOGE("%s: bridge LLM handle is not loaded — LoRA requires commons to expose "
+             "the lifecycle-owned handle (see hotspot-rn-core-001-followup-cpp). "
+             "Until the commons LoRA proto ABI is migrated, callers must not "
+             "rely on RunAnywhere.lora.* immediately after RunAnywhere.loadModel.",
+             operation);
         return emptyVoiceProtoBuffer();
     }
     rac_proto_buffer_t out;
@@ -1141,6 +1161,64 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
         }
         return copyVoiceProtoBuffer(out, "voiceAgentProcessTurnProto");
     });
+}
+
+// ============================================================================
+// Global component teardown (HOTSPOT-RN-CORE-002)
+// ============================================================================
+//
+// Reset the LLM/STT/TTS/VAD/voice-agent globals plus the commons lifecycle
+// registry so a HybridRunAnywhereCore::destroy() leaves no stale component
+// state across subsequent initialize() calls. Each section locks its own
+// mutex so we mirror the per-modality lifetime and cannot race a
+// concurrently-running operation that already holds a handle copy.
+extern "C" void rac_model_lifecycle_reset(void);
+
+void resetAllGlobalComponentHandles() {
+    {
+        std::lock_guard<std::mutex> lock(g_voice_agent_mutex);
+        if (g_voice_agent_handle != nullptr) {
+            rac_voice_agent_destroy(g_voice_agent_handle);
+            g_voice_agent_handle = nullptr;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_llm_mutex);
+        if (g_llm_component_handle != nullptr) {
+            rac_llm_component_cleanup(g_llm_component_handle);
+            rac_llm_component_destroy(g_llm_component_handle);
+            g_llm_component_handle = nullptr;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_stt_mutex);
+        if (g_stt_component_handle != nullptr) {
+            rac_stt_component_cleanup(g_stt_component_handle);
+            rac_stt_component_destroy(g_stt_component_handle);
+            g_stt_component_handle = nullptr;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_tts_mutex);
+        if (g_tts_component_handle != nullptr) {
+            rac_tts_component_cleanup(g_tts_component_handle);
+            rac_tts_component_destroy(g_tts_component_handle);
+            g_tts_component_handle = nullptr;
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_vad_mutex);
+        if (g_vad_component_handle != nullptr) {
+            rac_vad_component_cleanup(g_vad_component_handle);
+            rac_vad_component_destroy(g_vad_component_handle);
+            g_vad_component_handle = nullptr;
+        }
+    }
+
+    // Drop the commons lifecycle registry — must run AFTER component
+    // destruction so any models registered with the lifecycle are freed
+    // through their owning component's destroy path.
+    rac_model_lifecycle_reset();
 }
 
 } // namespace margelo::nitro::runanywhere

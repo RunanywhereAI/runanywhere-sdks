@@ -416,34 +416,46 @@ await RunAnywhere.cleanTempFiles();
 
 ```typescript
 import {
-  SDKError,
-  SDKErrorCode,
-  isSDKError,
-  notInitializedError,
-  modelNotFoundError,
+  SDKException,
+  isSDKException,
+  asSDKException,
+  ErrorCode,
+  ErrorCategory,
 } from '@runanywhere/core';
 
 try {
   await RunAnywhere.generate('Hello');
 } catch (error) {
-  if (isSDKError(error)) {
-    console.log('Code:', error.code);
-    console.log('Category:', error.category);
-    console.log('Suggestion:', error.recoverySuggestion);
+  if (isSDKException(error)) {
+    console.log('Code:', error.code);          // ErrorCode (proto enum)
+    console.log('Category:', error.category);  // ErrorCategory (proto enum)
+    console.log('cAbiCode:', error.cAbiCode);  // optional negative rac_result_t
+    console.log('Context:', error.context);    // optional ErrorContext
+  } else {
+    // Coerce non-SDKException values (Error / string / unknown) into one.
+    const sdkError = asSDKException(error);
+    console.log('Code:', sdkError.code);
   }
 }
 
-// Create errors
-throw notInitializedError();
-throw modelNotFoundError('model-id');
+// Create errors via the static factories on SDKException.
+throw SDKException.notInitialized();
+throw SDKException.modelNotFound('model-id');
+throw SDKException.of(ErrorCode.ERROR_CODE_INVALID_INPUT, 'Prompt is empty');
 ```
 
 ---
 
 ### Logging
 
+`SDKLogger` and `LogLevel` are part of the internal subpath
+(`@runanywhere/core/internal`) and not the stable root surface — the API may
+change between releases. Import from the internal subpath explicitly if you
+need them, otherwise prefer console/your own logger plus the EventBus stream
+for stable observability.
+
 ```typescript
-import { SDKLogger, LogLevel } from '@runanywhere/core';
+import { SDKLogger, LogLevel } from '@runanywhere/core/internal';
 
 // Set global log level
 RunAnywhere.setLogLevel(LogLevel.Debug);
@@ -462,64 +474,84 @@ logger.error('Error message', new Error('...'));
 
 ### Enums
 
+Only `SDKEnvironment` is re-exported from the `@runanywhere/core` root barrel.
+All other generated enums (`ExecutionTarget`, `InferenceFramework`,
+`ModelCategory`, `ModelFormat`, `HardwareAcceleration`, `ComponentState`, …)
+live in `@runanywhere/proto-ts/model_types` and should be imported directly
+from there.
+
 ```typescript
+import { SDKEnvironment } from '@runanywhere/core';
 import {
-  SDKEnvironment,
   ExecutionTarget,
   InferenceFramework,
   ModelCategory,
   ModelFormat,
   HardwareAcceleration,
   ComponentState,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/model_types';
 ```
 
 ### Interfaces
 
+The `@runanywhere/core` root barrel exports `SDKInitOptions`, `ToolExecutor`,
+`EventBus` types (`EventBusCancellable`, `SDKEventHandler`), and the plugin
+loader types (`PluginInfo`, `PluginLoaderCapability`). All other interfaces are
+proto-generated DTOs and should be imported from `@runanywhere/proto-ts/*`:
+
 ```typescript
+import type {
+  SDKInitOptions,
+  ToolExecutor,
+  EventBusCancellable,
+  SDKEventHandler,
+  PluginInfo,
+  PluginLoaderCapability,
+} from '@runanywhere/core';
+
 import type {
   // Models
   ModelInfo,
   StorageInfo,
-
-  // Generation (proto-generated)
+  // Generation
   LLMGenerationOptions,
   LLMGenerationResult,
   PerformanceMetrics,
+  // Download
+  DownloadProgress,
+} from '@runanywhere/proto-ts/model_types';
 
-  // Tool Calling
+import type {
+  STTOptions,
+  STTResult,
+} from '@runanywhere/proto-ts/stt_options';
+
+import type {
+  TTSConfiguration,
+  TTSResult,
+} from '@runanywhere/proto-ts/tts_options';
+
+import type {
   ToolDefinition,
   ToolParameter,
   ToolCall,
   ToolResult,
-  ToolExecutor,
   RegisteredTool,
   ToolCallingOptions,
   ToolCallingResult,
-
-  // Structured Output
   JSONSchema,
   StructuredOutputOptions,
   StructuredOutputResult,
   EntityExtractionResult,
   ClassificationResult,
+} from '@runanywhere/proto-ts/llm_options';
 
-  // Voice
-  STTOptions,
-  STTResult,
-  TTSConfiguration,
-  TTSResult,
-  VADConfiguration,
-
-  // Events
+import type {
   SDKEvent,
   SDKGenerationEvent,
   SDKModelEvent,
   SDKVoiceEvent,
-
-  // Download
-  DownloadProgress,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/sdk_events';
 ```
 
 ---
@@ -529,40 +561,48 @@ import type {
 ```
 packages/core/
 ├── src/
-│   ├── index.ts                    # Package exports
+│   ├── index.ts                    # Public package exports (RunAnywhere
+│   │                               #   facade + SDKException + proto re-exports)
+│   ├── internal.ts                 # `@runanywhere/core/internal` provider /
+│   │                               #   plugin plumbing
 │   ├── Public/
 │   │   ├── RunAnywhere.ts          # Main API singleton
-│   │   ├── Events/
-│   │   │   └── RunAnywhere+SDKEvents.ts
+│   │   ├── Events/                 # EventBus (public)
 │   │   └── Extensions/             # API method implementations
 │   │       ├── LLM/RunAnywhere+TextGeneration.ts
 │   │       ├── LLM/RunAnywhere+ToolCalling.ts
 │   │       ├── LLM/RunAnywhere+StructuredOutput.ts
+│   │       ├── LLM/RunAnywhere+LoRA.ts
 │   │       ├── STT/RunAnywhere+STT.ts
 │   │       ├── TTS/RunAnywhere+TTS.ts
 │   │       ├── VAD/RunAnywhere+VAD.ts
+│   │       ├── VLM/RunAnywhere+VisionLanguage.ts
 │   │       ├── VoiceAgent/RunAnywhere+VoiceAgent.ts
-│   │       └── ...
+│   │       ├── Models/             # Model lifecycle + downloads
+│   │       ├── Storage/RunAnywhere+Storage.ts
+│   │       ├── Solutions/          # Convenience solutions
+│   │       ├── RAG/RunAnywhere+RAG.ts
+│   │       ├── RunAnywhere+Hardware.ts
+│   │       ├── RunAnywhere+Logging.ts
+│   │       └── RunAnywhere+PluginLoader.ts
 │   ├── Foundation/
-│   │   ├── ErrorTypes/             # SDK errors
+│   │   ├── Constants/              # Config defaults
+│   │   ├── Errors/                 # SDKException + proto re-exports
 │   │   ├── Initialization/         # Init state machine
-│   │   ├── Security/               # Secure storage
-│   │   ├── Logging/                # Logger
-│   │   └── DependencyInjection/    # Service registry
-│   ├── Infrastructure/
-│   │   └── Events/                 # Event internals
+│   │   └── Logging/                # SDKLogger
+│   ├── Adapters/                   # VoiceAgent stream adapter
 │   ├── Features/
-│   │   └── VoiceSession/           # Voice session
+│   │   └── VoiceSession/           # Voice session + audio playback
+│   ├── Internal/
+│   │   └── Nitro/                  # NitroModules accessor wrappers
 │   ├── services/
 │   │   ├── ProtoBytes.ts           # ArrayBuffer/protobuf conversion
 │   │   └── Network/                # Telemetry/config wrappers
-│   ├── types/                      # TypeScript types
-│   │   ├── enums.ts                # RN-only enums + proto re-exports
-│   │   ├── LLMTypes.ts             # RN-local LLM streaming primitives
+│   ├── specs/                      # Nitro HybridObject TS specs
+│   ├── types/                      # TypeScript-only call-site types
 │   │   ├── models.ts               # Registry + init shapes
-│   │   └── ...                     # Tool / structured-output types
-│   │                               #   come from @runanywhere/proto-ts
-│   └── native/                     # Native module access
+│   │   └── external.d.ts           # External module declarations
+│   └── native/                     # NitroModules native module access
 ├── cpp/                            # C++ HybridObject bridges
 │   ├── HybridRunAnywhereCore.cpp   # Core native bridge
 │   └── bridges/                    # Platform adapters and native ABI bridges

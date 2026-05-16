@@ -206,6 +206,7 @@ class RunAnywhereSTT {
             return;
           }
 
+          var sawTerminalEvent = false;
           nativeCb = NativeCallable<RacSttStreamEventCallbackNative>.listener((
             Pointer<Uint8> bytesPtr,
             int bytesLen,
@@ -221,6 +222,11 @@ class RunAnywhereSTT {
                       isFinal: event.kind ==
                           STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL,
                     );
+              if (partial.isFinal ||
+                  event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL ||
+                  event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+                sawTerminalEvent = true;
+              }
               controller.add(partial);
             } catch (e, st) {
               controller.addError(e, st);
@@ -236,6 +242,17 @@ class RunAnywhereSTT {
               nativeCb!.nativeFunction,
               nullptr,
             );
+            // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
+            // `rac_stt_transcribe_stream_lifecycle_proto` is a blocking
+            // synchronous FFI call. While it runs, the main isolate's event
+            // loop is frozen, so NativeCallable.listener invocations queue up
+            // but do not execute. Yield to the event loop a few times so
+            // queued partial/final callbacks can drain before the controller
+            // is closed in the finally block — otherwise subscribers receive
+            // an empty stream even though native emitted partial/final events.
+            for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
+              await Future<void>.delayed(Duration.zero);
+            }
             if (code != 0) {
               controller.addError(StateError(
                 'rac_stt_transcribe_stream_lifecycle_proto failed: code=$code',

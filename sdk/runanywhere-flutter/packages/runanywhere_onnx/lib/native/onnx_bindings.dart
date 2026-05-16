@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
@@ -29,6 +30,17 @@ class OnnxBindings {
   // Function pointers - only registration functions
   late final RacBackendOnnxRegisterDart? _register;
   late final RacBackendOnnxUnregisterDart? _unregister;
+
+  // Sherpa registration. On Android the librac_backend_sherpa.so is preloaded
+  // by OnnxPlugin.kt; on iOS the symbol comes from the statically linked
+  // XCFramework. We bind the explicit register entry point if exported and
+  // fall back to the plugin-entry + plugin-register pair (Swift parity)
+  // when the wrapper symbol is unavailable.
+  late final RacBackendSherpaRegisterDart? _sherpaRegister;
+  late final RacBackendSherpaUnregisterDart? _sherpaUnregister;
+  late final RacPluginEntrySherpaDart? _sherpaPluginEntry;
+  late final RacPluginRegisterDart? _pluginRegister;
+  late final RacPluginUnregisterDart? _pluginUnregister;
 
   /// Create bindings using the appropriate library for each platform.
   ///
@@ -102,19 +114,33 @@ class OnnxBindings {
   }
 
   void _bindFunctions() {
-    // Backend registration - from RABackendONNX
-    try {
-      _register = _lib.lookupFunction<RacBackendOnnxRegisterNative,
-          RacBackendOnnxRegisterDart>('rac_backend_onnx_register');
-    } catch (_) {
-      _register = null;
-    }
+    _register = _lookup<RacBackendOnnxRegisterNative,
+        RacBackendOnnxRegisterDart>('rac_backend_onnx_register');
+    _unregister = _lookup<RacBackendOnnxUnregisterNative,
+        RacBackendOnnxUnregisterDart>('rac_backend_onnx_unregister');
 
+    // Sherpa lifecycle. Prefer the explicit wrapper (Android dynamic linkage);
+    // if absent (iOS XCFramework drops the wrapper), bind the plugin-entry
+    // pair so we can register Sherpa through the unified plugin registry.
+    _sherpaRegister = _lookup<RacBackendSherpaRegisterNative,
+        RacBackendSherpaRegisterDart>('rac_backend_sherpa_register');
+    _sherpaUnregister = _lookup<RacBackendSherpaUnregisterNative,
+        RacBackendSherpaUnregisterDart>('rac_backend_sherpa_unregister');
+    _sherpaPluginEntry = _lookup<RacPluginEntrySherpaNative,
+        RacPluginEntrySherpaDart>('rac_plugin_entry_sherpa');
+    _pluginRegister =
+        _lookup<RacPluginRegisterNative, RacPluginRegisterDart>(
+            'rac_plugin_register');
+    _pluginUnregister =
+        _lookup<RacPluginUnregisterNative, RacPluginUnregisterDart>(
+            'rac_plugin_unregister');
+  }
+
+  T? _lookup<NF extends Function, T extends Function>(String symbol) {
     try {
-      _unregister = _lib.lookupFunction<RacBackendOnnxUnregisterNative,
-          RacBackendOnnxUnregisterDart>('rac_backend_onnx_unregister');
+      return _lib.lookupFunction<NF, T>(symbol);
     } catch (_) {
-      _unregister = null;
+      return null;
     }
   }
 
@@ -140,6 +166,47 @@ class OnnxBindings {
     }
     return _unregister();
   }
+
+  /// Register the Sherpa engine plugin with the unified plugin registry.
+  ///
+  /// Mirrors Swift `ONNX.registerSherpaPlugin()`: on Android we call the
+  /// explicit `rac_backend_sherpa_register()` wrapper exported by
+  /// librac_backend_sherpa.so; on iOS/static hosts the wrapper is not
+  /// exported, so we fall back to `rac_plugin_register(rac_plugin_entry_sherpa())`.
+  ///
+  /// Returns RAC_SUCCESS / RAC_ERROR_MODULE_ALREADY_REGISTERED on success.
+  int registerSherpa() {
+    if (_sherpaRegister != null) {
+      return _sherpaRegister();
+    }
+    final entry = _sherpaPluginEntry;
+    final register = _pluginRegister;
+    if (entry == null || register == null) {
+      return RacResultCode.errorNotSupported;
+    }
+    final vtable = entry();
+    if (vtable == nullptr) {
+      return RacResultCode.errorNotSupported;
+    }
+    return register(vtable);
+  }
+
+  /// Unregister the Sherpa engine plugin.
+  int unregisterSherpa() {
+    if (_sherpaUnregister != null) {
+      return _sherpaUnregister();
+    }
+    final unregister = _pluginUnregister;
+    if (unregister == null) {
+      return RacResultCode.errorNotSupported;
+    }
+    final name = 'sherpa'.toNativeUtf8();
+    try {
+      return unregister(name.cast<Char>());
+    } finally {
+      malloc.free(name);
+    }
+  }
 }
 
 // FFI type definitions for ONNX backend registration
@@ -147,3 +214,19 @@ typedef RacBackendOnnxRegisterNative = Int32 Function();
 typedef RacBackendOnnxRegisterDart = int Function();
 typedef RacBackendOnnxUnregisterNative = Int32 Function();
 typedef RacBackendOnnxUnregisterDart = int Function();
+
+// FFI type definitions for Sherpa backend registration
+typedef RacBackendSherpaRegisterNative = Int32 Function();
+typedef RacBackendSherpaRegisterDart = int Function();
+typedef RacBackendSherpaUnregisterNative = Int32 Function();
+typedef RacBackendSherpaUnregisterDart = int Function();
+
+// FFI type definitions for the unified plugin registry. The vtable is an
+// opaque pointer here - we do not dereference it from Dart, the C registry
+// validates and stores it internally.
+typedef RacPluginEntrySherpaNative = Pointer<Void> Function();
+typedef RacPluginEntrySherpaDart = Pointer<Void> Function();
+typedef RacPluginRegisterNative = Int32 Function(Pointer<Void>);
+typedef RacPluginRegisterDart = int Function(Pointer<Void>);
+typedef RacPluginUnregisterNative = Int32 Function(Pointer<Char>);
+typedef RacPluginUnregisterDart = int Function(Pointer<Char>);

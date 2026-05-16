@@ -7,6 +7,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { ToolCall, ToolResult } from "./tool_calling";
 import { TokenKind, tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
@@ -92,6 +93,22 @@ export interface LLMGenerateRequest {
   /**
    * Additional LLMGenerationOptions fields kept inline to avoid a codegen
    * package cycle between service stubs and option messages.
+   *
+   * idl-002: Intentionally omitted from this streaming request (no current
+   * streaming consumer; route them through the non-streaming
+   * rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+   *   - thinking_pattern (LLMGenerationOptions field 11)
+   *   - structured_output (LLMGenerationOptions field 13)
+   *   - enable_real_time_tracking (LLMGenerationOptions field 14)
+   *   - repeat_last_n (LLMGenerationOptions field 18)
+   *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+   *     is not yet supported on the LLM.Generate rpc; tool sessions must
+   *     use the non-streaming generation path with LLMGenerationOptions.
+   * Additionally, preferred_framework (field 11) and execution_target
+   * (field 13) are degraded to `string` here instead of the InferenceFramework
+   * / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
+   * Callers must use the canonical enum string values (see
+   * llm_options.proto:69 and :85). See also synthesis idl-002.
    */
   repetitionPenalty: number;
   stopSequences: string[];
@@ -138,6 +155,14 @@ export interface LLMStreamFinalResult {
   errorMessage: string;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
+  /**
+   * hotspot-idl-002: tool calls actually executed during the streaming
+   * session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+   * llm_options.proto). Populated only on terminal events when the
+   * backend completed at least one tool call.
+   */
+  toolCalls: ToolCall[];
+  toolResults: ToolResult[];
 }
 
 /**
@@ -208,6 +233,13 @@ export interface LLMStreamEvent {
   promptTokensProcessed: number;
   completionTokensGenerated: number;
   elapsedMs: number;
+  /**
+   * hotspot-idl-002: structured tool-call payload emitted alongside an
+   * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+   * field the tool-call event kind carries no proto-typed payload and
+   * SDK consumers must fall back to JSON-parsing the raw `token` text.
+   */
+  toolCall?: ToolCall | undefined;
 }
 
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
@@ -769,6 +801,8 @@ function createBaseLLMStreamFinalResult(): LLMStreamFinalResult {
     errorMessage: "",
     promptEvalTimeMs: 0,
     decodeTimeMs: 0,
+    toolCalls: [],
+    toolResults: [],
   };
 }
 
@@ -812,6 +846,12 @@ export const LLMStreamFinalResult = {
     }
     if (message.decodeTimeMs !== 0) {
       writer.uint32(104).int64(message.decodeTimeMs);
+    }
+    for (const v of message.toolCalls) {
+      ToolCall.encode(v!, writer.uint32(114).fork()).ldelim();
+    }
+    for (const v of message.toolResults) {
+      ToolResult.encode(v!, writer.uint32(122).fork()).ldelim();
     }
     return writer;
   },
@@ -914,6 +954,20 @@ export const LLMStreamFinalResult = {
 
           message.decodeTimeMs = longToNumber(reader.int64() as Long);
           continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
+          continue;
+        case 15:
+          if (tag !== 122) {
+            break;
+          }
+
+          message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -938,6 +992,12 @@ export const LLMStreamFinalResult = {
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
       promptEvalTimeMs: isSet(object.promptEvalTimeMs) ? globalThis.Number(object.promptEvalTimeMs) : 0,
       decodeTimeMs: isSet(object.decodeTimeMs) ? globalThis.Number(object.decodeTimeMs) : 0,
+      toolCalls: globalThis.Array.isArray(object?.toolCalls)
+        ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
+        : [],
+      toolResults: globalThis.Array.isArray(object?.toolResults)
+        ? object.toolResults.map((e: any) => ToolResult.fromJSON(e))
+        : [],
     };
   },
 
@@ -982,6 +1042,12 @@ export const LLMStreamFinalResult = {
     if (message.decodeTimeMs !== 0) {
       obj.decodeTimeMs = Math.round(message.decodeTimeMs);
     }
+    if (message.toolCalls?.length) {
+      obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
+    }
+    if (message.toolResults?.length) {
+      obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
+    }
     return obj;
   },
 
@@ -1003,6 +1069,8 @@ export const LLMStreamFinalResult = {
     message.errorMessage = object.errorMessage ?? "";
     message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
     message.decodeTimeMs = object.decodeTimeMs ?? 0;
+    message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
+    message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
     return message;
   },
 };
@@ -1026,6 +1094,7 @@ function createBaseLLMStreamEvent(): LLMStreamEvent {
     promptTokensProcessed: 0,
     completionTokensGenerated: 0,
     elapsedMs: 0,
+    toolCall: undefined,
   };
 }
 
@@ -1081,6 +1150,9 @@ export const LLMStreamEvent = {
     }
     if (message.elapsedMs !== 0) {
       writer.uint32(136).int64(message.elapsedMs);
+    }
+    if (message.toolCall !== undefined) {
+      ToolCall.encode(message.toolCall, writer.uint32(146).fork()).ldelim();
     }
     return writer;
   },
@@ -1211,6 +1283,13 @@ export const LLMStreamEvent = {
 
           message.elapsedMs = longToNumber(reader.int64() as Long);
           continue;
+        case 18:
+          if (tag !== 146) {
+            break;
+          }
+
+          message.toolCall = ToolCall.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1241,6 +1320,7 @@ export const LLMStreamEvent = {
         ? globalThis.Number(object.completionTokensGenerated)
         : 0,
       elapsedMs: isSet(object.elapsedMs) ? globalThis.Number(object.elapsedMs) : 0,
+      toolCall: isSet(object.toolCall) ? ToolCall.fromJSON(object.toolCall) : undefined,
     };
   },
 
@@ -1297,6 +1377,9 @@ export const LLMStreamEvent = {
     if (message.elapsedMs !== 0) {
       obj.elapsedMs = Math.round(message.elapsedMs);
     }
+    if (message.toolCall !== undefined) {
+      obj.toolCall = ToolCall.toJSON(message.toolCall);
+    }
     return obj;
   },
 
@@ -1324,6 +1407,9 @@ export const LLMStreamEvent = {
     message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
     message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
     message.elapsedMs = object.elapsedMs ?? 0;
+    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+      ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
     return message;
   },
 };

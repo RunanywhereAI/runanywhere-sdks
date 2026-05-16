@@ -12,8 +12,9 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import okio.ByteString.Companion.decodeBase64
+import okio.ByteString.Companion.toByteString
 import java.io.File
-import java.util.Base64
 
 /**
  * Platform adapter that provides JNI callbacks for C++ core operations.
@@ -471,17 +472,20 @@ object CppBridgePlatformAdapter {
 
     fun secureGet(key: String): String? {
         val value = secureGetCallback(key) ?: return null
-        return Base64.getEncoder().encodeToString(value)
+        // Use okio.ByteString.base64() instead of java.util.Base64 so the
+        // JNI secure-storage callback path stays compatible with minSdk 24
+        // (java.util.Base64 is API 26+; the AAR currently has no core-library
+        // desugaring configured).
+        return value.toByteString().base64()
     }
 
     fun secureSet(key: String, value: String): Boolean {
-        return try {
-            val bytes = Base64.getDecoder().decode(value)
-            secureSetCallback(key, bytes)
-        } catch (e: Exception) {
-            logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: ${e.message}")
-            false
-        }
+        val bytes = value.decodeBase64()
+            ?: run {
+                logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: invalid base64 payload")
+                return false
+            }
+        return secureSetCallback(key, bytes.toByteArray())
     }
 
     fun secureDelete(key: String): Boolean = secureDeleteCallback(key)

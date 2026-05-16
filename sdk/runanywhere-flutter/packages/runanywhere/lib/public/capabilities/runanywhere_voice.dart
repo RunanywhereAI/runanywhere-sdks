@@ -37,11 +37,19 @@ class RunAnywhereVoice {
   static final RunAnywhereVoice _instance = RunAnywhereVoice._();
   static RunAnywhereVoice get shared => _instance;
 
-  /// True when STT + LLM + TTS are all loaded.
+  /// True when STT + LLM + TTS are all loaded through commons lifecycle.
+  ///
+  /// Reads each capability's lifecycle-backed `isLoaded` getter
+  /// (`COMPONENT_LIFECYCLE_STATE_READY` + non-empty modelId), NOT the legacy
+  /// DartBridge component handles. The new public load APIs
+  /// (`RunAnywhere.{stt,llm,tts}.load`) route through
+  /// `RunAnywhereModelLifecycle.shared.load(...)` and never set the legacy
+  /// DartBridge handles, so checking those would report false even after a
+  /// successful load.
   bool get isReady =>
-      DartBridge.stt.isLoaded &&
-      DartBridge.llm.isLoaded &&
-      DartBridge.tts.isLoaded;
+      RunAnywhereSTT.shared.isLoaded &&
+      RunAnywhereLLM.shared.isLoaded &&
+      RunAnywhereTTS.shared.isLoaded;
 
   /// Snapshot of STT/LLM/TTS load state — useful to surface readiness
   /// in voice-agent UI without firing off three separate getters.

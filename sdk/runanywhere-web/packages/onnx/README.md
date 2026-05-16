@@ -4,13 +4,17 @@ Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) b
 
 > **Current blocker:** This package does not publish a standalone speech WASM bundle. It registers against the unified RACommons WASM module, and real STT/TTS/VAD runtime support requires ONNX Runtime and Sherpa-ONNX/Piper/eSpeak WASM static archives to be present under `sdk/runanywhere-commons/third_party/*-wasm` before building. Until `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` exist in the active artifact, these APIs correctly report backend unavailable.
 
-> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
+> **Peer dependencies:**
+> - Required: [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
+> - Required for the default WASM artifact: [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) `>=0.19.13 <1` (declared as an optional peer; see "WASM Files" below for the standalone-artifact alternative)
 
 ## Installation
 
 ```bash
-npm install @runanywhere/web @runanywhere/web-onnx
+npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
 ```
+
+`@runanywhere/web-llamacpp` ships the unified RACommons WASM artifact that this package's backend registration shell loads by default. Apps that pre-register `LlamaCPP` (or pass an explicit `wasmUrl` to `ONNX.register()`) can omit it.
 
 ## Quick Start
 

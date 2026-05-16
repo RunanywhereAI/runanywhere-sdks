@@ -1216,6 +1216,23 @@ add_custom_command(TARGET runanywhere_wasm POST_BUILD
     COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
 )
 
+# When pthreads are enabled, Emscripten emits a companion worker script
+# (`<output>.worker.js`) that the main module fetches at runtime to spawn
+# pthread workers. The package layout requires this file next to the glue
+# JS / .wasm pair; without it, browser module init fails with a worker
+# fetch error. Stage it post-build and fail the build if it's missing —
+# build.sh defaults PTHREADS=ON, so a missing worker would silently break
+# every release artifact.
+if(RAC_WASM_PTHREADS)
+    add_custom_command(TARGET runanywhere_wasm POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
+            "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
+        COMMENT "Copying ${WASM_OUTPUT_NAME}.worker.js (pthread worker) to packages/llamacpp/wasm/"
+        VERBATIM
+    )
+endif()
+
 # =============================================================================
 # SUMMARY
 # =============================================================================

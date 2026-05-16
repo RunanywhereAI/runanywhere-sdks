@@ -32,8 +32,12 @@ Host apps that capture audio still need the platform microphone permission.
 ## Usage
 
 ```typescript
-import { RunAnywhere, InferenceFramework, ModelCategory } from '@runanywhere/core';
-import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
+import { RunAnywhere } from '@runanywhere/core';
+import {
+  InferenceFramework,
+  ModelCategory,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import { ONNX } from '@runanywhere/onnx';
 
 await RunAnywhere.initialize();

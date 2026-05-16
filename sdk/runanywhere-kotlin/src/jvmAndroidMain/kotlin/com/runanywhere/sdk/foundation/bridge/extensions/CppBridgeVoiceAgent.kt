@@ -35,7 +35,6 @@ import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.atomic.AtomicLong
 
 private fun <M : Message<M, *>> decodeOrThrow(
     adapter: ProtoAdapter<M>,
@@ -60,8 +59,22 @@ private fun <M : Message<M, *>> decodeOrThrow(
 object CppBridgeVoiceAgent {
     private const val INVALID_HANDLE: Long = 0L
     private val logger = SDKLogger("CppBridgeVoiceAgent")
-    private val handleRef = AtomicLong(INVALID_HANDLE)
+
+    /**
+     * Single coroutine [Mutex] guards both the stored handle slot AND the
+     * lifetime of in-flight native operations. All public APIs are suspend
+     * and serialize through this mutex so destroy() cannot interleave with
+     * an in-flight processVoiceTurnProto/getHandle/cleanup/initialize call.
+     *
+     * Mirrors Swift's `CppBridge.VoiceAgent` actor isolation — there, the
+     * compiler enforces that destroy() waits for the in-flight native call
+     * to finish before freeing the underlying rac_voice_agent_handle_t.
+     */
     private val mutex = Mutex()
+
+    /** Reads outside the lock are best-effort snapshots for non-state APIs. */
+    @Volatile
+    private var handle: Long = INVALID_HANDLE
 
     /**
      * Allocate a bare voice-agent handle without initialising it against any
@@ -73,22 +86,22 @@ object CppBridgeVoiceAgent {
      * to already be loaded and composes a handle over them via
      * `rac_voice_agent_create(...)`.
      */
-    @Synchronized
-    fun getRawHandle(): Long {
-        val existing = handleRef.get()
-        if (existing != INVALID_HANDLE) return existing
+    suspend fun getRawHandle(): Long =
+        mutex.withLock {
+            val existing = handle
+            if (existing != INVALID_HANDLE) return@withLock existing
 
-        val newHandle = RunAnywhereBridge.racVoiceAgentCreateStandalone()
-        if (newHandle == INVALID_HANDLE) {
-            throw IllegalStateException(
-                "rac_voice_agent_create_standalone returned 0 — " +
-                    "likely OOM or missing rac_commons linkage.",
-            )
+            val newHandle = RunAnywhereBridge.racVoiceAgentCreateStandalone()
+            if (newHandle == INVALID_HANDLE) {
+                throw IllegalStateException(
+                    "rac_voice_agent_create_standalone returned 0 — " +
+                        "likely OOM or missing rac_commons linkage.",
+                )
+            }
+            handle = newHandle
+            logger.info("Voice agent handle created: $newHandle")
+            newHandle
         }
-        handleRef.set(newHandle)
-        logger.info("Voice agent handle created: $newHandle")
-        return newHandle
-    }
 
     /**
      * Get or create the voice-agent composite handle.
@@ -104,17 +117,20 @@ object CppBridgeVoiceAgent {
      *         C side maps to `rac_voice_agent_create` failing — typically
      *         because one of the sub-handles is invalid).
      */
-    suspend fun getHandle(): Long =
-        mutex.withLock {
-            val existing = handleRef.get()
+    suspend fun getHandle(): Long {
+        // Sub-component actors take their own mutexes, so we must NOT hold
+        // this mutex while awaiting them or we risk an A→B/B→A deadlock with
+        // a concurrent cleanup() that already holds this mutex and tries to
+        // re-enter an LLM/STT/TTS/VAD actor.
+        val llmHandle = CppBridgeLLM.getHandle()
+        val sttHandle = CppBridgeSTT.getHandle()
+        val ttsHandle = CppBridgeTTS.getHandle()
+        val vadHandle = CppBridgeVAD.getHandle()
+
+        return mutex.withLock {
+            val existing = handle
             if (existing != INVALID_HANDLE) return@withLock existing
 
-            // Mirror Swift CppBridge+VoiceAgent: pull a handle from each
-            // sub-component actor.
-            val llmHandle = CppBridgeLLM.getHandle()
-            val sttHandle = CppBridgeSTT.getHandle()
-            val ttsHandle = CppBridgeTTS.getHandle()
-            val vadHandle = CppBridgeVAD.getHandle()
             logger.debug(
                 "Composing voice agent over sub-handles: " +
                     "llm=$llmHandle, stt=$sttHandle, tts=$ttsHandle, vad=$vadHandle",
@@ -135,16 +151,17 @@ object CppBridgeVoiceAgent {
                 )
             }
 
-            handleRef.set(newHandle)
+            handle = newHandle
             logger.info("Voice agent composed: $newHandle")
             newHandle
         }
+    }
 
     /** True when a voice-agent handle exists AND the C layer reports ready. */
     fun isReady(): Boolean {
-        val handle = handleRef.get()
-        if (handle == INVALID_HANDLE) return false
-        return RunAnywhereBridge.racVoiceAgentIsReady(handle)
+        val h = handle
+        if (h == INVALID_HANDLE) return false
+        return RunAnywhereBridge.racVoiceAgentIsReady(h)
     }
 
     /**
@@ -155,45 +172,53 @@ object CppBridgeVoiceAgent {
      */
     suspend fun cleanup() =
         mutex.withLock {
-            val handle = handleRef.get()
-            if (handle == INVALID_HANDLE) return@withLock
-            val result = RunAnywhereBridge.racVoiceAgentCleanup(handle)
+            val h = handle
+            if (h == INVALID_HANDLE) return@withLock
+            val result = RunAnywhereBridge.racVoiceAgentCleanup(h)
             if (result != 0) {
-                logger.warn("rac_voice_agent_cleanup returned $result for handle $handle")
+                logger.warn("rac_voice_agent_cleanup returned $result for handle $h")
             } else {
-                logger.info("Voice agent cleaned up: $handle")
+                logger.info("Voice agent cleaned up: $h")
             }
         }
 
     /**
-     * Release the handle + its owned component handles. Safe to call
-     * multiple times; subsequent getHandle() calls re-allocate.
+     * Release the handle + its owned component handles. Suspends behind the
+     * same [mutex] as in-flight native operations so destroy waits for the
+     * current processVoiceTurnProto / getHandle / cleanup to finish before
+     * freeing the C-side rac_voice_agent_handle_t. Safe to call multiple
+     * times; subsequent getHandle() calls re-allocate.
      */
-    @Synchronized
-    fun destroy() {
-        val existing = handleRef.getAndSet(INVALID_HANDLE)
-        if (existing != INVALID_HANDLE) {
-            RunAnywhereBridge.racVoiceAgentDestroy(existing)
-            logger.info("Voice agent handle destroyed: $existing")
+    suspend fun destroy() =
+        mutex.withLock {
+            val existing = handle
+            if (existing != INVALID_HANDLE) {
+                RunAnywhereBridge.racVoiceAgentDestroy(existing)
+                handle = INVALID_HANDLE
+                logger.info("Voice agent handle destroyed: $existing")
+            }
         }
-    }
 
-    fun initialize(handle: Long, config: RAVoiceAgentComposeConfig): RAVoiceAgentComponentStates =
-        decodeOrThrow(
-            VoiceAgentComponentStates.ADAPTER,
-            RunAnywhereBridge.racVoiceAgentInitializeProto(
-                handle,
-                VoiceAgentComposeConfig.ADAPTER.encode(config),
-            ),
-            "racVoiceAgentInitializeProto",
-        )
+    suspend fun initialize(handle: Long, config: RAVoiceAgentComposeConfig): RAVoiceAgentComponentStates =
+        mutex.withLock {
+            decodeOrThrow(
+                VoiceAgentComponentStates.ADAPTER,
+                RunAnywhereBridge.racVoiceAgentInitializeProto(
+                    handle,
+                    VoiceAgentComposeConfig.ADAPTER.encode(config),
+                ),
+                "racVoiceAgentInitializeProto",
+            )
+        }
 
-    fun states(handle: Long): RAVoiceAgentComponentStates =
-        decodeOrThrow(
-            VoiceAgentComponentStates.ADAPTER,
-            RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),
-            "racVoiceAgentComponentStatesProto",
-        )
+    suspend fun states(handle: Long): RAVoiceAgentComponentStates =
+        mutex.withLock {
+            decodeOrThrow(
+                VoiceAgentComponentStates.ADAPTER,
+                RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),
+                "racVoiceAgentComponentStatesProto",
+            )
+        }
 
     /**
      * Process one voice turn end-to-end (VAD → STT → LLM → TTS) over the
@@ -202,7 +227,8 @@ object CppBridgeVoiceAgent {
      * `rac_voice_agent_process_voice_turn_proto`.
      *
      * The handle is resolved via [getHandle], composing the underlying LLM /
-     * STT / TTS / VAD sub-handles on first call.
+     * STT / TTS / VAD sub-handles on first call. The native call runs under
+     * the same [mutex] so destroy() cannot free the handle mid-call.
      *
      * @param audioBytes raw audio data for the turn (PCM16 mono unless the
      *   component is configured otherwise).
@@ -211,11 +237,21 @@ object CppBridgeVoiceAgent {
      * @throws SDKException when the C ABI returns null or decoding fails.
      */
     suspend fun processVoiceTurnProto(audioBytes: ByteArray): VoiceAgentResult {
-        val handle = getHandle()
-        return decodeOrThrow(
-            VoiceAgentResult.ADAPTER,
-            RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(handle, audioBytes),
-            "racVoiceAgentProcessVoiceTurnProto",
-        )
+        // Ensure handle exists before taking the per-call lock. getHandle()
+        // re-enters this mutex internally so it must run outside withLock.
+        getHandle()
+        return mutex.withLock {
+            val h = handle
+            if (h == INVALID_HANDLE) {
+                throw SDKException.voiceAgent(
+                    "rac_voice_agent_process_voice_turn_proto: handle destroyed before call",
+                )
+            }
+            decodeOrThrow(
+                VoiceAgentResult.ADAPTER,
+                RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(h, audioBytes),
+                "racVoiceAgentProcessVoiceTurnProto",
+            )
+        }
     }
 }

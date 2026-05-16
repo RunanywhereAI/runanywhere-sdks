@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.mapNotNull
 
 /**
  * Central event bus for SDK-wide event distribution.
@@ -117,12 +118,46 @@ object EventBus {
     }
 
     /**
-     * Get events of a specific type.
+     * Extract a specific payload type from the proto envelope stream.
+     *
+     * Replaces the pre-proto `eventsOfType<T : SDKEvent>()` API. The
+     * generated `SDKEvent` is the top-level Wire envelope with optional
+     * `oneof` payload fields (model, generation, voice, etc.); payload
+     * types like [ModelEvent] are sibling messages, not subclasses, so
+     * the old `is T` filter could not work. Use the per-payload helpers
+     * below for common cases, or call this directly:
+     *
+     * ```kotlin
+     * RunAnywhere.events
+     *     .eventsOfPayload { it.model }
+     *     .collect { modelEvent: ModelEvent -> ... }
+     * ```
      */
-    @Suppress("UNCHECKED_CAST")
-    inline fun <reified T : SDKEvent> eventsOfType(): Flow<T> {
-        return events.filter { it is T } as Flow<T>
-    }
+    fun <T : Any> eventsOfPayload(selector: (SDKEvent) -> T?): Flow<T> = events.mapNotNull(selector)
+
+    /** Stream of [ModelEvent] payloads extracted from the SDKEvent envelope. */
+    val modelEventPayloads: Flow<ModelEvent>
+        get() = eventsOfPayload { it.model }
+
+    /** Stream of [GenerationEvent] payloads (LLM token + streaming generation events). */
+    val generationEventPayloads: Flow<GenerationEvent>
+        get() = eventsOfPayload { it.generation }
+
+    /** Stream of [VoiceEvent] payloads (voice-agent pipeline events). */
+    val voiceEventPayloads: Flow<VoiceEvent>
+        get() = eventsOfPayload { it.voice_pipeline }
+
+    /** Stream of [DownloadEvent] payloads (model download progress / lifecycle). */
+    val downloadEventPayloads: Flow<DownloadEvent>
+        get() = eventsOfPayload { it.download }
+
+    /** Stream of [ComponentLifecycleEvent] payloads. */
+    val componentLifecycleEventPayloads: Flow<ComponentLifecycleEvent>
+        get() = eventsOfPayload { it.component_lifecycle }
+
+    /** Stream of [ModelRegistryEvent] payloads. */
+    val modelRegistryEventPayloads: Flow<ModelRegistryEvent>
+        get() = eventsOfPayload { it.model_registry }
 
     // MARK: - Convenience Methods
 

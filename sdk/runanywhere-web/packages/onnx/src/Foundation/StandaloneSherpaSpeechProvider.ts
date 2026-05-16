@@ -92,6 +92,19 @@ class StandaloneSherpaSpeechProvider implements SpeechProvider {
     return this.module;
   }
 
+  /**
+   * Release all backend handles. Called by the core SDK shutdown/reset path
+   * via `disposeSpeechProvider()`. Safe to invoke multiple times.
+   */
+  async dispose(): Promise<void> {
+    await Promise.allSettled([
+      this.unloadVAD(),
+      this.unloadTTS(),
+      this.unloadSTT(),
+    ]);
+    this.module = null;
+  }
+
   // -------------------------------------------------------------------------
   // VAD
   // -------------------------------------------------------------------------
@@ -116,7 +129,7 @@ class StandaloneSherpaSpeechProvider implements SpeechProvider {
 
     const stagedPath = await stageModelInputBytes(module, request);
     const vad = new StandaloneSherpaVad(module);
-    vad.load({
+    await vad.load({
       modelPath: stagedPath,
       sampleRate: 16000,
       windowSize: 512,

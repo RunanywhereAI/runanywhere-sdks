@@ -85,24 +85,31 @@ public class ComponentActor(
      * Throws [SDKException] if the actor is already shut down or if the
      * native create call fails.
      */
-    public suspend fun getHandle(): Long =
-        mutex.withLock {
-            if (handle != 0L) {
-                return@withLock handle
-            }
-            if (closed) {
-                throw SDKException.notInitialized("${vtable.component.label} component is shut down")
-            }
-            val newHandle = vtable.create()
-            if (newHandle == 0L) {
-                throw SDKException.notInitialized(
-                    "Failed to create ${vtable.component.label} component",
-                )
-            }
-            handle = newHandle
-            logger.debug("${vtable.component.label} component created")
-            newHandle
+    public suspend fun getHandle(): Long = mutex.withLock { getOrCreateHandleLocked() }
+
+    /**
+     * Mutex-must-be-held variant of [getHandle]. Used by [loadModel] to
+     * keep the entire `create + native load + loadedAssetId update`
+     * sequence inside one critical section, so `unload()` / `destroy()`
+     * cannot interleave with an in-flight model load (Swift parity:
+     * Swift's `actor` isolates this naturally; Kotlin's `Mutex` is not
+     * reentrant so we extract the locked body into a private helper).
+     */
+    private fun getOrCreateHandleLocked(): Long {
+        if (handle != 0L) return handle
+        if (closed) {
+            throw SDKException.notInitialized("${vtable.component.label} component is shut down")
         }
+        val newHandle = vtable.create()
+        if (newHandle == 0L) {
+            throw SDKException.notInitialized(
+                "Failed to create ${vtable.component.label} component",
+            )
+        }
+        handle = newHandle
+        logger.debug("${vtable.component.label} component created")
+        return newHandle
+    }
 
     // MARK: - State queries
 
@@ -157,16 +164,25 @@ public class ComponentActor(
                 ?: throw SDKException.notImplemented(
                     "${vtable.component.label} does not support generic loadModel",
                 )
-        val h = getHandle()
-        val status = load(h, path, id, name)
-        if (status != 0) {
-            throw SDKException.modelLoadFailed(
-                modelId = id,
-                reason = "${vtable.component.label} model load failed: rc=$status",
-            )
+        // One serialized critical section: get-or-create the handle,
+        // run the native load, and publish loadedAssetId atomically so
+        // a concurrent unload()/destroy() cannot interleave with the
+        // in-flight native call (which would leave the asset id set
+        // for a freed handle). Mirrors Swift `ComponentActor.loadModel`
+        // (Sources/RunAnywhere/Foundation/Bridge/ComponentActor.swift)
+        // which runs the equivalent block under actor isolation.
+        mutex.withLock {
+            val h = getOrCreateHandleLocked()
+            val status = load(h, path, id, name)
+            if (status != 0) {
+                throw SDKException.modelLoadFailed(
+                    modelId = id,
+                    reason = "${vtable.component.label} model load failed: rc=$status",
+                )
+            }
+            loadedAssetId = id
+            logger.info("${vtable.component.label} model loaded: $id")
         }
-        loadedAssetId = id
-        logger.info("${vtable.component.label} model loaded: $id")
     }
 
     /**
@@ -174,10 +190,11 @@ public class ComponentActor(
      * C side. Used by modality-specific load paths that bypass this
      * scaffold's [loadModel] (e.g. modalities with non-standard load
      * signatures). Currently only VAD calls this to clear the asset id
-     * on unload.
+     * on unload. Serialized through the actor mutex so it cannot race
+     * with [loadModel] / [unload] / [destroy].
      */
-    public fun markAssetLoaded(id: String?) {
-        loadedAssetId = id
+    public suspend fun markAssetLoaded(id: String?) {
+        mutex.withLock { loadedAssetId = id }
     }
 
     /**

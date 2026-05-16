@@ -289,6 +289,89 @@ function modelListResult(models: ModelInfoList): ModelListResult {
 }
 
 // ---------------------------------------------------------------------------
+// Download progress multiplexer (HOTSPOT-RN-CORE-003)
+// ---------------------------------------------------------------------------
+//
+// The native side exposes a single process-wide
+// `setDownloadProgressCallbackProto` slot. Concurrent `downloadModel(id)`
+// iterators must share that slot, otherwise the most recent caller would
+// overwrite the previous iterator's callback and strand its progress events.
+//
+// This multiplexer registers the native callback exactly once, fan-outs each
+// inbound `DownloadProgress` to every subscriber whose `modelId` filter
+// matches, and only clears the native slot when the last subscriber leaves.
+// Subscribers are responsible for their own filtering/queueing semantics.
+type DownloadProgressSubscriber = (progress: DownloadProgress) => void;
+
+interface DownloadProgressEntry {
+  modelId: string;
+  callback: DownloadProgressSubscriber;
+}
+
+const downloadProgressSubscribers = new Set<DownloadProgressEntry>();
+let downloadProgressCallbackInstalled: Promise<void> | null = null;
+
+function dispatchDownloadProgress(progressBytes: ArrayBuffer): void {
+  const progress = DownloadProgressCodec.decode(arrayBufferToBytes(progressBytes));
+  // Snapshot the subscriber set before dispatch — handlers may unsubscribe
+  // synchronously on their terminal event, mutating the live set.
+  const snapshot = Array.from(downloadProgressSubscribers);
+  for (const entry of snapshot) {
+    if (progress.modelId && entry.modelId !== progress.modelId) continue;
+    try {
+      entry.callback(progress);
+    } catch {
+      // A misbehaving subscriber must not break the fan-out.
+    }
+  }
+}
+
+async function ensureNativeDownloadCallback(): Promise<void> {
+  if (downloadProgressCallbackInstalled) {
+    await downloadProgressCallbackInstalled;
+    return;
+  }
+  const native = requireNativeModule();
+  const pending = native
+    .setDownloadProgressCallbackProto(dispatchDownloadProgress)
+    .then(() => undefined)
+    .catch((err: unknown) => {
+      downloadProgressCallbackInstalled = null;
+      throw err;
+    });
+  downloadProgressCallbackInstalled = pending;
+  await pending;
+}
+
+async function clearNativeDownloadCallbackIfIdle(): Promise<void> {
+  if (downloadProgressSubscribers.size > 0) return;
+  if (!downloadProgressCallbackInstalled) return;
+  downloadProgressCallbackInstalled = null;
+  const native = requireNativeModule();
+  await native.clearDownloadProgressCallbackProto().catch(() => {});
+}
+
+async function subscribeToDownloadProgress(
+  entry: DownloadProgressEntry,
+): Promise<void> {
+  downloadProgressSubscribers.add(entry);
+  try {
+    await ensureNativeDownloadCallback();
+  } catch (err) {
+    downloadProgressSubscribers.delete(entry);
+    await clearNativeDownloadCallbackIfIdle();
+    throw err;
+  }
+}
+
+async function unsubscribeFromDownloadProgress(
+  entry: DownloadProgressEntry,
+): Promise<void> {
+  downloadProgressSubscribers.delete(entry);
+  await clearNativeDownloadCallbackIfIdle();
+}
+
+// ---------------------------------------------------------------------------
 // Download (canonical async iterable)
 // ---------------------------------------------------------------------------
 
@@ -387,6 +470,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
     [Symbol.asyncIterator](): AsyncIterator<DownloadProgress> {
       let started = false;
       let completed = false;
+      let subscribed = false;
       let activeTaskId: string | undefined;
       let modelForImport: ModelInfo | undefined;
       let completionImported = false;
@@ -396,23 +480,8 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
         | null = null;
       let streamError: Error | null = null;
 
-      const finish = () => {
-        completed = true;
-        if (resolver) {
-          resolver({
-            value: undefined as unknown as DownloadProgress,
-            done: true,
-          });
-          resolver = null;
-        }
-      };
-
-      const onBytes = (progressBytes: ArrayBuffer): void => {
+      const onProgress: DownloadProgressSubscriber = (progress) => {
         try {
-          const progress = DownloadProgressCodec.decode(
-            arrayBufferToBytes(progressBytes)
-          );
-          if (progress.modelId && progress.modelId !== modelId) return;
           if (resolver) {
             resolver({ value: progress, done: false });
             resolver = null;
@@ -425,16 +494,39 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
         }
       };
 
+      const subscriberEntry: DownloadProgressEntry = {
+        modelId,
+        callback: onProgress,
+      };
+
+      const teardownSubscription = async (): Promise<void> => {
+        if (!subscribed) return;
+        subscribed = false;
+        await unsubscribeFromDownloadProgress(subscriberEntry);
+      };
+
+      const finish = () => {
+        completed = true;
+        if (resolver) {
+          resolver({
+            value: undefined as unknown as DownloadProgress,
+            done: true,
+          });
+          resolver = null;
+        }
+      };
+
       const start = async (): Promise<void> => {
         if (started) return;
         started = true;
         try {
-          await native.setDownloadProgressCallbackProto(onBytes);
+          await subscribeToDownloadProgress(subscriberEntry);
+          subscribed = true;
           const modelBuffer = await native.getModelInfoProto(modelId);
           const modelBytes = arrayBufferToBytes(modelBuffer);
           if (modelBytes.byteLength === 0) {
             streamError = new Error(`model ${modelId} is not registered`);
-            await native.clearDownloadProgressCallbackProto().catch(() => {});
+            await teardownSubscription();
             finish();
             return;
           }
@@ -452,7 +544,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             streamError = new Error(
               plan.errorMessage || `download plan rejected for ${modelId}`
             );
-            await native.clearDownloadProgressCallbackProto().catch(() => {});
+            await teardownSubscription();
             finish();
             return;
           }
@@ -473,7 +565,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             streamError = new Error(
               startResult.errorMessage || `download not accepted for ${modelId}`
             );
-            await native.clearDownloadProgressCallbackProto().catch(() => {});
+            await teardownSubscription();
             finish();
             return;
           }
@@ -483,7 +575,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
           }
         } catch (err) {
           streamError = err instanceof Error ? err : new Error(String(err));
-          await native.clearDownloadProgressCallbackProto().catch(() => {});
+          await teardownSubscription();
           finish();
         }
       };
@@ -507,7 +599,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             if (isTerminalProgress(value)) {
               await handleProgress(value);
               finish();
-              await native.clearDownloadProgressCallbackProto().catch(() => {});
+              await teardownSubscription();
             }
             return { value, done: false };
           }
@@ -525,7 +617,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             if (!result.done && isTerminalProgress(result.value)) {
               await handleProgress(result.value);
               finish();
-              await native.clearDownloadProgressCallbackProto().catch(() => {});
+              await teardownSubscription();
             }
             return result;
           });
@@ -547,7 +639,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
               /* noop */
             }
           }
-          await native.clearDownloadProgressCallbackProto().catch(() => {});
+          await teardownSubscription();
           finish();
           return {
             value: undefined as unknown as DownloadProgress,

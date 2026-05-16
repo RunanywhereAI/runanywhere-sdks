@@ -153,7 +153,10 @@ result.throwIfCAbiErrorAsException("llm.generate")  // throws SDKException if < 
 
 ```kotlin
 RunAnywhere.events.llmEvents.collect { event -> ... }
-RunAnywhere.events.eventsOfType<ModelEvent>().collect { ... }
+// Extract proto envelope payloads (Wire generates SDKEvent as a oneof envelope,
+// so payload messages like ModelEvent are siblings, not subclasses):
+RunAnywhere.events.modelEventPayloads.collect { model: ModelEvent -> ... }
+RunAnywhere.events.eventsOfPayload { it.generation }.collect { ... }
 ```
 
 ### Modules

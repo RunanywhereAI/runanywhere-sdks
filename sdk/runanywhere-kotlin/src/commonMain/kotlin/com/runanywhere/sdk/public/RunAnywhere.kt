@@ -413,16 +413,27 @@ object RunAnywhere {
                 // also flushes the linked-models warning and dev-mode device
                 // registration. Mirrors Swift's awaited steps in
                 // `_performServicesInitialization`.
-                initializePlatformBridgeServices()
+                val httpConfigured = initializePlatformBridgeServices()
 
-                // Capture HTTP outcome so [ensureServicesReady] can decide
-                // whether to retry. The platform bridge sets HTTP up before
-                // phase2; we treat "services ready" as the proxy until a
-                // commonMain-visible HTTP-state expect lands.
-                _hasCompletedHTTPSetup = true
+                // Decouple "services ready" from "HTTP/auth complete" so
+                // offline/local-only Phase 2 still leaves
+                // `_hasCompletedHTTPSetup = false`. That keeps the recovery
+                // branch in [ensureServicesReady] reachable for the next
+                // online call (auth, device registration, telemetry flush,
+                // remote catalog/device paths). Mirrors Swift
+                // `RunAnywhere.swift:261-265` which derives
+                // `hasCompletedHTTPSetup` from `CppBridge.HTTP.shared.isConfigured`.
+                _hasCompletedHTTPSetup = httpConfigured
                 _areServicesReady = true
 
-                logger.info("Services initialized for ${params.environment.wireString} mode")
+                if (httpConfigured) {
+                    logger.info("Services initialized for ${params.environment.wireString} mode")
+                } else {
+                    logger.info(
+                        "Services initialized for ${params.environment.wireString} mode " +
+                            "(HTTP/auth deferred — will retry on next online call)",
+                    )
+                }
             } catch (e: Throwable) {
                 logger.error("Services initialization failed: ${e.message}")
                 throw e
@@ -477,9 +488,13 @@ object RunAnywhere {
         logger.debug("Retrying HTTP/auth setup for ${params.environment.wireString}...")
 
         try {
-            initializePlatformBridgeServices()
-            _hasCompletedHTTPSetup = true
-            logger.info("HTTP/Auth setup succeeded on retry")
+            val httpConfigured = initializePlatformBridgeServices()
+            _hasCompletedHTTPSetup = httpConfigured
+            if (httpConfigured) {
+                logger.info("HTTP/Auth setup succeeded on retry")
+            } else {
+                logger.debug("HTTP/Auth retry still missing usable config; will retry on next call")
+            }
         } catch (e: Throwable) {
             logger.debug("HTTP/Auth retry failed (still offline?): ${e.message}")
         }
@@ -536,9 +551,19 @@ internal expect fun initializePlatformBridge(environment: SDKEnvironment, apiKey
 
 /**
  * Initialize platform-specific bridge services (Phase 2).
- * On JVM/Android, this calls CppBridge.initializeServices().
+ *
+ * Returns `true` when the platform finished Phase 2 with a usable HTTP/auth
+ * configuration (Swift parity for `CppBridge.HTTP.shared.isConfigured`).
+ * Returns `false` when Phase 2 succeeded for the offline/local-only path —
+ * the SDK still reports services-ready so on-device models keep working,
+ * but [RunAnywhere.ensureServicesReady] will retry HTTP/auth via
+ * [retryHTTPSetup] when the next public call happens after credentials
+ * or connectivity appear.
+ *
+ * On JVM/Android, this calls `CppBridge.initializeServices()` and reads
+ * `HTTPClientAdapter.isConfigured`.
  */
-internal expect suspend fun initializePlatformBridgeServices()
+internal expect suspend fun initializePlatformBridgeServices(): Boolean
 
 /**
  * Shutdown platform-specific bridge.

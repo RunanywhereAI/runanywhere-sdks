@@ -445,7 +445,7 @@ cd packages/core && npx tsc --noEmit
 Use `detectCapabilities()` to check browser support at runtime:
 
 ```typescript
-import { detectCapabilities } from '@runanywhere/web';
+import { detectCapabilities } from '@runanywhere/web/browser';
 
 const caps = await detectCapabilities();
 console.log('Cross-Origin Isolated:', caps.isCrossOriginIsolated);

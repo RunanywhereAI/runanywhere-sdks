@@ -98,23 +98,42 @@ fi
 
 cd "$RN_ROOT"
 
-# The RN SDK declares `packageManager: "yarn@3.6.1"`, so it requires Corepack
-# (not the OS-level Yarn 1.x). Enable Corepack and use yarn; fall back to npm
-# only when yarn is genuinely unavailable.
+# The RN SDK declares `packageManager: "yarn@3.6.1"` and is a workspace under
+# the repo-root yarn.lock. Enable Corepack and run yarn install from the repo
+# root so the committed workspace lock is honoured; fall back to npm only as
+# an explicit escape hatch when Yarn/Corepack are genuinely unavailable.
+WANTS_YARN=0
 if grep -q '"packageManager": "yarn@' package.json 2>/dev/null; then
+    WANTS_YARN=1
+fi
+
+if [ -f "yarn.lock" ] || [ -f "${REPO_ROOT}/yarn.lock" ] || [ "$WANTS_YARN" = "1" ]; then
     if command -v corepack >/dev/null 2>&1; then
         corepack enable >/dev/null 2>&1 || true
     fi
 fi
 
-if [ -f "yarn.lock" ] && command -v yarn >/dev/null 2>&1; then
-    echo ">> yarn install"
-    yarn install --immutable 2>/dev/null || yarn install
+YARN_CWD=""
+if [ -f "yarn.lock" ]; then
+    YARN_CWD="$RN_ROOT"
+elif [ -f "${REPO_ROOT}/yarn.lock" ]; then
+    YARN_CWD="$REPO_ROOT"
+fi
+
+if [ -n "$YARN_CWD" ] && command -v yarn >/dev/null 2>&1; then
+    echo ">> yarn install (cwd=$YARN_CWD)"
+    (cd "$YARN_CWD" && (yarn install --immutable 2>/dev/null || yarn install))
     HAS_YARN=1
-else
-    echo ">> npm install --legacy-peer-deps"
+elif [ "${RAC_ALLOW_NPM_FALLBACK:-0}" = "1" ]; then
+    echo ">> npm install --legacy-peer-deps (RAC_ALLOW_NPM_FALLBACK=1)"
     npm install --legacy-peer-deps
     HAS_YARN=0
+else
+    echo "ERROR: Yarn workspace install required but yarn/corepack is unavailable." >&2
+    echo "       Install Node 18+ with Corepack (or 'npm i -g corepack') so 'yarn@3.6.1'" >&2
+    echo "       can be activated, or set RAC_ALLOW_NPM_FALLBACK=1 to opt into the" >&2
+    echo "       legacy npm install path explicitly." >&2
+    exit 1
 fi
 
 # Generate Nitro bindings if nitrogen is wired up

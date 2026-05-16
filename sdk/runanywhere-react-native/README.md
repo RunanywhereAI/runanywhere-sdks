@@ -165,18 +165,23 @@ async function drainModelDownload(modelId: string): Promise<void> {
   }
 }
 
-// Register LlamaCpp module and add LLM models
-LlamaCPP.register();
-await RunAnywhere.registerModel({
-  id: 'smollm2-360m-q8_0',
-  name: 'SmolLM2 360M Q8_0',
-  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  memoryRequirement: 500_000_000,
-});
+// Register LlamaCpp module and add LLM models. `register()` is async and
+// returns `Promise<boolean>` — `false` means the native backend was not
+// installed, so don't register Llama-backed models in that case.
+const llamaRegistered = await LlamaCPP.register();
+if (llamaRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'smollm2-360m-q8_0',
+    name: 'SmolLM2 360M Q8_0',
+    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    memoryRequirement: 500_000_000,
+  });
+}
 
-// Register ONNX module and add STT/TTS models
-ONNX.register();
+// Register ONNX module and add STT/TTS models. ONNX.register() is also async
+// and must be awaited before registering Sherpa-backed STT/TTS models.
+await ONNX.register();
 await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
@@ -441,23 +446,23 @@ const options: Partial<LLMGenerationOptions> = {
 
 ## Error Handling
 
-The SDK provides structured error handling through `SDKError`:
+The SDK provides structured error handling through `SDKException`:
 
 ```typescript
-import { SDKError, SDKErrorCode, isSDKError } from '@runanywhere/core';
+import { SDKException, ErrorCode, isSDKException } from '@runanywhere/core';
 
 try {
   const response = await RunAnywhere.generate('Hello!');
 } catch (error) {
-  if (isSDKError(error)) {
+  if (isSDKException(error)) {
     switch (error.code) {
-      case SDKErrorCode.notInitialized:
+      case ErrorCode.ERROR_CODE_NOT_INITIALIZED:
         console.log('SDK not initialized. Call RunAnywhere.initialize() first.');
         break;
-      case SDKErrorCode.modelNotFound:
+      case ErrorCode.ERROR_CODE_MODEL_NOT_FOUND:
         console.log('Model not found. Download it first.');
         break;
-      case SDKErrorCode.insufficientMemory:
+      case ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY:
         console.log('Not enough memory. Try a smaller model.');
         break;
       default:
@@ -487,8 +492,14 @@ try {
 
 ### Configure Logging
 
+The SDK ships its own structured logger. `SDKLogger` and `LogLevel` are part of
+the internal subpath (`@runanywhere/core/internal`) and may change between
+releases; for stable user code, prefer wiring console/your own logger and
+subscribing to the EventBus stream below for observability.
+
 ```typescript
-import { LogLevel, SDKLogger } from '@runanywhere/core';
+// Internal subpath — not part of the stable root surface.
+import { LogLevel, SDKLogger } from '@runanywhere/core/internal';
 
 // Set minimum log level
 RunAnywhere.setLogLevel(LogLevel.Debug);  // debug, info, warning, error, fault
@@ -668,27 +679,40 @@ Contributions are welcome. This section explains how to set up your development 
 
 ### First-Time Setup (Build from Source)
 
-The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
+The SDK depends on native C++ libraries from `runanywhere-commons`. Native artifacts are built in the owning layer (`runanywhere-commons`) and then staged into each RN package by `scripts/package-sdk.sh`.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks/sdk/runanywhere-react-native
+cd runanywhere-sdks
 
-# 2. Run first-time setup (~15-20 minutes)
-./scripts/build-react-native.sh --setup
+# 2. Build native artifacts from runanywhere-commons (from repo root)
+./scripts/build-core-xcframework.sh   # iOS XCFrameworks → build/ios/
+./scripts/build-core-android.sh       # Android .so files → build/android/
 
-# 3. Install JavaScript dependencies
+# 3. Stage the freshly built natives into the React Native packages
+cd sdk/runanywhere-react-native
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
+
+# 4. Install JavaScript dependencies (yarn workspaces)
 yarn install
 ```
 
-**What the setup script does:**
-1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
-2. Builds `RACommons.xcframework` and JNI libraries
-3. Builds `RABackendLLAMACPP` (LLM backend)
-4. Builds `RABackendONNX` and `RABackendSherpa` (ONNX/Sherpa backends)
-5. Copies package-owned frameworks to `ios/Binaries/` and JNI libs to `android/src/main/jniLibs/`
-6. Creates `.testlocal` marker files (enables local library consumption)
+`package-sdk.sh --natives-from PATH` copies each binary into the package that owns it:
+- `RACommons.xcframework` / `librac_commons.so` → `packages/core`
+- `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` → `packages/llamacpp`
+- `RABackendONNX.xcframework` + `RABackendSherpa.xcframework` / matching `.so` files → `packages/onnx`
+
+It then type-checks each package and produces `dist/sdk-rn/*.tgz` + `.sha256`.
+
+**Per-package download alternative:** if you do not need to rebuild commons from source, each package exposes a download helper that pulls pre-built natives from a GitHub release into the right package directory:
+
+```bash
+# From sdk/runanywhere-react-native/
+yarn core:download-ios          # or yarn core:download-android
+yarn llamacpp:download-ios      # or yarn llamacpp:download-android
+yarn onnx:download-ios          # or yarn onnx:download-android
+```
 
 ### Understanding testLocal
 
@@ -699,9 +723,9 @@ The SDK has two native-binary consumption modes:
 | **Local** | Uses frameworks/JNI libs staged into package directories for development |
 | **Packaged** | Published npm packages include package-owned natives; CocoaPods and Gradle consume them from the package directories |
 
-When you run `--setup`, the script automatically enables local mode via:
-- **iOS**: `.testlocal` marker files in `ios/` directories
-- **Android**: `RA_TEST_LOCAL=1` environment variable or `runanywhere.useLocalNatives=true` in `gradle.properties`
+Toggle local mode after staging natives:
+- **iOS**: `yarn native:local` writes the `.testlocal` marker files in each package's `ios/` directory; `yarn native:remote` removes them.
+- **Android**: set `RA_TEST_LOCAL=1` in your environment or `runanywhere.useLocalNatives=true` in `gradle.properties`.
 
 ### Testing with the React Native Sample App
 
@@ -731,7 +755,7 @@ The sample app's `package.json` uses workspace dependencies to reference the loc
 ```
 Sample App → Local RN SDK Packages → Local Frameworks/JNI libs
                                            ↑
-                          Built by build-react-native.sh --setup
+                Staged by ./scripts/package-sdk.sh --natives-from PATH
 ```
 
 ### Development Workflow
@@ -752,22 +776,24 @@ yarn build
 **After modifying runanywhere-commons (C++ code):**
 
 ```bash
+# 1. Rebuild native artifacts in the owning layer (repo root)
+./scripts/build-core-xcframework.sh   # iOS
+./scripts/build-core-android.sh       # Android
+
+# 2. Re-stage them into the RN packages
 cd sdk/runanywhere-react-native
-./scripts/build-react-native.sh --local --rebuild-commons
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
 ```
 
-### Build Script Reference
+### Packaging Reference
 
 | Command | Description |
 |---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks, enables local mode |
-| `--local` | Use local frameworks from package directories |
-| `--remote` | Use remote frameworks from GitHub releases |
-| `--rebuild-commons` | Rebuild runanywhere-commons from source |
-| `--ios` | Build for iOS only |
-| `--android` | Build for Android only |
-| `--clean` | Clean build artifacts before building |
-| `--abis=ABIS` | Android ABIs to build (default: `arm64-v8a`) |
+| `./scripts/package-sdk.sh --natives-from PATH` | Stage iOS XCFrameworks + Android `.so` files from `PATH` into each owning package, type-check, and produce `dist/sdk-rn/*.tgz` + `.sha256` |
+| `./scripts/package-sdk.sh --mode local\|ci` | Override packaging mode (default: auto-detect from `$CI`) |
+| `yarn <core\|llamacpp\|onnx>:download-ios` | Download pre-built iOS natives from GitHub releases for that package |
+| `yarn <core\|llamacpp\|onnx>:download-android` | Download pre-built Android `.so` files from GitHub releases for that package |
+| `yarn native:local` / `yarn native:remote` | Toggle iOS `.testlocal` marker files for local-vs-published native consumption |
 
 ### Code Style
 

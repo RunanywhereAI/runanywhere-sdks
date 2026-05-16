@@ -223,33 +223,111 @@ export class SherpaONNXBridge {
     logger.info('ONNX + Sherpa backends registered (STT/TTS/VAD vtables installed)');
   }
 
+  /**
+   * Build the ordered list of candidate URLs from which to import the
+   * `racommons-llamacpp.js` Emscripten glue. See `_loadCommonsModule()`
+   * for the resolution rules.
+   */
+  private _collectCommonsModuleCandidates(
+    options?: SherpaONNXBridgeLoadOptions,
+  ): string[] {
+    const candidates: string[] = [];
+    const explicit = options?.wasmUrl ?? this.wasmUrl;
+    if (explicit) candidates.push(explicit);
+
+    if (candidates.length === 0) {
+      const resolveFn = (
+        import.meta as ImportMeta & {
+          resolve?: (specifier: string) => string;
+        }
+      ).resolve;
+      if (typeof resolveFn === 'function') {
+        try {
+          candidates.push(
+            resolveFn('@runanywhere/web-llamacpp/wasm/racommons-llamacpp.js'),
+          );
+        } catch {
+          // import.meta.resolve threw — fall through to URL probes.
+        }
+      }
+
+      // Published-install layout: `node_modules/@runanywhere/web-llamacpp/...`.
+      try {
+        candidates.push(
+          new URL(
+            '../../../web-llamacpp/wasm/racommons-llamacpp.js',
+            import.meta.url,
+          ).href,
+        );
+      } catch {
+        // import.meta.url not a base URL (rare) — skip this probe.
+      }
+
+      // Monorepo-source layout: `sdk/runanywhere-web/packages/llamacpp/...`.
+      try {
+        candidates.push(
+          new URL(
+            '../../../llamacpp/wasm/racommons-llamacpp.js',
+            import.meta.url,
+          ).href,
+        );
+      } catch {
+        // import.meta.url not a base URL (rare) — skip this probe.
+      }
+    }
+
+    return candidates;
+  }
+
   private async _loadCommonsModule(
     options?: SherpaONNXBridgeLoadOptions,
   ): Promise<CommonsModule> {
-    const moduleUrl =
-      options?.wasmUrl ??
-      this.wasmUrl ??
-      new URL('../../../llamacpp/wasm/racommons-llamacpp.js', import.meta.url).href;
+    // Build the candidate list in priority order:
+    //   1. Explicit `{ wasmUrl }` override (per-call or sticky on the bridge).
+    //   2. `import.meta.resolve('@runanywhere/web-llamacpp/wasm/...')` —
+    //      the published-package contract that works in both monorepo dev
+    //      (via bundler aliases) and any consumer who installed the peer
+    //      dependency `@runanywhere/web-llamacpp` (Node 20.6+/Vite/modern
+    //      browsers ship `import.meta.resolve`).
+    //   3. Relative-URL probes for runtimes without `import.meta.resolve`:
+    //      try the published package directory name (`web-llamacpp`) first,
+    //      then the monorepo source folder name (`llamacpp`) as a last
+    //      resort.
+    const candidates = this._collectCommonsModuleCandidates(options);
+
+    let moduleUrl: string | undefined;
+    let factory: CommonsModuleFactory | undefined;
+    let lastError: string = 'no candidate URLs were resolvable';
+    for (const candidate of candidates) {
+      try {
+        const imported = (await import(/* @vite-ignore */ candidate)) as {
+          default: CommonsModuleFactory;
+        };
+        factory = imported.default;
+        moduleUrl = candidate;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        logger.debug(
+          `RACommons glue not resolvable at ${candidate}: ${lastError}`,
+        );
+      }
+    }
+
+    if (!factory || !moduleUrl) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'Failed to import RACommons glue from any default location. ' +
+        'Install `@runanywhere/web-llamacpp` alongside `@runanywhere/web-onnx` ' +
+        'so the published WASM artifact is reachable, or pass ' +
+        '`{ wasmUrl }` to `ONNX.register()`. Last error: ' + lastError,
+      );
+    }
 
     this.wasmUrl = moduleUrl;
     logger.info(`Loading RACommons WASM glue from ${moduleUrl}`);
 
     const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
-
-    let factory: CommonsModuleFactory;
-    try {
-      const imported = (await import(/* @vite-ignore */ moduleUrl)) as {
-        default: CommonsModuleFactory;
-      };
-      factory = imported.default;
-    } catch (err) {
-      throw SDKException.backendNotAvailable(
-        'ONNX.register',
-        `Failed to import RACommons glue at ${moduleUrl}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
 
     let module: CommonsModule;
     try {

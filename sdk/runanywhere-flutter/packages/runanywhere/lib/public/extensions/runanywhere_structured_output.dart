@@ -30,8 +30,10 @@ class RunAnywhereStructuredOutput {
     double temperature = 0.0,
   }) async {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
-    if (!DartBridge.llm.isLoaded) {
-      throw SDKException.componentNotReady('LLM model not loaded.');
+    if (RunAnywhereLLM.shared.currentModelId == null) {
+      throw SDKException.componentNotReady(
+        'LLM model not loaded. Call RunAnywhere.llm.load(modelId) first.',
+      );
     }
 
     final options = StructuredOutputOptions(
@@ -66,8 +68,10 @@ class RunAnywhereStructuredOutput {
     StructuredOutputRequest request,
   ) async {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
-    if (!DartBridge.llm.isLoaded) {
-      throw SDKException.componentNotReady('LLM model not loaded.');
+    if (RunAnywhereLLM.shared.currentModelId == null) {
+      throw SDKException.componentNotReady(
+        'LLM model not loaded. Call RunAnywhere.llm.load(modelId) first.',
+      );
     }
     return DartBridgeStructuredOutput.shared.generate(request);
   }

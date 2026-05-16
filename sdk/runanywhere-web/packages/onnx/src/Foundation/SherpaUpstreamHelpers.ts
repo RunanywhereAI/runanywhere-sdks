@@ -151,3 +151,54 @@ const TTS_EXPORTS = [
 export function loadSherpaTTSHelpers(): Promise<SherpaTTSHelpers> {
   return loadHelper<SherpaTTSHelpers>('sherpa-onnx-tts.js', TTS_EXPORTS);
 }
+
+// ---------------------------------------------------------------------------
+// VAD helpers (sherpa-onnx-vad.js)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors the upstream `SherpaOnnxVadModelConfig` shape consumed by
+ * `initSherpaOnnxVadModelConfig`. Either `sileroVad` or `tenVad` (or both)
+ * may be populated; the helper fills the other with a zeroed default.
+ */
+export interface UpstreamVadConfig {
+  sileroVad?: {
+    model: string;
+    threshold?: number;
+    minSilenceDuration?: number;
+    minSpeechDuration?: number;
+    windowSize?: number;
+    maxSpeechDuration?: number;
+  };
+  tenVad?: {
+    model: string;
+    threshold?: number;
+    minSilenceDuration?: number;
+    minSpeechDuration?: number;
+    windowSize?: number;
+    maxSpeechDuration?: number;
+  };
+  sampleRate?: number;
+  numThreads?: number;
+  provider?: string;
+  debug?: number;
+}
+
+export interface SherpaVADHelpers {
+  freeConfig: (handle: SherpaConfigHandle, module: StandaloneSherpaModule) => void;
+  initSherpaOnnxVadModelConfig: (
+    config: UpstreamVadConfig,
+    module: StandaloneSherpaModule,
+  ) => SherpaConfigHandle;
+}
+
+const VAD_EXPORTS = [
+  'freeConfig',
+  'initSherpaOnnxVadModelConfig',
+  'initSherpaOnnxSileroVadModelConfig',
+  'initSherpaOnnxTenVadModelConfig',
+] as const;
+
+export function loadSherpaVADHelpers(): Promise<SherpaVADHelpers> {
+  return loadHelper<SherpaVADHelpers>('sherpa-onnx-vad.js', VAD_EXPORTS);
+}

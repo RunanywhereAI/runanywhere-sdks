@@ -102,14 +102,21 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 8,
   )
   public val keep_tools_available: Boolean = false,
+  /**
+   * proto3 `optional` enables presence detection (has_validate_calls()).
+   * When unset, commons defaults to validate_calls=true (preserves the
+   * historical hard-coded behavior and the native run-loop / session
+   * contract that unknown tool calls short-circuit before host execution).
+   * Callers that delegate validation/authorization to their executor or
+   * use dynamic tool registries must explicitly set validate_calls=false.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "validateCalls",
     schemaIndex = 9,
   )
-  public val validate_calls: Boolean = false,
+  public val validate_calls: Boolean? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -157,7 +164,7 @@ public class ToolCallingSessionCreateRequest(
       result = result * 37 + format_hint.hashCode()
       result = result * 37 + max_iterations.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
-      result = result * 37 + validate_calls.hashCode()
+      result = result * 37 + (validate_calls?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -174,7 +181,7 @@ public class ToolCallingSessionCreateRequest(
     result += """format_hint=${sanitize(format_hint)}"""
     result += """max_iterations=$max_iterations"""
     result += """keep_tools_available=$keep_tools_available"""
-    result += """validate_calls=$validate_calls"""
+    if (validate_calls != null) result += """validate_calls=$validate_calls"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ",
         postfix = "}")
   }
@@ -189,7 +196,7 @@ public class ToolCallingSessionCreateRequest(
     format_hint: String = this.format_hint,
     max_iterations: Int = this.max_iterations,
     keep_tools_available: Boolean = this.keep_tools_available,
-    validate_calls: Boolean = this.validate_calls,
+    validate_calls: Boolean? = this.validate_calls,
     unknownFields: ByteString = this.unknownFields,
   ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens,
       temperature, top_p, system_prompt, tools, format_hint, max_iterations, keep_tools_available,
@@ -223,8 +230,7 @@ public class ToolCallingSessionCreateRequest(
             value.max_iterations)
         if (value.keep_tools_available != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
             value.keep_tools_available)
-        if (value.validate_calls != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
-            value.validate_calls)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.validate_calls)
         return size
       }
 
@@ -242,15 +248,13 @@ public class ToolCallingSessionCreateRequest(
             value.max_iterations)
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.keep_tools_available)
-        if (value.validate_calls != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
-            value.validate_calls)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
-        if (value.validate_calls != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
-            value.validate_calls)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.keep_tools_available)
         if (value.max_iterations != 0) ProtoAdapter.UINT32.encodeWithTag(writer, 4,
@@ -276,7 +280,7 @@ public class ToolCallingSessionCreateRequest(
         var format_hint: String = ""
         var max_iterations: Int = 0
         var keep_tools_available: Boolean = false
-        var validate_calls: Boolean = false
+        var validate_calls: Boolean? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)

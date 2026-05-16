@@ -553,7 +553,7 @@ await RunAnywhere.downloads.delete('old-model-id');
 **Solutions:**
 1. Ensure NDK is properly installed
 2. Check that `jniLibs` folder contains `.so` files
-3. Rebuild native libraries with `../../scripts/build-core-android.sh <ABI>` from the repo root
+3. Rebuild native libraries with `./scripts/build-core-android.sh <ABI>` from the repo root
 
 ### Model Not Found After Download
 

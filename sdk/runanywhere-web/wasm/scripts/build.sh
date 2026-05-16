@@ -268,8 +268,19 @@ if [ -f "${WASM_FILE}" ] && [ -f "${JS_FILE}" ]; then
     echo "  ${OUTPUT_NAME}.wasm: ${WASM_SIZE}"
     echo "  ${OUTPUT_NAME}.js:   ${JS_SIZE}"
 
-    if [ "$PTHREADS" = "ON" ] && [ -f "${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js" ]; then
-        WORKER_SIZE=$(du -h "${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js" | cut -f1)
+    # When pthreads are ON the Emscripten glue spawns workers from a
+    # companion `<output>.worker.js`. The CMake POST_BUILD step stages it,
+    # but verify here so a missing worker fails the build (rather than
+    # silently producing a partial release artifact).
+    if [ "$PTHREADS" = "ON" ]; then
+        WORKER_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js"
+        if [ ! -f "${WORKER_FILE}" ]; then
+            echo "ERROR: pthread worker missing!"
+            echo "  Expected: ${WORKER_FILE}"
+            echo "  PTHREADS=ON requires the Emscripten companion worker."
+            exit 1
+        fi
+        WORKER_SIZE=$(du -h "${WORKER_FILE}" | cut -f1)
         echo "  ${OUTPUT_NAME}.worker.js: ${WORKER_SIZE}"
     fi
 else

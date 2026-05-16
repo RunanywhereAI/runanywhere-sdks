@@ -108,13 +108,80 @@ object OkHttpTransport {
         nativeCallback: Long,
         nativeUserData: Long,
     ): StreamResponse {
+        return streamInternal(
+            method = method,
+            url = url,
+            headersFlat = headersFlat,
+            bodyBytes = bodyBytes,
+            timeoutMs = timeoutMs,
+            nativeCallback = nativeCallback,
+            nativeUserData = nativeUserData,
+            resumeFromByte = 0L,
+        )
+    }
+
+    /**
+     * `request_resume` vtable slot — identical to [executeStreamingRequest]
+     * but attaches a `Range: bytes=N-` header before dispatching, mirroring
+     * the iOS [URLSessionHttpTransport] implementation and the Kotlin SDK's
+     * `OkHttpHttpTransport.executeResumeRequest`.
+     *
+     * Range-honored disclosure: when the caller asked for a partial
+     * (`resumeFromByte > 0`) but the server answered with 200 (full file)
+     * instead of 206, the C++ download manager needs to know so it can
+     * truncate the destination before replaying bytes. A synthetic
+     * `X-RAC-Range-Honored` marker header surfaces that distinction.
+     */
+    @JvmStatic
+    fun executeResumeRequest(
+        method: String,
+        url: String,
+        headersFlat: Array<String>,
+        bodyBytes: ByteArray?,
+        timeoutMs: Long,
+        resumeFromByte: Long,
+        nativeCallback: Long,
+        nativeUserData: Long,
+    ): StreamResponse {
+        return streamInternal(
+            method = method,
+            url = url,
+            headersFlat = headersFlat,
+            bodyBytes = bodyBytes,
+            timeoutMs = timeoutMs,
+            nativeCallback = nativeCallback,
+            nativeUserData = nativeUserData,
+            resumeFromByte = resumeFromByte,
+        )
+    }
+
+    @JvmStatic
+    private external fun deliverChunkNative(
+        nativeCallback: Long,
+        nativeUserData: Long,
+        chunk: ByteArray,
+        chunkLen: Int,
+        totalWritten: Long,
+        contentLength: Long,
+    ): Boolean
+
+    private fun streamInternal(
+        method: String,
+        url: String,
+        headersFlat: Array<String>,
+        bodyBytes: ByteArray?,
+        timeoutMs: Long,
+        nativeCallback: Long,
+        nativeUserData: Long,
+        resumeFromByte: Long,
+    ): StreamResponse {
         return try {
-            val request = buildRequest(method, url, headersFlat, bodyBytes)
+            val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             val clientForCall = resolveClient(timeoutMs)
 
             val call = clientForCall.newCall(request)
             call.execute().use { resp ->
-                val headerPairs = flattenHeaders(resp.headers)
+                val headerPairs = buildResponseHeaders(resp.headers, resumeFromByte, resp.code)
                 val body = resp.body
                     ?: return StreamResponse(
                         statusCode = resp.code,
@@ -123,9 +190,23 @@ object OkHttpTransport {
                         cancelled = false,
                     )
 
-                val contentLength = if (body.contentLength() >= 0) body.contentLength() else 0L
+                // Resume accounting: when the server actually honored the
+                // Range (206), Content-Length is only the *remaining* bytes
+                // — add the resume offset so the chunk callback sees a
+                // monotonic `total_written` that tracks absolute file
+                // position. For 200 responses the server replayed the full
+                // file, so we leave the counter at 0 (the caller will
+                // truncate any partial bytes already on disk).
+                val honoredRange = resp.code == 206 && resumeFromByte > 0
+                val rawContentLength = if (body.contentLength() >= 0) body.contentLength() else 0L
+                val contentLength =
+                    if (honoredRange && rawContentLength > 0) {
+                        rawContentLength + resumeFromByte
+                    } else {
+                        rawContentLength
+                    }
                 val buffer = ByteArray(STREAM_CHUNK_SIZE)
-                var totalRead = 0L
+                var totalRead = if (honoredRange) resumeFromByte else 0L
                 var cancelled = false
 
                 body.byteStream().use { input ->
@@ -173,21 +254,12 @@ object OkHttpTransport {
         }
     }
 
-    @JvmStatic
-    private external fun deliverChunkNative(
-        nativeCallback: Long,
-        nativeUserData: Long,
-        chunk: ByteArray,
-        chunkLen: Int,
-        totalWritten: Long,
-        contentLength: Long,
-    ): Boolean
-
     private fun buildRequest(
         method: String,
         url: String,
         headersFlat: Array<String>,
         bodyBytes: ByteArray?,
+        resumeFromByte: Long = 0L,
     ): Request {
         val builder = Request.Builder().url(url)
 
@@ -201,6 +273,12 @@ object OkHttpTransport {
                 contentType = value
             }
             i += 2
+        }
+
+        // Attach the Range header for resume requests. Matches the Swift
+        // URLSessionHttpTransport adapter and the Kotlin SDK's transport.
+        if (resumeFromByte > 0) {
+            builder.header("Range", "bytes=$resumeFromByte-")
         }
 
         val body: RequestBody? =
@@ -219,6 +297,30 @@ object OkHttpTransport {
         }
 
         return builder.build()
+    }
+
+    /**
+     * Build the response headers array, appending the synthetic
+     * `X-RAC-Range-Honored` marker when the caller requested a resume so the
+     * C++ download manager can detect when the server ignored the Range
+     * request (200) versus honored it (206).
+     */
+    private fun buildResponseHeaders(
+        responseHeaders: okhttp3.Headers,
+        resumeFromByte: Long,
+        statusCode: Int,
+    ): Array<String> {
+        val pairs = ArrayList<String>(responseHeaders.size * 2 + 2)
+        for ((name, value) in responseHeaders) {
+            pairs.add(name)
+            pairs.add(value)
+        }
+        if (resumeFromByte > 0) {
+            val honored = statusCode == 206
+            pairs.add("X-RAC-Range-Honored")
+            pairs.add(if (honored) "true" else "false")
+        }
+        return pairs.toTypedArray()
     }
 
     private fun resolveClient(timeoutMs: Long): OkHttpClient {

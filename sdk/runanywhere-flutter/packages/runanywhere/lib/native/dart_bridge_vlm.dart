@@ -87,6 +87,8 @@ class DartBridgeVLM {
     final controller = StreamController<VLMStreamEvent>(sync: false);
     ffi.NativeCallable<_RacVlmStreamEventProtoCallbackNative>? callback;
 
+    var sawTerminalEvent = false;
+
     Future<void> run() async {
       final bytes = request.writeToBuffer();
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
@@ -107,6 +109,7 @@ class DartBridgeVLM {
             try {
               final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
               final event = VLMStreamEvent.fromBuffer(copy);
+              sawTerminalEvent = sawTerminalEvent || event.isFinal;
               controller.add(event);
               if (event.isFinal) {
                 unawaited(controller.close());
@@ -125,6 +128,16 @@ class DartBridgeVLM {
           callback!.nativeFunction,
           ffi.nullptr,
         );
+        // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
+        // `rac_vlm_stream_proto` is a blocking synchronous FFI call. While
+        // it runs, the main isolate's event loop is frozen, so
+        // NativeCallable.listener invocations queue up but do not execute.
+        // The terminal event therefore arrives ASYNCHRONOUSLY after `fn()`
+        // returns. Yield to the event loop a few times so queued chunk/final
+        // callbacks can drain before the force-close branches below.
+        for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
         if (code != RacResultCode.success && !controller.isClosed) {
           controller.addError(StateError(
             'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(code)}',

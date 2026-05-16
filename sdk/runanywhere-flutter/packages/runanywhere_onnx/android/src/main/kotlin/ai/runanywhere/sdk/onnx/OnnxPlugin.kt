@@ -35,11 +35,13 @@ class OnnxPlugin : FlutterPlugin {
                     "rac_backend_onnx_jni",
                     "runanywhere_onnx",
                 )
-                // B-FL-10-001 / B-RN-10-001: explicitly load the Sherpa engine lib so its
-                // ELF __attribute__((constructor)) auto-registers STT/TTS/VAD with the
-                // unified plugin registry. Without this, rac_plugin_route returns -423 for
-                // every Sherpa-backed model load. The autoregister wraps rac_plugin_register
-                // which is idempotent, so re-loads are safe.
+                // Preload librac_backend_sherpa.so so its exported
+                // `rac_backend_sherpa_register` symbol is resolvable to the Dart
+                // FFI bindings (see runanywhere_onnx/lib/native/onnx_bindings.dart).
+                // The ELF __attribute__((constructor)) auto-register path was
+                // removed upstream (engines/sherpa/rac_plugin_entry_sherpa.cpp);
+                // Dart's `Onnx.register()` now calls `rac_backend_sherpa_register`
+                // explicitly after ONNX registration to mirror Swift parity.
                 try {
                     System.loadLibrary("rac_backend_sherpa")
                 } catch (e: UnsatisfiedLinkError) {

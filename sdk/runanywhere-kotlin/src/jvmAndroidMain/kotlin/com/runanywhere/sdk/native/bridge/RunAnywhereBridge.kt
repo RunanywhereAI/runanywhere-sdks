@@ -237,6 +237,17 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsListVoicesLifecycleProto(): ByteArray?
 
+    /**
+     * Stop an in-flight lifecycle-owned TTS synthesis. Mirrors iOS Swift's
+     * `rac_tts_stop_lifecycle_proto` path — the v2 lifecycle TTS stack does
+     * not require a per-component handle and the legacy
+     * `racTtsComponentCancel(handle)` only addresses the
+     * ComponentActor-managed component path. Returns a serialized
+     * `TTSServiceState` proto.
+     */
+    @JvmStatic
+    external fun racTtsStopLifecycleProto(): ByteArray?
+
     // ========================================================================
     // VAD COMPONENT (rac_vad_component.h)
     // ========================================================================

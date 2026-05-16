@@ -196,7 +196,18 @@ export const LlamaCPP = {
         // Publish the active mode so `RunAnywhere.runtime.active` reflects
         // what the bridge actually picked (auto → webgpu/cpu resolution).
         setActiveAccelerationMode(bridge.accelerationMode);
-        setVisionLanguageProvider(lifecycleVLMProvider);
+
+        // Only install the VLM provider when `rac_backend_llamacpp_vlm_register()`
+        // actually succeeded. Mirrors Swift's `isVLMRegistered` gate so a
+        // module without VLM exports doesn't expose a "ready" VLM provider
+        // that fails at first use.
+        if (bridge.isVLMRegistered) {
+          setVisionLanguageProvider(lifecycleVLMProvider);
+        } else {
+          logger.info(
+            'VLM backend not registered — RunAnywhere.visionLanguage will report as unavailable.',
+          );
+        }
         await completeDeferredServicesInitialization();
 
         _isRegistered = true;

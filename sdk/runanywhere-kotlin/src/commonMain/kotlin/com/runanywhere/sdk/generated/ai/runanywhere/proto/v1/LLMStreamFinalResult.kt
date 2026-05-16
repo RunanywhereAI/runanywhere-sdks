@@ -13,6 +13,8 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -25,6 +27,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -136,8 +139,34 @@ public class LLMStreamFinalResult(
     schemaIndex = 12,
   )
   public val decode_time_ms: Long = 0L,
+  tool_calls: List<ToolCall> = emptyList(),
+  tool_results: List<ToolResult> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamFinalResult, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * hotspot-idl-002: tool calls actually executed during the streaming
+   * session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+   * llm_options.proto). Populated only on terminal events when the
+   * backend completed at least one tool call.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "toolCalls",
+    schemaIndex = 13,
+  )
+  public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
+
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "toolResults",
+    schemaIndex = 14,
+  )
+  public val tool_results: List<ToolResult> = immutableCopyOf("tool_results", tool_results)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -162,6 +191,8 @@ public class LLMStreamFinalResult(
     if (error_message != other.error_message) return false
     if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
     if (decode_time_ms != other.decode_time_ms) return false
+    if (tool_calls != other.tool_calls) return false
+    if (tool_results != other.tool_results) return false
     return true
   }
 
@@ -182,6 +213,8 @@ public class LLMStreamFinalResult(
       result = result * 37 + error_message.hashCode()
       result = result * 37 + prompt_eval_time_ms.hashCode()
       result = result * 37 + decode_time_ms.hashCode()
+      result = result * 37 + tool_calls.hashCode()
+      result = result * 37 + tool_results.hashCode()
       super.hashCode = result
     }
     return result
@@ -202,6 +235,8 @@ public class LLMStreamFinalResult(
     result += """error_message=${sanitize(error_message)}"""
     result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
     result += """decode_time_ms=$decode_time_ms"""
+    if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
+    if (tool_results.isNotEmpty()) result += """tool_results=$tool_results"""
     return result.joinToString(prefix = "LLMStreamFinalResult{", separator = ", ", postfix = "}")
   }
 
@@ -219,10 +254,13 @@ public class LLMStreamFinalResult(
     error_message: String = this.error_message,
     prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
     decode_time_ms: Long = this.decode_time_ms,
+    tool_calls: List<ToolCall> = this.tool_calls,
+    tool_results: List<ToolResult> = this.tool_results,
     unknownFields: ByteString = this.unknownFields,
   ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, prompt_tokens,
       completion_tokens, total_tokens, total_time_ms, time_to_first_token_ms, tokens_per_second,
-      finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, unknownFields)
+      finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, tool_calls,
+      tool_results, unknownFields)
 
   public companion object {
     @JvmField
@@ -261,6 +299,8 @@ public class LLMStreamFinalResult(
             value.prompt_eval_time_ms)
         if (value.decode_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(13,
             value.decode_time_ms)
+        size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(14, value.tool_calls)
+        size += ToolResult.ADAPTER.asRepeated().encodedSizeWithTag(15, value.tool_results)
         return size
       }
 
@@ -287,11 +327,15 @@ public class LLMStreamFinalResult(
             value.prompt_eval_time_ms)
         if (value.decode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 13,
             value.decode_time_ms)
+        ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.tool_calls)
+        ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 15, value.tool_results)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamFinalResult) {
         writer.writeBytes(value.unknownFields)
+        ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 15, value.tool_results)
+        ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.tool_calls)
         if (value.decode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 13,
             value.decode_time_ms)
         if (value.prompt_eval_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 12,
@@ -330,6 +374,8 @@ public class LLMStreamFinalResult(
         var error_message: String = ""
         var prompt_eval_time_ms: Long = 0L
         var decode_time_ms: Long = 0L
+        val tool_calls = mutableListOf<ToolCall>()
+        val tool_results = mutableListOf<ToolResult>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -345,6 +391,8 @@ public class LLMStreamFinalResult(
             11 -> error_message = ProtoAdapter.STRING.decode(reader)
             12 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
             13 -> decode_time_ms = ProtoAdapter.INT64.decode(reader)
+            14 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
+            15 -> tool_results.add(ToolResult.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -362,11 +410,15 @@ public class LLMStreamFinalResult(
           error_message = error_message,
           prompt_eval_time_ms = prompt_eval_time_ms,
           decode_time_ms = decode_time_ms,
+          tool_calls = tool_calls,
+          tool_results = tool_results,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMStreamFinalResult): LLMStreamFinalResult = value.copy(
+        tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
+        tool_results = value.tool_results.redactElements(ToolResult.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

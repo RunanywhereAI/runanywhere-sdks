@@ -91,6 +91,7 @@ class Onnx implements RunAnywhereModule {
   // ============================================================================
 
   static bool _isRegistered = false;
+  static bool _isSherpaRegistered = false;
   static OnnxBindings? _bindings;
   static final _logger = SDKLogger('Onnx');
 
@@ -100,8 +101,13 @@ class Onnx implements RunAnywhereModule {
 
   /// Register ONNX backend with the C++ service registry.
   ///
-  /// This calls `rac_backend_onnx_register()` to register all ONNX
-  /// service providers (STT, TTS, VAD) with the C++ commons layer.
+  /// This calls `rac_backend_onnx_register()` to register the generic ONNX
+  /// backend (embeddings + Silero VAD) and then registers the Sherpa-ONNX
+  /// engine plugin so STT (Whisper/Zipformer/Paraformer), TTS (Piper/VITS),
+  /// and Sherpa-backed VAD models with `framework == .sherpa` can resolve
+  /// through the unified plugin router. The two plugins are peers: "onnx"
+  /// owns embeddings, "sherpa" owns speech primitives. Mirrors Swift
+  /// `ONNX.register()` (ONNXRuntime/ONNX.swift).
   ///
   /// Safe to call multiple times - subsequent calls are no-ops.
   static Future<void> register({int priority = 100}) async {
@@ -130,14 +136,47 @@ class Onnx implements RunAnywhereModule {
       }
 
       _isRegistered = true;
-      _logger.info('ONNX backend registered successfully (STT + TTS + VAD)');
+      _logger.info('ONNX backend registered successfully (embeddings + plugin)');
+
+      _registerSherpa();
     } catch (e) {
       _logger.error('OnnxBindings not available: $e');
     }
   }
 
+  /// Register the Sherpa-ONNX engine plugin so the commons plugin router can
+  /// resolve `framework == .sherpa` models. Mirrors Swift
+  /// `ONNX.registerSherpaPlugin()`.
+  static void _registerSherpa() {
+    if (_isSherpaRegistered) return;
+    final bindings = _bindings;
+    if (bindings == null) return;
+
+    final result = bindings.registerSherpa();
+    if (result == RacResultCode.success ||
+        result == RacResultCode.errorModuleAlreadyRegistered) {
+      _isSherpaRegistered = true;
+      _logger.info(
+        'Sherpa engine plugin registered (STT + TTS + VAD via Sherpa-ONNX)',
+      );
+    } else if (result == RacResultCode.errorNotSupported) {
+      _logger.warning(
+        'Sherpa engine plugin entry not exported by this build '
+        '— Sherpa STT/TTS/VAD will not route',
+      );
+    } else {
+      _logger.error('Sherpa plugin registration failed: $result');
+    }
+  }
+
   /// Unregister the ONNX backend from C++ registry.
   static void unregister() {
+    if (_isSherpaRegistered) {
+      _bindings?.unregisterSherpa();
+      _isSherpaRegistered = false;
+      _logger.info('Sherpa engine plugin unregistered');
+    }
+
     if (!_isRegistered) return;
 
     _bindings?.unregister();
@@ -159,6 +198,7 @@ class Onnx implements RunAnywhereModule {
   static void dispose() {
     _bindings = null;
     _isRegistered = false;
+    _isSherpaRegistered = false;
     _logger.info('ONNX disposed');
   }
 

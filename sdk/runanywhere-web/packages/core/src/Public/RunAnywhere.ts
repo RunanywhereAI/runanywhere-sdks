@@ -59,14 +59,12 @@ import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
 import { createStorageNamespace } from './Extensions/RunAnywhere+Storage';
-import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
-import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
-import { DownloadAdapter } from '../Adapters/DownloadAdapter';
-import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
+import { disposeSpeechProvider } from './Extensions/SpeechProvider';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { SDK_VERSION } from '../Foundation/Version';
 import {
+  clearRunanywhereModule,
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule';
@@ -1001,13 +999,25 @@ export const RunAnywhere = {
   shutdown(): void {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
-    // Clear WASM adapter singletons so stale module refs don't linger.
+    // Clear every WASM adapter singleton that `setRunanywhereModule()`
+    // installed (DownloadAdapter, HardwareAdapter, ModelLifecycleAdapter,
+    // ModelRegistryAdapter, ModalityProtoAdapter, SDKEventStreamAdapter)
+    // and null the global module so post-shutdown calls into
+    // ModalityProtoAdapter / HardwareAdapter / tryRunanywhereModule()
+    // can't acquire stale references to a torn-down backend.
+    clearRunanywhereModule();
+    // HTTPAdapter and StorageAdapter are owned outside setRunanywhereModule(),
+    // so they must be cleared explicitly to complete the ownership boundary.
     HTTPAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
-    ModelLifecycleAdapter.clearDefaultModule();
-    DownloadAdapter.clearDefaultModule();
-    SDKEventStreamAdapter.clearDefaultModule();
     StorageAdapter.clearDefaultHandles();
+
+    // Tear down any registered speech provider (e.g. standalone Sherpa
+    // installed by `@runanywhere/web-onnx`) so its backend module/component
+    // handles do not survive across shutdown/reset boundaries. Errors are
+    // logged but do not block the rest of the teardown.
+    void disposeSpeechProvider().catch((err) => {
+      logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
+    });
 
     EventBus.reset();
 

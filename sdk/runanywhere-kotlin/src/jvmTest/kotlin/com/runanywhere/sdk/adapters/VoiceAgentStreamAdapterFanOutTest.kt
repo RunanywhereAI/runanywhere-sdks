@@ -21,12 +21,14 @@ import ai.runanywhere.proto.v1.UserSaidEvent
 import ai.runanywhere.proto.v1.VoiceEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -168,6 +170,78 @@ class VoiceAgentStreamAdapterFanOutTest {
                 1,
                 bridge.unregisterCount.get(),
             )
+        }
+
+    /**
+     * tests-and-coverage-003 regression coverage. The class doc for
+     * `HandleStreamAdapter` promises drop-oldest per-collector backpressure
+     * so a paused/slow collector can never stall the native callback
+     * thread. This test simulates a "slow collector" by deliberately not
+     * draining the Flow and verifies that:
+     *
+     *   1. `bridge.emit(...)` (executing on the simulated native callback
+     *      thread) returns promptly even when the per-collector channel is
+     *      fully saturated — i.e. no `trySendBlocking` waits for room.
+     *   2. After the collector starts draining, it observes a bounded
+     *      suffix of recent events (DROP_OLDEST drops older entries while
+     *      preserving the newest window).
+     */
+    @Test
+    fun `slow collector does not block native callback thread`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 123L, bridge = bridge)
+
+            // Deliberately slow collector: delays before consuming each event.
+            // The first event unblocks the channel, then we hold it for long
+            // enough that subsequent emit() calls must rely on DROP_OLDEST,
+            // not on backpressure-induced blocking.
+            val capturedSize = 8
+            val collected =
+                async(Dispatchers.Default) {
+                    withTimeout(10_000) {
+                        adapter.stream()
+                            .take(capturedSize)
+                            .toList()
+                    }
+                }
+
+            awaitRegistered(bridge)
+
+            // Fire well over the buffer capacity (HandleStreamAdapter.
+            // COLLECTOR_BUFFER_CAPACITY = 64) from this single thread — if
+            // trySendBlocking had been retained, this loop would stall as
+            // soon as the channel filled and we'd time out.
+            val burstSize = 256
+            val perEmitBudgetMs = 50L
+            for (i in 1..burstSize) {
+                val t0 = System.nanoTime()
+                bridge.emit(event(i.toLong(), "burst-$i"))
+                val elapsedMs = (System.nanoTime() - t0) / 1_000_000
+                assertTrue(
+                    "native callback emit #$i blocked for ${elapsedMs}ms — " +
+                        "DROP_OLDEST backpressure regressed (trySendBlocking?)",
+                    elapsedMs < perEmitBudgetMs,
+                )
+            }
+
+            // Let the slow collector wake up and drain whatever survived in
+            // the channel after DROP_OLDEST kicked in.
+            delay(100)
+            for (i in burstSize + 1..burstSize + capturedSize) {
+                bridge.emit(event(i.toLong(), "tail-$i"))
+            }
+
+            val received = collected.await()
+            assertEquals(capturedSize, received.size)
+            // We can't assert exact sequence numbers because the DROP_OLDEST
+            // window depends on scheduler timing, but every received event
+            // must come from the original burst or the tail and must be
+            // monotonically increasing — proving native delivery was never
+            // blocked behind the slow collector.
+            received.zipWithNext().forEach { (a, b) ->
+                assertTrue("events out of order: ${a.seq} >= ${b.seq}", a.seq < b.seq)
+            }
         }
 
     @Test

@@ -216,6 +216,19 @@ public class LLMStreamEvent(
     schemaIndex = 16,
   )
   public val elapsed_ms: Long = 0L,
+  /**
+   * hotspot-idl-002: structured tool-call payload emitted alongside an
+   * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+   * field the tool-call event kind carries no proto-typed payload and
+   * SDK consumers must fall back to JSON-parsing the raw `token` text.
+   */
+  @field:WireField(
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
+    jsonName = "toolCall",
+    schemaIndex = 17,
+  )
+  public val tool_call: ToolCall? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -246,6 +259,7 @@ public class LLMStreamEvent(
     if (prompt_tokens_processed != other.prompt_tokens_processed) return false
     if (completion_tokens_generated != other.completion_tokens_generated) return false
     if (elapsed_ms != other.elapsed_ms) return false
+    if (tool_call != other.tool_call) return false
     return true
   }
 
@@ -270,6 +284,7 @@ public class LLMStreamEvent(
       result_ = result_ * 37 + prompt_tokens_processed.hashCode()
       result_ = result_ * 37 + completion_tokens_generated.hashCode()
       result_ = result_ * 37 + elapsed_ms.hashCode()
+      result_ = result_ * 37 + (tool_call?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -294,6 +309,7 @@ public class LLMStreamEvent(
     result_ += """prompt_tokens_processed=$prompt_tokens_processed"""
     result_ += """completion_tokens_generated=$completion_tokens_generated"""
     result_ += """elapsed_ms=$elapsed_ms"""
+    if (tool_call != null) result_ += """tool_call=$tool_call"""
     return result_.joinToString(prefix = "LLMStreamEvent{", separator = ", ", postfix = "}")
   }
 
@@ -315,10 +331,11 @@ public class LLMStreamEvent(
     prompt_tokens_processed: Int = this.prompt_tokens_processed,
     completion_tokens_generated: Int = this.completion_tokens_generated,
     elapsed_ms: Long = this.elapsed_ms,
+    tool_call: ToolCall? = this.tool_call,
     unknownFields: ByteString = this.unknownFields,
   ): LLMStreamEvent = LLMStreamEvent(seq, timestamp_us, token, is_final, kind, token_id, logprob,
       finish_reason, error_message, result, error_code, event_kind, request_id, conversation_id,
-      prompt_tokens_processed, completion_tokens_generated, elapsed_ms, unknownFields)
+      prompt_tokens_processed, completion_tokens_generated, elapsed_ms, tool_call, unknownFields)
 
   public companion object {
     @JvmField
@@ -361,6 +378,7 @@ public class LLMStreamEvent(
             ProtoAdapter.INT32.encodedSizeWithTag(16, value.completion_tokens_generated)
         if (value.elapsed_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(17,
             value.elapsed_ms)
+        size += ToolCall.ADAPTER.encodedSizeWithTag(18, value.tool_call)
         return size
       }
 
@@ -390,11 +408,13 @@ public class LLMStreamEvent(
         if (value.completion_tokens_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
             value.completion_tokens_generated)
         if (value.elapsed_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
+        ToolCall.ADAPTER.encodeWithTag(writer, 18, value.tool_call)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamEvent) {
         writer.writeBytes(value.unknownFields)
+        ToolCall.ADAPTER.encodeWithTag(writer, 18, value.tool_call)
         if (value.elapsed_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
         if (value.completion_tokens_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
             value.completion_tokens_generated)
@@ -440,6 +460,7 @@ public class LLMStreamEvent(
         var prompt_tokens_processed: Int = 0
         var completion_tokens_generated: Int = 0
         var elapsed_ms: Long = 0L
+        var tool_call: ToolCall? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -467,6 +488,7 @@ public class LLMStreamEvent(
             15 -> prompt_tokens_processed = ProtoAdapter.INT32.decode(reader)
             16 -> completion_tokens_generated = ProtoAdapter.INT32.decode(reader)
             17 -> elapsed_ms = ProtoAdapter.INT64.decode(reader)
+            18 -> tool_call = ToolCall.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -488,12 +510,14 @@ public class LLMStreamEvent(
           prompt_tokens_processed = prompt_tokens_processed,
           completion_tokens_generated = completion_tokens_generated,
           elapsed_ms = elapsed_ms,
+          tool_call = tool_call,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMStreamEvent): LLMStreamEvent = value.copy(
         result = value.result?.let(LLMStreamFinalResult.ADAPTER::redact),
+        tool_call = value.tool_call?.let(ToolCall.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

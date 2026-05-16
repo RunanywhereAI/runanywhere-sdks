@@ -20,8 +20,13 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  # Core SDK dependency (provides RACommons)
-  runanywhere: ^0.19.0
+  # Core SDK dependency (provides RACommons).
+  # Backend packages must lockstep with the core/native ABI: the published
+  # 0.19.13 backend ships against the 0.19.13 native binaries, so the version
+  # range floor MUST match this release. ^0.19.13 still permits any 0.19.x
+  # patch >=13 (and any future 0.19.x minor in the caret range), so consumers
+  # can still upgrade core within the published patch suite.
+  runanywhere: ^0.19.13
   ffi: ^2.1.0
 
 dev_dependencies:

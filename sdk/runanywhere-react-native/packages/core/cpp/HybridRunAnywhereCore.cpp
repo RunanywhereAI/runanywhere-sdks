@@ -294,7 +294,13 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
 
         LOGI("Destroying Core SDK...");
 
-        // Cleanup in reverse order
+        // HOTSPOT-RN-CORE-002: tear down voice/component globals + the
+        // commons lifecycle registry FIRST so any in-flight component
+        // callbacks/streams stop referencing soon-to-be-destroyed bridges.
+        // Defined in HybridRunAnywhereCore+Voice.cpp.
+        resetAllGlobalComponentHandles();
+
+        // Cleanup bridges in reverse-init order.
         TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
         DownloadBridge::shared().shutdown();
         FileManagerBridge::shared().shutdown();

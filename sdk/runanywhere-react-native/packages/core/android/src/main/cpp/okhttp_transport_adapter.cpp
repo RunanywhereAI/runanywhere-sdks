@@ -30,8 +30,12 @@
  * callback returns false the Kotlin side calls `Call.cancel()` and we
  * surface `RAC_ERROR_CANCELLED`.
  *
- * Resume: left as NULL in the vtable so libcurl handles resumable
- * downloads for now (mirrors the Kotlin download manager path).
+ * Resume (RN-CORE-001): mirrors the iOS URLSessionHttpTransport and the
+ * Kotlin SDK's OkHttpHttpTransport — `request_resume` calls Kotlin's
+ * `executeResumeRequest`, which attaches a `Range: bytes=N-` header and
+ * surfaces a synthetic `X-RAC-Range-Honored` response header so the C++
+ * download manager can distinguish 206 (Range honored) from 200 (server
+ * replayed the full file).
  */
 
 #include <jni.h>
@@ -73,6 +77,7 @@ struct OkHttpTransportGlobals {
     jclass transport_cls = nullptr;         // global ref to OkHttpTransport
     jmethodID execute_request_mid = nullptr;
     jmethodID execute_streaming_request_mid = nullptr;
+    jmethodID execute_resume_request_mid = nullptr;  // RN-CORE-001
     jclass response_cls = nullptr;          // global ref to OkHttpTransport$HttpResponse
     jfieldID f_status_code = nullptr;
     jfieldID f_headers = nullptr;
@@ -472,6 +477,117 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     return rc;
 }
 
+// RN-CORE-001: real resume implementation. Mirrors `okhttp_request_stream`
+// but invokes Kotlin's `executeResumeRequest` so the OkHttp call attaches a
+// `Range: bytes=<resume_from_byte>-` header. Without this, RN Android
+// downloads of partial native models fall through `rac_http_request_resume`
+// in commons and fail with `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
+rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t* req,
+                                   uint64_t resume_from_byte, rac_http_body_chunk_fn cb,
+                                   void* cb_user_data, rac_http_response_t* out_resp_meta) {
+    if (req == nullptr || out_resp_meta == nullptr) return RAC_ERROR_INVALID_ARGUMENT;
+    if (req->method == nullptr || req->url == nullptr) return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto& g = globals();
+    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr ||
+        g.execute_resume_request_mid == nullptr) {
+        LOGe("okhttp_request_resume: adapter not fully initialized");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    ScopedJniEnv scope(g.jvm);
+    JNIEnv* env = scope.env();
+    if (env == nullptr) {
+        LOGe("okhttp_request_resume: AttachCurrentThread failed");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jstring j_method = env->NewStringUTF(req->method);
+    jstring j_url = env->NewStringUTF(req->url);
+    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
+    if (j_headers == nullptr) {
+        jclass strCls = env->FindClass("java/lang/String");
+        j_headers = env->NewObjectArray(0, strCls, nullptr);
+        if (strCls != nullptr) env->DeleteLocalRef(strCls);
+    }
+
+    jbyteArray j_body = nullptr;
+    if (req->body_bytes != nullptr && req->body_len > 0) {
+        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
+        if (j_body != nullptr) {
+            env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
+                                    reinterpret_cast<const jbyte*>(req->body_bytes));
+        }
+    }
+
+    jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+    jlong j_resume_from = static_cast<jlong>(resume_from_byte);
+    jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
+    jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
+
+    jobject j_resp = env->CallStaticObjectMethod(
+        g.transport_cls, g.execute_resume_request_mid, j_method, j_url, j_headers, j_body,
+        j_timeout_ms, j_resume_from, j_native_cb, j_native_ud);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        if (j_method) env->DeleteLocalRef(j_method);
+        if (j_url) env->DeleteLocalRef(j_url);
+        if (j_headers) env->DeleteLocalRef(j_headers);
+        if (j_body) env->DeleteLocalRef(j_body);
+        LOGe("okhttp_request_resume: executeResumeRequest threw");
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    if (j_method) env->DeleteLocalRef(j_method);
+    if (j_url) env->DeleteLocalRef(j_url);
+    if (j_headers) env->DeleteLocalRef(j_headers);
+    if (j_body) env->DeleteLocalRef(j_body);
+
+    if (j_resp == nullptr) {
+        LOGe("okhttp_request_resume: null response object");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jint status_code = env->GetIntField(j_resp, g.f_sr_status_code);
+    auto j_headers_out = reinterpret_cast<jobjectArray>(
+        env->GetObjectField(j_resp, g.f_sr_headers));
+    auto j_error_msg = reinterpret_cast<jstring>(
+        env->GetObjectField(j_resp, g.f_sr_error_message));
+    jboolean j_cancelled = env->GetBooleanField(j_resp, g.f_sr_cancelled);
+
+    if (j_cancelled == JNI_TRUE) {
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out) env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg) env->DeleteLocalRef(j_error_msg);
+        return RAC_ERROR_CANCELLED;
+    }
+
+    if (status_code == 0 && j_error_msg != nullptr) {
+        const char* chars = env->GetStringUTFChars(j_error_msg, nullptr);
+        std::string msg = chars ? chars : "";
+        if (chars) env->ReleaseStringUTFChars(j_error_msg, chars);
+        LOGe("okhttp_request_resume: transport error: %s", msg.c_str());
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out) env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg) env->DeleteLocalRef(j_error_msg);
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+    out_resp_meta->status = static_cast<int32_t>(status_code);
+
+    rac_result_t rc = copy_jstring_headers(env, j_headers_out, &out_resp_meta->headers,
+                                           &out_resp_meta->header_count);
+
+    env->DeleteLocalRef(j_resp);
+    if (j_headers_out) env->DeleteLocalRef(j_headers_out);
+    if (j_error_msg) env->DeleteLocalRef(j_error_msg);
+
+    return rc;
+}
+
 void okhttp_destroy(void* /*user_data*/) {
     auto& g = globals();
     std::lock_guard<std::mutex> lock(g.mu);
@@ -506,6 +622,7 @@ void okhttp_destroy(void* /*user_data*/) {
     }
     g.execute_request_mid = nullptr;
     g.execute_streaming_request_mid = nullptr;
+    g.execute_resume_request_mid = nullptr;
     g.f_status_code = nullptr;
     g.f_headers = nullptr;
     g.f_body_bytes = nullptr;
@@ -522,7 +639,7 @@ void okhttp_destroy(void* /*user_data*/) {
 rac_http_transport_ops_t kOps = {
     /*request_send*/ okhttp_request_send,
     /*request_stream*/ okhttp_request_stream,
-    /*request_resume*/ nullptr,       // libcurl keeps handling resume for now
+    /*request_resume*/ okhttp_request_resume,  // RN-CORE-001
     /*init*/ nullptr,
     /*destroy*/ okhttp_destroy,
 };
@@ -600,6 +717,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         return RAC_ERROR_INTERNAL;
     }
 
+    // RN-CORE-001: Signature: (String, String, String[], byte[], long, long, long, long)
+    //                          -> OkHttpTransport$StreamResponse
+    g.execute_resume_request_mid = env->GetStaticMethodID(
+        g.transport_cls, "executeResumeRequest",
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJJ)"
+        "Lcom/runanywhere/sdk/foundation/http/OkHttpTransport$StreamResponse;");
+    if (g.execute_resume_request_mid == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: executeResumeRequest method not found");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        g.transport_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
     // Cache the HttpResponse class + field IDs.
     jclass local_resp_cls =
         env->FindClass("com/runanywhere/sdk/foundation/http/OkHttpTransport$HttpResponse");
@@ -610,6 +744,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         g.transport_cls = nullptr;
         g.execute_request_mid = nullptr;
         g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
         return RAC_ERROR_INTERNAL;
     }
     g.response_cls = reinterpret_cast<jclass>(env->NewGlobalRef(local_resp_cls));
@@ -630,6 +765,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         g.response_cls = nullptr;
         g.execute_request_mid = nullptr;
         g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
         return RAC_ERROR_INTERNAL;
     }
 
@@ -645,6 +781,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         g.response_cls = nullptr;
         g.execute_request_mid = nullptr;
         g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
         return RAC_ERROR_INTERNAL;
     }
     g.stream_response_cls = reinterpret_cast<jclass>(env->NewGlobalRef(local_sr_cls));
@@ -668,6 +805,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         g.stream_response_cls = nullptr;
         g.execute_request_mid = nullptr;
         g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
         return RAC_ERROR_INTERNAL;
     }
 
@@ -687,6 +825,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
         g.stream_response_cls = nullptr;
         g.execute_request_mid = nullptr;
         g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
         g.initialized = false;
         return rc;
     }

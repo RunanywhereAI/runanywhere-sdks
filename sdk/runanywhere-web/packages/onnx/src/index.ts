@@ -14,53 +14,24 @@
  *      RACommons module — failures are logged and ignored, speech
  *      remains available via the standalone provider.
  *
+ * # Public surface
+ *
+ * The package root intentionally exposes ONLY the registration facade
+ * (`ONNX`, `autoRegister`) and its option types. The standalone Sherpa
+ * loader, MEMFS-oriented wrapper classes (`StandaloneSherpaVad`,
+ * `StandaloneSherpaTts`, `StandaloneSherpaStt`), provider installer,
+ * and upstream-helper accessors are deliberately NOT exported here:
+ * they exist as a temporary workaround for the proto-byte plugin path,
+ * and exposing them publicly would lock the workaround into the
+ * package's SemVer contract. Public speech usage stays on
+ * `RunAnywhere.{transcribe,synthesize,detectVoiceActivity}`.
+ *
+ * Internal callers that genuinely need those modules import them
+ * relatively from `./Foundation/*` inside this package; nothing
+ * outside `@runanywhere/web-onnx` is expected to depend on them.
+ *
  * @packageDocumentation
  */
 
 export { ONNX, autoRegister } from './ONNX';
 export type { ONNXRegisterOptions } from './ONNX';
-
-export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
-export type { SherpaONNXBridgeLoadOptions } from './Foundation/SherpaONNXBridge';
-
-export {
-  getStandaloneSherpaModule,
-  isStandaloneSherpaLoaded,
-  setStandaloneSherpaWasmLocation,
-  tryStandaloneSherpaModule,
-} from './Foundation/StandaloneSherpaModule';
-export type {
-  StandaloneSherpaLoadOptions,
-  StandaloneSherpaModule,
-} from './Foundation/StandaloneSherpaModule';
-
-export { StandaloneSherpaVad } from './Foundation/StandaloneSherpaVad';
-export type {
-  StandaloneSherpaVadConfig,
-} from './Foundation/StandaloneSherpaVad';
-
-export { StandaloneSherpaTts } from './Foundation/StandaloneSherpaTts';
-export type {
-  StandaloneSherpaTtsConfig,
-  StandaloneSherpaTtsResult,
-  StandaloneSherpaTtsVitsConfig,
-} from './Foundation/StandaloneSherpaTts';
-
-export { StandaloneSherpaStt } from './Foundation/StandaloneSherpaStt';
-export type {
-  StandaloneSherpaSttConfig,
-  StandaloneSherpaSttResult,
-  StandaloneSherpaSttWhisperConfig,
-} from './Foundation/StandaloneSherpaStt';
-
-export {
-  getInstalledStandaloneSherpaSpeechProvider,
-  installStandaloneSherpaSpeechProvider,
-  uninstallStandaloneSherpaSpeechProvider,
-} from './Foundation/StandaloneSherpaSpeechProvider';
-
-export { setSherpaUpstreamHelperBase } from './Foundation/SherpaUpstreamHelpers';
-export type {
-  SherpaASRHelpers,
-  SherpaConfigHandle,
-} from './Foundation/SherpaUpstreamHelpers';

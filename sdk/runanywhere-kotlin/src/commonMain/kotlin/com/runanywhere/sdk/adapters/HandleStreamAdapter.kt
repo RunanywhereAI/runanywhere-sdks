@@ -55,10 +55,11 @@
 package com.runanywhere.sdk.adapters
 
 import com.squareup.wire.Message
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 
 /**
@@ -128,7 +129,14 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             }
 
             awaitClose { fanOut.detach(channel) }
-        }
+        }.buffer(
+            // Per-collector bounded channel that drops the oldest event on
+            // overflow rather than blocking the native dispatcher. Matches
+            // the class-doc backpressure contract above and Swift's
+            // AsyncStream parity (yield never blocks the C callback).
+            capacity = COLLECTOR_BUFFER_CAPACITY,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
 
     /**
      * Force-tear down the per-handle registration regardless of
@@ -193,29 +201,55 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
          * Detach a collector. When the last collector detaches the C
          * registration is torn down and this fan-out is removed from
          * the global registry.
+         *
+         * `unregister` and `removeFanOut` are invoked OUTSIDE
+         * `synchronized(lock)`. The C unregister contract may serialise
+         * on in-flight callback invocations, so calling it under the
+         * per-fan-out lock — which broadcast() also acquires from the
+         * native callback thread — risks an ABBA deadlock between two
+         * concurrent JNI callback threads. Mirrors Swift's
+         * `HandleStreamAdapter.tearDown` ordering.
          */
         fun detach(channel: SendChannel<Event>) {
-            synchronized(lock) {
-                collectors.remove(channel)
-                if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {
-                    unregister(handle, callbackId)
-                    callbackId = INVALID_CALLBACK_ID
-                    removeFanOut(storeKey)
+            val idToUnregister: Long =
+                synchronized(lock) {
+                    collectors.remove(channel)
+                    if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {
+                        val id = callbackId
+                        callbackId = INVALID_CALLBACK_ID
+                        id
+                    } else {
+                        INVALID_CALLBACK_ID
+                    }
                 }
+            if (idToUnregister != INVALID_CALLBACK_ID) {
+                removeFanOut(storeKey)
+                unregister(handle, idToUnregister)
             }
         }
 
-        /** Force teardown ignoring outstanding collectors. */
+        /**
+         * Force teardown ignoring outstanding collectors.
+         *
+         * Lock-ordering rule: snapshot collector list and capture the
+         * callback id under the lock, clear internal state under the
+         * lock, then release the lock before calling `unregister`,
+         * `removeFanOut`, and closing channels. See [detach] for the
+         * deadlock rationale.
+         */
         fun forceTearDown() {
             val snapshot: List<SendChannel<Event>>
-            synchronized(lock) {
-                if (callbackId != INVALID_CALLBACK_ID) {
-                    unregister(handle, callbackId)
+            val idToUnregister: Long =
+                synchronized(lock) {
+                    snapshot = collectors.toList()
+                    collectors.clear()
+                    val id = callbackId
                     callbackId = INVALID_CALLBACK_ID
+                    id
                 }
-                snapshot = collectors.toList()
-                collectors.clear()
+            if (idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
+                unregister(handle, idToUnregister)
             }
             for (c in snapshot) c.close()
         }
@@ -235,15 +269,30 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                     // collector and tear down — broadcasting garbage is
                     // strictly worse than failing fast (matches Swift's
                     // `finishAll()` on decode failure).
+                    //
+                    // Lock-ordering rule (mirrors Swift): snapshot +
+                    // clear under the lock, then RELEASE the lock
+                    // before calling `unregister`, `removeFanOut`,
+                    // and closing channels. broadcast() runs on a C
+                    // callback thread; many native unregister contracts
+                    // serialise on in-flight callbacks, so holding the
+                    // per-fan-out lock through unregister can deadlock
+                    // a second concurrent JNI callback thread that is
+                    // already waiting to acquire the same lock.
                     val snapshot: List<SendChannel<Event>>
-                    synchronized(lock) {
-                        snapshot = collectors.toList()
-                        collectors.clear()
-                        if (callbackId != INVALID_CALLBACK_ID) {
-                            unregister(handle, callbackId)
-                            callbackId = INVALID_CALLBACK_ID
-                            removeFanOut(storeKey)
+                    val idToUnregister: Long =
+                        synchronized(lock) {
+                            snapshot = collectors.toList()
+                            collectors.clear()
+                            val id = callbackId
+                            if (callbackId != INVALID_CALLBACK_ID) {
+                                callbackId = INVALID_CALLBACK_ID
+                            }
+                            id
                         }
+                    if (idToUnregister != INVALID_CALLBACK_ID) {
+                        removeFanOut(storeKey)
+                        unregister(handle, idToUnregister)
                     }
                     for (c in snapshot) c.close(t)
                     return
@@ -252,22 +301,36 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             val isFinal = isTerminalEvent?.invoke(event) ?: false
 
             // Snapshot collectors under the lock so concurrent attach /
-            // detach can't observe a torn list mid-broadcast.
+            // detach can't observe a torn list mid-broadcast. Capture
+            // the callback id to unregister AFTER the lock is released
+            // (see decode-error path above for the deadlock rationale).
             val snapshot: List<SendChannel<Event>>
-            synchronized(lock) {
-                snapshot = collectors.toList()
-                if (isFinal) {
-                    collectors.clear()
-                    if (callbackId != INVALID_CALLBACK_ID) {
-                        unregister(handle, callbackId)
-                        callbackId = INVALID_CALLBACK_ID
-                        removeFanOut(storeKey)
+            val idToUnregister: Long =
+                synchronized(lock) {
+                    snapshot = collectors.toList()
+                    if (isFinal) {
+                        collectors.clear()
+                        val id = callbackId
+                        if (callbackId != INVALID_CALLBACK_ID) {
+                            callbackId = INVALID_CALLBACK_ID
+                        }
+                        id
+                    } else {
+                        INVALID_CALLBACK_ID
                     }
                 }
+
+            if (isFinal && idToUnregister != INVALID_CALLBACK_ID) {
+                removeFanOut(storeKey)
+                unregister(handle, idToUnregister)
             }
 
             for (c in snapshot) {
-                c.trySendBlocking(event)
+                // Non-blocking offer: the per-collector channel is
+                // configured with BufferOverflow.DROP_OLDEST (see stream()),
+                // so a saturated slow collector drops its oldest queued
+                // event instead of suspending this native callback thread.
+                c.trySend(event)
                 if (isFinal) c.close()
             }
         }
@@ -284,6 +347,16 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
          * leaves no native registration in place.
          */
         const val INVALID_CALLBACK_ID: Long = 0L
+
+        /**
+         * Per-collector channel capacity. Sized for typical proto stream
+         * burst (LLM token tail, voice-agent partial-transcripts) so a
+         * momentarily-paused collector tolerates a brief pile-up before
+         * DROP_OLDEST kicks in. Tuned conservatively — the cost of a
+         * dropped intermediate event is far lower than blocking the
+         * native callback thread.
+         */
+        internal const val COLLECTOR_BUFFER_CAPACITY: Int = 64
 
         // Backed by a `MutableMap` + monitor rather than
         // `ConcurrentHashMap` so the generic stays in `commonMain`

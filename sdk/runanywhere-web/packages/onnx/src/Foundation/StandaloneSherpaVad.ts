@@ -1,31 +1,25 @@
 /**
- * StandaloneSherpaVad — direct C-API wrapper for `_SherpaOnnxCreateVoiceActivityDetector`
+ * StandaloneSherpaVad — wrapper around `_SherpaOnnxCreateVoiceActivityDetector`
  * (Silero VAD) on top of the standalone Sherpa Emscripten module.
  *
- * Struct layout matches `SherpaOnnxVadModelConfig` from
- * `sherpa-onnx/c-api/c-api.h`:
- *
- *   silero_vad : { model* (i8*), threshold (f32), min_silence_duration (f32),
- *                  min_speech_duration (f32), window_size (i32),
- *                  max_speech_duration (f32) }   // 6 * 4 = 24 bytes
- *   sample_rate (i32)
- *   num_threads (i32)
- *   provider* (i8*)
- *   debug (i32)
- *   ten_vad : same shape as silero, all zero = disabled.
- *
- * Total: 24 + 4*4 + 24 = 64 bytes.
+ * Struct packing for `SherpaOnnxVadModelConfig` is delegated to the
+ * upstream `sherpa-onnx-vad.js` helper (`initSherpaOnnxVadModelConfig`)
+ * loaded via `SherpaUpstreamHelpers`. The same upstream-helper pattern is
+ * used by `StandaloneSherpaStt` and `StandaloneSherpaTts`; this avoids
+ * re-implementing the byte layout of the Silero/TEN sub-configs in
+ * TypeScript and stays aligned with future sherpa-onnx upstream changes.
  */
 
 import { SDKLogger } from '@runanywhere/web/internal';
 import type { StandaloneSherpaModule } from './StandaloneSherpaModule';
+import {
+  loadSherpaVADHelpers,
+  type SherpaConfigHandle,
+  type SherpaVADHelpers,
+  type UpstreamVadConfig,
+} from './SherpaUpstreamHelpers';
 
 const logger = new SDKLogger('StandaloneSherpaVad');
-
-const SILERO_BLOCK_SIZE = 6 * 4;
-const TEN_BLOCK_SIZE = 6 * 4;
-const TOP_BLOCK_SIZE = 4 * 4;
-const VAD_CONFIG_SIZE = SILERO_BLOCK_SIZE + TOP_BLOCK_SIZE + TEN_BLOCK_SIZE;
 
 export interface StandaloneSherpaVadConfig {
   modelPath: string;
@@ -41,12 +35,23 @@ export interface StandaloneSherpaVadConfig {
   debug?: boolean;
 }
 
+let _helpersPromise: Promise<SherpaVADHelpers> | null = null;
+function getVADHelpers(): Promise<SherpaVADHelpers> {
+  if (!_helpersPromise) _helpersPromise = loadSherpaVADHelpers();
+  return _helpersPromise;
+}
+
 export class StandaloneSherpaVad {
   private handle: number = 0;
+  private cfgHandle: SherpaConfigHandle | null = null;
 
   constructor(private readonly module: StandaloneSherpaModule) {}
 
-  load(config: StandaloneSherpaVadConfig): void {
+  /**
+   * Load the Silero VAD model. Async because the upstream
+   * `sherpa-onnx-vad.js` helper is fetched + compiled lazily.
+   */
+  async load(config: StandaloneSherpaVadConfig): Promise<void> {
     if (this.handle) {
       this.destroy();
     }
@@ -59,51 +64,42 @@ export class StandaloneSherpaVad {
       );
     }
 
-    const cfgPtr = m._malloc(VAD_CONFIG_SIZE);
-    m.HEAPU8.fill(0, cfgPtr, cfgPtr + VAD_CONFIG_SIZE);
+    const helpers = await getVADHelpers();
+    const upstreamConfig: UpstreamVadConfig = {
+      sileroVad: {
+        model: config.modelPath,
+        threshold: config.threshold ?? 0.5,
+        minSilenceDuration: config.minSilenceDurationSec ?? 0.5,
+        minSpeechDuration: config.minSpeechDurationSec ?? 0.25,
+        windowSize: config.windowSize ?? 512,
+        maxSpeechDuration: config.maxSpeechDurationSec ?? 20,
+      },
+      sampleRate: config.sampleRate ?? 16000,
+      numThreads: config.numThreads ?? 1,
+      provider: config.provider ?? 'cpu',
+      debug: config.debug ? 1 : 0,
+    };
 
-    const modelPath = config.modelPath;
-    const modelPathLen = m.lengthBytesUTF8(modelPath) + 1;
-    const modelPathPtr = m._malloc(modelPathLen);
-    m.stringToUTF8(modelPath, modelPathPtr, modelPathLen);
-
-    const providerStr = config.provider ?? 'cpu';
-    const providerLen = m.lengthBytesUTF8(providerStr) + 1;
-    const providerPtr = m._malloc(providerLen);
-    m.stringToUTF8(providerStr, providerPtr, providerLen);
-
-    // silero_vad
-    m.setValue(cfgPtr + 0, modelPathPtr, 'i8*');
-    m.setValue(cfgPtr + 4, config.threshold ?? 0.5, 'float');
-    m.setValue(cfgPtr + 8, config.minSilenceDurationSec ?? 0.5, 'float');
-    m.setValue(cfgPtr + 12, config.minSpeechDurationSec ?? 0.25, 'float');
-    m.setValue(cfgPtr + 16, config.windowSize ?? 512, 'i32');
-    m.setValue(cfgPtr + 20, config.maxSpeechDurationSec ?? 20, 'float');
-
-    // top-level after silero block
-    const topOffset = cfgPtr + SILERO_BLOCK_SIZE;
-    m.setValue(topOffset + 0, config.sampleRate ?? 16000, 'i32');
-    m.setValue(topOffset + 4, config.numThreads ?? 1, 'i32');
-    m.setValue(topOffset + 8, providerPtr, 'i8*');
-    m.setValue(topOffset + 12, config.debug ? 1 : 0, 'i32');
+    const cfgHandle = helpers.initSherpaOnnxVadModelConfig(upstreamConfig, m);
+    this.cfgHandle = cfgHandle;
 
     try {
       const handle = m._SherpaOnnxCreateVoiceActivityDetector(
-        cfgPtr,
+        cfgHandle.ptr,
         config.bufferSizeInSeconds ?? 30,
       );
       if (!handle) {
+        this.releaseConfigHandle();
         throw new Error(
-          `_SherpaOnnxCreateVoiceActivityDetector returned NULL for model "${modelPath}". ` +
+          `_SherpaOnnxCreateVoiceActivityDetector returned NULL for model "${config.modelPath}". ` +
           'The Silero VAD model may be the v5 schema; sherpa-onnx 1.12.x requires v4.',
         );
       }
       this.handle = handle;
-      logger.info(`Standalone Sherpa VAD loaded (handle=${handle}, model=${modelPath})`);
-    } finally {
-      m._free(modelPathPtr);
-      m._free(providerPtr);
-      m._free(cfgPtr);
+      logger.info(`Standalone Sherpa VAD loaded (handle=${handle}, model=${config.modelPath})`);
+    } catch (err) {
+      this.releaseConfigHandle();
+      throw err;
     }
   }
 
@@ -112,12 +108,16 @@ export class StandaloneSherpaVad {
   }
 
   destroy(): void {
-    if (!this.handle) return;
+    if (!this.handle) {
+      this.releaseConfigHandle();
+      return;
+    }
     const m = this.module;
     if (typeof m._SherpaOnnxDestroyVoiceActivityDetector === 'function') {
       m._SherpaOnnxDestroyVoiceActivityDetector(this.handle);
     }
     this.handle = 0;
+    this.releaseConfigHandle();
   }
 
   /**
@@ -161,5 +161,18 @@ export class StandaloneSherpaVad {
     if (!this.handle) return;
     const fn = this.module._SherpaOnnxVoiceActivityDetectorReset;
     if (typeof fn === 'function') fn(this.handle);
+  }
+
+  private releaseConfigHandle(): void {
+    if (!this.cfgHandle) return;
+    const handle = this.cfgHandle;
+    this.cfgHandle = null;
+    void getVADHelpers()
+      .then((helpers) => helpers.freeConfig(handle, this.module))
+      .catch((err) => {
+        logger.warning(
+          `Failed to free VAD config handle: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   }
 }

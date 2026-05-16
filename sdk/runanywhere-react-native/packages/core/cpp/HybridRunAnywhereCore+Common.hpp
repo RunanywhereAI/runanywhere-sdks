@@ -502,4 +502,12 @@ std::string headersToJson(const std::vector<std::pair<std::string, std::string>>
 
 } // anonymous namespace
 
+// Voice/component teardown — defined in HybridRunAnywhereCore+Voice.cpp.
+// Destroys the global LLM/STT/TTS/VAD component handles and the global
+// voice-agent handle (if any), then resets the commons lifecycle registry.
+// Called from HybridRunAnywhereCore::destroy() so an SDK reset/destroy is
+// symmetric with initialize() and does not leak component state across
+// account/environment switches or test teardown.
+void resetAllGlobalComponentHandles();
+
 } // namespace margelo::nitro::runanywhere

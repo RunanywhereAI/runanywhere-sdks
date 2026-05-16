@@ -331,14 +331,19 @@ export function streamCallback<T>(
         if (stopWhen?.(event)) finish();
       };
 
-      const start = (): void => {
-        if (started) return;
-        started = true;
+      // HOTSPOT-WEB-CORE-002 / WEB-CORE-001: register the native callback
+      // synchronously (cheap pointer install) but DEFER the blocking native
+      // `call(callbackPtr)` until the next microtask. Without this defer,
+      // the iterator's first `next()` re-enters the synchronous Emscripten
+      // export, drains all events into the queue, and only then resolves —
+      // which means the public `await generateStream(...)` / streamCallback
+      // contract cannot return its handle before native generation begins
+      // and cancellation cannot interleave with a still-running call.
+      const installCallback = (): boolean => {
         if (!module.addFunction || !module.removeFunction || !module.HEAPU8) {
           fail(SDKException.wasmNotLoaded(`${functionName}: module missing callback helpers`));
-          return;
+          return false;
         }
-
         callbackPtr = module.addFunction((bytesPtr: number, size: number): CallbackResult => {
           if (!bytesPtr || size <= 0) return callbackReturnsBool ? 1 : undefined;
           try {
@@ -350,7 +355,15 @@ export function streamCallback<T>(
             return callbackReturnsBool ? 0 : undefined;
           }
         }, callbackSignature(callbackReturnsBool));
+        return true;
+      };
 
+      const runNativeCall = (): void => {
+        if (finished) {
+          // Cancelled before the deferred call started — nothing to invoke.
+          cleanup();
+          return;
+        }
         callActive = true;
         try {
           const rc = call(callbackPtr);
@@ -365,6 +378,19 @@ export function streamCallback<T>(
           callActive = false;
           cleanup();
         }
+      };
+
+      const start = (): void => {
+        if (started) return;
+        started = true;
+        if (!installCallback()) return;
+        // Run the blocking native call on a fresh microtask so the iterator's
+        // first `next()` resolves (or registers its waiter) before native
+        // code starts draining tokens. This keeps the AsyncIterable contract
+        // observable and lets `iterator.return()` / facade `cancel()` reach
+        // the `onCancel` hook before the blocking call begins for fake/test
+        // modules whose stream export can block on a deferred latch.
+        queueMicrotask(runNativeCall);
       };
 
       return {

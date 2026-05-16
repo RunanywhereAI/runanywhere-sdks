@@ -57,7 +57,13 @@
     "node": ">=18.0.0"
   },
   "peerDependencies": {
-    "@runanywhere/web": ">=0.19.13 <1"
+    "@runanywhere/web": ">=0.19.13 <1",
+    "@runanywhere/web-llamacpp": ">=0.19.13 <1"
+  },
+  "peerDependenciesMeta": {
+    "@runanywhere/web-llamacpp": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.6.0",

@@ -600,7 +600,15 @@ export interface ToolCallingSessionCreateRequest {
   formatHint: string;
   maxIterations: number;
   keepToolsAvailable: boolean;
-  validateCalls: boolean;
+  /**
+   * proto3 `optional` enables presence detection (has_validate_calls()).
+   * When unset, commons defaults to validate_calls=true (preserves the
+   * historical hard-coded behavior and the native run-loop / session
+   * contract that unknown tool calls short-circuit before host execution).
+   * Callers that delegate validation/authorization to their executor or
+   * use dynamic tool registries must explicitly set validate_calls=false.
+   */
+  validateCalls?: boolean | undefined;
 }
 
 export interface ToolCallingSessionCreateResult {
@@ -3198,7 +3206,7 @@ function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRe
     formatHint: "",
     maxIterations: 0,
     keepToolsAvailable: false,
-    validateCalls: false,
+    validateCalls: undefined,
   };
 }
 
@@ -3231,7 +3239,7 @@ export const ToolCallingSessionCreateRequest = {
     if (message.keepToolsAvailable !== false) {
       writer.uint32(40).bool(message.keepToolsAvailable);
     }
-    if (message.validateCalls !== false) {
+    if (message.validateCalls !== undefined) {
       writer.uint32(48).bool(message.validateCalls);
     }
     return writer;
@@ -3334,7 +3342,7 @@ export const ToolCallingSessionCreateRequest = {
       formatHint: isSet(object.formatHint) ? globalThis.String(object.formatHint) : "",
       maxIterations: isSet(object.maxIterations) ? globalThis.Number(object.maxIterations) : 0,
       keepToolsAvailable: isSet(object.keepToolsAvailable) ? globalThis.Boolean(object.keepToolsAvailable) : false,
-      validateCalls: isSet(object.validateCalls) ? globalThis.Boolean(object.validateCalls) : false,
+      validateCalls: isSet(object.validateCalls) ? globalThis.Boolean(object.validateCalls) : undefined,
     };
   },
 
@@ -3367,7 +3375,7 @@ export const ToolCallingSessionCreateRequest = {
     if (message.keepToolsAvailable !== false) {
       obj.keepToolsAvailable = message.keepToolsAvailable;
     }
-    if (message.validateCalls !== false) {
+    if (message.validateCalls !== undefined) {
       obj.validateCalls = message.validateCalls;
     }
     return obj;
@@ -3389,7 +3397,7 @@ export const ToolCallingSessionCreateRequest = {
     message.formatHint = object.formatHint ?? "";
     message.maxIterations = object.maxIterations ?? 0;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
-    message.validateCalls = object.validateCalls ?? false;
+    message.validateCalls = object.validateCalls ?? undefined;
     return message;
   },
 };

@@ -306,6 +306,13 @@ tasks.register("syncAndroidRuntimeLibs") {
     outputs.dirs(androidRuntimeAbis.map { file("$outputDir/$it") })
 
     doLast {
+        if (!useLocalNatives) {
+            logger.lifecycle(
+                "ONNX: skipping NDK runtime sync (useLocalNatives=false), " +
+                    "using libc++_shared.so from downloaded prebuilt zips.",
+            )
+            return@doLast
+        }
         syncAndroidNdkRuntimeLibs(outputDir)
         logger.lifecycle("ONNX: synced 16 KB-aligned Android NDK libc++ into $outputDir")
     }

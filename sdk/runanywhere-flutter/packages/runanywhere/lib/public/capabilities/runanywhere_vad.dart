@@ -23,10 +23,7 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
         VADConfiguration,
         VADOptions,
         VADProcessRequest,
-        VADResult,
-        VADStatistics;
-import 'package:runanywhere/generated/vad_options.pbenum.dart'
-    show VADStreamEventKind;
+        VADResult;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
@@ -43,7 +40,6 @@ class RunAnywhereVAD {
   static RunAnywhereVAD get shared => _instance;
 
   final _logger = SDKLogger('RunAnywhere.VAD');
-  final _activityController = StreamController<VADStreamEventKind>.broadcast();
 
   /// Initialize VAD with a generated configuration.
   Future<void> initializeVAD([VADConfiguration? config]) async {
@@ -133,25 +129,13 @@ class RunAnywhereVAD {
     await unloadModel();
   }
 
-  /// Stream of speech activity transitions.
-  Stream<VADStreamEventKind> get activityStream => _activityController.stream;
-
-  /// Register a single callback for speech activity events.
-  void setSpeechActivityCallback(
-    void Function(VADStreamEventKind event)? callback,
-  ) {}
-
-  /// Register a single callback for raw audio buffers.
-  void setAudioBufferCallback(
-    void Function(Float32List samples)? callback,
-  ) {}
-
-  /// Register a single callback for VAD statistics.
-  void setStatisticsCallback(
-    void Function(VADStatistics stats)? callback,
-  ) {}
-
   /// Stream VAD results from a continuous audio byte stream.
+  ///
+  /// Mirrors Swift's `RunAnywhere.streamVAD(audio:)`. The canonical Flutter
+  /// VAD surface is `detectVoiceActivity(...)` / `streamVAD(...)` / `reset()`.
+  /// Per-event callback setters were intentionally removed (see Swift's
+  /// public VAD surface in `RunAnywhere+VAD.swift`); subscribe to this
+  /// stream instead of registering a speech-activity callback.
   Stream<VADResult> streamVAD(Stream<Uint8List> audio) async* {
     await for (final chunk in audio) {
       yield await detectVoiceActivity(chunk);
@@ -249,7 +233,8 @@ class RunAnywhereVAD {
 
   /// Internal: tear down all controllers. Used by `RunAnywhere.reset()`.
   Future<void> dispose() async {
-    await _activityController.close();
+    // No long-lived controllers held by RunAnywhereVAD itself; per-call
+    // streams are owned by `streamVAD(...)` callers.
   }
 
   Future<VADResult> _processAudioData(

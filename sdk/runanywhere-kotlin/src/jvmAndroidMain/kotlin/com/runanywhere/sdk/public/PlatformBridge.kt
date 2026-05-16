@@ -9,6 +9,7 @@
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -59,11 +60,21 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey
 /**
  * Initialize CppBridge services (Phase 2).
  * This includes model assignment, platform services, and device registration.
+ *
+ * Returns `true` when the HTTP client adapter was configured with a usable
+ * external URL + credential, so commonMain can mark `_hasCompletedHTTPSetup`
+ * accordingly. Returns `false` for the offline/local-only path where Phase 2
+ * still completes but auth/device-registration/telemetry are deferred until
+ * the next [RunAnywhere.ensureServicesReady] call retries HTTP setup.
  */
-internal actual suspend fun initializePlatformBridgeServices() {
+internal actual suspend fun initializePlatformBridgeServices(): Boolean {
     logger.info("Initializing CppBridge services...")
     CppBridge.initializeServices()
-    logger.info("CppBridge services initialization complete")
+    val httpConfigured = HTTPClientAdapter.isConfigured
+    logger.info(
+        "CppBridge services initialization complete (httpConfigured=$httpConfigured)",
+    )
+    return httpConfigured
 }
 
 /**

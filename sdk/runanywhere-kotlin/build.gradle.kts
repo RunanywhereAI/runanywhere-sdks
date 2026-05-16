@@ -635,6 +635,19 @@ tasks.register("syncAndroidRuntimeLibs") {
     outputs.dirs(androidRuntimeAbis.map { file("$outputDir/$it") })
 
     doLast {
+        // NDK runtime sync (libc++_shared.so / libomp.so) is only required for
+        // the local source-build path. The remote prebuilt zips already ship
+        // the matching 16 KB-aligned sidecars, so on the `useLocalNatives=false`
+        // path we trust those artifacts instead of demanding a developer-local
+        // NDK toolchain (which is intentionally absent on JitPack-style and
+        // release-packaging machines).
+        if (!useLocalNatives) {
+            logger.lifecycle(
+                "Skipping Android NDK runtime sync: useLocalNatives=false, " +
+                    "trusting libc++_shared.so / libomp.so shipped in downloaded prebuilt zips.",
+            )
+            return@doLast
+        }
         syncAndroidNdkRuntimeLibs(outputDir, includeLibcxx = true, includeLibomp = true)
         logger.lifecycle("Synced 16 KB-aligned Android NDK runtime libs into $outputDir")
     }

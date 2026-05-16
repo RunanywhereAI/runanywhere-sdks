@@ -96,11 +96,22 @@ object CppBridgeTTS {
 
     // MARK: - TTS-specific operations
 
-    /** Stop any in-flight synthesis. No-op if the handle is not created. */
+    /**
+     * Stop any in-flight synthesis on the lifecycle-loaded TTS voice.
+     *
+     * Routes through `rac_tts_stop_lifecycle_proto`, mirroring Swift's
+     * lifecycle TTS stop ABI. The v2 public TTS path
+     * (`synthesizeStream` → `racTtsSynthesizeStreamLifecycleProto`)
+     * never creates the legacy ComponentActor handle, so the previous
+     * `racTtsComponentCancel(handle)` no-op did not actually stop the
+     * native synthesis. This call returns serialized `TTSServiceState`
+     * bytes; we ignore them — the caller only cares that the native
+     * synthesis is asked to stop.
+     */
     suspend fun stop() {
-        val handle = inner.existingHandle()
-        if (handle == 0L) return
-        RunAnywhereBridge.racTtsComponentCancel(handle)
+        // racTtsStopLifecycleProto is safe to call even when no voice is
+        // loaded: the C ABI returns RAC_ERROR_INVALID_STATE in that case.
+        RunAnywhereBridge.racTtsStopLifecycleProto()
     }
 
     /**

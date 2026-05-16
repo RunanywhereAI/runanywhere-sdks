@@ -142,7 +142,15 @@ export type {
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
 
+// SpeechProvider escape hatch — INTERNAL / EXPERIMENTAL only. See the
+// REMOVAL CONTRACT comment in `./Public/Extensions/SpeechProvider.ts`.
+// The proto-byte adapters (STTProtoAdapter / TTSProtoAdapter /
+// VADProtoAdapter) remain the canonical core speech path; the symbols
+// below MUST disappear once the unified racommons-llamacpp.wasm artifact
+// passes STT/TTS/VAD smoke tests with ORT + Sherpa linked in
+// (DUPLICATE-ABSTRACTIONS-AND-SOLID-001).
 export {
+  disposeSpeechProvider,
   getSpeechProvider,
   hasSpeechProviderSTT,
   hasSpeechProviderTTS,

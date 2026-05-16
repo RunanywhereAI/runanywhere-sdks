@@ -50,10 +50,10 @@
     "@runanywhere/proto-ts": "^0.21.0"
   },
   "peerDependencies": {
-    "@runanywhere/core": ">=0.16.0",
+    "@runanywhere/core": ">=0.19.13",
     "react": ">=18.0.0",
     "react-native": ">=0.74.0",
-    "react-native-nitro-modules": ">=0.31.3"
+    "react-native-nitro-modules": ">=0.33.9"
   },
   "devDependencies": {
     "nitrogen": "^0.33.9",

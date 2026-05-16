@@ -25,9 +25,17 @@ import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart
 
 /// Diffusion (image generation) capability surface.
 ///
-/// Access via `RunAnywhere.diffusion`. Load/current/unload state is
-/// owned by commons lifecycle; one-shot generation uses the lifecycle-owned
-/// generated-proto commons ABI.
+/// NOTE: This namespace is NOT part of the Swift-as-reference cross-SDK v2
+/// public contract yet — the `RunAnywhere.diffusion` getter and the public
+/// barrel export were removed under swift-parity-002-followup-flutter so
+/// Flutter does not advertise a surface that other SDKs do not implement.
+/// The class is retained for the day the cross-SDK v2 contract for image
+/// generation lands (proto-backed lifecycle stream/cancel/capabilities ABIs
+/// across Swift/Kotlin/RN/Web); callers that absolutely need it today must
+/// import this file directly and treat it as experimental/internal.
+///
+/// Load/current/unload state is owned by commons lifecycle; one-shot
+/// generation uses the lifecycle-owned generated-proto commons ABI.
 class RunAnywhereDiffusion {
   RunAnywhereDiffusion._();
   static final RunAnywhereDiffusion _instance = RunAnywhereDiffusion._();

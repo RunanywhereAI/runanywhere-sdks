@@ -27,7 +27,11 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -192,7 +196,7 @@ internal object ToolCallingOrchestrator {
     suspend fun generateWithTools(
         prompt: String,
         options: ToolCallingOptions? = null,
-    ): ToolCallingResult {
+    ): ToolCallingResult = coroutineScope {
         require(RunAnywhere.isInitialized) { "SDK not initialized" }
 
         val opts = options ?: ToolCallingOptions()
@@ -214,8 +218,16 @@ internal object ToolCallingOrchestrator {
                 tools = tools,
             )
 
+        // Decouple JNI callback thread from tool execution / step_with_result.
+        // The native session emits `tool_call` while holding session->mu (and
+        // before *out_session_handle is written), so calling step_with_result
+        // synchronously from the listener would either deadlock the session
+        // mutex or feed in session_handle=0. Instead, the listener does only
+        // non-blocking enqueue work; a worker coroutine drives step_with_result
+        // off-thread once the handle is known.
         val completion = CompletableDeferred<ToolCallingResult>()
-        var sessionHandle = 0L
+        val handleDeferred = CompletableDeferred<Long>()
+        val toolCallChannel = Channel<ToolCall>(capacity = Channel.UNLIMITED)
 
         val listener =
             NativeProtoProgressListener { bytes ->
@@ -223,37 +235,15 @@ internal object ToolCallingOrchestrator {
                 when {
                     event.final_result != null -> {
                         if (!completion.isCompleted) completion.complete(event.final_result)
+                        toolCallChannel.close()
                     }
                     event.tool_call != null -> {
-                        // Execute the tool on a non-JNI thread; feed result
-                        // back via step_with_result_proto. Run blocking on
-                        // IO so the native callback thread stays unblocked
-                        // only for the quick enqueue path.
-                        val toolCall = event.tool_call
-                        val handle = sessionHandle
-                        runBlocking {
-                            val tool = ToolRegistry.get(toolCall.name)
-                            val stepRequest = buildStepRequest(handle, toolCall, tool)
-                            val rc =
-                                RunAnywhereBridge.racToolCallingSessionStepWithResultProto(
-                                    ToolCallingSessionStepWithResultRequest.ADAPTER.encode(
-                                        stepRequest,
-                                    ),
-                                )
-                            if (rc != RunAnywhereBridge.RAC_SUCCESS &&
-                                !completion.isCompleted
-                            ) {
-                                completion.complete(
-                                    ToolCallingResult(
-                                        text = "",
-                                        is_complete = false,
-                                        error_message =
-                                            "racToolCallingSessionStepWithResultProto failed with rc=$rc",
-                                        error_code = rc,
-                                    ),
-                                )
-                            }
-                        }
+                        // Non-blocking enqueue. Channel.UNLIMITED guarantees
+                        // trySend succeeds; this keeps the JNI callback thread
+                        // unblocked so native run_generate_loop can pause and
+                        // rac_tool_calling_session_create_proto can return,
+                        // making the session handle visible to the worker.
+                        toolCallChannel.trySend(event.tool_call)
                     }
                     event.error_bytes != null -> {
                         val sdkError =
@@ -272,20 +262,64 @@ internal object ToolCallingOrchestrator {
                                 ),
                             )
                         }
+                        toolCallChannel.close()
                     }
                 }
                 true
             }
 
-        sessionHandle =
-            withContext(Dispatchers.IO) {
-                RunAnywhereBridge.racToolCallingSessionCreateProto(
-                    ToolCallingSessionCreateRequest.ADAPTER.encode(request),
-                    listener,
-                )
+        // Worker drains queued tool_calls and feeds step_with_result on a
+        // separate thread, so it can re-acquire session->mu only after the
+        // create / previous step call has released it.
+        val worker =
+            launch(Dispatchers.IO) {
+                val handle = handleDeferred.await()
+                if (handle == 0L) return@launch
+                for (toolCall in toolCallChannel) {
+                    val tool = ToolRegistry.get(toolCall.name)
+                    val stepRequest = buildStepRequest(handle, toolCall, tool)
+                    val rc =
+                        RunAnywhereBridge.racToolCallingSessionStepWithResultProto(
+                            ToolCallingSessionStepWithResultRequest.ADAPTER.encode(stepRequest),
+                        )
+                    if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                        if (!completion.isCompleted) {
+                            completion.complete(
+                                ToolCallingResult(
+                                    text = "",
+                                    is_complete = false,
+                                    error_message =
+                                        "racToolCallingSessionStepWithResultProto failed with rc=$rc",
+                                    error_code = rc,
+                                ),
+                            )
+                        }
+                        toolCallChannel.close()
+                        break
+                    }
+                }
             }
+
+        val sessionHandle =
+            try {
+                withContext(Dispatchers.IO) {
+                    RunAnywhereBridge.racToolCallingSessionCreateProto(
+                        ToolCallingSessionCreateRequest.ADAPTER.encode(request),
+                        listener,
+                    )
+                }
+            } catch (t: Throwable) {
+                handleDeferred.complete(0L)
+                toolCallChannel.close()
+                worker.cancelAndJoin()
+                throw t
+            }
+        handleDeferred.complete(sessionHandle)
+
         if (sessionHandle == 0L) {
-            return ToolCallingResult(
+            toolCallChannel.close()
+            worker.join()
+            return@coroutineScope ToolCallingResult(
                 text = "",
                 is_complete = false,
                 error_message = "racToolCallingSessionCreateProto returned 0",
@@ -294,9 +328,11 @@ internal object ToolCallingOrchestrator {
         }
 
         try {
-            return completion.await()
+            completion.await()
         } finally {
-            withContext(Dispatchers.IO) {
+            toolCallChannel.close()
+            worker.cancelAndJoin()
+            withContext(NonCancellable + Dispatchers.IO) {
                 RunAnywhereBridge.racToolCallingSessionDestroyProto(sessionHandle)
             }
         }
