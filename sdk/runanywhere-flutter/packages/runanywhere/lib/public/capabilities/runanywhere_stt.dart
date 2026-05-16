@@ -14,6 +14,8 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/convenience/ra_convenience.dart'
+    show STTLanguageWireString;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
@@ -24,7 +26,6 @@ import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
-import 'package:runanywhere/public/extensions/stt/stt_options_helpers.dart';
 
 /// STT (speech-to-text) capability surface.
 ///
@@ -365,7 +366,8 @@ class RunAnywhereSTT {
     }
     if (!opts.hasLanguageCode() &&
         opts.language != STTLanguage.STT_LANGUAGE_AUTO) {
-      opts.languageCode = opts.language.bcp47 ?? 'en';
+      final code = opts.language.wireString;
+      opts.languageCode = code.isEmpty ? 'en' : code;
     }
     return opts;
   }

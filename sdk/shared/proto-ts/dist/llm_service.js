@@ -14,6 +14,7 @@ exports.lLMStreamEventKindToJSON = lLMStreamEventKindToJSON;
 /* eslint-disable */
 const long_1 = __importDefault(require("long"));
 const minimal_1 = __importDefault(require("protobufjs/minimal"));
+const tool_calling_1 = require("./tool_calling");
 const voice_events_1 = require("./voice_events");
 exports.protobufPackage = "runanywhere.v1";
 var LLMStreamEventKind;
@@ -599,6 +600,8 @@ function createBaseLLMStreamFinalResult() {
         errorMessage: "",
         promptEvalTimeMs: 0,
         decodeTimeMs: 0,
+        toolCalls: [],
+        toolResults: [],
     };
 }
 exports.LLMStreamFinalResult = {
@@ -641,6 +644,12 @@ exports.LLMStreamFinalResult = {
         }
         if (message.decodeTimeMs !== 0) {
             writer.uint32(104).int64(message.decodeTimeMs);
+        }
+        for (const v of message.toolCalls) {
+            tool_calling_1.ToolCall.encode(v, writer.uint32(114).fork()).ldelim();
+        }
+        for (const v of message.toolResults) {
+            tool_calling_1.ToolResult.encode(v, writer.uint32(122).fork()).ldelim();
         }
         return writer;
     },
@@ -729,6 +738,18 @@ exports.LLMStreamFinalResult = {
                     }
                     message.decodeTimeMs = longToNumber(reader.int64());
                     continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.toolCalls.push(tool_calling_1.ToolCall.decode(reader, reader.uint32()));
+                    continue;
+                case 15:
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.toolResults.push(tool_calling_1.ToolResult.decode(reader, reader.uint32()));
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -752,6 +773,12 @@ exports.LLMStreamFinalResult = {
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
             promptEvalTimeMs: isSet(object.promptEvalTimeMs) ? globalThis.Number(object.promptEvalTimeMs) : 0,
             decodeTimeMs: isSet(object.decodeTimeMs) ? globalThis.Number(object.decodeTimeMs) : 0,
+            toolCalls: globalThis.Array.isArray(object?.toolCalls)
+                ? object.toolCalls.map((e) => tool_calling_1.ToolCall.fromJSON(e))
+                : [],
+            toolResults: globalThis.Array.isArray(object?.toolResults)
+                ? object.toolResults.map((e) => tool_calling_1.ToolResult.fromJSON(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -795,6 +822,12 @@ exports.LLMStreamFinalResult = {
         if (message.decodeTimeMs !== 0) {
             obj.decodeTimeMs = Math.round(message.decodeTimeMs);
         }
+        if (message.toolCalls?.length) {
+            obj.toolCalls = message.toolCalls.map((e) => tool_calling_1.ToolCall.toJSON(e));
+        }
+        if (message.toolResults?.length) {
+            obj.toolResults = message.toolResults.map((e) => tool_calling_1.ToolResult.toJSON(e));
+        }
         return obj;
     },
     create(base) {
@@ -815,6 +848,8 @@ exports.LLMStreamFinalResult = {
         message.errorMessage = object.errorMessage ?? "";
         message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
         message.decodeTimeMs = object.decodeTimeMs ?? 0;
+        message.toolCalls = object.toolCalls?.map((e) => tool_calling_1.ToolCall.fromPartial(e)) || [];
+        message.toolResults = object.toolResults?.map((e) => tool_calling_1.ToolResult.fromPartial(e)) || [];
         return message;
     },
 };
@@ -837,6 +872,7 @@ function createBaseLLMStreamEvent() {
         promptTokensProcessed: 0,
         completionTokensGenerated: 0,
         elapsedMs: 0,
+        toolCall: undefined,
     };
 }
 exports.LLMStreamEvent = {
@@ -891,6 +927,9 @@ exports.LLMStreamEvent = {
         }
         if (message.elapsedMs !== 0) {
             writer.uint32(136).int64(message.elapsedMs);
+        }
+        if (message.toolCall !== undefined) {
+            tool_calling_1.ToolCall.encode(message.toolCall, writer.uint32(146).fork()).ldelim();
         }
         return writer;
     },
@@ -1003,6 +1042,12 @@ exports.LLMStreamEvent = {
                     }
                     message.elapsedMs = longToNumber(reader.int64());
                     continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.toolCall = tool_calling_1.ToolCall.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1032,6 +1077,7 @@ exports.LLMStreamEvent = {
                 ? globalThis.Number(object.completionTokensGenerated)
                 : 0,
             elapsedMs: isSet(object.elapsedMs) ? globalThis.Number(object.elapsedMs) : 0,
+            toolCall: isSet(object.toolCall) ? tool_calling_1.ToolCall.fromJSON(object.toolCall) : undefined,
         };
     },
     toJSON(message) {
@@ -1087,6 +1133,9 @@ exports.LLMStreamEvent = {
         if (message.elapsedMs !== 0) {
             obj.elapsedMs = Math.round(message.elapsedMs);
         }
+        if (message.toolCall !== undefined) {
+            obj.toolCall = tool_calling_1.ToolCall.toJSON(message.toolCall);
+        }
         return obj;
     },
     create(base) {
@@ -1113,6 +1162,9 @@ exports.LLMStreamEvent = {
         message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
         message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
         message.elapsedMs = object.elapsedMs ?? 0;
+        message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+            ? tool_calling_1.ToolCall.fromPartial(object.toolCall)
+            : undefined;
         return message;
     },
 };

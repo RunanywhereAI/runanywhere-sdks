@@ -6,6 +6,7 @@ import {
   type TTSOutput as ProtoTTSOutput,
   type TTSVoiceInfo as ProtoTTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
 import {
   adapterState,
@@ -83,10 +84,18 @@ export class TTSProtoAdapter {
     text: string,
     options: ProtoTTSOptions,
   ): AsyncIterable<ProtoTTSOutput> {
+    const optionsBytes = TTSOptions.encode(options).finish();
+    // T6.1: prefer Worker path when available; otherwise main-thread MVP.
+    const offscreen = OffscreenRuntimeBridge.tryGet();
+    if (offscreen != null) {
+      return offscreen.getStreamIterator(
+        { kind: 'stream.tts.synthesize', handle, text, optionsBytes },
+        TTSOutput,
+      );
+    }
     requireExports(this.module, 'tts.synthesizeStream', [
       '_rac_tts_component_synthesize_stream_proto',
     ]);
-    const optionsBytes = TTSOptions.encode(options).finish();
     return streamCallback(
       this.module,
       TTSOutput,

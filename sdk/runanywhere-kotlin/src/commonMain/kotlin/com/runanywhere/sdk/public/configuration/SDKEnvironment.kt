@@ -31,21 +31,13 @@ typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
 
 // ════════════════════════════════════════════════════════════════════════════
 // Extensions (preserved from the hand-written enum)
+//
+// `wireString` and the reverse `fromWireString` factory are emitted by the
+// convenience codegen (see `generated/convenience/RAConvenience.kt`) — the
+// hand-written drift was retired in T6.4. Import them from
+// `com.runanywhere.sdk.generated.convenience` (extension property +
+// `Companion.fromWireString` factory).
 // ════════════════════════════════════════════════════════════════════════════
-
-/**
- * Lowercase wire string ("development" / "staging" / "production" /
- * "unspecified"). Used by Sentry tags, log-line tags, and any other
- * identifier that wants the short case name rather than the proto prefix.
- */
-val SDKEnvironment.wireString: String
-    get() =
-        when (this) {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "development"
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> "staging"
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "production"
-            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "unspecified"
-        }
 
 /**
  * Legacy C-ABI integer (0 = development, 1 = staging, 2 = production).
@@ -60,18 +52,6 @@ val SDKEnvironment.cEnvironment: Int
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> 2
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> 0
         }
-
-/**
- * Parse a wire-format string back into the proto enum. Case-insensitive.
- * Returns null on unknown inputs.
- */
-fun sdkEnvironmentFromWireString(value: String): SDKEnvironment? =
-    when (value.lowercase()) {
-        "development" -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-        "staging" -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
-        "production" -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-        else -> null
-    }
 
 // ════════════════════════════════════════════════════════════════════════════
 // Behaviour helpers — mirror Swift `RASDKEnvironment` extensions in

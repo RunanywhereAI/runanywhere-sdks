@@ -27,6 +27,23 @@ const logger = new SDKLogger('Runtime');
 export type RuntimeAccelerationMode = 'cpu' | 'webgpu' | 'auto';
 
 /**
+ * Streaming delivery mode (T6.1).
+ *
+ *   - `'auto'`   — use the Worker path when a `streamWorkerFactory` is
+ *                  registered (`@runanywhere/web-llamacpp` / `@runanywhere/web-onnx`
+ *                  install one during `register()`); fall back to the
+ *                  main-thread `queueMicrotask` path otherwise.
+ *   - `'worker'` — require the Worker path. If no factory is registered
+ *                  the bridge still returns `null` and the main-thread
+ *                  fallback is used; a warning is logged on first use.
+ *   - `'main'`   — force the main-thread path even when a Worker factory
+ *                  is registered. Useful for debugging perf regressions.
+ *
+ * See `docs/STREAM_DELIVERY_DESIGN.md` for the architectural framing.
+ */
+export type StreamingMode = 'auto' | 'worker' | 'main';
+
+/**
  * Function installed by a backend (typically the llamacpp bridge) to perform
  * the acceleration switch. Should be idempotent.
  */
@@ -42,6 +59,7 @@ export type RuntimeModelLoadFailureRecovery = (context: {
 
 let _preferred: RuntimeAccelerationMode = 'auto';
 let _activeMode: 'cpu' | 'webgpu' | null = null;
+let _streamingMode: StreamingMode = 'auto';
 let _switcher: RuntimeAccelerationSwitcher | null = null;
 let _modelLoadPreparation: RuntimeModelLoadPreparation | null = null;
 let _modelLoadFailureRecovery: RuntimeModelLoadFailureRecovery | null = null;
@@ -84,6 +102,22 @@ export const Runtime = {
     }
     await _switcher(mode);
     _activeMode = mode;
+  },
+
+  /**
+   * Preferred streaming delivery mode (T6.1).
+   *
+   * Adapters consult this on every `*Stream` invocation; switching it
+   * between calls is supported. Default `'auto'` resolves to the Worker
+   * path when a backend has registered a `streamWorkerFactory`, else
+   * the existing main-thread `queueMicrotask` path.
+   */
+  get streamingMode(): StreamingMode {
+    return _streamingMode;
+  },
+
+  set streamingMode(mode: StreamingMode) {
+    _streamingMode = mode;
   },
 };
 

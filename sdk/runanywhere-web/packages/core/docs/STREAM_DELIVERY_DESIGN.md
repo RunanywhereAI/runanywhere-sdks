@@ -1,8 +1,9 @@
 # Web Stream Delivery — Architecture & Roadmap
 
 Owner: Web Core / Adapters
-Status: T3.1 MVP shipped (this PR); follow-up options below
-Surface: `streamCallback` in `src/Adapters/ProtoAdapterTypes.ts`
+Status: T3.1 MVP shipped; T6.1 Worker path landed (DECISION-3 Option A)
+Surface: `streamCallback` in `src/Adapters/ProtoAdapterTypes.ts` +
+`OffscreenRuntimeBridge` in `src/runtime/OffscreenRuntimeBridge.ts`
 Consumers: `LLMProtoAdapter`, `STTProtoAdapter`, `TTSProtoAdapter`,
 `VLMProtoAdapter`, `DiffusionProtoAdapter` (any modality with a
 `_rac_*_stream_proto` Emscripten export)
@@ -44,7 +45,91 @@ event only **after** the export returns. For long-running LLM streams
 this manifests as bursty UI updates and a measurable lag between
 "native is producing" and "consumer sees a token".
 
-## What shipped in T3.1 (this PR)
+## What shipped in T6.1 (Worker path landed)
+
+T6.1 picks DECISION-3 Option A from the roadmap below and ships it
+behind a runtime feature flag. The synchronous main-thread path is
+preserved verbatim so non-Worker callers (and the existing T3.1
+test fakes) keep working.
+
+### Change set (T6.1)
+
+- New singleton `OffscreenRuntimeBridge` (`src/runtime/OffscreenRuntimeBridge.ts`)
+  spawns a Web Worker on first use and routes per-call streaming
+  requests (`stream.llm.generate`, `stream.stt.transcribe`,
+  `stream.tts.synthesize`, `stream.vlm.process`) over a typed
+  discriminated-union message protocol defined in
+  `src/runtime/StreamWorker.ts`.
+- `StreamWorker.ts` doubles as (a) the wire protocol types
+  (`WorkerRequest` / `WorkerResponse`, imported via `import type` by
+  the bridge so no worker runtime leaks into the main bundle) and
+  (b) the worker-thread dispatch (`runStreamWorker`,
+  `registerStreamModuleFactory`).
+- `StreamWorkerFactoryRegistry.ts` exposes `setStreamWorkerFactory(fn)`.
+  Core stays pure-TS — bundler-specific `new Worker(new URL(...))`
+  construction lives in `@runanywhere/web-llamacpp` and
+  `@runanywhere/web-onnx`. When no factory is registered, every
+  adapter `*Stream` method transparently falls back to the
+  T3.1 main-thread `queueMicrotask` path.
+- `Runtime.streamingMode: 'auto' | 'worker' | 'main'` (default
+  `'auto'`) added to `RuntimeConfig.ts`. Apps can force the
+  Worker path or pin to the legacy main path for A/B perf testing.
+- `LLMProtoAdapter.generateStream`, `STTProtoAdapter.transcribeStream`,
+  `TTSProtoAdapter.synthesizeStream`, and `VLMProtoAdapter.streamEvents`
+  consult `OffscreenRuntimeBridge.tryGet()` first; if non-null they
+  route via the bridge, otherwise they call `streamCallback` exactly
+  as before. The AsyncIterable contract is byte-identical from the
+  consumer's perspective.
+
+### Trade-offs explicitly accepted (T6.1)
+
+- **~2× memory for streaming WASM** — the worker maintains its own
+  Emscripten module instance for streaming exports only. Non-streaming
+  exports stay on the main-thread `EmscriptenModule` singleton.
+  Mirroring the full module simplifies the contract (no per-call
+  marshalling of state across the boundary) at the cost of duplicated
+  WASM linear memory + code section. Measured against the live
+  delivery win this is the smaller cost.
+- **Slot-based callbacks excluded** — `VAD activity` callback (set
+  once via `_rac_vad_component_set_activity_proto_callback`, fires
+  many times across separate `process` calls) and `VoiceAgentStreamAdapter`
+  (subscribe-once, fan-out fanout via `_rac_voice_agent_set_proto_callback`)
+  are NOT routed through the Worker path. They don't fit the per-call
+  request/response message pattern and would need a different
+  "channel" abstraction. Tracked as a follow-up; not in T6.1.
+- **Deep cancel for VLM** — the worker `cancel` handler pokes
+  `_rac_llm_cancel_proto` but has no per-requestId handle bookkeeping
+  for VLM (`_rac_vlm_cancel_proto` takes a handle the worker doesn't
+  retain). Consumer-side cancellation is still deterministic — the
+  bridge ends the iterator immediately — but C-side compute may
+  continue to drain to completion. Follow-up: track outstanding
+  handles in the worker so `cancel` can call the matching verb.
+
+### Test coverage (T6.1)
+
+`tests/unit/runtime/StreamWorker.test.ts` (Vitest, node env, fake
+Worker via `setStreamWorkerFactory`):
+- `Worker mode delivers first callback before done` — the central
+  invariant: the consumer iterator observes the first decoded event
+  BEFORE the worker has posted its terminating `done` message.
+- `cancel() interrupts mid-stream` — after the consumer breaks the
+  for-await loop, the bridge posts `{type:'cancel', requestId}` to
+  the worker, the iterator immediately reports `done: true`, and any
+  in-flight `callback` messages for the cancelled requestId are
+  dropped before reaching the consumer.
+- `falls back to main-thread when no factory registered` — exercises
+  the T3.1 `streamCallback` path to verify the Worker switch is
+  truly opt-in and the legacy path stays correct.
+
+Test env note: DECISION-7 called for `environment: 'happy-dom'`
++ a `worker_threads`-backed shim. The agent sandbox in which T6.1
+landed couldn't install `happy-dom` (npm cache `EACCES`), so the
+test keeps Vitest's `node` env. The Worker dependency is injected
+via the factory and never reaches a real `Worker` constructor, so
+the env choice doesn't affect what's asserted. Inline in the test
+file in case the next reader wonders.
+
+## What shipped earlier in T3.1
 
 A minimum-viable, lower-risk change focused on **unlocking** live
 delivery without rewriting any caller.

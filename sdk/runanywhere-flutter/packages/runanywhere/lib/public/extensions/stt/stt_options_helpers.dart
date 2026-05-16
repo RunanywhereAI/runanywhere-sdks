@@ -1,82 +1,21 @@
 // Phase C-prime FLUTTER: Dart-side helpers layered on top of the
 // canonical proto types in `stt_options.pb.dart` / `.pbenum.dart`.
 // The proto bindings are the source of truth for shape; these
-// extensions add idiomatic Dart conveniences (BCP-47 language strings,
-// `Duration` getters for Int64-millisecond timestamps, default-config
-// factories, validity checks) without modifying the generated files.
+// extensions add idiomatic Dart conveniences (Duration getters for
+// Int64-millisecond timestamps, validity checks) without modifying
+// the generated files.
+//
+// The `STTLanguageBcp47.bcp47` getter / `fromBcp47` static factory
+// were retired in T6.4 — call sites now use the generated
+// `STTLanguageWireString.wireString` extension and the top-level
+// `sttLanguageFromWireString` factory in
+// `package:runanywhere/generated/convenience/ra_convenience.dart`
+// (the BCP-47 codes ARE the wire strings; see idl/stt_options.proto
+// `rac_wire_string` annotations on `STTLanguage`).
 
 import 'package:fixnum/fixnum.dart';
 
 import 'package:runanywhere/generated/stt_options.pb.dart';
-
-/// Map a proto [STTLanguage] enum to a BCP-47 string ("en", "es", ...).
-extension STTLanguageBcp47 on STTLanguage {
-  /// BCP-47 / ISO-639-1 language code. `null` for `UNSPECIFIED` / `AUTO`.
-  String? get bcp47 {
-    switch (this) {
-      case STTLanguage.STT_LANGUAGE_EN:
-        return 'en';
-      case STTLanguage.STT_LANGUAGE_ES:
-        return 'es';
-      case STTLanguage.STT_LANGUAGE_FR:
-        return 'fr';
-      case STTLanguage.STT_LANGUAGE_DE:
-        return 'de';
-      case STTLanguage.STT_LANGUAGE_ZH:
-        return 'zh';
-      case STTLanguage.STT_LANGUAGE_JA:
-        return 'ja';
-      case STTLanguage.STT_LANGUAGE_KO:
-        return 'ko';
-      case STTLanguage.STT_LANGUAGE_IT:
-        return 'it';
-      case STTLanguage.STT_LANGUAGE_PT:
-        return 'pt';
-      case STTLanguage.STT_LANGUAGE_AR:
-        return 'ar';
-      case STTLanguage.STT_LANGUAGE_RU:
-        return 'ru';
-      case STTLanguage.STT_LANGUAGE_HI:
-        return 'hi';
-      default:
-        return null;
-    }
-  }
-
-  /// Parse a BCP-47 / ISO-639-1 string into an [STTLanguage]. Falls
-  /// back to [STT_LANGUAGE_AUTO] for empty / unknown input.
-  static STTLanguage fromBcp47(String? code) {
-    if (code == null || code.isEmpty) return STTLanguage.STT_LANGUAGE_AUTO;
-    switch (code.toLowerCase().split('-').first) {
-      case 'en':
-        return STTLanguage.STT_LANGUAGE_EN;
-      case 'es':
-        return STTLanguage.STT_LANGUAGE_ES;
-      case 'fr':
-        return STTLanguage.STT_LANGUAGE_FR;
-      case 'de':
-        return STTLanguage.STT_LANGUAGE_DE;
-      case 'zh':
-        return STTLanguage.STT_LANGUAGE_ZH;
-      case 'ja':
-        return STTLanguage.STT_LANGUAGE_JA;
-      case 'ko':
-        return STTLanguage.STT_LANGUAGE_KO;
-      case 'it':
-        return STTLanguage.STT_LANGUAGE_IT;
-      case 'pt':
-        return STTLanguage.STT_LANGUAGE_PT;
-      case 'ar':
-        return STTLanguage.STT_LANGUAGE_AR;
-      case 'ru':
-        return STTLanguage.STT_LANGUAGE_RU;
-      case 'hi':
-        return STTLanguage.STT_LANGUAGE_HI;
-      default:
-        return STTLanguage.STT_LANGUAGE_AUTO;
-    }
-  }
-}
 
 /// Helpers on the proto [STTConfiguration] message.
 extension STTConfigurationHelpers on STTConfiguration {

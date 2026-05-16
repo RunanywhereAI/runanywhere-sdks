@@ -38,7 +38,39 @@ export type {
   RuntimeAccelerationSwitcher,
   RuntimeModelLoadPreparation,
   RuntimeModelLoadFailureRecovery,
+  StreamingMode,
 } from './Foundation/RuntimeConfig';
+
+// T6.1 — Worker streaming primitives. Backend packages call
+// `setStreamWorkerInit(...)` with their wasm bytes + factory id during
+// `register()`. App code does NOT use these — see `index.ts` for the
+// public `setStreamWorkerFactory`.
+export {
+  setStreamWorkerFactory,
+  getStreamWorkerFactory,
+  hasStreamWorkerFactory,
+} from './runtime/StreamWorkerFactoryRegistry';
+export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
+export {
+  OffscreenRuntimeBridge,
+  setStreamWorkerInit,
+} from './runtime/OffscreenRuntimeBridge';
+export type {
+  BridgeStreamRequest,
+  StreamIteratorOptions,
+} from './runtime/OffscreenRuntimeBridge';
+export type {
+  StreamRequestKind,
+  StreamWorkerModule,
+  StreamModuleFactory,
+  StreamWorkerScope,
+  WorkerRequest,
+  WorkerResponse,
+} from './runtime/StreamWorker';
+export {
+  registerStreamModuleFactory,
+  runStreamWorker,
+} from './runtime/StreamWorker';
 export type { AccelerationMode } from './Foundation/WASMBridge';
 
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';

@@ -365,7 +365,15 @@ export interface ToolCallingSessionCreateRequest {
     formatHint: string;
     maxIterations: number;
     keepToolsAvailable: boolean;
-    validateCalls: boolean;
+    /**
+     * proto3 `optional` enables presence detection (has_validate_calls()).
+     * When unset, commons defaults to validate_calls=true (preserves the
+     * historical hard-coded behavior and the native run-loop / session
+     * contract that unknown tool calls short-circuit before host execution).
+     * Callers that delegate validation/authorization to their executor or
+     * use dynamic tool registries must explicitly set validate_calls=false.
+     */
+    validateCalls?: boolean | undefined;
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;

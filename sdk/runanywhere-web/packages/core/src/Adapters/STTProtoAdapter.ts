@@ -6,6 +6,7 @@ import {
   type STTOutput as ProtoSTTOutput,
   type STTPartialResult as ProtoSTTPartialResult,
 } from '@runanywhere/proto-ts/stt_options';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
 import {
   adapterState,
@@ -66,10 +67,24 @@ export class STTProtoAdapter {
     audioData: Uint8Array,
     options: ProtoSTTOptions,
   ): AsyncIterable<ProtoSTTPartialResult> {
+    const optionsBytes = STTOptions.encode(options).finish();
+    // T6.1: prefer Worker path when available; otherwise main-thread MVP.
+    const offscreen = OffscreenRuntimeBridge.tryGet();
+    if (offscreen != null) {
+      return offscreen.getStreamIterator(
+        {
+          kind: 'stream.stt.transcribe',
+          handle,
+          audioBytes: audioData,
+          optionsBytes,
+        },
+        STTPartialResult,
+        { stopWhen: (event) => event.isFinal },
+      );
+    }
     requireExports(this.module, 'stt.transcribeStream', [
       '_rac_stt_component_transcribe_stream_proto',
     ]);
-    const optionsBytes = STTOptions.encode(options).finish();
     return streamCallback(
       this.module,
       STTPartialResult,

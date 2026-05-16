@@ -12,6 +12,7 @@ import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
 import {
   adapterState,
@@ -54,8 +55,22 @@ export class LLMProtoAdapter {
   }
 
   generateStream(request: ProtoLLMGenerateRequest): AsyncIterable<ProtoLLMStreamEvent> {
-    this.requireExports('llm.generateStream', ['_rac_llm_generate_stream_proto']);
     const encoded = LLMGenerateRequest.encode({ ...request, streamingEnabled: true }).finish();
+    // T6.1: prefer the Worker path when a streamWorkerFactory is
+    // registered (and `streamingMode !== 'main'`); transparently fall
+    // back to the existing main-thread `streamCallback` MVP otherwise.
+    const offscreen = OffscreenRuntimeBridge.tryGet();
+    if (offscreen != null) {
+      return offscreen.getStreamIterator(
+        { kind: 'stream.llm.generate', handle: 0, requestBytes: encoded },
+        LLMStreamEvent,
+        {
+          stopWhen: (event) => event.isFinal,
+          onCancel: () => { this.cancel(); },
+        },
+      );
+    }
+    this.requireExports('llm.generateStream', ['_rac_llm_generate_stream_proto']);
     return streamCallback(
       this.module,
       LLMStreamEvent,

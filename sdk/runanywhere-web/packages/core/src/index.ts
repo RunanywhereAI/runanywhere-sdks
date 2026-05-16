@@ -49,6 +49,15 @@ export type {
   HardwareProfileResult,
 } from './Public/Extensions/RunAnywhere+Hardware';
 
+// T6.1 — Worker streaming path. Backend packages
+// (`@runanywhere/web-llamacpp`, `@runanywhere/web-onnx`) call
+// `setStreamWorkerFactory(fn)` during their `register()`; consumers can
+// override `Runtime.streamingMode` to force `'auto' | 'worker' | 'main'`.
+// When unregistered, all adapter `*Stream` methods transparently use the
+// main-thread `queueMicrotask` path (the T3.1 MVP).
+export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
+export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
+
 export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException';
 export {

@@ -10,6 +10,7 @@ import {
   SDKEvent,
   type SDKEvent as ProtoSDKEvent,
 } from '@runanywhere/proto-ts/sdk_events';
+import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm';
 import {
   adapterState,
@@ -136,11 +137,25 @@ export class VLMProtoAdapter {
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
   ): AsyncIterable<ProtoSDKEvent> {
+    const imageBytes = VLMImage.encode(image).finish();
+    const optionsBytes = VLMGenerationOptions.encode({ ...options, streamingEnabled: true }).finish();
+    // T6.1: prefer Worker path when available; otherwise main-thread MVP.
+    const offscreen = OffscreenRuntimeBridge.tryGet();
+    if (offscreen != null) {
+      return offscreen.getStreamIterator(
+        {
+          kind: 'stream.vlm.process',
+          handle,
+          imageBytes,
+          promptBytes: optionsBytes,
+        },
+        SDKEvent,
+        { onCancel: () => { this.cancel(handle); } },
+      );
+    }
     if (!ensureExports(this.module, 'vlm.processImageStream', ['_rac_vlm_process_stream_proto'])) {
       return emptyStream();
     }
-    const imageBytes = VLMImage.encode(image).finish();
-    const optionsBytes = VLMGenerationOptions.encode({ ...options, streamingEnabled: true }).finish();
     const bridge = this.bridge();
     return streamCallback(
       this.module,

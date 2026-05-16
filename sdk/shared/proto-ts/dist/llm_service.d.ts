@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { ToolCall, ToolResult } from "./tool_calling";
 import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {
@@ -26,6 +27,22 @@ export interface LLMGenerateRequest {
     /**
      * Additional LLMGenerationOptions fields kept inline to avoid a codegen
      * package cycle between service stubs and option messages.
+     *
+     * idl-002: Intentionally omitted from this streaming request (no current
+     * streaming consumer; route them through the non-streaming
+     * rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+     *   - thinking_pattern (LLMGenerationOptions field 11)
+     *   - structured_output (LLMGenerationOptions field 13)
+     *   - enable_real_time_tracking (LLMGenerationOptions field 14)
+     *   - repeat_last_n (LLMGenerationOptions field 18)
+     *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+     *     is not yet supported on the LLM.Generate rpc; tool sessions must
+     *     use the non-streaming generation path with LLMGenerationOptions.
+     * Additionally, preferred_framework (field 11) and execution_target
+     * (field 13) are degraded to `string` here instead of the InferenceFramework
+     * / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
+     * Callers must use the canonical enum string values (see
+     * llm_options.proto:69 and :85). See also synthesis idl-002.
      */
     repetitionPenalty: number;
     stopSequences: string[];
@@ -72,6 +89,14 @@ export interface LLMStreamFinalResult {
     errorMessage: string;
     promptEvalTimeMs: number;
     decodeTimeMs: number;
+    /**
+     * hotspot-idl-002: tool calls actually executed during the streaming
+     * session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+     * llm_options.proto). Populated only on terminal events when the
+     * backend completed at least one tool call.
+     */
+    toolCalls: ToolCall[];
+    toolResults: ToolResult[];
 }
 /**
  * v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -139,6 +164,13 @@ export interface LLMStreamEvent {
     promptTokensProcessed: number;
     completionTokensGenerated: number;
     elapsedMs: number;
+    /**
+     * hotspot-idl-002: structured tool-call payload emitted alongside an
+     * event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+     * field the tool-call event kind carries no proto-typed payload and
+     * SDK consumers must fall back to JSON-parsing the raw `token` text.
+     */
+    toolCall?: ToolCall | undefined;
 }
 export declare const LLMGenerateRequest: {
     encode(message: LLMGenerateRequest, writer?: _m0.Writer): _m0.Writer;

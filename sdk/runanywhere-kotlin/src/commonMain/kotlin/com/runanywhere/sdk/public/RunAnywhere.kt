@@ -21,10 +21,10 @@ package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
-import com.runanywhere.sdk.public.configuration.wireString
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.LogLevel
 import kotlinx.coroutines.CoroutineScope
