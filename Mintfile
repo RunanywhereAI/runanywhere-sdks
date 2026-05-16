@@ -1,5 +1,5 @@
-realm/SwiftLint@0.57.1
-peripheryapp/periphery@2.21.2
-apple/swift-format@600.0.0
-apple/swift-protobuf@1.27.0
-grpc/grpc-swift@1.23.0
+realm/SwiftLint@0.63.2
+peripheryapp/periphery@3.7.4
+apple/swift-format@602.0.0
+apple/swift-protobuf@1.38.0
+grpc/grpc-swift@2.2.3

@@ -12,8 +12,8 @@ topics:
   - speech-recognition
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
-  flutter: '>=3.24.0'
+  sdk: '>=3.8.0 <4.0.0'
+  flutter: '>=3.28.0'
 
 resolution: workspace
 
@@ -21,7 +21,7 @@ dependencies:
   flutter:
     sdk: flutter
   # FFI (Foreign Function Interface)
-  ffi: ^2.1.0
+  ffi: ^2.2.0
   # Networking: HTTP transport routed through the commons Phase H C ABI
   # (rac_http_client_*, rac_http_download_execute).
   # Protobuf runtime — consumed by the IDL-generated bindings in
@@ -31,27 +31,27 @@ dependencies:
   protobuf: ^3.1.0
   # `fixnum` is a transitive peer of `protobuf` — the generated bindings
   # import it directly for `int64` field handling, so it must be declared.
-  fixnum: ^1.1.0
+  fixnum: ^1.1.1
   # Storage
-  shared_preferences: ^2.2.3
-  path_provider: ^2.1.3
-  flutter_secure_storage: ^9.0.0
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.5
+  flutter_secure_storage: ^10.2.0
   # Device info
-  device_info_plus: ^10.0.0
+  device_info_plus: ^12.4.0
   # Utilities
-  uuid: ^4.4.0
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   test: ^1.24.0
-  flutter_lints: ^3.0.0
+  flutter_lints: ^5.0.0
   # Pinned (not caret) so local + CI codegen produces byte-identical output.
   # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup-toolchain.sh and
   # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
   # the workspace `melos.dependencies` block at
   # sdk/runanywhere-flutter/pubspec.yaml in the same change.
-  protoc_plugin: 21.1.2
+  protoc_plugin: 22.0.0
 
 flutter:
   uses-material-design: true

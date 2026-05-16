@@ -24,11 +24,16 @@
 /// run scripts/sync-versions.sh to refresh.
 public enum RAVersions {
     public static let sdkVersion = "0.19.13"
+    // T5.4: swift-tools-version stays at 5.9 — the 6.0 attempt enabled Swift 6
+    // strict concurrency and surfaced pre-existing source-level issues
+    // (mutable static globals, closure-captured locals in audio + URLSession
+    // callbacks) that are out of scope for the dep-bump PR. Re-attempt once
+    // the strict-concurrency migration lands.
     public static let swiftToolsVersion = "5.9"
-    // Pinned SPM dep version floors (must match Package.swift)
-    public static let swiftProtobuf = "1.27.0"
-    public static let sentryCocoa = "8.40.0"
-    public static let deviceKit = "5.6.0"
-    public static let swiftCrypto = "3.0.0"
+    // Pinned SPM dep version floors (must match Package.swift) — bumped in T5.4.
+    public static let swiftProtobuf = "1.38.0"
+    public static let sentryCocoa = "8.58.2"
+    public static let deviceKit = "5.8.0"
+    public static let swiftCrypto = "3.15.1"
     public static let files = "4.3.0"
 }

@@ -4,7 +4,7 @@
 # Generate Dart bindings via dart-lang/protobuf (protoc_plugin).
 #
 # Requirements:
-#   dart pub global activate protoc_plugin 21.1.2
+#   dart pub global activate protoc_plugin 22.0.0
 #   export PATH="$PATH:$HOME/.pub-cache/bin"
 #
 # Output:
@@ -54,18 +54,18 @@ if ! command -v protoc >/dev/null 2>&1; then
 fi
 if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     echo "error: protoc-gen-dart not found." >&2
-    echo "       Install via: dart pub global activate protoc_plugin 21.1.2" >&2
+    echo "       Install via: dart pub global activate protoc_plugin 22.0.0" >&2
     echo "       and add \$HOME/.pub-cache/bin to your PATH." >&2
     exit 127
 fi
 
-# IDL-16 / CPP-10: verify protoc_plugin is pinned at 21.1.2. The plugin does
+# IDL-16 / CPP-10: verify protoc_plugin is pinned at 22.0.0. The plugin does
 # not expose --version in older releases; fall back to a best-effort check.
 if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
-    if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "21.1.2"; then
-        echo "warning: protoc_plugin version could not be verified as 21.1.2." >&2
+    if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "22.0.0"; then
+        echo "warning: protoc_plugin version could not be verified as 22.0.0." >&2
         echo "         Got: ${PLUGIN_VERSION_OUT}" >&2
-        echo "         Re-pin via: dart pub global activate protoc_plugin 21.1.2" >&2
+        echo "         Re-pin via: dart pub global activate protoc_plugin 22.0.0" >&2
     fi
 fi
 

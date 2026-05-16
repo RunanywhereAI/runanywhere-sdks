@@ -61,10 +61,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "long": "^5.2.3",
-    "protobufjs": "^7.5.6"
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.8"
   },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   }
 }

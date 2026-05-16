@@ -52,8 +52,8 @@
   "license": "MIT",
   "dependencies": {
     "@runanywhere/proto-ts": "^0.21.0",
-    "long": "^5.2.3",
-    "protobufjs": "^7.5.6"
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.8"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -75,10 +75,10 @@
     }
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "nitrogen": "^0.33.9",
-    "react-native-nitro-modules": "^0.33.9",
-    "typescript": "^5.9.2"
+    "@types/react": "~19.2.14",
+    "nitrogen": "^0.34.1",
+    "react-native-nitro-modules": "^0.34.1",
+    "typescript": "^5.9.3"
   },
   "create-react-native-library": {
     "languages": "kotlin-swift",

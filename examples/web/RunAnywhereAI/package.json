@@ -11,11 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vite": "^6.0.0"
+    "typescript": "^5.9.3",
+    "vite": "^6.4.2"
   },
   "dependencies": {
-    "long": "^5.2.3",
-    "protobufjs": "^7.5.6"
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.8"
   }
 }

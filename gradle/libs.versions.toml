@@ -2,19 +2,19 @@
 # ============================================================================
 # Build Tools & Language
 # ============================================================================
-agp = "8.11.2"
-kotlin = "2.1.21"
+agp = "8.13.0"
+kotlin = "2.1.21" # T5.3: bumped to 2.2.0; rolled back due to kotlinOptions DSL removal in 2.2.x; modules/runanywhere-core-llamacpp/build.gradle.kts uses deprecated kotlinOptions.jvmTarget (out of scope to fix here). Deferred.
 pdfbox = "2.0.27.0"
 
 # ============================================================================
 # AndroidX Core Libraries
 # ============================================================================
-coreKtx = "1.15.0"
-appcompat = "1.7.0"
+coreKtx = "1.16.0"
+appcompat = "1.7.1"
 material = "1.13.0"
-lifecycleRuntimeKtx = "2.8.7"
-lifecycleViewModelCompose = "2.8.7"
-activityCompose = "1.9.3"
+lifecycleRuntimeKtx = "2.9.0"
+lifecycleViewModelCompose = "2.9.0"
+activityCompose = "1.10.1"
 
 # ============================================================================
 # Jetpack Compose
@@ -26,10 +26,10 @@ composeBom = "2025.08.01"
 # ============================================================================
 coroutines = "1.10.2"
 datetime = "0.7.1"
-kotlinxSerialization = "1.8.0"
+kotlinxSerialization = "1.9.0"
 # Square Wire — runtime types + code generator for idl/*.proto consumed by
 # sdk/runanywhere-kotlin (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).
-wire = "4.9.9"
+wire = "5.3.5"
 
 # ============================================================================
 # Testing
@@ -37,7 +37,7 @@ wire = "4.9.9"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-mockk = "1.13.14"
+mockk = "1.13.17"
 
 # ============================================================================
 # Logging
@@ -52,7 +52,7 @@ sentry = "8.0.0"
 # ============================================================================
 # Networking
 # ============================================================================
-okhttp = "4.12.0"
+okhttp = "5.1.0"
 retrofit = "2.11.0"
 ktor = "3.0.3"
 
@@ -66,7 +66,7 @@ junit-vintage = "5.10.2"
 # ============================================================================
 # Navigation
 # ============================================================================
-navigationCompose = "2.8.5"
+navigationCompose = "2.9.0"
 
 # ============================================================================
 # Code Quality
@@ -83,7 +83,7 @@ workManager = "2.10.0"
 # File Management
 # ============================================================================
 commonsIo = "2.18.0"
-okio = "3.9.0"
+okio = "3.15.0"
 
 # ============================================================================
 # AI/ML - Speech Recognition

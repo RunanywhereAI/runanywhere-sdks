@@ -33,16 +33,7 @@
       "isIgnored": true
     },
     {
-      "label": "eslint: RN packages stay on ^8.x (matches @react-native/eslint-config 0.83.x). Do NOT lift to 9.x here (Tier 5).",
-      "dependencies": ["eslint"],
-      "packages": [
-        "runanywhere-react-native-monorepo",
-        "runanywhere-ai-example"
-      ],
-      "isIgnored": true
-    },
-    {
-      "label": "vite: Playground stays on ^5.x (Tier 5 bump). Do NOT lift to 6.x here.",
+      "label": "vite: Playground stays on ^5.x (separate migration). Do NOT lift to 6.x here.",
       "dependencies": ["vite"],
       "packages": ["local-browser"],
       "isIgnored": true
@@ -50,62 +41,62 @@
     {
       "label": "Pinned: long (centralized in dependencies/versions.json)",
       "dependencies": ["long"],
-      "pinVersion": "^5.2.3"
+      "pinVersion": "^5.3.2"
     },
     {
       "label": "Pinned: protobufjs (centralized in dependencies/versions.json)",
       "dependencies": ["protobufjs"],
-      "pinVersion": "^7.5.6"
+      "pinVersion": "^7.5.8"
     },
     {
       "label": "Pinned: typescript (centralized in dependencies/versions.json)",
       "dependencies": ["typescript"],
-      "pinVersion": "^5.9.2"
+      "pinVersion": "^5.9.3"
     },
     {
-      "label": "Pinned: eslint (centralized in dependencies/versions.json) — non-RN scope",
+      "label": "Pinned: eslint (centralized in dependencies/versions.json) — monorepo-wide",
       "dependencies": ["eslint"],
-      "pinVersion": "^9.18.0"
+      "pinVersion": "^9.39.4"
     },
     {
       "label": "Pinned: typescript-eslint unified meta-package (centralized in dependencies/versions.json)",
       "dependencies": ["typescript-eslint"],
-      "pinVersion": "^8.0.0"
+      "pinVersion": "^8.59.3"
     },
     {
       "label": "Pinned: vitest (centralized in dependencies/versions.json)",
       "dependencies": ["vitest"],
-      "pinVersion": "^2.1.9"
+      "pinVersion": "^3.2.4"
     },
     {
       "label": "Pinned: react-native-nitro-modules (centralized in dependencies/versions.json)",
       "dependencies": ["react-native-nitro-modules"],
-      "pinVersion": "^0.33.9"
+      "pinVersion": "^0.34.1"
     },
     {
       "label": "Pinned: nitrogen (centralized in dependencies/versions.json)",
       "dependencies": ["nitrogen"],
-      "pinVersion": "^0.33.9"
+      "pinVersion": "^0.34.1"
     },
     {
       "label": "Pinned: lerna (centralized in dependencies/versions.json)",
       "dependencies": ["lerna"],
-      "pinVersion": "^8.0.0"
+      "pinVersion": "^8.2.4"
     },
     {
       "label": "Pinned: prettier (centralized in dependencies/versions.json)",
       "dependencies": ["prettier"],
-      "pinVersion": "^3.3.2"
+      "pinVersion": "^3.8.3"
     },
     {
       "label": "Pinned: @playwright/test (centralized in dependencies/versions.json)",
       "dependencies": ["@playwright/test"],
-      "pinVersion": "^1.48.0"
+      "pinVersion": "^1.60.0"
     },
     {
       "label": "Pinned: vite (centralized in dependencies/versions.json) — examples/web scope",
       "dependencies": ["vite"],
-      "pinVersion": "^6.0.0"
+      "pinVersion": "^6.4.2"
     },
     {
       "label": "Catch-all: dependencies not centralized in dependencies/versions.json (left to each package). Add to versions.json to enforce.",

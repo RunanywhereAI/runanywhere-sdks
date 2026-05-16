@@ -13,7 +13,7 @@
 #   protoc                 25.x     (shared, all languages)
 #   protoc-gen-swift       1.27.x   (swift-protobuf)
 #   wire-compiler          4.9.x    (Kotlin via Square Wire)
-#   protoc_plugin          21.1.2   (Dart — emits *.pb.dart and *.pbgrpc.dart)
+#   protoc_plugin          22.0.0   (Dart — emits *.pb.dart and *.pbgrpc.dart)
 #   ts-proto               1.181.x  (TypeScript message types)
 #   google-protobuf Python 4.25.x   (Python message types)
 #
@@ -44,7 +44,7 @@ done
 PROTOC_EXPECTED_MAJOR="25"
 SWIFT_PROTOBUF_EXPECTED="1.27"
 WIRE_EXPECTED="4.9"
-PROTOC_PLUGIN_DART_EXPECTED="21.1.2"
+PROTOC_PLUGIN_DART_EXPECTED="22.0.0"
 TS_PROTO_EXPECTED="1.181"
 PYTHON_PROTOBUF_EXPECTED="4.25"
 # GAP 09 streaming additions:
@@ -109,7 +109,7 @@ install_wire() {
 
 install_dart_plugin() {
     # IDL-16 / CPP-10: Dart codegen requires Dart 3.0+ AND protoc_plugin
-    # pinned at 21.1.2. Older Dart / plugin combos emit subtly different
+    # pinned at 22.0.0. Older Dart / plugin combos emit subtly different
     # code that trips idl-drift-check on unrelated PRs. `generate_dart.sh`
     # enforces both at runtime; this installer documents the intent.
     if have protoc-gen-dart; then
@@ -124,7 +124,7 @@ install_dart_plugin() {
     DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     DART_MAJOR=$(echo "${DART_VERSION:-0.0.0}" | cut -d. -f1)
     if [ "${DART_MAJOR}" -lt 3 ]; then
-        echo "warning: Dart ${DART_VERSION} < 3.0 — protoc_plugin 21.1.2 requires Dart 3.0+." >&2
+        echo "warning: Dart ${DART_VERSION} < 3.0 — protoc_plugin 22.0.0 requires Dart 3.0+." >&2
         echo "         Upgrade Dart before running idl/codegen/generate_dart.sh." >&2
         return 0
     fi

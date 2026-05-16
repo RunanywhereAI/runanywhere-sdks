@@ -66,9 +66,9 @@
     }
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "eslint": "^9.18.0",
+    "typescript": "^5.9.3",
+    "eslint": "^9.39.4",
     "@eslint/js": "^9.0.0",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.59.3"
   }
 }

@@ -52,11 +52,12 @@ CMAKE_VERSION=3.27
 # Minimum CMake version advertised by every `cmake_minimum_required()` in this
 # repo. Must be >= 3.24 because cmake/FetchONNXRuntime.cmake uses the
 # DOWNLOAD_EXTRACT_TIMESTAMP keyword which was added in CMake 3.24. Bumping
-# this drops support for CMake 3.22/3.16/3.14/3.9 hosts; CI/devs need 3.24+.
+# this drops support for older CMake hosts; CI/devs need this version+.
 # NOTE: `cmake_minimum_required(VERSION ...)` must be the first command and
-# cannot be parameterised by a CMake variable — keep the literal 3.24 in
-# each CMakeLists.txt in sync with this value when bumping.
-MIN_CMAKE_VERSION=3.24
+# cannot be parameterised by a CMake variable — keep the literal value in
+# each CMakeLists.txt in sync with this when bumping.
+# T5.1: bumped from 3.24 to 3.30 (stable in 2026; widely available on CI hosts).
+MIN_CMAKE_VERSION=3.30
 
 # =============================================================================
 # ONNX Runtime
@@ -65,24 +66,79 @@ MIN_CMAKE_VERSION=3.24
 #   1. What sherpa-onnx was built against
 #   2. What's in runanywhere-swift/Binaries/onnxruntime.xcframework
 # sherpa-onnx 1.12.17+ requires ONNX Runtime >= 1.17.1
+#
+# T5.2 (heavy dep bump) — DEFERRED: tried 1.26.0, rolled back.
+# The vendored xcframework at third_party/onnxruntime-ios/onnxruntime.xcframework
+# is the 1.17.1 build (matches sherpa-onnx-ios 1.12.18's link surface).
+# FetchONNXRuntime.cmake silently consumes whatever .xcframework is present, so
+# bumping this key without re-running scripts/ios/download-onnx.sh would
+# produce a silent header-vs-binary version skew (compile-time headers from
+# 1.26.0 + link against 1.17.1 binary). Re-vendoring requires:
+#   1. rm -rf third_party/onnxruntime-ios && ./scripts/ios/download-onnx.sh
+#   2. ALSO re-vendor sherpa-onnx-ios against the matching ORT (sherpa-onnx
+#      links ORT statically into its xcframework on iOS, so the two must move
+#      together).
+# Tracked as: T5.2 follow-up — re-vendoring required for ONNX_VERSION_IOS.
 ONNX_VERSION_IOS=1.17.1
 
 # Android version - used by Sherpa-ONNX, must be compatible
+#
+# T5.2 (heavy dep bump) — DEFERRED: tried 1.26.0, rolled back.
+# Android ONNX Runtime ships INSIDE the vendored sherpa-onnx-android prebuilt
+# (third_party/sherpa-onnx-android/jniLibs/<abi>/libonnxruntime.so). The
+# vendored .so corresponds to whatever ORT sherpa-onnx 1.12.20 was built
+# against — bumping the standalone ONNX_VERSION_ANDROID key only changes the
+# C++ header URL that FetchONNXRuntime.cmake downloads (header-only), so a
+# bump without re-vendoring sherpa-onnx-android produces a header/binary skew.
+# Tracked as: T5.2 follow-up — re-vendoring required for ONNX_VERSION_ANDROID
+# (tied to sherpa-onnx-android bump).
 ONNX_VERSION_ANDROID=1.17.1
 
 # macOS version (can use latest)
+#
+# T5.2 (heavy dep bump) — DEFERRED: tried 1.26.0, rolled back to 1.23.2.
+# Upstream microsoft/onnxruntime stopped publishing the
+# `onnxruntime-osx-universal2-${VERSION}.tgz` artifact starting at v1.24.0
+# (only `onnxruntime-osx-arm64-${VERSION}.tgz` is shipped now). The current
+# FetchONNXRuntime.cmake macOS branch hard-codes the `osx-universal2` URL
+# pattern, so any version >= 1.24.0 will 404 at FetchContent download time.
+# Verified by: cmake reconfigure of build/macos-debug-core → 404 on
+#   https://github.com/microsoft/onnxruntime/releases/download/v1.26.0/onnxruntime-osx-universal2-1.26.0.tgz
+# Bumping past 1.23.2 requires editing FetchONNXRuntime.cmake to switch the
+# macOS URL to `onnxruntime-osx-arm64-...` (and likely guard for x86_64),
+# which is out of T5.2 scope (hard-rule: only VERSIONS + engines/CMakeLists.txt
+# for llama/whisper tag patterns).
+# Tracked as: T5.2 follow-up — `osx-universal2` → `osx-arm64` URL migration
+# in cmake/FetchONNXRuntime.cmake required before bumping ONNX_VERSION_MACOS.
 ONNX_VERSION_MACOS=1.23.2
 
 # Linux version (can use latest)
-ONNX_VERSION_LINUX=1.23.2
+# T5.2 (heavy dep bump): 1.23.2 → 1.26.0. Pulled via FetchContent
+# (microsoft/onnxruntime releases tarball, x64 or aarch64).
+ONNX_VERSION_LINUX=1.26.0
 
 # Windows version (can use latest)
-ONNX_VERSION_WINDOWS=1.23.2
+# T5.2 (heavy dep bump): 1.23.2 → 1.26.0. Pulled via FetchContent
+# (microsoft/onnxruntime releases zip, x64 or x86).
+ONNX_VERSION_WINDOWS=1.26.0
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
 # iOS version
+#
+# T5.2 (heavy dep bump) — DEFERRED: tried 1.13.2, rolled back.
+# The vendored sherpa-onnx.xcframework under third_party/sherpa-onnx-ios/ is
+# the 1.12.18 build (statically links ORT 1.17.1). FetchONNXRuntime.cmake +
+# engines/sherpa consume whatever binary is on disk, so bumping this key
+# without first re-vendoring the xcframework would silently drift headers vs.
+# binary (same failure mode flagged for ONNX_VERSION_IOS above).
+# Re-vendoring path:
+#   rm -rf third_party/sherpa-onnx-ios && ./scripts/ios/download-sherpa-onnx.sh
+# (which pulls the matching xcframework from runanywhere-binaries releases —
+# requires a corresponding 1.13.2 release artifact to exist).
+# Tracked as: T5.2 follow-up — re-vendoring required for SHERPA_ONNX_VERSION_IOS
+# (must move in lockstep with ONNX_VERSION_IOS).
 SHERPA_ONNX_VERSION_IOS=1.12.18
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
@@ -91,58 +147,86 @@ SHERPA_ONNX_VERSION_IOS=1.12.18
 #   rm -rf third_party/sherpa-onnx-android
 #   ./scripts/android/download-sherpa-onnx.sh
 # The download script now auto-validates header vs .so version consistency.
+#
+# T5.2 (heavy dep bump) — DEFERRED: tried 1.13.2, rolled back.
+# third_party/sherpa-onnx-android/{include,jniLibs/<abi>/*.so} is the 1.12.20
+# vendored snapshot; FetchONNXRuntime.cmake (ANDROID branch) imports those
+# binaries directly. A bump without re-running download-sherpa-onnx.sh would
+# trip the script's auto-validation on the next configure, AND would mismatch
+# the bundled libonnxruntime.so consumed by ONNX_VERSION_ANDROID above.
+# Tracked as: T5.2 follow-up — re-vendoring required for SHERPA_ONNX_VERSION_ANDROID
+# (tied to ONNX_VERSION_ANDROID bump).
 SHERPA_ONNX_VERSION_ANDROID=1.12.20
 
 # macOS version
-SHERPA_ONNX_VERSION_MACOS=1.12.18
+# T5.2 (heavy dep bump): 1.12.18 → 1.13.2. Built from source via
+# scripts/macos/download-sherpa-onnx.sh (no prebuilt vendored), so the bump
+# only changes the upstream tag that the build script clones; next invocation
+# of the script will produce 1.13.2 static archives under third_party/sherpa-
+# onnx-macos/. Existing third_party/ has no sherpa-onnx-macos/ directory yet,
+# so nothing to re-vendor proactively.
+SHERPA_ONNX_VERSION_MACOS=1.13.2
 
 # Linux version
-SHERPA_ONNX_VERSION_LINUX=1.12.23
+# T5.2 (heavy dep bump): 1.12.23 → 1.13.2. Pulled per-arch by
+# scripts/linux/download-sherpa-onnx.sh (curl from k2-fsa/sherpa-onnx
+# releases). No vendored archive in the repo — script downloads on demand.
+SHERPA_ONNX_VERSION_LINUX=1.13.2
 
 # Windows version
-SHERPA_ONNX_VERSION_WINDOWS=1.12.23
+# T5.2 (heavy dep bump): 1.12.23 → 1.13.2. Pulled by
+# scripts/windows/download-sherpa-onnx.bat (curl + tar from k2-fsa releases).
+# No vendored archive — downloads on demand.
+SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# b9174 - latest stable release (May 2026).
-# NOTE: Bumped from b8201 to address macOS CI build failure where the vendored
-# llama.cpp Metal backend (ggml-metal-context.m) failed to compile against the
-# current Xcode SDK with errors like:
+# b9180 — latest stable upstream release as of 2026-05-16 (T5.2 heavy dep bump).
+# History: b7650 -> b8201 (enabled GGML_WEBGPU for WASM) -> b9174 (partial
+#          Metal fix for ggml-metal-context.m strict ARC) -> b9180 (T5.2 —
+#          minor 6-commit forward roll, current latest stable).
+#
+# T5.2 host-validation note: the local build host (Xcode 26.5 / Apple Clang
+# 21.0.0) rejects BOTH b9174 (baseline at HEAD) and b9180 with strict ObjC
+# protocol-pointer errors in ggml-metal-device.m, e.g.:
 #   error: cannot initialize a variable of type 'id<MTLDevice>' with an rvalue
-#          of type 'void *' (ggml-metal-context.m)
-# Upstream's ggml-metal sources have been refactored multiple times since b8201
-# (residency-sets keep-alive, command-buffer failure handling, capture-compute
-# counter, etc.). Bumping to a more recent tag picks up those fixes and keeps
-# us aligned with the upstream Metal API.
-# History: b7650 -> b8201 (enabled GGML_WEBGPU for WASM) -> b9174 (Metal fix).
-LLAMACPP_VERSION=b9174
+#          of type 'void *' (ggml-metal-device.m)
+# Verified by configuring `build/t5.2-llamacheck` against both tags — same
+# Metal compile failure with identical line locations. This is a PRE-EXISTING
+# host-SDK incompatibility, not a regression introduced by T5.2; CI hosts on
+# the pinned XCODE_VERSION=15.4 are not affected. Upstream llama.cpp needs
+# additional ARC-strict cleanup in ggml/src/ggml-metal/ for Apple Clang 21.x.
+# Tracked as: T5.2 follow-up — llama.cpp Metal backend Apple Clang 21.x ARC
+# strictness fix (upstream ggml change, not a VERSIONS pin issue).
+LLAMACPP_VERSION=b9180
 
 # =============================================================================
 # whisper.cpp (STT — opt-in fallback for Whisper-family models)
 # =============================================================================
 # Pinned tag for engines/whispercpp/CMakeLists.txt FetchContent.
-WHISPERCPP_VERSION=v1.8.2
+# T5.2 (heavy dep bump): v1.8.2 → v1.8.4 (latest v1.x stable as of 2026-05-16).
+WHISPERCPP_VERSION=v1.8.4
 
 # =============================================================================
 # nlohmann/json
 # =============================================================================
-NLOHMANN_JSON_VERSION=3.11.3
+NLOHMANN_JSON_VERSION=3.12.0
 
 # =============================================================================
 # USearch (vector search engine used by the RAG pipeline)
 # =============================================================================
-USEARCH_VERSION=v2.15.2
+USEARCH_VERSION=v2.18.0
 
 # =============================================================================
 # cpp-httplib (header-only HTTP server — RAC_BUILD_SERVER only)
 # =============================================================================
-CPPHTTPLIB_VERSION=v0.15.3
+CPPHTTPLIB_VERSION=v0.18.5
 
 # =============================================================================
 # zlib (bundled for Android/Emscripten where the platform SDK lacks it)
 # =============================================================================
-ZLIB_VERSION=v1.3.1
+ZLIB_VERSION=v1.3.2
 
 # =============================================================================
 # bzip2 (bundled for Android/Emscripten — sourceware tarball, NOT a `v` prefix)
@@ -155,17 +239,17 @@ BZIP2_VERSION=1.0.8
 # Must match what the checked-in generated headers under
 # sdk/runanywhere-commons/src/generated/proto/ were emitted by (Protobuf C++
 # 7.34.1 → upstream tag v34.1). Bumping requires regenerating those headers.
-PROTOBUF_VERSION=34.1
+PROTOBUF_VERSION=34.2
 
 # =============================================================================
 # GoogleTest (test framework for commons + RAG unit tests)
 # =============================================================================
-GOOGLETEST_VERSION=v1.14.0
+GOOGLETEST_VERSION=v1.16.0
 
 # =============================================================================
 # libarchive (archive extraction - ZIP, TAR.GZ, TAR.BZ2, TAR.XZ)
 # =============================================================================
-LIBARCHIVE_VERSION=3.8.1
+LIBARCHIVE_VERSION=3.8.2
 
 # =============================================================================
 # RAC Commons Version (for remote builds/CI)

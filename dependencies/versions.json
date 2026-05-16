@@ -2,24 +2,24 @@
   "$schema": "https://json.schemastore.org/package",
   "_comment": "Centralized version pins for TypeScript/Web/RN deps. Referenced by syncpack (.syncpackrc.json) to enforce consistency across all package.json files in the monorepo. When bumping a value here, run `npx syncpack fix-mismatches` to propagate the change. See scripts/validation/check_typescript_centralization.sh for the CI gate.",
   "_notes": {
-    "long": "Held at ^5.2.3 (proto-ts published API was generated against long@5.2.x). Bumping to 5.3.x is a separate Tier 5 task.",
-    "protobufjs": "Held at ^7.x. The published @runanywhere/proto-ts is generated against protobufjs 7.x; 8.x is a Tier 5 migration.",
-    "eslint": "Pinned for non-RN packages only. RN packages (sdk/runanywhere-react-native, examples/react-native) intentionally remain on ^8.x to keep parity with the @react-native/eslint-config 0.83.x baseline.",
-    "vite": "Pinned for examples/web only. Playground/on-device-browser-agent stays on ^5.x (Tier 5 bump).",
+    "long": "Held at ^5.x. The published @runanywhere/proto-ts is generated against long 5.x; 6.x (if released) would be a separate migration.",
+    "protobufjs": "Held at ^7.x. The published @runanywhere/proto-ts is generated against protobufjs 7.x; 8.x is a separate migration.",
+    "eslint": "ESLint 9.x is now used across the monorepo (including RN packages). @react-native/eslint-config 0.85.x supports ESLint 8 and 9, so RN parity is preserved.",
+    "vite": "Pinned for examples/web only. Playground/on-device-browser-agent stays on ^5.x (separate migration).",
     "typescript-eslint": "Applies only to the unified 'typescript-eslint' meta-package consumed by the web SDK packages. The separate @typescript-eslint/eslint-plugin + @typescript-eslint/parser packages used by the RN tree are not covered here."
   },
   "pinned": {
-    "long": "^5.2.3",
-    "protobufjs": "^7.5.6",
-    "typescript": "^5.9.2",
-    "eslint": "^9.18.0",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^2.1.9",
-    "react-native-nitro-modules": "^0.33.9",
-    "nitrogen": "^0.33.9",
-    "lerna": "^8.0.0",
-    "prettier": "^3.3.2",
-    "@playwright/test": "^1.48.0",
-    "vite": "^6.0.0"
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.8",
+    "typescript": "^5.9.3",
+    "eslint": "^9.39.4",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^3.2.4",
+    "react-native-nitro-modules": "^0.34.1",
+    "nitrogen": "^0.34.1",
+    "lerna": "^8.2.4",
+    "prettier": "^3.8.3",
+    "@playwright/test": "^1.60.0",
+    "vite": "^6.4.2"
   }
 }
