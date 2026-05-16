@@ -132,6 +132,13 @@ jobs:
         run: |
           npm install -g ts-proto@1.181.1 protobufjs
 
+      - name: Install Python protobuf runtime
+        # idl/codegen/generate_*_convenience.py drivers import
+        # `google.protobuf.descriptor_pb2` so we need the Python
+        # protobuf package available to the system Python that
+        # invokes generate_all.sh.
+        run: python3 -m pip install --upgrade --break-system-packages protobuf
+
       - name: Dump toolchain versions (debug)
         run: |
           echo "protoc: $(protoc --version)"
