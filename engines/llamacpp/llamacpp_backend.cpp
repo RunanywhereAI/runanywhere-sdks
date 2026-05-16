@@ -1,6 +1,10 @@
 #include "llamacpp_backend.h"
 
 #include "common.h"
+// llama.cpp b9180 puts the model-memory fitting helper + status enum in a
+// dedicated header (common/fit.h). Include it explicitly so callers don't
+// rely on incidental re-export from common.h.
+#include "fit.h"
 
 // Internal llama.cpp header for LoRA adapter introspection (ab_map tensor
 // count)
@@ -372,24 +376,29 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
 
   RAC_LOG_INFO(
       "LLM.LlamaCpp",
-      "Calling llama_params_fit (margin=%zuMiB, n_ctx_min=%u, n_devices=%zu)",
+      "Calling common_fit_params (margin=%zuMiB, n_ctx_min=%u, n_devices=%zu)",
       margin_mib, n_ctx_min, n_devices);
 
-  llama_params_fit_status fit_status =
-      llama_params_fit(resolved_path.c_str(), &model_params, &ctx_params,
-                       tensor_split.data(), tensor_buft_overrides.data(),
-                       margins.data(), n_ctx_min, GGML_LOG_LEVEL_INFO);
+  // llama.cpp b9180 exposes the fit helper as `common_fit_params` (returning
+  // `enum common_params_fit_status`) under the `common/` umbrella, not the
+  // hypothetical `llama_params_fit*` names. Status constants are likewise
+  // prefixed `COMMON_PARAMS_FIT_STATUS_*` (see common/fit.h in the tree
+  // FetchContent pulls).
+  common_params_fit_status fit_status = common_fit_params(
+      resolved_path.c_str(), &model_params, &ctx_params, tensor_split.data(),
+      tensor_buft_overrides.data(), margins.data(), n_ctx_min,
+      GGML_LOG_LEVEL_INFO);
 
   switch (fit_status) {
-  case LLAMA_PARAMS_FIT_STATUS_SUCCESS:
+  case COMMON_PARAMS_FIT_STATUS_SUCCESS:
     RAC_LOG_INFO("LLM.LlamaCpp",
-                 "llama_params_fit SUCCESS: n_gpu_layers=%d, n_ctx=%u",
+                 "common_fit_params SUCCESS: n_gpu_layers=%d, n_ctx=%u",
                  model_params.n_gpu_layers, ctx_params.n_ctx);
     break;
-  case LLAMA_PARAMS_FIT_STATUS_FAILURE:
+  case COMMON_PARAMS_FIT_STATUS_FAILURE:
     RAC_LOG_INFO(
         "LLM.LlamaCpp",
-        "llama_params_fit FAILURE: could not fit model to device memory. "
+        "common_fit_params FAILURE: could not fit model to device memory. "
         "Proceeding with conservative CPU-only defaults.");
     model_params.n_gpu_layers = 0;
     if (user_context_size > 0 && user_context_size > 2048) {
@@ -402,9 +411,9 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
       ctx_params.n_ctx = 2048;
     }
     break;
-  case LLAMA_PARAMS_FIT_STATUS_ERROR:
+  case COMMON_PARAMS_FIT_STATUS_ERROR:
     RAC_LOG_ERROR("LLM.LlamaCpp",
-                  "llama_params_fit ERROR for model: %s. "
+                  "common_fit_params ERROR for model: %s. "
                   "Falling back to conservative CPU-only defaults.",
                   resolved_path.c_str());
     model_params.n_gpu_layers = 0;
@@ -421,12 +430,12 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
   }
 
   // Apply user gpu_layers override after fit, respecting the CPU-only build
-  // constraint. llama_params_fit does not yet account for host memory in
+  // constraint. common_fit_params does not yet account for host memory in
   // CPU-only builds (upstream PR:
   // https://github.com/ggml-org/llama.cpp/pull/19711).
 #if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) &&                     \
     !defined(GGML_USE_WEBGPU)
-  if (fit_status == LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
+  if (fit_status == COMMON_PARAMS_FIT_STATUS_SUCCESS) {
     RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: llama_params_fit fitted to "
                                  "GPU memory but no GPU backend active. "
                                  "Applying conservative CPU defaults.");
@@ -445,16 +454,17 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
   }
 #else
   if (user_gpu_layers >= 0) {
-    // llama_params_fit fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
+    // common_fit_params fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
     // honouring the user override here reinstates the OOM risk the fit call
     // was supposed to prevent. Log a warning so it's visible in the event of
     // a subsequent crash/OOM, but keep honouring the user's explicit request.
-    if (fit_status != LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
-      const char *fit_label =
-          fit_status == LLAMA_PARAMS_FIT_STATUS_FAILURE ? "FAILURE" : "ERROR";
+    if (fit_status != COMMON_PARAMS_FIT_STATUS_SUCCESS) {
+      const char *fit_label = fit_status == COMMON_PARAMS_FIT_STATUS_FAILURE
+                                  ? "FAILURE"
+                                  : "ERROR";
       RAC_LOG_WARNING("LLM.LlamaCpp",
                       "Applying user gpu_layers=%d override despite "
-                      "llama_params_fit %s — risk of OOM",
+                      "common_fit_params %s — risk of OOM",
                       user_gpu_layers, fit_label);
     }
     model_params.n_gpu_layers = user_gpu_layers;
