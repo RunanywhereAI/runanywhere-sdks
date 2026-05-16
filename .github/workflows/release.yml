@@ -558,7 +558,7 @@ jobs:
           # T5.7: match the Flutter pin in
           # sdk/runanywhere-flutter/.fvm/fvm_config.json so the consumer
           # validation reflects what we actually ship against.
-          flutter-version: '3.28.0'
+          flutter-version: '3.27.0'
       - name: Clone flutter-starter-example
         uses: actions/checkout@v4
         with:

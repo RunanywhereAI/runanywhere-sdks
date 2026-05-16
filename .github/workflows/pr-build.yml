@@ -141,7 +141,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         # T5.7: pin Flutter to the version recorded in
         # sdk/runanywhere-flutter/.fvm/fvm_config.json so CI matches local FVM.
-        with: { flutter-version: '3.28.0' }
+        with: { flutter-version: '3.27.0' }
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
 
   rn-typecheck:
@@ -179,13 +179,15 @@ jobs:
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
       # llamacpp, and onnx — exactly the surface this PR touches.
-      # npm 10 (Node 20) does not consistently hoist transitive workspace deps
-      # for proto-ts when installed only via the web root workspace install.
-      # Install proto-ts deps explicitly first so `long` + `protobufjs/minimal`
-      # are resolvable when `tsc --noEmit` runs against sdk/shared/proto-ts.
-      - name: Install proto-ts dependencies (workspace member)
+      # proto-ts is a workspace member of BOTH the repo-root Yarn workspace AND
+      # the sdk/runanywhere-web npm workspace. When we cd into proto-ts and run
+      # `npm install`, npm walks up, finds the root Yarn package.json with
+      # `workspace:*` deps it can't parse, and bails (EUNSUPPORTEDPROTOCOL).
+      # `--workspaces=false` keeps npm from inheriting the root workspace
+      # context and resolves the long/protobufjs deps in-tree directly.
+      - name: Install proto-ts dependencies (standalone install)
         working-directory: sdk/shared/proto-ts
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --workspaces=false
       - name: Install workspace dependencies
         working-directory: sdk/runanywhere-web
         run: npm install --no-audit --no-fund

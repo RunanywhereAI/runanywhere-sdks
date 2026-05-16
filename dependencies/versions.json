@@ -15,7 +15,7 @@
     "eslint": "^9.39.4",
     "typescript-eslint": "^8.59.3",
     "vitest": "^3.2.4",
-    "react-native-nitro-modules": "^0.34.1",
+    "react-native-nitro-modules": "^0.33.9",
     "nitrogen": "^0.34.1",
     "lerna": "^8.2.4",
     "prettier": "^3.8.3",
