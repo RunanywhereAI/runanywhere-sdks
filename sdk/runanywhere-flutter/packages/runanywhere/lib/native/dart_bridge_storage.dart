@@ -259,26 +259,36 @@ class DartBridgeStorage {
     }
   }
 
+  // dart:ffi `Pointer.fromFunction(..., exceptionalReturn)` requires the
+  // exceptionalReturn argument to be a const expression. Dart 3.6's
+  // analyzer reports `argument_must_be_a_constant` on plain negative
+  // integer literals because it sees `-1` as a unary expression rather
+  // than a constant int. Hoisting into named top-level `const` ints
+  // sidesteps the rule with identical runtime behavior.
+  static const int _kFallbackNegOne = -1;
+  static const int _kFallbackZero = 0;
+  static const int _kFallbackRacErrBadParam = -187;
+
   static Pointer<RacStorageCallbacks> _createCallbacks() {
     final ptr = calloc<RacStorageCallbacks>();
     ptr.ref
       ..calculateDirSize =
           Pointer.fromFunction<RacStorageCalculateDirSizeNative>(
-              _calculateDirSize, -1)
-      ..getFileSize =
-          Pointer.fromFunction<RacStorageGetFileSizeNative>(_getFileSize, -1)
-      ..pathExists =
-          Pointer.fromFunction<RacStoragePathExistsNative>(_pathExists, 0)
-      ..getAvailableSpace =
-          Pointer.fromFunction<RacStorageGetSpaceNative>(_getAvailableSpace, 0)
-      ..getTotalSpace =
-          Pointer.fromFunction<RacStorageGetSpaceNative>(_getTotalSpace, 0)
-      ..deletePath =
-          Pointer.fromFunction<RacStorageDeletePathNative>(_deletePath, -187)
-      ..isModelLoaded =
-          Pointer.fromFunction<RacStorageIsModelLoadedNative>(_isModelLoaded, 0)
-      ..unloadModel =
-          Pointer.fromFunction<RacStorageUnloadModelNative>(_unloadModel, 0)
+              _calculateDirSize, _kFallbackNegOne)
+      ..getFileSize = Pointer.fromFunction<RacStorageGetFileSizeNative>(
+          _getFileSize, _kFallbackNegOne)
+      ..pathExists = Pointer.fromFunction<RacStoragePathExistsNative>(
+          _pathExists, _kFallbackZero)
+      ..getAvailableSpace = Pointer.fromFunction<RacStorageGetSpaceNative>(
+          _getAvailableSpace, _kFallbackZero)
+      ..getTotalSpace = Pointer.fromFunction<RacStorageGetSpaceNative>(
+          _getTotalSpace, _kFallbackZero)
+      ..deletePath = Pointer.fromFunction<RacStorageDeletePathNative>(
+          _deletePath, _kFallbackRacErrBadParam)
+      ..isModelLoaded = Pointer.fromFunction<RacStorageIsModelLoadedNative>(
+          _isModelLoaded, _kFallbackZero)
+      ..unloadModel = Pointer.fromFunction<RacStorageUnloadModelNative>(
+          _unloadModel, _kFallbackZero)
       ..userData = nullptr;
     return ptr;
   }

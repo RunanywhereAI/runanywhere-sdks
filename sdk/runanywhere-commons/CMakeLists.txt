@@ -1293,7 +1293,13 @@ endif()
 # rac_commons below.
 # =============================================================================
 
-if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG
+# Decouple RAG from RAC_BUILD_BACKENDS so the proto C ABI symbols
+# (`rac_rag_query_proto` etc.) referenced from src/solutions/operators/
+# op_engine_backed.cpp are always resolvable inside librac_commons. RAG
+# only depends on USearch + nlohmann_json (header-only) — no llama.cpp /
+# ONNX runtime pull-in — so it is safe to enable on every host preset
+# even when the heavier engines are gated behind RAC_BUILD_BACKENDS.
+if(RAC_BACKEND_RAG
    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
     message(STATUS "Building RAG pipeline (USearch) — folded into rac_commons")
     add_subdirectory(src/features/rag)
@@ -1379,12 +1385,10 @@ endif()
 if(RAC_PLATFORM_WINDOWS)
     message(STATUS "  Platform:     Windows (MSVC)")
 endif()
-if(RAC_BUILD_BACKENDS)
-    # T5.4: per-engine RAC_BACKEND_<name> status is printed by each
-    # engines/<name>/CMakeLists.txt; commons only reports its RAG flag.
-    if(RAC_BACKEND_RAG)
-        message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
-    endif()
+# RAG is folded into rac_commons regardless of RAC_BUILD_BACKENDS (see the
+# decoupled add_subdirectory above); print its status unconditionally.
+if(RAC_BACKEND_RAG)
+    message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
 endif()
 if(RAC_BUILD_SERVER)
     message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")
