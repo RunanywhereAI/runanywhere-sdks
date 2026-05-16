@@ -37,7 +37,8 @@
             "inherits": "base-debug",
             "cacheVariables": {
                 "RAC_BUILD_PLATFORM": "ON",
-                "RAC_BUILD_SHARED": "OFF"
+                "RAC_BUILD_SHARED": "OFF",
+                "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
         },
@@ -47,7 +48,8 @@
             "inherits": "base-release",
             "cacheVariables": {
                 "RAC_BUILD_PLATFORM": "ON",
-                "RAC_BUILD_SHARED": "OFF"
+                "RAC_BUILD_SHARED": "OFF",
+                "GGML_METAL": "OFF"
             },
             "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
         },

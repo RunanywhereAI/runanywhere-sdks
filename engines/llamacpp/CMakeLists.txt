@@ -81,9 +81,18 @@ elseif(RAC_PLATFORM_ANDROID)
     # Disable openmp to avoid Android threading issues
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_MACOS)
-    set(GGML_METAL ON CACHE BOOL "" FORCE)
+    # Allow upstream callers (CI test preset, command-line) to opt out of
+    # GGML_METAL by setting it OFF before the project() call. Recent
+    # Xcode / Apple Clang strict-ARC errors in ggml-metal-device.m make
+    # the Metal build unusable for headless CMake test jobs; the CPU
+    # path is enough for unit tests.
+    if(NOT DEFINED CACHE{GGML_METAL})
+        set(GGML_METAL ON CACHE BOOL "" FORCE)
+    endif()
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
-    set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
+    if(GGML_METAL)
+        set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
+    endif()
 elseif(RAC_PLATFORM_LINUX)
     # Disable GPU backends not typically available on Linux ARM
     set(GGML_METAL OFF CACHE BOOL "" FORCE)

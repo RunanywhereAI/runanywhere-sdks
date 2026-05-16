@@ -21,7 +21,7 @@ dependencies:
   flutter:
     sdk: flutter
   # FFI (Foreign Function Interface)
-  ffi: ^2.2.0
+  ffi: ^2.1.3
   # Networking: HTTP transport routed through the commons Phase H C ABI
   # (rac_http_client_*, rac_http_download_execute).
   # Protobuf runtime — consumed by the IDL-generated bindings in

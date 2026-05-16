@@ -32,10 +32,10 @@ jobs:
   macos-debug:
     # Pinned to macos-14 (Xcode 15.4) because macos-15 ships Xcode 16+ /
     # Apple Clang 18 which now rejects llama.cpp's `void* → id<MTLDevice>`
-    # casts in ggml-metal-device.m. b9174 (matching XCODE_VERSION=15.4 in
-    # VERSIONS) builds cleanly under Xcode 15.4. The Swift-only workflows
-    # that need Xcode 16+ (idl-drift-check, ios-device) still run on
-    # macos-15 explicitly.
+    # casts in ggml-metal-device.m. The CMake preset additionally disables
+    # GGML_METAL for the test build (CPU paths are sufficient for unit
+    # tests; Metal is only required by iOS/Swift runtime builds, which
+    # run in their own dedicated jobs).
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
