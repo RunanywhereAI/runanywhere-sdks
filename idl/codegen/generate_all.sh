@@ -55,15 +55,45 @@ echo "▶ Swift proto codegen"
 echo "▶ Kotlin proto codegen"
 "${SCRIPT_DIR}/generate_kotlin.sh"
 
+# T3.3: emit RAConvenience.kt from rac_options.proto annotations on top of the
+# Wire-generated message/enum types. Must run AFTER generate_kotlin.sh so the
+# referenced types (ai.runanywhere.proto.v1.*) exist on disk; Wire emits a
+# `companion object` on every message/enum, which the convenience extensions
+# bind to. The post-processor exits 0 (warning) when python3 is unavailable so
+# Kotlin-only developer workflows that omit Python remain unblocked.
+if command -v python3 >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_kotlin_convenience.py"
+else
+    echo "warning: python3 not found — skipping RAConvenience.kt codegen." >&2
+fi
+
 if [ "${SKIP_DART}" -eq 1 ]; then
     echo "▶ Dart proto codegen (skipped via --skip-dart)"
 else
     echo "▶ Dart proto codegen"
     "${SCRIPT_DIR}/generate_dart.sh"
+    # Convenience post-processor (rac_* annotations -> defaults() / validate()
+    # / wireString helpers). Tolerant of a python3-less environment: skip
+    # with a warning rather than fail the upstream codegen.
+    if command -v python3 >/dev/null 2>&1; then
+        echo "▶ Dart convenience post-processor"
+        python3 "${SCRIPT_DIR}/generate_dart_convenience.py"
+    else
+        echo "warning: python3 not on PATH; skipping Dart convenience post-processor." >&2
+    fi
 fi
 
 echo "▶ TypeScript proto codegen (RN + Web)"
 "${SCRIPT_DIR}/generate_ts.sh"
+# T3.3-ts-impl: TypeScript convenience helpers (defaults / validate /
+# wireString) derived from rac_* annotations. Skips silently when python3
+# is absent, so a TS-only developer environment without Python still
+# completes the upstream codegen successfully.
+if command -v python3 >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_ts_convenience.py"
+else
+    echo "warning: python3 not on PATH; skipping generate_ts_convenience.py" >&2
+fi
 
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"

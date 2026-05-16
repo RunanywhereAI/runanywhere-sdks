@@ -270,15 +270,59 @@ export function emptyLoRAState(): ProtoLoRAState {
   };
 }
 
+/**
+ * Default number of native callback emissions between cooperative yield
+ * points. See `streamYield` for usage by async call wrappers.
+ *
+ * For a purely synchronous Emscripten export this counter is observed but
+ * does not pause the export — `queueMicrotask`'d work cannot preempt a
+ * still-running synchronous JS frame. The counter becomes meaningful for
+ * cooperative (async) call wrappers — test fakes today, Asyncify / Worker
+ * backends tomorrow — that `await streamYield()` between callback batches.
+ */
+export const DEFAULT_STREAM_YIELD_EVERY = 16;
+
+/**
+ * Cooperative yield primitive for asynchronous native-call wrappers used
+ * with `streamCallback`. Resolves on the next microtask, giving the
+ * consumer iterator's pending `next()` resolutions a chance to run before
+ * the wrapper resumes emitting.
+ *
+ * Usage in an async wrapper:
+ *
+ * ```ts
+ *   async (callbackPtr) => {
+ *     for (let i = 0; i < tokens.length; i++) {
+ *       emitToken(callbackPtr, tokens[i]);
+ *       if (i % DEFAULT_STREAM_YIELD_EVERY === DEFAULT_STREAM_YIELD_EVERY - 1) {
+ *         await streamYield();
+ *       }
+ *     }
+ *     return 0;
+ *   }
+ * ```
+ *
+ * Purely synchronous Emscripten exports do not need to call this — they
+ * cannot be preempted from JS, and `streamCallback` already defers them
+ * onto a microtask so the AsyncIterable handle is observable before the
+ * blocking call begins. See `docs/STREAM_DELIVERY_DESIGN.md` for the full
+ * architectural picture and migration path to true live delivery.
+ */
+export function streamYield(): Promise<void> {
+  return new Promise<void>((resolve) => queueMicrotask(resolve));
+}
+
 export function streamCallback<T>(
   module: ModalityProtoModule,
   codec: ProtoCodec<T>,
   functionName: string,
-  call: (callbackPtr: number) => number,
+  call: (callbackPtr: number) => number | Promise<number>,
   stopWhen?: (event: T) => boolean,
   onCancel?: () => void,
   callbackReturnsBool = false,
+  yieldEvery: number = DEFAULT_STREAM_YIELD_EVERY,
 ): AsyncIterable<T> {
+  const yieldThreshold = Math.max(1, yieldEvery | 0);
   return {
     [Symbol.asyncIterator](): AsyncIterator<T> {
       const queue: T[] = [];
@@ -290,6 +334,7 @@ export function streamCallback<T>(
       let started = false;
       let finished = false;
       let callActive = false;
+      let emitsSinceYield = 0;
 
       const cleanup = (): void => {
         if (callbackPtr && !callActive) {
@@ -323,6 +368,21 @@ export function streamCallback<T>(
         } else {
           queue.push(event);
         }
+        // Callback yield (option (b) in STREAM_DELIVERY_DESIGN.md): after
+        // every `yieldThreshold` emissions, post an empty microtask. This
+        // is the cooperative scheduling boundary an async call wrapper
+        // can synchronise against via `await streamYield()` — at that
+        // point any pending consumer waiter resolutions (queued by the
+        // `resolve(...)` above) flush before the wrapper resumes, so the
+        // consumer iterator observes events live instead of seeing the
+        // full batch only after the native call returns. For purely
+        // synchronous wrappers the queued microtask is a no-op because
+        // sync JS frames cannot be preempted from inside `emit`.
+        emitsSinceYield += 1;
+        if (emitsSinceYield >= yieldThreshold) {
+          emitsSinceYield = 0;
+          queueMicrotask(noopBarrier);
+        }
         if (stopWhen?.(event)) finish();
       };
 
@@ -353,7 +413,18 @@ export function streamCallback<T>(
         return true;
       };
 
-      const runNativeCall = (): void => {
+      // `runNativeCall` is async so the `call` wrapper may opt into
+      // returning a Promise<number> instead of a sync number. Synchronous
+      // Emscripten exports (the production llamacpp / ONNX path today)
+      // continue to work transparently — `await sync_number` resolves
+      // immediately. The architectural value of the `await` is unlocking
+      // cooperative (async) wrappers without breaking any caller:
+      //   • Test mocks can simulate live delivery (see
+      //     `tests/unit/Adapters/StreamLiveDelivery.test.ts`).
+      //   • A future Asyncify / Web Worker backend can drop in an async
+      //     wrapper that yields between callback batches without any
+      //     change to `streamCallback` or its consumers.
+      const runNativeCall = async (): Promise<void> => {
         if (finished) {
           // Cancelled before the deferred call started — nothing to invoke.
           cleanup();
@@ -361,7 +432,7 @@ export function streamCallback<T>(
         }
         callActive = true;
         try {
-          const rc = call(callbackPtr);
+          const rc = await call(callbackPtr);
           if (rc !== 0) {
             fail(SDKException.fromRACResult(rc, functionName));
             return;
@@ -379,13 +450,16 @@ export function streamCallback<T>(
         if (started) return;
         started = true;
         if (!installCallback()) return;
-        // Run the blocking native call on a fresh microtask so the iterator's
-        // first `next()` resolves (or registers its waiter) before native
-        // code starts draining tokens. This keeps the AsyncIterable contract
-        // observable and lets `iterator.return()` / facade `cancel()` reach
-        // the `onCancel` hook before the blocking call begins for fake/test
-        // modules whose stream export can block on a deferred latch.
-        queueMicrotask(runNativeCall);
+        // Run the (potentially blocking) native call on a fresh microtask
+        // so the iterator's first `next()` resolves (or registers its
+        // waiter) before native code starts draining tokens. This keeps
+        // the AsyncIterable contract observable and lets
+        // `iterator.return()` / facade `cancel()` reach the `onCancel`
+        // hook before the call begins for fake/test modules whose stream
+        // export can block on a deferred latch. The returned Promise is
+        // intentionally discarded — `runNativeCall` routes every error
+        // through `fail()` so it never rejects.
+        queueMicrotask(() => { void runNativeCall(); });
       };
 
       return {
@@ -412,6 +486,10 @@ export function streamCallback<T>(
       };
     },
   };
+}
+
+function noopBarrier(): void {
+  /* cooperative-yield barrier; intentionally empty */
 }
 
 export function collectCallback<T>(

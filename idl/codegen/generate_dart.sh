@@ -112,10 +112,11 @@ protoc \
     "${DART_PROTO_BASENAMES[@]}"
 
 # Belt-and-braces: strip stubs/descriptors that are not runtime SDK surface.
+# (The convenience subtree under ${OUT_DIR}/convenience/ is owned by
+# generate_dart_convenience.py and intentionally NOT stripped here.)
 rm -f \
     "${OUT_DIR}"/*.pbgrpc.dart \
     "${OUT_DIR}"/*.pbserver.dart \
-    "${OUT_DIR}"/*.pbjson.dart \
-    "${OUT_DIR}"/ra_convenience.dart
+    "${OUT_DIR}"/*.pbjson.dart
 
 echo "✓ Dart proto codegen → ${OUT_DIR} (message/enum bindings; stubs/descriptors stripped)"

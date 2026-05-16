@@ -205,10 +205,18 @@ let package = Package(
 
         // -------------------------------------------------------------------
         // Unit tests (AudioCaptureManager — see Issue #198)
+        //
+        // `SwiftProtobuf` is listed alongside `RunAnywhere` because the
+        // HandleStreamAdapter coverage in Tests/RunAnywhereTests/Adapters/
+        // calls `Message.serializedData()` directly to drive synthetic
+        // proto-byte payloads through the C trampoline.
         // -------------------------------------------------------------------
         .testTarget(
             name: "RunAnywhereTests",
-            dependencies: ["RunAnywhere"],
+            dependencies: [
+                "RunAnywhere",
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+            ],
             path: "Tests/RunAnywhereTests"
         ),
 

@@ -7,11 +7,13 @@
  * The V2 architecture's canonical path for STT/TTS/VAD is the proto-byte
  * RACommons C ABI (`STTProtoAdapter` / `TTSProtoAdapter` /
  * `VADProtoAdapter`) exposed by the unified `racommons-llamacpp.wasm`
- * artifact. That path still hits a deep Emscripten exception-trampoline
- * mismatch when the vendored ORT + Sherpa static archives are linked into
- * the unified module, so a working speech artifact is currently provided
- * by the standalone `sherpa-onnx.wasm` module that `@runanywhere/web-onnx`
- * builds via `wasm/scripts/build-sherpa-onnx.sh`.
+ * artifact. That path still hits an Emscripten exception-trampoline
+ * mismatch on the `Ort::InferenceSession::ConstructorCommon` symbol
+ * (manifests at runtime as a `function signature mismatch` invoke
+ * trampoline error) when the vendored ORT + Sherpa static archives are
+ * linked into the unified module, so a working speech artifact is
+ * currently provided by the standalone `sherpa-onnx.wasm` module that
+ * `@runanywhere/web-onnx` builds via `wasm/scripts/build-sherpa-onnx.sh`.
  *
  * To keep the public Swift-shaped facade verbs
  * (`RunAnywhere.transcribe` / `synthesize` / `detectVoiceActivity`)
@@ -26,6 +28,23 @@
  *   tests with ORT + Sherpa linked in. Do NOT design new SDK features
  *   around the SpeechProvider routing layer; new speech behavior belongs
  *   in the proto-byte adapter contract.
+ *
+ *   Enabling work (cross-links):
+ *     - `engines/sherpa/CMakeLists.txt:307-348` — Emscripten branch that
+ *       already wires the vendored Sherpa-ONNX static archives into the
+ *       unified WASM link, gated on
+ *       `third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a`.
+ *     - `comments/pr-494/addressing/REMAINING_WORK.md` section B4
+ *       ("Remove SpeechProvider escape hatch when unified WASM is ready")
+ *       — the tracking workstream that supersedes this escape hatch.
+ *     - `comments/pr-494/addressing/comments/duplicate-abstractions-and-SOLID-001-followup-web.json`
+ *       — future GH issue payload that owns the actual deletion.
+ *
+ *   Verification gate (DO NOT delete this file before this passes):
+ *     Removal is gated on `tests/browser/facade-speech-vad.spec.ts`
+ *     running with `skipProtoBytePlugins: false` against an
+ *     `--all-backends` build, with no `function signature mismatch`
+ *     runtime error.
  *
  * The provider operates on opaque model identifiers — the SDK already
  * downloaded and extracted the model into the local storage backend
