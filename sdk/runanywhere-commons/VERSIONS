@@ -46,12 +46,17 @@ JAVA_VERSION=17
 # Gradle wrapper version baseline
 GRADLE_VERSION=8.11.1
 
-# CMake version installed in CI. Must be >= 3.24 because
-# cmake/FetchONNXRuntime.cmake uses the DOWNLOAD_EXTRACT_TIMESTAMP keyword
-# which was added in CMake 3.24. (The repo's CMakeLists.txt advertises
-# cmake_minimum_required(3.22) for build-system documentation, but the
-# toolchain installed in CI has to be 3.24+ to actually run the build.)
+# CMake version installed in CI. Toolchain present on the build host.
 CMAKE_VERSION=3.27
+
+# Minimum CMake version advertised by every `cmake_minimum_required()` in this
+# repo. Must be >= 3.24 because cmake/FetchONNXRuntime.cmake uses the
+# DOWNLOAD_EXTRACT_TIMESTAMP keyword which was added in CMake 3.24. Bumping
+# this drops support for CMake 3.22/3.16/3.14/3.9 hosts; CI/devs need 3.24+.
+# NOTE: `cmake_minimum_required(VERSION ...)` must be the first command and
+# cannot be parameterised by a CMake variable — keep the literal 3.24 in
+# each CMakeLists.txt in sync with this value when bumping.
+MIN_CMAKE_VERSION=3.24
 
 # =============================================================================
 # ONNX Runtime
@@ -114,9 +119,48 @@ SHERPA_ONNX_VERSION_WINDOWS=1.12.23
 LLAMACPP_VERSION=b9174
 
 # =============================================================================
+# whisper.cpp (STT — opt-in fallback for Whisper-family models)
+# =============================================================================
+# Pinned tag for engines/whispercpp/CMakeLists.txt FetchContent.
+WHISPERCPP_VERSION=v1.8.2
+
+# =============================================================================
 # nlohmann/json
 # =============================================================================
 NLOHMANN_JSON_VERSION=3.11.3
+
+# =============================================================================
+# USearch (vector search engine used by the RAG pipeline)
+# =============================================================================
+USEARCH_VERSION=v2.15.2
+
+# =============================================================================
+# cpp-httplib (header-only HTTP server — RAC_BUILD_SERVER only)
+# =============================================================================
+CPPHTTPLIB_VERSION=v0.15.3
+
+# =============================================================================
+# zlib (bundled for Android/Emscripten where the platform SDK lacks it)
+# =============================================================================
+ZLIB_VERSION=v1.3.1
+
+# =============================================================================
+# bzip2 (bundled for Android/Emscripten — sourceware tarball, NOT a `v` prefix)
+# =============================================================================
+BZIP2_VERSION=1.0.8
+
+# =============================================================================
+# Protobuf (libprotobuf runtime + matching libprotobuf-lite/abseil)
+# =============================================================================
+# Must match what the checked-in generated headers under
+# sdk/runanywhere-commons/src/generated/proto/ were emitted by (Protobuf C++
+# 7.34.1 → upstream tag v34.1). Bumping requires regenerating those headers.
+PROTOBUF_VERSION=34.1
+
+# =============================================================================
+# GoogleTest (test framework for commons + RAG unit tests)
+# =============================================================================
+GOOGLETEST_VERSION=v1.14.0
 
 # =============================================================================
 # libarchive (archive extraction - ZIP, TAR.GZ, TAR.BZ2, TAR.XZ)

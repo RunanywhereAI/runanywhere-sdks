@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.22)
+# Must match VERSIONS::MIN_CMAKE_VERSION (3.24). Required for FetchContent's
+# FIND_PACKAGE_ARGS and DOWNLOAD_EXTRACT_TIMESTAMP keywords (both added in 3.24)
+# used by the protobuf and ONNX Runtime fetches below.
+cmake_minimum_required(VERSION 3.24)
 
 # Read version from VERSION file
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_CONTENT)
@@ -183,7 +186,7 @@ if(NOT ZLIB_FOUND)
     FetchContent_Declare(
         zlib_src
         GIT_REPOSITORY https://github.com/madler/zlib.git
-        GIT_TAG        v1.3.1
+        GIT_TAG        ${ZLIB_VERSION}
         GIT_SHALLOW    TRUE
     )
     # Prevent zlib from installing or building examples
@@ -231,7 +234,7 @@ if(NOT ZLIB_FOUND)
             ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
         )
     endif()
-    message(STATUS "Bundled zlib ready (v1.3.1)")
+    message(STATUS "Bundled zlib ready (${ZLIB_VERSION})")
 else()
     message(STATUS "Using system zlib: ${ZLIB_LIBRARIES}")
 endif()
@@ -257,7 +260,7 @@ if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
         bzip2_src
-        URL https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+        URL https://sourceware.org/pub/bzip2/bzip2-${BZIP2_VERSION}.tar.gz
         URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
     )
     FetchContent_MakeAvailable(bzip2_src)
@@ -299,7 +302,7 @@ if(NOT BZIP2_FOUND)
             ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
         )
     endif()
-    message(STATUS "Bundled BZip2 ready (v1.0.8)")
+    message(STATUS "Bundled BZip2 ready (v${BZIP2_VERSION})")
 else()
     message(STATUS "Using system BZip2: ${BZIP2_LIBRARIES}")
 endif()
@@ -423,7 +426,7 @@ if(RAC_BUILD_SERVER)
     FetchContent_Declare(
         cpp-httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-        GIT_TAG v0.15.3
+        GIT_TAG ${CPPHTTPLIB_VERSION}
         GIT_SHALLOW TRUE
     )
 
@@ -1000,23 +1003,24 @@ endif()
 if(RAC_ENABLE_PROTOBUF)
     message(STATUS "RAC_ENABLE_PROTOBUF=ON — building generated-proto native ABI implementations")
     if(RAC_VENDOR_PROTOBUF)
-        find_package(Protobuf 34.1 EXACT CONFIG QUIET)
+        find_package(Protobuf ${PROTOBUF_VERSION} EXACT CONFIG QUIET)
     else()
-        find_package(Protobuf 34.1 EXACT QUIET)
+        find_package(Protobuf ${PROTOBUF_VERSION} EXACT QUIET)
     endif()
     # Fallback for homebrew/system protobuf 34.x: the upstream config file
     # reports PACKAGE_VERSION_MAJOR==7 (runtime ABI major) and rejects
-    # `Protobuf 34.1 EXACT`. Module mode finds the same install with a
+    # `Protobuf <X> EXACT`. Module mode finds the same install with a
     # synthesized version string. Accept either so local dev on macOS works
     # without requiring a vendored FetchContent build.
     #
     # T1.1: require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
     # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
-    # FetchContent fetches v34.1 below. The checked-in generated headers
-    # under src/generated/proto/ are Protobuf C++ Version 7.34.1 and include
-    # `google/protobuf/runtime_version.h`, which only exists in the
-    # libprotobuf 4.x+ runtime. Linking against 3.x produces
-    # `fatal error: google/protobuf/runtime_version.h: No such file or directory`.
+    # FetchContent fetches the centralized PROTOBUF_VERSION below. The
+    # checked-in generated headers under src/generated/proto/ are Protobuf
+    # C++ Version 7.34.1 and include `google/protobuf/runtime_version.h`,
+    # which only exists in the libprotobuf 4.x+ runtime. Linking against
+    # 3.x produces `fatal error: google/protobuf/runtime_version.h: No such
+    # file or directory`.
     if(NOT Protobuf_FOUND)
         find_package(Protobuf 5.0 QUIET)
     endif()
@@ -1043,12 +1047,12 @@ if(RAC_ENABLE_PROTOBUF)
         # of mismatched absl dylibs that happen under `FetchContent` alone.
         set(_rac_fetch_protobuf_find_args "")
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
-            set(_rac_fetch_protobuf_find_args FIND_PACKAGE_ARGS 34.1 EXACT NAMES Protobuf)
+            set(_rac_fetch_protobuf_find_args FIND_PACKAGE_ARGS ${PROTOBUF_VERSION} EXACT NAMES Protobuf)
         endif()
         FetchContent_Declare(
             protobuf_fetched
             GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-            GIT_TAG        v34.1
+            GIT_TAG        v${PROTOBUF_VERSION}
             GIT_SHALLOW    TRUE
             ${_rac_fetch_protobuf_find_args}
         )
@@ -1061,7 +1065,7 @@ if(RAC_ENABLE_PROTOBUF)
         endif()
         if(TARGET protobuf::libprotobuf OR TARGET libprotobuf)
             set(Protobuf_FOUND TRUE)
-            message(STATUS "RunAnywhere: vendored libprotobuf v34.1 via FetchContent (absl=module)")
+            message(STATUS "RunAnywhere: vendored libprotobuf v${PROTOBUF_VERSION} via FetchContent (absl=module)")
         endif()
     endif()
 

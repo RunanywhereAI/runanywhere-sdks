@@ -64,8 +64,8 @@
     "@runanywhere/proto-ts": "^0.21.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
-    "eslint": "^9.0.0",
+    "typescript": "^5.9.2",
+    "eslint": "^9.18.0",
     "@eslint/js": "^9.0.0",
     "typescript-eslint": "^8.0.0"
   }

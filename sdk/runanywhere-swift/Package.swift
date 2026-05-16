@@ -46,14 +46,20 @@ let package = Package(
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
     ],
     dependencies: [
-        // Pins mirror `Package.resolved`.
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
-        .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
-        .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
+        // T4.3: SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
+        // silent upstream major bump can't land in `Package.resolved` without
+        // a Package.swift edit. Version floors are mirrored in
+        // Sources/RunAnywhere/Generated/Versions.swift (RAVersions) — keep
+        // both in sync via scripts/sync-versions.sh.
+        .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.0.0")),
+        .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
+        .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.6.0")),
+        .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.40.0")),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
-        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.27.0"),
+        // swift-protobuf uses .upToNextMajor because generated pb.swift code calls
+        // SwiftProtobuf._NameMap(bytecode:) which was added in 1.28.0.
+        .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMajor(from: "1.27.0")),
     ],
     targets: [
         // -------------------------------------------------------------------

@@ -46,6 +46,12 @@ dev_dependencies:
     sdk: flutter
   test: ^1.24.0
   flutter_lints: ^3.0.0
+  # Pinned (not caret) so local + CI codegen produces byte-identical output.
+  # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup-toolchain.sh and
+  # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
+  # the workspace `melos.dependencies` block at
+  # sdk/runanywhere-flutter/pubspec.yaml in the same change.
+  protoc_plugin: 21.1.2
 
 flutter:
   uses-material-design: true

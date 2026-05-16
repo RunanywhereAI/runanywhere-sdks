@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.22)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
 # Integration Test Suite for runanywhere-commons
@@ -1320,11 +1321,15 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     include(FetchContent)
     find_package(Threads REQUIRED)
 
-    # GoogleTest (download on first configure)
+    # GoogleTest pinned via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION
+    # so the RAG and benchmark suites below agree on a single tag (previously
+    # this block requested release-1.12.1 while the benchmark block fetched
+    # v1.14.0 — FetchContent dedupes by name and silently used whichever
+    # declaration ran first, creating ABI-mismatch link errors).
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        release-1.12.1
+        GIT_TAG        ${GOOGLETEST_VERSION}
         GIT_SHALLOW    TRUE
     )
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -1357,10 +1362,10 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         Threads::Threads
         GTest::gtest_main
     )
-    # Force the bundled (release-1.12.1) gtest headers to win over any system
-    # gtest (e.g. /opt/homebrew/include) — without this the prebuilt
-    # libgtest_main.a (older `const char*` ABI) link-fails when the test
-    # picks up the newer `std::string` header signatures. Same fix as
+    # Force the bundled (centralized GOOGLETEST_VERSION) gtest headers to win
+    # over any system gtest (e.g. /opt/homebrew/include) — without this the
+    # prebuilt libgtest_main.a (older `const char*` ABI) link-fails when the
+    # test picks up the newer `std::string` header signatures. Same fix as
     # rac_benchmark_tests below.
     if(TARGET gtest)
         target_include_directories(rac_chunker_test BEFORE PRIVATE
@@ -1406,10 +1411,13 @@ endif()
 
 include(FetchContent)
 
+# Pin via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION so this and the
+# RAG-test block above share a single FetchContent declaration. (FetchContent
+# dedupes by content name; first declaration wins. Both must match.)
 FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
+    GIT_TAG ${GOOGLETEST_VERSION}
 )
 
 # Prevent GoogleTest from overriding compiler/linker options

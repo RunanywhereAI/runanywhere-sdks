@@ -27,12 +27,16 @@ dependencies:
   # patch >=13 (and any future 0.19.x minor in the caret range), so consumers
   # can still upgrade core within the published patch suite.
   runanywhere: ^0.19.13
-  ffi: ^2.1.0
+  # Workspace-resolved: actual constraint lives in
+  # sdk/runanywhere-flutter/pubspec.yaml (melos.dependencies) and the
+  # `runanywhere` package. `any` defers to that single workspace resolution
+  # so we never carry a duplicate floor that can drift out of lockstep.
+  ffi: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: any
 
 flutter:
   uses-material-design: true

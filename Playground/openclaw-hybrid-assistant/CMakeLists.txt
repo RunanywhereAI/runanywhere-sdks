@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 project(openclaw-hybrid-assistant VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)

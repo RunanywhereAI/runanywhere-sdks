@@ -1,5 +1,6 @@
 project(runanywhereonnx)
-cmake_minimum_required(VERSION 3.9.0)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 
 set(PACKAGE_NAME runanywhereonnx)
 set(CMAKE_VERBOSE_MAKEFILE ON)

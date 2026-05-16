@@ -29,7 +29,10 @@
 # preset output into the right SDK directory layout.
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.22)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+# Required for FetchContent's FIND_PACKAGE_ARGS and DOWNLOAD_EXTRACT_TIMESTAMP
+# (both added in CMake 3.24) used by the protobuf and ONNX Runtime fetches.
+cmake_minimum_required(VERSION 3.24)
 
 # Read version from the canonical VERSION file (kept under commons for
 # historical reasons; treat as monorepo-wide).

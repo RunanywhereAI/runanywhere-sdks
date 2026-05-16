@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.22)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 
 project(RunAnywhereWebWASM
     VERSION 0.1.0

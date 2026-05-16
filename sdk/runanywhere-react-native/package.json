@@ -54,10 +54,10 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.1",
     "lerna": "^8.0.0",
-    "prettier": "^3.0.3",
+    "prettier": "^3.3.2",
     "react": "19.2.0",
     "react-native": "0.83.1",
-    "typescript": "~5.9.2"
+    "typescript": "^5.9.2"
   },
   "packageManager": "yarn@3.6.1",
   "engines": {

@@ -27,7 +27,7 @@ set(USEARCH_USE_SIMSIMD OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     usearch
     GIT_REPOSITORY https://github.com/unum-cloud/usearch.git
-    GIT_TAG        v2.15.2
+    GIT_TAG        ${USEARCH_VERSION}
     GIT_SHALLOW    TRUE
 )
 set(USEARCH_BUILD_TEST_C OFF CACHE BOOL "" FORCE)
@@ -42,7 +42,7 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
     FetchContent_Declare(
         nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG        v3.11.3
+        GIT_TAG        v${NLOHMANN_JSON_VERSION}
         GIT_SHALLOW    TRUE
     )
     set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -166,7 +166,7 @@ endif()
 # =============================================================================
 
 message(STATUS "RAG Pipeline Configuration:")
-message(STATUS "  USearch: v2.15.2 (HNSW vector search)")
+message(STATUS "  USearch: ${USEARCH_VERSION} (HNSW vector search)")
 message(STATUS "  Architecture: Pipeline (calls LLM + Embeddings via vtables)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
 

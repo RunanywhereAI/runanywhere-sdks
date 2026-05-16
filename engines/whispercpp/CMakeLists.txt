@@ -18,11 +18,9 @@ message(STATUS "Configuring WhisperCPP backend...")
 include(FetchContent)
 include(LoadVersions)
 
-# Fetch nlohmann_json for JSON parsing (if not already available)
+# Fetch nlohmann_json for JSON parsing (if not already available).
+# Version comes from sdk/runanywhere-commons/VERSIONS via LoadVersions above.
 if(NOT TARGET nlohmann_json::nlohmann_json)
-    if(NOT DEFINED NLOHMANN_JSON_VERSION)
-        set(NLOHMANN_JSON_VERSION "3.11.3")
-    endif()
     FetchContent_Declare(
         nlohmann_json
         GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -34,12 +32,9 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
 endif()
 
 # =============================================================================
-# Fetch whisper.cpp
+# Fetch whisper.cpp — pin from VERSIONS::WHISPERCPP_VERSION (no local fallback).
 # =============================================================================
 
-if(NOT DEFINED WHISPERCPP_VERSION)
-    set(WHISPERCPP_VERSION "v1.8.2")
-endif()
 set(WHISPER_CPP_VERSION "${WHISPERCPP_VERSION}")
 
 FetchContent_Declare(

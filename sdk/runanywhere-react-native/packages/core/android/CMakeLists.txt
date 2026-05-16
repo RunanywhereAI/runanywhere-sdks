@@ -1,19 +1,29 @@
 project(runanywherecore)
-cmake_minimum_required(VERSION 3.9.0)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 
 set(PACKAGE_NAME runanywherecore)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
-# nlohmann/json - Header-only JSON library for robust JSON parsing
+# nlohmann/json - Header-only JSON library for robust JSON parsing.
 # Used by JSON-based bridge helpers such as RAGBridge.
+#
+# Version is centralized in sdk/runanywhere-commons/VERSIONS::NLOHMANN_JSON_VERSION.
+# This RN package is consumed standalone from node_modules (no access to the
+# monorepo VERSIONS file at consumer build time), so we fall back to a literal
+# pinned value when the parent CMake didn't already supply it. Keep the
+# fallback in sync with the canonical VERSIONS file when bumping.
 # =============================================================================
 include(FetchContent)
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
+    GIT_TAG v${NLOHMANN_JSON_VERSION}
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)

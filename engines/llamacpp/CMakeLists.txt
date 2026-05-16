@@ -18,13 +18,9 @@ message(STATUS "Configuring LlamaCPP backend...")
 include(FetchContent)
 include(LoadVersions)
 
-# Fallback must match sdk/runanywhere-commons/VERSIONS (LLAMACPP_VERSION).
-# Bumped to b9174 (May 2026) alongside VERSIONS to fix macOS Metal compile
-# errors in ggml-metal-context.m caused by Metal API skew against the current
-# Xcode SDK on b8201. Keep this in sync with the canonical VERSIONS file.
-if(NOT DEFINED LLAMACPP_VERSION)
-    set(LLAMACPP_VERSION "b9174")
-endif()
+# Pin to the centralized LLAMACPP_VERSION from sdk/runanywhere-commons/VERSIONS.
+# LoadVersions FORCEs the cache var, so it is always defined here — no local
+# fallback (DRY; single source of truth).
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
 # ENG-LLAMA-01: propagate llama.cpp upstream tag through to the JNI bridge so

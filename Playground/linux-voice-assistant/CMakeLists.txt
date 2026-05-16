@@ -24,7 +24,8 @@
 #      ./build/voice-assistant
 # =============================================================================
 
-cmake_minimum_required(VERSION 3.16)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 project(linux-voice-assistant
     VERSION 1.0.0
     LANGUAGES CXX
