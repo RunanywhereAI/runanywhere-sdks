@@ -37,7 +37,7 @@ dependencies:
   path_provider: ^2.1.5
   flutter_secure_storage: ^10.2.0
   # Device info
-  device_info_plus: '>=11.4.0 <11.5.0'
+  device_info_plus: '>=11.0.0 <11.3.2'
   # Utilities
   uuid: ^4.5.3
 

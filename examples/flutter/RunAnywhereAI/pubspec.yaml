@@ -35,7 +35,7 @@ dependencies:
   # File system access
   path_provider: ^2.1.5
   # Device information
-  device_info_plus: '>=11.4.0 <11.5.0'
+  device_info_plus: '>=11.0.0 <11.3.2'
   # App package info
   package_info_plus: ^4.2.0
   # URL launcher

@@ -231,7 +231,11 @@ rac_add_engine_plugin(llamacpp
     SHARED_ONLY                          # always a standalone target — matches onnx
     SOURCES             ${LLAMACPP_BACKEND_SOURCES}
                         ${LLAMACPP_BACKEND_HEADERS}
-    LINK_LIBRARIES      llama common
+    # llama.cpp b9180 renamed the `common` static library target to
+    # `llama-common` (see _deps/llamacpp-src/common/CMakeLists.txt) — the old
+    # bare `common` symbol is no longer exported, so linking macOS jobs
+    # bailed with `ld: library 'common' not found`.
+    LINK_LIBRARIES      llama llama-common
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
                         ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
