@@ -66,6 +66,11 @@ EXCLUDE_GLOBS=(
     '!**/build-*/**'
     '!**/build_*/**'
     '!gradle/libs.versions.toml'
+    # Playground/ is a collection of standalone demo projects that are not part
+    # of any unified build system (see CLAUDE.md). They are intentionally
+    # excluded from the centralization gate so their experimental version pins
+    # can drift independently.
+    '!Playground/**'
 )
 
 if ! command -v rg >/dev/null 2>&1; then
