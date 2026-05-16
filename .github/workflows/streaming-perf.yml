@@ -29,7 +29,11 @@ on:
 
 jobs:
   cpp-producers-and-aggregators:
-    runs-on: ubuntu-latest
+    # T5.7: pin to ubuntu-24.04 explicitly so libprotobuf-dev and libabsl-dev
+    # resolve to protobuf 5.x / abseil 2024xx.x — matches PROTOBUF_VERSION=34.2
+    # in sdk/runanywhere-commons/VERSIONS. ubuntu-22.04 ships protobuf 3.x and
+    # would silently force the FetchContent fallback path.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 

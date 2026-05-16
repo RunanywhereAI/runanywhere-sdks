@@ -30,7 +30,10 @@ jobs:
   # =============================================================================
 
   macos-debug:
-    runs-on: macos-14
+    # T5.7: macos-15 runner ships Xcode 16+ / Swift 6, required by the Swift
+    # 6.3.2 toolchain used by the iOS/macOS native targets and brew formulas
+    # (grpc-swift v2, swift-protobuf 1.x). macos-14 only ships Xcode 15.x.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install ninja + protobuf
@@ -43,7 +46,7 @@ jobs:
         run: ctest --preset macos-debug
 
   macos-release:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - run: brew install ninja protobuf
@@ -51,7 +54,10 @@ jobs:
       - run: cmake --build --preset macos-release
 
   linux-debug:
-    runs-on: ubuntu-22.04
+    # T5.7: ubuntu-24.04 ships libprotobuf-dev 5.x (matches PROTOBUF_VERSION=34.2
+    # in sdk/runanywhere-commons/VERSIONS) and a newer abseil. ubuntu-22.04 ships
+    # protobuf 3.x which would force the FetchContent fallback path.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install ninja + protobuf
@@ -61,7 +67,7 @@ jobs:
       - run: ctest --preset linux-debug
 
   linux-asan:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libprotobuf-dev protobuf-compiler
@@ -70,7 +76,7 @@ jobs:
       - run: ctest --preset linux-asan
 
   ios-device:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - run: brew install protobuf
@@ -100,7 +106,7 @@ jobs:
   # =============================================================================
 
   swift-spm:
-    runs-on: macos-14
+    runs-on: macos-15
     needs: [ios-device]
     steps:
       - uses: actions/checkout@v4
@@ -133,7 +139,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { flutter-version: '3.38.x' }
+        # T5.7: pin Flutter to the version recorded in
+        # sdk/runanywhere-flutter/.fvm/fvm_config.json so CI matches local FVM.
+        with: { flutter-version: '3.28.0' }
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
 
   rn-typecheck:
