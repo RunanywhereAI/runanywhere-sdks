@@ -36,7 +36,12 @@ on:
 jobs:
   check:
     name: Verify generated code matches IDL
-    runs-on: macos-14
+    # T1.7: macos-15 ships Xcode 16 with Swift 6, which is the minimum
+    # required by Homebrew's grpc-swift v2 formula. On macos-14 the formula
+    # bails with "protoc-gen-grpc-swift: An unsatisfied requirement failed
+    # this build", which previously masked the Swift gRPC plugin install and
+    # let downstream `protoc --grpc-swift_out=` discoveries silently fail.
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -56,26 +61,41 @@ jobs:
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
+          # T1.7: grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
+          # Fail loud if the install does not produce protoc-gen-grpc-swift —
+          # silently skipping previously let Swift gRPC drift through CI.
+          #
           # v2 close-out Phase 3: grpc-swift formula installs the binary as
-          # protoc-gen-grpc-swift-2; symlink to the legacy name our codegen
-          # script expects.
-          brew install grpc-swift || echo "grpc-swift bottle unavailable; Swift gRPC stubs skipped"
+          # protoc-gen-grpc-swift-2; symlink to the legacy name the codegen
+          # script expects so `protoc --grpc-swift_out=` invocations resolve.
+          brew install grpc-swift
           if [ -x /opt/homebrew/bin/protoc-gen-grpc-swift-2 ]; then
             ln -sf /opt/homebrew/bin/protoc-gen-grpc-swift-2 /opt/homebrew/bin/protoc-gen-grpc-swift
+          fi
+          if ! command -v protoc-gen-grpc-swift >/dev/null 2>&1; then
+            echo "::error::protoc-gen-grpc-swift not on PATH after brew install grpc-swift"
+            exit 1
           fi
 
       - name: Install wire-compiler (best-effort — Gradle Wire plugin is the fallback)
         run: |
           brew install wire || echo "wire bottle unavailable; Gradle Wire plugin will handle Kotlin codegen"
 
+      - name: Install Dart 3.x
+        # T1.7: macos-{14,15} runners do not ship Dart by default, so the
+        # previous `command -v dart` gate silently skipped the Dart codegen
+        # and let Flutter bindings drift (e.g. tool_call additions to
+        # LLMStreamEvent / LLMStreamFinalResult in idl/llm_service.proto were
+        # not regenerated into lib/generated/llm_service.pb.dart). Pin Dart
+        # 3.0+ here so generate_dart.sh always runs in CI.
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
       - name: Install Dart plugin (protoc-gen-dart)
         run: |
-          if command -v dart >/dev/null 2>&1; then
-            dart pub global activate protoc_plugin 21.1.2
-            echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-          else
-            echo "::warning::dart not found on macos-14 runner; Dart codegen skipped"
-          fi
+          dart pub global activate protoc_plugin 21.1.2
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
         run: |
@@ -85,8 +105,9 @@ jobs:
         run: |
           echo "protoc: $(protoc --version)"
           echo "protoc-gen-swift: $(protoc-gen-swift --version 2>/dev/null || echo 'not present')"
+          echo "protoc-gen-grpc-swift: $(protoc-gen-grpc-swift --version 2>/dev/null || echo 'not present')"
           echo "wire-compiler: $(wire-compiler --version 2>/dev/null || echo 'not present')"
-          echo "protoc-gen-dart: $(protoc-gen-dart --version 2>/dev/null || echo 'present or skipped')"
+          echo "dart: $(dart --version 2>&1 || echo 'not present')"
           echo "node: $(node --version)"
 
       - name: Regenerate all bindings

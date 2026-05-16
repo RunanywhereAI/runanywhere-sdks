@@ -2230,6 +2230,12 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearKeepToolsAvailable() => clearField(5);
 
+  /// proto3 `optional` enables presence detection (has_validate_calls()).
+  /// When unset, commons defaults to validate_calls=true (preserves the
+  /// historical hard-coded behavior and the native run-loop / session
+  /// contract that unknown tool calls short-circuit before host execution).
+  /// Callers that delegate validation/authorization to their executor or
+  /// use dynamic tool registries must explicitly set validate_calls=false.
   @$pb.TagNumber(6)
   $core.bool get validateCalls => $_getBF(5);
   @$pb.TagNumber(6)

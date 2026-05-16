@@ -16,6 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'llm_service.pbenum.dart';
+import 'tool_calling.pb.dart' as $0;
 import 'voice_events.pbenum.dart' as $14;
 
 export 'llm_service.pbenum.dart';
@@ -243,8 +244,24 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearEmitThoughts() => clearField(7);
 
-  /// Additional LLMGenerationOptions fields kept inline to avoid a codegen
-  /// package cycle between service stubs and option messages.
+  ///  Additional LLMGenerationOptions fields kept inline to avoid a codegen
+  ///  package cycle between service stubs and option messages.
+  ///
+  ///  idl-002: Intentionally omitted from this streaming request (no current
+  ///  streaming consumer; route them through the non-streaming
+  ///  rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+  ///    - thinking_pattern (LLMGenerationOptions field 11)
+  ///    - structured_output (LLMGenerationOptions field 13)
+  ///    - enable_real_time_tracking (LLMGenerationOptions field 14)
+  ///    - repeat_last_n (LLMGenerationOptions field 18)
+  ///    - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+  ///      is not yet supported on the LLM.Generate rpc; tool sessions must
+  ///      use the non-streaming generation path with LLMGenerationOptions.
+  ///  Additionally, preferred_framework (field 11) and execution_target
+  ///  (field 13) are degraded to `string` here instead of the InferenceFramework
+  ///  / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
+  ///  Callers must use the canonical enum string values (see
+  ///  llm_options.proto:69 and :85). See also synthesis idl-002.
   @$pb.TagNumber(8)
   $core.double get repetitionPenalty => $_getN(7);
   @$pb.TagNumber(8)
@@ -415,6 +432,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     $fixnum.Int64? promptEvalTimeMs,
     $fixnum.Int64? decodeTimeMs,
+    $core.Iterable<$0.ToolCall>? toolCalls,
+    $core.Iterable<$0.ToolResult>? toolResults,
   }) {
     final $result = create();
     if (text != null) {
@@ -456,6 +475,12 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     if (decodeTimeMs != null) {
       $result.decodeTimeMs = decodeTimeMs;
     }
+    if (toolCalls != null) {
+      $result.toolCalls.addAll(toolCalls);
+    }
+    if (toolResults != null) {
+      $result.toolResults.addAll(toolResults);
+    }
     return $result;
   }
   LLMStreamFinalResult._() : super();
@@ -476,6 +501,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
     ..aInt64(12, _omitFieldNames ? '' : 'promptEvalTimeMs')
     ..aInt64(13, _omitFieldNames ? '' : 'decodeTimeMs')
+    ..pc<$0.ToolCall>(14, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: $0.ToolCall.create)
+    ..pc<$0.ToolResult>(15, _omitFieldNames ? '' : 'toolResults', $pb.PbFieldType.PM, subBuilder: $0.ToolResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -616,6 +643,16 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   $core.bool hasDecodeTimeMs() => $_has(12);
   @$pb.TagNumber(13)
   void clearDecodeTimeMs() => clearField(13);
+
+  /// hotspot-idl-002: tool calls actually executed during the streaming
+  /// session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+  /// llm_options.proto). Populated only on terminal events when the
+  /// backend completed at least one tool call.
+  @$pb.TagNumber(14)
+  $core.List<$0.ToolCall> get toolCalls => $_getList(13);
+
+  @$pb.TagNumber(15)
+  $core.List<$0.ToolResult> get toolResults => $_getList(14);
 }
 
 /// v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -642,6 +679,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $core.int? promptTokensProcessed,
     $core.int? completionTokensGenerated,
     $fixnum.Int64? elapsedMs,
+    $0.ToolCall? toolCall,
   }) {
     final $result = create();
     if (seq != null) {
@@ -695,6 +733,9 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     if (elapsedMs != null) {
       $result.elapsedMs = elapsedMs;
     }
+    if (toolCall != null) {
+      $result.toolCall = toolCall;
+    }
     return $result;
   }
   LLMStreamEvent._() : super();
@@ -719,6 +760,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..a<$core.int>(15, _omitFieldNames ? '' : 'promptTokensProcessed', $pb.PbFieldType.O3)
     ..a<$core.int>(16, _omitFieldNames ? '' : 'completionTokensGenerated', $pb.PbFieldType.O3)
     ..aInt64(17, _omitFieldNames ? '' : 'elapsedMs')
+    ..aOM<$0.ToolCall>(18, _omitFieldNames ? '' : 'toolCall', subBuilder: $0.ToolCall.create)
     ..hasRequiredFields = false
   ;
 
@@ -920,6 +962,21 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   $core.bool hasElapsedMs() => $_has(16);
   @$pb.TagNumber(17)
   void clearElapsedMs() => clearField(17);
+
+  /// hotspot-idl-002: structured tool-call payload emitted alongside an
+  /// event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+  /// field the tool-call event kind carries no proto-typed payload and
+  /// SDK consumers must fall back to JSON-parsing the raw `token` text.
+  @$pb.TagNumber(18)
+  $0.ToolCall get toolCall => $_getN(17);
+  @$pb.TagNumber(18)
+  set toolCall($0.ToolCall v) { setField(18, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasToolCall() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearToolCall() => clearField(18);
+  @$pb.TagNumber(18)
+  $0.ToolCall ensureToolCall() => $_ensure(17);
 }
 
 class LLMApi {

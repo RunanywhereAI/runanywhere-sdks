@@ -8,11 +8,18 @@
 # each uses its own protoc plugin invocation under idl/codegen/*.sh so CI
 # reuses identical commands for PR drift detection.
 
-find_package(Protobuf QUIET)
+# T1.1: require Protobuf >= 5.0 — the renumbered runtime that emits
+# .pb.h files including `google/protobuf/runtime_version.h`. System
+# protobuf 3.x (Ubuntu 22.04/24.04 apt) is rejected so we don't build
+# rac_idl against a header set incompatible with the commons checked-in
+# generated code. CI must install libprotobuf-dev >= 5.0 + libabsl-dev,
+# or skip rac_idl entirely.
+find_package(Protobuf 5.0 QUIET)
 
 if(NOT Protobuf_FOUND)
-    message(STATUS "idl/: Protobuf not found via find_package — skipping rac_idl target. "
-                   "Install with 'brew install protobuf' or 'apt-get install libprotobuf-dev protobuf-compiler'.")
+    message(STATUS "idl/: Protobuf >= 5.0 not found via find_package — skipping rac_idl target. "
+                   "Install with 'brew install protobuf' or 'apt-get install libprotobuf-dev libabsl-dev protobuf-compiler' "
+                   "(requires libprotobuf-dev >= 5.0).")
     return()
 endif()
 
@@ -81,8 +88,23 @@ else()
     target_link_libraries(rac_idl PUBLIC ${Protobuf_LIBRARIES})
 endif()
 # v2 close-out: SHARED consumers need explicit absl deps; see cmake/protobuf.cmake.
+#
+# T1.1: cmake/protobuf.cmake now probes each absl::* target before adding it
+# to RAC_ABSL_LIBS so this link line stays valid even when the system absl
+# install is missing newer components (e.g. absl::log on Ubuntu 22.04's
+# libabsl-dev). Filter once more as defense-in-depth in case a consumer
+# overrides RAC_ABSL_LIBS via cache before this subdir runs.
 if(RAC_ABSL_LIBS)
-    target_link_libraries(rac_idl PUBLIC ${RAC_ABSL_LIBS})
+    set(_RAC_IDL_ABSL_LIBS "")
+    foreach(_rac_idl_absl_lib ${RAC_ABSL_LIBS})
+        if(TARGET ${_rac_idl_absl_lib})
+            list(APPEND _RAC_IDL_ABSL_LIBS ${_rac_idl_absl_lib})
+        endif()
+    endforeach()
+    if(_RAC_IDL_ABSL_LIBS)
+        target_link_libraries(rac_idl PUBLIC ${_RAC_IDL_ABSL_LIBS})
+    endif()
+    unset(_RAC_IDL_ABSL_LIBS)
 endif()
 
 # Mirror the header tree into the usual install target so CMake consumers can

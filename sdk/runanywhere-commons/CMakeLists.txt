@@ -1009,8 +1009,16 @@ if(RAC_ENABLE_PROTOBUF)
     # `Protobuf 34.1 EXACT`. Module mode finds the same install with a
     # synthesized version string. Accept either so local dev on macOS works
     # without requiring a vendored FetchContent build.
+    #
+    # T1.1: require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
+    # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
+    # FetchContent fetches v34.1 below. The checked-in generated headers
+    # under src/generated/proto/ are Protobuf C++ Version 7.34.1 and include
+    # `google/protobuf/runtime_version.h`, which only exists in the
+    # libprotobuf 4.x+ runtime. Linking against 3.x produces
+    # `fatal error: google/protobuf/runtime_version.h: No such file or directory`.
     if(NOT Protobuf_FOUND)
-        find_package(Protobuf QUIET)
+        find_package(Protobuf 5.0 QUIET)
     endif()
 
     if(NOT Protobuf_FOUND AND RAC_VENDOR_PROTOBUF)
@@ -1119,12 +1127,27 @@ if(RAC_ENABLE_PROTOBUF)
 
     # Shared builds with some system protobuf packages still need explicit absl
     # link targets. Vendored protobuf normally propagates these transitively.
+    #
+    # T1.1: only collect absl components whose imported targets actually
+    # exist. Ubuntu 22.04's libabsl-dev (20210324) is missing absl::log —
+    # which lands in 20220623 — and `target_link_libraries` on a missing
+    # target reports "Target ... links to absl::log but the target was not
+    # found". The probe below keeps the link line correct on every host
+    # (Homebrew absl, Ubuntu 24.04 libabsl-dev, vendored protobuf).
     if(NOT DEFINED RAC_ABSL_LIBS)
         find_package(absl QUIET CONFIG)
+        set(RAC_ABSL_LIBS "")
         if(absl_FOUND)
-            set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
-        else()
-            set(RAC_ABSL_LIBS "")
+            foreach(_rac_absl_component
+                    absl::log
+                    absl::log_internal_check_op
+                    absl::hash
+                    absl::strings
+                    absl::status)
+                if(TARGET ${_rac_absl_component})
+                    list(APPEND RAC_ABSL_LIBS ${_rac_absl_component})
+                endif()
+            endforeach()
         endif()
     endif()
     if(RAC_ABSL_LIBS)

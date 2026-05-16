@@ -80,14 +80,17 @@ jobs:
   android-arm64:
     runs-on: ubuntu-22.04
     env:
-      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk-r27c
+      # Stage the NDK outside the workspace so the unzip + extraction directory
+      # do NOT collide with the destination path (which previously caused
+      # `mv ... into a subdirectory of itself`).
+      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
       - uses: actions/checkout@v4
       - name: Install Android NDK
         run: |
-          curl -sSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q ndk.zip
-          mv android-ndk-r27c "${ANDROID_NDK_HOME}"
+          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
+          unzip -q /tmp/ndk.zip -d /tmp
+          test -d "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset android-arm64
       - run: cmake --build --preset android-arm64
@@ -111,13 +114,14 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [android-arm64]
     env:
-      ANDROID_NDK_HOME: ${{ github.workspace }}/android-ndk-r27c
+      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          curl -sSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q ndk.zip
-          mv android-ndk-r27c "${ANDROID_NDK_HOME}"
+      - name: Install Android NDK
+        run: |
+          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
+          unzip -q /tmp/ndk.zip -d /tmp
+          test -d "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Build Android JNI libs
         run: ./scripts/build-core-android.sh
@@ -138,6 +142,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
+      # Repo root and sdk/runanywhere-react-native pin `packageManager: yarn@3.6.1`
+      # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
+      # activate the pinned version through Corepack before any `yarn` call.
+      - name: Enable Corepack (yarn@3.6.1)
+        run: |
+          corepack enable
+          corepack prepare yarn@3.6.1 --activate
       - run: cd sdk/runanywhere-react-native && yarn install --immutable
       - run: cd sdk/runanywhere-react-native/packages/core && yarn typecheck
 

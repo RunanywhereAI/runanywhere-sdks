@@ -372,6 +372,14 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: sdk-only
+      # The RN tree pins `packageManager: yarn@3.6.1` (Yarn Berry). Activate it
+      # via Corepack at the workflow level so package-sdk.sh (and any later
+      # `yarn` invocation against the RN workspace) doesn't silently fall back
+      # to the runner's global yarn 1.x.
+      - name: Enable Corepack (yarn@3.6.1)
+        run: |
+          corepack enable
+          corepack prepare yarn@3.6.1 --activate
       - name: Download iOS natives
         uses: actions/download-artifact@v4
         with:
