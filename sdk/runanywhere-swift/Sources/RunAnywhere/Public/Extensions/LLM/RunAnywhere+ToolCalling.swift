@@ -82,7 +82,7 @@ public extension RunAnywhere {
     ///
     /// Example:
     /// ```swift
-    /// RunAnywhere.registerTool(
+    /// await RunAnywhere.registerTool(
     ///     RAToolDefinition(
     ///         name: "get_weather",
     ///         description: "Gets current weather for a location",
@@ -91,9 +91,12 @@ public extension RunAnywhere {
     ///         ]
     ///     )
     /// ) { args in
-    ///     let location = args["location"] as? String ?? "Unknown"
+    ///     let location = args["location"]?.string ?? "Unknown"
     ///     // Call weather API...
-    ///     return ["temperature": 72, "condition": "Sunny"]
+    ///     return [
+    ///         "temperature": RAToolValue(72),
+    ///         "condition": RAToolValue("Sunny")
+    ///     ]
     /// }
     /// ```
     ///

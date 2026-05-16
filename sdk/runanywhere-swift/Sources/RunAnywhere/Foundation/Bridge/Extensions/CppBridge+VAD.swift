@@ -36,9 +36,33 @@ extension CppBridge {
         /// failed load doesn't poison a subsequent retry.
         private var loadedModelId: String?
 
+        /// Opaque pointer to the currently-installed activity-callback
+        /// `ProtoProgressContext`. Owned by Swift via `Unmanaged.passRetained`
+        /// at install time and released either when a new callback replaces
+        /// it (`swapActivityCallbackContextPtr(_:)`) or when the actor is
+        /// destroyed. Never expose outside this actor — actor isolation is
+        /// what keeps the swap atomic relative to the C registration call.
+        internal var activityCallbackContextPtr: UnsafeMutableRawPointer?
+
         private let logger = SDKLogger(category: "CppBridge.VAD")
 
         private init() {}
+
+        // MARK: - Activity callback ownership
+
+        /// Swap the stored activity-callback context pointer, returning the
+        /// previous value. Callers MUST balance the returned pointer with
+        /// `Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>.fromOpaque(_:).release()`
+        /// AFTER they have cleared the C-side slot via the matching
+        /// `set_activity_proto_callback(handle, nil, nil)` call. This avoids
+        /// the unbounded leak documented in comment record `mlt-001`.
+        internal func swapActivityCallbackContextPtr(
+            _ new: UnsafeMutableRawPointer?
+        ) -> UnsafeMutableRawPointer? {
+            let old = activityCallbackContextPtr
+            activityCallbackContextPtr = new
+            return old
+        }
 
         // MARK: - Handle Management
 
@@ -140,6 +164,17 @@ extension CppBridge {
 
         /// Destroy the component
         public func destroy() async {
+            // Release any retained activity-callback context BEFORE the
+            // underlying handle is destroyed. The C component teardown
+            // implicitly clears its own callback slot, so we just need to
+            // balance the +1 retain from the original `Unmanaged.passRetained`.
+            // (See comment record `mlt-001`.)
+            if let ptr = activityCallbackContextPtr {
+                activityCallbackContextPtr = nil
+                Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
+                    .fromOpaque(ptr)
+                    .release()
+            }
             await inner.destroy()
             loadedModelId = nil
         }

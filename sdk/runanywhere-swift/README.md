@@ -153,7 +153,7 @@ This repository contains **two** `Package.swift` files for different use cases:
 
 **For app developers:** Use the root-level package via the GitHub URL (as shown above).
 
-**For SDK contributors:** Use the local package with `testLocal = true` after running the setup script.
+**For SDK contributors:** Use the local package with `useLocalNatives = true` in `sdk/runanywhere-swift/Package.swift` after building the XCFrameworks (see [Local Development & Contributing](#local-development--contributing) below).
 
 ---
 
@@ -196,31 +196,39 @@ struct MyApp: App {
 ### 2. Generate Text
 
 ```swift
-// Simple chat interface
-let response = try await RunAnywhere.chat("What is the capital of France?")
-print(response)  // "The capital of France is Paris."
+// Build a proto-backed generate request via the v2 surface
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 200
+options.temperature = 0.7
 
-// Full generation with metrics
-let result = try await RunAnywhere.generate(
-    "Explain quantum computing in simple terms",
-    options: LLMGenerationOptions(
-        maxTokens: 200,
-        temperature: 0.7
-    )
+var request = options.toRALLMGenerateRequest(
+    prompt: "Explain quantum computing in simple terms"
 )
+
+let result = try await RunAnywhere.generate(request)
 print("Response: \(result.text)")
 print("Tokens used: \(result.tokensUsed)")
-print("Speed: \(result.tokensPerSecond) tok/s")
 ```
 
 ### 3. Load a Model
 
 ```swift
-// Load an LLM model by ID
-try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
+// Load an LLM through the canonical lifecycle (RAModelLoadRequest).
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "llama-3.2-1b-instruct-q4"
+loadRequest.category = .language
 
-// Check if model is loaded
-let isLoaded = await RunAnywhere.isModelLoaded
+let loadResult = await RunAnywhere.loadModel(loadRequest)
+guard loadResult.success else {
+    print("Load failed: \(loadResult.errorMessage)")
+    return
+}
+
+// Check if a model is loaded for a given modality via the lifecycle service.
+var current = RACurrentModelRequest()
+current.category = .language
+let snapshot = RunAnywhere.currentModel(current)
+print("Loaded:", snapshot.found, "id=", snapshot.modelID)
 ```
 
 ---
@@ -248,15 +256,13 @@ try RunAnywhere.initialize(
 ### Generation Options
 
 ```swift
-let options = LLMGenerationOptions(
-    maxTokens: 100,
-    temperature: 0.8,
-    topP: 1.0,
-    stopSequences: ["END"],
-    streamingEnabled: false,
-    preferredFramework: .llamaCpp,
-    systemPrompt: "You are a helpful assistant."
-)
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 100
+options.temperature = 0.8
+options.topP = 1.0
+options.stopSequences = ["END"]
+options.streamingEnabled = false
+options.systemPrompt = "You are a helpful assistant."
 ```
 
 ### Module Registration
@@ -282,46 +288,45 @@ func setupSDK() {
 ### Streaming Text Generation
 
 ```swift
-let result = try await RunAnywhere.generateStream(
-    "Write a short poem about AI",
-    options: LLMGenerationOptions(maxTokens: 150)
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 150
+options.streamingEnabled = true
+let request = options.toRALLMGenerateRequest(
+    prompt: "Write a short poem about AI"
 )
 
-for try await token in result.stream {
-    print(token, terminator: "")
+let stream = try await RunAnywhere.generateStream(request)
+for await event in stream {
+    if event.kind == .token {
+        print(event.token, terminator: "")
+    }
 }
-
-let metrics = try await result.result.value
-print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
 ```
 
 ### Structured Output Generation
 
 ```swift
-struct QuizQuestion: Generatable {
-    let question: String
-    let options: [String]
-    let correctAnswer: Int
-
-    static var jsonSchema: String {
-        """
-        {
-          "type": "object",
-          "properties": {
-            "question": { "type": "string" },
-            "options": { "type": "array", "items": { "type": "string" } },
-            "correctAnswer": { "type": "integer" }
-          },
-          "required": ["question", "options", "correctAnswer"]
-        }
-        """
-    }
+// Commons owns the full structured-output pipeline (prepare → generate →
+// strip thinking tags → extract JSON → validate). Build a `RAJSONSchema`
+// from your schema string and call the proto-backed v2 API.
+var schema = RAJSONSchema()
+schema.json = """
+{
+  "type": "object",
+  "properties": {
+    "question": { "type": "string" },
+    "options":  { "type": "array", "items": { "type": "string" } },
+    "correctAnswer": { "type": "integer" }
+  },
+  "required": ["question", "options", "correctAnswer"]
 }
+"""
 
-let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
-    QuizQuestion.self,
-    prompt: "Create a quiz question about Swift programming"
+let result = try await RunAnywhere.generateStructured(
+    prompt: "Create a quiz question about Swift programming",
+    schema: schema
 )
+print("Validated JSON:", result.json)
 ```
 
 ### Speech-to-Text Transcription
@@ -330,45 +335,50 @@ let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
 import RunAnywhere
 import ONNXRuntime
 
-await ONNX.register()
-try await RunAnywhere.loadSTTModel("whisper-base-onnx")
+ONNX.register()
+
+// Load the STT model through the canonical lifecycle.
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "whisper-base-onnx"
+loadRequest.category = .speechRecognition
+_ = await RunAnywhere.loadModel(loadRequest)
 
 let audioData: Data = // your audio data (16kHz, mono, Float32)
-let transcription = try await RunAnywhere.transcribe(audioData)
-print("Transcribed: \(transcription)")
+let transcription = try await RunAnywhere.transcribe(audio: audioData)
+print("Transcribed: \(transcription.text)")
 ```
 
 ### Text-to-Speech Synthesis
 
 ```swift
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
+// Load a TTS voice through the canonical lifecycle.
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "piper-en-us-amy"
+loadRequest.category = .speechSynthesis
+_ = await RunAnywhere.loadModel(loadRequest)
+
+var options = RATTSOptions.defaults()
+options.speakingRate = 1.0
+options.pitch = 1.0
+options.volume = 0.8
 
 let output = try await RunAnywhere.synthesize(
     "Hello! Welcome to RunAnywhere.",
-    options: TTSOptions(
-        speakingRate: 1.0,
-        pitch: 1.0,
-        volume: 0.8
-    )
+    options: options
 )
 ```
 
 ### Voice Agent Pipeline
 
 ```swift
-try await RunAnywhere.initializeVoiceAgent(
-    sttModelId: "whisper-base-onnx",
-    llmModelId: "llama-3.2-1b-instruct-q4",
-    ttsVoice: "com.apple.ttsbundle.siri_female_en-US_compact"
-)
+// Once STT, LLM, and TTS models are loaded via RAModelLoadRequest, compose
+// the voice agent from the lifecycle snapshots:
+try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
 let audioData: Data = // recorded audio
 let result = try await RunAnywhere.processVoiceTurn(audioData)
-
-print("User said: \(result.transcription)")
-print("AI response: \(result.response)")
-
-await RunAnywhere.cleanupVoiceAgent()
+print("User said:", result.transcription)
+print("AI response:", result.responseText)
 ```
 
 ### Subscribing to Events
@@ -490,49 +500,45 @@ The SDK automatically tracks key metrics:
 
 ## Error Handling
 
-All SDK errors are represented by `SDKError`, which provides:
+All SDK errors are thrown as `SDKException`, which carries a typed error
+`code` (`RASDKErrorCode`), a developer-facing `message`, and a `category`
+identifying which subsystem produced the error.
 
-- Typed error cases for each error category
-- Detailed error descriptions
-- Recovery suggestions
-- Underlying error information when applicable
+### Error Codes
 
-### Error Categories
+`RASDKErrorCode` covers the v2 surface, including:
 
-```swift
-case notInitialized
-case invalidAPIKey(String?)
-case invalidConfiguration(String)
-case modelNotFound(String)
-case modelLoadFailed(String, Error?)
-case modelIncompatible(String, String)
-case generationFailed(String)
-case generationTimeout(String?)
-case contextTooLong(Int, Int)
-case networkUnavailable
-case downloadFailed(String, Error?)
-case insufficientStorage(Int64, Int64)
-case storageFull
-```
+- `.notInitialized`
+- `.invalidAPIKey`
+- `.modelNotLoaded`
+- `.modelLoadFailed`
+- `.generationFailed`
+- `.processingFailed`
+- `.networkError`
+- `.cancelled`
+
+(See `SDKException.swift` and `Generated/sdk_errors.pb.swift` for the full
+list of codes and categories.)
 
 ### Handling Errors
 
 ```swift
 do {
-    let result = try await RunAnywhere.generate("Hello")
-} catch let error as SDKError {
+    var options = RALLMGenerationOptions.defaults()
+    options.maxTokens = 64
+    let request = options.toRALLMGenerateRequest(prompt: "Hello")
+    let result = try await RunAnywhere.generate(request)
+    print(result.text)
+} catch let error as SDKException {
     switch error.code {
     case .notInitialized:
         print("Please call RunAnywhere.initialize() first")
-    case .modelNotFound:
-        print("Model not found. Download it first.")
+    case .modelNotLoaded:
+        print("Model not loaded. Call RunAnywhere.loadModel(_:) first.")
     case .generationFailed:
         print("Generation failed: \(error.message)")
     default:
-        print("Error: \(error.localizedDescription)")
-        if let suggestion = error.recoverySuggestion {
-            print("Suggestion: \(suggestion)")
-        }
+        print("Error (\(error.category)): \(error.message)")
     }
 }
 ```
@@ -550,8 +556,10 @@ do {
 ### Memory Management
 
 ```swift
-// Unload models when not in use
-try await RunAnywhere.unloadModel()
+// Unload a model through the canonical lifecycle.
+var unloadRequest = RAModelUnloadRequest()
+unloadRequest.category = .language
+_ = await RunAnywhere.unloadModel(unloadRequest)
 
 // Check storage before downloading
 let storageInfo = await RunAnywhere.getStorageInfo()
@@ -572,9 +580,13 @@ try await RunAnywhere.cleanTempFiles()
 ### Streaming for Responsiveness
 
 ```swift
-let result = try await RunAnywhere.generateStream(prompt)
-for try await token in result.stream {
-    await MainActor.run { self.text += token }
+var options = RALLMGenerationOptions.defaults()
+options.streamingEnabled = true
+let request = options.toRALLMGenerateRequest(prompt: prompt)
+
+let stream = try await RunAnywhere.generateStream(request)
+for await event in stream where event.kind == .token {
+    await MainActor.run { self.text += event.token }
 }
 ```
 
@@ -606,7 +618,7 @@ Model sizes vary significantly:
 
 ### Can I use multiple models simultaneously?
 
-Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alongside LLM models. Use `unloadModel()` before loading a different LLM.
+Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alongside LLM models. Use `RunAnywhere.unloadModel(RAModelUnloadRequest())` before loading a different LLM.
 
 ### How do I handle model updates?
 
@@ -622,10 +634,13 @@ By default, only anonymous analytics (latency, error rates) are collected. Actua
 2. Check logs with Pulse integration
 3. Subscribe to error events: `RunAnywhere.events.on(.error) { ... }`
 
-### What's the difference between chat() and generate()?
+### How do I send a generation request?
 
-- `chat(_:)` returns just the text string
-- `generate(_:options:)` returns `LLMGenerationResult` with full metrics
+Build a `RALLMGenerationOptions`, call `toRALLMGenerateRequest(prompt:)` to
+produce a `RALLMGenerateRequest`, and pass it to `RunAnywhere.generate(_:)`
+or `RunAnywhere.generateStream(_:)`. There is no longer a separate `chat()`
+convenience — the proto-backed `generate(_:)` API returns a full
+`RALLMGenerationResult` with metrics.
 
 ---
 

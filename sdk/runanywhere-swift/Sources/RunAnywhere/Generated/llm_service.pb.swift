@@ -128,6 +128,22 @@ public struct RALLMGenerateRequest: @unchecked Sendable {
 
   /// Additional LLMGenerationOptions fields kept inline to avoid a codegen
   /// package cycle between service stubs and option messages.
+  ///
+  /// idl-002: Intentionally omitted from this streaming request (no current
+  /// streaming consumer; route them through the non-streaming
+  /// rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+  ///   - thinking_pattern (LLMGenerationOptions field 11)
+  ///   - structured_output (LLMGenerationOptions field 13)
+  ///   - enable_real_time_tracking (LLMGenerationOptions field 14)
+  ///   - repeat_last_n (LLMGenerationOptions field 18)
+  ///   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+  ///     is not yet supported on the LLM.Generate rpc; tool sessions must
+  ///     use the non-streaming generation path with LLMGenerationOptions.
+  /// Additionally, preferred_framework (field 11) and execution_target
+  /// (field 13) are degraded to `string` here instead of the InferenceFramework
+  /// / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
+  /// Callers must use the canonical enum string values (see
+  /// llm_options.proto:69 and :85). See also synthesis idl-002.
   public var repetitionPenalty: Float {
     get {_storage._repetitionPenalty}
     set {_uniqueStorage()._repetitionPenalty = newValue}
@@ -267,6 +283,14 @@ public struct RALLMStreamFinalResult: Sendable {
 
   public var decodeTimeMs: Int64 = 0
 
+  /// hotspot-idl-002: tool calls actually executed during the streaming
+  /// session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+  /// llm_options.proto). Populated only on terminal events when the
+  /// backend completed at least one tool call.
+  public var toolCalls: [RAToolCall] = []
+
+  public var toolResults: [RAToolResult] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -395,6 +419,19 @@ public struct RALLMStreamEvent: @unchecked Sendable {
     get {_storage._elapsedMs}
     set {_uniqueStorage()._elapsedMs = newValue}
   }
+
+  /// hotspot-idl-002: structured tool-call payload emitted alongside an
+  /// event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+  /// field the tool-call event kind carries no proto-typed payload and
+  /// SDK consumers must fall back to JSON-parsing the raw `token` text.
+  public var toolCall: RAToolCall {
+    get {_storage._toolCall ?? RAToolCall()}
+    set {_uniqueStorage()._toolCall = newValue}
+  }
+  /// Returns true if `toolCall` has been explicitly set.
+  public var hasToolCall: Bool {_storage._toolCall != nil}
+  /// Clears the value of `toolCall`. Subsequent reads from it will return its default value.
+  public mutating func clearToolCall() {_uniqueStorage()._toolCall = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -647,7 +684,7 @@ extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamFinalResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0\u{3}error_code\0\u{3}error_message\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0\u{3}error_code\0\u{3}error_message\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -668,6 +705,8 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 11: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
       case 12: try { try decoder.decodeSingularInt64Field(value: &self.promptEvalTimeMs) }()
       case 13: try { try decoder.decodeSingularInt64Field(value: &self.decodeTimeMs) }()
+      case 14: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
+      case 15: try { try decoder.decodeRepeatedMessageField(value: &self.toolResults) }()
       default: break
       }
     }
@@ -717,6 +756,12 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if self.decodeTimeMs != 0 {
       try visitor.visitSingularInt64Field(value: self.decodeTimeMs, fieldNumber: 13)
     }
+    if !self.toolCalls.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.toolCalls, fieldNumber: 14)
+    }
+    if !self.toolResults.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.toolResults, fieldNumber: 15)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -734,6 +779,8 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.promptEvalTimeMs != rhs.promptEvalTimeMs {return false}
     if lhs.decodeTimeMs != rhs.decodeTimeMs {return false}
+    if lhs.toolCalls != rhs.toolCalls {return false}
+    if lhs.toolResults != rhs.toolResults {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -741,7 +788,7 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0\u{3}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0\u{3}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0\u{3}tool_call\0")
 
   fileprivate class _StorageClass {
     var _seq: UInt64 = 0
@@ -761,6 +808,7 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     var _promptTokensProcessed: Int32 = 0
     var _completionTokensGenerated: Int32 = 0
     var _elapsedMs: Int64 = 0
+    var _toolCall: RAToolCall? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -788,6 +836,7 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       _promptTokensProcessed = source._promptTokensProcessed
       _completionTokensGenerated = source._completionTokensGenerated
       _elapsedMs = source._elapsedMs
+      _toolCall = source._toolCall
     }
   }
 
@@ -823,6 +872,7 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
         case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._promptTokensProcessed) }()
         case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._completionTokensGenerated) }()
         case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._toolCall) }()
         default: break
         }
       }
@@ -886,6 +936,9 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       if _storage._elapsedMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._elapsedMs, fieldNumber: 17)
       }
+      try { if let v = _storage._toolCall {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -912,6 +965,7 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
         if _storage._promptTokensProcessed != rhs_storage._promptTokensProcessed {return false}
         if _storage._completionTokensGenerated != rhs_storage._completionTokensGenerated {return false}
         if _storage._elapsedMs != rhs_storage._elapsedMs {return false}
+        if _storage._toolCall != rhs_storage._toolCall {return false}
         return true
       }
       if !storagesAreEqual {return false}

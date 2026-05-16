@@ -107,17 +107,53 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         func attach(_ continuation: AsyncStream<Event>.Continuation) -> UUID? {
-            // Install the trampoline outside the lock — the C
-            // registration may invoke the callback synchronously on
-            // some platforms, so we must not hold the lock across it.
-            let alreadyInstalled = state.withLock { $0.installed }
-
-            if !alreadyInstalled {
-                if !install() { return nil }
+            // Insert the continuation BEFORE the C registration runs.
+            // The C callback may fire synchronously during register(...)
+            // on some platforms; if the continuations dict is empty at
+            // that point, broadcast() snapshots an empty set and the
+            // first event is silently dropped (see comment record
+            // mlt-002). Adding the continuation up-front guarantees a
+            // synchronously-fired event is delivered.
+            //
+            // The first attach for a fan-out flips the installation
+            // state from `.notInstalled` to `.installing` under the
+            // lock and becomes the sole installer. Concurrent attaches
+            // observe `.installing` (or `.installed`) and join as
+            // additional fan-out subscribers without re-invoking the
+            // C `register(...)` symbol — this prevents the historical
+            // race where two first-subscribers each retained the
+            // fan-out, registered the same C callback twice, and
+            // overwrote a single stored userPtr (so tearDown could
+            // only release one of the two retains and one would leak).
+            //
+            // We install() outside the lock — the C registration call
+            // must not run while the lock is held in case the
+            // synchronously-invoked callback re-enters broadcast()
+            // and tries to take the same lock to snapshot continuations.
+            let id = UUID()
+            let role: HandleFanOutAttachRole = state.withLock { lockedState in
+                lockedState.continuations[id] = continuation
+                switch lockedState.installation {
+                case .notInstalled:
+                    lockedState.installation = .installing
+                    return .installer
+                case .installing, .installed:
+                    return .joiner
+                }
             }
 
-            let id = UUID()
-            state.withLock { $0.continuations[id] = continuation }
+            switch role {
+            case .installer:
+                if !install() {
+                    // install() rolled back state and finished every
+                    // continuation that joined the in-flight install,
+                    // including ours; AsyncStream sees `.finished`.
+                    return nil
+                }
+            case .joiner:
+                break
+            }
+
             return id
         }
 
@@ -148,20 +184,31 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 fanOut.deliverBytes(bytesPtr, bytesLen)
             }
 
-            // Optimistic write — assume the registration will succeed.
-            state.withLock {
-                $0.userPtr = userPtr
-                $0.installed = true
-            }
-
             let result = register(handle, trampoline, userPtr)
+
             if result != RAC_SUCCESS {
-                state.withLock {
-                    $0.userPtr = nil
-                    $0.installed = false
+                // Roll back: drop every continuation that joined the
+                // in-flight install (so their AsyncStreams finish),
+                // reset the installation flag so a fresh first
+                // subscriber can retry, and release the retain we
+                // optimistically took above.
+                let pending: [AsyncStream<Event>.Continuation] = state.withLock { lockedState in
+                    let values = Array(lockedState.continuations.values)
+                    lockedState.continuations.removeAll()
+                    lockedState.installation = .notInstalled
+                    lockedState.userPtr = nil
+                    return values
+                }
+                for continuation in pending {
+                    continuation.finish()
                 }
                 Unmanaged<HandleFanOut>.fromOpaque(userPtr).release()
                 return false
+            }
+
+            state.withLock {
+                $0.userPtr = userPtr
+                $0.installation = .installed
             }
             return true
         }
@@ -216,9 +263,9 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
 
         func tearDown() {
             let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { lockedState in
-                guard lockedState.installed else { return nil }
+                guard lockedState.installation == .installed else { return nil }
                 unregister(handle)
-                lockedState.installed = false
+                lockedState.installation = .notInstalled
                 let ptr = lockedState.userPtr
                 lockedState.userPtr = nil
                 return ptr
@@ -238,7 +285,11 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     // `[StoreKey: AnyObject]` lock backs every instantiation of this
     // generic. `streamKey` partitions the dictionary so two
     // specialisations cannot collide even if their `Handle.hashValue`
-    // happens to match.
+    // happens to match. The composite key embeds the handle as
+    // `AnyHashable` (rather than a bare `hashValue: Int`) so two
+    // distinct native handles whose hashes happen to coincide are
+    // routed to different fan-out entries instead of aliasing onto
+    // one shared registration.
     // swiftlint:disable:next avoid_any_object
     private static var fanOuts: OSAllocatedUnfairLock<[HandleStreamStoreKey: AnyObject]> {
         HandleStreamAdapterRegistry.shared.fanOuts
@@ -251,7 +302,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         unregister: @escaping Unregister,
         isTerminalEvent: IsTerminalEvent?
     ) -> HandleFanOut {
-        let key = HandleStreamStoreKey(streamKey: streamKey, handleHash: handle.hashValue)
+        let key = HandleStreamStoreKey(streamKey: streamKey, handle: AnyHashable(handle))
         return fanOuts.withLock { dict in
             if let existing = dict[key] as? HandleFanOut {
                 return existing
@@ -347,7 +398,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     /// Intended for use during component destruction; ordinary
     /// cancellation should rely on `for-await break`.
     public func tearDown() {
-        let key = HandleStreamStoreKey(streamKey: streamKey, handleHash: handle.hashValue)
+        let key = HandleStreamStoreKey(streamKey: streamKey, handle: AnyHashable(handle))
         let fanOut = Self.fanOuts.withLock { $0[key] as? HandleFanOut }
         fanOut?.tearDown()
     }
@@ -370,12 +421,33 @@ private protocol HandleStreamFanOutEntry: AnyObject {
 /// `streamKey` distinguishes adapters that share the same `Handle`
 /// type but address different C registration ABIs (e.g. a future
 /// per-handle adapter that registers two unrelated streams against
-/// the same `rac_handle_t`).
+/// the same `rac_handle_t`). The `handle` is stored as `AnyHashable`
+/// rather than a bare `hashValue: Int` so two distinct native handles
+/// whose hashes happen to collide are routed to different fan-out
+/// entries instead of aliasing onto the same registration.
 private struct HandleStreamStoreKey: Hashable, Sendable {
     // periphery:ignore
     let streamKey: String
     // periphery:ignore
-    let handleHash: Int
+    let handle: AnyHashable
+}
+
+/// Lifecycle of the per-handle native callback registration. The
+/// `installing` state lets the very first attach claim ownership of
+/// the C `register(...)` call under the lock so concurrent first
+/// subscribers cannot each install (and each retain) the fan-out.
+private enum HandleFanOutInstallation: Sendable {
+    case notInstalled
+    case installing
+    case installed
+}
+
+/// Outcome of `HandleFanOut.attach` — drives whether the calling
+/// task is responsible for executing `install()` or simply joins an
+/// already-installed (or in-flight) registration.
+private enum HandleFanOutAttachRole {
+    case installer
+    case joiner
 }
 
 /// Mutable state guarded by `HandleFanOut`'s `OSAllocatedUnfairLock`.
@@ -384,7 +456,7 @@ private struct HandleStreamStoreKey: Hashable, Sendable {
 private struct HandleFanOutState<Event: Message> {
     var continuations: [UUID: AsyncStream<Event>.Continuation] = [:]
     var userPtr: UnsafeMutableRawPointer?
-    var installed: Bool = false
+    var installation: HandleFanOutInstallation = .notInstalled
 }
 
 /// Holds the lock that backs every `HandleStreamAdapter` instantiation.

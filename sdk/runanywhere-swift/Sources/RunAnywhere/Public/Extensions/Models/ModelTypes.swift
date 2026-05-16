@@ -105,11 +105,19 @@ public extension RAModelFormat {
 
     /// Parse a `RAModelFormat` from a wire string. Matches case-insensitively
     /// against the proto-name `wireString` emitted by `rac_model_format_wire_string`
-    /// (e.g. `MODEL_FORMAT_GGUF`).
+    /// (e.g. `MODEL_FORMAT_GGUF`) AND the legacy short extension string from
+    /// `rac_model_format_extension` (e.g. `gguf`, `onnx`, `mlmodel`). The
+    /// legacy fallback preserves Codable round-trip for persisted model
+    /// metadata that was written with the pre-IDL short names — see comment
+    /// record `hotspot-swift-public-features-004`.
     static func fromWireString(_ raw: String) -> RAModelFormat? {
         let lowered = raw.lowercased()
-        for format in RAModelFormat.allCases where format.wireString.lowercased() == lowered {
-            return format
+        for format in RAModelFormat.allCases {
+            if format.wireString.lowercased() == lowered { return format }
+            if let extPtr = rac_model_format_extension(format.toC()),
+               String(cString: extPtr).lowercased() == lowered {
+                return format
+            }
         }
         return nil
     }

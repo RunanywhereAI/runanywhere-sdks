@@ -138,6 +138,14 @@ public enum ONNX {
     }
 
     /// Unregister the ONNX backend from C++ registry.
+    ///
+    /// `@MainActor` so the `isRegistered` / `isSherpaRegistered` static flags
+    /// stay in the same isolation domain as `register(priority:)` and the
+    /// `autoRegister` Task hop. Without this annotation, a teardown call on
+    /// a background thread would race the registration path and could leave
+    /// the C registry in an inconsistent state (double-unregister or skipped
+    /// unregister, see comment record `mlt-003`).
+    @MainActor
     public static func unregister() {
         if isSherpaRegistered {
             _ = rac_plugin_unregister("sherpa")

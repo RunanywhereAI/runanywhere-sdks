@@ -88,14 +88,23 @@ public final class SolutionHandle: @unchecked Sendable {
         handle.withLock { $0 != nil }
     }
 
+    /// Run `body` against the native handle while holding the slot lock so
+    /// that a concurrent `destroy()` (or `deinit`) cannot free the handle
+    /// mid-call. `rac_solution_destroy` cancels and joins before deleting
+    /// the runner, so serialising the lifecycle verbs is the simplest way
+    /// to honour the Sendable contract without resurrecting a freed pointer
+    /// (see swift-public-features-002).
     private func withHandle(_ body: (rac_solution_handle_t) -> rac_result_t) throws {
-        let snapshot = handle.withLock { $0 }
-
-        guard let snapshot else {
-            throw SDKException(code: .invalidState, message: "Solution handle has already been destroyed", category: .internal)
+        let result: rac_result_t = try handle.withLock { current in
+            guard let current else {
+                throw SDKException(
+                    code: .invalidState,
+                    message: "Solution handle has already been destroyed",
+                    category: .internal
+                )
+            }
+            return body(current)
         }
-
-        let result = body(snapshot)
         guard result == RAC_SUCCESS else {
             throw SDKException(
                 code: .processingFailed,

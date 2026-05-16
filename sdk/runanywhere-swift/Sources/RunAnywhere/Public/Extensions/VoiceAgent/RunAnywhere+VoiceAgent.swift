@@ -33,10 +33,10 @@ public extension RunAnywhere {
 
     /// Initialize the voice agent from currently-loaded STT / LLM / TTS models.
     ///
-    /// Reads the model IDs from the per-component bridge actors
-    /// (`CppBridge.STT.shared`, `.LLM.shared`, `.TTS.shared`, `.VAD.shared`),
-    /// builds a `RAVoiceAgentComposeConfig` from them, and forwards to
-    /// `initializeVoiceAgent(_:)`. Mirrors the Kotlin / Web SDKs'
+    /// Composes a `RAVoiceAgentComposeConfig` from the canonical model
+    /// lifecycle (`RunAnywhere.currentModel(_:)`) snapshots for
+    /// `.speechRecognition`, `.language`, and `.speechSynthesis`, then
+    /// forwards to `initializeVoiceAgent(_:)`. Mirrors the Kotlin / Web SDKs'
     /// `initializeVoiceAgentWithLoadedModels()` API.
     ///
     /// - Throws: `SDKException(code: .notInitialized, message: ..., category: .internal)` if the SDK has
@@ -50,14 +50,27 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let sttModelId = await CppBridge.STT.shared.currentModelId
-        let llmModelId = await CppBridge.LLM.shared.currentModelId
-        let ttsVoiceId = await CppBridge.TTS.shared.currentVoiceId
+        // The C++ lifecycle service is the canonical source of truth for
+        // "is this modality loaded"; the per-component CppBridge actor
+        // mirrors are not updated by RunAnywhere.loadModel(_:). Query the
+        // lifecycle directly, matching the iOS example app and the rest of
+        // the public Swift surface (STT/TTS/VLM readiness checks).
+        var sttRequest = RACurrentModelRequest()
+        sttRequest.category = .speechRecognition
+        let sttSnap = RunAnywhere.currentModel(sttRequest)
+
+        var llmRequest = RACurrentModelRequest()
+        llmRequest.category = .language
+        let llmSnap = RunAnywhere.currentModel(llmRequest)
+
+        var ttsRequest = RACurrentModelRequest()
+        ttsRequest.category = .speechSynthesis
+        let ttsSnap = RunAnywhere.currentModel(ttsRequest)
 
         var missing: [String] = []
-        if sttModelId?.isEmpty ?? true { missing.append("STT") }
-        if llmModelId?.isEmpty ?? true { missing.append("LLM") }
-        if ttsVoiceId?.isEmpty ?? true { missing.append("TTS") }
+        if !sttSnap.found || sttSnap.modelID.isEmpty { missing.append("STT") }
+        if !llmSnap.found || llmSnap.modelID.isEmpty { missing.append("LLM") }
+        if !ttsSnap.found || ttsSnap.modelID.isEmpty { missing.append("TTS") }
         guard missing.isEmpty else {
             throw SDKException(
                 code: .modelNotLoaded,
@@ -67,9 +80,9 @@ public extension RunAnywhere {
         }
 
         var config = RAVoiceAgentComposeConfig()
-        if let id = sttModelId { config.sttModelID = id }
-        if let id = llmModelId { config.llmModelID = id }
-        if let id = ttsVoiceId { config.ttsVoiceID = id }
+        config.sttModelID = sttSnap.modelID
+        config.llmModelID = llmSnap.modelID
+        config.ttsVoiceID = ttsSnap.modelID
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
         _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)

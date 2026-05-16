@@ -48,10 +48,21 @@ public extension RunAnywhere {
         return try await CppBridge.LLM.shared.generateStream(request)
     }
 
-    /// Cancel the current text generation
+    /// Cancel the current text generation.
+    ///
+    /// Routes through the lifecycle proto ABI (`rac_llm_cancel_proto`) so the
+    /// active `generate` / `generateStream` call — which runs through the
+    /// handleless lifecycle path — observes the cancel signal and terminates
+    /// promptly with `finishReason == .cancelled`. Calling the legacy
+    /// per-component actor `cancel()` is a no-op against lifecycle generation
+    /// (see comment record `hotspot-swift-public-features-002`).
     static func cancelGeneration() async {
         guard isInitialized else { return }
-        await CppBridge.LLM.shared.cancel()
+        do {
+            _ = try await CppBridge.LLM.shared.cancelProto()
+        } catch {
+            SDKLogger.llm.warning("cancelGeneration failed: \(error.localizedDescription)")
+        }
     }
 }
 

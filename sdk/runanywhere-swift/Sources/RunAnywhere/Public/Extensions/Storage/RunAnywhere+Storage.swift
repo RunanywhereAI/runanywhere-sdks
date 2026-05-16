@@ -229,14 +229,23 @@ public extension RunAnywhere {
         subscribeRequest.modelID = startResult.modelID.isEmpty ? model.id : startResult.modelID
         subscribeRequest.taskID = startResult.taskID
 
-        while true {
-            try Task.checkCancellation()
-            try await Task.sleep(nanoseconds: 250_000_000)
+        // Swift owns the polling/import loop, so a Swift task cancellation
+        // must also tear down the native download worker — otherwise the
+        // commons download keeps running after the caller's Task ends and
+        // updateRegistryOnCompletion=false leaves the registry inconsistent.
+        do {
+            while true {
+                try Task.checkCancellation()
+                try await Task.sleep(nanoseconds: 250_000_000)
 
-            let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
-            if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                return try await persistDownloadCompletion(model: model, progress: progress)
+                let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
+                if try await reportDownloadProgress(progress, onProgress: onProgress) {
+                    return try await persistDownloadCompletion(model: model, progress: progress)
+                }
             }
+        } catch is CancellationError {
+            await cancelNativeDownload(taskID: subscribeRequest.taskID, modelID: subscribeRequest.modelID)
+            throw CancellationError()
         }
     }
 
@@ -310,6 +319,19 @@ private extension RunAnywhere {
             )
         }
         return try RAModelInfo(serializedBytes: Data(bytes: bytes, count: outBuffer.size))
+    }
+
+    /// Tear down the commons download worker for `taskID` / `modelID` so a
+    /// Swift `Task.cancel()` propagates through `rac_download_cancel_proto`.
+    /// `deletePartialBytes: false` preserves resume tokens for callers that
+    /// retry the same model after cancelling.
+    static func cancelNativeDownload(taskID: String, modelID: String) async {
+        guard !taskID.isEmpty else { return }
+        var cancelRequest = RADownloadCancelRequest()
+        cancelRequest.taskID = taskID
+        cancelRequest.modelID = modelID
+        cancelRequest.deletePartialBytes = false
+        _ = await CppBridge.Download.shared.cancel(cancelRequest)
     }
 
     static func reportDownloadProgress(

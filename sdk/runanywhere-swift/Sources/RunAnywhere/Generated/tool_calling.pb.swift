@@ -1086,11 +1086,26 @@ public struct RAToolCallingSessionCreateRequest: Sendable {
 
   public var keepToolsAvailable: Bool = false
 
-  public var validateCalls: Bool = false
+  /// proto3 `optional` enables presence detection (has_validate_calls()).
+  /// When unset, commons defaults to validate_calls=true (preserves the
+  /// historical hard-coded behavior and the native run-loop / session
+  /// contract that unknown tool calls short-circuit before host execution).
+  /// Callers that delegate validation/authorization to their executor or
+  /// use dynamic tool registries must explicitly set validate_calls=false.
+  public var validateCalls: Bool {
+    get {_validateCalls ?? false}
+    set {_validateCalls = newValue}
+  }
+  /// Returns true if `validateCalls` has been explicitly set.
+  public var hasValidateCalls: Bool {self._validateCalls != nil}
+  /// Clears the value of `validateCalls`. Subsequent reads from it will return its default value.
+  public mutating func clearValidateCalls() {self._validateCalls = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _validateCalls: Bool? = nil
 }
 
 public struct RAToolCallingSessionCreateResult: Sendable {
@@ -2448,7 +2463,7 @@ extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{4}\u{5}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{4}\u{5}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0\u{c}\u{7}\u{4}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2461,7 +2476,7 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
       case 3: try { try decoder.decodeSingularStringField(value: &self.formatHint) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.maxIterations) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.validateCalls) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self._validateCalls) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
       case 12: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
       case 13: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
@@ -2472,6 +2487,10 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.prompt.isEmpty {
       try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
     }
@@ -2487,9 +2506,9 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
     if self.keepToolsAvailable != false {
       try visitor.visitSingularBoolField(value: self.keepToolsAvailable, fieldNumber: 5)
     }
-    if self.validateCalls != false {
-      try visitor.visitSingularBoolField(value: self.validateCalls, fieldNumber: 6)
-    }
+    try { if let v = self._validateCalls {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+    } }()
     if self.maxTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 11)
     }
@@ -2515,7 +2534,7 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
     if lhs.formatHint != rhs.formatHint {return false}
     if lhs.maxIterations != rhs.maxIterations {return false}
     if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
-    if lhs.validateCalls != rhs.validateCalls {return false}
+    if lhs._validateCalls != rhs._validateCalls {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

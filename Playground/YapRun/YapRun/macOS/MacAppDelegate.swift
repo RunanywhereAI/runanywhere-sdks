@@ -10,7 +10,6 @@ import AppKit
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
-import WhisperKitRuntime
 import os
 
 @MainActor
@@ -64,7 +63,6 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
-            WhisperKitSTT.register(priority: 200)
 
             try RunAnywhere.initialize()
             logger.info("SDK initialized")

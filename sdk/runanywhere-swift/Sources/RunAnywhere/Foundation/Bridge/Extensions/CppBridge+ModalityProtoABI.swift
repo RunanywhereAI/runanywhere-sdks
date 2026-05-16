@@ -15,6 +15,7 @@
 
 import CRACommons
 import Foundation
+import os
 import SwiftProtobuf
 
 // MARK: - C symbol tables (custom methods only)
@@ -90,12 +91,18 @@ private enum VLMCustomProtoABI {
         UnsafeMutableRawPointer?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
+    typealias Cancel = @convention(c) (rac_handle_t?) -> rac_result_t
 
     static let processName = "rac_vlm_process_proto"
     static let streamName = "rac_vlm_process_stream_proto"
+    static let cancelName = "rac_vlm_cancel_proto"
 
     static let process = NativeProtoABI.load(processName, as: Process.self)
     static let stream = NativeProtoABI.load(streamName, as: ProcessStream.self)
+    // Handle-scoped cancel used by `processStream`'s onTermination so
+    // that consumer cancellation tears down the in-flight native
+    // generation instead of letting it run to completion.
+    static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
 private enum RAGSessionProtoABI {
@@ -134,13 +141,37 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     let continuation: AsyncStream<Event>.Continuation
     let logger: SDKLogger
 
+    // Thread-safe cancellation flag flipped by the AsyncStream's
+    // onTermination handler (consumer cancelled via `break`, task
+    // cancellation, or dropping the stream). yield() and any C
+    // callback that consults `isCancelled` must stop emitting events
+    // and (where the C ABI allows) signal the native side to stop.
+    // OSAllocatedUnfairLock matches the rest of the SDK's locking
+    // policy (CLAUDE.md forbids NSLock).
+    private let cancellationState = OSAllocatedUnfairLock<Bool>(initialState: false)
+
     init(continuation: AsyncStream<Event>.Continuation, category: String) {
         self.continuation = continuation
         self.logger = SDKLogger(category: category)
     }
 
+    /// True once the AsyncStream has been cancelled by its consumer.
+    /// Safe to call from any thread (including the C callback).
+    var isCancelled: Bool {
+        cancellationState.withLock { $0 }
+    }
+
+    /// Mark the stream cancelled. Idempotent; safe from any thread.
+    /// Subsequent `yield(bytes:size:)` calls become no-ops so the
+    /// native callback cannot deliver more events once the consumer
+    /// has broken out of the stream.
+    func cancel() {
+        cancellationState.withLock { $0 = true }
+    }
+
     func yield(bytes: UnsafePointer<UInt8>?, size: Int) {
         guard let bytes, size > 0 else { return }
+        if isCancelled { return }
         do {
             let event = try Event(serializedBytes: Data(bytes: bytes, count: size))
             continuation.yield(event)
@@ -159,12 +190,26 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     /// optional `onError` closure may produce a terminal `Event` to yield
     /// before the stream finishes.
     ///
+    /// Cancellation: `onTermination` on the returned `AsyncStream` flips
+    /// the context's `isCancelled` flag (so the shared trampoline stops
+    /// decoding/yielding) and invokes the optional `onCancel` closure
+    /// where a domain-specific C cancel symbol is available (e.g.
+    /// `rac_llm_cancel_proto` / `rac_vlm_cancel_lifecycle_proto`). This
+    /// satisfies the AsyncStream ownership contract: dropping the
+    /// stream stops the native work instead of letting it run to
+    /// completion in the detached task.
+    ///
     /// - Parameters:
     ///   - request: Proto request to serialise into the bytes/size pair.
     ///   - category: Logger category for decode failures.
     ///   - onError: Optional terminal-event factory invoked when the C call
     ///     reports a non-success status. Returning `nil` finishes the stream
-    ///     silently. The closure runs on the detached task.
+    ///     silently. The closure runs on the detached task. Not invoked when
+    ///     the failure was triggered by cancellation.
+    ///   - onCancel: Optional closure invoked when the consumer cancels the
+    ///     AsyncStream. Typical implementations call a domain-specific
+    ///     `rac_*_cancel_*` symbol so the native runtime stops producing
+    ///     events. May be called from any thread.
     ///   - body: Closure that invokes the C streaming function pointer with
     ///     the serialised bytes, the trampoline, and the userData pointer.
     /// - Returns: An `AsyncStream<Event>` that yields decoded events as the C
@@ -174,6 +219,7 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
         request: Request,
         category: String,
         onError: (@Sendable (rac_result_t) -> Event?)? = nil,
+        onCancel: (@Sendable () -> Void)? = nil,
         body: @escaping @Sendable (
             UnsafePointer<UInt8>?,
             Int,
@@ -188,6 +234,26 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
                 category: category
             )
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+            // Wire cancellation BEFORE Task.detached starts so the
+            // handler is already installed if the consumer cancels
+            // before the native call gets going. Only react to
+            // `.cancelled` — `.finished` means the detached task has
+            // already drained the native call and called finish(),
+            // so re-invoking the native cancel symbol would either be
+            // a no-op or report a spurious error.
+            continuation.onTermination = { @Sendable termination in
+                switch termination {
+                case .cancelled:
+                    context.cancel()
+                    onCancel?()
+                case .finished:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+
             Task.detached {
                 let rc = requestData.withUnsafeBytes { rawBuffer in
                     body(
@@ -200,7 +266,10 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
                 Unmanaged<ProtoStreamContext<Event>>
                     .fromOpaque(contextPtr)
                     .release()
-                if rc != RAC_SUCCESS, let terminal = onError?(rc) {
+                // Skip the synthesized terminal error event when the
+                // consumer cancelled — the non-success return code is
+                // the expected effect of `onCancel`, not a real error.
+                if rc != RAC_SUCCESS, !context.isCancelled, let terminal = onError?(rc) {
                     continuation.yield(terminal)
                 }
                 continuation.finish()
@@ -210,7 +279,7 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     // swiftlint:enable unused_declaration
 }
 
-private final class ProtoProgressContext<Event: Message>: @unchecked Sendable {
+internal final class ProtoProgressContext<Event: Message>: @unchecked Sendable {
     let callback: (Event) -> Bool
     let logger: SDKLogger
 
@@ -290,6 +359,21 @@ extension CppBridge.VAD {
             VADComponentProtoABI.setActivityCallback,
             named: VADComponentProtoABI.setActivityCallbackName
         )
+
+        // Tear down the previous callback BEFORE installing a new one so the
+        // C component drops its borrow on the old context pointer first; the
+        // matching Unmanaged.release() then balances the +1 retain that
+        // Unmanaged.passRetained gave it. Without this, every successful call
+        // beyond the first leaks the prior ProtoProgressContext (and its
+        // captured closure). See comment record `mlt-001`.
+        let previousPtr = swapActivityCallbackContextPtr(nil)
+        if let previousPtr {
+            _ = setCallback(handle, nil, nil)
+            Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
+                .fromOpaque(previousPtr)
+                .release()
+        }
+
         let context = ProtoProgressContext<RASpeechActivityEvent>(
             category: "CppBridge.VAD.ProtoActivity"
         ) { event in
@@ -314,6 +398,9 @@ extension CppBridge.VAD {
                 .release()
             throw SDKException(code: .processingFailed, message: "VAD activity callback failed: \(rc)", category: .component)
         }
+        // Registration succeeded — record the new pointer so subsequent
+        // setActivityCallbackProto / destroy() calls can release it.
+        _ = swapActivityCallbackContextPtr(contextPtr)
     }
 }
 
@@ -380,6 +467,32 @@ extension CppBridge.VLM {
                 category: "CppBridge.VLM.ProtoStream"
             )
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+            // Wire the AsyncStream cancellation BEFORE launching the
+            // detached task. Consumer cancellation (`.cancelled`) now
+            // (a) flips the context cancellation flag so the stream
+            // callback returns RAC_FALSE and stops yielding, and (b)
+            // invokes the native VLM cancel symbol so the underlying
+            // generation tears down instead of running to completion
+            // in the background. `.finished` means the detached task
+            // already drained the native call, so the cancel symbol
+            // is intentionally skipped on that path. The detached
+            // task's `release()` still balances `passRetained`
+            // regardless of which path completes first.
+            continuation.onTermination = { @Sendable termination in
+                switch termination {
+                case .cancelled:
+                    context.cancel()
+                    if let cancel = VLMCustomProtoABI.cancel {
+                        _ = cancel(handle)
+                    }
+                case .finished:
+                    break
+                @unknown default:
+                    break
+                }
+            }
+
             Task.detached {
                 var outBuffer = rac_proto_buffer_t()
                 defer { NativeProtoABI.free(&outBuffer) }
@@ -392,12 +505,17 @@ extension CppBridge.VLM {
                             optionRaw.bindMemory(to: UInt8.self).baseAddress,
                             optionRaw.count,
                             { bytes, size, userData in
-                                guard let userData else { return RAC_TRUE }
-                                Unmanaged<ProtoStreamContext<RASDKEvent>>
+                                guard let userData else { return RAC_FALSE }
+                                let ctx = Unmanaged<ProtoStreamContext<RASDKEvent>>
                                     .fromOpaque(userData)
                                     .takeUnretainedValue()
-                                    .yield(bytes: bytes, size: size)
-                                return RAC_TRUE
+                                // Signal the C side to stop as soon as
+                                // the consumer cancels — skip the yield
+                                // entirely and return RAC_FALSE so the
+                                // native loop breaks on its next tick.
+                                if ctx.isCancelled { return RAC_FALSE }
+                                ctx.yield(bytes: bytes, size: size)
+                                return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
                             },
                             contextPtr,
                             &outBuffer
@@ -407,7 +525,10 @@ extension CppBridge.VLM {
                 Unmanaged<ProtoStreamContext<RASDKEvent>>
                     .fromOpaque(contextPtr)
                     .release()
-                if rc != RAC_SUCCESS {
+                // A non-success return code on a cancelled stream is
+                // expected (the native runtime bailed out); only log it
+                // as an actual failure when the consumer is still attached.
+                if rc != RAC_SUCCESS, !context.isCancelled {
                     SDKLogger(category: "CppBridge.VLM.ProtoStream")
                         .warning("VLM proto stream failed: \(rc)")
                 }

@@ -15,48 +15,95 @@ public extension RunAnywhere {
 
     /// Generate structured output from a prompt using a JSON schema (CANONICAL_API §3).
     ///
-    /// Commons owns the full pipeline (prepare prompt → run lifecycle LLM →
-    /// strip thinking tags → extract JSON → validate). `options` is accepted
-    /// for cross-SDK API parity; commons currently uses default generation
-    /// parameters.
+    /// Caller-supplied `options` (maxTokens, temperature, topP, preferredFramework,
+    /// systemPrompt, …) are forwarded to the underlying LLM through
+    /// `generateWithStructuredOutput(_:)`; the resulting raw text is then
+    /// passed to `extractStructuredOutput(text:schema:)` so commons still owns
+    /// extraction, canonicalization, and schema validation. This restores the
+    /// pre-PR-494 behavior where caller generation knobs were honored
+    /// (see comment record `swift-public-features-004`).
     static func generateStructured(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RAStructuredOutputResult {
-        _ = options
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        return try CppBridge.StructuredOutput.generate(
-            CppBridge.StructuredOutput.makeGenerateRequest(
-                prompt: prompt,
-                options: .defaults(schema: schema)
-            )
+        let generation = try await generateWithStructuredOutput(
+            prompt: prompt,
+            structuredOutput: .defaults(schema: schema),
+            options: options
         )
+        return try extractStructuredOutput(text: generation.text, schema: schema)
     }
 
     /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
     ///
-    /// Commons emits `RAStructuredOutputStreamEvent` payloads (token, partial
-    /// JSON, terminal completed/error). Sequence numbers, timestamps and
-    /// request IDs are populated by the C++ stream producer.
+    /// Caller-supplied `options` are forwarded to `generateStream(_:)` so
+    /// generation knobs (maxTokens, temperature, topP, preferredFramework,
+    /// systemPrompt, …) take effect. Token events from the LLM are
+    /// translated into `.token` `RAStructuredOutputStreamEvent`s; on the
+    /// final token the accumulated text is parsed via
+    /// `extractStructuredOutput` and emitted as a `.completed` event with
+    /// the validated `RAStructuredOutputResult` attached. Decoding/validation
+    /// failures are surfaced as a terminal `.error` event.
+    /// (See comment record `swift-public-features-004`.)
     static func generateStructuredStream(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) -> AsyncStream<RAStructuredOutputStreamEvent> {
-        _ = options
         guard isInitialized else { return errorStream("SDK not initialized") }
-        do {
-            return try CppBridge.StructuredOutput.generateStream(
-                CppBridge.StructuredOutput.makeGenerateRequest(
-                    prompt: prompt,
-                    options: .defaults(schema: schema)
-                )
-            )
-        } catch {
-            return errorStream(error.localizedDescription)
+
+        var internalOptions = options ?? RALLMGenerationOptions.defaults()
+        internalOptions.structuredOutput = .defaults(schema: schema)
+        var request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
+
+        return AsyncStream { continuation in
+            let task = Task {
+                do {
+                    let stream = try await generateStream(request)
+                    var accumulated = ""
+                    var seq: UInt64 = 0
+                    for await event in stream {
+                        if Task.isCancelled { break }
+                        if !event.token.isEmpty {
+                            accumulated += event.token
+                            seq &+= 1
+                            var emitted = RAStructuredOutputStreamEvent()
+                            emitted.kind = .token
+                            emitted.token = event.token
+                            emitted.seq = seq
+                            continuation.yield(emitted)
+                        }
+                    }
+                    seq &+= 1
+                    do {
+                        let parsed = try extractStructuredOutput(text: accumulated, schema: schema)
+                        var terminal = RAStructuredOutputStreamEvent()
+                        terminal.kind = .completed
+                        terminal.result = parsed
+                        terminal.seq = seq
+                        continuation.yield(terminal)
+                    } catch {
+                        var failure = RAStructuredOutputStreamEvent()
+                        failure.kind = .error
+                        failure.errorMessage = error.localizedDescription
+                        failure.seq = seq
+                        continuation.yield(failure)
+                    }
+                    continuation.finish()
+                } catch {
+                    var failure = RAStructuredOutputStreamEvent()
+                    failure.kind = .error
+                    failure.errorMessage = error.localizedDescription
+                    continuation.yield(failure)
+                    continuation.finish()
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

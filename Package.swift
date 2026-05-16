@@ -292,29 +292,38 @@ func binaryTargets() -> [Target] {
         // PRODUCTION MODE (for external SPM consumers)
         // Download XCFrameworks from GitHub releases
         // All xcframeworks include iOS + macOS slices (v0.19.0+)
+        //
+        // ONNXBackend / ONNXRuntime hard-depend on RABackendSherpaBinary, so
+        // it MUST appear in this list with a real URL + checksum before tagging
+        // a release. `scripts/release-swift-binaries.sh` zips
+        // `RABackendSherpa.xcframework` into `RABackendSherpa-ios-v<version>.zip`
+        // and `scripts/sync-checksums.sh` patches the checksum below. The
+        // placeholder checksum here is intentional: a release whose
+        // `release-swift-binaries.sh` run did not publish the Sherpa zip will
+        // fail `swift package resolve` with a wrong-checksum error rather than
+        // silently shipping a manifest that omits the Sherpa target.
         // =====================================================================
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "a1caaf12186c896b49bfccc7348a71c3b3428b282e5ac3f5a3181a022b5401da"
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "7ff978fbc87726423c682298f04354c7c11dfbfe9403b51f63d49df9c92e097a"
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "0f8575559ac96a9a7b872bb3adca3608acef38fdec1ab8ccf9b0716a8d627c6c"
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
-            // NOTE: Sherpa xcframework release URL + checksum TBD — once the
-            // release pipeline publishes RABackendSherpa-ios-v<sdkVersion>.zip,
-            // add a matching `.binaryTarget(name: "RABackendSherpaBinary", …)`
-            // entry here so production consumers link the sherpa plugin too.
-            // Until then external SPM consumers will be missing STT/TTS via
-            // sherpa (LLM via llamacpp + embeddings via onnx continue to work).
+            .binaryTarget(
+                name: "RABackendSherpaBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+            ),
         ]
     }
 }
