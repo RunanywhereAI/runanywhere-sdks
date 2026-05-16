@@ -30,10 +30,13 @@ jobs:
   # =============================================================================
 
   macos-debug:
-    # T5.7: macos-15 runner ships Xcode 16+ / Swift 6, required by the Swift
-    # 6.3.2 toolchain used by the iOS/macOS native targets and brew formulas
-    # (grpc-swift v2, swift-protobuf 1.x). macos-14 only ships Xcode 15.x.
-    runs-on: macos-15
+    # Pinned to macos-14 (Xcode 15.4) because macos-15 ships Xcode 16+ /
+    # Apple Clang 18 which now rejects llama.cpp's `void* → id<MTLDevice>`
+    # casts in ggml-metal-device.m. b9174 (matching XCODE_VERSION=15.4 in
+    # VERSIONS) builds cleanly under Xcode 15.4. The Swift-only workflows
+    # that need Xcode 16+ (idl-drift-check, ios-device) still run on
+    # macos-15 explicitly.
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - name: Install ninja + protobuf
@@ -46,7 +49,9 @@ jobs:
         run: ctest --preset macos-debug
 
   macos-release:
-    runs-on: macos-15
+    # Same reason as macos-debug: pin to macos-14 / Xcode 15.4 so the
+    # llama.cpp Metal compile units don't trip Xcode 16's strict ARC.
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - run: brew install ninja protobuf
@@ -54,14 +59,18 @@ jobs:
       - run: cmake --build --preset macos-release
 
   linux-debug:
-    # T5.7: ubuntu-24.04 ships libprotobuf-dev 5.x (matches PROTOBUF_VERSION=34.2
-    # in sdk/runanywhere-commons/VERSIONS) and a newer abseil. ubuntu-22.04 ships
-    # protobuf 3.x which would force the FetchContent fallback path.
+    # Note: we intentionally do NOT apt-install libprotobuf-dev here. Ubuntu
+    # 24.04 still only ships protobuf 3.21, which is rejected by our
+    # RAC_PROTOBUF_MIN_VERSION=5.0 check, but find_package still registers
+    # IMPORTED `protobuf::libprotobuf{,-lite}` targets from the system config
+    # before FetchContent_MakeAvailable() can add its own ALIAS, producing
+    # "add_library cannot create ALIAS target ... already exists". Skipping
+    # the apt install forces the vendored FetchContent path cleanly.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install ninja + protobuf
-        run: sudo apt-get update && sudo apt-get install -y ninja-build libprotobuf-dev protobuf-compiler
+      - name: Install ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset linux-debug
       - run: cmake --build --preset linux-debug
       - run: ctest --preset linux-debug
@@ -70,7 +79,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build libprotobuf-dev protobuf-compiler
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset linux-asan
       - run: cmake --build --preset linux-asan
       - run: ctest --preset linux-asan
@@ -98,6 +107,8 @@ jobs:
           unzip -q /tmp/ndk.zip -d /tmp
           test -d "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Download vendored Sherpa-ONNX (Android)
+        run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - run: cmake --preset android-arm64
       - run: cmake --build --preset android-arm64
 
