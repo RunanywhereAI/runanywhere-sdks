@@ -458,10 +458,15 @@ class HTTPClientAdapter {
     if (body is Uint8List) return body;
     if (body is String) return Uint8List.fromList(utf8.encode(body));
     if (body is List<int>) return Uint8List.fromList(body);
-    // Map / List / toJson object — JSON-encode.
+    // Map / List / toJson object — JSON-encode. The `toJson` dispatch is
+    // intentionally dynamic because the caller may pass an arbitrary
+    // user-defined model class; suppress avoid_dynamic_calls just for that
+    // one call.
     try {
-      final jsonable =
-          (body is Map || body is List) ? body : (body as dynamic).toJson();
+      final dynamic jsonable = (body is Map || body is List)
+          ? body
+          // ignore: avoid_dynamic_calls
+          : (body as dynamic).toJson();
       return Uint8List.fromList(utf8.encode(json.encode(jsonable)));
     } catch (_) {
       throw ArgumentError(
