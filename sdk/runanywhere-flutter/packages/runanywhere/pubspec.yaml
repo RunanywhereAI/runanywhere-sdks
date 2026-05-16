@@ -33,11 +33,11 @@ dependencies:
   # import it directly for `int64` field handling, so it must be declared.
   fixnum: ^1.1.1
   # Storage
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.3
   path_provider: ^2.1.5
   flutter_secure_storage: ^10.2.0
   # Device info
-  device_info_plus: ^12.4.0
+  device_info_plus: ^11.4.0
   # Utilities
   uuid: ^4.5.3
 

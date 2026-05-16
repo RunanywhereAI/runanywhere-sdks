@@ -29,13 +29,13 @@ dependencies:
   record: ^6.1.0
   audioplayers: ^6.0.0
   permission_handler: ^11.1.0
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.3
   # Secure storage (iOS Keychain, Android Keystore)
   flutter_secure_storage: ^10.2.0
   # File system access
   path_provider: ^2.1.5
   # Device information
-  device_info_plus: ^12.4.0
+  device_info_plus: ^11.4.0
   # App package info
   package_info_plus: ^4.2.0
   # URL launcher
