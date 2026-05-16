@@ -218,16 +218,21 @@ dependencies:
 ### Web (Browser)
 
 ```typescript
-import { RunAnywhere, TextGeneration } from '@runanywhere/web';
+import { RunAnywhere } from '@runanywhere/web';
 
 // 1. Initialize
 await RunAnywhere.initialize({ environment: 'development' });
 
 // 2. Load a model
-await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
+await RunAnywhere.loadModel({
+  id: 'qwen2.5-0.5b',
+  source: '/models/qwen2.5-0.5b-instruct-q4_0.gguf',
+});
 
 // 3. Generate
-const result = await TextGeneration.generate('What is the capital of France?');
+const result = await RunAnywhere.generate({
+  prompt: 'What is the capital of France?',
+});
 console.log(result.text); // "Paris is the capital of France."
 ```
 

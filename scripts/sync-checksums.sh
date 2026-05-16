@@ -53,6 +53,7 @@ declare_mapping() {
     echo "RACommonsBinary|RACommons-ios"
     echo "RABackendLlamaCPPBinary|RABackendLLAMACPP-ios"
     echo "RABackendONNXBinary|RABackendONNX-ios"
+    echo "RABackendSherpaBinary|RABackendSherpa-ios"
     echo "RABackendMetalRTBinary|RABackendMetalRT-ios"
 }
 

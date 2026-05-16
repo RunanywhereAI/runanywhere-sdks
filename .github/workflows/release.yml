@@ -212,16 +212,18 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: web
-      - name: Build WASM (all backends)
+      - name: Build WASM (CPU, llama.cpp + VLM)
         working-directory: sdk/runanywhere-web
-        run: ./scripts/build-web.sh --build-wasm --all-backends
+        run: npm run build:wasm -- --llamacpp --vlm
+      - name: Build WASM (WebGPU, llama.cpp + VLM)
+        working-directory: sdk/runanywhere-web
+        run: npm run build:wasm -- --llamacpp --vlm --webgpu
       - name: Package Web/WASM outputs
-        # build-web.sh puts every WASM variant (CPU, WebGPU, sherpa) under
-        # packages/llamacpp/wasm (see WASM_OUTPUT_DIR in scripts/build-web.sh).
-        # Also include packages/core/wasm if present (sherpa-onnx artifacts
-        # sometimes land here). Package only directories that actually exist
-        # so a missing optional variant (e.g. WebGPU on older emsdk) doesn't
-        # break the release.
+        # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
+        # under packages/llamacpp/wasm. Also include packages/core/wasm and
+        # packages/onnx/wasm if present (vendored sherpa-onnx / ONNX Runtime
+        # artifacts). Package only directories that actually exist so a
+        # missing optional variant doesn't break the release.
         working-directory: sdk/runanywhere-web
         run: |
           set -euo pipefail
@@ -231,7 +233,7 @@ jobs:
             [ -d "packages/$d" ] && tar_inputs+=("$d")
           done
           if [ ${#tar_inputs[@]} -eq 0 ]; then
-            echo "::error::No WASM output directories produced by build-web.sh"
+            echo "::error::No WASM output directories produced by npm run build:wasm"
             exit 1
           fi
           echo "Packaging: ${tar_inputs[*]}"
@@ -345,8 +347,9 @@ jobs:
         working-directory: sdk/runanywhere-web
         run: |
           mkdir -p ../../sdk-staging/web
-          for pkg in packages/core packages/llamacpp packages/onnx; do
-            (cd "$pkg" && npm pack --pack-destination ../../../../sdk-staging/web/)
+          WEB_DEST="$(cd ../../sdk-staging/web && pwd)"
+          for pkg in ../shared/proto-ts packages/core packages/llamacpp packages/onnx; do
+            (cd "$pkg" && npm pack --pack-destination "$WEB_DEST")
           done
           ls -la ../../sdk-staging/web/ || true
           for f in ../../sdk-staging/web/*.tgz; do
@@ -357,6 +360,71 @@ jobs:
         with:
           name: sdk-web
           path: sdk-staging/web/**
+          retention-days: 7
+          if-no-files-found: warn
+
+  sdk_react_native:
+    needs: [validate, native_ios, native_android]
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Download iOS natives
+        uses: actions/download-artifact@v4
+        with:
+          name: native-ios-macos
+          path: native-ios-staging
+      - name: Download Android natives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-android-*
+          path: native-android-staging
+      - name: Stage natives into a single layout for package-sdk.sh
+        run: |
+          STAGING="$GITHUB_WORKSPACE/rn-natives-staging"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING"
+          # iOS: unzip every xcframework into the staging root so
+          # package-sdk.sh sees <Framework>.xcframework directories.
+          for zip in native-ios-staging/*.zip; do
+            [ -f "$zip" ] || continue
+            echo "Extracting iOS $zip"
+            unzip -o "$zip" -d "$STAGING"
+          done
+          # Android: each native-android-<abi> bundle contains a per-ABI zip
+          # of .so files; unpack into $STAGING/<abi>/.
+          for abi_dir in native-android-staging/*; do
+            [ -d "$abi_dir" ] || continue
+            for zip in "$abi_dir"/*.zip; do
+              [ -f "$zip" ] || continue
+              echo "Extracting Android $zip"
+              unzip -o "$zip" -d "$STAGING"
+            done
+          done
+          ls -la "$STAGING" || true
+      - name: Package RN SDK tarballs
+        env:
+          RAC_ALLOW_NPM_FALLBACK: "1"
+        run: |
+          bash sdk/runanywhere-react-native/scripts/package-sdk.sh \
+            --mode ci \
+            --natives-from "$GITHUB_WORKSPACE/rn-natives-staging"
+      - name: Collect RN SDK artifacts
+        run: |
+          mkdir -p sdk-staging/react-native
+          if [ -d sdk/runanywhere-react-native/dist/sdk-rn ]; then
+            cp sdk/runanywhere-react-native/dist/sdk-rn/*.tgz sdk-staging/react-native/ 2>/dev/null || true
+            cp sdk/runanywhere-react-native/dist/sdk-rn/*.sha256 sdk-staging/react-native/ 2>/dev/null || true
+          fi
+          ls -la sdk-staging/react-native/ || true
+      - name: Upload RN SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-react-native
+          path: sdk-staging/react-native/**
           retention-days: 7
           if-no-files-found: warn
 
@@ -493,7 +561,7 @@ jobs:
           fi
 
   validate_consumer_react_native:
-    needs: [validate, native_ios, native_android]
+    needs: [validate, sdk_react_native]
     if: always() && needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -508,10 +576,20 @@ jobs:
         with:
           repository: RunanywhereAI/react-native-starter-app
           path: consumer-rn
-      - name: Install RN starter
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-react-native
+          path: sdk-rn-staging
+      - name: Install RN starter with locally-packed tarballs
         run: |
           cd consumer-rn
           if [ -f package.json ]; then
+            # Install each locally-packed tarball into the starter so we
+            # validate the release candidates produced by this workflow,
+            # not whatever the registry happens to resolve.
+            for tgz in ../sdk-rn-staging/*.tgz; do
+              [ -f "$tgz" ] && (npm install --no-save --legacy-peer-deps "$tgz" || true)
+            done
             npm install --legacy-peer-deps || yarn install || echo "::warning::install failed"
             npx tsc --noEmit 2>/dev/null || echo "::warning::RN typecheck failed"
           else
@@ -532,6 +610,7 @@ jobs:
       - native_web
       - sdk_kotlin
       - sdk_web
+      - sdk_react_native
     if: >-
       needs.validate.result == 'success' &&
       needs.native_ios.result == 'success' &&
@@ -540,7 +619,8 @@ jobs:
       needs.native_windows.result != 'failure' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result != 'failure' &&
-      needs.sdk_web.result != 'failure'
+      needs.sdk_web.result != 'failure' &&
+      needs.sdk_react_native.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

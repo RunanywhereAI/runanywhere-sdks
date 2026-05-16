@@ -132,6 +132,14 @@ zip_target "RACommons.xcframework"          "RACommons-ios"
 zip_target "RABackendLLAMACPP.xcframework"  "RABackendLLAMACPP-ios"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     zip_target "RABackendONNX.xcframework"  "RABackendONNX-ios"
+    # Sherpa-ONNX ships as a peer xcframework alongside RABackendONNX. The
+    # Swift ONNXBackend / ONNXRuntime targets in Package.swift declare an
+    # unconditional dependency on RABackendSherpaBinary, so external SPM
+    # consumers cannot resolve the manifest unless we publish this zip and
+    # populate the matching `.binaryTarget(name: "RABackendSherpaBinary", …)`
+    # entry. Skipping it when the xcframework is absent would only mask the
+    # gap until the first `swift package resolve`.
+    zip_target "RABackendSherpa.xcframework" "RABackendSherpa-ios"
 else
     echo "  ▶ Skipping RABackendONNX zip (RAC_BACKEND_ONNX=OFF)"
 fi

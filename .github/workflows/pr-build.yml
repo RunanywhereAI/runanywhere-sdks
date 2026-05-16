@@ -16,9 +16,9 @@ name: PR build matrix
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev, "feat/v2-architecture"]
   push:
-    branches: [main, "feat/v2-architecture"]
+    branches: [main, dev, "feat/v2-architecture"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -147,4 +147,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - run: cd sdk/runanywhere-web/packages/core && npm install --no-audit --no-fund && npx tsc --noEmit
+      # Install + typecheck from the workspace root so the in-tree
+      # @runanywhere/proto-ts package (sdk/shared/proto-ts) is resolved as a
+      # workspace member instead of being fetched from the npm registry. The
+      # `typecheck` script builds proto-ts first, then typechecks core,
+      # llamacpp, and onnx — exactly the surface this PR touches.
+      - name: Install workspace dependencies
+        working-directory: sdk/runanywhere-web
+        run: npm install --no-audit --no-fund
+      - name: Typecheck Web workspace (proto-ts + packages)
+        working-directory: sdk/runanywhere-web
+        run: npm run typecheck

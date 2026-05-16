@@ -10,6 +10,9 @@ Every shell script in the repo lives in one of these places, organized by scope:
 | `sync-versions.sh <version>` | Bumps the version string in every manifest across the monorepo (`VERSION`, `VERSIONS`, `Package.swift`, `gradle.properties`, all `package.json`, all `pubspec.yaml`). Run locally before tagging a release. |
 | `sync-checksums.sh <zip_dir>` | Reads SHA-256 of freshly-built XCFramework zips and updates the `checksum: "..."` lines in root `Package.swift`. Run in the release workflow after native iOS/macOS builds produce the zips. |
 | `validate-artifact.sh <file>...` | Type-aware sanity check for each artifact extension (XCFramework Info.plist + slices, `.so` ELF magic, `.aar` classes.jar + jni, `.wasm` magic bytes, `.tgz` package.json). Same script runs locally and in CI. |
+| `build-core-xcframework.sh` | Canonical native xcframework build / packager for Swift consumers — writes `RACommons.xcframework`, `RABackendONNX.xcframework`, `RABackendLLAMACPP.xcframework`, and `RABackendSherpa.xcframework` into `sdk/runanywhere-swift/Binaries/`. Replaced the per-SDK `sdk/runanywhere-swift/scripts/build-swift.sh` orchestrator. |
+| `build-core-android.sh` | Canonical native build for Android consumers (per-ABI `.so` outputs). |
+| `build-core-wasm.sh` | Canonical native build for Web/WASM consumers. |
 
 ## Validation command hub — `scripts/validation/`
 
@@ -38,9 +41,11 @@ Per-SDK scripts currently in tree:
 
 ```
 sdk/runanywhere-swift/scripts/
-    build-swift.sh                   # --setup | --build-commons | --set-local | --set-remote
-    package-sdk.sh                   # unified contract
+    package-sdk.sh                   # unified release packaging contract
     create-onnxruntime-xcframework.sh  # one-shot helper for building the combined ONNXRuntime xcframework
+    # NOTE: per-SDK orchestrator removed — native xcframeworks are now built
+    #       via the consolidated repo-root scripts/build-core-xcframework.sh,
+    #       and the Swift SDK itself is compiled directly by Xcode/SwiftPM.
 
 sdk/runanywhere-kotlin/scripts/
     build-kotlin.sh                  # full pipeline

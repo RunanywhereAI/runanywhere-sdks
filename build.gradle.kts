@@ -17,10 +17,6 @@
 //   ./gradlew buildAndroidApp    - Build Android example app
 //   ./gradlew runAndroidApp      - Build, install, and launch Android app
 //
-//   IntelliJ Plugin:
-//   ./gradlew buildIntellijPlugin - Build IntelliJ plugin
-//   ./gradlew runIntellijPlugin  - Run IntelliJ plugin in sandbox
-//
 //   Utility:
 //   ./gradlew buildAll           - Build everything
 //   ./gradlew cleanAll           - Clean everything
@@ -122,17 +118,25 @@ tasks.register("setup") {
         if (testLocal) {
             println()
             println("testLocal=true: Running native dependency setup...")
-            val buildScript = file("sdk/runanywhere-kotlin/scripts/build-kotlin.sh")
-            if (buildScript.exists()) {
-                exec {
-                    workingDir = file("sdk/runanywhere-kotlin")
-                    environment("ANDROID_NDK_HOME", ndkHome)
-                    commandLine("bash", buildScript.absolutePath, "--setup", "--skip-build")
-                }
-                println("Native setup complete")
-            } else {
-                println("[WARN] build-kotlin.sh not found at ${buildScript.relativeTo(rootDir)}")
+            // sdk/runanywhere-kotlin/scripts/build-{kotlin,sdk}.sh were
+            // removed by GAP 07 Phase 6; the canonical entry point is the
+            // repo-root scripts/build-core-android.sh, which builds via CMake
+            // presets and stages JNI libs into every consuming SDK
+            // (runanywhere-kotlin, runanywhere-react-native, runanywhere-flutter).
+            val buildScript = file("scripts/build-core-android.sh")
+            if (!buildScript.exists()) {
+                throw GradleException(
+                    "runanywhere.useLocalNatives=true requires scripts/build-core-android.sh, " +
+                        "but it is missing at ${buildScript.relativeTo(rootDir)}. " +
+                        "Restore the script or switch to runanywhere.useLocalNatives=false.",
+                )
             }
+            exec {
+                workingDir = projectDir
+                environment("ANDROID_NDK_HOME", ndkHome)
+                commandLine("bash", buildScript.absolutePath)
+            }
+            println("Native setup complete")
         } else {
             println("testLocal=false: Native libs will be downloaded from GitHub releases during build")
         }
@@ -140,47 +144,50 @@ tasks.register("setup") {
 }
 
 // =============================================================================
-// Native (C++) tasks — wraps build-sdk.sh for IDE integration
+// Native (C++) tasks — wraps scripts/build-core-android.sh for IDE integration.
+// build-core-android.sh runs the android-{arm64,armv7,x86_64} CMake presets
+// and stages the resulting .so files into every consuming SDK's jniLibs tree
+// (Kotlin, React Native, Flutter). It replaces the per-SDK build-sdk.sh /
+// build-kotlin.sh shell scripts removed in GAP 07 Phase 6.
 // =============================================================================
 
 tasks.register("buildCpp") {
     group = "native"
-    description = "Build C++ (runanywhere-commons) and copy .so to jniLibs"
+    description = "Build C++ (runanywhere-commons) and stage .so into Kotlin/RN/Flutter jniLibs"
 
     doLast {
         val ndkHome = resolveNdkHome(resolveAndroidHome())
         exec {
-            workingDir = file("sdk/runanywhere-kotlin")
+            workingDir = projectDir
             environment("ANDROID_NDK_HOME", ndkHome)
-            commandLine("bash", "scripts/build-sdk.sh", "--cpp-only")
+            commandLine("bash", "scripts/build-core-android.sh")
         }
     }
 }
 
 tasks.register("buildFullSdk") {
     group = "native"
-    description = "Full pipeline: build C++ + copy .so + build Kotlin SDK"
+    description = "Full pipeline: build C++ + stage .so + build Kotlin SDK"
+    dependsOn("buildCpp", ":runanywhere-kotlin:assembleDebug", ":runanywhere-kotlin:jvmJar")
 
     doLast {
-        val ndkHome = resolveNdkHome(resolveAndroidHome())
-        exec {
-            workingDir = file("sdk/runanywhere-kotlin")
-            environment("ANDROID_NDK_HOME", ndkHome)
-            commandLine("bash", "scripts/build-sdk.sh")
-        }
+        println("Full SDK build complete (C++ + Kotlin AAR + JVM JAR)")
     }
 }
 
 tasks.register("copyNativeLibs") {
     group = "native"
-    description = "Copy .so from dist/ to jniLibs/ (no C++ rebuild)"
+    description = "Re-stage .so into jniLibs/ (incremental: rebuilds via CMake only if sources changed)"
 
     doLast {
         val ndkHome = resolveNdkHome(resolveAndroidHome())
+        // build-core-android.sh is incremental: CMake's --build is a no-op
+        // when nothing changed, so the marginal cost over a pure copy is
+        // small. There is no separate copy-only script after GAP 07 Phase 6.
         exec {
-            workingDir = file("sdk/runanywhere-kotlin")
+            workingDir = projectDir
             environment("ANDROID_NDK_HOME", ndkHome)
-            commandLine("bash", "scripts/build-kotlin.sh", "--local", "--skip-build")
+            commandLine("bash", "scripts/build-core-android.sh")
         }
     }
 }
@@ -262,41 +269,6 @@ tasks.register("runAndroidApp") {
     }
 }
 
-// IntelliJ plugin tasks (SDK consumed via Maven Local)
-
-tasks.register("buildIntellijPlugin") {
-    group = "intellij"
-    description = "Publish SDK + build IntelliJ plugin"
-
-    doLast {
-        exec {
-            workingDir = projectDir
-            commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "buildPlugin")
-        }
-        println("IntelliJ plugin built: examples/intellij-plugin-demo/plugin/build/distributions/")
-    }
-}
-
-tasks.register("runIntellijPlugin") {
-    group = "intellij"
-    description = "Publish SDK + run IntelliJ plugin in sandbox"
-
-    doLast {
-        exec {
-            workingDir = projectDir
-            commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "runIde")
-        }
-    }
-}
-
 // Convenience tasks
 
 tasks.register("buildAll") {
@@ -305,26 +277,19 @@ tasks.register("buildAll") {
     dependsOn("setup")
 
     doLast {
-        // Build SDK
         exec {
             workingDir = projectDir
             commandLine("./gradlew", ":runanywhere-kotlin:assembleDebug")
         }
 
-        // Build Android app
         exec {
             workingDir = file("examples/android/RunAnywhereAI")
             commandLine("./gradlew", "assembleDebug")
         }
 
-        // Publish SDK to Maven Local + build IntelliJ plugin
         exec {
             workingDir = projectDir
             commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "buildPlugin")
         }
 
         println()
@@ -332,7 +297,6 @@ tasks.register("buildAll") {
         println("  SDK AAR:          sdk/runanywhere-kotlin/build/outputs/aar/")
         println("  Maven Local:      ~/.m2/repository/com/runanywhere/runanywhere-sdk/")
         println("  Android APK:      examples/android/RunAnywhereAI/app/build/outputs/apk/")
-        println("  IntelliJ Plugin:  examples/intellij-plugin-demo/plugin/build/distributions/")
     }
 }
 
@@ -346,10 +310,6 @@ tasks.register("cleanAll") {
 
         exec {
             workingDir = file("examples/android/RunAnywhereAI")
-            commandLine("./gradlew", "clean")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "clean")
         }
         println("All projects cleaned")

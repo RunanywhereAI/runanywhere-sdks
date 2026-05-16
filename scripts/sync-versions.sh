@@ -74,16 +74,16 @@ bump_pubspec_version() {
 }
 
 # Flutter sub-packages (genie/llamacpp/onnx) depend on the core `runanywhere`
-# package via a caret constraint like `runanywhere: ^0.19.0`. When we bump
-# the suite, that constraint must track the NEW_VERSION's MAJOR.MINOR floor
-# so the sub-packages pull a matching core, not an older published one.
+# package via a caret constraint like `runanywhere: ^0.19.13`. When we bump
+# the suite, that constraint must track the FULL NEW_VERSION (patch included)
+# because backend packages ship native binaries that lockstep with the core
+# release; resolving an older same-minor core (e.g. 0.19.0) against a newer
+# backend (0.19.13) would create a hard-to-debug native ABI mismatch in apps
+# outside the monorepo workspace.
 bump_pubspec_runanywhere_dep() {
     local file="$1"
-    # Caret floor = current MAJOR.MINOR.0 (e.g. 0.19.12 → 0.19.0)
-    local major_minor
-    major_minor="$(echo "${NEW_VERSION}" | awk -F. '{print $1"."$2".0"}')"
     bump_line "$file" '^  runanywhere: \^[0-9]+\.[0-9]+\.[0-9]+' \
-        "  runanywhere: ^${major_minor}"
+        "  runanywhere: ^${NEW_VERSION}"
 }
 
 echo ">> Syncing versions to ${NEW_VERSION}"

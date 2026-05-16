@@ -584,23 +584,30 @@ sync_react_native_frameworks() {
     run rm -rf "${rn_root}/core/ios/Binaries/RACommons.xcframework"
     run cp -R "${DEST}/RACommons.xcframework" "${rn_root}/core/ios/Binaries/"
 
-    run mkdir -p "${rn_root}/llamacpp/ios/Frameworks"
+    # RN backend podspecs vendor xcframeworks from ios/Binaries (matches
+    # package-sdk.sh --natives-from staging and the new podspec contract).
+    # Clean up the legacy ios/Frameworks paths so the source layout cannot
+    # serve a stale framework while CocoaPods looks at ios/Binaries.
+    run mkdir -p "${rn_root}/llamacpp/ios/Binaries"
+    run rm -rf "${rn_root}/llamacpp/ios/Binaries/RABackendLLAMACPP.xcframework"
     run rm -rf "${rn_root}/llamacpp/ios/Frameworks/RABackendLLAMACPP.xcframework"
-    run cp -R "${DEST}/RABackendLLAMACPP.xcframework" "${rn_root}/llamacpp/ios/Frameworks/"
+    run cp -R "${DEST}/RABackendLLAMACPP.xcframework" "${rn_root}/llamacpp/ios/Binaries/"
 
     if [ -d "${DEST}/RABackendONNX.xcframework" ]; then
-        run mkdir -p "${rn_root}/onnx/ios/Frameworks"
+        run mkdir -p "${rn_root}/onnx/ios/Binaries"
+        run rm -rf "${rn_root}/onnx/ios/Binaries/RABackendONNX.xcframework"
         run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendONNX.xcframework"
-        run cp -R "${DEST}/RABackendONNX.xcframework" "${rn_root}/onnx/ios/Frameworks/"
         run rm -rf "${rn_root}/onnx/ios/Frameworks/onnxruntime.xcframework"
+        run cp -R "${DEST}/RABackendONNX.xcframework" "${rn_root}/onnx/ios/Binaries/"
     fi
 
     # GAP 06 T5.1 — stage the Sherpa plugin xcframework alongside ONNX's
     # (sherpa is the long-term owner of speech primitives).
     if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then
-        run mkdir -p "${rn_root}/onnx/ios/Frameworks"
+        run mkdir -p "${rn_root}/onnx/ios/Binaries"
+        run rm -rf "${rn_root}/onnx/ios/Binaries/RABackendSherpa.xcframework"
         run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendSherpa.xcframework"
-        run cp -R "${DEST}/RABackendSherpa.xcframework" "${rn_root}/onnx/ios/Frameworks/"
+        run cp -R "${DEST}/RABackendSherpa.xcframework" "${rn_root}/onnx/ios/Binaries/"
     fi
 }
 
