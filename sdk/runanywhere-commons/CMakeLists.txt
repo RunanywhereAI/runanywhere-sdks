@@ -828,8 +828,17 @@ endif()
 # archive and every symbol is visible to downstream consumers. The override
 # is target-scoped so engine backends keep their hidden-visibility hardening.
 # TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
-# and drop this Android-specific override.
-if(ANDROID)
+# and drop this Android-specific override. Also flip the same override on
+# Linux: the test executables (test_voice_agent_pipeline,
+# test_graph_scheduler, test_pipeline_executor) link directly against
+# internal C++ classes (`rac::voice_agent::VoiceAgentPipeline`,
+# `rac::graph::GraphScheduler`, etc.) that don't yet carry RAC_API. With
+# the default hidden visibility on Linux SHARED builds the test linker
+# fails with `undefined reference to <class>::<class>()`. Apple builds
+# already use a curated exports list so they're unaffected by this; macOS
+# CMake builds use RAC_BUILD_SHARED=OFF so the symbols live inside the
+# static archive.
+if(ANDROID OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND RAC_BUILD_SHARED))
     set_target_properties(rac_commons PROPERTIES
         C_VISIBILITY_PRESET   default
         CXX_VISIBILITY_PRESET default

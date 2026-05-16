@@ -167,11 +167,17 @@ if(RAC_VLM_USE_MTMD)
         # GAP 02 Phase 8: unified engine plugin entry point for VLM.
         rac_plugin_entry_llamacpp_vlm.cpp
     )
-    # Add mtmd sources from llama.cpp tools directory
+    # Add mtmd sources from llama.cpp tools directory. mtmd-image.cpp
+    # carries the `mtmd_image_preprocessor_*` vtables that mtmd.cpp
+    # references during `mtmd_context::init_vision()`; without it ld.lld
+    # on Linux/Android complains:
+    #   ld.lld: error: undefined symbol: vtable for
+    #     mtmd_image_preprocessor_{llava_uhd,step3vl,idefics3,internvl}
     list(APPEND LLAMACPP_BACKEND_SOURCES
         ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-image.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
     )
     # Glob every mtmd model implementation upstream ships. The previous
