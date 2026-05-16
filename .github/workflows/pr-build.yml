@@ -149,8 +149,16 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@3.6.1 --activate
-      - run: cd sdk/runanywhere-react-native && yarn install --immutable
-      - run: cd sdk/runanywhere-react-native/packages/core && yarn typecheck
+      # Yarn 3 Berry: the project root with the workspaces declaration is the
+      # REPO ROOT (which lists `sdk/runanywhere-react-native/packages/*` as
+      # workspace members). `sdk/runanywhere-react-native` itself is NOT a
+      # workspace member, so `cd sdk/runanywhere-react-native && yarn install`
+      # fails the project-detection guard. Run yarn from the repo root and
+      # target the specific workspace explicitly.
+      - name: Yarn install (repo root)
+        run: yarn install --immutable
+      - name: Typecheck @runanywhere/core
+        run: yarn workspace @runanywhere/core typecheck
 
   web-typecheck:
     runs-on: ubuntu-22.04
@@ -163,6 +171,13 @@ jobs:
       # workspace member instead of being fetched from the npm registry. The
       # `typecheck` script builds proto-ts first, then typechecks core,
       # llamacpp, and onnx — exactly the surface this PR touches.
+      # npm 10 (Node 20) does not consistently hoist transitive workspace deps
+      # for proto-ts when installed only via the web root workspace install.
+      # Install proto-ts deps explicitly first so `long` + `protobufjs/minimal`
+      # are resolvable when `tsc --noEmit` runs against sdk/shared/proto-ts.
+      - name: Install proto-ts dependencies (workspace member)
+        working-directory: sdk/shared/proto-ts
+        run: npm install --no-audit --no-fund
       - name: Install workspace dependencies
         working-directory: sdk/runanywhere-web
         run: npm install --no-audit --no-fund
