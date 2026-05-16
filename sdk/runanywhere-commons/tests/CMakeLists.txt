@@ -830,6 +830,23 @@ target_compile_features(test_lora_service_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_lora_service_proto_abi)
 add_test(NAME lora_service_proto_abi_tests COMMAND test_lora_service_proto_abi)
 
+# --- T2.2: lifecycle-aware LoRA proto ABI tests -----------------------------
+# Pins the v2 contract: each rac_lora_*_proto resolves its backend through
+# the model-lifecycle service (no rac_handle_t llm_component arg). Covers the
+# COMPONENT_NOT_READY guard plus apply/list/state/remove against a
+# lifecycle-loaded mock backend, mirroring the JNI / Swift call sites the
+# SDK bridges already use.
+add_executable(test_lora_proto_abi test_lora_proto_abi.cpp)
+target_include_directories(test_lora_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_lora_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_lora_proto_abi)
+target_compile_features(test_lora_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_lora_proto_abi)
+add_test(NAME lora_proto_abi_tests COMMAND test_lora_proto_abi)
+
 # --- Storage generated service descriptor test ------------------------------
 add_executable(test_storage_service_proto_abi test_storage_service_proto_abi.cpp)
 target_include_directories(test_storage_service_proto_abi PRIVATE

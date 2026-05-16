@@ -4001,74 +4001,67 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionGetCapabili
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraApplyProto(
-    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray requestProto) {
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     (void)clazz;
     JByteArrayView request(env, requestProto);
-    if (llmHandle == 0L || !request.ok)
+    if (!request.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc =
-        rac_lora_apply_proto(handleFromJLong(llmHandle), request.u8(), request.size(), &result);
+    rac_result_t rc = rac_lora_apply_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racLoraApplyProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRemoveProto(
-    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray requestProto) {
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     (void)clazz;
     JByteArrayView request(env, requestProto);
-    if (llmHandle == 0L || !request.ok)
+    if (!request.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc =
-        rac_lora_remove_proto(handleFromJLong(llmHandle), request.u8(), request.size(), &result);
+    rac_result_t rc = rac_lora_remove_proto(request.u8(), request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racLoraRemoveProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraListProto(JNIEnv* env, jclass clazz,
-                                                                          jlong llmHandle,
                                                                           jbyteArray stateProto) {
     (void)clazz;
     JByteArrayView state(env, stateProto);
-    if (llmHandle == 0L || !state.ok)
+    if (!state.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc =
-        rac_lora_list_proto(handleFromJLong(llmHandle), state.u8(), state.size(), &result);
+    rac_result_t rc = rac_lora_list_proto(state.u8(), state.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racLoraListProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraStateProto(JNIEnv* env,
                                                                            jclass clazz,
-                                                                           jlong llmHandle,
                                                                            jbyteArray stateProto) {
     (void)clazz;
     JByteArrayView state(env, stateProto);
-    if (llmHandle == 0L || !state.ok)
+    if (!state.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc =
-        rac_lora_state_proto(handleFromJLong(llmHandle), state.u8(), state.size(), &result);
+    rac_result_t rc = rac_lora_state_proto(state.u8(), state.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racLoraStateProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCompatibilityProto(
-    JNIEnv* env, jclass clazz, jlong llmHandle, jbyteArray configProto) {
+    JNIEnv* env, jclass clazz, jbyteArray configProto) {
     (void)clazz;
     JByteArrayView config(env, configProto);
-    if (llmHandle == 0L || !config.ok)
+    if (!config.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_lora_compatibility_proto(handleFromJLong(llmHandle), config.u8(),
-                                                   config.size(), &result);
+    rac_result_t rc = rac_lora_compatibility_proto(config.u8(), config.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racLoraCompatibilityProto");
 }
 

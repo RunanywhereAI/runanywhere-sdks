@@ -14,7 +14,6 @@ import 'dart:ffi';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
-import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 // =============================================================================
@@ -23,7 +22,8 @@ import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// LoRA adapter bridge for runtime operations.
 ///
-/// Uses the LLM component handle - LoRA ops are on the LLM component in C++.
+/// The lifecycle-aware C ABI resolves the active LLM component internally;
+/// callers no longer thread an LLM component handle through these calls.
 /// Matches Swift CppBridge.LLM LoRA methods.
 class DartBridgeLora {
   // MARK: - Singleton
@@ -42,8 +42,7 @@ class DartBridgeLora {
     if (fn == null) {
       throw UnsupportedError('rac_lora_apply_proto is unavailable');
     }
-    final result = DartBridgeProtoUtils.callRequestWithHandle<LoRAApplyResult>(
-      handle: DartBridgeLLM.shared.getHandle(),
+    final result = DartBridgeProtoUtils.callRequest<LoRAApplyResult>(
       request: request,
       invoke: fn,
       decode: LoRAApplyResult.fromBuffer,
@@ -59,8 +58,7 @@ class DartBridgeLora {
     if (fn == null) {
       throw UnsupportedError('rac_lora_remove_proto is unavailable');
     }
-    final result = DartBridgeProtoUtils.callRequestWithHandle<LoRAState>(
-      handle: DartBridgeLLM.shared.getHandle(),
+    final result = DartBridgeProtoUtils.callRequest<LoRAState>(
       request: request,
       invoke: fn,
       decode: LoRAState.fromBuffer,
@@ -76,8 +74,7 @@ class DartBridgeLora {
     if (fn == null) {
       throw UnsupportedError('rac_lora_list_proto is unavailable');
     }
-    return DartBridgeProtoUtils.callRequestWithHandle<LoRAState>(
-      handle: DartBridgeLLM.shared.getHandle(),
+    return DartBridgeProtoUtils.callRequest<LoRAState>(
       request: request ?? LoRAState(),
       invoke: fn,
       decode: LoRAState.fromBuffer,
@@ -91,8 +88,7 @@ class DartBridgeLora {
     if (fn == null) {
       throw UnsupportedError('rac_lora_state_proto is unavailable');
     }
-    return DartBridgeProtoUtils.callRequestWithHandle<LoRAState>(
-      handle: DartBridgeLLM.shared.getHandle(),
+    return DartBridgeProtoUtils.callRequest<LoRAState>(
       request: request ?? LoRAState(),
       invoke: fn,
       decode: LoRAState.fromBuffer,
@@ -106,8 +102,7 @@ class DartBridgeLora {
     if (fn == null) {
       throw UnsupportedError('rac_lora_compatibility_proto is unavailable');
     }
-    return DartBridgeProtoUtils.callRequestWithHandle<LoraCompatibilityResult>(
-      handle: DartBridgeLLM.shared.getHandle(),
+    return DartBridgeProtoUtils.callRequest<LoraCompatibilityResult>(
       request: config,
       invoke: fn,
       decode: LoraCompatibilityResult.fromBuffer,

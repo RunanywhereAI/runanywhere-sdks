@@ -11,15 +11,18 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <ranges>
 #include <string>
 #include <vector>
 
+#include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
@@ -63,24 +66,25 @@ struct TrackedLoRAState {
     std::vector<runanywhere::v1::LoRAAdapterInfo> adapters;
 };
 
+// Per-backend tracked LoRA state. The key is the lifecycle backend instance
+// pointer (rac::llm::LifecycleLlmRef::impl) — stable for the lifetime of a
+// loaded model and freed when the lifecycle service unloads. Reusing the same
+// map for legacy callers via `rac_lora_forget_component_state(handle)` is safe
+// because both keys are `void*` and addresses never collide while the
+// underlying object is alive.
 std::mutex& tracked_lora_mutex() {
     static std::mutex mutex;
     return mutex;
 }
 
-std::map<rac_handle_t, TrackedLoRAState>& tracked_lora_states() {
-    static std::map<rac_handle_t, TrackedLoRAState> states;
+std::map<void*, TrackedLoRAState>& tracked_lora_states() {
+    static std::map<void*, TrackedLoRAState> states;
     return states;
 }
 
-std::string current_base_model_id(rac_handle_t llm_component) {
-    const char* model_id = rac_llm_component_get_model_id(llm_component);
-    return model_id ? std::string(model_id) : std::string();
-}
-
-TrackedLoRAState& ensure_tracked_lora_state_locked(rac_handle_t llm_component,
+TrackedLoRAState& ensure_tracked_lora_state_locked(void* backend_impl,
                                                    const std::string& base_model_id) {
-    auto& state = tracked_lora_states()[llm_component];
+    auto& state = tracked_lora_states()[backend_impl];
     if (state.base_model_id != base_model_id) {
         state.base_model_id = base_model_id;
         state.adapters.clear();
@@ -88,17 +92,17 @@ TrackedLoRAState& ensure_tracked_lora_state_locked(rac_handle_t llm_component,
     return state;
 }
 
-TrackedLoRAState snapshot_tracked_lora_state(rac_handle_t llm_component,
+TrackedLoRAState snapshot_tracked_lora_state(void* backend_impl,
                                              const std::string& base_model_id) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    return ensure_tracked_lora_state_locked(llm_component, base_model_id);
+    return ensure_tracked_lora_state_locked(backend_impl, base_model_id);
 }
 
-void forget_tracked_lora_state(rac_handle_t llm_component) {
-    if (!llm_component)
+void forget_tracked_lora_state(void* backend_impl) {
+    if (!backend_impl)
         return;
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    tracked_lora_states().erase(llm_component);
+    tracked_lora_states().erase(backend_impl);
 }
 
 void populate_state_from_snapshot(const TrackedLoRAState& snapshot,
@@ -112,21 +116,21 @@ void populate_state_from_snapshot(const TrackedLoRAState& snapshot,
     state->set_has_active_adapters(!snapshot.adapters.empty());
 }
 
-void populate_tracked_state(rac_handle_t llm_component, const std::string& base_model_id,
+void populate_tracked_state(void* backend_impl, const std::string& base_model_id,
                             runanywhere::v1::LoRAState* state) {
-    populate_state_from_snapshot(snapshot_tracked_lora_state(llm_component, base_model_id), state);
+    populate_state_from_snapshot(snapshot_tracked_lora_state(backend_impl, base_model_id), state);
 }
 
-void track_lora_cleared(rac_handle_t llm_component, const std::string& base_model_id) {
+void track_lora_cleared(void* backend_impl, const std::string& base_model_id) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
+    auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     state.adapters.clear();
 }
 
-void track_lora_applied(rac_handle_t llm_component, const std::string& base_model_id,
+void track_lora_applied(void* backend_impl, const std::string& base_model_id,
                         const runanywhere::v1::LoRAAdapterInfo& info) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
+    auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     auto existing =
         std::ranges::find_if(state.adapters, [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
             return adapter.adapter_path() == info.adapter_path();
@@ -138,10 +142,10 @@ void track_lora_applied(rac_handle_t llm_component, const std::string& base_mode
     }
 }
 
-void track_lora_removed_path(rac_handle_t llm_component, const std::string& base_model_id,
+void track_lora_removed_path(void* backend_impl, const std::string& base_model_id,
                              const std::string& adapter_path) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
+    auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     state.adapters.erase(
         std::ranges::remove_if(state.adapters,
                                [&](const runanywhere::v1::LoRAAdapterInfo& adapter) {
@@ -151,7 +155,7 @@ void track_lora_removed_path(rac_handle_t llm_component, const std::string& base
         state.adapters.end());
 }
 
-rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component, const std::string& base_model_id,
+rac_result_t resolve_lora_id_to_path(void* backend_impl, const std::string& base_model_id,
                                      const std::string& adapter_id, std::string* out_path,
                                      std::string* out_error) {
     if (adapter_id.empty()) {
@@ -161,7 +165,7 @@ rac_result_t resolve_lora_id_to_path(rac_handle_t llm_component, const std::stri
     }
 
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
-    const auto& state = ensure_tracked_lora_state_locked(llm_component, base_model_id);
+    const auto& state = ensure_tracked_lora_state_locked(backend_impl, base_model_id);
     const runanywhere::v1::LoRAAdapterInfo* match = nullptr;
     for (const auto& adapter : state.adapters) {
         if (adapter.adapter_id() != adapter_id)
@@ -306,13 +310,23 @@ void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code, cons
                                                                         : rac_error_message(code));
 }
 
-bool lora_service_loaded(rac_handle_t llm_component) {
-    return (llm_component != nullptr) && rac_llm_component_is_loaded(llm_component) == RAC_TRUE;
-}
-
 const char* no_service_message() {
     return "LoRA service is not loaded; load an LLM model before calling generated LoRA service "
            "operations";
+}
+
+// Acquire the lifecycle-owned LLM backend. On the not-loaded path the caller
+// receives a typed COMPONENT_NOT_READY error so it can surface the failure on
+// the result message instead of leaking the raw lifecycle error code.
+rac_result_t acquire_lifecycle_llm_for_lora(rac::llm::LifecycleLlmRef* out_ref) {
+    const rac_result_t rc = rac::llm::acquire_lifecycle_llm(out_ref);
+    if (rc == RAC_SUCCESS) {
+        return RAC_SUCCESS;
+    }
+    if (rc == RAC_ERROR_NOT_INITIALIZED || rc == RAC_ERROR_NOT_SUPPORTED) {
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+    return rc;
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -333,6 +347,11 @@ extern "C" {
 
 void rac_lora_forget_component_state(rac_handle_t llm_component) {
 #if defined(RAC_HAVE_PROTOBUF)
+    // Legacy entry point: best-effort cleanup of tracked LoRA state keyed by
+    // the supplied handle. After the lifecycle refactor the proto ABIs key
+    // state on the lifecycle backend impl pointer, so this only fires for
+    // legacy llm_component callers whose handles still happen to match a
+    // tracked entry. Safe to call unconditionally.
     forget_tracked_lora_state(llm_component);
 #else
     (void)llm_component;
@@ -346,14 +365,12 @@ rac_result_t rac_lora_register_proto(rac_lora_registry_handle_t registry,
                                                           entry_proto_size, out_entry);
 }
 
-rac_result_t rac_lora_compatibility_proto(rac_handle_t llm_component,
-                                          const uint8_t* config_proto_bytes,
+rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
                                           size_t config_proto_size,
                                           rac_proto_buffer_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)llm_component;
     (void)config_proto_bytes;
     (void)config_proto_size;
     return feature_unavailable(out_result);
@@ -364,24 +381,60 @@ rac_result_t rac_lora_compatibility_proto(rac_handle_t llm_component,
         return rc;
 
     runanywhere::v1::LoraCompatibilityResult result;
-    char* error = nullptr;
-    rc = rac_llm_component_check_lora_compat(llm_component, config.adapter_path().c_str(), &error);
-    result.set_is_compatible(rc == RAC_SUCCESS);
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = acquire_lifecycle_llm_for_lora(&ref);
     if (rc != RAC_SUCCESS) {
-        result.set_error_message(error ? error : rac_error_message(rc));
-        result.set_error_code(static_cast<int32_t>(rc));
+        result.set_is_compatible(false);
+        result.set_error_message(no_service_message());
+        result.set_error_code(static_cast<int32_t>(RAC_ERROR_COMPONENT_NOT_READY));
+        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.compatibility", no_service_message());
+        return copy_proto(result, out_result);
     }
-    rac_free(error);
+
+    // Adapter path emptiness is already validated by parse_config above.
+    // Backend capability + GGUF header check mirror the legacy
+    // rac_llm_component_check_lora_compat helper so generated callers retain
+    // the typed errors they used to see.
+    if (!ref.ops || !ref.ops->load_lora) {
+        result.set_is_compatible(false);
+        result.set_error_message("Backend does not support LoRA adapters");
+        result.set_error_code(static_cast<int32_t>(RAC_ERROR_NOT_SUPPORTED));
+        rac::llm::release_lifecycle_llm(&ref);
+        return copy_proto(result, out_result);
+    }
+
+    {
+        std::ifstream file(config.adapter_path(), std::ios::binary);
+        if (!file.is_open()) {
+            result.set_is_compatible(false);
+            result.set_error_message("Adapter file not found");
+            result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
+            rac::llm::release_lifecycle_llm(&ref);
+            return copy_proto(result, out_result);
+        }
+        uint32_t magic = 0;
+        file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+        if (!file || magic != 0x46554747u) {  // "GGUF" in little-endian
+            result.set_is_compatible(false);
+            result.set_error_message("Adapter file is not a valid GGUF file");
+            result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
+            rac::llm::release_lifecycle_llm(&ref);
+            return copy_proto(result, out_result);
+        }
+    }
+
+    result.set_is_compatible(true);
+    rac::llm::release_lifecycle_llm(&ref);
     return copy_proto(result, out_result);
 #endif
 }
 
-rac_result_t rac_lora_apply_proto(rac_handle_t llm_component, const uint8_t* request_proto_bytes,
-                                  size_t request_proto_size, rac_proto_buffer_t* out_result) {
+rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                                  rac_proto_buffer_t* out_result) {
     if (!out_result)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)llm_component;
     (void)request_proto_bytes;
     (void)request_proto_size;
     return feature_unavailable(out_result);
@@ -395,30 +448,52 @@ rac_result_t rac_lora_apply_proto(rac_handle_t llm_component, const uint8_t* req
     runanywhere::v1::LoRAApplyResult result;
     result.set_request_id(request.request_id());
 
-    if (!lora_service_loaded(llm_component)) {
-        forget_tracked_lora_state(llm_component);
+    rac::llm::LifecycleLlmRef ref;
+    rc = acquire_lifecycle_llm_for_lora(&ref);
+    if (rc != RAC_SUCCESS) {
         mark_apply_error(&result, RAC_ERROR_COMPONENT_NOT_READY, no_service_message());
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.apply", no_service_message());
         return copy_proto(result, out_result);
     }
-    const std::string base_model_id = current_base_model_id(llm_component);
+
+    void* const backend_impl = ref.impl;
+    const std::string base_model_id = (ref.model_id != nullptr) ? ref.model_id : std::string();
 
     if (request.adapters_size() == 0) {
         mark_apply_error(&result, RAC_ERROR_INVALID_ARGUMENT,
                          "LoRAApplyRequest.adapters is required");
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.apply",
                         "LoRAApplyRequest.adapters is required");
+        rac::llm::release_lifecycle_llm(&ref);
+        return copy_proto(result, out_result);
+    }
+
+    if (!ref.ops || !ref.ops->load_lora) {
+        mark_apply_error(&result, RAC_ERROR_NOT_SUPPORTED,
+                         "Backend does not support LoRA adapters");
+        publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.apply",
+                        "Backend does not support LoRA adapters");
+        rac::llm::release_lifecycle_llm(&ref);
         return copy_proto(result, out_result);
     }
 
     if (request.replace_existing()) {
-        rc = rac_llm_component_clear_lora(llm_component);
+        if (!ref.ops->clear_lora) {
+            mark_apply_error(&result, RAC_ERROR_NOT_SUPPORTED,
+                             "Backend does not support LoRA clear");
+            publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.apply",
+                            "Backend does not support LoRA clear");
+            rac::llm::release_lifecycle_llm(&ref);
+            return copy_proto(result, out_result);
+        }
+        rc = ref.ops->clear_lora(ref.impl);
         if (rc != RAC_SUCCESS) {
             mark_apply_error(&result, rc, rac_error_message(rc));
             publish_failure(rc, "lora.apply", rac_error_message(rc));
+            rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
-        track_lora_cleared(llm_component, base_model_id);
+        track_lora_cleared(backend_impl, base_model_id);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
                            "lora.apply.replaceExisting", nullptr);
     }
@@ -432,21 +507,23 @@ rac_result_t rac_lora_apply_proto(rac_handle_t llm_component, const uint8_t* req
                              "LoRAAdapterConfig.adapter_path is required");
             publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.apply",
                             "LoRAAdapterConfig.adapter_path is required");
+            rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
 
         const float scale = config.scale() > 0.0f ? config.scale() : 1.0f;
-        rc = rac_llm_component_load_lora(llm_component, config.adapter_path().c_str(), scale);
+        rc = ref.ops->load_lora(ref.impl, config.adapter_path().c_str(), scale);
         if (rc != RAC_SUCCESS) {
             auto* info = result.add_adapters();
             *info = make_info(config, false, rac_error_message(rc), rc);
             mark_apply_error(&result, rc, rac_error_message(rc));
             publish_failure(rc, "lora.apply", rac_error_message(rc));
+            rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
 
         runanywhere::v1::LoRAAdapterInfo applied_info = make_info(config, true);
-        track_lora_applied(llm_component, base_model_id, applied_info);
+        track_lora_applied(backend_impl, base_model_id, applied_info);
         auto* info = result.add_adapters();
         *info = applied_info;
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED,
@@ -454,16 +531,16 @@ rac_result_t rac_lora_apply_proto(rac_handle_t llm_component, const uint8_t* req
     }
 
     result.set_success(true);
+    rac::llm::release_lifecycle_llm(&ref);
     return copy_proto(result, out_result);
 #endif
 }
 
-rac_result_t rac_lora_remove_proto(rac_handle_t llm_component, const uint8_t* request_proto_bytes,
-                                   size_t request_proto_size, rac_proto_buffer_t* out_state) {
+rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                                   rac_proto_buffer_t* out_state) {
     if (!out_state)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)llm_component;
     (void)request_proto_bytes;
     (void)request_proto_size;
     return feature_unavailable(out_state);
@@ -475,39 +552,56 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component, const uint8_t* re
         return rc;
 
     runanywhere::v1::LoRAState state;
-    if (!lora_service_loaded(llm_component)) {
-        forget_tracked_lora_state(llm_component);
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = acquire_lifecycle_llm_for_lora(&ref);
+    if (rc != RAC_SUCCESS) {
         mark_state_error(&state, RAC_ERROR_COMPONENT_NOT_READY, no_service_message());
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.remove", no_service_message());
         return copy_proto(state, out_state);
     }
-    const std::string base_model_id = current_base_model_id(llm_component);
+
+    void* const backend_impl = ref.impl;
+    const std::string base_model_id = (ref.model_id != nullptr) ? ref.model_id : std::string();
+
+    auto finish = [&](rac_result_t copy_rc) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return copy_rc;
+    };
 
     if (request.clear_all()) {
-        rc = rac_llm_component_clear_lora(llm_component);
+        if (!ref.ops || !ref.ops->clear_lora) {
+            populate_tracked_state(backend_impl, base_model_id, &state);
+            mark_state_error(&state, RAC_ERROR_NOT_SUPPORTED,
+                             "Backend does not support LoRA clear");
+            publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.remove",
+                            "Backend does not support LoRA clear");
+            return finish(copy_proto(state, out_state));
+        }
+        rc = ref.ops->clear_lora(ref.impl);
         if (rc != RAC_SUCCESS) {
-            populate_tracked_state(llm_component, base_model_id, &state);
+            populate_tracked_state(backend_impl, base_model_id, &state);
             mark_state_error(&state, rc, rac_error_message(rc));
             publish_failure(rc, "lora.remove", rac_error_message(rc));
-            return copy_proto(state, out_state);
+            return finish(copy_proto(state, out_state));
         }
-        track_lora_cleared(llm_component, base_model_id);
-        populate_tracked_state(llm_component, base_model_id, &state);
+        track_lora_cleared(backend_impl, base_model_id);
+        populate_tracked_state(backend_impl, base_model_id, &state);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
                            "lora.remove", nullptr);
-        return copy_proto(state, out_state);
+        return finish(copy_proto(state, out_state));
     }
 
     std::vector<std::string> paths;
     for (const auto& adapter_id : request.adapter_ids()) {
         std::string path;
         std::string error;
-        rc = resolve_lora_id_to_path(llm_component, base_model_id, adapter_id, &path, &error);
+        rc = resolve_lora_id_to_path(backend_impl, base_model_id, adapter_id, &path, &error);
         if (rc != RAC_SUCCESS) {
-            populate_tracked_state(llm_component, base_model_id, &state);
+            populate_tracked_state(backend_impl, base_model_id, &state);
             mark_state_error(&state, rc, error.c_str());
             publish_failure(rc, "lora.remove", error.c_str());
-            return copy_proto(state, out_state);
+            return finish(copy_proto(state, out_state));
         }
         add_unique_path(&paths, path);
     }
@@ -515,10 +609,10 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component, const uint8_t* re
     for (const auto& adapter_path : request.adapter_paths()) {
         if (adapter_path.empty()) {
             const char* message = "LoRARemoveRequest.adapter_paths cannot contain empty paths";
-            populate_tracked_state(llm_component, base_model_id, &state);
+            populate_tracked_state(backend_impl, base_model_id, &state);
             mark_state_error(&state, RAC_ERROR_INVALID_ARGUMENT, message);
             publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.remove", message);
-            return copy_proto(state, out_state);
+            return finish(copy_proto(state, out_state));
         }
         add_unique_path(&paths, adapter_path);
     }
@@ -526,36 +620,44 @@ rac_result_t rac_lora_remove_proto(rac_handle_t llm_component, const uint8_t* re
     if (paths.empty()) {
         const char* message =
             "LoRARemoveRequest.clear_all, adapter_ids, or adapter_paths is required";
-        populate_tracked_state(llm_component, base_model_id, &state);
+        populate_tracked_state(backend_impl, base_model_id, &state);
         mark_state_error(&state, RAC_ERROR_INVALID_ARGUMENT, message);
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "lora.remove", message);
-        return copy_proto(state, out_state);
+        return finish(copy_proto(state, out_state));
+    }
+
+    if (!ref.ops || !ref.ops->remove_lora) {
+        populate_tracked_state(backend_impl, base_model_id, &state);
+        mark_state_error(&state, RAC_ERROR_NOT_SUPPORTED,
+                         "Backend does not support LoRA remove");
+        publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.remove",
+                        "Backend does not support LoRA remove");
+        return finish(copy_proto(state, out_state));
     }
 
     for (const auto& adapter_path : paths) {
-        rc = rac_llm_component_remove_lora(llm_component, adapter_path.c_str());
+        rc = ref.ops->remove_lora(ref.impl, adapter_path.c_str());
         if (rc != RAC_SUCCESS) {
-            populate_tracked_state(llm_component, base_model_id, &state);
+            populate_tracked_state(backend_impl, base_model_id, &state);
             mark_state_error(&state, rc, rac_error_message(rc));
             publish_failure(rc, "lora.remove", rac_error_message(rc));
-            return copy_proto(state, out_state);
+            return finish(copy_proto(state, out_state));
         }
-        track_lora_removed_path(llm_component, base_model_id, adapter_path);
+        track_lora_removed_path(backend_impl, base_model_id, adapter_path);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED,
                            "lora.remove", nullptr);
     }
 
-    populate_tracked_state(llm_component, base_model_id, &state);
-    return copy_proto(state, out_state);
+    populate_tracked_state(backend_impl, base_model_id, &state);
+    return finish(copy_proto(state, out_state));
 #endif
 }
 
-rac_result_t rac_lora_list_proto(rac_handle_t llm_component, const uint8_t* state_proto_bytes,
-                                 size_t state_proto_size, rac_proto_buffer_t* out_state) {
+rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes, size_t state_proto_size,
+                                 rac_proto_buffer_t* out_state) {
     if (!out_state)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)llm_component;
     (void)state_proto_bytes;
     (void)state_proto_size;
     return feature_unavailable(out_state);
@@ -568,24 +670,26 @@ rac_result_t rac_lora_list_proto(rac_handle_t llm_component, const uint8_t* stat
     (void)request;
 
     runanywhere::v1::LoRAState state;
-    if (!lora_service_loaded(llm_component)) {
-        forget_tracked_lora_state(llm_component);
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = acquire_lifecycle_llm_for_lora(&ref);
+    if (rc != RAC_SUCCESS) {
         mark_state_error(&state, RAC_ERROR_COMPONENT_NOT_READY, no_service_message());
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.list", no_service_message());
         return copy_proto(state, out_state);
     }
-    const std::string base_model_id = current_base_model_id(llm_component);
-    populate_tracked_state(llm_component, base_model_id, &state);
+    const std::string base_model_id = (ref.model_id != nullptr) ? ref.model_id : std::string();
+    populate_tracked_state(ref.impl, base_model_id, &state);
+    rac::llm::release_lifecycle_llm(&ref);
     return copy_proto(state, out_state);
 #endif
 }
 
-rac_result_t rac_lora_state_proto(rac_handle_t llm_component, const uint8_t* state_proto_bytes,
-                                  size_t state_proto_size, rac_proto_buffer_t* out_state) {
+rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes, size_t state_proto_size,
+                                  rac_proto_buffer_t* out_state) {
     if (!out_state)
         return RAC_ERROR_NULL_POINTER;
 #if !defined(RAC_HAVE_PROTOBUF)
-    (void)llm_component;
     (void)state_proto_bytes;
     (void)state_proto_size;
     return feature_unavailable(out_state);
@@ -599,14 +703,17 @@ rac_result_t rac_lora_state_proto(rac_handle_t llm_component, const uint8_t* sta
     (void)request;
 
     runanywhere::v1::LoRAState state;
-    if (!lora_service_loaded(llm_component)) {
-        forget_tracked_lora_state(llm_component);
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = acquire_lifecycle_llm_for_lora(&ref);
+    if (rc != RAC_SUCCESS) {
         mark_state_error(&state, RAC_ERROR_COMPONENT_NOT_READY, no_service_message());
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.state", no_service_message());
         return copy_proto(state, out_state);
     }
-    const std::string base_model_id = current_base_model_id(llm_component);
-    populate_tracked_state(llm_component, base_model_id, &state);
+    const std::string base_model_id = (ref.model_id != nullptr) ? ref.model_id : std::string();
+    populate_tracked_state(ref.impl, base_model_id, &state);
+    rac::llm::release_lifecycle_llm(&ref);
     return copy_proto(state, out_state);
 #endif
 }

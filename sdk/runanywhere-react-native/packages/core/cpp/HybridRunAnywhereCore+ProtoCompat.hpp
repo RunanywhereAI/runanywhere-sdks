@@ -338,7 +338,6 @@ using EmbeddingsDestroyFn = void (*)(
     rac_handle_t);
 
 using LoRARequestProtoFn = rac_result_t (*)(
-    rac_handle_t,
     const uint8_t*,
     size_t,
     rac_proto_buffer_t*);

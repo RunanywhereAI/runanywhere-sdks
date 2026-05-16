@@ -229,36 +229,11 @@ private enum RAGFreeFunctionsGeneratedProtoABI {
 }
 
 private enum LoRAGeneratedProtoABI {
-    typealias ApplyLoraAdaptersFn = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias RemoveLoraAdaptersFn = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias ListLoraAdaptersFn = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias GetLoraStateFn = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias CheckLoraCompatibilityFn = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
+    typealias ApplyLoraAdaptersFn = NativeProtoABI.ProtoRequest
+    typealias RemoveLoraAdaptersFn = NativeProtoABI.ProtoRequest
+    typealias ListLoraAdaptersFn = NativeProtoABI.ProtoRequest
+    typealias GetLoraStateFn = NativeProtoABI.ProtoRequest
+    typealias CheckLoraCompatibilityFn = NativeProtoABI.ProtoRequest
 
     static let applyLoraAdaptersName = "rac_lora_apply_proto"
     static let removeLoraAdaptersName = "rac_lora_remove_proto"
@@ -726,50 +701,45 @@ func resolveRAGConfigurationDefaults(_ request: RARAGConfiguration) -> RARAGConf
 // MARK: - LoRA
 
 extension CppBridge.LLM {
-    public func applyLoraAdapters(handle: rac_handle_t, _ request: RALoRAApplyRequest) throws -> RALoRAApplyResult {
+    public func applyLoraAdapters(_ request: RALoRAApplyRequest) throws -> RALoRAApplyResult {
         return try NativeProtoABI.invoke(
             request,
-            on: handle,
             symbol: LoRAGeneratedProtoABI.applyLoraAdapters,
             symbolName: LoRAGeneratedProtoABI.applyLoraAdaptersName,
             responseType: RALoRAApplyResult.self
         )
     }
 
-    public func removeLoraAdapters(handle: rac_handle_t, _ request: RALoRARemoveRequest) throws -> RALoRAState {
+    public func removeLoraAdapters(_ request: RALoRARemoveRequest) throws -> RALoRAState {
         return try NativeProtoABI.invoke(
             request,
-            on: handle,
             symbol: LoRAGeneratedProtoABI.removeLoraAdapters,
             symbolName: LoRAGeneratedProtoABI.removeLoraAdaptersName,
             responseType: RALoRAState.self
         )
     }
 
-    public func listLoraAdapters(handle: rac_handle_t, _ request: RALoRAState) throws -> RALoRAState {
+    public func listLoraAdapters(_ request: RALoRAState) throws -> RALoRAState {
         return try NativeProtoABI.invoke(
             request,
-            on: handle,
             symbol: LoRAGeneratedProtoABI.listLoraAdapters,
             symbolName: LoRAGeneratedProtoABI.listLoraAdaptersName,
             responseType: RALoRAState.self
         )
     }
 
-    public func getLoraState(handle: rac_handle_t, _ request: RALoRAState) throws -> RALoRAState {
+    public func getLoraState(_ request: RALoRAState) throws -> RALoRAState {
         return try NativeProtoABI.invoke(
             request,
-            on: handle,
             symbol: LoRAGeneratedProtoABI.getLoraState,
             symbolName: LoRAGeneratedProtoABI.getLoraStateName,
             responseType: RALoRAState.self
         )
     }
 
-    public func checkLoraCompatibility(handle: rac_handle_t, _ request: RALoRAAdapterConfig) throws -> RALoraCompatibilityResult {
+    public func checkLoraCompatibility(_ request: RALoRAAdapterConfig) throws -> RALoraCompatibilityResult {
         return try NativeProtoABI.invoke(
             request,
-            on: handle,
             symbol: LoRAGeneratedProtoABI.checkLoraCompatibility,
             symbolName: LoRAGeneratedProtoABI.checkLoraCompatibilityName,
             responseType: RALoraCompatibilityResult.self

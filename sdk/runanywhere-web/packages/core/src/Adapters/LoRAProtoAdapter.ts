@@ -204,10 +204,7 @@ export class LoRAProtoAdapter {
     );
   }
 
-  compatibility(
-    llmComponent: number,
-    config: ProtoLoRAAdapterConfig,
-  ): ProtoLoraCompatibilityResult | null {
+  compatibility(config: ProtoLoRAAdapterConfig): ProtoLoraCompatibilityResult | null {
     if (!ensureExports(this.module, 'lora.compatibility', [
       '_rac_lora_compatibility_proto',
     ])) {
@@ -218,64 +215,59 @@ export class LoRAProtoAdapter {
       LoRAAdapterConfig,
       LoraCompatibilityResult,
       (configPtr, configSize, outResult) => (
-        this.module._rac_lora_compatibility_proto!(
-          llmComponent,
-          configPtr,
-          configSize,
-          outResult,
-        )
+        this.module._rac_lora_compatibility_proto!(configPtr, configSize, outResult)
       ),
       'rac_lora_compatibility_proto',
     );
   }
 
-  apply(llmComponent: number, request: ProtoLoRAApplyRequest): ProtoLoRAApplyResult | null {
+  apply(request: ProtoLoRAApplyRequest): ProtoLoRAApplyResult | null {
     if (!ensureExports(this.module, 'lora.apply', ['_rac_lora_apply_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
       LoRAApplyRequest,
       LoRAApplyResult,
       (requestPtr, requestSize, outResult) => (
-        this.module._rac_lora_apply_proto!(llmComponent, requestPtr, requestSize, outResult)
+        this.module._rac_lora_apply_proto!(requestPtr, requestSize, outResult)
       ),
       'rac_lora_apply_proto',
     );
   }
 
-  remove(llmComponent: number, request: ProtoLoRARemoveRequest): ProtoLoRAState | null {
+  remove(request: ProtoLoRARemoveRequest): ProtoLoRAState | null {
     if (!ensureExports(this.module, 'lora.remove', ['_rac_lora_remove_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
       LoRARemoveRequest,
       LoRAState,
       (requestPtr, requestSize, outState) => (
-        this.module._rac_lora_remove_proto!(llmComponent, requestPtr, requestSize, outState)
+        this.module._rac_lora_remove_proto!(requestPtr, requestSize, outState)
       ),
       'rac_lora_remove_proto',
     );
   }
 
-  list(llmComponent: number, request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
+  list(request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
     if (!ensureExports(this.module, 'lora.list', ['_rac_lora_list_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
       LoRAState,
       LoRAState,
       (requestPtr, requestSize, outState) => (
-        this.module._rac_lora_list_proto!(llmComponent, requestPtr, requestSize, outState)
+        this.module._rac_lora_list_proto!(requestPtr, requestSize, outState)
       ),
       'rac_lora_list_proto',
     );
   }
 
-  state(llmComponent: number, request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
+  state(request: ProtoLoRAState = emptyLoRAState()): ProtoLoRAState | null {
     if (!ensureExports(this.module, 'lora.state', ['_rac_lora_state_proto'])) return null;
     return this.bridge().withEncodedRequest(
       request,
       LoRAState,
       LoRAState,
       (requestPtr, requestSize, outState) => (
-        this.module._rac_lora_state_proto!(llmComponent, requestPtr, requestSize, outState)
+        this.module._rac_lora_state_proto!(requestPtr, requestSize, outState)
       ),
       'rac_lora_state_proto',
     );

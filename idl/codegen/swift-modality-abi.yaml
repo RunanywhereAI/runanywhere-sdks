@@ -461,21 +461,18 @@ modalities:
         request: RALoRAApplyRequest
         response: RALoRAApplyResult
         kind: invoke
-        context: rac_handle_t
 
       - swift_name: removeLoraAdapters
         c_symbol: rac_lora_remove_proto
         request: RALoRARemoveRequest
         response: RALoRAState
         kind: invoke
-        context: rac_handle_t
 
       - swift_name: listLoraAdapters
         c_symbol: rac_lora_list_proto
         request: RALoRAState
         response: RALoRAState
         kind: invoke
-        context: rac_handle_t
         # Sentinel/empty request: facade passes RALoRAState() because the C
         # ABI uses the LLMRequest shape but ignores the body.
 
@@ -484,7 +481,6 @@ modalities:
         request: RALoRAState
         response: RALoRAState
         kind: invoke
-        context: rac_handle_t
         # Sentinel/empty request -- see listLoraAdapters.
 
       - swift_name: checkLoraCompatibility
@@ -492,7 +488,6 @@ modalities:
         request: RALoRAAdapterConfig
         response: RALoraCompatibilityResult
         kind: invoke
-        context: rac_handle_t
 
   # --------------------------------------------------------------------------
   # LoraRegistry  (CppBridge.LoraRegistry, threads rac_lora_registry_handle_t)

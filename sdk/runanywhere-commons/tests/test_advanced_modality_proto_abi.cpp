@@ -13,6 +13,7 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -30,6 +31,7 @@
 #include "diffusion_options.pb.h"
 #include "embeddings_options.pb.h"
 #include "lora_options.pb.h"
+#include "model_types.pb.h"
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
 #include "vlm_options.pb.h"
@@ -733,13 +735,79 @@ int test_rag_missing_embedding_model_id_fails() {
     return 0;
 }
 
+// Adapter file with valid GGUF magic so the lifecycle-aware
+// rac_lora_compatibility_proto + rac_lora_apply_proto headers see a
+// well-formed adapter on disk.
+void write_gguf_adapter(const std::filesystem::path& path) {
+    std::ofstream out(path, std::ios::binary);
+    const uint32_t magic = 0x46554747u;  // "GGUF" little-endian
+    out.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
+    const char tail[] = "adapter";
+    out.write(tail, sizeof(tail) - 1);
+}
+
+// MF-1: lifecycle-aware LoRA service ABI test. Replaces the legacy
+// rac_llm_component-based plumbing with the model-lifecycle registry +
+// rac_model_lifecycle_load_proto so the proto ABI is exercised exactly the
+// way the v2 SDK bridges call it.
+const uint32_t g_lora_advanced_formats[] = {
+    static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+
+runanywhere::v1::ModelInfo build_lora_test_model(const std::string& id, const std::string& name) {
+    runanywhere::v1::ModelInfo model;
+    model.set_id(id);
+    model.set_name(name);
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    model.set_local_path("/tmp/" + id + ".gguf");
+    model.set_is_downloaded(true);
+    model.set_is_available(true);
+    return model;
+}
+
+bool register_lora_test_model(rac_model_registry_handle_t registry,
+                              const runanywhere::v1::ModelInfo& model) {
+    std::vector<uint8_t> bytes;
+    if (!serialize(model, &bytes))
+        return false;
+    return rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
+                                             bytes.size()) == RAC_SUCCESS;
+}
+
+bool lifecycle_load_lora_model(rac_model_registry_handle_t registry, const std::string& model_id) {
+    runanywhere::v1::ModelLoadRequest request;
+    request.set_model_id(model_id);
+    std::vector<uint8_t> bytes;
+    if (!serialize(request, &bytes))
+        return false;
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult result;
+    const bool ok = rc == RAC_SUCCESS &&
+                    out.status == RAC_SUCCESS &&
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) &&
+                    result.success();
+    rac_proto_buffer_free(&out);
+    return ok;
+}
+
+void lora_test_environment_reset() {
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+    (void)rac_plugin_unregister("llamacpp");
+}
+
 int test_lora_register_compat_apply_remove_clear() {
     auto root = temp_root("lora");
     auto adapter_path = root / "adapter.gguf";
-    write_file(adapter_path, "GGUFadapter");
+    write_gguf_adapter(adapter_path);
 
-    rac_lora_registry_handle_t registry = nullptr;
-    CHECK(rac_lora_registry_create(&registry) == RAC_SUCCESS && registry != nullptr,
+    rac_lora_registry_handle_t lora_registry = nullptr;
+    CHECK(rac_lora_registry_create(&lora_registry) == RAC_SUCCESS && lora_registry != nullptr,
           "LoRA registry creates");
     runanywhere::v1::LoraAdapterCatalogEntry entry;
     entry.set_id("style.adapter");
@@ -751,25 +819,29 @@ int test_lora_register_compat_apply_remove_clear() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc =
-        rac_lora_register_proto(registry, entry_bytes.data(), entry_bytes.size(), &out);
+        rac_lora_register_proto(lora_registry, entry_bytes.data(), entry_bytes.size(), &out);
     runanywhere::v1::LoraAdapterCatalogEntry registered;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &registered),
           "LoRA register returns catalog entry");
     CHECK(registered.id() == "style.adapter", "LoRA register preserves id");
     rac_proto_buffer_free(&out);
-    rac_lora_registry_destroy(registry);
+    rac_lora_registry_destroy(lora_registry);
 
+    rac_model_registry_handle_t model_registry = nullptr;
+    CHECK(rac_model_registry_create(&model_registry) == RAC_SUCCESS && model_registry != nullptr,
+          "LoRA test model registry creates");
+
+    lora_test_environment_reset();
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t llamacpp = make_vtable("llamacpp", &llm_ops, nullptr, nullptr);
-    (void)rac_plugin_unregister("llamacpp");
+    llamacpp.metadata.formats = g_lora_advanced_formats;
+    llamacpp.metadata.formats_count =
+        sizeof(g_lora_advanced_formats) / sizeof(g_lora_advanced_formats[0]);
     CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "LoRA-capable plugin registers");
-
-    rac_handle_t component = nullptr;
-    CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
-          "LLM component creates for LoRA");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
-              RAC_SUCCESS,
-          "LLM component loads mocked model");
+    CHECK(register_lora_test_model(model_registry, build_lora_test_model("mock-llm", "Mock LLM")),
+          "mock-llm registers in model registry");
+    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"),
+          "lifecycle loads mock LLM model");
 
     runanywhere::v1::LoRAAdapterConfig config;
     config.set_adapter_path(adapter_path.string());
@@ -779,7 +851,7 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(serialize(config, &config_bytes), "LoRAAdapterConfig serializes");
 
     rac_proto_buffer_init(&out);
-    rc = rac_lora_compatibility_proto(component, config_bytes.data(), config_bytes.size(), &out);
+    rc = rac_lora_compatibility_proto(config_bytes.data(), config_bytes.size(), &out);
     runanywhere::v1::LoraCompatibilityResult compat;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &compat), "LoRA compatibility returns result");
     CHECK(compat.is_compatible(), "LoRA compatibility succeeds for capable backend");
@@ -791,7 +863,7 @@ int test_lora_register_compat_apply_remove_clear() {
     std::vector<uint8_t> apply_bytes;
     CHECK(serialize(apply, &apply_bytes), "LoRAApplyRequest serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "LoRA apply returns generated result");
@@ -808,35 +880,35 @@ int test_lora_register_compat_apply_remove_clear() {
     std::vector<uint8_t> clear_bytes;
     CHECK(serialize(clear, &clear_bytes), "LoRARemoveRequest clear serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(component, clear_bytes.data(), clear_bytes.size(), &out);
+    rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
     runanywhere::v1::LoRAState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "LoRA remove clear_all returns generated state");
     CHECK(!state.has_active_adapters() && state.loaded_adapters_size() == 0,
           "LoRA remove clear_all returns empty state");
     rac_proto_buffer_free(&out);
-    rac_llm_component_destroy(component);
-    (void)rac_plugin_unregister("llamacpp");
+
+    lora_test_environment_reset();
 
     rac_llm_service_ops_t no_lora_ops = make_llm_ops(/*supports_lora=*/false);
     rac_engine_vtable_t no_lora = make_vtable("llamacpp", &no_lora_ops, nullptr, nullptr);
+    no_lora.metadata.formats = g_lora_advanced_formats;
+    no_lora.metadata.formats_count =
+        sizeof(g_lora_advanced_formats) / sizeof(g_lora_advanced_formats[0]);
     CHECK(rac_plugin_register(&no_lora) == RAC_SUCCESS, "non-LoRA plugin registers");
-    component = nullptr;
-    CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
-          "LLM component creates for unsupported LoRA check");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
-              RAC_SUCCESS,
-          "LLM component loads non-LoRA model");
+    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"),
+          "lifecycle reloads mock LLM with non-LoRA backend");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_compatibility_proto(component, config_bytes.data(), config_bytes.size(), &out);
+    rc = rac_lora_compatibility_proto(config_bytes.data(), config_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &compat),
           "unsupported LoRA compatibility still returns generated result");
     CHECK(!compat.is_compatible() &&
               compat.error_message().find("Backend does not support") != std::string::npos,
           "unsupported LoRA reports typed incompatibility");
     rac_proto_buffer_free(&out);
-    rac_llm_component_destroy(component);
-    (void)rac_plugin_unregister("llamacpp");
+
+    lora_test_environment_reset();
+    rac_model_registry_destroy(model_registry);
     return 0;
 }
 

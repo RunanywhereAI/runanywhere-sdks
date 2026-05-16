@@ -9,16 +9,19 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "lora_options.pb.h"
+#include "model_types.pb.h"
 
 #include <algorithm>
 #include <google/protobuf/descriptor.h>
 #include <ranges>
 
 #include "rac/core/rac_error.h"
-#include "rac/features/llm/rac_llm_component.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #endif
 
@@ -136,6 +139,11 @@ rac_llm_service_ops_t make_llm_ops(bool supports_lora) {
     return ops;
 }
 
+// GGUF metadata format markers — lifecycle routing inspects the registered
+// ModelInfo.format to pick a compatible plugin, so every dummy vtable that
+// participates in a lifecycle load must advertise the GGUF format.
+const uint32_t g_lora_test_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+
 rac_engine_vtable_t make_vtable(const char* name, const rac_llm_service_ops_t* llm_ops) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
@@ -143,8 +151,61 @@ rac_engine_vtable_t make_vtable(const char* name, const rac_llm_service_ops_t* l
     v.metadata.display_name = name;
     v.metadata.engine_version = "0.0.0";
     v.metadata.priority = 10000;
+    v.metadata.formats = g_lora_test_formats;
+    v.metadata.formats_count =
+        sizeof(g_lora_test_formats) / sizeof(g_lora_test_formats[0]);
     v.llm_ops = llm_ops;
     return v;
+}
+
+runanywhere::v1::ModelInfo build_lora_test_model(const std::string& id, const std::string& name) {
+    runanywhere::v1::ModelInfo model;
+    model.set_id(id);
+    model.set_name(name);
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    model.set_local_path("/tmp/" + id + ".gguf");
+    model.set_is_downloaded(true);
+    model.set_is_available(true);
+    return model;
+}
+
+bool register_lora_test_model(rac_model_registry_handle_t registry,
+                              const runanywhere::v1::ModelInfo& model) {
+    std::vector<uint8_t> bytes;
+    bytes.resize(model.ByteSizeLong());
+    if (!bytes.empty() && !model.SerializeToArray(bytes.data(), static_cast<int>(bytes.size())))
+        return false;
+    return rac_model_registry_register_proto(registry, bytes.empty() ? nullptr : bytes.data(),
+                                             bytes.size()) == RAC_SUCCESS;
+}
+
+bool load_lora_test_model(rac_model_registry_handle_t registry, const std::string& model_id) {
+    runanywhere::v1::ModelLoadRequest request;
+    request.set_model_id(model_id);
+    std::vector<uint8_t> bytes;
+    bytes.resize(request.ByteSizeLong());
+    if (!bytes.empty() && !request.SerializeToArray(bytes.data(), static_cast<int>(bytes.size())))
+        return false;
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult result;
+    const bool ok = rc == RAC_SUCCESS &&
+                    out.status == RAC_SUCCESS &&
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) &&
+                    result.success();
+    rac_proto_buffer_free(&out);
+    return ok;
+}
+
+void lora_test_environment_reset() {
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+    (void)rac_plugin_unregister("llamacpp");
 }
 
 void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const char* method_name,
@@ -501,9 +562,7 @@ int test_generated_lora_catalog_negative_errors() {
 }
 
 int test_generated_lora_apply_no_service_typed_error() {
-    rac_handle_t component = nullptr;
-    CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
-          "LLM component creates for no-service LoRA test");
+    lora_test_environment_reset();
 
     runanywhere::v1::LoRAApplyRequest request;
     request.set_request_id("apply-no-service");
@@ -517,7 +576,7 @@ int test_generated_lora_apply_no_service_typed_error() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    const rac_result_t rc = rac_lora_apply_proto(component, bytes.data(), bytes.size(), &out);
+    const rac_result_t rc = rac_lora_apply_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "LoRA apply no-service returns typed result");
@@ -528,22 +587,19 @@ int test_generated_lora_apply_no_service_typed_error() {
     CHECK(result.error_message().find("LoRA service is not loaded") != std::string::npos,
           "LoRA apply no-service explains missing service");
     rac_proto_buffer_free(&out);
-    rac_llm_component_destroy(component);
     return 0;
 }
 
-int test_generated_lora_apply_list_state_remove_and_clear() {
+int test_generated_lora_apply_list_state_remove_and_clear(rac_model_registry_handle_t registry) {
+    lora_test_environment_reset();
+
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
-    (void)rac_plugin_unregister("llamacpp");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA service test plugin registers");
-
-    rac_handle_t component = nullptr;
-    CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
-          "LLM component creates for generated LoRA apply");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
-              RAC_SUCCESS,
-          "LLM component loads mock model for generated LoRA apply");
+    CHECK(register_lora_test_model(registry, build_lora_test_model("mock-llm", "Mock LLM")),
+          "mock-llm registers for generated LoRA apply");
+    CHECK(load_lora_test_model(registry, "mock-llm"),
+          "lifecycle loads mock model for generated LoRA apply");
 
     runanywhere::v1::LoRAApplyRequest apply;
     apply.set_request_id("apply-generated");
@@ -561,7 +617,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "generated LoRA apply returns LoRAApplyResult");
@@ -576,7 +632,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     std::vector<uint8_t> state_bytes;
     CHECK(serialize(state_request, &state_bytes), "generated LoRA state request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_list_proto(component, state_bytes.data(), state_bytes.size(), &out);
+    rc = rac_lora_list_proto(state_bytes.data(), state_bytes.size(), &out);
     runanywhere::v1::LoRAState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA list returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA list has no error");
@@ -590,7 +646,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
-    rc = rac_lora_state_proto(component, state_bytes.data(), state_bytes.size(), &out);
+    rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA state returns LoRAState");
     CHECK(state.has_active_adapters() && state.loaded_adapters_size() == 2,
           "generated LoRA state mirrors tracked adapters");
@@ -603,7 +659,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     CHECK(serialize(remove_one, &remove_one_bytes),
           "generated LoRA remove-by-id request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(component, remove_one_bytes.data(), remove_one_bytes.size(), &out);
+    rc = rac_lora_remove_proto(remove_one_bytes.data(), remove_one_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "generated LoRA remove-by-id returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA remove-by-id has no error");
@@ -622,7 +678,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     CHECK(serialize(remove_path, &remove_path_bytes),
           "generated LoRA remove-by-path request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(component, remove_path_bytes.data(), remove_path_bytes.size(), &out);
+    rc = rac_lora_remove_proto(remove_path_bytes.data(), remove_path_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "generated LoRA remove-by-path returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA remove-by-path has no error");
@@ -632,7 +688,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
 
     CHECK(serialize(apply, &apply_bytes), "generated LoRA reapply request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "generated LoRA reapply returns LoRAApplyResult");
     CHECK(apply_result.success(), "generated LoRA reapply succeeds");
@@ -644,7 +700,7 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     std::vector<uint8_t> remove_bytes;
     CHECK(serialize(remove, &remove_bytes), "generated LoRA clear request serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(component, remove_bytes.data(), remove_bytes.size(), &out);
+    rc = rac_lora_remove_proto(remove_bytes.data(), remove_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "generated LoRA clear returns LoRAState");
     CHECK(state.error_code() == RAC_SUCCESS, "generated LoRA clear has no error");
     CHECK(!state.has_active_adapters() && state.loaded_adapters_size() == 0,
@@ -652,23 +708,20 @@ int test_generated_lora_apply_list_state_remove_and_clear() {
     CHECK(state.base_model_id() == "mock-llm", "generated LoRA clear keeps base model id");
     rac_proto_buffer_free(&out);
 
-    rac_llm_component_destroy(component);
-    (void)rac_plugin_unregister("llamacpp");
+    lora_test_environment_reset();
     return 0;
 }
 
-int test_generated_lora_remove_unknown_id_is_typed_error() {
+int test_generated_lora_remove_unknown_id_is_typed_error(rac_model_registry_handle_t registry) {
+    lora_test_environment_reset();
+
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
-    (void)rac_plugin_unregister("llamacpp");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA unknown-id plugin registers");
-
-    rac_handle_t component = nullptr;
-    CHECK(rac_llm_component_create(&component) == RAC_SUCCESS && component != nullptr,
-          "LLM component creates for generated LoRA unknown-id test");
-    CHECK(rac_llm_component_load_model(component, "/tmp/mock-llm.gguf", "mock-llm", "Mock LLM") ==
-              RAC_SUCCESS,
-          "LLM component loads mock model for generated LoRA unknown-id test");
+    CHECK(register_lora_test_model(registry, build_lora_test_model("mock-llm", "Mock LLM")),
+          "mock-llm registers for generated LoRA unknown-id test");
+    CHECK(load_lora_test_model(registry, "mock-llm"),
+          "lifecycle loads mock model for generated LoRA unknown-id test");
 
     runanywhere::v1::LoRAApplyRequest apply;
     apply.set_request_id("apply-before-unknown-id");
@@ -681,7 +734,7 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "LoRA apply-before-unknown-id returns result");
@@ -694,7 +747,7 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
     CHECK(serialize(remove_by_id, &remove_bytes), "LoRA remove unknown-id request serializes");
 
     rac_proto_buffer_init(&out);
-    rc = rac_lora_remove_proto(component, remove_bytes.data(), remove_bytes.size(), &out);
+    rc = rac_lora_remove_proto(remove_bytes.data(), remove_bytes.size(), &out);
     runanywhere::v1::LoRAState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "LoRA remove unknown-id returns typed state error");
@@ -708,29 +761,28 @@ int test_generated_lora_remove_unknown_id_is_typed_error() {
           "LoRA remove unknown-id keeps existing adapter");
     rac_proto_buffer_free(&out);
 
-    rac_llm_component_destroy(component);
-    (void)rac_plugin_unregister("llamacpp");
+    lora_test_environment_reset();
     return 0;
 }
 
-int test_generated_lora_state_is_scoped_per_component() {
+// Verifies that tracked LoRA state is keyed on the lifecycle backend instance
+// and resets when the lifecycle service unloads/reloads a model. With the
+// lifecycle service owning a single LLM at a time, "scoped per component"
+// becomes "scoped per loaded model" — loading a different model after unload
+// must NOT inherit adapters from the previous load.
+int test_generated_lora_state_is_scoped_per_lifecycle_load(rac_model_registry_handle_t registry) {
+    lora_test_environment_reset();
+
     rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
     rac_engine_vtable_t vtable = make_vtable("llamacpp", &llm_ops);
-    (void)rac_plugin_unregister("llamacpp");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "LoRA scoped-state plugin registers");
+    CHECK(register_lora_test_model(registry, build_lora_test_model("model-a", "Model A")),
+          "model-a registers for scoped LoRA state");
+    CHECK(register_lora_test_model(registry, build_lora_test_model("model-b", "Model B")),
+          "model-b registers for scoped LoRA state");
 
-    rac_handle_t first = nullptr;
-    rac_handle_t second = nullptr;
-    CHECK(rac_llm_component_create(&first) == RAC_SUCCESS && first != nullptr,
-          "first LLM component creates for scoped LoRA state");
-    CHECK(rac_llm_component_create(&second) == RAC_SUCCESS && second != nullptr,
-          "second LLM component creates for scoped LoRA state");
-    CHECK(rac_llm_component_load_model(first, "/tmp/model-a.gguf", "model-a", "Model A") ==
-              RAC_SUCCESS,
-          "first LLM component loads model for scoped LoRA state");
-    CHECK(rac_llm_component_load_model(second, "/tmp/model-b.gguf", "model-b", "Model B") ==
-              RAC_SUCCESS,
-          "second LLM component loads model for scoped LoRA state");
+    CHECK(load_lora_test_model(registry, "model-a"),
+          "lifecycle loads model-a for scoped LoRA state");
 
     runanywhere::v1::LoRAApplyRequest apply_first;
     apply_first.set_request_id("apply-first");
@@ -744,12 +796,33 @@ int test_generated_lora_state_is_scoped_per_component() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc =
-        rac_lora_apply_proto(first, first_apply_bytes.data(), first_apply_bytes.size(), &out);
+        rac_lora_apply_proto(first_apply_bytes.data(), first_apply_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "first scoped LoRA apply returns result");
     CHECK(apply_result.success(), "first scoped LoRA apply succeeds");
     rac_proto_buffer_free(&out);
+
+    runanywhere::v1::LoRAState state_request;
+    std::vector<uint8_t> state_bytes;
+    CHECK(serialize(state_request, &state_bytes), "scoped LoRA state request serializes");
+
+    runanywhere::v1::LoRAState state;
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
+          "model-a scoped LoRA state returns state");
+    CHECK(state.base_model_id() == "model-a", "model-a scoped LoRA state keeps model id");
+    CHECK(state.loaded_adapters_size() == 1 && state_has_adapter(state, "first", "/tmp/first.gguf"),
+          "model-a scoped LoRA state sees only first adapter");
+    rac_proto_buffer_free(&out);
+
+    // Unload model-a and load model-b. Tracked state for model-a must NOT
+    // leak into model-b because the backend impl pointer is a different
+    // allocation and the base model id has changed.
+    rac_model_lifecycle_reset();
+    CHECK(load_lora_test_model(registry, "model-b"),
+          "lifecycle loads model-b for scoped LoRA state");
 
     runanywhere::v1::LoRAApplyRequest apply_second;
     apply_second.set_request_id("apply-second");
@@ -762,37 +835,25 @@ int test_generated_lora_state_is_scoped_per_component() {
           "second scoped LoRA apply request serializes");
 
     rac_proto_buffer_init(&out);
-    rc = rac_lora_apply_proto(second, second_apply_bytes.data(), second_apply_bytes.size(), &out);
+    rc = rac_lora_apply_proto(second_apply_bytes.data(), second_apply_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "second scoped LoRA apply returns result");
     CHECK(apply_result.success(), "second scoped LoRA apply succeeds");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::LoRAState state_request;
-    std::vector<uint8_t> state_bytes;
-    CHECK(serialize(state_request, &state_bytes), "scoped LoRA state request serializes");
-
-    runanywhere::v1::LoRAState state;
     rac_proto_buffer_init(&out);
-    rc = rac_lora_state_proto(first, state_bytes.data(), state_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "first scoped LoRA state returns state");
-    CHECK(state.base_model_id() == "model-a", "first scoped LoRA state keeps model id");
-    CHECK(state.loaded_adapters_size() == 1 && state_has_adapter(state, "first", "/tmp/first.gguf"),
-          "first scoped LoRA state sees only first adapter");
-    rac_proto_buffer_free(&out);
-
-    rac_proto_buffer_init(&out);
-    rc = rac_lora_state_proto(second, state_bytes.data(), state_bytes.size(), &out);
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state), "second scoped LoRA state returns state");
-    CHECK(state.base_model_id() == "model-b", "second scoped LoRA state keeps model id");
+    rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
+          "model-b scoped LoRA state returns state");
+    CHECK(state.base_model_id() == "model-b", "model-b scoped LoRA state keeps model id");
     CHECK(state.loaded_adapters_size() == 1 &&
               state_has_adapter(state, "second", "/tmp/second.gguf"),
-          "second scoped LoRA state sees only second adapter");
+          "model-b scoped LoRA state sees only second adapter");
+    CHECK(!state_has_adapter(state, "first", "/tmp/first.gguf"),
+          "model-b scoped LoRA state does not inherit model-a adapter");
     rac_proto_buffer_free(&out);
 
-    rac_llm_component_destroy(first);
-    rac_llm_component_destroy(second);
-    (void)rac_plugin_unregister("llamacpp");
+    lora_test_environment_reset();
     return 0;
 }
 
@@ -806,21 +867,34 @@ int main() {
     std::fprintf(stdout, "  skip: LoRA service proto ABI tests (no protobuf)\n");
     return 0;
 #else
+    rac_model_registry_handle_t registry = nullptr;
+    if (rac_model_registry_create(&registry) != RAC_SUCCESS || registry == nullptr) {
+        std::fprintf(stderr, "  FATAL: failed to create model registry\n");
+        return 1;
+    }
+
     try {
         test_lora_generated_service_contract();
         test_generated_lora_catalog_register_list_query_get_and_completion();
         test_generated_lora_catalog_negative_errors();
         test_generated_lora_apply_no_service_typed_error();
-        test_generated_lora_apply_list_state_remove_and_clear();
-        test_generated_lora_remove_unknown_id_is_typed_error();
-        test_generated_lora_state_is_scoped_per_component();
+        test_generated_lora_apply_list_state_remove_and_clear(registry);
+        test_generated_lora_remove_unknown_id_is_typed_error(registry);
+        test_generated_lora_state_is_scoped_per_lifecycle_load(registry);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "  FATAL: uncaught exception: %s\n", e.what());
+        lora_test_environment_reset();
+        rac_model_registry_destroy(registry);
         return 1;
     } catch (...) {
         std::fprintf(stderr, "  FATAL: uncaught unknown exception\n");
+        lora_test_environment_reset();
+        rac_model_registry_destroy(registry);
         return 1;
     }
+
+    lora_test_environment_reset();
+    rac_model_registry_destroy(registry);
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 #endif

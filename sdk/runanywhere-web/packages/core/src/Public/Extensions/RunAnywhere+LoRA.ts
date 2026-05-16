@@ -93,52 +93,47 @@ export function missingLoRACatalogExports(): string[] {
 }
 
 export async function applyLoraAdapters(
-  llmComponent: number,
   request: LoRAApplyRequest,
 ): Promise<LoRAApplyResult> {
   return requireResult(
     'LoRA.apply',
-    requireAdapter('LoRA.apply').apply(llmComponent, request),
+    requireAdapter('LoRA.apply').apply(request),
   );
 }
 
 export async function removeLoraAdapters(
-  llmComponent: number,
   request: LoRARemoveRequest,
 ): Promise<LoRAState> {
   return requireResult(
     'LoRA.remove',
-    requireAdapter('LoRA.remove').remove(llmComponent, request),
+    requireAdapter('LoRA.remove').remove(request),
   );
 }
 
 export async function listLoraAdapters(
-  llmComponent: number,
   request: LoRAState = emptyLoRAState(),
 ): Promise<LoRAState> {
   return requireResult(
     'LoRA.list',
-    requireAdapter('LoRA.list').list(llmComponent, request),
+    requireAdapter('LoRA.list').list(request),
   );
 }
 
 export async function getLoraState(
-  llmComponent: number,
   request: LoRAState = emptyLoRAState(),
 ): Promise<LoRAState> {
   return requireResult(
     'LoRA.state',
-    requireAdapter('LoRA.state').state(llmComponent, request),
+    requireAdapter('LoRA.state').state(request),
   );
 }
 
 export async function checkLoraCompatibility(
-  llmComponent: number,
   config: LoRAAdapterConfig,
 ): Promise<LoraCompatibilityResult> {
   return requireResult(
     'LoRA.checkCompatibility',
-    requireAdapter('LoRA.checkCompatibility').compatibility(llmComponent, config),
+    requireAdapter('LoRA.checkCompatibility').compatibility(config),
   );
 }
 

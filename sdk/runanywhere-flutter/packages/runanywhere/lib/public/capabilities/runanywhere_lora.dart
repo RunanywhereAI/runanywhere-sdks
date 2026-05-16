@@ -11,13 +11,8 @@
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
-import 'package:runanywhere/generated/model_types.pb.dart'
-    show CurrentModelRequest;
-import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show ModelCategory;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// LoRA (Low-Rank Adaptation) capability surface.
 ///
@@ -33,25 +28,21 @@ class RunAnywhereLoRACapability {
 
   /// Apply one or more LoRA adapters to the current model.
   Future<LoRAApplyResult> apply(LoRAApplyRequest request) async {
-    await _requireInitializedAndLoadedLLM();
     return DartBridgeLora.shared.apply(request);
   }
 
   /// Remove one or more LoRA adapters, or clear all adapters.
   Future<LoRAState> remove(LoRARemoveRequest request) async {
-    await _requireInitializedAndLoadedLLM();
     return DartBridgeLora.shared.remove(request);
   }
 
   /// Currently loaded LoRA adapters.
   Future<LoRAState> list() async {
-    await _requireInitializedAndLoadedLLM();
     return DartBridgeLora.shared.list();
   }
 
   /// LoRA service state reported by commons.
   Future<LoRAState> state() async {
-    await _requireInitializedAndLoadedLLM();
     return DartBridgeLora.shared.state();
   }
 
@@ -59,46 +50,7 @@ class RunAnywhereLoRACapability {
   Future<LoraCompatibilityResult> checkCompatibility(
     LoRAAdapterConfig config,
   ) async {
-    try {
-      await _requireInitializedAndLoadedLLM();
-    } on SDKException catch (e) {
-      return LoraCompatibilityResult(
-        isCompatible: false,
-        errorMessage: e.message,
-      );
-    }
     return DartBridgeLora.shared.checkCompatibility(config);
-  }
-
-  /// Preflight: SDK initialised AND an LLM is loaded via the canonical
-  /// lifecycle (`RunAnywhere.llm.load(...)` →
-  /// `RunAnywhereModelLifecycle.shared.load(...)`).
-  ///
-  /// Mirrors Swift `RunAnywhere.LoRA.requireInitializedAndLoadedLLM()`:
-  /// the LoRA C ABI today still consumes the legacy
-  /// `DartBridgeLLM.shared.getHandle()` (a fresh, unloaded component handle
-  /// disjoint from the lifecycle-owned one used by
-  /// `rac_llm_generate_proto`). If the user only loaded via the lifecycle
-  /// path, the underlying call would fail with the unhelpful
-  /// `LoRA service is not loaded` / `RAC_ERROR_INVALID_STATE` from
-  /// `lora_service_loaded()`. This preflight surfaces a clearer error
-  /// instead.
-  ///
-  /// The proper fix is a commons-side ABI change so the LoRA ABI acquires
-  /// the lifecycle LLM internally (mirroring `rac_llm_generate_proto`),
-  /// tracked by the commons followup record for this finding.
-  Future<void> _requireInitializedAndLoadedLLM() async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    final current = await RunAnywhereModelLifecycle.shared.current(
-      CurrentModelRequest(category: ModelCategory.MODEL_CATEGORY_LANGUAGE),
-    );
-    if (!current.found || current.modelId.isEmpty) {
-      throw SDKException.componentNotReady(
-        'LoRA requires an LLM loaded via RunAnywhere.llm.load(modelId).',
-      );
-    }
   }
 
   // --- Catalog operations -----------------------------------------------

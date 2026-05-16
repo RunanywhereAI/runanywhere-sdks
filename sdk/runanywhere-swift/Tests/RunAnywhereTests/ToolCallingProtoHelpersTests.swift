@@ -4,6 +4,13 @@
 //
 //  Focused tests for generated RATool* helper surface.
 //
+//  Untyped dictionaries from `JSONSerialization.jsonObject` are unavoidable
+//  here — the assertions cast its return value to inspect the JSON payload
+//  carried by `RAToolResult.result_json`. The `avoid_any_type` rule is
+//  silenced for this file only.
+//
+
+// swiftlint:disable avoid_any_type
 
 import Foundation
 import XCTest
@@ -11,7 +18,14 @@ import XCTest
 @testable import RunAnywhere
 
 final class ToolCallingProtoHelpersTests: XCTestCase {
-    func testRAToolValueRoundTripsJSONObject() throws {
+    func testRAToolValueTypedInitsAndAccessorsRoundTrip() throws {
+        // The JSON <-> RAToolValue round-trip is owned by commons
+        // (`rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`)
+        // and is integration-tested in the commons C++ test suite. Here we
+        // only verify the Swift-side typed initializers and the `.string` /
+        // `.int` / `.bool` / `.array` / `.object` accessor surface, which is
+        // the contract this test target can deterministically exercise
+        // without the native ABI being dlsym-resolvable.
         let object: [String: RAToolValue] = [
             "location": RAToolValue("San Francisco"),
             "days": RAToolValue(3),
@@ -19,31 +33,39 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
             "units": .array([RAToolValue("fahrenheit"), RAToolValue("mph")])
         ]
 
-        let json = RAToolValue.jsonString(from: object)
-        let parsed = RAToolValue.parseObjectJSON(json)
+        XCTAssertEqual(object["location"]?.string, "San Francisco")
+        XCTAssertEqual(object["days"]?.int, 3)
+        XCTAssertEqual(object["includeHourly"]?.bool, true)
+        XCTAssertEqual(object["units"]?.array?.compactMap(\.string), ["fahrenheit", "mph"])
 
-        XCTAssertEqual(parsed["location"]?.string, "San Francisco")
-        XCTAssertEqual(parsed["days"]?.int, 3)
-        XCTAssertEqual(parsed["includeHourly"]?.bool, true)
-        XCTAssertEqual(parsed["units"]?.array?.compactMap(\.string), ["fahrenheit", "mph"])
+        let wrapped = RAToolValue.object(object)
+        let fields = try XCTUnwrap(wrapped.object)
+        XCTAssertEqual(fields["location"]?.string, "San Francisco")
+        XCTAssertEqual(fields["days"]?.int, 3)
+        XCTAssertEqual(fields["includeHourly"]?.bool, true)
+        XCTAssertEqual(fields["units"]?.array?.compactMap(\.string), ["fahrenheit", "mph"])
     }
 
     func testRAToolResultUsesGeneratedFieldsAndJSONPayload() throws {
+        // `RAToolResult` now carries tool output exclusively as a JSON string
+        // (`result_json`). The previous typed `result` map field was removed as
+        // part of the proto contract simplification; callers JSON-encode the
+        // payload themselves and downstream consumers decode it on read.
         var result = RAToolResult()
         result.name = "get_weather"
         result.success = true
-        result.result = ["temperature": RAToolValue(72)]
-        result.resultJson = RAToolValue.jsonString(from: result.result)
+        result.resultJson = "{\"temperature\":72}"
         result.toolCallID = "call_1"
         result.callID = result.toolCallID
 
         XCTAssertEqual(result.name, "get_weather")
+        XCTAssertTrue(result.success)
         XCTAssertEqual(result.toolCallID, "call_1")
         XCTAssertEqual(result.callID, "call_1")
-        XCTAssertEqual(result.result["temperature"]?.int, 72)
 
-        let json = RAToolValue.parseObjectJSON(result.resultJson)
-        XCTAssertEqual(json["temperature"]?.int, 72)
+        let data = try XCTUnwrap(result.resultJson.data(using: .utf8))
+        let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(parsed?["temperature"] as? Int, 72)
     }
 
     func testToolCallingOptionsPreferGeneratedFormatEnum() {
@@ -54,3 +76,5 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
         XCTAssertEqual(options.resolvedFormatName, "openai")
     }
 }
+
+// swiftlint:enable avoid_any_type

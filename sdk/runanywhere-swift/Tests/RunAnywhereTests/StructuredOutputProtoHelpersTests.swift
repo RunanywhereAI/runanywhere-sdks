@@ -108,12 +108,19 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
         XCTAssertTrue(request.options.jsonSchema.contains("\"status\""))
     }
 
-    func testStructuredOutputPreparePromptRequestUsesGeneratedContract() {
+    func testStructuredOutputGenerateRequestUsesGeneratedContract() {
+        // The prepare-prompt and full-generate flows now share the same wire
+        // request (`RAStructuredOutputRequest`); the prior
+        // `makePreparePromptRequest` helper was collapsed into
+        // `makeGenerateRequest`. Both ABI symbols
+        // (`rac_structured_output_prepare_prompt_proto` and
+        // `rac_structured_output_generate_proto`) decode this request shape,
+        // so the helper-construction contract is the same for both flows.
         var schema = RAJSONSchema()
         schema.type = .array
         let options = RAStructuredOutputOptions.defaults(schema: schema)
 
-        let request = CppBridge.StructuredOutput.makePreparePromptRequest(
+        let request = CppBridge.StructuredOutput.makeGenerateRequest(
             prompt: "Return rows",
             options: options,
             requestID: "prepare-test"

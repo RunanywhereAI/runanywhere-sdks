@@ -34,9 +34,7 @@ public extension RunAnywhere {
         /// - Returns: Generated apply result from commons.
         @discardableResult
         public func apply(_ request: RALoRAApplyRequest) async throws -> RALoRAApplyResult {
-            try requireInitializedAndLoadedLLM()
-            let handle = try await CppBridge.LLM.shared.getHandle()
-            return try await CppBridge.LLM.shared.applyLoraAdapters(handle: handle, request)
+            return try await CppBridge.LLM.shared.applyLoraAdapters(request)
         }
 
         /// Remove one or more LoRA adapters, or clear all adapters.
@@ -46,69 +44,28 @@ public extension RunAnywhere {
         /// - Returns: Generated LoRA state after removal.
         @discardableResult
         public func remove(_ request: RALoRARemoveRequest) async throws -> RALoRAState {
-            try requireInitializedAndLoadedLLM()
-            let handle = try await CppBridge.LLM.shared.getHandle()
-            return try await CppBridge.LLM.shared.removeLoraAdapters(handle: handle, request)
+            return try await CppBridge.LLM.shared.removeLoraAdapters(request)
         }
 
         /// Get info about all currently loaded LoRA adapters.
         public func list() async throws -> RALoRAState {
-            try requireInitializedAndLoadedLLM()
-            let handle = try await CppBridge.LLM.shared.getHandle()
-            return try await CppBridge.LLM.shared.listLoraAdapters(handle: handle, RALoRAState())
+            return try await CppBridge.LLM.shared.listLoraAdapters(RALoRAState())
         }
 
         /// Get the LoRA service state reported by commons.
         public func state() async throws -> RALoRAState {
-            try requireInitializedAndLoadedLLM()
-            let handle = try await CppBridge.LLM.shared.getHandle()
-            return try await CppBridge.LLM.shared.getLoraState(handle: handle, RALoRAState())
+            return try await CppBridge.LLM.shared.getLoraState(RALoRAState())
         }
 
         /// Check whether a LoRA adapter is compatible with a model.
         ///
-        /// The current C ABI checks against the active model loaded via
-        /// `loadLLMModel`.
+        /// The lifecycle-aware C ABI resolves the active LLM component
+        /// internally; callers no longer need to thread a handle.
         public func checkCompatibility(_ config: RALoRAAdapterConfig) async -> RALoraCompatibilityResult {
             do {
-                try requireInitializedAndLoadedLLM()
-            } catch let error as SDKException {
-                return incompatibleResult(error.message)
+                return try await CppBridge.LLM.shared.checkLoraCompatibility(config)
             } catch {
                 return incompatibleResult(error.localizedDescription)
-            }
-            do {
-                let handle = try await CppBridge.LLM.shared.getHandle()
-                return try await CppBridge.LLM.shared.checkLoraCompatibility(handle: handle, config)
-            } catch {
-                return incompatibleResult(error.localizedDescription)
-            }
-        }
-
-        /// Preflight: SDK initialised AND an LLM is loaded via the canonical
-        /// lifecycle (`RunAnywhere.loadModel(RAModelLoadRequest(category:
-        /// .language))`).
-        ///
-        /// Provides user-facing error context only — the LoRA C ABI today
-        /// still consumes the legacy `CppBridge.LLM.shared.getHandle()` and
-        /// will fail with `LoRA service is not loaded` if no model is
-        /// loaded against THAT actor handle. The proper fix is a commons
-        /// ABI change so LoRA acquires the lifecycle LLM internally
-        /// (mirroring `rac_llm_generate_proto`); see the followup
-        /// `hotspot-swift-public-features-001-followup-commons.json`.
-        private func requireInitializedAndLoadedLLM() throws {
-            guard RunAnywhere.isInitialized else {
-                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-            }
-            var current = RACurrentModelRequest()
-            current.category = .language
-            let snapshot = RunAnywhere.currentModel(current)
-            guard snapshot.found, !snapshot.modelID.isEmpty else {
-                throw SDKException(
-                    code: .modelNotLoaded,
-                    message: "LoRA requires an LLM loaded via RunAnywhere.loadModel(RAModelLoadRequest(category: .language)).",
-                    category: .component
-                )
             }
         }
 

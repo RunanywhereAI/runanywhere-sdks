@@ -609,7 +609,7 @@ export const RunAnywhere = {
   /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.Debug)` */
   logging: LoggingCapability,
 
-  /** LoRA adapter management — `RunAnywhere.lora.apply(handle, request)` etc. */
+  /** LoRA adapter management — `RunAnywhere.lora.apply(request)` etc. */
   lora: LoRACapability,
 
   /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */

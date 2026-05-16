@@ -131,40 +131,24 @@ static rac_handle_t getGlobalLLMHandle() {
     return g_llm_component_handle;
 }
 
-// HOTSPOT-RN-CORE-001: the public RunAnywhere v2 path loads the LLM via
-// `rac_model_lifecycle_load_proto`, which populates the commons lifecycle
-// registry but NOT this RN bridge's `g_llm_component_handle`. If we hand an
-// unloaded handle to the LoRA proto ABI, commons returns the typed
-// "LoRA service is not loaded" result and LoRA looks broken on RN even
-// though plain generation works (rac_llm_generate_*_proto acquire the
-// lifecycle-owned handle internally).
-//
-// As a stop-gap until the commons LoRA proto ABI grows a handleless variant
-// or exposes a lifecycle-owned LLM accessor, refuse the call early with a
-// clear log line so callers see an actionable error instead of a confusing
-// "no LoRA service" result. See followups/hotspot-rn-core-001-followup-cpp.json.
+// Commons resolves the lifecycle-owned LLM component internally for every
+// `rac_lora_*_proto` entry point, so the RN bridge no longer needs to
+// acquire/validate a handle here. We just pass the request bytes straight
+// through; commons returns the typed result (including "service not loaded"
+// failures) so callers see the same surface across platforms.
 static std::shared_ptr<ArrayBuffer> callLoraRequestProto(
     const std::vector<uint8_t>& bytes,
     const char* symbolName,
     const char* operation) {
-    rac_handle_t handle = getGlobalLLMHandle();
     auto fn = proto_compat::symbol<proto_compat::LoRARequestProtoFn>(symbolName);
-    if (!handle || !fn) {
-        LOGE("%s: LLM handle or %s unavailable", operation, symbolName);
-        return emptyVoiceProtoBuffer();
-    }
-    if (rac_llm_component_is_loaded(handle) != RAC_TRUE) {
-        LOGE("%s: bridge LLM handle is not loaded — LoRA requires commons to expose "
-             "the lifecycle-owned handle (see hotspot-rn-core-001-followup-cpp). "
-             "Until the commons LoRA proto ABI is migrated, callers must not "
-             "rely on RunAnywhere.lora.* immediately after RunAnywhere.loadModel.",
-             operation);
+    if (!fn) {
+        LOGE("%s: %s unavailable", operation, symbolName);
         return emptyVoiceProtoBuffer();
     }
     rac_proto_buffer_t out;
     proto_compat::initBuffer(&out);
     const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-    rac_result_t rc = fn(handle, data, bytes.size(), &out);
+    rac_result_t rc = fn(data, bytes.size(), &out);
     if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
         LOGE("%s: rc=%d", operation, rc);
         proto_compat::freeBuffer(&out);

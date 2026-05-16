@@ -49,50 +49,35 @@ object CppBridgeLoraRegistry {
     suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult =
         decodeOrThrow(
             LoRAApplyResult.ADAPTER,
-            RunAnywhereBridge.racLoraApplyProto(
-                CppBridgeLLM.getHandle(),
-                LoRAApplyRequest.ADAPTER.encode(request),
-            ),
+            RunAnywhereBridge.racLoraApplyProto(LoRAApplyRequest.ADAPTER.encode(request)),
             "racLoraApplyProto",
         )
 
     suspend fun remove(request: RALoRARemoveRequest): RALoRAState =
         decodeOrThrow(
             LoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraRemoveProto(
-                CppBridgeLLM.getHandle(),
-                LoRARemoveRequest.ADAPTER.encode(request),
-            ),
+            RunAnywhereBridge.racLoraRemoveProto(LoRARemoveRequest.ADAPTER.encode(request)),
             "racLoraRemoveProto",
         )
 
     suspend fun list(request: RALoRAState): RALoRAState =
         decodeOrThrow(
             LoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraListProto(
-                CppBridgeLLM.getHandle(),
-                LoRAState.ADAPTER.encode(request),
-            ),
+            RunAnywhereBridge.racLoraListProto(LoRAState.ADAPTER.encode(request)),
             "racLoraListProto",
         )
 
     suspend fun state(request: RALoRAState): RALoRAState =
         decodeOrThrow(
             LoRAState.ADAPTER,
-            RunAnywhereBridge.racLoraStateProto(
-                CppBridgeLLM.getHandle(),
-                LoRAState.ADAPTER.encode(request),
-            ),
+            RunAnywhereBridge.racLoraStateProto(LoRAState.ADAPTER.encode(request)),
             "racLoraStateProto",
         )
 
     suspend fun compatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult =
         decodeOrThrow(
             LoraCompatibilityResult.ADAPTER,
-            RunAnywhereBridge.racLoraCompatibilityProto(
-                CppBridgeLLM.getHandle(),
-                LoRAAdapterConfig.ADAPTER.encode(config),
-            ),
+            RunAnywhereBridge.racLoraCompatibilityProto(LoRAAdapterConfig.ADAPTER.encode(config)),
             "racLoraCompatibilityProto",
         )
 

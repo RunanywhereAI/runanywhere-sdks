@@ -1080,15 +1080,15 @@ object RunAnywhereBridge {
     // LORA GENERATED-PROTO ABI (rac_lora_service.h)
     // ========================================================================
 
-    @JvmStatic external fun racLoraApplyProto(llmHandle: Long, requestProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraApplyProto(requestProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraRemoveProto(llmHandle: Long, requestProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraRemoveProto(requestProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraListProto(llmHandle: Long, stateProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraListProto(stateProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraStateProto(llmHandle: Long, stateProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraStateProto(stateProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraCompatibilityProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraCompatibilityProto(configProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racLoraRegisterProto(entryProto: ByteArray): ByteArray?
 

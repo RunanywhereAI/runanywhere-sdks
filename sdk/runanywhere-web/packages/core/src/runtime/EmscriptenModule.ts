@@ -269,31 +269,26 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   _rac_lora_compatibility_proto?(
-    llmComponent: number,
     configBytes: number,
     configSize: number,
     outResult: number,
   ): number;
   _rac_lora_apply_proto?(
-    llmComponent: number,
     requestBytes: number,
     requestSize: number,
     outResult: number,
   ): number;
   _rac_lora_remove_proto?(
-    llmComponent: number,
     requestBytes: number,
     requestSize: number,
     outState: number,
   ): number;
   _rac_lora_list_proto?(
-    llmComponent: number,
     requestBytes: number,
     requestSize: number,
     outState: number,
   ): number;
   _rac_lora_state_proto?(
-    llmComponent: number,
     requestBytes: number,
     requestSize: number,
     outState: number,
