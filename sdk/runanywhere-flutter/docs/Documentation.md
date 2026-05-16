@@ -71,7 +71,6 @@ abstract final class RunAnywhere {
   static RunAnywhereTools          get tools;
   static RunAnywhereRAG            get rag;
   static RunAnywhereSolutions      get solutions;
-  static RunAnywhereDiffusion      get diffusion;
   static RunAnywhereEmbeddings     get embeddings;
   static RunAnywhereLoRACapability get lora;
   static RunAnywhereHardware       get hardware;

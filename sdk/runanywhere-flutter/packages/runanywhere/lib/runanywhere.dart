@@ -9,8 +9,13 @@ export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'foundation/constants/sdk_constants.dart';
 export 'foundation/errors/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
-export 'public/capabilities/runanywhere_diffusion.dart'
-    show RunAnywhereDiffusion;
+// Diffusion is intentionally NOT exported from the public barrel until the
+// cross-SDK v2 contract for image generation lands (proto-backed lifecycle
+// stream/cancel/capabilities ABIs across Swift/Kotlin/RN/Web). Removed under
+// swift-parity-002-followup-flutter to keep the Swift-as-reference public
+// surface coherent. The implementation in
+// `public/capabilities/runanywhere_diffusion.dart` is retained for the day
+// the contract is settled.
 export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
 export 'public/capabilities/runanywhere_embeddings.dart'

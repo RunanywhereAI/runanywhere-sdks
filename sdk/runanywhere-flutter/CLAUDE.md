@@ -117,7 +117,7 @@ iOS requires `use_frameworks! :linkage => :static` in the Podfile and `-all_load
 await RunAnywhere.initialize(
   apiKey: 'optional',
   baseURL: 'optional',
-  environment: SDKEnvironment.development, // or staging, production
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT, // or SDK_ENVIRONMENT_STAGING, SDK_ENVIRONMENT_PRODUCTION
 );
 
 // Capability accessors (shared capability instances)
@@ -134,7 +134,6 @@ RunAnywhere.downloads // RunAnywhereDownloads
 RunAnywhere.tools     // RunAnywhereTools
 RunAnywhere.rag       // RunAnywhereRAG
 RunAnywhere.solutions // RunAnywhereSolutions
-RunAnywhere.diffusion // RunAnywhereDiffusion
 RunAnywhere.embeddings // RunAnywhereEmbeddings
 RunAnywhere.lora      // RunAnywhereLoRACapability
 RunAnywhere.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Wave-H HW-001 Swift parity; was previously returning an empty fallback)

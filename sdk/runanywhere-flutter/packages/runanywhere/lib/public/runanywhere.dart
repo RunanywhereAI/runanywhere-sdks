@@ -61,7 +61,6 @@ import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hardware.dart';
@@ -430,6 +429,15 @@ abstract final class RunAnywhere {
 
   /// Reset all SDK state; clears registered models, cached
   /// configuration, loaded backends. Useful for tests.
+  ///
+  /// Mirrors Swift `RunAnywhere.reset()`: this is the symmetric counterpart
+  /// of [initializeWithParams]. Calling reset() and then a subsequent
+  /// initialize(...) MUST run a fresh Phase 1 + Phase 2 against the new
+  /// params, so reset must clear the bridge's `_isInitialized` flag —
+  /// otherwise [initializeWithParams] short-circuits at
+  /// `if (DartBridge.isInitialized) return;` and the SDK stays in a
+  /// half-reset state (Dart caches empty, native bridge still marked
+  /// initialized).
   static Future<void> reset() async {
     DartBridgeTelemetry.flush();
 
@@ -439,6 +447,10 @@ abstract final class RunAnywhere {
     _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
     HTTPClientAdapter.shared.resetForTesting();
+    // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
+    // can flush against a still-initialized native side. Mirrors Swift's
+    // `await CppBridge.shutdown()` ordering inside `RunAnywhere.reset()`.
+    DartBridge.shutdown();
   }
 
   // --- Capability surfaces -------------------------------------------------
@@ -493,9 +505,13 @@ abstract final class RunAnywhere {
   /// start / stop / cancel / feed / closeInput / destroy verbs.
   static RunAnywhereSolutions get solutions => RunAnywhereSolutions.shared;
 
-  /// Diffusion (image generation). Calls the `rac_diffusion_*` C ABI;
-  /// surfaces `featureNotAvailable` only when commons indicates so.
-  static RunAnywhereDiffusion get diffusion => RunAnywhereDiffusion.shared;
+  // Diffusion (image generation) is intentionally NOT exposed on the public
+  // `RunAnywhere` namespace until the cross-SDK v2 contract for image
+  // generation lands (proto-backed lifecycle stream/cancel/capabilities ABIs
+  // across Swift/Kotlin/RN/Web). Removed under swift-parity-002-followup-flutter
+  // to keep the Swift-as-reference public surface coherent. The implementation
+  // in `public/capabilities/runanywhere_diffusion.dart` is retained for the
+  // day the contract is settled.
 
   /// Embeddings — load an embeddings model and generate embedding vectors.
   static RunAnywhereEmbeddings get embeddings => RunAnywhereEmbeddings.shared;
