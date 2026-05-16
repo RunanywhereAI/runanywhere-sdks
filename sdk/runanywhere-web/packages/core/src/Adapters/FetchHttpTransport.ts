@@ -276,7 +276,14 @@ export class FetchHttpTransport {
         typeof performance !== 'undefined' && typeof performance.now === 'function'
           ? performance.now()
           : Date.now();
-      xhr.send(req.body && req.body.length > 0 ? req.body : null);
+      const sendBody: BodyInit | null =
+        req.body && req.body.length > 0
+          ? (req.body.buffer.slice(
+              req.body.byteOffset,
+              req.body.byteOffset + req.body.byteLength,
+            ) as ArrayBuffer)
+          : null;
+      xhr.send(sendBody as XMLHttpRequestBodyInit | null);
       const elapsedMs = Math.max(
         0,
         Math.round(

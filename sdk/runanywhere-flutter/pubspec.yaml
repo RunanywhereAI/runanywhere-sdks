@@ -11,7 +11,7 @@ workspace:
   - packages/runanywhere_genie
 
 dev_dependencies:
-  melos: 7.7.0
+  melos: 7.4.0
 
 melos:
   command:

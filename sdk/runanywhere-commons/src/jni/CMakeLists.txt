@@ -17,7 +17,7 @@
 # XCFramework (RABackendLlamaCPP, RABackendONNX).
 
 # Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.24)
 project(runanywhere_commons_jni)
 
 set(CMAKE_CXX_STANDARD 20)

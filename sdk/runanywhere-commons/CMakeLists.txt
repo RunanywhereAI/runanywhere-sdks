@@ -1,7 +1,7 @@
 # Must match VERSIONS::MIN_CMAKE_VERSION (3.30). Required for FetchContent's
 # FIND_PACKAGE_ARGS and DOWNLOAD_EXTRACT_TIMESTAMP keywords (both added in 3.24)
 # used by the protobuf and ONNX Runtime fetches below.
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.24)
 
 # Read version from VERSION file
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_CONTENT)
@@ -1038,25 +1038,25 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
         set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
-        # CPP-11: FIND_PACKAGE_ARGS (CMake 3.24+) lets FetchContent try a
-        # system Protobuf+absl first and only fall through to the git clone
-        # when neither is present. Homebrew Protobuf 34.x reports
-        # PACKAGE_FIND_VERSION_MAJOR=7 and is rejected by the upstream
-        # version check, which is exactly when we WANT the fall-through —
-        # explicit NAMES keeps the guard narrow and avoids silent captures
-        # of mismatched absl dylibs that happen under `FetchContent` alone.
-        set(_rac_fetch_protobuf_find_args "")
-        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
-            set(_rac_fetch_protobuf_find_args FIND_PACKAGE_ARGS ${PROTOBUF_VERSION} EXACT NAMES Protobuf)
-        endif()
+        # T1.1 follow-up: FIND_PACKAGE_ARGS was removed because on Ubuntu CI
+        # the internal find_package(Protobuf ... NAMES Protobuf) call silently
+        # registered `protobuf::libprotobuf-lite` as an IMPORTED target from
+        # a config file even when the EXACT version check failed. Protobuf
+        # v34.1's own cmake/libprotobuf-lite.cmake then failed with
+        # "add_library cannot create ALIAS target ... already exists" when
+        # MakeAvailable processed the fetched source. Forcing a bare
+        # FetchContent_Declare (always fetch + add_subdirectory) avoids that
+        # IMPORTED-vs-fetched collision.
         FetchContent_Declare(
             protobuf_fetched
             GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
             GIT_TAG        v${PROTOBUF_VERSION}
             GIT_SHALLOW    TRUE
-            ${_rac_fetch_protobuf_find_args}
         )
         FetchContent_MakeAvailable(protobuf_fetched)
+        # Protobuf v34.x's libprotobuf-lite.cmake already creates
+        # `protobuf::libprotobuf-lite` and `protobuf::libprotobuf` aliases.
+        # Keep guards so older versions without those aliases still get them.
         if(TARGET libprotobuf AND NOT TARGET protobuf::libprotobuf)
             add_library(protobuf::libprotobuf ALIAS libprotobuf)
         endif()

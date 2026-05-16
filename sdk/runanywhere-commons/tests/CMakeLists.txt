@@ -1,5 +1,5 @@
 # Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
 # Integration Test Suite for runanywhere-commons

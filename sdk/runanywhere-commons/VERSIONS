@@ -56,8 +56,9 @@ CMAKE_VERSION=3.27
 # NOTE: `cmake_minimum_required(VERSION ...)` must be the first command and
 # cannot be parameterised by a CMake variable — keep the literal value in
 # each CMakeLists.txt in sync with this when bumping.
-# T5.1: bumped from 3.24 to 3.30 (stable in 2026; widely available on CI hosts).
-MIN_CMAKE_VERSION=3.30
+# T5.1: bumped from 3.24 to 3.30; reverted to 3.24 because some CI Docker
+# base images still ship cmake 3.27 and the bump caused configure failures.
+MIN_CMAKE_VERSION=3.24
 
 # =============================================================================
 # ONNX Runtime
@@ -115,12 +116,12 @@ ONNX_VERSION_MACOS=1.23.2
 # Linux version (can use latest)
 # T5.2 (heavy dep bump): 1.23.2 → 1.26.0. Pulled via FetchContent
 # (microsoft/onnxruntime releases tarball, x64 or aarch64).
-ONNX_VERSION_LINUX=1.26.0
+ONNX_VERSION_LINUX=1.23.2
 
 # Windows version (can use latest)
 # T5.2 (heavy dep bump): 1.23.2 → 1.26.0. Pulled via FetchContent
 # (microsoft/onnxruntime releases zip, x64 or x86).
-ONNX_VERSION_WINDOWS=1.26.0
+ONNX_VERSION_WINDOWS=1.23.2
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
@@ -165,19 +166,19 @@ SHERPA_ONNX_VERSION_ANDROID=1.12.20
 # of the script will produce 1.13.2 static archives under third_party/sherpa-
 # onnx-macos/. Existing third_party/ has no sherpa-onnx-macos/ directory yet,
 # so nothing to re-vendor proactively.
-SHERPA_ONNX_VERSION_MACOS=1.13.2
+SHERPA_ONNX_VERSION_MACOS=1.12.18
 
 # Linux version
 # T5.2 (heavy dep bump): 1.12.23 → 1.13.2. Pulled per-arch by
 # scripts/linux/download-sherpa-onnx.sh (curl from k2-fsa/sherpa-onnx
 # releases). No vendored archive in the repo — script downloads on demand.
-SHERPA_ONNX_VERSION_LINUX=1.13.2
+SHERPA_ONNX_VERSION_LINUX=1.12.23
 
 # Windows version
 # T5.2 (heavy dep bump): 1.12.23 → 1.13.2. Pulled by
 # scripts/windows/download-sherpa-onnx.bat (curl + tar from k2-fsa releases).
 # No vendored archive — downloads on demand.
-SHERPA_ONNX_VERSION_WINDOWS=1.13.2
+SHERPA_ONNX_VERSION_WINDOWS=1.12.23
 
 # =============================================================================
 # llama.cpp (LLM inference)
@@ -199,34 +200,34 @@ SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 # additional ARC-strict cleanup in ggml/src/ggml-metal/ for Apple Clang 21.x.
 # Tracked as: T5.2 follow-up — llama.cpp Metal backend Apple Clang 21.x ARC
 # strictness fix (upstream ggml change, not a VERSIONS pin issue).
-LLAMACPP_VERSION=b9180
+LLAMACPP_VERSION=b9174
 
 # =============================================================================
 # whisper.cpp (STT — opt-in fallback for Whisper-family models)
 # =============================================================================
 # Pinned tag for engines/whispercpp/CMakeLists.txt FetchContent.
 # T5.2 (heavy dep bump): v1.8.2 → v1.8.4 (latest v1.x stable as of 2026-05-16).
-WHISPERCPP_VERSION=v1.8.4
+WHISPERCPP_VERSION=v1.8.2
 
 # =============================================================================
 # nlohmann/json
 # =============================================================================
-NLOHMANN_JSON_VERSION=3.12.0
+NLOHMANN_JSON_VERSION=3.11.3
 
 # =============================================================================
 # USearch (vector search engine used by the RAG pipeline)
 # =============================================================================
-USEARCH_VERSION=v2.18.0
+USEARCH_VERSION=v2.15.2
 
 # =============================================================================
 # cpp-httplib (header-only HTTP server — RAC_BUILD_SERVER only)
 # =============================================================================
-CPPHTTPLIB_VERSION=v0.18.5
+CPPHTTPLIB_VERSION=v0.15.3
 
 # =============================================================================
 # zlib (bundled for Android/Emscripten where the platform SDK lacks it)
 # =============================================================================
-ZLIB_VERSION=v1.3.2
+ZLIB_VERSION=v1.3.1
 
 # =============================================================================
 # bzip2 (bundled for Android/Emscripten — sourceware tarball, NOT a `v` prefix)
@@ -244,12 +245,12 @@ PROTOBUF_VERSION=34.1
 # =============================================================================
 # GoogleTest (test framework for commons + RAG unit tests)
 # =============================================================================
-GOOGLETEST_VERSION=v1.16.0
+GOOGLETEST_VERSION=v1.14.0
 
 # =============================================================================
 # libarchive (archive extraction - ZIP, TAR.GZ, TAR.BZ2, TAR.XZ)
 # =============================================================================
-LIBARCHIVE_VERSION=3.8.2
+LIBARCHIVE_VERSION=3.8.1
 
 # =============================================================================
 # RAC Commons Version (for remote builds/CI)

@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+// Postinstall driver for the RunAnywhereAI example.
+//
+// Skips both the `patch-package` apply and the macOS `pod-install` step when
+// running in CI typecheck/install contexts where:
+//   - Yarn 3 may hoist `react-native` to the workspace root `node_modules`,
+//     causing patch-package to fail with "Patch file found for package
+//     react-native which is not present at node_modules/react-native".
+//   - `pod-install` is irrelevant outside macOS Xcode builds.
+//
+// Behavior:
+//   - Always skipped when CI=true (typecheck workflows don't build native).
+//   - Locally: apply patches if node_modules/react-native exists at the
+//     workspace, then run pod-install on Darwin only.
+
+const { existsSync } = require('node:fs');
+const { execSync } = require('node:child_process');
+const path = require('node:path');
+
+const isCI = process.env.CI === 'true' || process.env.CI === '1';
+if (isCI) {
+  process.stdout.write('[postinstall] CI=true detected; skipping patch-package + pod-install.\n');
+  process.exit(0);
+}
+
+const cwd = process.cwd();
+const localRN = path.join(cwd, 'node_modules', 'react-native', 'package.json');
+
+if (existsSync(localRN)) {
+  try {
+    execSync('npx --no-install patch-package', { stdio: 'inherit', cwd });
+  } catch (err) {
+    process.stderr.write(`[postinstall] patch-package warning: ${err.message}\n`);
+  }
+} else {
+  process.stdout.write('[postinstall] react-native not in local node_modules (hoisted); skipping patch-package.\n');
+}
+
+if (process.platform === 'darwin' && existsSync(path.join(cwd, 'ios', 'Podfile'))) {
+  try {
+    execSync('bash scripts/pod-install.sh', { stdio: 'inherit', cwd });
+  } catch (err) {
+    process.stderr.write(`[postinstall] pod-install failed: ${err.message}\n`);
+    process.exit(err.status ?? 1);
+  }
+}
