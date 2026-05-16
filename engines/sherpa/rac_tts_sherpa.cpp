@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <set>
 #include <string>
@@ -22,6 +23,17 @@
 struct rac_sherpa_tts_handle_impl {
   std::unique_ptr<runanywhere::SherpaBackend> backend;
   runanywhere::SherpaTTS *tts; // Owned by backend
+
+  // Voice-info cache for `rac_tts_sherpa_get_info`. The service-layer
+  // lifecycle voice-list ABI (`rac_nonllm_lifecycle_proto_abi.cpp`) and the
+  // component voice-list path (`tts_component.cpp`) both surface voices via
+  // `rac_tts_info_t.available_voices`, which is a `const char* const*`
+  // owned by the engine. Storing both the backing strings and the pointer
+  // array on the handle keeps the pointer addresses stable across
+  // overlapping reads while still letting us refresh after `load_model`.
+  std::mutex voice_cache_mutex;
+  std::vector<std::string> voice_ids;
+  std::vector<const char *> voice_ptrs;
 };
 
 extern "C" {
@@ -168,6 +180,42 @@ rac_result_t rac_tts_sherpa_get_voices(rac_handle_t handle, char ***out_voices,
     }
   }
 
+  return RAC_SUCCESS;
+}
+
+rac_result_t rac_tts_sherpa_get_info(rac_handle_t handle,
+                                     rac_tts_info_t *out_info) {
+  if (handle == nullptr || out_info == nullptr) {
+    return RAC_ERROR_NULL_POINTER;
+  }
+
+  auto *h = static_cast<rac_sherpa_tts_handle_impl *>(handle);
+
+  out_info->is_ready = (h->tts != nullptr) ? RAC_TRUE : RAC_FALSE;
+  out_info->is_synthesizing = RAC_FALSE;
+
+  std::lock_guard<std::mutex> lock(h->voice_cache_mutex);
+  h->voice_ids.clear();
+  h->voice_ptrs.clear();
+
+  if (h->tts) {
+    const auto &voices = h->tts->get_voices();
+    h->voice_ids.reserve(voices.size());
+    h->voice_ptrs.reserve(voices.size());
+    for (const auto &v : voices) {
+      if (v.id.empty()) {
+        continue;
+      }
+      h->voice_ids.push_back(v.id);
+    }
+    for (const auto &id : h->voice_ids) {
+      h->voice_ptrs.push_back(id.c_str());
+    }
+  }
+
+  out_info->available_voices =
+      h->voice_ptrs.empty() ? nullptr : h->voice_ptrs.data();
+  out_info->num_voices = h->voice_ptrs.size();
   return RAC_SUCCESS;
 }
 

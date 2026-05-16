@@ -67,16 +67,25 @@ rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
                           err ? [[err localizedDescription] UTF8String] : "unknown");
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }
-        auto* session = new (std::nothrow) CoreMLSession();
-        if (!session) return RAC_ERROR_OUT_OF_MEMORY;
-        session->model = model;
-        *out = reinterpret_cast<rac_runtime_session_t*>(session);
+        auto* sess = new (std::nothrow) CoreMLSession();
+        if (!sess) return RAC_ERROR_OUT_OF_MEMORY;
+        // `model` was returned autoreleased by +[MLModel modelWithContentsOfURL:].
+        // Without an explicit retain it dies when this @autoreleasepool drains,
+        // leaving CoreMLSession::model dangling for every subsequent prediction
+        // /model_description access (runtimes-001). MRC semantics — paired
+        // -release lives in coreml_destroy_session.
+        sess->model = [model retain];
+        *out = reinterpret_cast<rac_runtime_session_t*>(sess);
         return RAC_SUCCESS;
     }
 }
 
 void coreml_destroy_session(rac_runtime_session_t* session) {
-    delete reinterpret_cast<CoreMLSession*>(session);
+    auto* sess = reinterpret_cast<CoreMLSession*>(session);
+    if (!sess) return;
+    [sess->model release];
+    sess->model = nil;
+    delete sess;
 }
 
 rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
@@ -232,7 +241,12 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir,
                       err ? [[err localizedDescription] UTF8String] : "unknown");
         return nil;
     }
-    return model;
+    // +modelWithContentsOfURL: returns an autoreleased instance — promote it
+    // to a retained reference so callers that store the pointer into
+    // long-lived engine state (e.g. diffusion_coreml_backend.mm) don't end
+    // up with a dangling reference after the enclosing @autoreleasepool
+    // drains. NS_RETURNS_RETAINED documents the matching -release contract.
+    return [model retain];
 }
 
 extern "C" rac_result_t rac_coreml_runtime_require_available(void) {

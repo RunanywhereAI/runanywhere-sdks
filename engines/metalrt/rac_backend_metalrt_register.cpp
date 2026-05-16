@@ -30,6 +30,8 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_metalrt.h"
 
 static const char *LOG_CAT = "MetalRT";
 
@@ -490,11 +492,24 @@ rac_result_t rac_backend_metalrt_register(void) {
     return result;
   }
 
-  // v3 Phase B6: plugin registration via rac_plugin_entry_metalrt().
+  // Service routing dispatches from the unified plugin registry (not the
+  // legacy module registry), so the vtable must be installed there too —
+  // otherwise rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT|TRANSCRIBE|
+  // SYNTHESIZE|VLM, framework=metalrt) returns BACKEND_NOT_FOUND even
+  // though module_info is registered. Mirrors the Sherpa/WhisperCPP pattern.
+  const rac_engine_vtable_t *vt = rac_plugin_entry_metalrt();
+  if (vt != nullptr) {
+    rac_result_t plugin_rc = rac_plugin_register(vt);
+    if (plugin_rc != RAC_SUCCESS &&
+        plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+    } else {
+      RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'metalrt'");
+    }
+  }
+
   state.registered = true;
-  RAC_LOG_INFO(LOG_CAT,
-               "Backend registered successfully (module_register only; "
-               "plugin registration via rac_plugin_entry_metalrt)");
+  RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module + plugin)");
   return RAC_SUCCESS;
 }
 
@@ -506,6 +521,10 @@ rac_result_t rac_backend_metalrt_unregister(void) {
     return RAC_ERROR_MODULE_NOT_FOUND;
   }
 
+  // Tear down the plugin route before the module entry so any in-flight
+  // routing lookup sees a consistent state. RAC_ERROR_NOT_FOUND is
+  // acceptable here (stub registrations never call rac_plugin_register).
+  rac_plugin_unregister("metalrt");
   rac_module_unregister(state.module_id);
 
   state.registered = false;

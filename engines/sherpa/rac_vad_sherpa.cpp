@@ -135,13 +135,17 @@ rac_result_t rac_vad_sherpa_set_threshold(rac_handle_t handle,
   }
 
   auto *h = static_cast<rac_sherpa_vad_handle_impl *>(handle);
-  if (h->vad) {
-    auto config = h->vad->get_vad_config();
-    config.threshold = threshold;
-    h->vad->configure_vad(config);
+  if (!h->vad) {
+    return RAC_ERROR_INVALID_HANDLE;
   }
 
-  return RAC_SUCCESS;
+  auto config = h->vad->get_vad_config();
+  config.threshold = threshold;
+  // Surface the live-detector rebuild result to callers so a failed
+  // recreate (e.g. SherpaOnnxCreateVoiceActivityDetector returns null)
+  // is not silently reported as a successful threshold change.
+  return h->vad->configure_vad(config) ? RAC_SUCCESS
+                                       : RAC_ERROR_INFERENCE_FAILED;
 }
 
 rac_bool_t rac_vad_sherpa_is_speech_active(rac_handle_t handle) {
@@ -150,7 +154,11 @@ rac_bool_t rac_vad_sherpa_is_speech_active(rac_handle_t handle) {
   }
 
   auto *h = static_cast<rac_sherpa_vad_handle_impl *>(handle);
-  return (h->vad && h->vad->is_ready()) ? RAC_TRUE : RAC_FALSE;
+  // Report the *latest detected speech* state instead of model readiness.
+  // is_ready() is true the moment the model loads and stays true through
+  // silence/reset, so consumers of VADServiceState.is_speech_active (UI,
+  // speech gates, barge-in) would otherwise see a stuck-active signal.
+  return (h->vad && h->vad->is_speech_active()) ? RAC_TRUE : RAC_FALSE;
 }
 
 void rac_vad_sherpa_destroy(rac_handle_t handle) {

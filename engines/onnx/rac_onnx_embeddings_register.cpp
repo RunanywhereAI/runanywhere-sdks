@@ -60,6 +60,15 @@ onnx_embed_vtable_embed(void *impl, const char *text,
 
   try {
     auto embedding = h->provider->embed(text);
+    // The provider uses an empty vector as its failure sentinel
+    // (onnx_embedding_provider.cpp:591-633 — model run / dtype mismatch /
+    // exception all return {}). Treat that as RAC_ERROR_INFERENCE_FAILED so
+    // a corrupted inference does not surface to the SDK / RAG indexing path
+    // as a successful zero-dimensional vector.
+    if (embedding.empty()) {
+      RAC_LOG_ERROR(LOG_CAT, "Embedding inference returned an empty vector");
+      return RAC_ERROR_INFERENCE_FAILED;
+    }
     size_t dim = embedding.size();
 
     out_result->num_embeddings = 1;
@@ -116,6 +125,17 @@ onnx_embed_vtable_embed_batch(void *impl, const char *const *texts,
                     "Batch embedding returned %zu results, expected %zu",
                     batch_results.size(), num_texts);
       return RAC_ERROR_INFERENCE_FAILED;
+    }
+
+    // Reject the provider's empty-vector failure sentinel before the result
+    // is published, so a per-text inference failure does not become a
+    // successful zero-dimensional embedding (see engine-onnx-003).
+    for (size_t i = 0; i < num_texts; ++i) {
+      if (batch_results[i].empty()) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "Batch embedding[%zu] returned an empty vector", i);
+        return RAC_ERROR_INFERENCE_FAILED;
+      }
     }
 
     size_t dim = h->provider->dimension();

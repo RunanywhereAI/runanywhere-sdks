@@ -1250,6 +1250,13 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
             RAC_LOG_ERROR(kLogCat,
                           "CoreML diffusion initialize failed — missing one of "
                           "TextEncoder.mlmodelc / Unet.mlmodelc / VAEDecoder.mlmodelc");
+            // rac_coreml_load_model_in_dir returns a retained MLModel
+            // (NS_RETURNS_RETAINED). Release any partially loaded models on
+            // the error path so we don't leak a strong ref per failed init.
+            [impl->text_encoder release];
+            [impl->unet release];
+            [impl->vae_decoder release];
+            [impl->safety_checker release];
             impl->text_encoder = nil;
             impl->unet = nil;
             impl->vae_decoder = nil;
@@ -1345,6 +1352,14 @@ rac_result_t rac_diffusion_coreml_cancel(rac_diffusion_coreml_impl_t* impl) {
 rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t* impl) {
     if (!impl) return RAC_ERROR_NULL_POINTER;
     std::lock_guard<std::mutex> lock(impl->mtx);
+    // Pair the retain that rac_coreml_load_model_in_dir performed during
+    // initialize. Without these -release calls the MLModel instances would
+    // leak; without the retain in the helper they would dangle. See
+    // runtimes-001.
+    [impl->text_encoder release];
+    [impl->unet release];
+    [impl->vae_decoder release];
+    [impl->safety_checker release];
     impl->text_encoder = nil;
     impl->unet = nil;
     impl->vae_decoder = nil;

@@ -278,6 +278,13 @@ public:
   std::vector<std::string> get_supported_languages() const;
 
 private:
+  // Builds the offline recognizer using cached model paths and the current
+  // `language_`. Mutex MUST be held by the caller. Returns true on success.
+  // Existing recognizer (if any) is destroyed first. Used by load_model() to
+  // do the initial build and by transcribe() to honor per-call language /
+  // detect-language requests on Whisper recognizers (engine-sherpa-001).
+  bool build_offline_recognizer_locked();
+
   SherpaBackend *backend_;
 #if SHERPA_ONNX_AVAILABLE
   const SherpaOnnxOfflineRecognizer *sherpa_recognizer_ = nullptr;
@@ -353,6 +360,12 @@ public:
   ~SherpaVAD();
 
   bool is_ready() const;
+  // Returns true iff the most recent process() call observed speech in the
+  // latest Silero window. Distinct from is_ready(), which only reports model
+  // load status. Lifecycle/state APIs (VADServiceState.is_speech_active) and
+  // the rac_vad_sherpa_is_speech_active vtable slot route through here so
+  // consumers see actual frame state, not stale readiness.
+  bool is_speech_active() const;
   bool load_model(const std::string &model_path,
                   VADModelType model_type = VADModelType::SILERO,
                   const nlohmann::json &config = {});
@@ -382,6 +395,9 @@ private:
   std::string model_path_;
   VADConfig config_;
   std::atomic<bool> model_loaded_{false};
+  // Latest detected speech state, refreshed by process() and cleared by
+  // reset()/unload_model()/configure_vad(rebuild). Guarded by mutex_.
+  bool last_is_speech_ = false;
   mutable std::mutex mutex_;
 
   // Internal buffer to accumulate audio until we have a full Silero window (512

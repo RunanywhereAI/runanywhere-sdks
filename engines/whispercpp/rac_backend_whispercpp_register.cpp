@@ -205,6 +205,14 @@ rac_result_t rac_backend_whispercpp_unregister(void) {
     return RAC_ERROR_MODULE_NOT_FOUND;
   }
 
+  // Tear down the unified plugin route before the legacy module entry.
+  // Service routing (rac_stt_service.cpp:108-127) dispatches from the
+  // plugin registry, so skipping this leaves the whispercpp STT vtable
+  // selectable for RAC_PRIMITIVE_TRANSCRIBE after the host believes the
+  // backend has been torn down (see engine-others-004). RAC_ERROR_NOT_FOUND
+  // is tolerated for hosts that never called rac_plugin_register (older
+  // bootstrap paths or partial registration).
+  rac_plugin_unregister("whispercpp");
   rac_module_unregister(MODULE_ID);
 
   g_registered = false;

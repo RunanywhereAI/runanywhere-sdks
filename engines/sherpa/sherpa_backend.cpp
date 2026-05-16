@@ -311,6 +311,35 @@ bool SherpaSTT::load_model(const std::string &model_path,
   tokens_path_ = tokens_path;
   nemo_ctc_model_path_ = nemo_ctc_model_path;
 
+  if (!build_offline_recognizer_locked()) {
+    return false;
+  }
+
+  RAC_LOG_INFO("Sherpa.STT", "STT model loaded successfully (%s)",
+               is_nemo_ctc ? "NeMo CTC" : "Whisper");
+  model_loaded_ = true;
+  return true;
+
+#else
+  RAC_LOG_ERROR("Sherpa.STT",
+                "Sherpa-ONNX not available - streaming STT disabled");
+  return false;
+#endif
+}
+
+bool SherpaSTT::build_offline_recognizer_locked() {
+#if SHERPA_ONNX_AVAILABLE
+  // Tear down any prior recognizer so we can rebuild with the current
+  // `language_` setting. Used both by load_model() and by transcribe() when
+  // the per-call language differs from what the recognizer was last built
+  // with (engine-sherpa-001).
+  if (sherpa_recognizer_) {
+    SherpaOnnxDestroyOfflineRecognizer(sherpa_recognizer_);
+    sherpa_recognizer_ = nullptr;
+  }
+
+  const bool is_nemo_ctc = (model_type_ == STTModelType::NEMO_CTC);
+
   // Initialize all config fields explicitly to avoid any uninitialized pointer
   // issues. The struct layout MUST match the prebuilt libsherpa-onnx-c-api.so
   // version (v1.12.20).
@@ -334,16 +363,16 @@ bool SherpaSTT::load_model(const std::string &model_path,
   recognizer_config.model_config.whisper.tail_paddings = -1;
 
   if (is_nemo_ctc) {
-    // Configure for NeMo CTC (Parakeet, etc.)
     recognizer_config.model_config.nemo_ctc.model =
         nemo_ctc_model_path_.c_str();
     recognizer_config.model_config.model_type = "nemo_ctc";
 
     RAC_LOG_INFO("Sherpa.STT", "Configuring NeMo CTC recognizer");
   } else {
-    // Configure for Whisper (encoder-decoder)
     recognizer_config.model_config.whisper.encoder = encoder_path_.c_str();
     recognizer_config.model_config.whisper.decoder = decoder_path_.c_str();
+    // Whisper auto-detects language when whisper.language == "". That's the
+    // mode we use when the caller passes detect_language=true.
     recognizer_config.model_config.whisper.language = language_.c_str();
     recognizer_config.model_config.whisper.task = "transcribe";
     recognizer_config.model_config.model_type = "whisper";
@@ -399,8 +428,9 @@ bool SherpaSTT::load_model(const std::string &model_path,
   recognizer_config.hr.lexicon = "";
   recognizer_config.hr.rule_fsts = "";
 
-  RAC_LOG_INFO("Sherpa.STT", "Creating SherpaOnnxOfflineRecognizer (%s)...",
-               is_nemo_ctc ? "NeMo CTC" : "Whisper");
+  RAC_LOG_INFO("Sherpa.STT",
+               "Creating SherpaOnnxOfflineRecognizer (%s, lang=\"%s\")...",
+               is_nemo_ctc ? "NeMo CTC" : "Whisper", language_.c_str());
 
   try {
     sherpa_recognizer_ = SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
@@ -417,15 +447,8 @@ bool SherpaSTT::load_model(const std::string &model_path,
     RAC_LOG_ERROR("Sherpa.STT", "Failed to create SherpaOnnxOfflineRecognizer");
     return false;
   }
-
-  RAC_LOG_INFO("Sherpa.STT", "STT model loaded successfully (%s)",
-               is_nemo_ctc ? "NeMo CTC" : "Whisper");
-  model_loaded_ = true;
   return true;
-
 #else
-  RAC_LOG_ERROR("Sherpa.STT",
-                "Sherpa-ONNX not available - streaming STT disabled");
   return false;
 #endif
 }
@@ -459,14 +482,65 @@ STTResult SherpaSTT::transcribe(const STTRequest &request) {
   STTResult result;
 
 #if SHERPA_ONNX_AVAILABLE
+  // Lock for the lifetime of this call so we can safely (a) honor a per-call
+  // language change by rebuilding the recognizer and (b) use the recognizer
+  // without racing other callers who might rebuild/destroy it.
+  std::lock_guard<std::mutex> lock(mutex_);
+
   if (!sherpa_recognizer_ || !model_loaded_) {
     RAC_LOG_ERROR("Sherpa.STT", "STT not ready for transcription");
     result.text = "[Error: STT model not loaded]";
     return result;
   }
 
-  RAC_LOG_INFO("Sherpa.STT", "Transcribing %zu samples at %d Hz",
-               request.audio_samples.size(), request.sample_rate);
+  // engine-sherpa-001: the recognizer is built once with `language_` (default
+  // "en"). Per-call STTRequest.language / detect_language was previously
+  // ignored, so multilingual Whisper users got English-forced output. Honor
+  // the request by rebuilding the Whisper recognizer with the new whisper.
+  // language slot when it differs. detect_language=true maps to Whisper's
+  // auto-detect mode (whisper.language == ""). Non-Whisper recognizers
+  // (e.g. NeMo CTC) are single-language by construction, so an explicit
+  // mismatched per-call language is reported as not-supported.
+  std::string desired_language = language_;
+  if (request.detect_language) {
+    desired_language = "";
+  } else if (!request.language.empty()) {
+    desired_language = request.language;
+  }
+
+  if (desired_language != language_) {
+    if (model_type_ != STTModelType::WHISPER) {
+      RAC_LOG_WARNING("Sherpa.STT",
+                      "Per-call language='%s' (detect=%d) not supported for "
+                      "non-Whisper recognizer; rejecting request",
+                      request.language.c_str(),
+                      request.detect_language ? 1 : 0);
+      result.text = "[Error: language not supported by recognizer]";
+      return result;
+    }
+    const std::string previous_language = language_;
+    language_ = desired_language;
+    if (!build_offline_recognizer_locked()) {
+      RAC_LOG_ERROR("Sherpa.STT",
+                    "Failed to rebuild Whisper recognizer for language=\"%s\"; "
+                    "reverting to \"%s\"",
+                    desired_language.c_str(), previous_language.c_str());
+      language_ = previous_language;
+      // Try to restore the previous recognizer; if even that fails, mark the
+      // backend not-ready so subsequent calls fail fast instead of crashing.
+      if (!build_offline_recognizer_locked()) {
+        model_loaded_ = false;
+        result.text = "[Error: recognizer rebuild failed]";
+        return result;
+      }
+      result.text = "[Error: language not supported by recognizer]";
+      return result;
+    }
+  }
+
+  RAC_LOG_INFO("Sherpa.STT", "Transcribing %zu samples at %d Hz (lang=\"%s\")",
+               request.audio_samples.size(), request.sample_rate,
+               language_.c_str());
 
   const SherpaOnnxOfflineStream *stream =
       SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
@@ -1170,6 +1244,13 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
   };
   SynthesisGuard guard(active_synthesis_count_);
 
+  // hotspot-engine-sherpa-004: clear any stale cancel signal from a prior
+  // synthesis so cancel() observed during THIS call's blocking
+  // SherpaOnnxOfflineTtsGenerate is what we react to. The Sherpa-ONNX C TTS
+  // API has no cancellation hook, so the flag is consulted post-generate to
+  // suppress the result instead of preempting compute.
+  cancel_requested_.store(false, std::memory_order_release);
+
   const SherpaOnnxOfflineTts *tts_ptr = nullptr;
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -1223,6 +1304,24 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
     return result;
   }
 
+  // hotspot-engine-sherpa-004: drop the post-stop result if cancel() fired
+  // while SherpaOnnxOfflineTtsGenerate was running. We can't preempt the
+  // blocking Piper generator, but we MUST NOT surface its chunk/completion
+  // through the stream wrapper after the SDK requested a stop — empty
+  // audio_samples here makes the rac_tts_sherpa_synthesize wrapper return
+  // RAC_ERROR_INFERENCE_FAILED so the lifecycle stream/one-shot path does
+  // not deliver phantom audio.
+  if (cancel_requested_.load(std::memory_order_acquire)) {
+    int dropped_samples = audio->n;
+    SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
+    RAC_LOG_WARNING("Sherpa.TTS",
+                    "Dropping %d-sample synthesis result; cancel was "
+                    "requested during blocking generation (Sherpa-ONNX TTS "
+                    "compute cannot be preempted)",
+                    dropped_samples);
+    return result;
+  }
+
   RAC_LOG_INFO("Sherpa.TTS", "Generated %d samples at %d Hz", audio->n,
                audio->sample_rate);
 
@@ -1266,6 +1365,11 @@ SherpaVAD::SherpaVAD(SherpaBackend *backend) : backend_(backend) {}
 SherpaVAD::~SherpaVAD() { unload_model(); }
 
 bool SherpaVAD::is_ready() const { return model_loaded_; }
+
+bool SherpaVAD::is_speech_active() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return last_is_speech_;
+}
 
 bool SherpaVAD::load_model(const std::string &model_path,
                            VADModelType model_type,
@@ -1370,13 +1474,76 @@ bool SherpaVAD::unload_model() {
 #endif
 
   pending_samples_.clear();
+  last_is_speech_ = false;
   model_loaded_ = false;
   return true;
 }
 
 bool SherpaVAD::configure_vad(const VADConfig &config) {
   std::lock_guard<std::mutex> lock(mutex_);
+
+  const float old_threshold = config_.threshold;
   config_ = config;
+
+#if SHERPA_ONNX_AVAILABLE
+  // Sherpa-ONNX's SilerVAD captures the threshold at detector construction
+  // and exposes no setter, so a `set_threshold` that only mutates `config_`
+  // round-trips through the service layer as a successful no-op while the
+  // model-based VAD decision still uses the original threshold (see
+  // engine-sherpa-002). Rebuild the live detector when the threshold
+  // actually changes so the new value affects subsequent process() calls.
+  if (sherpa_vad_ != nullptr && !model_path_.empty() &&
+      old_threshold != config_.threshold) {
+    SherpaOnnxVadModelConfig vad_config;
+    memset(&vad_config, 0, sizeof(vad_config));
+    vad_config.silero_vad.model = model_path_.c_str();
+    vad_config.silero_vad.threshold = config_.threshold;
+    vad_config.silero_vad.min_silence_duration = 0.5f;
+    vad_config.silero_vad.min_speech_duration = 0.25f;
+    vad_config.silero_vad.max_speech_duration = 15.0f;
+    vad_config.silero_vad.window_size = 512;
+    vad_config.sample_rate = 16000;
+    vad_config.num_threads = 1;
+    vad_config.debug = 0;
+    vad_config.provider = "cpu";
+
+    const SherpaOnnxVoiceActivityDetector *new_vad = nullptr;
+    try {
+      new_vad = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
+    } catch (const std::exception &e) {
+      RAC_LOG_ERROR("Sherpa.VAD",
+                    "configure_vad: failed to recreate VAD detector with "
+                    "threshold=%.2f: %s",
+                    config_.threshold, e.what());
+      config_.threshold = old_threshold;
+      return false;
+    } catch (...) {
+      RAC_LOG_ERROR("Sherpa.VAD",
+                    "configure_vad: failed to recreate VAD detector with "
+                    "threshold=%.2f",
+                    config_.threshold);
+      config_.threshold = old_threshold;
+      return false;
+    }
+    if (!new_vad) {
+      RAC_LOG_ERROR("Sherpa.VAD",
+                    "configure_vad: SherpaOnnxCreateVoiceActivityDetector "
+                    "returned null for threshold=%.2f",
+                    config_.threshold);
+      config_.threshold = old_threshold;
+      return false;
+    }
+
+    SherpaOnnxDestroyVoiceActivityDetector(sherpa_vad_);
+    sherpa_vad_ = new_vad;
+    pending_samples_.clear();
+    last_is_speech_ = false;
+    RAC_LOG_INFO("Sherpa.VAD",
+                 "VAD detector recreated with threshold=%.2f (was %.2f)",
+                 config_.threshold, old_threshold);
+  }
+#endif
+
   return true;
 }
 
@@ -1415,6 +1582,9 @@ VADResult SherpaVAD::process(const std::vector<float> &audio_samples,
   // Check if speech is currently detected in the latest frame
   result.is_speech = SherpaOnnxVoiceActivityDetectorDetected(sherpa_vad_) != 0;
   result.probability = result.is_speech ? 1.0f : 0.0f;
+  // Cache for is_speech_active() so lifecycle/state queries reflect the
+  // detector's actual frame state, not is_ready() (model-loaded flag).
+  last_is_speech_ = result.is_speech;
 
   // Drain any completed speech segments (keeps internal queue from growing)
   while (SherpaOnnxVoiceActivityDetectorEmpty(sherpa_vad_) == 0) {
@@ -1454,6 +1624,7 @@ void SherpaVAD::reset() {
   }
 #endif
   pending_samples_.clear();
+  last_is_speech_ = false;
 }
 
 VADConfig SherpaVAD::get_vad_config() const {

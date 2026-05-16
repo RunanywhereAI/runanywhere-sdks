@@ -17,6 +17,18 @@ rac_result_t rac_tts_sherpa_synthesize(rac_handle_t handle, const char *text,
                                        rac_tts_result_t *out_result);
 rac_result_t rac_tts_sherpa_get_voices(rac_handle_t handle, char ***out_voices,
                                        size_t *out_count);
+
+/**
+ * @brief Populate `rac_tts_info_t` for the canonical lifecycle voice-list ABI.
+ *
+ * Mirrors the per-handle `get_voices()` enumeration into
+ * `out_info->available_voices` + `num_voices`. The returned pointer array is
+ * owned by the handle and remains valid until the next call into
+ * `rac_tts_sherpa_get_info` on the same handle, or until the handle is
+ * destroyed via `rac_tts_sherpa_destroy`. Callers MUST NOT free the pointers.
+ */
+rac_result_t rac_tts_sherpa_get_info(rac_handle_t handle,
+                                     rac_tts_info_t *out_info);
 void rac_tts_sherpa_stop(rac_handle_t handle);
 void rac_tts_sherpa_destroy(rac_handle_t handle);
 rac_result_t rac_tts_sherpa_get_languages(rac_handle_t handle, char **out_json);

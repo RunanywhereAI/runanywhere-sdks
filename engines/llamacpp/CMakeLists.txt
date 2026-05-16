@@ -288,6 +288,33 @@ else()
     )
     rac_apply_android_page_alignment(runanywhere_llamacpp)
     install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
+
+    if(RAC_VLM_USE_MTMD)
+        # Parallel SHARED carrier for the VLM vtable so dynamic-plugin hosts
+        # can route RAC_PRIMITIVE_VLM (name="llamacpp_vlm") via
+        # `rac_registry_load_plugin(librunanywhere_llamacpp_vlm.*)`. The
+        # dlopen loader derives the entry-symbol name from the library
+        # filename (see plugin_loader.cpp::entry_symbol_from_path), so the
+        # carrier's basename must match `runanywhere_llamacpp_vlm` to map to
+        # `rac_plugin_entry_llamacpp_vlm`. Without this, a host that does NOT
+        # call `rac_backend_llamacpp_vlm_register()` directly (the Swift /
+        # Kotlin / RN bridge path) cannot reach the VLM plugin even though
+        # the implementation is linked into rac_backend_llamacpp.
+        add_library(runanywhere_llamacpp_vlm SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp_vlm.cpp
+        )
+        set_target_properties(runanywhere_llamacpp_vlm PROPERTIES
+            OUTPUT_NAME           runanywhere_llamacpp_vlm
+            C_VISIBILITY_PRESET   hidden
+            CXX_VISIBILITY_PRESET hidden
+        )
+        target_link_libraries(runanywhere_llamacpp_vlm PUBLIC
+            rac_backend_llamacpp
+            rac_commons
+        )
+        rac_apply_android_page_alignment(runanywhere_llamacpp_vlm)
+        install(TARGETS runanywhere_llamacpp_vlm LIBRARY DESTINATION lib)
+    endif()
 endif()
 
 # =============================================================================

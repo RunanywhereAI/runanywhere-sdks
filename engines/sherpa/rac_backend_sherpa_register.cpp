@@ -160,86 +160,23 @@ static rac_result_t sherpa_stt_vtable_detect_language(
                                         out_language);
 }
 
-// -----------------------------------------------------------------------------
-// CPP-14 (Wave 1): persistent per-session streaming handles.
-//
-// The Sherpa-ONNX online recognizer expects a stable OnlineStream handle
-// across all chunks of an utterance. Pre-CPP-14, commons handed each
-// chunk to transcribe_stream which synthesized a fresh stream per frame
-// and discarded it — first-token latency regressed badly on Android /
-// Linux voice-agent paths. The three slots below let commons keep the
-// backing SherpaOnnxOnlineStream alive for the whole session: one
-// create, N x feed_audio_chunk with real-time partial emission, one
-// destroy.
-// -----------------------------------------------------------------------------
-
-static rac_result_t
-sherpa_stt_vtable_stream_create(void *impl,
-                                const rac_stt_options_t * /*options*/,
-                                rac_handle_t *out_stream_handle) {
-  if (!impl || !out_stream_handle)
-    return RAC_ERROR_INVALID_ARGUMENT;
-  return rac_stt_sherpa_create_stream(static_cast<rac_handle_t>(impl),
-                                      out_stream_handle);
-}
-
-static rac_result_t sherpa_stt_vtable_stream_feed_audio_chunk(
-    void *impl, rac_handle_t stream_handle, const int16_t *samples,
-    size_t count, rac_stt_stream_callback_t callback, void *user_data) {
-  if (!impl || !stream_handle)
-    return RAC_ERROR_INVALID_ARGUMENT;
-  if (count > 0 && !samples)
-    return RAC_ERROR_INVALID_ARGUMENT;
-
-  std::vector<float> float_samples;
-  float_samples.reserve(count);
-  for (size_t i = 0; i < count; ++i) {
-    float_samples.push_back(static_cast<float>(samples[i]) / 32768.0f);
-  }
-
-  auto backend_handle = static_cast<rac_handle_t>(impl);
-  rac_result_t feed_rc =
-      rac_stt_sherpa_feed_audio(backend_handle, stream_handle,
-                                float_samples.data(), float_samples.size());
-  if (feed_rc != RAC_SUCCESS)
-    return feed_rc;
-
-  // Pull partials out of the recognizer while it has enough buffered
-  // audio. Matches what the legacy transcribe_stream path did, but
-  // without discarding the online recognizer after each chunk.
-  while (rac_stt_sherpa_stream_is_ready(backend_handle, stream_handle) ==
-         RAC_TRUE) {
-    char *text = nullptr;
-    rac_result_t dec_rc =
-        rac_stt_sherpa_decode_stream(backend_handle, stream_handle, &text);
-    if (dec_rc != RAC_SUCCESS)
-      return dec_rc;
-
-    const bool endpoint =
-        rac_stt_sherpa_is_endpoint(backend_handle, stream_handle) == RAC_TRUE;
-    if (callback && text) {
-      callback(text, endpoint ? RAC_TRUE : RAC_FALSE, user_data);
-    }
-    if (text)
-      free(text);
-    if (!endpoint)
-      break; // emitted the final for this utterance, wait for more audio
-  }
-  return RAC_SUCCESS;
-}
-
-static rac_result_t
-sherpa_stt_vtable_stream_destroy(void *impl, rac_handle_t stream_handle) {
-  if (!impl || !stream_handle)
-    return RAC_SUCCESS;
-  rac_stt_sherpa_destroy_stream(static_cast<rac_handle_t>(impl), stream_handle);
-  return RAC_SUCCESS;
-}
-
 } // namespace
 
 // Keep external C linkage so rac_plugin_entry_sherpa.cpp can wire this ops
 // table in both static and shared builds.
+//
+// CPP-14 (Wave 1) persistent per-session stream slots are intentionally
+// NULL: the underlying Sherpa-ONNX integration here is backed by the
+// *offline* recognizer (engines/sherpa/sherpa_backend.cpp::SherpaSTT —
+// SherpaOnnxCreateOfflineStream + SherpaOnnxDecodeOfflineStream every
+// feed, no endpoint detection, no final emission). Wiring those slots
+// caused commons to take the persistent path
+// (rac_stt_stream.cpp:319-410), which then produced repeated offline
+// re-decodes as partials and never emitted a final/endpoint event,
+// violating the STT stream contract. Leaving the slots NULL forces
+// commons back onto the legacy transcribe_stream behavior — paying the
+// per-chunk decode cost but preserving correctness — until an online
+// recognizer implementation lands here.
 extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .initialize = sherpa_stt_vtable_initialize,
     .transcribe = sherpa_stt_vtable_transcribe,
@@ -250,10 +187,9 @@ extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .create = sherpa_stt_create_impl,
     .get_languages = sherpa_stt_vtable_get_languages,
     .detect_language = sherpa_stt_vtable_detect_language,
-    // CPP-14 (Wave 1): persistent per-session streaming recognizer.
-    .stream_create = sherpa_stt_vtable_stream_create,
-    .stream_feed_audio_chunk = sherpa_stt_vtable_stream_feed_audio_chunk,
-    .stream_destroy = sherpa_stt_vtable_stream_destroy,
+    .stream_create = nullptr,
+    .stream_feed_audio_chunk = nullptr,
+    .stream_destroy = nullptr,
 };
 
 namespace { // reopen for the next batch of static helpers
@@ -287,22 +223,27 @@ static rac_result_t sherpa_tts_vtable_synthesize_stream(
 }
 
 static rac_result_t sherpa_tts_vtable_stop(void *impl) {
+  // hotspot-engine-sherpa-004: still mark the in-flight cancel flag so any
+  // synthesize() that is currently blocked inside SherpaOnnxOfflineTtsGenerate
+  // will drop its post-generation result instead of emitting it. But the
+  // Sherpa-ONNX C TTS API exposes no preemption hook for VITS/Piper
+  // generation, so we cannot truly stop ongoing compute. Returning
+  // RAC_SUCCESS here would mislead the lifecycle stop ABI
+  // (rac_tts_stop_lifecycle_proto -> TTSServiceState.is_ready=true) and the
+  // Kotlin / Flutter / RN / Swift stream-cancellation paths into believing
+  // synthesis was actually stopped while Piper continues to run. Surface the
+  // capability gap honestly with RAC_ERROR_NOT_SUPPORTED.
   rac_tts_sherpa_stop(impl);
-  return RAC_SUCCESS;
+  return RAC_ERROR_NOT_SUPPORTED;
 }
 
 static rac_result_t sherpa_tts_vtable_get_info(void *impl,
                                                rac_tts_info_t *out_info) {
-  (void)impl;
-  if (!out_info)
-    return RAC_ERROR_NULL_POINTER;
-
-  out_info->is_ready = RAC_TRUE;
-  out_info->is_synthesizing = RAC_FALSE;
-  out_info->available_voices = nullptr;
-  out_info->num_voices = 0;
-
-  return RAC_SUCCESS;
+  // Forward to the per-handle helper so the lifecycle voice-list ABI
+  // (rac_nonllm_lifecycle_proto_abi.cpp / tts_component.cpp) sees the
+  // speakers Sherpa enumerated during load_model rather than the previous
+  // empty fallback that masked every multi-speaker Piper model.
+  return rac_tts_sherpa_get_info(impl, out_info);
 }
 
 static rac_result_t sherpa_tts_vtable_cleanup(void *impl) {

@@ -16,6 +16,8 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_whisperkit_coreml.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -219,11 +221,26 @@ rac_result_t rac_backend_whisperkit_coreml_register(void) {
     return result;
   }
 
-  // v3 Phase B5: plugin registration via rac_plugin_entry_whisperkit_coreml().
+  // STT routing dispatches from the unified plugin registry (see
+  // rac_stt_service.cpp:108-127), not the legacy module registry. Without
+  // this call, models pinned to RAC_FRAMEWORK_WHISPERKIT_COREML fail to
+  // resolve a TRANSCRIBE plugin even though the Swift callbacks are
+  // installed and module state is registered (engine-others-001).
+  const rac_engine_vtable_t *vt = rac_plugin_entry_whisperkit_coreml();
+  if (vt != nullptr) {
+    rac_result_t plugin_rc = rac_plugin_register(vt);
+    if (plugin_rc != RAC_SUCCESS &&
+        plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+    } else {
+      RAC_LOG_INFO(LOG_CAT,
+                   "rac_plugin_register succeeded for 'whisperkit_coreml'");
+    }
+  }
+
   g_registered = true;
   RAC_LOG_INFO(LOG_CAT,
-               "WhisperKit CoreML backend registered (module_register only; "
-               "plugin registration via rac_plugin_entry_whisperkit_coreml)");
+               "WhisperKit CoreML backend registered (module + plugin)");
   return RAC_SUCCESS;
 }
 
@@ -232,6 +249,10 @@ rac_result_t rac_backend_whisperkit_coreml_unregister(void) {
     return RAC_ERROR_MODULE_NOT_FOUND;
   }
 
+  // Tear down the unified plugin route alongside the legacy module entry
+  // so service routing sees a consistent state and reload paths can
+  // re-register cleanly.
+  rac_plugin_unregister("whisperkit_coreml");
   rac_module_unregister(MODULE_ID);
 
   g_registered = false;

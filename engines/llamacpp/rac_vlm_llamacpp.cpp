@@ -526,15 +526,20 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
                image->pixel_data) {
       RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
       bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
-    } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64 &&
-               image->base64_data) {
-      RAC_LOG_WARNING(LOG_CAT,
-                      "Base64 image format not yet supported, using text-only");
+    } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64) {
+      // Base64 decode is not wired through mtmd yet. Returning an explicit
+      // error is strictly better than silently dropping the image and
+      // generating a text-only answer the caller will read as visual
+      // analysis (see hotspot-engine-llamacpp-001).
+      RAC_LOG_ERROR(LOG_CAT,
+                    "Base64 image format not supported by llama.cpp VLM "
+                    "backend; decode to RGB pixels or supply a file path");
+      return RAC_ERROR_INVALID_INPUT;
     }
 
     has_image = (bitmap != nullptr);
     RAC_LOG_INFO(LOG_CAT, "[v3-prep] bitmap ready=%d", has_image ? 1 : 0);
-    if (!has_image && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
+    if (!has_image) {
       RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
       return RAC_ERROR_INVALID_INPUT;
     }
@@ -799,39 +804,58 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   configure_sampler(backend, nullptr);
 
 #ifdef RAC_VLM_USE_MTMD
-  // Initialize mtmd context if mmproj provided
-  if (mmproj_path && mmproj_path[0]) {
-    mtmd_context_params mparams = mtmd_context_params_default();
-    // Force CPU for vision encoder too when model requires CPU (M-RoPE)
-#ifdef __EMSCRIPTEN__
-    if (backend->config.use_gpu_vision && !force_cpu) {
-      RAC_LOG_WARNING(
-          LOG_CAT,
-          "Web VLM vision encoder is forced to CPU; WebGPU CLIP image encoding "
-          "is not stable in current llama.cpp/mtmd builds");
-    }
-    mparams.use_gpu = false;
-    mparams.n_threads = 1;
-#else
-    mparams.use_gpu = force_cpu ? false : backend->config.use_gpu_vision;
-    mparams.n_threads = n_threads;
-#endif
-    mparams.print_timings = false;
-    mparams.warmup = true;
-
-    backend->mtmd_ctx =
-        mtmd_init_from_file(mmproj_path, backend->model, mparams);
-    if (!backend->mtmd_ctx) {
-      RAC_LOG_ERROR(LOG_CAT, "Failed to load vision projector: %s",
-                    mmproj_path);
-      // Continue without vision - will work as text-only LLM
-      RAC_LOG_WARNING(LOG_CAT, "VLM will operate in text-only mode");
-    } else {
-      RAC_LOG_INFO(LOG_CAT, "Vision projector loaded successfully%s",
-                   force_cpu ? " (CPU mode for M-RoPE compat)" : "");
-    }
-    backend->mmproj_path = mmproj_path;
+  // VLM contract (rac_vlm_service.h:44-47): mmproj_path is REQUIRED for
+  // llama.cpp. Silently falling back to text-only on a missing/failed vision
+  // projector previously let lifecycle/get_info report VLM ready while
+  // inference dropped images — violating the readiness contract Swift's
+  // public VLM API relies on. Fail the load cleanly so callers can either
+  // supply a projector or route the request through the LLM path instead.
+  if (!mmproj_path || !mmproj_path[0]) {
+    RAC_LOG_ERROR(LOG_CAT,
+                  "VLM load requires mmproj_path; refusing to load as VLM "
+                  "without a vision projector");
+    llama_sampler_free(backend->sampler);
+    backend->sampler = nullptr;
+    llama_free(backend->ctx);
+    backend->ctx = nullptr;
+    llama_model_free(backend->model);
+    backend->model = nullptr;
+    return RAC_ERROR_INVALID_INPUT;
   }
+
+  mtmd_context_params mparams = mtmd_context_params_default();
+  // Force CPU for vision encoder too when model requires CPU (M-RoPE)
+#ifdef __EMSCRIPTEN__
+  if (backend->config.use_gpu_vision && !force_cpu) {
+    RAC_LOG_WARNING(
+        LOG_CAT,
+        "Web VLM vision encoder is forced to CPU; WebGPU CLIP image encoding "
+        "is not stable in current llama.cpp/mtmd builds");
+  }
+  mparams.use_gpu = false;
+  mparams.n_threads = 1;
+#else
+  mparams.use_gpu = force_cpu ? false : backend->config.use_gpu_vision;
+  mparams.n_threads = n_threads;
+#endif
+  mparams.print_timings = false;
+  mparams.warmup = true;
+
+  backend->mtmd_ctx =
+      mtmd_init_from_file(mmproj_path, backend->model, mparams);
+  if (!backend->mtmd_ctx) {
+    RAC_LOG_ERROR(LOG_CAT, "Failed to load vision projector: %s", mmproj_path);
+    llama_sampler_free(backend->sampler);
+    backend->sampler = nullptr;
+    llama_free(backend->ctx);
+    backend->ctx = nullptr;
+    llama_model_free(backend->model);
+    backend->model = nullptr;
+    return RAC_ERROR_MODEL_LOAD_FAILED;
+  }
+  RAC_LOG_INFO(LOG_CAT, "Vision projector loaded successfully%s",
+               force_cpu ? " (CPU mode for M-RoPE compat)" : "");
+  backend->mmproj_path = mmproj_path;
 #endif
 
   backend->model_path = model_path;
@@ -1097,6 +1121,19 @@ rac_result_t rac_vlm_llamacpp_process_stream(
   int repeat_run = 0;
   constexpr int MAX_CONSECUTIVE_REPEATS = 4;
 
+  // The VLM stream ABI documents `is_final` as the terminal marker callers
+  // wait on to flush UI / accumulated text (rac_vlm_llamacpp.h:139-148).
+  // Several normal exit paths (max_tokens exhaustion, empty-EOG token,
+  // callback-requested stop) used to fall through to RAC_SUCCESS without
+  // ever emitting that marker, leaving direct engine-API consumers stuck.
+  // Track whether a terminal callback was already sent (repetition guard
+  // and the non-empty-EOG branch already emit one) so we can guarantee
+  // exactly one is_final=true event before returning success.
+  bool terminal_emitted = false;
+  // Track decode failure so we surface it as an error instead of silently
+  // returning RAC_SUCCESS after emitting the terminal callback.
+  bool decode_failed = false;
+
   for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
     llama_token token =
         llama_sampler_sample(backend->sampler, backend->ctx, -1);
@@ -1113,6 +1150,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(
               LOG_CAT, "Repetition guard: token %d repeated %d times, stopping",
               token, repeat_run + 1);
           callback("", RAC_TRUE, user_data);
+          terminal_emitted = true;
           break;
         }
       } else {
@@ -1125,8 +1163,12 @@ rac_result_t rac_vlm_llamacpp_process_stream(
     int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
     if (len > 0) {
       buf[len] = '\0';
-      if (callback(buf, is_eog ? RAC_TRUE : RAC_FALSE, user_data) ==
-          RAC_FALSE) {
+      const rac_bool_t final_flag = is_eog ? RAC_TRUE : RAC_FALSE;
+      const rac_bool_t cb_rc = callback(buf, final_flag, user_data);
+      if (final_flag == RAC_TRUE) {
+        terminal_emitted = true;
+      }
+      if (cb_rc == RAC_FALSE) {
         break; // Callback requested stop
       }
     }
@@ -1144,12 +1186,20 @@ rac_result_t rac_vlm_llamacpp_process_stream(
     batch.n_tokens = 1;
 
     if (llama_decode(backend->ctx, batch) != 0) {
+      RAC_LOG_ERROR(LOG_CAT, "llama_decode failed during VLM streaming");
+      decode_failed = true;
       break;
     }
   }
 
+  // Guarantee the terminal marker on every successful exit path so direct
+  // engine-API callers can rely on is_final=true to close the stream.
+  if (!terminal_emitted) {
+    callback("", RAC_TRUE, user_data);
+  }
+
   llama_batch_free(batch);
-  return RAC_SUCCESS;
+  return decode_failed ? RAC_ERROR_INFERENCE_FAILED : RAC_SUCCESS;
 }
 
 void rac_vlm_llamacpp_cancel(rac_handle_t handle) {
