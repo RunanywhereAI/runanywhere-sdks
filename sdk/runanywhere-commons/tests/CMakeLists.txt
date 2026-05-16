@@ -369,12 +369,23 @@ add_test(NAME proto_runtime_smoke_tests COMMAND test_proto_runtime_smoke)
 
 # --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
 # No backend dependency; all three link directly against rac_commons.
+# test_engine_vtable.cpp includes the generated runanywhere.v1
+# model_types.pb.h directly, which transitively pulls in
+# google/protobuf/runtime_version.h. rac_commons keeps its protobuf
+# include path PRIVATE (the public ABI exposes byte buffers, not
+# `runanywhere::v1::*` C++ types), so the test target needs to inherit
+# the include path explicitly to find the FetchContent-built headers
+# on Linux runners that don't have a system protobuf installed.
 add_executable(test_engine_vtable test_engine_vtable.cpp)
 target_include_directories(test_engine_vtable PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${Protobuf_INCLUDE_DIRS}
 )
 target_link_libraries(test_engine_vtable PRIVATE rac_commons)
+if(TARGET protobuf::libprotobuf)
+    target_link_libraries(test_engine_vtable PRIVATE protobuf::libprotobuf)
+endif()
 rac_link_archive_deps(test_engine_vtable)
 target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
 add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)

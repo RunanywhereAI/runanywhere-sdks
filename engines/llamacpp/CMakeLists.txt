@@ -174,27 +174,19 @@ if(RAC_VLM_USE_MTMD)
         ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
     )
-    # Add mtmd model implementations (clip_graph_* classes)
-    list(APPEND LLAMACPP_BACKEND_SOURCES
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llava.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen2vl.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen3vl.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/minicpmv.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/glm4v.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/cogvlm.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/internvl.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimivl.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llama4.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/siglip.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/pixtral.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimik25.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/mobilenetv5.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/paddleocr.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/nemotron-v2-vl.cpp
+    # Glob every mtmd model implementation upstream ships. The previous
+    # hand-curated list drifts each llama.cpp bump (b9180 adds
+    # deepseekocr / dotsocr / gemma4a / gemma4v / granite-speech /
+    # hunyuanocr / mimovl / qwen3a / step3vl / yasa2 over what we
+    # listed). On Linux/Android the resulting clip_image_build_graph
+    # references unconditionally need every clip_graph_<name>::* vtable
+    # to be present at link time, otherwise ld.lld bails with
+    #   ld.lld: error: undefined symbol: vtable for clip_graph_<name>
+    # `CONFIGURE_DEPENDS` re-globs when the directory changes.
+    file(GLOB _RAC_MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
+        "${llamacpp_SOURCE_DIR}/tools/mtmd/models/*.cpp"
     )
+    list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 endif()
 
 # GAP 06 close-out (Phase 1 / B1): migrated to rac_add_engine_plugin().

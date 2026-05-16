@@ -97,6 +97,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install protobuf
+      - name: Download vendored ONNX Runtime (iOS xcframework)
+        run: bash sdk/runanywhere-commons/scripts/ios/download-onnx.sh
+      - name: Download vendored Sherpa-ONNX (iOS xcframework)
+        run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
       - run: cmake --preset ios-device
       - run: cmake --build --preset ios-device --config Release
 
