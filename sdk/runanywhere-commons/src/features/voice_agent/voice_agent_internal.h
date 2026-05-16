@@ -51,6 +51,18 @@ struct rac_voice_agent {
     ///
     /// Held via shared_ptr so destroy() can hand a reference to the
     /// in-flight cancel path without racing the agent destructor.
+    ///
+    /// commons-features-voice-003: a dedicated mutex protects every read,
+    /// assign, and reset of `pipeline`. The outer `mutex` field is held by
+    /// `rac_voice_agent_process_stream` for the entire pipeline run, so
+    /// destroy()/cleanup() cannot acquire it to snapshot the active
+    /// pipeline. Using a separate, briefly-held mutex lets the teardown
+    /// path snapshot the shared_ptr safely and call `cancel()` outside the
+    /// lock — without racing the process_stream store/reset (which would
+    /// otherwise be a documented data race on the shared_ptr control
+    /// block, per cppreference: concurrent reads/assigns of the same
+    /// shared_ptr instance require external synchronization).
+    std::mutex pipeline_mutex;
     std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline;
 };
 

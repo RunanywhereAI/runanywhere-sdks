@@ -15,6 +15,10 @@
 #include "rac/plugin/rac_plugin_loader.h"
 #include "rac/plugin/rac_primitive.h"
 
+#if (!defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC) && !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
 #ifndef RAC_TEST_PLUGIN_PATH
 #error "RAC_TEST_PLUGIN_PATH must be set by tests/CMakeLists.txt"
 #endif
@@ -61,6 +65,24 @@ int main() {
         std::fprintf(stderr, "still in registry after unload\n");
         return 1;
     }
+
+    /* (3b) The redundant dlopen from step (2) must be balanced by an extra
+     * dlclose inside rac_registry_load_plugin, otherwise the OS keeps the
+     * library mapped after the single unload in step (3). On POSIX we can
+     * confirm this with dlopen(RTLD_NOLOAD): it returns NULL if and only if
+     * the library is no longer present in the process. We immediately
+     * dlclose() any non-null result so the probe is side-effect free. */
+#if !defined(_WIN32)
+    void* probe = dlopen(RAC_TEST_PLUGIN_PATH, RTLD_NOLOAD | RTLD_LAZY);
+    if (probe != nullptr) {
+        std::fprintf(stderr,
+                     "leak detected: '%s' is still mapped after one unload "
+                     "following two loads (RTLD_NOLOAD returned %p)\n",
+                     RAC_TEST_PLUGIN_PATH, probe);
+        dlclose(probe);
+        return 1;
+    }
+#endif
 
     /* (4) Unloading a name that no longer exists returns NOT_FOUND, never crash. */
     rc = rac_registry_unload_plugin("test_plugin");

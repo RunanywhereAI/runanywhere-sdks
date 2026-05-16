@@ -15,6 +15,7 @@
 #include <cstring>
 #include <limits>
 #include <mutex>
+#include <new>
 #include <random>
 #include <string>
 #include <vector>
@@ -1088,6 +1089,25 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
 // rac_stt_stream.cpp falls back to the per-chunk transcribe_stream path.
 // =============================================================================
 
+namespace {
+
+// Wraps a backend-owned stream handle together with the lifecycle service
+// instance that produced it. We pin (acquire) the lifecycle service on
+// stream_create so subsequent feed/destroy calls always route through the
+// same service even if a concurrent rac_lifecycle_unload would otherwise
+// destroy the backend. The pinned ref is released by stream_destroy.
+//
+// This honors the contract in include/rac/features/stt/rac_stt_stream.h
+// that "the lifecycle manager — unloading the model cancels active
+// sessions" by ensuring the service cannot be destroyed mid-session.
+struct PersistentStreamHandle {
+    rac_handle_t lifecycle = nullptr;
+    rac_stt_service_t* service = nullptr;
+    rac_handle_t backend_handle = nullptr;
+};
+
+}  // namespace
+
 extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
                                                         const rac_stt_options_t* options,
                                                         rac_handle_t* out_stream_handle) {
@@ -1099,19 +1119,41 @@ extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Acquire (not require) so the lifecycle service refcount is held for
+    // the lifetime of the stream. This is the key fix for
+    // hotspot-commons-features-voice-001 — a concurrent unload now waits
+    // for stream_destroy before tearing down the backend service.
     rac_handle_t service_handle = nullptr;
-    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
+    rac_result_t rc = rac_lifecycle_acquire_service(component->lifecycle, &service_handle);
     if (rc != RAC_SUCCESS) {
         return rc;
     }
 
     auto* service = static_cast<rac_stt_service_t*>(service_handle);
     if (!service || !service->ops || !service->ops->stream_create) {
+        rac_lifecycle_release_service(component->lifecycle);
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
     const rac_stt_options_t* effective = options ? options : &component->default_options;
-    return service->ops->stream_create(service->impl, effective, out_stream_handle);
+    rac_handle_t backend_stream = nullptr;
+    rc = service->ops->stream_create(service->impl, effective, &backend_stream);
+    if (rc != RAC_SUCCESS || backend_stream == nullptr) {
+        rac_lifecycle_release_service(component->lifecycle);
+        return rc;
+    }
+
+    auto* wrapper = new (std::nothrow) PersistentStreamHandle{};
+    if (wrapper == nullptr) {
+        (void)service->ops->stream_destroy(service->impl, backend_stream);
+        rac_lifecycle_release_service(component->lifecycle);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    wrapper->lifecycle = component->lifecycle;
+    wrapper->service = service;
+    wrapper->backend_handle = backend_stream;
+    *out_stream_handle = wrapper;
+    return RAC_SUCCESS;
 }
 
 extern "C" rac_result_t
@@ -1120,23 +1162,21 @@ rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle, rac_handle_t stre
                                           rac_stt_stream_callback_t callback, void* user_data) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
+    if (!stream_handle)
+        return RAC_ERROR_INVALID_HANDLE;
     if (count > 0 && !samples)
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    rac_handle_t service_handle = nullptr;
-    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-    auto* service = static_cast<rac_stt_service_t*>(service_handle);
+    auto* wrapper = static_cast<PersistentStreamHandle*>(stream_handle);
+    auto* service = wrapper->service;
     if (!service || !service->ops || !service->ops->stream_feed_audio_chunk) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
-    return service->ops->stream_feed_audio_chunk(service->impl, stream_handle, samples, count,
-                                                 callback, user_data);
+    return service->ops->stream_feed_audio_chunk(service->impl, wrapper->backend_handle, samples,
+                                                 count, callback, user_data);
 }
 
 extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
@@ -1149,14 +1189,19 @@ extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    rac_handle_t service_handle = nullptr;
-    rac_result_t rc = rac_lifecycle_require_service(component->lifecycle, &service_handle);
-    if (rc != RAC_SUCCESS) {
-        return rc;
+    auto* wrapper = static_cast<PersistentStreamHandle*>(stream_handle);
+    auto* service = wrapper->service;
+    rac_result_t rc = RAC_SUCCESS;
+    if (service && service->ops && service->ops->stream_destroy && wrapper->backend_handle) {
+        rc = service->ops->stream_destroy(service->impl, wrapper->backend_handle);
+    } else if (!service || !service->ops || !service->ops->stream_destroy) {
+        rc = RAC_ERROR_NOT_SUPPORTED;
     }
-    auto* service = static_cast<rac_stt_service_t*>(service_handle);
-    if (!service || !service->ops || !service->ops->stream_destroy) {
-        return RAC_ERROR_NOT_SUPPORTED;
+    // Always release the pinned lifecycle ref so unload can proceed even
+    // when the backend reports an error during destroy.
+    if (wrapper->lifecycle) {
+        rac_lifecycle_release_service(wrapper->lifecycle);
     }
-    return service->ops->stream_destroy(service->impl, stream_handle);
+    delete wrapper;
+    return rc;
 }

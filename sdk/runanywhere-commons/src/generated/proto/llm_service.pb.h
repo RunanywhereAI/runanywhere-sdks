@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "voice_events.pb.h"
+#include "tool_calling.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -141,6 +142,45 @@ template <>
 // ===================================================================
 
 
+// -------------------------------------------------------------------
+
+class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerateRequest_MetadataEntry_DoNotUse final
+    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
+ public:
+  using SuperType =
+      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
+  LLMGenerateRequest_MetadataEntry_DoNotUse();
+  template <typename = void>
+  explicit constexpr LLMGenerateRequest_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
+  explicit LLMGenerateRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
+    return &_LLMGenerateRequest_MetadataEntry_DoNotUse_default_instance_;
+  }
+
+
+  static constexpr auto InternalGenerateClassData_();
+
+ private:
+  friend class ::google::protobuf::MessageLite;
+  friend struct ::TableStruct_llm_5fservice_2eproto;
+
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 64,
+                                   2>
+      _table_;
+
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+};
+extern const ::google::protobuf::internal::ClassDataFull LLMGenerateRequest_MetadataEntry_DoNotUse_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public ::google::protobuf::Message
@@ -289,6 +329,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public
 
   // accessors -------------------------------------------------------
   enum : int {
+    kToolCallsFieldNumber = 14,
+    kToolResultsFieldNumber = 15,
     kTextFieldNumber = 1,
     kThinkingContentFieldNumber = 2,
     kFinishReasonFieldNumber = 9,
@@ -303,6 +345,46 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public
     kDecodeTimeMsFieldNumber = 13,
     kErrorCodeFieldNumber = 10,
   };
+  // repeated .runanywhere.v1.ToolCall tool_calls = 14;
+  [[nodiscard]] int tool_calls_size()
+      const;
+  private:
+  int _internal_tool_calls_size() const;
+
+  public:
+  void clear_tool_calls() ;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_calls(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
+  mutable_tool_calls();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& _internal_tool_calls() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL _internal_mutable_tool_calls();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_calls(int index) const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL add_tool_calls();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& tool_calls()
+      const;
+  // repeated .runanywhere.v1.ToolResult tool_results = 15;
+  [[nodiscard]] int tool_results_size()
+      const;
+  private:
+  int _internal_tool_results_size() const;
+
+  public:
+  void clear_tool_results() ;
+  [[nodiscard]] ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL mutable_tool_results(int index);
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL
+  mutable_tool_results();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& _internal_tool_results() const;
+  ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL _internal_mutable_tool_results();
+  public:
+  [[nodiscard]] const ::runanywhere::v1::ToolResult& tool_results(int index) const;
+  ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL add_tool_results();
+  [[nodiscard]] const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& tool_results()
+      const;
   // string text = 1;
   void clear_text() ;
   [[nodiscard]] const ::std::string& text() const;
@@ -459,8 +541,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 13,
-                                   0, 98,
+  static const ::google::protobuf::internal::TcParseTable<4, 15,
+                                   2, 98,
                                    2>
       _table_;
 
@@ -483,6 +565,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public
         const LLMStreamFinalResult& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolCall > tool_calls_;
+    ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolResult > tool_results_;
     ::google::protobuf::internal::ArenaStringPtr text_;
     ::google::protobuf::internal::ArenaStringPtr thinking_content_;
     ::google::protobuf::internal::ArenaStringPtr finish_reason_;
@@ -503,464 +587,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamFinalResult final : public
 };
 
 extern const ::google::protobuf::internal::ClassDataFull LLMStreamFinalResult_class_data_;
-// -------------------------------------------------------------------
-
-class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerateRequest_MetadataEntry_DoNotUse final
-    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
- public:
-  using SuperType =
-      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
-                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
-  LLMGenerateRequest_MetadataEntry_DoNotUse();
-  template <typename = void>
-  explicit constexpr LLMGenerateRequest_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
-  explicit LLMGenerateRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
-    return &_LLMGenerateRequest_MetadataEntry_DoNotUse_default_instance_;
-  }
-
-
-  static constexpr auto InternalGenerateClassData_();
-
- private:
-  friend class ::google::protobuf::MessageLite;
-  friend struct ::TableStruct_llm_5fservice_2eproto;
-
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<1, 2,
-                                   0, 64,
-                                   2>
-      _table_;
-
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-};
-extern const ::google::protobuf::internal::ClassDataFull LLMGenerateRequest_MetadataEntry_DoNotUse_class_data_;
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.LLMStreamEvent) */ {
- public:
-  inline LLMStreamEvent() : LLMStreamEvent(nullptr) {}
-  ~LLMStreamEvent() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(LLMStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(LLMStreamEvent));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr LLMStreamEvent(::google::protobuf::internal::ConstantInitialized);
-
-  inline LLMStreamEvent(const LLMStreamEvent& from) : LLMStreamEvent(nullptr, from) {}
-  inline LLMStreamEvent(LLMStreamEvent&& from) noexcept
-      : LLMStreamEvent(nullptr, ::std::move(from)) {}
-  inline LLMStreamEvent& operator=(const LLMStreamEvent& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline LLMStreamEvent& operator=(LLMStreamEvent&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const LLMStreamEvent& default_instance() {
-    return *reinterpret_cast<const LLMStreamEvent*>(
-        &_LLMStreamEvent_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages = 3;
-  friend void swap(LLMStreamEvent& a, LLMStreamEvent& b) { a.Swap(&b); }
-  inline void Swap(LLMStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(LLMStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] LLMStreamEvent* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<LLMStreamEvent>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const LLMStreamEvent& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const LLMStreamEvent& from) { LLMStreamEvent::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(LLMStreamEvent* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.LLMStreamEvent"; }
-
-  explicit LLMStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  LLMStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const LLMStreamEvent& from);
-  LLMStreamEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, LLMStreamEvent&& from) noexcept
-      : LLMStreamEvent(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_();
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kTokenFieldNumber = 3,
-    kFinishReasonFieldNumber = 8,
-    kErrorMessageFieldNumber = 9,
-    kRequestIdFieldNumber = 13,
-    kConversationIdFieldNumber = 14,
-    kResultFieldNumber = 10,
-    kSeqFieldNumber = 1,
-    kTimestampUsFieldNumber = 2,
-    kIsFinalFieldNumber = 4,
-    kKindFieldNumber = 5,
-    kTokenIdFieldNumber = 6,
-    kLogprobFieldNumber = 7,
-    kErrorCodeFieldNumber = 11,
-    kEventKindFieldNumber = 12,
-    kPromptTokensProcessedFieldNumber = 15,
-    kCompletionTokensGeneratedFieldNumber = 16,
-    kElapsedMsFieldNumber = 17,
-  };
-  // string token = 3;
-  void clear_token() ;
-  [[nodiscard]] const ::std::string& token() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_token(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_token();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_token();
-  void set_allocated_token(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_token() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_token(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_token();
-
-  public:
-  // string finish_reason = 8;
-  void clear_finish_reason() ;
-  [[nodiscard]] const ::std::string& finish_reason() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_finish_reason(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_finish_reason();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_finish_reason();
-  void set_allocated_finish_reason(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_finish_reason() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_finish_reason(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_finish_reason();
-
-  public:
-  // string error_message = 9;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // string request_id = 13;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // string conversation_id = 14;
-  void clear_conversation_id() ;
-  [[nodiscard]] const ::std::string& conversation_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_conversation_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
-  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_conversation_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
-
-  public:
-  // optional .runanywhere.v1.LLMStreamFinalResult result = 10;
-  [[nodiscard]] bool has_result()
-      const;
-  void clear_result() ;
-  [[nodiscard]] const ::runanywhere::v1::LLMStreamFinalResult& result() const;
-  [[nodiscard]] ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE release_result();
-  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NONNULL mutable_result();
-  void set_allocated_result(::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_result(::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
-
-  private:
-  const ::runanywhere::v1::LLMStreamFinalResult& _internal_result() const;
-  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NONNULL _internal_mutable_result();
-
-  public:
-  // uint64 seq = 1;
-  void clear_seq() ;
-  [[nodiscard]] ::uint64_t seq() const;
-  void set_seq(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_seq() const;
-  void _internal_set_seq(::uint64_t value);
-
-  public:
-  // int64 timestamp_us = 2;
-  void clear_timestamp_us() ;
-  [[nodiscard]] ::int64_t timestamp_us() const;
-  void set_timestamp_us(::int64_t value);
-
-  private:
-  ::int64_t _internal_timestamp_us() const;
-  void _internal_set_timestamp_us(::int64_t value);
-
-  public:
-  // bool is_final = 4;
-  void clear_is_final() ;
-  [[nodiscard]] bool is_final() const;
-  void set_is_final(bool value);
-
-  private:
-  bool _internal_is_final() const;
-  void _internal_set_is_final(bool value);
-
-  public:
-  // .runanywhere.v1.TokenKind kind = 5;
-  void clear_kind() ;
-  [[nodiscard]] ::runanywhere::v1::TokenKind kind() const;
-  void set_kind(::runanywhere::v1::TokenKind value);
-
-  private:
-  ::runanywhere::v1::TokenKind _internal_kind() const;
-  void _internal_set_kind(::runanywhere::v1::TokenKind value);
-
-  public:
-  // uint32 token_id = 6;
-  void clear_token_id() ;
-  [[nodiscard]] ::uint32_t token_id() const;
-  void set_token_id(::uint32_t value);
-
-  private:
-  ::uint32_t _internal_token_id() const;
-  void _internal_set_token_id(::uint32_t value);
-
-  public:
-  // float logprob = 7;
-  void clear_logprob() ;
-  [[nodiscard]] float logprob() const;
-  void set_logprob(float value);
-
-  private:
-  float _internal_logprob() const;
-  void _internal_set_logprob(float value);
-
-  public:
-  // int32 error_code = 11;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
-  void clear_event_kind() ;
-  [[nodiscard]] ::runanywhere::v1::LLMStreamEventKind event_kind() const;
-  void set_event_kind(::runanywhere::v1::LLMStreamEventKind value);
-
-  private:
-  ::runanywhere::v1::LLMStreamEventKind _internal_event_kind() const;
-  void _internal_set_event_kind(::runanywhere::v1::LLMStreamEventKind value);
-
-  public:
-  // int32 prompt_tokens_processed = 15;
-  void clear_prompt_tokens_processed() ;
-  [[nodiscard]] ::int32_t prompt_tokens_processed() const;
-  void set_prompt_tokens_processed(::int32_t value);
-
-  private:
-  ::int32_t _internal_prompt_tokens_processed() const;
-  void _internal_set_prompt_tokens_processed(::int32_t value);
-
-  public:
-  // int32 completion_tokens_generated = 16;
-  void clear_completion_tokens_generated() ;
-  [[nodiscard]] ::int32_t completion_tokens_generated() const;
-  void set_completion_tokens_generated(::int32_t value);
-
-  private:
-  ::int32_t _internal_completion_tokens_generated() const;
-  void _internal_set_completion_tokens_generated(::int32_t value);
-
-  public:
-  // int64 elapsed_ms = 17;
-  void clear_elapsed_ms() ;
-  [[nodiscard]] ::int64_t elapsed_ms() const;
-  void set_elapsed_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_elapsed_ms() const;
-  void _internal_set_elapsed_ms(::int64_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.LLMStreamEvent)
- private:
-  class _Internal;
-  friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<5, 17,
-                                   1, 110,
-                                   2>
-      _table_;
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const LLMStreamEvent& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr token_;
-    ::google::protobuf::internal::ArenaStringPtr finish_reason_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
-    ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE result_;
-    ::uint64_t seq_;
-    ::int64_t timestamp_us_;
-    bool is_final_;
-    int kind_;
-    ::uint32_t token_id_;
-    float logprob_;
-    ::int32_t error_code_;
-    int event_kind_;
-    ::int32_t prompt_tokens_processed_;
-    ::int32_t completion_tokens_generated_;
-    ::int64_t elapsed_ms_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_llm_5fservice_2eproto;
-};
-
-extern const ::google::protobuf::internal::ClassDataFull LLMStreamEvent_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerateRequest final : public ::google::protobuf::Message
@@ -1516,6 +1142,443 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerateRequest final : public :
 };
 
 extern const ::google::protobuf::internal::ClassDataFull LLMGenerateRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.LLMStreamEvent) */ {
+ public:
+  inline LLMStreamEvent() : LLMStreamEvent(nullptr) {}
+  ~LLMStreamEvent() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(LLMStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(LLMStreamEvent));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr LLMStreamEvent(::google::protobuf::internal::ConstantInitialized);
+
+  inline LLMStreamEvent(const LLMStreamEvent& from) : LLMStreamEvent(nullptr, from) {}
+  inline LLMStreamEvent(LLMStreamEvent&& from) noexcept
+      : LLMStreamEvent(nullptr, ::std::move(from)) {}
+  inline LLMStreamEvent& operator=(const LLMStreamEvent& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline LLMStreamEvent& operator=(LLMStreamEvent&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const LLMStreamEvent& default_instance() {
+    return *reinterpret_cast<const LLMStreamEvent*>(
+        &_LLMStreamEvent_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(LLMStreamEvent& a, LLMStreamEvent& b) { a.Swap(&b); }
+  inline void Swap(LLMStreamEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(LLMStreamEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] LLMStreamEvent* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<LLMStreamEvent>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const LLMStreamEvent& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const LLMStreamEvent& from) { LLMStreamEvent::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(LLMStreamEvent* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.LLMStreamEvent"; }
+
+  explicit LLMStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  LLMStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const LLMStreamEvent& from);
+  LLMStreamEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, LLMStreamEvent&& from) noexcept
+      : LLMStreamEvent(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kTokenFieldNumber = 3,
+    kFinishReasonFieldNumber = 8,
+    kErrorMessageFieldNumber = 9,
+    kRequestIdFieldNumber = 13,
+    kConversationIdFieldNumber = 14,
+    kResultFieldNumber = 10,
+    kToolCallFieldNumber = 18,
+    kSeqFieldNumber = 1,
+    kTimestampUsFieldNumber = 2,
+    kIsFinalFieldNumber = 4,
+    kKindFieldNumber = 5,
+    kTokenIdFieldNumber = 6,
+    kLogprobFieldNumber = 7,
+    kErrorCodeFieldNumber = 11,
+    kEventKindFieldNumber = 12,
+    kPromptTokensProcessedFieldNumber = 15,
+    kCompletionTokensGeneratedFieldNumber = 16,
+    kElapsedMsFieldNumber = 17,
+  };
+  // string token = 3;
+  void clear_token() ;
+  [[nodiscard]] const ::std::string& token() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_token(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_token();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_token();
+  void set_allocated_token(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_token() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_token(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_token();
+
+  public:
+  // string finish_reason = 8;
+  void clear_finish_reason() ;
+  [[nodiscard]] const ::std::string& finish_reason() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_finish_reason(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_finish_reason();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_finish_reason();
+  void set_allocated_finish_reason(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_finish_reason() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_finish_reason(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_finish_reason();
+
+  public:
+  // string error_message = 9;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // string request_id = 13;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // string conversation_id = 14;
+  void clear_conversation_id() ;
+  [[nodiscard]] const ::std::string& conversation_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_conversation_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_conversation_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_conversation_id();
+  void set_allocated_conversation_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_conversation_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_conversation_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_conversation_id();
+
+  public:
+  // optional .runanywhere.v1.LLMStreamFinalResult result = 10;
+  [[nodiscard]] bool has_result()
+      const;
+  void clear_result() ;
+  [[nodiscard]] const ::runanywhere::v1::LLMStreamFinalResult& result() const;
+  [[nodiscard]] ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE release_result();
+  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NONNULL mutable_result();
+  void set_allocated_result(::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_result(::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
+
+  private:
+  const ::runanywhere::v1::LLMStreamFinalResult& _internal_result() const;
+  ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NONNULL _internal_mutable_result();
+
+  public:
+  // optional .runanywhere.v1.ToolCall tool_call = 18;
+  [[nodiscard]] bool has_tool_call()
+      const;
+  void clear_tool_call() ;
+  [[nodiscard]] const ::runanywhere::v1::ToolCall& tool_call() const;
+  [[nodiscard]] ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE release_tool_call();
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL mutable_tool_call();
+  void set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE unsafe_arena_release_tool_call();
+
+  private:
+  const ::runanywhere::v1::ToolCall& _internal_tool_call() const;
+  ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL _internal_mutable_tool_call();
+
+  public:
+  // uint64 seq = 1;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
+  // int64 timestamp_us = 2;
+  void clear_timestamp_us() ;
+  [[nodiscard]] ::int64_t timestamp_us() const;
+  void set_timestamp_us(::int64_t value);
+
+  private:
+  ::int64_t _internal_timestamp_us() const;
+  void _internal_set_timestamp_us(::int64_t value);
+
+  public:
+  // bool is_final = 4;
+  void clear_is_final() ;
+  [[nodiscard]] bool is_final() const;
+  void set_is_final(bool value);
+
+  private:
+  bool _internal_is_final() const;
+  void _internal_set_is_final(bool value);
+
+  public:
+  // .runanywhere.v1.TokenKind kind = 5;
+  void clear_kind() ;
+  [[nodiscard]] ::runanywhere::v1::TokenKind kind() const;
+  void set_kind(::runanywhere::v1::TokenKind value);
+
+  private:
+  ::runanywhere::v1::TokenKind _internal_kind() const;
+  void _internal_set_kind(::runanywhere::v1::TokenKind value);
+
+  public:
+  // uint32 token_id = 6;
+  void clear_token_id() ;
+  [[nodiscard]] ::uint32_t token_id() const;
+  void set_token_id(::uint32_t value);
+
+  private:
+  ::uint32_t _internal_token_id() const;
+  void _internal_set_token_id(::uint32_t value);
+
+  public:
+  // float logprob = 7;
+  void clear_logprob() ;
+  [[nodiscard]] float logprob() const;
+  void set_logprob(float value);
+
+  private:
+  float _internal_logprob() const;
+  void _internal_set_logprob(float value);
+
+  public:
+  // int32 error_code = 11;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
+  // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
+  void clear_event_kind() ;
+  [[nodiscard]] ::runanywhere::v1::LLMStreamEventKind event_kind() const;
+  void set_event_kind(::runanywhere::v1::LLMStreamEventKind value);
+
+  private:
+  ::runanywhere::v1::LLMStreamEventKind _internal_event_kind() const;
+  void _internal_set_event_kind(::runanywhere::v1::LLMStreamEventKind value);
+
+  public:
+  // int32 prompt_tokens_processed = 15;
+  void clear_prompt_tokens_processed() ;
+  [[nodiscard]] ::int32_t prompt_tokens_processed() const;
+  void set_prompt_tokens_processed(::int32_t value);
+
+  private:
+  ::int32_t _internal_prompt_tokens_processed() const;
+  void _internal_set_prompt_tokens_processed(::int32_t value);
+
+  public:
+  // int32 completion_tokens_generated = 16;
+  void clear_completion_tokens_generated() ;
+  [[nodiscard]] ::int32_t completion_tokens_generated() const;
+  void set_completion_tokens_generated(::int32_t value);
+
+  private:
+  ::int32_t _internal_completion_tokens_generated() const;
+  void _internal_set_completion_tokens_generated(::int32_t value);
+
+  public:
+  // int64 elapsed_ms = 17;
+  void clear_elapsed_ms() ;
+  [[nodiscard]] ::int64_t elapsed_ms() const;
+  void set_elapsed_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_elapsed_ms() const;
+  void _internal_set_elapsed_ms(::int64_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.LLMStreamEvent)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<5, 18,
+                                   2, 110,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const LLMStreamEvent& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr token_;
+    ::google::protobuf::internal::ArenaStringPtr finish_reason_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::google::protobuf::internal::ArenaStringPtr conversation_id_;
+    ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE result_;
+    ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
+    ::uint64_t seq_;
+    ::int64_t timestamp_us_;
+    bool is_final_;
+    int kind_;
+    ::uint32_t token_id_;
+    float logprob_;
+    ::int32_t error_code_;
+    int event_kind_;
+    ::int32_t prompt_tokens_processed_;
+    ::int32_t completion_tokens_generated_;
+    ::int64_t elapsed_ms_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_llm_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull LLMStreamEvent_class_data_;
 
 // ===================================================================
 
@@ -2623,7 +2686,7 @@ inline void LLMStreamFinalResult::clear_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.text_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
+                  0x00000004U);
 }
 inline const ::std::string& LLMStreamFinalResult::text() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -2633,13 +2696,13 @@ inline const ::std::string& LLMStreamFinalResult::text() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void LLMStreamFinalResult::set_text(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.text_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.text)
 }
 inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_text()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_text();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.text)
   return _s;
@@ -2659,10 +2722,10 @@ inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::_internal_mutable_t
 inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_text() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.LLMStreamFinalResult.text)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.text_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.text_.Set("", GetArena());
@@ -2672,9 +2735,9 @@ inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_text() {
 inline void LLMStreamFinalResult::set_allocated_text(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.text_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.text_.IsDefault()) {
@@ -2685,14 +2748,14 @@ inline void LLMStreamFinalResult::set_allocated_text(::std::string* PROTOBUF_NUL
 
 // optional string thinking_content = 2;
 inline bool LLMStreamFinalResult::has_thinking_content() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
   return value;
 }
 inline void LLMStreamFinalResult::clear_thinking_content() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.thinking_content_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000008U);
 }
 inline const ::std::string& LLMStreamFinalResult::thinking_content() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -2702,13 +2765,13 @@ inline const ::std::string& LLMStreamFinalResult::thinking_content() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void LLMStreamFinalResult::set_thinking_content(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   _impl_.thinking_content_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.thinking_content)
 }
 inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_thinking_content()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   ::std::string* _s = _internal_mutable_thinking_content();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.thinking_content)
   return _s;
@@ -2728,10 +2791,10 @@ inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::_internal_mutable_t
 inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_thinking_content() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.LLMStreamFinalResult.thinking_content)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   auto* released = _impl_.thinking_content_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.thinking_content_.Set("", GetArena());
@@ -2741,9 +2804,9 @@ inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_thinking_c
 inline void LLMStreamFinalResult::set_allocated_thinking_content(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
   }
   _impl_.thinking_content_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.thinking_content_.IsDefault()) {
@@ -2757,7 +2820,7 @@ inline void LLMStreamFinalResult::clear_prompt_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000040U);
 }
 inline ::int32_t LLMStreamFinalResult::prompt_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.prompt_tokens)
@@ -2765,7 +2828,7 @@ inline ::int32_t LLMStreamFinalResult::prompt_tokens() const {
 }
 inline void LLMStreamFinalResult::set_prompt_tokens(::int32_t value) {
   _internal_set_prompt_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.prompt_tokens)
 }
 inline ::int32_t LLMStreamFinalResult::_internal_prompt_tokens() const {
@@ -2782,7 +2845,7 @@ inline void LLMStreamFinalResult::clear_completion_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.completion_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000080U);
 }
 inline ::int32_t LLMStreamFinalResult::completion_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.completion_tokens)
@@ -2790,7 +2853,7 @@ inline ::int32_t LLMStreamFinalResult::completion_tokens() const {
 }
 inline void LLMStreamFinalResult::set_completion_tokens(::int32_t value) {
   _internal_set_completion_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.completion_tokens)
 }
 inline ::int32_t LLMStreamFinalResult::_internal_completion_tokens() const {
@@ -2807,7 +2870,7 @@ inline void LLMStreamFinalResult::clear_total_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000200U);
 }
 inline ::int32_t LLMStreamFinalResult::total_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.total_tokens)
@@ -2815,7 +2878,7 @@ inline ::int32_t LLMStreamFinalResult::total_tokens() const {
 }
 inline void LLMStreamFinalResult::set_total_tokens(::int32_t value) {
   _internal_set_total_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.total_tokens)
 }
 inline ::int32_t LLMStreamFinalResult::_internal_total_tokens() const {
@@ -2832,7 +2895,7 @@ inline void LLMStreamFinalResult::clear_total_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_time_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000100U);
 }
 inline ::int64_t LLMStreamFinalResult::total_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.total_time_ms)
@@ -2840,7 +2903,7 @@ inline ::int64_t LLMStreamFinalResult::total_time_ms() const {
 }
 inline void LLMStreamFinalResult::set_total_time_ms(::int64_t value) {
   _internal_set_total_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.total_time_ms)
 }
 inline ::int64_t LLMStreamFinalResult::_internal_total_time_ms() const {
@@ -2857,7 +2920,7 @@ inline void LLMStreamFinalResult::clear_time_to_first_token_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.time_to_first_token_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00000800U);
 }
 inline ::int64_t LLMStreamFinalResult::time_to_first_token_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.time_to_first_token_ms)
@@ -2865,7 +2928,7 @@ inline ::int64_t LLMStreamFinalResult::time_to_first_token_ms() const {
 }
 inline void LLMStreamFinalResult::set_time_to_first_token_ms(::int64_t value) {
   _internal_set_time_to_first_token_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.time_to_first_token_ms)
 }
 inline ::int64_t LLMStreamFinalResult::_internal_time_to_first_token_ms() const {
@@ -2882,7 +2945,7 @@ inline void LLMStreamFinalResult::clear_tokens_per_second() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tokens_per_second_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000400U);
 }
 inline float LLMStreamFinalResult::tokens_per_second() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.tokens_per_second)
@@ -2890,7 +2953,7 @@ inline float LLMStreamFinalResult::tokens_per_second() const {
 }
 inline void LLMStreamFinalResult::set_tokens_per_second(float value) {
   _internal_set_tokens_per_second(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.tokens_per_second)
 }
 inline float LLMStreamFinalResult::_internal_tokens_per_second() const {
@@ -2907,7 +2970,7 @@ inline void LLMStreamFinalResult::clear_finish_reason() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.finish_reason_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000010U);
 }
 inline const ::std::string& LLMStreamFinalResult::finish_reason() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -2917,13 +2980,13 @@ inline const ::std::string& LLMStreamFinalResult::finish_reason() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void LLMStreamFinalResult::set_finish_reason(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.finish_reason_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.finish_reason)
 }
 inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_finish_reason()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_finish_reason();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.finish_reason)
   return _s;
@@ -2943,10 +3006,10 @@ inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::_internal_mutable_f
 inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_finish_reason() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.LLMStreamFinalResult.finish_reason)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.finish_reason_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.finish_reason_.Set("", GetArena());
@@ -2956,9 +3019,9 @@ inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_finish_rea
 inline void LLMStreamFinalResult::set_allocated_finish_reason(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.finish_reason_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.finish_reason_.IsDefault()) {
@@ -2972,7 +3035,7 @@ inline void LLMStreamFinalResult::clear_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00001000U);
+                  0x00004000U);
 }
 inline ::int32_t LLMStreamFinalResult::error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.error_code)
@@ -2980,7 +3043,7 @@ inline ::int32_t LLMStreamFinalResult::error_code() const {
 }
 inline void LLMStreamFinalResult::set_error_code(::int32_t value) {
   _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.error_code)
 }
 inline ::int32_t LLMStreamFinalResult::_internal_error_code() const {
@@ -2997,7 +3060,7 @@ inline void LLMStreamFinalResult::clear_error_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_message_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000020U);
 }
 inline const ::std::string& LLMStreamFinalResult::error_message() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3007,13 +3070,13 @@ inline const ::std::string& LLMStreamFinalResult::error_message() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void LLMStreamFinalResult::set_error_message(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.error_message)
 }
 inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_error_message()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::std::string* _s = _internal_mutable_error_message();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.error_message)
   return _s;
@@ -3033,10 +3096,10 @@ inline ::std::string* PROTOBUF_NONNULL LLMStreamFinalResult::_internal_mutable_e
 inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_error_message() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.LLMStreamFinalResult.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   auto* released = _impl_.error_message_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.error_message_.Set("", GetArena());
@@ -3046,9 +3109,9 @@ inline ::std::string* PROTOBUF_NULLABLE LLMStreamFinalResult::release_error_mess
 inline void LLMStreamFinalResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   _impl_.error_message_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
@@ -3062,7 +3125,7 @@ inline void LLMStreamFinalResult::clear_prompt_eval_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_eval_time_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000400U);
+                  0x00001000U);
 }
 inline ::int64_t LLMStreamFinalResult::prompt_eval_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.prompt_eval_time_ms)
@@ -3070,7 +3133,7 @@ inline ::int64_t LLMStreamFinalResult::prompt_eval_time_ms() const {
 }
 inline void LLMStreamFinalResult::set_prompt_eval_time_ms(::int64_t value) {
   _internal_set_prompt_eval_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.prompt_eval_time_ms)
 }
 inline ::int64_t LLMStreamFinalResult::_internal_prompt_eval_time_ms() const {
@@ -3087,7 +3150,7 @@ inline void LLMStreamFinalResult::clear_decode_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.decode_time_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000800U);
+                  0x00002000U);
 }
 inline ::int64_t LLMStreamFinalResult::decode_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.decode_time_ms)
@@ -3095,7 +3158,7 @@ inline ::int64_t LLMStreamFinalResult::decode_time_ms() const {
 }
 inline void LLMStreamFinalResult::set_decode_time_ms(::int64_t value) {
   _internal_set_decode_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamFinalResult.decode_time_ms)
 }
 inline ::int64_t LLMStreamFinalResult::_internal_decode_time_ms() const {
@@ -3107,6 +3170,106 @@ inline void LLMStreamFinalResult::_internal_set_decode_time_ms(::int64_t value) 
   _impl_.decode_time_ms_ = value;
 }
 
+// repeated .runanywhere.v1.ToolCall tool_calls = 14;
+inline int LLMStreamFinalResult::_internal_tool_calls_size() const {
+  return _internal_tool_calls().size();
+}
+inline int LLMStreamFinalResult::tool_calls_size() const {
+  return _internal_tool_calls_size();
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_tool_calls(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.tool_calls)
+  return _internal_mutable_tool_calls()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_tool_calls()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.LLMStreamFinalResult.tool_calls)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_tool_calls();
+}
+inline const ::runanywhere::v1::ToolCall& LLMStreamFinalResult::tool_calls(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.tool_calls)
+  return _internal_tool_calls().Get(index);
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL LLMStreamFinalResult::add_tool_calls()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::ToolCall* _add =
+      _internal_mutable_tool_calls()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.LLMStreamFinalResult.tool_calls)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>& LLMStreamFinalResult::tool_calls() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.LLMStreamFinalResult.tool_calls)
+  return _internal_tool_calls();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>&
+LLMStreamFinalResult::_internal_tool_calls() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.tool_calls_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolCall>* PROTOBUF_NONNULL
+LLMStreamFinalResult::_internal_mutable_tool_calls() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.tool_calls_;
+}
+
+// repeated .runanywhere.v1.ToolResult tool_results = 15;
+inline int LLMStreamFinalResult::_internal_tool_results_size() const {
+  return _internal_tool_results().size();
+}
+inline int LLMStreamFinalResult::tool_results_size() const {
+  return _internal_tool_results_size();
+}
+inline ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_tool_results(int index)
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamFinalResult.tool_results)
+  return _internal_mutable_tool_results()->Mutable(index);
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL LLMStreamFinalResult::mutable_tool_results()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.LLMStreamFinalResult.tool_results)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_tool_results();
+}
+inline const ::runanywhere::v1::ToolResult& LLMStreamFinalResult::tool_results(int index) const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamFinalResult.tool_results)
+  return _internal_tool_results().Get(index);
+}
+inline ::runanywhere::v1::ToolResult* PROTOBUF_NONNULL LLMStreamFinalResult::add_tool_results()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::runanywhere::v1::ToolResult* _add =
+      _internal_mutable_tool_results()->InternalAddWithArena(
+          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.LLMStreamFinalResult.tool_results)
+  return _add;
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>& LLMStreamFinalResult::tool_results() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.LLMStreamFinalResult.tool_results)
+  return _internal_tool_results();
+}
+inline const ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>&
+LLMStreamFinalResult::_internal_tool_results() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.tool_results_;
+}
+inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::ToolResult>* PROTOBUF_NONNULL
+LLMStreamFinalResult::_internal_mutable_tool_results() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.tool_results_;
+}
+
 // -------------------------------------------------------------------
 
 // LLMStreamEvent
@@ -3116,7 +3279,7 @@ inline void LLMStreamEvent::clear_seq() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.seq_ = ::uint64_t{0u};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000080U);
 }
 inline ::uint64_t LLMStreamEvent::seq() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.seq)
@@ -3124,7 +3287,7 @@ inline ::uint64_t LLMStreamEvent::seq() const {
 }
 inline void LLMStreamEvent::set_seq(::uint64_t value) {
   _internal_set_seq(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.seq)
 }
 inline ::uint64_t LLMStreamEvent::_internal_seq() const {
@@ -3141,7 +3304,7 @@ inline void LLMStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000100U);
 }
 inline ::int64_t LLMStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.timestamp_us)
@@ -3149,7 +3312,7 @@ inline ::int64_t LLMStreamEvent::timestamp_us() const {
 }
 inline void LLMStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.timestamp_us)
 }
 inline ::int64_t LLMStreamEvent::_internal_timestamp_us() const {
@@ -3231,7 +3394,7 @@ inline void LLMStreamEvent::clear_is_final() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_final_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000200U);
 }
 inline bool LLMStreamEvent::is_final() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.is_final)
@@ -3239,7 +3402,7 @@ inline bool LLMStreamEvent::is_final() const {
 }
 inline void LLMStreamEvent::set_is_final(bool value) {
   _internal_set_is_final(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.is_final)
 }
 inline bool LLMStreamEvent::_internal_is_final() const {
@@ -3256,7 +3419,7 @@ inline void LLMStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00000400U);
 }
 inline ::runanywhere::v1::TokenKind LLMStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.kind)
@@ -3264,7 +3427,7 @@ inline ::runanywhere::v1::TokenKind LLMStreamEvent::kind() const {
 }
 inline void LLMStreamEvent::set_kind(::runanywhere::v1::TokenKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.kind)
 }
 inline ::runanywhere::v1::TokenKind LLMStreamEvent::_internal_kind() const {
@@ -3281,7 +3444,7 @@ inline void LLMStreamEvent::clear_token_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.token_id_ = 0u;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000400U);
+                  0x00000800U);
 }
 inline ::uint32_t LLMStreamEvent::token_id() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.token_id)
@@ -3289,7 +3452,7 @@ inline ::uint32_t LLMStreamEvent::token_id() const {
 }
 inline void LLMStreamEvent::set_token_id(::uint32_t value) {
   _internal_set_token_id(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.token_id)
 }
 inline ::uint32_t LLMStreamEvent::_internal_token_id() const {
@@ -3306,7 +3469,7 @@ inline void LLMStreamEvent::clear_logprob() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.logprob_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000800U);
+                  0x00001000U);
 }
 inline float LLMStreamEvent::logprob() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.logprob)
@@ -3314,7 +3477,7 @@ inline float LLMStreamEvent::logprob() const {
 }
 inline void LLMStreamEvent::set_logprob(float value) {
   _internal_set_logprob(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.logprob)
 }
 inline float LLMStreamEvent::_internal_logprob() const {
@@ -3560,7 +3723,7 @@ inline void LLMStreamEvent::clear_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00001000U);
+                  0x00002000U);
 }
 inline ::int32_t LLMStreamEvent::error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.error_code)
@@ -3568,7 +3731,7 @@ inline ::int32_t LLMStreamEvent::error_code() const {
 }
 inline void LLMStreamEvent::set_error_code(::int32_t value) {
   _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.error_code)
 }
 inline ::int32_t LLMStreamEvent::_internal_error_code() const {
@@ -3585,7 +3748,7 @@ inline void LLMStreamEvent::clear_event_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.event_kind_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00002000U);
+                  0x00004000U);
 }
 inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::event_kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.event_kind)
@@ -3593,7 +3756,7 @@ inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::event_kind() const 
 }
 inline void LLMStreamEvent::set_event_kind(::runanywhere::v1::LLMStreamEventKind value) {
   _internal_set_event_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.event_kind)
 }
 inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::_internal_event_kind() const {
@@ -3740,7 +3903,7 @@ inline void LLMStreamEvent::clear_prompt_tokens_processed() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_tokens_processed_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00004000U);
+                  0x00008000U);
 }
 inline ::int32_t LLMStreamEvent::prompt_tokens_processed() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.prompt_tokens_processed)
@@ -3748,7 +3911,7 @@ inline ::int32_t LLMStreamEvent::prompt_tokens_processed() const {
 }
 inline void LLMStreamEvent::set_prompt_tokens_processed(::int32_t value) {
   _internal_set_prompt_tokens_processed(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.prompt_tokens_processed)
 }
 inline ::int32_t LLMStreamEvent::_internal_prompt_tokens_processed() const {
@@ -3765,7 +3928,7 @@ inline void LLMStreamEvent::clear_completion_tokens_generated() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.completion_tokens_generated_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00008000U);
+                  0x00010000U);
 }
 inline ::int32_t LLMStreamEvent::completion_tokens_generated() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.completion_tokens_generated)
@@ -3773,7 +3936,7 @@ inline ::int32_t LLMStreamEvent::completion_tokens_generated() const {
 }
 inline void LLMStreamEvent::set_completion_tokens_generated(::int32_t value) {
   _internal_set_completion_tokens_generated(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.completion_tokens_generated)
 }
 inline ::int32_t LLMStreamEvent::_internal_completion_tokens_generated() const {
@@ -3790,7 +3953,7 @@ inline void LLMStreamEvent::clear_elapsed_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.elapsed_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00010000U);
+                  0x00020000U);
 }
 inline ::int64_t LLMStreamEvent::elapsed_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.elapsed_ms)
@@ -3798,7 +3961,7 @@ inline ::int64_t LLMStreamEvent::elapsed_ms() const {
 }
 inline void LLMStreamEvent::set_elapsed_ms(::int64_t value) {
   _internal_set_elapsed_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.elapsed_ms)
 }
 inline ::int64_t LLMStreamEvent::_internal_elapsed_ms() const {
@@ -3808,6 +3971,99 @@ inline ::int64_t LLMStreamEvent::_internal_elapsed_ms() const {
 inline void LLMStreamEvent::_internal_set_elapsed_ms(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.elapsed_ms_ = value;
+}
+
+// optional .runanywhere.v1.ToolCall tool_call = 18;
+inline bool LLMStreamEvent::has_tool_call() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  PROTOBUF_ASSUME(!value || _impl_.tool_call_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::ToolCall& LLMStreamEvent::_internal_tool_call() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::ToolCall* p = _impl_.tool_call_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::ToolCall&>(::runanywhere::v1::_ToolCall_default_instance_);
+}
+inline const ::runanywhere::v1::ToolCall& LLMStreamEvent::tool_call() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.tool_call)
+  return _internal_tool_call();
+}
+inline void LLMStreamEvent::unsafe_arena_set_allocated_tool_call(
+    ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.tool_call_);
+  }
+  _impl_.tool_call_ = reinterpret_cast<::runanywhere::v1::ToolCall*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.LLMStreamEvent.tool_call)
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE LLMStreamEvent::release_tool_call() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::ToolCall* released = _impl_.tool_call_;
+  _impl_.tool_call_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE LLMStreamEvent::unsafe_arena_release_tool_call() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LLMStreamEvent.tool_call)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::ToolCall* temp = _impl_.tool_call_;
+  _impl_.tool_call_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL LLMStreamEvent::_internal_mutable_tool_call() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.tool_call_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ToolCall>(GetArena());
+    _impl_.tool_call_ = reinterpret_cast<::runanywhere::v1::ToolCall*>(p);
+  }
+  return _impl_.tool_call_;
+}
+inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL LLMStreamEvent::mutable_tool_call()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::ToolCall* _msg = _internal_mutable_tool_call();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LLMStreamEvent.tool_call)
+  return _msg;
+}
+inline void LLMStreamEvent::set_allocated_tool_call(::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.tool_call_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+
+  _impl_.tool_call_ = reinterpret_cast<::runanywhere::v1::ToolCall*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LLMStreamEvent.tool_call)
 }
 
 #ifdef __GNUC__

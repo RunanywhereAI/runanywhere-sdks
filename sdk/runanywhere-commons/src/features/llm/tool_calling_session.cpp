@@ -514,7 +514,13 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     session->max_iterations =
         request.max_iterations() == 0 ? kDefaultMaxIterations : request.max_iterations();
     session->keep_tools_available = request.keep_tools_available();
-    session->validate_calls = true;
+    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
+    // The field is `optional bool` so we can preserve the historical default
+    // (validate=true) when the caller did not set it, while still letting hosts
+    // that delegate validation/authorization to their executor opt out by
+    // explicitly setting validate_calls=false.
+    session->validate_calls =
+        request.has_validate_calls() ? request.validate_calls() : true;
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;

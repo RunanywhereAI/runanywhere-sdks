@@ -936,10 +936,64 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
             out->model_family = RAC_VLM_MODEL_FAMILY_AUTO;
             break;
     }
+
+    // hotspot-engine-llamacpp-001: carry request-owned strings into
+    // rac_vlm_options_t so the llama.cpp VLM engine can actually apply
+    // them. The engine reads options->system_prompt directly when building
+    // the VLM prompt; stop_sequences is in the C ABI struct for future
+    // enforcement parity with LLM.
+    if (in.has_system_prompt() && !in.system_prompt().empty()) {
+        out->system_prompt = rac_strdup(in.system_prompt().c_str());
+    }
+    const int stop_count = in.stop_sequences_size();
+    if (stop_count > 0) {
+        auto** arr =
+            static_cast<const char**>(std::malloc(static_cast<size_t>(stop_count) * sizeof(char*)));
+        if (arr) {
+            size_t written = 0;
+            for (int i = 0; i < stop_count; ++i) {
+                const auto& seq = in.stop_sequences(i);
+                if (seq.empty()) {
+                    continue;
+                }
+                arr[written] = rac_strdup(seq.c_str());
+                if (arr[written] != nullptr) {
+                    ++written;
+                }
+            }
+            if (written > 0) {
+                out->stop_sequences = arr;
+                out->num_stop_sequences = written;
+            } else {
+                std::free(static_cast<void*>(arr));
+            }
+        }
+    }
+
     if (out_prompt) {
         *out_prompt = in.prompt().empty() ? nullptr : rac_strdup(in.prompt().c_str());
     }
     return true;
+}
+
+void rac_vlm_options_free_owned(rac_vlm_options_t* options) {
+    if (!options) {
+        return;
+    }
+    if (options->system_prompt) {
+        rac_free(const_cast<char*>(options->system_prompt));
+        options->system_prompt = nullptr;
+    }
+    if (options->stop_sequences && options->num_stop_sequences > 0) {
+        for (size_t i = 0; i < options->num_stop_sequences; ++i) {
+            if (options->stop_sequences[i]) {
+                rac_free(const_cast<char*>(options->stop_sequences[i]));
+            }
+        }
+        std::free(static_cast<void*>(const_cast<const char**>(options->stop_sequences)));
+    }
+    options->stop_sequences = nullptr;
+    options->num_stop_sequences = 0;
 }
 
 bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out) {

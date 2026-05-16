@@ -88,14 +88,19 @@ State& state() {
     return s;
 }
 
-/** Flag that gates the one-time bootstrap of built-in runtimes. We want the
- *  CPU runtime registered on first registry touch, without re-entering the
+/** Gates the one-time bootstrap of built-in runtimes. We want the CPU
+ *  runtime registered on first registry touch, without re-entering the
  *  public register/unregister surface (which would deadlock on our mutex).
- *  A raw flag + a helper suffice — `std::once_flag` is avoided to keep the
- *  hot path branch-predictor-friendly and because we only ever flip this
- *  once per process. */
-bool g_builtins_ready = false;
-std::mutex g_builtins_mu;
+ *
+ *  `std::once_flag` + `std::call_once` is the only race-free implementation
+ *  of double-checked initialization in standard C++ — a plain bool read on
+ *  the fast path racing with a mutex-protected store is undefined behavior
+ *  under the C++ memory model (data race), even though the load happens to
+ *  be naturally atomic on every supported architecture. `call_once` carries
+ *  the necessary acquire/release synchronization with the slow path, removes
+ *  the custom DCL pattern entirely, and is the well-trodden answer to TSan
+ *  reports against `ensure_builtins_registered()`. */
+std::once_flag g_builtins_once;
 
 /** Insert a vtable straight into the state (no lock held by caller; we grab
  *  the registry's mutex internally). Used only by bootstrap, because bypass
@@ -117,15 +122,11 @@ void insert_builtin(const rac_runtime_vtable_t* v, State& s) {
 }
 
 void ensure_builtins_registered() {
-    /* Fast path: already done. `bool` reads are atomic on all supported
-     * archs + the flag is only ever written while holding g_builtins_mu. */
-    if (g_builtins_ready)
-        return;
-    std::lock_guard<std::mutex> lock(g_builtins_mu);
-    if (g_builtins_ready)
-        return;
-    const rac_runtime_vtable_t* cpu = rac_runtime_entry_cpu();
-    if (cpu != nullptr && cpu->init != nullptr) {
+    std::call_once(g_builtins_once, [] {
+        const rac_runtime_vtable_t* cpu = rac_runtime_entry_cpu();
+        if (cpu == nullptr || cpu->init == nullptr) {
+            return;
+        }
         rac_result_t rc = cpu->init();
         if (rc == RAC_SUCCESS) {
             insert_builtin(cpu, state());
@@ -133,8 +134,7 @@ void ensure_builtins_registered() {
         } else {
             RAC_LOG_ERROR(LOG_CAT, "bootstrap: CPU runtime init returned %d — skipping", (int)rc);
         }
-    }
-    g_builtins_ready = true;
+    });
 }
 
 bool has_required_ops(const rac_runtime_vtable_t* v) {

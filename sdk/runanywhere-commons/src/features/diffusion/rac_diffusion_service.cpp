@@ -18,6 +18,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/rac_route.h"
 #include "rac/router/rac_routing_hints.h"
@@ -27,18 +28,30 @@ namespace fs = std::filesystem;
 
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        // GAP 06 T5.3: routed diffusion previously pointed at the generic
-        // "platform" plugin (Apple Foundation Models), which never
-        // registered diffusion_ops — effectively a no-op stub. The new
-        // engines/diffusion-coreml plugin registers the real
-        // rac_diffusion_service_ops_t vtable under this name. ONNX is
-        // retained as a fallback route even though ONNX diffusion is not
-        // supported (the router will fail cleanly with
-        // RAC_ERROR_BACKEND_NOT_FOUND if neither plugin is loaded).
+        // commons-features-other-002: align with the lifecycle mapping in
+        // model_lifecycle.cpp (INFERENCE_FRAMEWORK_COREML → "platform") and
+        // with the Swift / Flutter reference, both of which only register
+        // rac_plugin_entry_platform() — the unified Apple platform vtable
+        // that owns g_platform_diffusion_ops (see
+        // rac_plugin_entry_platform.cpp:75).
+        //
+        // The standalone engines/diffusion-coreml/rac_plugin_entry_diffusion_coreml.cpp
+        // exists as an opt-in plugin for hosts that prefer the dedicated
+        // CoreML diffusion vtable, but no SDK currently registers it. Pinning
+        // the engine name to "diffusion-coreml" here would cause the engine
+        // router (rac_engine_router.cpp:185-189) to hard-reject the platform
+        // vtable that Swift/Flutter actually load, returning
+        // RAC_ERROR_BACKEND_NOT_FOUND for every direct CoreML diffusion
+        // creation through this service — splitting public diffusion
+        // behavior between the lifecycle path (which routes via "platform")
+        // and the direct-service path (which used to route via
+        // "diffusion-coreml").
         case RAC_FRAMEWORK_COREML:
-            return "diffusion-coreml";
+            return "platform";
+        // ONNX diffusion is not supported; leave the hint blank so the
+        // router fails cleanly with RAC_ERROR_BACKEND_NOT_FOUND when no
+        // plugin advertises diffusion_ops for ONNX.
         case RAC_FRAMEWORK_ONNX:
-            return "onnx";
         default:
             return nullptr;
     }
@@ -104,14 +117,21 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
 
     // Start with UNKNOWN framework - will be determined by file detection or registry
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    const char* model_path = model_id;
+    // Own the resolved path as a std::string so it survives rac_model_info_free()
+    // below. Previously we captured a raw pointer into model_info->local_path
+    // and then freed model_info before vt->diffusion_ops->create() — a
+    // use-after-free that handed freed heap bytes to the CoreML diffusion
+    // backend (mirrors the embeddings/VLM lifetime fix in the same wave).
+    std::string model_path_owned = model_id ? model_id : "";
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : model_id;
+        if (model_info->local_path && model_info->local_path[0] != '\0') {
+            model_path_owned = model_info->local_path;
+        }
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path ? model_path : "NULL");
+                     model_path_owned.c_str());
     } else {
         RAC_LOG_WARNING(LOG_CAT, "Model NOT found in registry (result=%d), will detect from path",
                         result);
@@ -143,9 +163,20 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework);
 
+    // commons-features-other-002: pass the model format hint so the engine
+    // router awards kModelFormatWeight to vtables that advertise COREML
+    // (the platform vtable in rac_plugin_entry_platform.cpp declares
+    // RAC_MODEL_FORMAT_ID_COREML), letting it win the diffusion route even
+    // when the engine name hint is left blank.
+    uint32_t format_hint = 0;
+    if (framework == RAC_FRAMEWORK_COREML) {
+        format_hint = RAC_MODEL_FORMAT_ID_COREML;
+    } else if (framework == RAC_FRAMEWORK_ONNX) {
+        format_hint = RAC_MODEL_FORMAT_ID_ONNX;
+    }
+
     const rac_engine_vtable_t* vt = nullptr;
-    result = rac_plugin_route(RAC_PRIMITIVE_DIFFUSION,
-                              /*format=*/0, &hints, &vt);
+    result = rac_plugin_route(RAC_PRIMITIVE_DIFFUSION, format_hint, &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
         model_info = nullptr;
@@ -157,7 +188,7 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
-    result = vt->diffusion_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    result = vt->diffusion_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
     if (result != RAC_SUCCESS || !impl) {
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;

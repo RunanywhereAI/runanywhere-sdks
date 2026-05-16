@@ -67,18 +67,21 @@ protoc \
 
 echo "✓ Swift proto codegen → ${OUT_DIR}"
 
-# SWF-grpc delete (Wave H-2): the three `*.grpc.swift` stubs (voice_agent_service,
-# llm_service, download_service) require GRPCCore / GRPCProtobuf and therefore
-# macOS 15 / iOS 18 — above our supported minimums (macOS 14 / iOS 17). Swift
-# consumes the same services through hand-written AsyncStream adapters
-# (VoiceAgentStreamAdapter, LLMStreamAdapter) wired to the in-process C
-# callback, so the gRPC stubs would only be dead code. We skip emitting them.
+# SWF-grpc delete (Wave H-2): the `*.grpc.swift` stubs require GRPCCore /
+# GRPCProtobuf and therefore macOS 15 / iOS 18 — above our supported
+# minimums (macOS 14 / iOS 17). Swift consumes streaming services through
+# hand-written AsyncStream adapters (VoiceAgentStreamAdapter,
+# LLMStreamAdapter, etc.) wired to the in-process C callback, so the gRPC
+# stubs would only be dead code. We skip emitting them.
 #
 # Belt-and-braces: if an older toolchain or a developer invocation emits
 # the stubs anyway, strip them here so CI remains byte-deterministic.
-rm -f "${OUT_DIR}/voice_agent_service.grpc.swift" \
-      "${OUT_DIR}/llm_service.grpc.swift" \
-      "${OUT_DIR}/download_service.grpc.swift"
+# Wildcard intentionally covers ALL service protos (21 today: Chat,
+# Diffusion, Download, Embeddings, Hardware, Lifecycle, LLM, LoRA,
+# ModelRegistry, Pipeline, RAG, SDKEvents, Solutions, Storage,
+# StructuredOutput, STT, ToolCalling, TTS, VAD, VLM, VoiceAgent) plus
+# any future ones, so this gate stays correct without per-service updates.
+rm -f "${OUT_DIR}"/*.grpc.swift
 
 # P4-T2: emit RAConvenience.swift from rac_options.proto annotations
 # (rac_display_name / rac_analytics_key / rac_wire_string + future rac_default /

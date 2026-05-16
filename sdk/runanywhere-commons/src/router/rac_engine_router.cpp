@@ -187,6 +187,15 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
         if (vt.metadata.name == nullptr || req.pinned_engine != vt.metadata.name) {
             return kRejectScore;
         }
+        /* Pinned-name match still has to satisfy the runtime-unavailable
+         * contract: an engine whose declared L1 runtimes are all unregistered
+         * cannot execute regardless of pinning. Returning the runtime-reject
+         * sentinel here keeps no_fallback=true honest ("only this engine if it
+         * is executable") and lets rac_plugin_route surface
+         * RAC_ERROR_RUNTIME_UNAVAILABLE instead of a later generic load
+         * failure. */
+        if (!has_registered_declared_runtime(vt))
+            return kRuntimeRejectScore;
         /* Pinned-name match is itself a strong signal — give a large bonus
          * so it wins even against higher-priority unpinned plugins. */
         return kPinnedEngineBonus + vt.metadata.priority;
@@ -264,19 +273,26 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
         }
     }
     if (scored.empty()) {
-        if (!req.pinned_engine.empty() && req.no_fallback) {
-            return RouteResult{.vtable = nullptr,
-                               .score = -1,
-                               .rejection_reason = std::string("pinned engine '") +
-                                                   std::string(req.pinned_engine) +
-                                                   "' not registered; no_fallback=true"};
-        }
+        /* Runtime-unavailable takes precedence over pinned/no_fallback so the
+         * C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE (not NOT_FOUND) when a
+         * pinned engine exists in the registry but every one of its declared
+         * L1 runtimes is unregistered on this host. Without this ordering
+         * model_lifecycle's framework-pinned loads would receive a generic
+         * "pinned engine not registered" reason even though the engine is
+         * registered and the real failure is missing runtime. */
         if (any_runtime_reject && !any_other_reject) {
             return RouteResult{.vtable = nullptr,
                                .score = -1,
                                .rejection_reason =
                                    "no registered runtime satisfies any candidate "
                                    "engine's declared runtimes"};
+        }
+        if (!req.pinned_engine.empty() && req.no_fallback) {
+            return RouteResult{.vtable = nullptr,
+                               .score = -1,
+                               .rejection_reason = std::string("pinned engine '") +
+                                                   std::string(req.pinned_engine) +
+                                                   "' not registered; no_fallback=true"};
         }
         return RouteResult{.vtable = nullptr,
                            .score = -1,

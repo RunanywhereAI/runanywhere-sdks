@@ -112,6 +112,12 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
     return RAC_SUCCESS;
 }
 
+// When true, the test transport simulates a CDN/server that ignores Range
+// and returns HTTP 200 + the full payload in response to a resume request.
+// Used by test_resume_falls_back_when_range_ignored to exercise the
+// rac_http_download_execute resume-fallback path (Range: bytes=N- → HTTP 200).
+std::atomic<bool> g_resume_returns_200{false};
+
 rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_t resume_from_byte,
                                    rac_http_body_chunk_fn cb, void* cb_user_data,
                                    rac_http_response_t* out_resp_meta) {
@@ -121,6 +127,16 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
     if (path != "/payload") {
         out_resp_meta->status = 404;
         return RAC_SUCCESS;
+    }
+    if (g_resume_returns_200.load()) {
+        // Range not honored: stream the full payload from byte 0 with HTTP 200.
+        // This is the exact wire shape some CDNs / mis-configured proxies
+        // produce when they see a Range header they choose to drop, and is
+        // the scenario the resume-fallback recovery has to handle.
+        out_resp_meta->status = 200;
+        (void)resume_from_byte;
+        return stream_payload_from(0, cb, cb_user_data) == RAC_TRUE ? RAC_SUCCESS
+                                                                    : RAC_ERROR_CANCELLED;
     }
     out_resp_meta->status = 206;
     size_t from = std::min<size_t>(static_cast<size_t>(resume_from_byte), g_payload.size());
@@ -593,6 +609,93 @@ void test_resume_rejects_stale_offset() {
     fs::remove(dest);
 }
 
+// Regression: covers the CDN / proxy behavior where a resume request
+// (Range: bytes=N-) is answered with HTTP 200 plus the FULL body instead of
+// 206 plus the requested tail. Without the resume-fallback path this would
+// leave the destination file as [original partial][full payload] — a silent
+// corruption that only surfaces as CHECKSUM_FAILED later (or, with no
+// checksum supplied, never surfaces at all). The runner must shift the file
+// left so the final bytes are the full payload only.
+void test_resume_with_200_full_body_replay_checksum() {
+    auto dest = tmp_file("resume-200.bin");
+    std::string dest_str = dest.string();
+    const size_t prefix_size = g_payload.size() / 3;
+
+    // Seed a "partial" prefix on disk that matches what the previous
+    // attempt would have left after a cancel.
+    {
+        std::ofstream out(dest, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(g_payload.data()),
+                  static_cast<std::streamsize>(prefix_size));
+    }
+    T_CHECK(fs::file_size(dest) == prefix_size);
+
+    g_resume_returns_200.store(true);
+    rac_http_download_request_t req{};
+    auto u = url("/payload");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = prefix_size;
+    req.expected_sha256_hex = g_expected_sha.c_str();
+
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    g_resume_returns_200.store(false);
+
+    T_CHECK(rc == RAC_HTTP_DL_OK);
+    T_CHECK(status == 200);
+    T_CHECK(fs::file_size(dest) == g_payload.size());
+
+    // The file on disk must be byte-for-byte the full payload — not the
+    // [prefix][full payload] concatenation that would result without the
+    // fallback shift.
+    std::ifstream in(dest, std::ios::binary);
+    std::vector<uint8_t> merged((std::istreambuf_iterator<char>(in)),
+                                std::istreambuf_iterator<char>());
+    T_CHECK(merged == g_payload);
+
+    fs::remove(dest);
+}
+
+// Same scenario as above but without an expected_sha256_hex. The runner
+// cannot rely on the checksum to detect corruption, so the resume-fallback
+// shift is the only thing keeping the file correct.
+void test_resume_with_200_full_body_replay_no_checksum() {
+    auto dest = tmp_file("resume-200-nocs.bin");
+    std::string dest_str = dest.string();
+    const size_t prefix_size = g_payload.size() / 4;
+    {
+        std::ofstream out(dest, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(g_payload.data()),
+                  static_cast<std::streamsize>(prefix_size));
+    }
+
+    g_resume_returns_200.store(true);
+    rac_http_download_request_t req{};
+    auto u = url("/payload");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = prefix_size;
+    req.expected_sha256_hex = nullptr;
+
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    g_resume_returns_200.store(false);
+
+    T_CHECK(rc == RAC_HTTP_DL_OK);
+    T_CHECK(fs::file_size(dest) == g_payload.size());
+    std::ifstream in(dest, std::ios::binary);
+    std::vector<uint8_t> merged((std::istreambuf_iterator<char>(in)),
+                                std::istreambuf_iterator<char>());
+    T_CHECK(merged == g_payload);
+
+    fs::remove(dest);
+}
+
 }  // namespace
 
 int main() {
@@ -618,6 +721,8 @@ int main() {
         test_cancel_via_progress();
         test_resume_merged_matches_payload();
         test_resume_rejects_stale_offset();
+        test_resume_with_200_full_body_replay_checksum();
+        test_resume_with_200_full_body_replay_no_checksum();
 
         rac_http_transport_register(nullptr, nullptr);
         stop();

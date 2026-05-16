@@ -285,11 +285,13 @@ rac_http_download_execute(const rac_http_download_request_t* req,
 #endif
         return RAC_HTTP_DL_INVALID_URL;
     }
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_INFO, "rac_http_dl",
-                        "rac_http_download_execute: url=[%s] dest=[%s]", req->url,
-                        req->destination_path);
-#endif
+    // Privacy: do not emit the full URL or destination path to logcat.
+    // Model download URLs frequently carry signed-URL query parameters or
+    // bearer tokens, and destination paths reveal the app's filesystem
+    // layout and model ids. logcat is collected by QA tooling, crash
+    // reporters, MDM agents, and adb sessions, so unconditional INFO
+    // diagnostics are not appropriate here. Errors and progress are
+    // reported via the SDK logger / return codes below.
 
     // ---- Ensure destination directory exists -----------------------
     std::error_code ec;
@@ -402,6 +404,25 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                         static_cast<int>(rc), http_status,
                         static_cast<unsigned long long>(ctx.bytes_written));
 #endif
+    // Snapshot the canonical X-RAC-Range-Honored header before freeing the
+    // response so the resume-fallback check below can still observe it.
+    // Swift URLSession and Kotlin OkHttp emit `X-RAC-Range-Honored: false`
+    // whenever a resume request received 200 — see
+    // sdk/runanywhere-swift/Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift:496-505
+    // and sdk/runanywhere-kotlin/.../OkHttpHttpTransport.kt:360-366.
+    bool range_honored_signal_header = false;
+    if (req->resume_from_byte > 0 && rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
+        for (size_t i = 0; i < resp_meta.header_count; ++i) {
+            const auto& kv = resp_meta.headers[i];
+            if (kv.name == nullptr || kv.value == nullptr) {
+                continue;
+            }
+            if (iequals(kv.name, "X-RAC-Range-Honored") && iequals(kv.value, "false")) {
+                range_honored_signal_header = true;
+                break;
+            }
+        }
+    }
     rac_http_response_free(&resp_meta);
     rac_http_client_destroy(client);
 
@@ -413,6 +434,83 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     }
     if (ctx.cancelled) {
         return RAC_HTTP_DL_CANCELLED;
+    }
+
+    // ---- Resume fallback: server ignored Range and replayed full body --
+    //
+    // When the request was a resume (`resume_from_byte > 0`) but the server
+    // responded with HTTP 200 instead of 206, the body we just appended is
+    // the FULL payload — not the [resume_prefix : end] tail we asked for.
+    // The file on disk is now [original prefix][full payload]; the prefix
+    // is no longer valid. Shift left by `resume_prefix` so the file ends up
+    // as the full payload only. The operation succeeds deterministically
+    // instead of silently producing a corrupted file or surfacing a misleading
+    // CHECKSUM_FAILED. Mirrors the behavior callers expect from a CDN that
+    // does not honor Range (e.g. some S3 / GCS configurations and proxies
+    // that strip the header).
+    //
+    // Either an HTTP 200 status or an explicit X-RAC-Range-Honored=false
+    // header (snapshotted above) means the server replayed the full body.
+    if (req->resume_from_byte > 0 && rc == RAC_SUCCESS &&
+        (http_status == 200 || range_honored_signal_header)) {
+        RAC_LOG_WARNING(kTag,
+                        "resume request returned HTTP 200 (Range not honored); shifting "
+                        "destination left by %llu bytes to recover the full payload",
+                        static_cast<unsigned long long>(req->resume_from_byte));
+        fs::path tmp_path(std::string(req->destination_path) + ".rac_resume_fallback.tmp");
+        std::error_code ren_ec;
+        fs::rename(dest, tmp_path, ren_ec);
+        if (ren_ec) {
+            return RAC_HTTP_DL_FILE_ERROR;
+        }
+        {
+            std::ifstream src(tmp_path, std::ios::binary);
+            std::ofstream dst(dest, std::ios::binary | std::ios::trunc);
+            if (!src.is_open() || !dst.is_open()) {
+                std::error_code restore_ec;
+                fs::rename(tmp_path, dest, restore_ec);
+                return RAC_HTTP_DL_FILE_ERROR;
+            }
+            src.seekg(static_cast<std::streamoff>(req->resume_from_byte));
+            std::vector<char> shift_buf(static_cast<size_t>(64) * 1024);
+            while (src.good()) {
+                src.read(shift_buf.data(),
+                         static_cast<std::streamsize>(shift_buf.size()));
+                std::streamsize n = src.gcount();
+                if (n <= 0)
+                    break;
+                dst.write(shift_buf.data(), n);
+                if (!dst.good()) {
+                    std::error_code rm_ec;
+                    fs::remove(tmp_path, rm_ec);
+                    return RAC_HTTP_DL_FILE_ERROR;
+                }
+            }
+        }
+        std::error_code rm_ec;
+        fs::remove(tmp_path, rm_ec);
+
+        // Re-hash from the corrected file. The previously rehydrated hasher
+        // covered the now-discarded prefix plus a body that turned out to be
+        // the full payload (not the resume tail), so the running digest is
+        // wrong; recompute it from scratch over the on-disk bytes.
+        if (do_hash) {
+            sha256_init(&hasher);
+            std::ifstream rehash(dest, std::ios::binary);
+            std::vector<uint8_t> hbuf(static_cast<size_t>(64) * 1024);
+            while (rehash.good()) {
+                rehash.read(reinterpret_cast<char*>(hbuf.data()),
+                            static_cast<std::streamsize>(hbuf.size()));
+                std::streamsize n = rehash.gcount();
+                if (n <= 0)
+                    break;
+                sha256_update(&hasher, hbuf.data(), static_cast<size_t>(n));
+            }
+        }
+
+        // Treat the corrected payload as a successful full download for the
+        // remaining status / checksum / progress emission paths below.
+        ctx.resume_prefix = 0;
     }
 
     rac_http_download_status_t status = map_rac_error(rc, http_status);

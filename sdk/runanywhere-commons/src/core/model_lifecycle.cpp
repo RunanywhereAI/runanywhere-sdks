@@ -279,9 +279,20 @@ const char* framework_to_plugin_name(InferenceFramework framework, rac_primitive
             }
             return "llamacpp";
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
+            // Voice primitives on ONNX-format models are typically served by
+            // the Sherpa plugin (it advertises STT/TTS/VAD ops over ONNX
+            // Runtime); the production "onnx" plugin only exposes embedding
+            // ops. We intentionally do NOT pin to "sherpa" here so the router
+            // picks the highest-priority registered plugin that actually
+            // advertises the voice primitive — letting alternate voice
+            // backends (whispercpp/whisperkit) or test mocks load when sherpa
+            // is not present without hard-failing the load. The router's
+            // primitive-support filter (rac_engine_router.cpp) skips engines
+            // missing the requested ops, so non-voice plugins ("onnx" in
+            // production) are still excluded.
             if (primitive == RAC_PRIMITIVE_DETECT_VOICE || primitive == RAC_PRIMITIVE_TRANSCRIBE ||
                 primitive == RAC_PRIMITIVE_SYNTHESIZE) {
-                return "sherpa";
+                return nullptr;
             }
             return "onnx";
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:

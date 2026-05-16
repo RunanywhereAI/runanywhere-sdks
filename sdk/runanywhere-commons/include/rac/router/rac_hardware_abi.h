@@ -61,8 +61,9 @@ RAC_API rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out,
 /**
  * @brief Set the accelerator preference for subsequent inference calls.
  *
- * @param preference_enum  AcceleratorPreference enum value (0=AUTO, 1=ANE,
- *                         2=GPU, 3=CPU — matches hardware_profile.proto).
+ * @param preference_enum  AccelerationPreference enum value from
+ *                         hardware_profile.proto (UNSPECIFIED=0, AUTO=1,
+ *                         CPU=2, GPU=3, NPU=4, WEBGPU=5, METAL=6, VULKAN=7).
  * @return RAC_SUCCESS or RAC_ERROR_INVALID_ARGUMENT.
  */
 RAC_API rac_result_t rac_hardware_set_accelerator_preference(int preference_enum);

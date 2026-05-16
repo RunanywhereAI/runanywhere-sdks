@@ -3377,6 +3377,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsListVoicesLifecyc
     return makeProtoCallResult(env, rc, &result, "racTtsListVoicesLifecycleProto");
 }
 
+// Swift-aligned: exposes rac_tts_stop_lifecycle_proto so Kotlin can stop an
+// in-flight lifecycle-owned TTS synthesis. The legacy
+// racTtsComponentCancel(handle) only addresses the per-component handle path;
+// the v2 lifecycle TTS path (racTtsSynthesizeStreamLifecycleProto) requires
+// this stop ABI to terminate synthesis without freeing the loaded voice.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsStopLifecycleProto(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_tts_stop_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racTtsStopLifecycleProto");
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeStreamLifecycleProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {

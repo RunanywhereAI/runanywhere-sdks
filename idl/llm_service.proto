@@ -10,6 +10,13 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "voice_events.proto";
+// hotspot-idl-002: ToolCall / ToolResult are needed on the LLM streaming
+// event path (event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL is meaningless
+// without a structured tool-call payload). tool_calling.proto has no
+// upstream imports today so adding it here does NOT reintroduce the
+// llm_options ↔ sdk_events package cycle that motivated the inline-fields
+// duplication on LLMGenerateRequest / LLMStreamFinalResult.
+import "tool_calling.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -31,6 +38,22 @@ message LLMGenerateRequest {
 
     // Additional LLMGenerationOptions fields kept inline to avoid a codegen
     // package cycle between service stubs and option messages.
+    //
+    // idl-002: Intentionally omitted from this streaming request (no current
+    // streaming consumer; route them through the non-streaming
+    // rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+    //   - thinking_pattern (LLMGenerationOptions field 11)
+    //   - structured_output (LLMGenerationOptions field 13)
+    //   - enable_real_time_tracking (LLMGenerationOptions field 14)
+    //   - repeat_last_n (LLMGenerationOptions field 18)
+    //   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+    //     is not yet supported on the LLM.Generate rpc; tool sessions must
+    //     use the non-streaming generation path with LLMGenerationOptions.
+    // Additionally, preferred_framework (field 11) and execution_target
+    // (field 13) are degraded to `string` here instead of the InferenceFramework
+    // / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
+    // Callers must use the canonical enum string values (see
+    // llm_options.proto:69 and :85). See also synthesis idl-002.
     float  repetition_penalty = 8;
     repeated string stop_sequences = 9;
     bool   streaming_enabled = 10;
@@ -69,6 +92,13 @@ message LLMStreamFinalResult {
     string error_message = 11;
     int64 prompt_eval_time_ms = 12;
     int64 decode_time_ms = 13;
+
+    // hotspot-idl-002: tool calls actually executed during the streaming
+    // session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+    // llm_options.proto). Populated only on terminal events when the
+    // backend completed at least one tool call.
+    repeated ToolCall tool_calls = 14;
+    repeated ToolResult tool_results = 15;
 }
 
 enum LLMStreamEventKind {
@@ -141,11 +171,24 @@ message LLMStreamEvent {
     int32 prompt_tokens_processed = 15;
     int32 completion_tokens_generated = 16;
     int64 elapsed_ms = 17;
+
+    // hotspot-idl-002: structured tool-call payload emitted alongside an
+    // event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+    // field the tool-call event kind carries no proto-typed payload and
+    // SDK consumers must fall back to JSON-parsing the raw `token` text.
+    optional ToolCall tool_call = 18;
 }
 
 service LLM {
     // Server-streaming: emits one LLMStreamEvent per generated token
     // until is_final=true. Cancellation aborts the underlying generation
     // via the existing rac_llm_cancel() C ABI.
+    //
+    // idl-002: tool-calling generation is NOT supported on this streaming
+    // entry point. LLMGenerateRequest does not carry ToolCallingOptions
+    // (see comment on LLMGenerateRequest). Use the non-streaming
+    // generation path that carries LLMGenerationOptions when a session
+    // requires tools / structured output / thinking-tag patterns /
+    // repeat_last_n / enable_real_time_tracking.
     rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
 }

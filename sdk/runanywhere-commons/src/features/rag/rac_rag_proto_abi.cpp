@@ -479,6 +479,13 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
+    // Per-query retrieval overrides from RAGQueryOptions (idl/rag.proto:180-183).
+    // Zero values fall back to the session-level RAGConfig defaults inside
+    // RAGBackend::query so legacy callers behave as before.
+    RAGBackend::QueryOverrides overrides;
+    overrides.retrieval_top_k = query_proto.retrieval_top_k();
+    overrides.similarity_threshold = query_proto.similarity_threshold();
+
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
                        "rag.query", 0.0f, 1, 0, nullptr);
 
@@ -487,7 +494,7 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     nlohmann::json metadata;
     rac_result_t status = RAC_SUCCESS;
     try {
-        status = s->backend->query(question, &opts, &llm_result, metadata);
+        status = s->backend->query(question, &opts, &llm_result, metadata, nullptr, &overrides);
     } catch (const std::exception& e) {
         LOGE("rag.query exception: %s", e.what());
         rac_llm_result_free(&llm_result);

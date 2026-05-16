@@ -158,8 +158,15 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
+// Fills `options` from `request`. The caller-owned `stop_storage`/`stop_ptrs`
+// must outlive every generate/generate_stream dispatch that observes
+// `options.stop_sequences` — they hold the backing memory the C ABI points
+// into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
+// copies stopSequences into the canonical proto request.
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
-                                       const std::string& system_prompt) {
+                                       const std::string& system_prompt,
+                                       std::vector<std::string>& stop_storage,
+                                       std::vector<const char*>& stop_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
     if (request.max_tokens() > 0) {
         options.max_tokens = request.max_tokens();
@@ -171,6 +178,24 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
         options.top_p = request.top_p();
     }
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+
+    stop_storage.clear();
+    stop_ptrs.clear();
+    const int stop_count = request.stop_sequences_size();
+    if (stop_count > 0) {
+        stop_storage.reserve(static_cast<size_t>(stop_count));
+        for (const auto& seq : request.stop_sequences()) {
+            if (!seq.empty()) {
+                stop_storage.push_back(seq);
+            }
+        }
+        stop_ptrs.reserve(stop_storage.size());
+        for (const auto& seq : stop_storage) {
+            stop_ptrs.push_back(seq.c_str());
+        }
+    }
+    options.stop_sequences = stop_ptrs.empty() ? nullptr : stop_ptrs.data();
+    options.num_stop_sequences = stop_ptrs.size();
     return options;
 }
 
@@ -494,7 +519,10 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                              0);
 
     const std::string system_prompt = request.system_prompt();
-    rac_llm_options_t options = options_from_request(request, system_prompt);
+    std::vector<std::string> stop_storage;
+    std::vector<const char*> stop_ptrs;
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -583,7 +611,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                              0);
 
     const std::string system_prompt = request.system_prompt();
-    rac_llm_options_t options = options_from_request(request, system_prompt);
+    std::vector<std::string> stop_storage;
+    std::vector<const char*> stop_ptrs;
+    rac_llm_options_t options =
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -613,7 +644,17 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
     } else {
-        dispatch_terminal_once(&ctx, "stop", nullptr);
+        // commons-features-llm-rag-002: mirror the OpenAI-style finish_reason
+        // contract from llm_component.cpp:867-884 and rac_llm_generate_proto's
+        // set_result_from_raw — when the backend stopped because it generated
+        // the requested max_tokens, the terminal proto event must report
+        // "length" rather than "stop". Without this gate every successful
+        // streaming proto generation looks like a natural stop, which breaks
+        // OpenAI parity for direct streaming proto callers (JNI, Web, etc.)
+        // and diverges from the non-streaming proto path.
+        const char* finish_reason =
+            (options.max_tokens > 0 && ctx.token_count >= options.max_tokens) ? "length" : "stop";
+        dispatch_terminal_once(&ctx, finish_reason, nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms);

@@ -800,3 +800,22 @@ _rac_error_set_details
 # Audio utilities — WAV header helpers used by Swift TTS shim and level-meter DSP.
 _rac_audio_float32_to_wav
 _rac_audio_compute_level_db
+
+# ============================================================================
+# WAVE W1.1 (2026-05-15): Swift-called commons RAC_API symbols missing from
+# the curated list (commons-tests-build-002). Without these, dynamic Apple
+# builds of librac_commons would lose Swift error mapping, ModelInfo proto
+# construction, and log-metadata redaction at link time.
+# ============================================================================
+
+# Swift error helpers — RASDKError+Helpers.swift converts rac_result_t into
+# proto-encoded SDKError bytes via this commons helper.
+_rac_result_to_proto_error
+
+# Swift ModelInfo proto factory — ModelTypes+Artifacts.swift uses this to
+# construct ModelInfo proto bytes that cross back into commons.
+_rac_model_info_make_proto
+
+# Swift log redaction — SDKLogger.swift consults this to decide whether log
+# metadata fields must be redacted before emit.
+_rac_log_metadata_should_redact

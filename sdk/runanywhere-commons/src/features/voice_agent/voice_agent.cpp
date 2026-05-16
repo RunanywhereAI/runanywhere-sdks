@@ -176,12 +176,39 @@ runanywhere::v1::ComponentLifecycleState lifecycle_state_vad() {
     return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
 }
 
-void fill_component_states(rac_voice_agent_handle_t /*handle*/,
+// Promote a NOT_LOADED lifecycle state to READY when the voice-agent's own
+// component handle reports the modality as loaded. This is the same fallback
+// pattern used by validate_all_components_ready: callers that loaded models
+// through rac_voice_agent_load_*_model never registered with the global
+// lifecycle, but the per-handle component is still authoritative for those
+// flows.
+runanywhere::v1::ComponentLifecycleState
+promote_with_component(runanywhere::v1::ComponentLifecycleState lifecycle_state,
+                       rac_handle_t component_handle,
+                       rac_lifecycle_state_t (*get_state_fn)(rac_handle_t)) {
+    if (lifecycle_state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY)
+        return lifecycle_state;
+    if (component_handle && get_state_fn &&
+        get_state_fn(component_handle) == RAC_LIFECYCLE_STATE_LOADED) {
+        return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+    }
+    return lifecycle_state;
+}
+
+void fill_component_states(rac_voice_agent_handle_t handle,
                            runanywhere::v1::VoiceAgentComponentStates* out) {
-    const auto stt = lifecycle_state_stt();
-    const auto llm = lifecycle_state_llm();
-    const auto tts = lifecycle_state_tts();
-    const auto vad = lifecycle_state_vad();
+    const auto stt = promote_with_component(lifecycle_state_stt(),
+                                            handle ? handle->stt_handle : nullptr,
+                                            rac_stt_component_get_state);
+    const auto llm = promote_with_component(lifecycle_state_llm(),
+                                            handle ? handle->llm_handle : nullptr,
+                                            rac_llm_component_get_state);
+    const auto tts = promote_with_component(lifecycle_state_tts(),
+                                            handle ? handle->tts_handle : nullptr,
+                                            rac_tts_component_get_state);
+    const auto vad = promote_with_component(lifecycle_state_vad(),
+                                            handle ? handle->vad_handle : nullptr,
+                                            rac_vad_component_get_state);
     out->set_stt_state(stt);
     out->set_llm_state(llm);
     out->set_tts_state(tts);
@@ -547,11 +574,20 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     handle->is_configured.store(false, std::memory_order_release);
 
     // GAP 05 Phase 2 — propagate cancel to any GraphScheduler-driven
-    // pipeline run currently in flight. Snapshot under no lock; the
-    // pipeline itself uses cancel_all() which is non-blocking and
-    // idempotent, so racing destroy() against an in-flight run is safe.
-    if (auto pipeline = handle->pipeline) {
-        pipeline->cancel();
+    // pipeline run currently in flight. commons-features-voice-003:
+    // snapshot the shared_ptr under handle->pipeline_mutex (held only
+    // while copying the control block) so we never race the
+    // process_stream store/reset, then call cancel() OUTSIDE the lock.
+    // The pipeline's cancel_all() is non-blocking and idempotent, so
+    // racing destroy() against an in-flight run is safe once the
+    // shared_ptr copy is established without UB.
+    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        pipeline_snapshot = handle->pipeline;
+    }
+    if (pipeline_snapshot) {
+        pipeline_snapshot->cancel();
     }
 
     // Spin-wait until all in-flight operations complete
@@ -564,7 +600,12 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 
         // Drop the pipeline before component handles so its nodes (which
         // call into stt/llm/tts/vad) cannot outlive the handles they use.
-        handle->pipeline.reset();
+        // Reset under pipeline_mutex too: process_stream may still try to
+        // assign here on another thread until is_shutting_down propagates.
+        {
+            std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+            handle->pipeline.reset();
+        }
 
         if (handle->owns_components) {
             RAC_LOG_DEBUG("VoiceAgent", "Destroying owned component handles");
@@ -842,8 +883,15 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     // GAP 05 Phase 2 — cancel any in-flight pipeline BEFORE taking the
     // outer mutex; the pipeline run holds the same mutex while it drains
     // and cancel_all() is the only way out of a stalled stage.
-    if (auto pipeline = handle->pipeline) {
-        pipeline->cancel();
+    // commons-features-voice-003: snapshot under pipeline_mutex so the
+    // shared_ptr copy is synchronized with process_stream's store/reset.
+    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        pipeline_snapshot = handle->pipeline;
+    }
+    if (pipeline_snapshot) {
+        pipeline_snapshot->cancel();
     }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
@@ -852,7 +900,10 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
 
     // Tear the pipeline down before the underlying components so its
     // worker threads cannot dispatch into stt/llm/tts/vad after cleanup.
-    handle->pipeline.reset();
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        handle->pipeline.reset();
+    }
 
     // Cleanup all components (mirrors Swift's cleanup)
     rac_llm_component_cleanup(handle->llm_handle);
@@ -1034,13 +1085,22 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     // graph down deterministically.
     auto pipeline =
         std::make_shared<rac::voice_agent::VoiceAgentPipeline>(handle, callback, user_data);
-    handle->pipeline = pipeline;
+    // commons-features-voice-003: every store/reset of handle->pipeline goes
+    // through pipeline_mutex so it is correctly synchronized with the
+    // destroy/cleanup snapshots that read the same shared_ptr instance.
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        handle->pipeline = pipeline;
+    }
 
     rac_result_t result = pipeline->run_once(audio_data, audio_size);
 
     // Drop the per-call pipeline so destroy()'s cancel path doesn't latch
     // onto a torn-down scheduler. Any future call constructs a fresh one.
-    handle->pipeline.reset();
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        handle->pipeline.reset();
+    }
     return result;
 }
 
@@ -1307,32 +1367,38 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
 
-    // SWIFT-VOICE-AGENT-001 (T16/Path X): dispatch through the lifecycle
-    // (level-1 impl + ops) instead of the agent's per-modality component
-    // handles. The handles are owned by the Swift bridge actor and are
-    // not the same as the lifecycle entries populated by
-    // `rac_model_lifecycle_load_proto`. Mirrors the Phase 6j VLM
-    // precedent in `rac_vlm_process_proto`.
-    rac::lifecycle::LifecycleSttRef stt_ref;
-    rac_result_t rc = rac::lifecycle::acquire_lifecycle_stt(&stt_ref);
-    if (rc != RAC_SUCCESS) {
-        emit_component_failure(handle, "stt", rc, "STT lifecycle is not loaded");
-        return rac_proto_buffer_set_error(out_result, rc, "STT lifecycle is not loaded");
-    }
+    // SWIFT-VOICE-AGENT-001 (T16/Path X): prefer the global lifecycle
+    // (level-1 impl + ops) for callers that loaded models via
+    // rac_model_lifecycle_load_proto / RunAnywhere.loadModel; fall back to
+    // the per-handle component when callers loaded via the voice-agent's
+    // own rac_voice_agent_load_*_model family (which only writes the
+    // component handle, not the lifecycle entry). Mirrors the Phase 6j VLM
+    // precedent in rac_vlm_process_proto.
+    rac::lifecycle::LifecycleSttRef stt_ref{};
+    const bool have_lifecycle_stt =
+        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
 
     rac_stt_result_t stt = {};
-    {
+    rac_result_t rc;
+    if (have_lifecycle_stt) {
         rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
         rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
+    } else {
+        rc = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
+                                          &stt);
     }
     if (rc != RAC_SUCCESS) {
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     if (!stt.text || stt.text[0] == '\0') {
         rac_stt_result_free(&stt);
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
                                "STT transcription was empty");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
@@ -1344,52 +1410,54 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
                         stt.text);
 
-    rac::llm::LifecycleLlmRef llm_ref;
-    rc = rac::llm::acquire_lifecycle_llm(&llm_ref);
-    if (rc != RAC_SUCCESS) {
-        rac_stt_result_free(&stt);
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
-        emit_component_failure(handle, "llm", rc, "LLM lifecycle is not loaded");
-        return rac_proto_buffer_set_error(out_result, rc, "LLM lifecycle is not loaded");
-    }
+    rac::llm::LifecycleLlmRef llm_ref{};
+    const bool have_lifecycle_llm =
+        rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
 
     rac_llm_result_t llm = {};
-    {
+    if (have_lifecycle_llm) {
         rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
         rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+    } else {
+        rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
     }
     if (rc != RAC_SUCCESS) {
-        rac::llm::release_lifecycle_llm(&llm_ref);
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
         rac_stt_result_free(&stt);
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rac_proto_buffer_set_error(out_result, rc, "LLM generation failed");
     }
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
                         stt.text, llm.text);
 
-    rac::lifecycle::LifecycleTtsRef tts_ref;
-    rc = rac::lifecycle::acquire_lifecycle_tts(&tts_ref);
-    if (rc != RAC_SUCCESS) {
-        rac_llm_result_free(&llm);
-        rac::llm::release_lifecycle_llm(&llm_ref);
-        rac_stt_result_free(&stt);
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
-        emit_component_failure(handle, "tts", rc, "TTS lifecycle is not loaded");
-        return rac_proto_buffer_set_error(out_result, rc, "TTS lifecycle is not loaded");
-    }
+    rac::lifecycle::LifecycleTtsRef tts_ref{};
+    const bool have_lifecycle_tts =
+        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
 
     rac_tts_result_t tts = {};
-    {
+    if (have_lifecycle_tts) {
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
         rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+    } else {
+        rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
     }
     if (rc != RAC_SUCCESS) {
-        rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        if (have_lifecycle_tts) {
+            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        }
         rac_llm_result_free(&llm);
-        rac::llm::release_lifecycle_llm(&llm_ref);
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
         rac_stt_result_free(&stt);
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
         return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
     }
@@ -1403,11 +1471,17 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                       &wav_data, &wav_size);
         if (rc != RAC_SUCCESS) {
             rac_tts_result_free(&tts);
-            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+            if (have_lifecycle_tts) {
+                rac::lifecycle::release_lifecycle_tts(&tts_ref);
+            }
             rac_llm_result_free(&llm);
-            rac::llm::release_lifecycle_llm(&llm_ref);
+            if (have_lifecycle_llm) {
+                rac::llm::release_lifecycle_llm(&llm_ref);
+            }
             rac_stt_result_free(&stt);
-            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            if (have_lifecycle_stt) {
+                rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            }
             emit_component_failure(handle, "tts", rc, "TTS audio conversion failed");
             return rac_proto_buffer_set_error(out_result, rc, "TTS audio conversion failed");
         }
@@ -1429,11 +1503,17 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
 
     std::free(wav_data);
     rac_tts_result_free(&tts);
-    rac::lifecycle::release_lifecycle_tts(&tts_ref);
+    if (have_lifecycle_tts) {
+        rac::lifecycle::release_lifecycle_tts(&tts_ref);
+    }
     rac_llm_result_free(&llm);
-    rac::llm::release_lifecycle_llm(&llm_ref);
+    if (have_lifecycle_llm) {
+        rac::llm::release_lifecycle_llm(&llm_ref);
+    }
     rac_stt_result_free(&stt);
-    rac::lifecycle::release_lifecycle_stt(&stt_ref);
+    if (have_lifecycle_stt) {
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+    }
     return copy_proto_message(result, out_result);
 #endif
 }
@@ -1830,10 +1910,29 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_LISTENING,
                   runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH, session_id, turn_id,
                   request_id, event_callback, user_data);
+
+    // commons-features-voice-001: dispatch through lifecycle refs when the
+    // canonical lifecycle bridge owns the loaded models; fall back to the
+    // voice-agent's per-handle component for callers that loaded via
+    // rac_voice_agent_load_*_model and never bound a global lifecycle model.
+    // Both paths satisfy the component_states READY check above.
+    rac::lifecycle::LifecycleSttRef stt_ref{};
+    const bool have_lifecycle_stt =
+        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+
     rac_stt_result_t stt = {};
-    rac_result_t rc =
-        rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
+    rac_result_t rc;
+    if (have_lifecycle_stt) {
+        rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
+        rc = rac_stt_transcribe(&stt_service, audio.data(), audio.size(), nullptr, &stt);
+    } else {
+        rc = rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr,
+                                          &stt);
+    }
     if (rc != RAC_SUCCESS) {
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         d7_emit_error(handle, rc, "stt", "STT transcription failed", session_id, turn_id,
                       request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
@@ -1841,6 +1940,9 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     }
     if (!stt.text || stt.text[0] == '\0') {
         rac_stt_result_free(&stt);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "stt", "STT transcription was empty",
                       session_id, turn_id, request_id, event_callback, user_data);
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
@@ -1858,10 +1960,25 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH,
                   runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE, session_id, turn_id,
                   request_id, event_callback, user_data);
+
+    rac::llm::LifecycleLlmRef llm_ref{};
+    const bool have_lifecycle_llm =
+        rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
     rac_llm_result_t llm = {};
-    rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+    if (have_lifecycle_llm) {
+        rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
+        rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+    } else {
+        rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+    }
     if (rc != RAC_SUCCESS) {
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
         rac_stt_result_free(&stt);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         d7_emit_error(handle, rc, "llm", "LLM generation failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
@@ -1873,11 +1990,29 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE,
                   runanywhere::v1::PIPELINE_STATE_PLAYING_TTS, session_id, turn_id, request_id,
                   event_callback, user_data);
+
+    rac::lifecycle::LifecycleTtsRef tts_ref{};
+    const bool have_lifecycle_tts =
+        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
     rac_tts_result_t tts = {};
-    rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+    if (have_lifecycle_tts) {
+        rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
+        rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+    } else {
+        rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+    }
     if (rc != RAC_SUCCESS) {
+        if (have_lifecycle_tts) {
+            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        }
         rac_stt_result_free(&stt);
         rac_llm_result_free(&llm);
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         d7_emit_error(handle, rc, "tts", "TTS synthesis failed", session_id, turn_id, request_id,
                       event_callback, user_data);
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
@@ -1898,6 +2033,15 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     rac_stt_result_free(&stt);
     rac_llm_result_free(&llm);
     rac_tts_result_free(&tts);
+    if (have_lifecycle_tts) {
+        rac::lifecycle::release_lifecycle_tts(&tts_ref);
+    }
+    if (have_lifecycle_llm) {
+        rac::llm::release_lifecycle_llm(&llm_ref);
+    }
+    if (have_lifecycle_stt) {
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+    }
     return RAC_SUCCESS;
 #endif
 }
@@ -1929,20 +2073,42 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse VoiceAgentTranscribeProtoRequest");
     }
-    if (!handle->stt_handle ||
-        rac_stt_component_get_state(handle->stt_handle) != RAC_LIFECYCLE_STATE_LOADED) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
-                                          "STT component is not loaded");
-    }
     const std::string& audio = request.audio_data();
     if (audio.empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "transcribe request is missing audio_data");
     }
+
+    // commons-features-voice-001: prefer the canonical lifecycle STT ref so
+    // transcribe works when callers loaded STT through the lifecycle bridge
+    // and never bound the voice-agent's stt_handle. When the lifecycle ref
+    // is not loaded (e.g. callers loaded via rac_voice_agent_load_stt_model
+    // into the voice-agent's own component handle), fall back to the
+    // component-handle dispatch path so the test/legacy contract still
+    // works end-to-end.
+    rac::lifecycle::LifecycleSttRef stt_ref{};
+    const bool have_lifecycle_stt =
+        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+    if (!have_lifecycle_stt &&
+        (!handle->stt_handle ||
+         rac_stt_component_get_state(handle->stt_handle) != RAC_LIFECYCLE_STATE_LOADED)) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
+                                          "STT component is not loaded");
+    }
+
     rac_stt_result_t stt = {};
-    rac_result_t rc =
-        rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr, &stt);
+    rac_result_t rc;
+    if (have_lifecycle_stt) {
+        rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
+        rc = rac_stt_transcribe(&stt_service, audio.data(), audio.size(), nullptr, &stt);
+    } else {
+        rc = rac_stt_component_transcribe(handle->stt_handle, audio.data(), audio.size(), nullptr,
+                                          &stt);
+    }
     if (rc != RAC_SUCCESS) {
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     runanywhere::v1::STTOutput output;
@@ -1957,6 +2123,9 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
     }
     output.set_timestamp_ms(rac_get_current_time_ms());
     rac_stt_result_free(&stt);
+    if (have_lifecycle_stt) {
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+    }
     return copy_proto_message(output, out_result);
 #endif
 }
@@ -1988,19 +2157,38 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse VoiceAgentSynthesizeSpeechProtoRequest");
     }
-    if (!handle->tts_handle ||
-        rac_tts_component_get_state(handle->tts_handle) != RAC_LIFECYCLE_STATE_LOADED) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
-                                          "TTS component is not loaded");
-    }
     if (request.text().empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "synthesize request is missing text");
     }
+
+    // commons-features-voice-001: prefer the canonical lifecycle TTS ref;
+    // fall back to the voice-agent's tts_handle for callers that loaded TTS
+    // through rac_voice_agent_load_tts_voice and never bound a global
+    // lifecycle TTS model.
+    rac::lifecycle::LifecycleTtsRef tts_ref{};
+    const bool have_lifecycle_tts =
+        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
+    if (!have_lifecycle_tts &&
+        (!handle->tts_handle ||
+         rac_tts_component_get_state(handle->tts_handle) != RAC_LIFECYCLE_STATE_LOADED)) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_INITIALIZED,
+                                          "TTS component is not loaded");
+    }
+
     rac_tts_result_t tts = {};
-    rac_result_t rc =
-        rac_tts_component_synthesize(handle->tts_handle, request.text().c_str(), nullptr, &tts);
+    rac_result_t rc;
+    if (have_lifecycle_tts) {
+        rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
+        rc = rac_tts_synthesize(&tts_service, request.text().c_str(), nullptr, &tts);
+    } else {
+        rc = rac_tts_component_synthesize(handle->tts_handle, request.text().c_str(), nullptr,
+                                          &tts);
+    }
     if (rc != RAC_SUCCESS) {
+        if (have_lifecycle_tts) {
+            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        }
         return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
     }
     runanywhere::v1::TTSOutput output;
@@ -2012,6 +2200,9 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
     output.set_is_final(true);
     output.set_audio_size_bytes(static_cast<int64_t>(tts.audio_size));
     rac_tts_result_free(&tts);
+    if (have_lifecycle_tts) {
+        rac::lifecycle::release_lifecycle_tts(&tts_ref);
+    }
     return copy_proto_message(output, out_result);
 #endif
 }

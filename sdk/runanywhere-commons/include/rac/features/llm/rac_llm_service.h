@@ -275,6 +275,16 @@ RAC_API void rac_llm_result_free(rac_llm_result_t* result);
  * serialized runanywhere.v1.LLMGenerationResult bytes in out_result. Thinking
  * blocks, token splits, and structured JSON extraction are normalized by the
  * C++ commons layer before the result crosses the ABI.
+ *
+ * idl-abi-contract-003 / idl-002: LLMGenerateRequest is currently a reduced
+ * 25-field shape that does NOT carry tool_calling, thinking_pattern,
+ * structured_output, enable_real_time_tracking, or repeat_last_n
+ * (see idl/llm_options.proto LLMGenerationOptions for the full set), and
+ * `preferred_framework` / `execution_target` are degraded to `string`
+ * instead of the canonical InferenceFramework / ExecutionTarget enums.
+ * Until idl-002 augments LLMGenerateRequest, callers that need those
+ * options must wire them through a separate out-of-band channel; this
+ * proto entry point will silently drop them.
  */
 RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
                                             size_t request_proto_size,
@@ -286,6 +296,11 @@ RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
  * Uses the LLM model loaded through rac_model_lifecycle_load_proto(). The
  * callback receives one serialized runanywhere.v1.LLMStreamEvent per token and
  * exactly one terminal event with is_final=true.
+ *
+ * idl-abi-contract-003 / idl-002: shares the same reduced LLMGenerateRequest
+ * shape as rac_llm_generate_proto above — tool_calling, thinking_pattern,
+ * structured_output, enable_real_time_tracking, and repeat_last_n cannot be
+ * carried over the streaming path either until idl-002 lands.
  */
 RAC_API rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                                    size_t request_proto_size,

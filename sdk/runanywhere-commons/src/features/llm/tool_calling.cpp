@@ -1537,6 +1537,11 @@ struct ProtoToolCallingOptions {
     std::string system_prompt;
     std::string format_hint = "default";
     std::string tools_json = "[]";
+    // Mirror of ToolCallingOptions.tool_choice (idl/tool_calling.proto:262).
+    // UNSPECIFIED is treated as AUTO so legacy callers behave as before.
+    runanywhere::v1::ToolChoiceMode tool_choice =
+        runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
+    std::string forced_tool_name;
 };
 
 static void refresh_proto_tool_calling_options(ProtoToolCallingOptions* converted) {
@@ -1587,6 +1592,10 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     }
     if (proto.has_max_tool_calls() && proto.max_tool_calls() > 0) {
         converted.options.max_tool_calls = proto.max_tool_calls();
+    }
+    converted.tool_choice = proto.tool_choice();
+    if (proto.has_forced_tool_name()) {
+        converted.forced_tool_name = proto.forced_tool_name();
     }
 
     refresh_proto_tool_calling_options(&converted);
@@ -1718,8 +1727,20 @@ collect_proto_tool_validation_errors(const runanywhere::v1::ToolCallValidationRe
 
     const auto& options = request.options();
     const auto& tool_call = request.tool_call();
-    if (options.has_forced_tool_name() && !options.forced_tool_name().empty() &&
-        tool_call.name() != options.forced_tool_name()) {
+    // Honor ToolCallingOptions.tool_choice (idl/tool_calling.proto:262).
+    // NONE disables any tool call entirely. SPECIFIC narrows allowed calls to
+    // forced_tool_name; the existing forced_tool_name check below also covers
+    // this case but we keep the message specific to tool_choice when set.
+    if (options.tool_choice() == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
+        errors.emplace_back(
+            "Tool calls are disabled by tool_choice=NONE");
+    } else if (options.tool_choice() == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+               options.has_forced_tool_name() && !options.forced_tool_name().empty() &&
+               tool_call.name() != options.forced_tool_name()) {
+        errors.push_back("Tool call must use tool_choice=SPECIFIC target: " +
+                         options.forced_tool_name());
+    } else if (options.has_forced_tool_name() && !options.forced_tool_name().empty() &&
+               tool_call.name() != options.forced_tool_name()) {
         errors.push_back("Tool call must use forced tool: " + options.forced_tool_name());
     }
 
@@ -1856,13 +1877,36 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
     char* prompt = nullptr;
     rac_result_t rc = RAC_SUCCESS;
 
-    if (request.tool_results_size() == 0) {
+    // Honor ToolCallingOptions.tool_choice. When tool_choice is NONE we must
+    // not advertise any tools to the model. Treat the formatted prompt as the
+    // user prompt verbatim (or empty if absent). For SPECIFIC, narrow the
+    // advertised set to forced_tool_name so the model is steered to that
+    // call. UNSPECIFIED/AUTO/REQUIRED keep today's full advertise-all behavior.
+    const bool suppress_tools =
+        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE;
+    std::string effective_tools_json = converted.tools_json;
+    if (!suppress_tools &&
+        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+        !converted.forced_tool_name.empty() && request.has_options()) {
+        json filtered = json::array();
+        for (const auto& tool : request.options().tools()) {
+            if (tool.name() == converted.forced_tool_name) {
+                filtered.push_back(tool_definition_proto_to_json(tool));
+            }
+        }
+        effective_tools_json = filtered.dump();
+    }
+
+    if (suppress_tools) {
+        prompt = dup_owned_string(request.user_prompt());
+        rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+    } else if (request.tool_results_size() == 0) {
         if (request.user_prompt().empty()) {
             rc = rac_tool_call_format_prompt_json_with_format_name(
-                converted.tools_json.c_str(), converted.format_hint.c_str(), &prompt);
+                effective_tools_json.c_str(), converted.format_hint.c_str(), &prompt);
         } else {
             rc = rac_tool_call_build_initial_prompt(request.user_prompt().c_str(),
-                                                    converted.tools_json.c_str(),
+                                                    effective_tools_json.c_str(),
                                                     &converted.options, &prompt);
         }
     } else {
@@ -1871,7 +1915,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
         char* tools_prompt_raw = nullptr;
         if (converted.options.keep_tools_available == RAC_TRUE) {
             const rac_result_t tools_rc = rac_tool_call_format_prompt_json_with_format_name(
-                converted.tools_json.c_str(), converted.format_hint.c_str(), &tools_prompt_raw);
+                effective_tools_json.c_str(), converted.format_hint.c_str(), &tools_prompt_raw);
             if (tools_rc != RAC_SUCCESS) {
                 free(tools_prompt_raw);
                 return set_tool_prompt_format_proto_error(

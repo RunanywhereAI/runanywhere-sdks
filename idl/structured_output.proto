@@ -395,22 +395,17 @@ message NERResult {
 // Logical structured-output service contract. Model execution, retries, UI
 // callbacks, and platform-specific JSON parser choices remain adapter-owned;
 // this service describes portable prompt preparation, extraction/parsing,
-// validation, and generation semantics over generated messages.
+// and validation semantics over generated messages.
 //
-// Generate / GenerateStream mirror the C ABI entry points
-// rac_structured_output_generate_proto / rac_structured_output_generate_stream_proto
-// (see sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h).
+// Generation entry points (rac_structured_output_generate_proto /
+// rac_structured_output_generate_stream_proto) are intentionally NOT modeled
+// as service RPCs here — they are first-class C ABI calls that consume
+// StructuredOutputRequest and emit StructuredOutputResult /
+// StructuredOutputStreamEvent directly without a service descriptor.
+// The cross-SDK contract (test_structured_output_service_proto_abi.cpp) pins
+// the service surface to exactly three RPCs: PreparePrompt / Validate / Parse.
 service StructuredOutput {
     rpc PreparePrompt(StructuredOutputRequest) returns (StructuredOutputPromptResult);
     rpc Validate(StructuredOutputValidationRequest) returns (StructuredOutputValidation);
     rpc Parse(StructuredOutputParseRequest) returns (StructuredOutputResult);
-
-    // Run the lifecycle-owned LLM with a structured-output prompt and return
-    // the parsed JSON result. Mirrors rac_structured_output_generate_proto.
-    rpc Generate(StructuredOutputRequest) returns (StructuredOutputResult);
-
-    // Server-streaming: emit StructuredOutputStreamEvent payloads (token +
-    // partial JSON + validation events) until kind=COMPLETED|ERROR. Mirrors
-    // rac_structured_output_generate_stream_proto.
-    rpc GenerateStream(StructuredOutputRequest) returns (stream StructuredOutputStreamEvent);
 }

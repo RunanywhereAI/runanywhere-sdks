@@ -364,7 +364,8 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
 
 rac_result_t RAGBackend::query(const std::string& question, const rac_llm_options_t* options,
                                rac_llm_result_t* out_result, nlohmann::json& out_metadata,
-                               std::function<bool(const std::string&)> on_token) {
+                               std::function<bool(const std::string&)> on_token,
+                               const QueryOverrides* overrides) {
     RAGGraphInputs g_in;
 
     {
@@ -382,6 +383,18 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         g_in.similarity_threshold = config_.similarity_threshold;
         g_in.max_context_tokens = config_.max_context_tokens;
         g_in.prompt_template = config_.prompt_template;
+    }
+
+    // Per-query overrides from RAGQueryOptions (idl/rag.proto). Zero/unset
+    // values fall back to the session-level RAGConfig defaults captured
+    // above so this stays backward-compatible with callers that omit them.
+    if (overrides != nullptr) {
+        if (overrides->retrieval_top_k > 0) {
+            g_in.top_k = static_cast<size_t>(overrides->retrieval_top_k);
+        }
+        if (overrides->similarity_threshold > 0.0f) {
+            g_in.similarity_threshold = overrides->similarity_threshold;
+        }
     }
 
     g_in.question = question;

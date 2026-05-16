@@ -172,6 +172,24 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         return rc;
     }
 
+    /* Replacement load: the registry accepts equal-priority duplicates by
+     * overwriting the by-name entry. Any previously tracked OS handle must be
+     * dlclosed here — `rac_plugin_registry_set_dl_handle` overwrites the
+     * stored handle unconditionally and the registry itself has no ownership
+     * of the OS library mapping (see plugin_registry_internal.h). Without
+     * this we leak one shared-library mapping per same-name reload from a
+     * different path, and on POSIX the extra refcount from a same-path
+     * re-dlopen is never balanced. Taking before setting also avoids a race
+     * window where a concurrent unload could see the new handle before we
+     * drop the old one. Note `prior` may equal `handle` on POSIX when the
+     * same path is reopened (dlopen returns the same handle and bumps the
+     * refcount); the matching dlclose still has to happen so the OS refcount
+     * returns to 1 after the redundant load. */
+    if (void* prior = rac_plugin_registry_take_dl_handle(vt->metadata.name);
+        prior != nullptr) {
+        rac_dl_close(static_cast<rac_lib_handle_t>(prior));
+    }
+
     /* Track the handle so unload can dlclose it exactly once. */
     rac_plugin_registry_set_dl_handle(vt->metadata.name, handle);
     RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,

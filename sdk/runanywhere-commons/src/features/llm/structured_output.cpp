@@ -1203,7 +1203,13 @@ extern "C" rac_result_t rac_structured_output_parse_proto(const uint8_t* request
     rac_result_t rc = rac_structured_output_parse(
         request.text().c_str(), converted.config.json_schema ? &converted.config : nullptr,
         &parsed);
-    if (rc != RAC_SUCCESS) {
+    // Treat ordinary invalid output (INVALID_FORMAT/VALIDATION_FAILED) as a
+    // typed StructuredOutputResult payload — the proto envelope exists to
+    // carry those failures via validation.is_valid/error_code. Reserve
+    // rac_proto_buffer_set_error for malformed request bytes, null pointers,
+    // missing lifecycle model, serialization failure, or allocation errors.
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT &&
+        rc != RAC_ERROR_VALIDATION_FAILED) {
         rac_structured_output_parse_result_free(&parsed);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1485,7 +1491,11 @@ extern "C" rac_result_t rac_structured_output_validate_proto(const uint8_t* requ
     const rac_result_t rc = rac_structured_output_parse(
         request.text().c_str(), converted.config.json_schema ? &converted.config : nullptr,
         &parsed);
-    if (rc != RAC_SUCCESS) {
+    // Validation failures are an expected proto outcome — serialize the
+    // populated StructuredOutputValidation. Only ABI/IO failures escape as
+    // typed transport errors.
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT &&
+        rc != RAC_ERROR_VALIDATION_FAILED) {
         rac_structured_output_parse_result_free(&parsed);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }

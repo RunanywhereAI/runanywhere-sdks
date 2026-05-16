@@ -80,9 +80,20 @@ class RAGBackend {
      * instead of running the steps imperatively. When `on_token` is non-null,
      * tokens are forwarded as the LLM streams them.
      */
+    /**
+     * Per-query retrieval overrides taken from RAGQueryOptions
+     * (idl/rag.proto). A zero/unset value falls back to the session-level
+     * `RAGConfig` defaults (top_k, similarity_threshold).
+     */
+    struct QueryOverrides {
+        int32_t retrieval_top_k = 0;
+        float similarity_threshold = 0.0f;
+    };
+
     rac_result_t query(const std::string& question, const rac_llm_options_t* options,
                        rac_llm_result_t* out_result, nlohmann::json& out_metadata,
-                       std::function<bool(const std::string&)> on_token = nullptr);
+                       std::function<bool(const std::string&)> on_token = nullptr,
+                       const QueryOverrides* overrides = nullptr);
 
     void clear();
     nlohmann::json get_statistics() const;

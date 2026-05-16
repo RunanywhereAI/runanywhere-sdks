@@ -63,10 +63,13 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-uint64_t next_session_id() {
-    static std::atomic<uint64_t> g_counter{0};
-    return g_counter.fetch_add(1, std::memory_order_relaxed) + 1;
-}
+// commons-features-other-003: the previous next_session_id() helper was
+// inlined into rac_diffusion_stream_start_proto, but that entry point now
+// returns RAC_ERROR_NOT_IMPLEMENTED until the diffusion engine kickoff is
+// wired into dispatch_diffusion_stream_event(). The session id allocator
+// will be reintroduced in lockstep with that wiring; keeping it removed
+// today avoids an unused-function lint and clarifies that no live session
+// ids are minted on this code path.
 
 #if defined(RAC_HAVE_PROTOBUF)
 int64_t now_us() {
@@ -117,28 +120,27 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     *out_session_id = 0;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
+    // Validate the request bytes early so callers still get RAC_ERROR_DECODING_ERROR
+    // for malformed inputs even though the engine kickoff is not yet wired.
     runanywhere::v1::DiffusionGenerationRequest parsed;
     if (request_proto_size > 0 &&
         !parsed.ParseFromArray(request_proto_bytes, static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
+    (void)parsed;
 
-    const uint64_t id = next_session_id();
-    {
-        std::lock_guard<std::mutex> lock(g_mu());
-        StreamSession& s = g_sessions()[id];
-        s.handle = handle;
-        s.request_id = parsed.request_id().empty() ? std::string("diffusion-") + std::to_string(id)
-                                                   : parsed.request_id();
-        s.is_cancelled.store(false, std::memory_order_relaxed);
-    }
-    *out_session_id = id;
-
-    // TODO(CPP-03 follow-up): kick off the diffusion engine here. The
-    // existing rac_diffusion_generate_with_progress_proto() path remains
-    // the supported codegen entrypoint; the new stream-callback registry
-    // will replace it once SDK migration lands.
-    return RAC_SUCCESS;
+    // CPP-03 follow-up: until the diffusion engine kickoff is wired into
+    // dispatch_diffusion_stream_event(), this entrypoint cannot honour the
+    // contract documented in rac_diffusion_stream.h ("Session started"
+    // implies STARTED/PROGRESS/COMPLETED/ERROR will be dispatched). The
+    // header explicitly reserves RAC_ERROR_NOT_IMPLEMENTED for this stub
+    // state, so we return that instead of RAC_SUCCESS to prevent SDKs from
+    // waiting forever on a session that will never emit a terminal event.
+    // The supported codegen entrypoint remains
+    // rac_diffusion_generate_with_progress_proto(); SDKs should fall back
+    // to it until the kickoff lands.
+    *out_session_id = 0;
+    return RAC_ERROR_NOT_IMPLEMENTED;
 #endif
 }
 

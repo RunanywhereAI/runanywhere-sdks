@@ -309,7 +309,12 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
     ctx.max_iterations =
         request.max_iterations() == 0 ? kDefaultMaxIterations : request.max_iterations();
     ctx.keep_tools_available = request.keep_tools_available();
-    ctx.validate_calls = true;
+    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
+    // The field is `optional bool` so we can preserve the historical default
+    // (validate=true) when the caller did not set it, while still letting hosts
+    // that delegate validation/authorization to their executor opt out by
+    // explicitly setting validate_calls=false.
+    ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
     for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }

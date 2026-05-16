@@ -59,6 +59,19 @@ if command -v wire-compiler >/dev/null 2>&1; then
         KOTLIN_PROTO_BASENAMES+=("${proto_base}")
     done <<< "${RAC_PROTO_FILES}"
 
+    # Pre-clean the Wire output namespace so that types removed or renamed in
+    # the IDL (e.g. AcceleratorPreference → AccelerationPreference) cannot
+    # linger as committed orphans. wire-compiler writes files but never
+    # deletes; without this `rm -rf` step a previous codegen output for a
+    # type that no longer exists in any .proto stays committed in the
+    # generated directory, ends up on developers' classpath, and silently
+    # competes with the canonical type at autocomplete time. Constrain the
+    # delete to the Wire-owned subtree (`ai/runanywhere/proto/v1/`) so
+    # hand-written code under the same `generated/` root is preserved.
+    if [ -d "${OUT_DIR}/ai/runanywhere/proto/v1" ]; then
+        find "${OUT_DIR}/ai/runanywhere/proto/v1" -name "*.kt" -delete
+    fi
+
     wire-compiler \
         --proto_path="${PROTO_DIR}" \
         --kotlin_out="${OUT_DIR}" \

@@ -35,6 +35,25 @@ static std::string g_base_dir{};
 
 namespace fs = std::filesystem;
 
+// Mirrors download_orchestrator.cpp::is_safe_path_segment.
+// model_id is concatenated into the per-model folder root (and used as a
+// fallback filename), so any path-separator or traversal token in the
+// untrusted id could pivot the storage root before any descriptor path is
+// applied (security-privacy-storage-network-001-followup-model-id).
+namespace {
+bool is_safe_model_id_segment(const char* model_id) {
+    if (!model_id || model_id[0] == '\0') {
+        return false;
+    }
+    const std::string_view sv{model_id};
+    if (sv == "." || sv == "..") {
+        return false;
+    }
+    return sv.find('/') == std::string_view::npos &&
+           sv.find('\\') == std::string_view::npos;
+}
+}  // namespace
+
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
@@ -813,7 +832,10 @@ rac_result_t rac_model_paths_get_model_folder(const char* model_id,
     // Mirrors Swift's ModelPathUtils.getModelFolder(modelId:framework:)
     // Returns: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
 
-    if (!model_id) {
+    if (!is_safe_model_id_segment(model_id)) {
+        RAC_LOG_WARNING("ModelPaths",
+                        "Rejecting unsafe model_id for model folder construction "
+                        "(security-privacy-storage-network-001-followup-model-id).");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -840,7 +862,10 @@ rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
     // Returns:
     // {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/{modelId}.{format.rawValue}
 
-    if (!model_id) {
+    if (!is_safe_model_id_segment(model_id)) {
+        RAC_LOG_WARNING("ModelPaths",
+                        "Rejecting unsafe model_id for model file path construction "
+                        "(security-privacy-storage-network-001-followup-model-id).");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 

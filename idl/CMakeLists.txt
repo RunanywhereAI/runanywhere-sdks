@@ -55,6 +55,13 @@ set(_RAC_IDL_PROTO_FILES
     # Phase 4 — custom FieldOptions / EnumValueOptions extensions consumed by
     # SDK codegen post-processors (defaults(), validate(), wire-string).
     ${CMAKE_CURRENT_SOURCE_DIR}/rac_options.proto
+    # P2-T9 — canonical two-phase SDK init request/result messages
+    # (SdkInitPhase1Request / SdkInitPhase2Request / SdkInitResult). The
+    # other 28 protos above keep parity with idl/codegen/generate_*.sh
+    # which emit sdk_init for every other language target; this entry
+    # ensures the generated sdk_init.pb.{cc,h} also link into rac_idl
+    # for the C++ commons consumer.
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdk_init.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

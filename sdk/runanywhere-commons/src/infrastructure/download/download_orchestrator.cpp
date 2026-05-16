@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -342,6 +343,82 @@ std::string join_path(const std::string& lhs, const std::string& rhs) {
     if (lhs.back() == '/' || lhs.back() == '\\')
         return lhs + rhs;
     return lhs + "/" + rhs;
+}
+
+// security-privacy-storage-network-001: descriptor-supplied path components
+// (ModelFileDescriptor.relative_path / .destination_path / .filename and the
+// model_id used to build per-model folders) flow from app or remote catalog
+// metadata into the download writer with no inherent trust. We treat them as
+// untrusted strings and reject any value that could cause the writer to
+// escape the RunAnywhere model storage root.
+//
+// Rejection rules (applied per component):
+//   - empty, ".", ".."           → traversal / no-op
+//   - contains '/' or '\\'       → embedded separators (only the joiner is
+//                                  allowed to introduce separators)
+// Top-level rules for relative paths:
+//   - empty                      → nothing to write
+//   - is_absolute_path(path)     → absolute paths are policy decisions, not
+//                                  data; the C++ writer must not be steered
+//                                  by descriptor data into arbitrary roots.
+//
+// `is_safe_model_id_component` is the strictest of the three because the
+// model_id is concatenated into the per-model folder root and then used as
+// a fallback filename; allowing separators or '..' lets a malicious id pivot
+// the storage root before any descriptor path is even applied.
+bool is_safe_path_segment(const std::string& component) {
+    if (component.empty() || component == "." || component == "..")
+        return false;
+    return component.find('/') == std::string::npos &&
+           component.find('\\') == std::string::npos;
+}
+
+bool is_safe_relative_descriptor_path(const std::string& path) {
+    if (path.empty())
+        return false;
+    if (is_absolute_path(path))
+        return false;
+
+    size_t start = 0;
+    while (start <= path.size()) {
+        size_t end = path.find_first_of("/\\", start);
+        if (end == std::string::npos)
+            end = path.size();
+        std::string component = path.substr(start, end - start);
+        if (!is_safe_path_segment(component))
+            return false;
+        if (end == path.size())
+            break;
+        start = end + 1;
+    }
+    return true;
+}
+
+// Joins `model_folder` and `relative_path` using join_path, then lexically
+// normalizes the result and verifies the canonical form is still rooted
+// under the lexically-normalized canonical model_folder. Returns nullopt
+// when the result escapes the root or the inputs fail the safety checks.
+// `model_folder` is trusted (built from rac_model_paths_get_*); only
+// `relative_path` is treated as untrusted.
+std::optional<std::string> safe_descriptor_path_under(const std::string& model_folder,
+                                                      const std::string& relative_path) {
+    if (model_folder.empty() || !is_safe_relative_descriptor_path(relative_path))
+        return std::nullopt;
+
+    fs::path root = fs::path(model_folder).lexically_normal();
+    fs::path joined = (root / relative_path).lexically_normal();
+
+    // Verify joined still has root as a prefix (lexical containment check).
+    auto root_it = root.begin();
+    auto joined_it = joined.begin();
+    for (; root_it != root.end() && joined_it != joined.end(); ++root_it, ++joined_it) {
+        if (*root_it != *joined_it)
+            return std::nullopt;
+    }
+    if (root_it != root.end())
+        return std::nullopt;
+
+    return joined.string();
 }
 
 bool looks_like_http_url(const std::string& url) {
@@ -921,17 +998,49 @@ std::string destination_from_model_file(const std::string& model_folder,
                                         const rav1::ModelFileDescriptor& file,
                                         const std::string& url,
                                         const std::string& fallback_model_id) {
+    // security-privacy-storage-network-001: descriptor.destination_path is
+    // app/catalog metadata, not a trusted filesystem policy. Reject absolute
+    // paths and any relative path that lexically escapes model_folder before
+    // the worker can hand it to rac_http_download_execute.
     if (file.has_destination_path() && !file.destination_path().empty()) {
-        return is_absolute_path(file.destination_path())
-                   ? file.destination_path()
-                   : join_path(model_folder, file.destination_path());
+        if (auto safe = safe_descriptor_path_under(model_folder, file.destination_path())) {
+            return *safe;
+        }
+        RAC_LOG_WARNING(LOG_TAG,
+                        "Rejecting unsafe descriptor destination_path '%s' for model_folder '%s' "
+                        "(security-privacy-storage-network-001); falling back to filename-only path.",
+                        file.destination_path().c_str(), model_folder.c_str());
+        // Intentionally fall through to the filename-based path below so the
+        // download still completes safely instead of aborting the whole plan.
     }
+
     std::string filename = file.filename();
+    if (!filename.empty() && !is_safe_path_segment(filename)) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "Rejecting unsafe descriptor filename '%s' "
+                        "(security-privacy-storage-network-001); deriving from URL.",
+                        filename.c_str());
+        filename.clear();
+    }
     if (filename.empty()) {
         filename = get_filename(url.c_str());
+        if (!filename.empty() && !is_safe_path_segment(filename)) {
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Rejecting unsafe URL-derived filename '%s' "
+                            "(security-privacy-storage-network-001); using model_id fallback.",
+                            filename.c_str());
+            filename.clear();
+        }
     }
     if (filename.empty()) {
         filename = fallback_model_id;
+    }
+    if (!is_safe_path_segment(filename)) {
+        // Last-ditch sanitization: if every input collapsed to an unsafe
+        // value, return model_folder unchanged so the writer fails cleanly
+        // (it will reject an attempt to open a directory for write) rather
+        // than silently writing outside the root.
+        return model_folder;
     }
     return join_path(model_folder, filename);
 }
@@ -981,19 +1090,75 @@ void append_planned_file(rav1::DownloadPlanResult* result,
     out_file->set_is_resume_candidate(is_resume_candidate);
 }
 
+// security-privacy-storage-network-001: defensive check applied to plan
+// entries flowing in via rac_download_start_proto (which lets callers skip
+// the trusted planner). The trusted planner always emits absolute paths
+// rooted under a per-model folder, so we accept absolute paths but reject
+// any '..' / '.' / empty / backslash path components — those are the
+// traversal vectors that allow a malicious plan to escape the storage root
+// even when the path looks rooted.
+bool is_traversal_safe_destination(const std::string& path) {
+    if (path.empty())
+        return false;
+    size_t start = 0;
+    while (start < path.size()) {
+        size_t end = path.find_first_of("/\\", start);
+        if (end == std::string::npos)
+            end = path.size();
+        // Tolerate the leading '/' on POSIX absolute paths and the
+        // leading '\\' on UNC-style Windows paths by allowing exactly one
+        // empty segment at position 0.
+        if (end == start) {
+            if (start == 0) {
+                start = end + 1;
+                continue;
+            }
+            return false;  // double separator inside the path
+        }
+        std::string component = path.substr(start, end - start);
+        if (component == "." || component == "..")
+            return false;
+        if (end == path.size())
+            break;
+        start = end + 1;
+    }
+    return true;
+}
+
 std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& plan) {
     std::vector<proto_plan_file> files;
     files.reserve(static_cast<size_t>(plan.files_size()));
     for (const auto& input : plan.files()) {
+        // security-privacy-storage-network-001: DownloadPlanResult.files
+        // can originate from rac_download_plan_proto (trusted, already
+        // validated by destination_from_model_file) OR from a
+        // caller-supplied DownloadStartRequest.plan_files that bypasses
+        // planning. The traversal-safe check defends the bypass path.
+        const std::string& destination = input.destination_path();
+        if (!is_traversal_safe_destination(destination)) {
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Skipping plan entry with unsafe destination_path '%s' "
+                            "(security-privacy-storage-network-001).",
+                            destination.c_str());
+            continue;
+        }
+
         proto_plan_file file;
         file.url = input.file().url();
-        file.destination_path = input.destination_path();
+        file.destination_path = destination;
         file.storage_key = input.storage_key();
         file.expected_bytes = input.expected_bytes();
         file.checksum_sha256 = input.checksum_sha256();
         file.requires_extraction = input.requires_extraction();
         file.is_resume_candidate = input.is_resume_candidate();
         file.filename = input.file().filename();
+        if (!file.filename.empty() && !is_safe_path_segment(file.filename)) {
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Replacing unsafe plan filename '%s' with URL-derived basename "
+                            "(security-privacy-storage-network-001).",
+                            file.filename.c_str());
+            file.filename.clear();
+        }
         if (file.filename.empty()) {
             file.filename = get_filename(file.url.c_str());
         }

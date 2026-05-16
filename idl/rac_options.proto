@@ -44,10 +44,13 @@
 //
 // USAGE
 //
-//   This file only DEFINES the option extensions. No proto in idl/ uses
-//   them yet — adopting an annotation is an opt-in, per-field choice made
-//   in a later phase, modality by modality. Importing this file in a
-//   schema unlocks annotations like:
+//   This file only DEFINES the option extensions. Annotations are opt-in
+//   per field. Current adopters: model_types.proto (rac_wire_string on
+//   enums), embeddings_options.proto, rag.proto, stt_options.proto,
+//   tts_options.proto, vad_options.proto (rac_default / rac_required /
+//   rac_min / rac_max). See those files for usage examples before
+//   annotating a new schema. Importing this file in a schema unlocks
+//   annotations like:
 //
 //       import "rac_options.proto";
 //

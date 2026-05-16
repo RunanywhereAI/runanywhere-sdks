@@ -50,6 +50,13 @@ struct StreamSession {
     std::string request_id;
     std::atomic<bool> is_cancelled{false};
     int32_t sample_rate = 16000;
+    // hotspot-commons-features-voice-003: per-session VAD threshold override
+    // captured from VADOptions.threshold (0.0f = no override → use the
+    // component's configured threshold). Applied per-frame in
+    // rac_vad_stream_feed_audio_proto via the same set/restore pattern that
+    // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041), so
+    // streaming and one-shot proto callers honor the same per-call threshold.
+    float threshold_override = 0.0f;
 };
 
 std::mutex& g_mu() {
@@ -85,12 +92,17 @@ int64_t now_us() {
 #if defined(RAC_HAVE_PROTOBUF)
 namespace rac::vad {
 // Forward declaration: implemented later in this same TU. Used by
-// rac_vad_stream_feed_audio_proto() to emit FRAME events.
+// rac_vad_stream_feed_audio_proto() to emit FRAME events. session_id
+// correlates emitted events back to the originating session so multiple
+// concurrent sessions on one component handle do not cross-attribute their
+// request_ids (hotspot-commons-features-voice-002). session_id == 0 falls
+// back to legacy handle-only first-match scan.
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
-                               const char* error_message, int error_code);
+                               const char* error_message, int error_code,
+                               uint64_t session_id = 0);
 }  // namespace rac::vad
 #endif
 
@@ -149,6 +161,15 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         // VADOptions does not carry a sample rate today; default to 16 kHz
         // which matches RAC_VAD_DEFAULT_SAMPLE_RATE / Silero / energy VAD.
         s.sample_rate = 16000;
+        // hotspot-commons-features-voice-003: capture the per-call energy
+        // threshold override (0.0f = use the component's configured value).
+        // The min_speech_duration_ms / min_silence_duration_ms /
+        // max_speech_duration_ms / include_statistics fields on VADOptions
+        // are debounce gates owned by the VAD backend itself; the streaming
+        // ABI cannot retune the backend per session today, so they are
+        // intentionally not propagated. Tracked under
+        // hotspot-commons-features-voice-003.
+        s.threshold_override = parsed.threshold() > 0.0f ? parsed.threshold() : 0.0f;
     }
     *out_session_id = id;
     return RAC_SUCCESS;
@@ -173,6 +194,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // dispatch_vad_stream_event() via its own session-table lookup.
     rac_handle_t component_handle = nullptr;
     int32_t sample_rate = 16000;
+    float threshold_override = 0.0f;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -183,6 +205,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         }
         component_handle = it->second.handle;
         sample_rate = it->second.sample_rate;
+        threshold_override = it->second.threshold_override;
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -211,12 +234,27 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         num_samples > 0 ? static_cast<float>(std::sqrt(sum_sq / static_cast<double>(num_samples)))
                         : 0.0f;
 
+    // hotspot-commons-features-voice-003: apply VADOptions.threshold per
+    // frame using the same set/restore pattern that
+    // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041).
+    // Without this gate the streaming proto path silently ignored every
+    // per-call threshold tuning while the one-shot proto path honored it.
+    const float original_threshold =
+        threshold_override > 0.0f ? rac_vad_component_get_energy_threshold(component_handle) : 0.0f;
+    if (threshold_override > 0.0f) {
+        (void)rac_vad_component_set_energy_threshold(component_handle, threshold_override);
+    }
+
     // Forward to the VAD component. Speech-activity transitions still flow
     // through whichever activity callback is registered (energy VAD's
     // internal callback or rac_vad_component_set_activity_proto_callback).
     rac_bool_t is_speech = RAC_FALSE;
     rac_result_t rc =
         rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
+
+    if (threshold_override > 0.0f) {
+        (void)rac_vad_component_set_energy_threshold(component_handle, original_threshold);
+    }
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::VADResult err_payload;
         err_payload.set_is_speech(false);
@@ -230,7 +268,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                                             runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR,
                                             /*result=*/nullptr,
                                             /*activity=*/nullptr,
-                                            /*statistics=*/nullptr, msg, rc);
+                                            /*statistics=*/nullptr, msg, rc, session_id);
         return rc;
     }
 
@@ -252,7 +290,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                                         /*activity=*/nullptr,
                                         /*statistics=*/nullptr,
                                         /*error_message=*/nullptr,
-                                        /*error_code=*/0);
+                                        /*error_code=*/0, session_id);
     return RAC_SUCCESS;
 #endif
 }
@@ -298,7 +336,8 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
-                               const char* error_message, int error_code) {
+                               const char* error_message, int error_code,
+                               uint64_t session_id) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;
@@ -309,10 +348,22 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
             return;
         slot = it->second;
         seq = ++(it->second.seq);
-        for (const auto& [_, session] : g_sessions()) {
-            if (session.handle == handle && !session.is_cancelled.load(std::memory_order_relaxed)) {
-                request_id = session.request_id;
-                break;
+        // Prefer the explicit session_id over a handle-wide scan so
+        // overlapping sessions on the same component handle don't
+        // cross-attribute their request_ids.
+        if (session_id != 0) {
+            auto sit = g_sessions().find(session_id);
+            if (sit != g_sessions().end() && sit->second.handle == handle) {
+                request_id = sit->second.request_id;
+            }
+        }
+        if (request_id.empty()) {
+            for (const auto& [_, session] : g_sessions()) {
+                if (session.handle == handle &&
+                    !session.is_cancelled.load(std::memory_order_relaxed)) {
+                    request_id = session.request_id;
+                    break;
+                }
             }
         }
     }

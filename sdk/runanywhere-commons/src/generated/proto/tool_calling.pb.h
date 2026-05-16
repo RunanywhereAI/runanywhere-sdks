@@ -5185,7 +5185,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
   void _internal_set_keep_tools_available(bool value);
 
   public:
-  // bool validate_calls = 6;
+  // optional bool validate_calls = 6;
+  [[nodiscard]] bool has_validate_calls()
+      const;
   void clear_validate_calls() ;
   [[nodiscard]] bool validate_calls() const;
   void set_validate_calls(bool value);
@@ -12504,7 +12506,11 @@ inline void ToolCallingSessionCreateRequest::_internal_set_keep_tools_available(
   _impl_.keep_tools_available_ = value;
 }
 
-// bool validate_calls = 6;
+// optional bool validate_calls = 6;
+inline bool ToolCallingSessionCreateRequest::has_validate_calls() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
 inline void ToolCallingSessionCreateRequest::clear_validate_calls() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validate_calls_ = false;

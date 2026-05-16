@@ -109,10 +109,10 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
     if (request_proto_size > 0 && request_proto_bytes == nullptr) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    *out_session_id = 0;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)request_proto_bytes;
     (void)request_proto_size;
-    *out_session_id = 0;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
     runanywhere::v1::TTSSynthesisRequest parsed;
@@ -121,21 +121,16 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
         return RAC_ERROR_DECODING_ERROR;
     }
 
-    const uint64_t id = next_session_id();
-    {
-        std::lock_guard<std::mutex> lock(g_mu());
-        StreamSession& s = g_sessions()[id];
-        s.handle = handle;
-        s.request_id = parsed.request_id().empty() ? std::string("tts-") + std::to_string(id)
-                                                   : parsed.request_id();
-        s.is_cancelled.store(false, std::memory_order_relaxed);
-    }
-    *out_session_id = id;
-
-    // TODO(CPP-03 follow-up): kick off tts_component's streaming synthesis
-    // loop here. The SDK side can already register callbacks and stop()
-    // the session.
-    return RAC_SUCCESS;
+    // Per-handle TTS streaming is not yet wired to rac_tts_component's
+    // synthesize_stream loop. Until the backend is wired, fail explicitly
+    // with NOT_IMPLEMENTED rather than returning SUCCESS for a stub that
+    // would leave callers hanging on stream callbacks that never fire.
+    // The lifecycle-owned TTS stream path in
+    // rac_nonllm_lifecycle_proto_abi.cpp already emits STARTED/AUDIO_CHUNK/
+    // COMPLETED via synthesize_stream and remains the supported route.
+    // Header rac_tts_stream.h documents this error code for the unwired
+    // backend case.
+    return RAC_ERROR_NOT_IMPLEMENTED;
 #endif
 }
 

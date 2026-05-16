@@ -71,10 +71,13 @@ echo "▶ C++ proto codegen"
 # GAP 09 Phase 14: AsyncIterable<T> stream wrappers for RN + Web. The
 # template-based renderer is intentionally separate from generate_ts.sh
 # (which uses ts-proto for messages) — different tools, different outputs.
-echo "▶ RN AsyncIterable streams (GAP 09)"
-"${SCRIPT_DIR}/generate_rn_streams.sh"
-
-echo "▶ Web AsyncIterable streams (GAP 09)"
-"${SCRIPT_DIR}/generate_web_streams.sh"
+#
+# hotspot-idl-005: a single shared script renders the streams once into
+# sdk/shared/proto-ts/src/streams. Both RN and Web consume the result via
+# @runanywhere/proto-ts; the previous generate_rn_streams.sh /
+# generate_web_streams.sh pair was byte-identical and overwrote each
+# other's output, masking unilateral edits.
+echo "▶ Shared TS AsyncIterable streams (GAP 09)"
+"${SCRIPT_DIR}/generate_streams.sh"
 
 echo "✓ All proto codegen complete."

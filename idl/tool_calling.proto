@@ -395,7 +395,20 @@ message ToolCallingSessionCreateRequest {
     string format_hint = 3;
     uint32 max_iterations = 4;
     bool keep_tools_available = 5;
-    bool validate_calls = 6;
+    // proto3 `optional` enables presence detection (has_validate_calls()).
+    // When unset, commons defaults to validate_calls=true (preserves the
+    // historical hard-coded behavior and the native run-loop / session
+    // contract that unknown tool calls short-circuit before host execution).
+    // Callers that delegate validation/authorization to their executor or
+    // use dynamic tool registries must explicitly set validate_calls=false.
+    optional bool validate_calls = 6;
+
+    // 7-10 reserved: gap between session-control fields (1-6) and inline LLM
+    // generation params (11-14). Explicitly reserving prevents two concurrent
+    // patches from racing to claim a number here with conflicting semantics —
+    // a wire-compat hazard that would silently mis-decode data once both
+    // patches land.
+    reserved 7 to 10;
 }
 
 message ToolCallingSessionCreateResult {

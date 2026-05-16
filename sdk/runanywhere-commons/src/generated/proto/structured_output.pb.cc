@@ -1244,7 +1244,7 @@ const char descriptor_table_protodef_structured_5foutput_2eproto[] ABSL_ATTRIBUT
     ".STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VAL"
     "IDATION\020\003\0221\n-STRUCTURED_OUTPUT_STREAM_EV"
     "ENT_KIND_COMPLETED\020\004\022-\n)STRUCTURED_OUTPU"
-    "T_STREAM_EVENT_KIND_ERROR\020\0052\213\004\n\020Structur"
+    "T_STREAM_EVENT_KIND_ERROR\020\0052\304\002\n\020Structur"
     "edOutput\022f\n\rPreparePrompt\022\'.runanywhere."
     "v1.StructuredOutputRequest\032,.runanywhere"
     ".v1.StructuredOutputPromptResult\022i\n\010Vali"
@@ -1252,22 +1252,17 @@ const char descriptor_table_protodef_structured_5foutput_2eproto[] ABSL_ATTRIBUT
     "lidationRequest\032*.runanywhere.v1.Structu"
     "redOutputValidation\022]\n\005Parse\022,.runanywhe"
     "re.v1.StructuredOutputParseRequest\032&.run"
-    "anywhere.v1.StructuredOutputResult\022[\n\010Ge"
-    "nerate\022\'.runanywhere.v1.StructuredOutput"
-    "Request\032&.runanywhere.v1.StructuredOutpu"
-    "tResult\022h\n\016GenerateStream\022\'.runanywhere."
-    "v1.StructuredOutputRequest\032+.runanywhere"
-    ".v1.StructuredOutputStreamEvent0\001B\220\001\n\027ai"
-    ".runanywhere.proto.v1B\025StructuredOutputP"
-    "rotoP\001Z<github.com/runanywhere/runanywhe"
-    "re-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002"
-    "\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "anywhere.v1.StructuredOutputResultB\220\001\n\027a"
+    "i.runanywhere.proto.v1B\025StructuredOutput"
+    "ProtoP\001Z<github.com/runanywhere/runanywh"
+    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
+    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_structured_5foutput_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_structured_5foutput_2eproto = {
     false,
     false,
-    6148,
+    5949,
     descriptor_table_protodef_structured_5foutput_2eproto,
     "structured_output.proto",
     &descriptor_table_structured_5foutput_2eproto_once,

@@ -349,6 +349,15 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt /*
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
                                 rac_vlm_options_t* out, const char** out_prompt /*optional*/);
 
+/**
+ * Frees the request-scoped strings (`system_prompt`,
+ * `stop_sequences`/`num_stop_sequences`) that
+ * `rac_vlm_options_from_proto` allocated into `options`. Safe to call on
+ * a default-initialized `rac_vlm_options_t`. Resets freed pointers to RAC_NULL
+ * so the struct is safe to re-use.
+ */
+void rac_vlm_options_free_owned(rac_vlm_options_t* options);
+
 bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out);
 bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in, rac_vlm_result_t* out);
 

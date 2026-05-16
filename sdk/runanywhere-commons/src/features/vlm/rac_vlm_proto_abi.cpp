@@ -421,6 +421,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     if (rc != RAC_SUCCESS) {
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         if (have_lifecycle)
             rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         publish_failure(rc, "vlm.process", out_result->error_message);
@@ -445,6 +446,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
         publish_failure(rc, "vlm.process", rac_error_message(rc));
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         if (have_lifecycle)
             rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -462,6 +464,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     rac_vlm_result_free(&result);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    rac::foundation::rac_vlm_options_free_owned(&options);
     if (have_lifecycle)
         rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
     return rc;
@@ -512,6 +515,7 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
         publish_failure(rc, "vlm.processStream", error_buffer->error_message);
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         if (!out_result)
             rac_proto_buffer_free(&local_error);
         if (have_lifecycle)
@@ -551,6 +555,7 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
         publish_failure(rc, "vlm.processStream", rac_error_message(rc));
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         if (have_lifecycle)
             rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         return out_result ? rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc)) : rc;
@@ -569,6 +574,7 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
                        "vlm.processStream", 1.0f, 1, ctx->token_count, nullptr);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    rac::foundation::rac_vlm_options_free_owned(&options);
     if (have_lifecycle)
         rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
     return rc;
@@ -659,6 +665,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         publish_failure(rc, "vlm.generate", out_result->error_message);
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rc;
     }
@@ -674,6 +681,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         publish_failure(rc, "vlm.generate", rac_error_message(rc));
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -690,6 +698,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    rac::foundation::rac_vlm_options_free_owned(&options);
     rac::vlm::release_lifecycle_vlm(&ref);
     return rc;
 #endif
@@ -732,6 +741,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         rac_proto_buffer_free(&error_buffer);
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return rc;
     }
@@ -739,6 +749,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     if (!ref.ops || !ref.ops->process_stream) {
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        rac::foundation::rac_vlm_options_free_owned(&options);
         rac::vlm::release_lifecycle_vlm(&ref);
         return RAC_ERROR_NOT_SUPPORTED;
     }
@@ -792,6 +803,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
 
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    rac::foundation::rac_vlm_options_free_owned(&options);
     rac::vlm::release_lifecycle_vlm(&ref);
     return rc;
 #endif

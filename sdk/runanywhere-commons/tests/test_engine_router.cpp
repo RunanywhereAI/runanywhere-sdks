@@ -571,6 +571,46 @@ int main() {
               "(CPP-05.6) unregistered CUDA reports 0 from available alias too");
     }
 
+    /* (CPP-05.7) Pinned engine whose declared runtimes are all unregistered
+     *            must still be hard-rejected — pinning is not an escape hatch
+     *            from the runtime-unavailable contract. Covers both the
+     *            EngineRouter::route path and the rac_plugin_route C ABI with
+     *            no_fallback=true so model_lifecycle's framework-pinned loads
+     *            cannot select a non-executable engine. */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t cuda_rts[] = {RAC_RUNTIME_CUDA};
+        auto v_pin = make_vt("cuda_pinned_engine", 50, cuda_rts, 1, nullptr, 0);
+        rac_plugin_register(&v_pin);
+
+        CHECK(rac_runtime_is_registered(RAC_RUNTIME_CUDA) == 0,
+              "(CPP-05.7) CUDA runtime is not registered on this host");
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        req.pinned_engine = "cuda_pinned_engine";
+        req.no_fallback = true;
+        auto result = router.route(req);
+        CHECK(result.vtable == nullptr,
+              "(CPP-05.7) pinned engine with unregistered declared runtime is rejected");
+
+        rac_routing_hints_t hints = {};
+        hints.preferred_engine_name = "cuda_pinned_engine";
+        hints.no_fallback = 1;
+        const rac_engine_vtable_t* out = nullptr;
+        rac_result_t rc =
+            rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out);
+        CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
+              "(CPP-05.7) C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE for pinned "
+              "engine when its declared runtime is unregistered");
+        CHECK(out == nullptr,
+              "(CPP-05.7) C ABI leaves out_vtable NULL on pinned runtime rejection");
+
+        rac_plugin_unregister("cuda_pinned_engine");
+    }
+
     /* --- (bonus) Genie SDK-absent plugins are not routable --------------- */
     {
         rac::router::HardwareProfile prof{};

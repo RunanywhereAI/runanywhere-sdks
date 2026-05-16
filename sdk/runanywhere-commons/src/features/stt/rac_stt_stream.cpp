@@ -172,10 +172,16 @@ runanywhere::v1::STTLanguage stt_language_from_code(const char* code) {
 namespace rac::stt {
 // Forward declaration: implemented later in this same TU. Used by
 // rac_stt_stream_feed_audio_proto() to emit PARTIAL / FINAL events.
+// session_id correlates the emitted event with the originating session so
+// concurrent sessions on the same component handle do not cross-pollinate
+// request_ids (hotspot-commons-features-voice-002). A session_id of 0 falls
+// back to the legacy handle-scan path used by error emissions where the
+// session context is not threaded.
 void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
                                const runanywhere::v1::STTPartialResult* partial,
                                const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code);
+                               const char* error_message, int error_code,
+                               uint64_t session_id = 0);
 }  // namespace rac::stt
 #endif
 
@@ -233,17 +239,66 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.handle = handle;
         s.request_id = "stt-" + std::to_string(id);
         s.is_cancelled.store(false, std::memory_order_relaxed);
+        // hotspot-commons-features-voice-003: honor every STTOptions field
+        // the C ABI's rac_stt_options_t can carry. Previously this dropped
+        // language_code, sample_rate, audio_format, and detect_language
+        // before they could reach the backend stream_create / feed_audio
+        // calls, which made the streaming path silently inconsistent with
+        // the one-shot rac_stt_component_process_proto path.
         if (parsed.language() == runanywhere::v1::STT_LANGUAGE_AUTO) {
             s.detect_language = true;
         } else if (const char* code = stt_language_code(parsed.language())) {
             s.language = code;
         }
+        // The free-form BCP-47 language_code wins over the enum-derived
+        // language when set, matching the proto comment ("consumers should
+        // prefer this over the base-language enum").
+        if (!parsed.language_code().empty()) {
+            s.language = parsed.language_code();
+        }
+        // Explicit detect_language flag overrides the STT_LANGUAGE_AUTO
+        // shorthand so generated-only consumers can request auto-detect
+        // alongside a hint language.
+        if (parsed.detect_language()) {
+            s.detect_language = true;
+        }
         s.enable_punctuation = parsed.enable_punctuation();
         s.enable_diarization = parsed.enable_diarization();
         s.max_speakers = parsed.max_speakers();
         s.enable_timestamps = parsed.enable_word_timestamps();
-        s.sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE;
-        s.audio_format = RAC_AUDIO_FORMAT_PCM;
+        // Fall back to defaults when the proto field is unset (0 for
+        // sample_rate, AUDIO_FORMAT_UNSPECIFIED for audio_format).
+        s.sample_rate =
+            parsed.sample_rate() > 0 ? parsed.sample_rate() : RAC_STT_DEFAULT_SAMPLE_RATE;
+        switch (parsed.audio_format()) {
+            case runanywhere::v1::AUDIO_FORMAT_WAV:
+                s.audio_format = RAC_AUDIO_FORMAT_WAV;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_MP3:
+                s.audio_format = RAC_AUDIO_FORMAT_MP3;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_OPUS:
+                s.audio_format = RAC_AUDIO_FORMAT_OPUS;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_AAC:
+                s.audio_format = RAC_AUDIO_FORMAT_AAC;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_FLAC:
+                s.audio_format = RAC_AUDIO_FORMAT_FLAC;
+                break;
+            case runanywhere::v1::AUDIO_FORMAT_PCM:
+            case runanywhere::v1::AUDIO_FORMAT_PCM_S16LE:
+            case runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED:
+            default:
+                // Container formats with no C enum equivalent (OGG, M4A) and
+                // proto3 unset default both map to PCM, mirroring
+                // audio_format_from_proto() in rac_proto_adapters.cpp.
+                s.audio_format = RAC_AUDIO_FORMAT_PCM;
+                break;
+        }
+        // STTOptions.beam_size and .max_alternatives have no equivalent slots
+        // on rac_stt_options_t today; backends that need them must surface
+        // them through STTConfiguration. Tracking: hotspot-commons-features-voice-003.
     }
     *out_session_id = id;
     return RAC_SUCCESS;
@@ -358,7 +413,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                 rac::stt::dispatch_stt_stream_event(component_handle,
                                                     runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
                                                     /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming start failed", create_rc);
+                                                    "STT streaming start failed", create_rc,
+                                                    session_id);
                 return create_rc;
             }
         }
@@ -373,7 +429,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             struct BridgeCtxStream {
                 rac_handle_t handle;
                 runanywhere::v1::STTLanguage language;
-            } ctx{.handle = component_handle, .language = stt_language_from_code(options.language)};
+                uint64_t session_id;
+            } ctx{.handle = component_handle,
+                  .language = stt_language_from_code(options.language),
+                  .session_id = session_id};
 
             auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
                 auto* c = static_cast<BridgeCtxStream*>(opaque);
@@ -390,12 +449,13 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                     final_output.set_language(c->language);
                     rac::stt::dispatch_stt_stream_event(
                         c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial,
-                        &final_output, /*error_message=*/nullptr, /*error_code=*/0);
+                        &final_output, /*error_message=*/nullptr, /*error_code=*/0,
+                        c->session_id);
                 } else {
                     rac::stt::dispatch_stt_stream_event(
                         c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
                         /*final_output=*/nullptr, /*error_message=*/nullptr,
-                        /*error_code=*/0);
+                        /*error_code=*/0, c->session_id);
                 }
             };
 
@@ -405,7 +465,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                 rac::stt::dispatch_stt_stream_event(component_handle,
                                                     runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
                                                     /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming chunk failed", feed_rc);
+                                                    "STT streaming chunk failed", feed_rc,
+                                                    session_id);
             }
             return feed_rc;
         }
@@ -423,9 +484,11 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         rac_handle_t handle;
         runanywhere::v1::STTLanguage language;
         size_t audio_size;
+        uint64_t session_id;
     } ctx{.handle = component_handle,
           .language = stt_language_from_code(options.language),
-          .audio_size = audio_size};
+          .audio_size = audio_size,
+          .session_id = session_id};
 
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* c = static_cast<BridgeCtx*>(opaque);
@@ -446,13 +509,13 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             rac::stt::dispatch_stt_stream_event(
                 c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial, &final_output,
                 /*error_message=*/nullptr,
-                /*error_code=*/0);
+                /*error_code=*/0, c->session_id);
         } else {
             rac::stt::dispatch_stt_stream_event(
                 c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
                 /*final_output=*/nullptr,
                 /*error_message=*/nullptr,
-                /*error_code=*/0);
+                /*error_code=*/0, c->session_id);
         }
     };
 
@@ -462,7 +525,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         rac::stt::dispatch_stt_stream_event(
             component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
             /*partial=*/nullptr,
-            /*final_output=*/nullptr, "STT streaming chunk failed", rc);
+            /*final_output=*/nullptr, "STT streaming chunk failed", rc, session_id);
     }
     return rc;
 #endif
@@ -536,7 +599,8 @@ namespace rac::stt {
 void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
                                const runanywhere::v1::STTPartialResult* partial,
                                const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code) {
+                               const char* error_message, int error_code,
+                               uint64_t session_id) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;
@@ -547,10 +611,24 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
             return;
         slot = it->second;
         seq = ++(it->second.seq);
-        for (const auto& [_, session] : g_sessions()) {
-            if (session.handle == handle && !session.is_cancelled.load(std::memory_order_relaxed)) {
-                request_id = session.request_id;
-                break;
+        // Prefer the caller-supplied session_id when known so events stay
+        // bound to the producing session even with multiple concurrent
+        // sessions on the same component handle. Fall back to the legacy
+        // first-active-session-by-handle scan only when no session_id was
+        // threaded through (e.g. legacy callbacks emitting handle-only).
+        if (session_id != 0) {
+            auto sit = g_sessions().find(session_id);
+            if (sit != g_sessions().end() && sit->second.handle == handle) {
+                request_id = sit->second.request_id;
+            }
+        }
+        if (request_id.empty()) {
+            for (const auto& [_, session] : g_sessions()) {
+                if (session.handle == handle &&
+                    !session.is_cancelled.load(std::memory_order_relaxed)) {
+                    request_id = session.request_id;
+                    break;
+                }
             }
         }
     }
