@@ -42,7 +42,13 @@ jobs:
     # this build", which previously masked the Swift gRPC plugin install and
     # let downstream `protoc --grpc-swift_out=` discoveries silently fail.
     runs-on: macos-15
-    timeout-minutes: 15
+    # Mint cache-miss path (first run after Mintfile bump) rebuilds
+    # SwiftLint + periphery + swift-format + swift-protobuf +
+    # protoc-gen-grpc-swift from source, which on a cold runner takes
+    # ~20 minutes on macos-15. Bump the timeout so the initial-warmup
+    # run can complete; subsequent runs hit the actions/cache restore
+    # path and finish in under 2 minutes.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
