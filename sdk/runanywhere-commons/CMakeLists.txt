@@ -1033,6 +1033,14 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
         set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
         set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
+        # Skip building upb (Universal Protocol Buffers) entirely. Upstream
+        # protobuf v34 builds protoc-gen-upb / protoc-gen-upbdefs /
+        # protoc-gen-upb_minitable executables even with PROTOC_BINARIES=OFF,
+        # which Xcode then rejects on iOS with `error: Bundle identifier is
+        # missing. protoc-gen-upb doesn't have a bundle identifier`. We
+        # never link the upb runtime — every generated header in
+        # src/generated/proto/ uses the classic libprotobuf C++ surface.
+        set(protobuf_BUILD_LIBUPB           OFF CACHE BOOL "" FORCE)
         # protobuf v28+ depends on abseil. Force FetchContent dependencies so
         # Apple static packages do not capture host/Homebrew absl dylibs.
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
