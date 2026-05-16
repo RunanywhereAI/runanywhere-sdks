@@ -154,7 +154,10 @@ jobs:
       - name: Build shared TypeScript proto package
         run: |
           cd sdk/shared/proto-ts
-          npm install --package-lock=false
+          # `--workspaces=false` so npm doesn't walk up into the repo-root
+          # Yarn workspace (which uses `workspace:*` deps that npm can't
+          # parse — bails with EUNSUPPORTEDPROTOCOL).
+          npm install --package-lock=false --workspaces=false
           npm run build
 
       - name: Fail on drift
