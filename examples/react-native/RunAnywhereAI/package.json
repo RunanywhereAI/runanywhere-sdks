@@ -13,9 +13,9 @@
     "format": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --check",
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
-    "pod-install": "cd ios && bundle exec pod install",
-    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && cd ios && bundle exec pod install",
-    "postinstall": "patch-package && node -e \"process.platform==='darwin' && require('fs').existsSync('ios/Podfile') && require('child_process').execSync('cd ios && bundle exec pod install', { stdio: 'inherit' })\""
+    "pod-install": "bash scripts/pod-install.sh",
+    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && bash scripts/pod-install.sh",
+    "postinstall": "patch-package && node -e \"process.platform==='darwin' && require('fs').existsSync('ios/Podfile') && require('child_process').execSync('bash scripts/pod-install.sh', { stdio: 'inherit' })\""
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

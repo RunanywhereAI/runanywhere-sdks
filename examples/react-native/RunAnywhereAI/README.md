@@ -55,8 +55,9 @@ cd ../../..
 ./scripts/build-core-xcframework.sh
 cd examples/react-native/RunAnywhereAI
 
-# Generate React Native/Nitro iOS codegen through CocoaPods.
-cd ios && pod install && cd ..
+# Generate React Native/Nitro iOS codegen through the locked Bundler/CocoaPods graph.
+# scripts/pod-install.sh runs `bundle install` if needed, then `bundle exec pod install`.
+yarn pod-install
 
 # Android build gate.
 cd android && ./gradlew :app:assembleDebug && cd ..
@@ -88,23 +89,31 @@ This Sample App → Local RN SDK packages (sdk/runanywhere-react-native/packages
                           ↓
               Local XCFrameworks/JNI libs (in each package's ios/ and android/ directories)
                           ↑
-           Built by: ./scripts/build-react-native.sh --setup
+        Staged by: sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from PATH
 ```
 
-The `build-react-native.sh --setup` script:
-1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
-2. Builds the native C++ libraries from `runanywhere-commons`
-3. Copies XCFrameworks to `packages/*/ios/Binaries/` and `packages/*/ios/Frameworks/`
-4. Copies JNI `.so` files to `packages/*/android/src/main/jniLibs/`
-5. Creates `.testlocal` marker files (enables local library consumption)
+`scripts/package-sdk.sh --natives-from PATH`:
+1. Stages prebuilt natives from the owning layer (`runanywhere-commons`) into each RN package: `packages/core` gets `RACommons`, `packages/llamacpp` gets `RABackendLLAMACPP`, `packages/onnx` gets `RABackendONNX` + `RABackendSherpa`.
+2. Copies XCFrameworks to `packages/*/ios/Binaries/`.
+3. Copies JNI `.so` files into `packages/*/android/src/main/jniLibs/<abi>/`.
+4. Type-checks each package and produces `dist/sdk-rn/*.tgz` with matching `.sha256` files.
+
+`yarn native:local` writes the `.testlocal` marker files that enable local library consumption (use `yarn native:remote` to revert).
+
+If you do not need to rebuild commons from source, run the per-package download helpers (`yarn core:download-ios`, `yarn core:download-android`, etc.) from `sdk/runanywhere-react-native/` to pull prebuilt natives from a GitHub release directly.
 
 ### After Modifying the SDK
 
 - **TypeScript SDK code changes**: Metro bundler picks them up automatically (Fast Refresh)
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
+  # Rebuild natives in the owning layer
+  ./scripts/build-core-xcframework.sh   # iOS
+  ./scripts/build-core-android.sh       # Android
+
+  # Re-stage them into the RN packages
   cd sdk/runanywhere-react-native
-  ./scripts/build-react-native.sh --local --rebuild-commons
+  ./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
   ```
 
 ---
@@ -294,8 +303,8 @@ cd runanywhere-sdks/examples/react-native/RunAnywhereAI
 # Install JavaScript dependencies
 npm install
 
-# Install iOS dependencies
-cd ios && pod install && cd ..
+# Install iOS dependencies (bootstraps locked Bundler gemset, then runs pod install)
+yarn pod-install
 ```
 
 ### Run on iOS
@@ -361,17 +370,23 @@ await RunAnywhere.initialize({
   environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
-// Phase 2: Register optional backends and proto-described models
-LlamaCPP.register();
-await RunAnywhere.registerModel({
-  id: 'smollm2-360m-q8_0',
-  name: 'SmolLM2 360M Q8_0',
-  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  memoryRequirement: 500_000_000,
-});
+// Phase 2: Register optional backends and proto-described models. Both
+// `LlamaCPP.register()` and `ONNX.register()` return `Promise<boolean>` and
+// must be awaited before registering models against them; a `false` result
+// means the native backend was not installed and dependent models should be
+// skipped.
+const llamaRegistered = await LlamaCPP.register();
+if (llamaRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'smollm2-360m-q8_0',
+    name: 'SmolLM2 360M Q8_0',
+    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    memoryRequirement: 500_000_000,
+  });
+}
 
-ONNX.register();
+await ONNX.register();
 await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
@@ -826,9 +841,9 @@ See [CONTRIBUTING.md](../../../CONTRIBUTING.md) for guidelines.
 git clone https://github.com/YOUR_USERNAME/runanywhere-sdks.git
 cd runanywhere-sdks/examples/react-native/RunAnywhereAI
 
-# Install dependencies
+# Install dependencies (yarn pod-install bootstraps Bundler then runs pod install)
 npm install
-cd ios && pod install && cd ..
+yarn pod-install
 
 # Create feature branch
 git checkout -b feature/your-feature

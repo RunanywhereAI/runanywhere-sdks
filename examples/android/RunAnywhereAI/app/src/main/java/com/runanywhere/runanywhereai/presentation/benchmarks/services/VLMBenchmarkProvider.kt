@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.VLMImageFormat
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
@@ -42,10 +41,13 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
 
         // Load
         val loadStart = System.nanoTime()
+        // VLM catalog entries are seeded as MODEL_CATEGORY_MULTIMODAL (see
+        // ModelBootstrap.VLM_*_MODELS); load under the model's own category so
+        // currentModel(category = MULTIMODAL) lookups can find the loaded VLM.
         RunAnywhere.loadModel(
             RAModelLoadRequest(
                 model_id = model.id,
-                category = ModelCategory.MODEL_CATEGORY_VISION,
+                category = model.category,
             ),
         )
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0

@@ -155,9 +155,17 @@ async function registerModulesAndModels(): Promise<void> {
   // =========================================================================
   // LlamaCPP backend + LLM models
   // =========================================================================
-  if (LlamaCPP) {
-    LlamaCPP.register();
+  // LlamaCPP.register() returns Promise<boolean>; only register Llama/VLM
+  // models when the native backend was actually installed so the demo never
+  // routes inference to a backend that failed to register.
+  const llamaRegistered = LlamaCPP ? await LlamaCPP.register() : false;
+  if (!llamaRegistered && LlamaCPP) {
+    logDiagnostic(
+      '[App] LlamaCPP.register() returned false - skipping LLM/VLM model registration'
+    );
+  }
 
+  if (llamaRegistered) {
     await Promise.all([
       registerModel({
         id: 'smollm2-360m-q8_0',
@@ -261,14 +269,14 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 1_400_000_000,
       }),
     ]);
-  } else {
+  } else if (!LlamaCPP) {
     logDiagnostic('[App] Skipping LlamaCPP models - backend not available');
   }
 
   // =========================================================================
   // VLM (Vision Language) models
   // =========================================================================
-  if (LlamaCPP) {
+  if (llamaRegistered) {
     await Promise.all([
       // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
       registerModel({

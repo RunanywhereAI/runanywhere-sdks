@@ -262,14 +262,42 @@ function setAnswer(msg: string): void {
   el.innerHTML = msg;
 }
 
+// Embedding / LLM IDs that the example seeds via services/model-catalog.ts.
+// The native RAG ABI is in-memory and the bootstrap call is idempotent: once
+// the pipeline exists, RAG.availability() flips to source='wasm-session' and
+// future ensureRAGReady() calls become no-ops.
+const RAG_EMBEDDING_MODEL_ID = 'all-minilm-l6-v2';
+const RAG_LLM_MODEL_ID = 'smollm2-360m-q8_0';
+
 async function ensureRAGReady(): Promise<boolean> {
   const availability = RunAnywhere.rag.availability();
-  if (!availability.available) {
-    setStatus(availability.reason);
-    return false;
+  if (availability.available) {
+    return true;
   }
 
-  return true;
+  // `wasm-exports` means the native RAG proto exports are present but no
+  // provider/session has been created yet. The example owns that bootstrap
+  // — without it, RAG availability stays `false` forever and every ingest /
+  // query / clear path short-circuits even though the WASM is healthy.
+  if (availability.source === 'wasm-exports') {
+    try {
+      setStatus('Initializing RAG pipeline...');
+      await RunAnywhere.rag.createPipeline(
+        RunAnywhere.rag.defaultConfiguration({
+          embeddingModelId: RAG_EMBEDDING_MODEL_ID,
+          llmModelId: RAG_LLM_MODEL_ID,
+        }),
+      );
+      setStatus('RAG ready.');
+      return true;
+    } catch (err) {
+      setStatus(`RAG bootstrap failed: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  }
+
+  setStatus(availability.reason);
+  return false;
 }
 
 function formatAnswer(text: string, sources: RAGSearchResult[]): string {

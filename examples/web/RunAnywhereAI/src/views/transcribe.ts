@@ -37,10 +37,20 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   unmounted = false;
   renderTranscribe();
   return {
+    // app.ts fires onDeactivate on every tab switch (not only on panel
+    // teardown). Treat the flag as a "currently inactive" guard for
+    // in-flight async renders and reset it on re-activation so a returning
+    // user doesn't see stale microphone / processing state or skipped
+    // post-ONNX-register re-renders.
+    onActivate: () => {
+      unmounted = false;
+      renderTranscribe();
+    },
     onDeactivate: () => {
       unmounted = true;
       audioCapture?.stop();
       audioCapture = null;
+      isCapturing = false;
     },
   };
 }

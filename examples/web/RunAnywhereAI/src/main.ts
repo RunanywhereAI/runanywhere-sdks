@@ -14,6 +14,7 @@ import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
+type BackendReadinessState = 'pending' | 'registered' | 'unavailable';
 
 interface AppShellProbe {
   shellReady: boolean;
@@ -27,6 +28,8 @@ interface AppReadinessSnapshot extends AppShellProbe {
   ready: boolean;
   state: AppReadinessState;
   sdk: SDKReadinessState;
+  backend: BackendReadinessState;
+  backendError?: string;
   updatedAt: number;
   error?: string;
 }
@@ -47,15 +50,28 @@ window.__RUNANYWHERE_SDK__ = RunAnywhere;
 
 let sdkReadinessState: SDKReadinessState = 'initializing';
 let sdkInitializationError: string | undefined;
+let backendReadinessState: BackendReadinessState = 'pending';
+let backendRegistrationError: string | undefined;
 
 function publishReadiness(state: AppReadinessState, error?: string): AppReadinessSnapshot {
   const probe = probeAppShell();
-  const ready = state === 'interactive' && probe.shellReady && probe.modelUiReady;
+  // Inference readiness is independent of app-shell readiness: when the
+  // backend WASM is missing or fails to register, the model selector is
+  // intentionally disabled (catalogRegistered=false), but the rest of the
+  // demo (Voice/Documents/Settings tabs, feature-unavailable placeholders)
+  // is still navigable. Treating that as "not interactive" would convert
+  // the documented degraded mode into a fatal initialization error view.
+  const backendDegraded = backendReadinessState === 'unavailable';
+  const ready = state === 'interactive'
+    && probe.shellReady
+    && (probe.modelUiReady || backendDegraded);
   const snapshot: AppReadinessSnapshot = {
     ...probe,
     ready,
     state,
     sdk: sdkReadinessState,
+    backend: backendReadinessState,
+    backendError: backendRegistrationError,
     updatedAt: Date.now(),
     error: error ?? sdkInitializationError,
   };
@@ -66,6 +82,7 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
   root.dataset.runanywhereAiReady = ready ? 'true' : 'false';
   root.dataset.runanywhereAiState = state;
   root.dataset.runanywhereAiSdk = sdkReadinessState;
+  root.dataset.runanywhereAiBackend = backendReadinessState;
   root.dataset.runanywhereAiShellReady = probe.shellReady ? 'true' : 'false';
   root.dataset.runanywhereAiModelUiReady = probe.modelUiReady ? 'true' : 'false';
   root.dataset.runanywhereAiModelUiTarget = probe.modelUiTarget ?? '';
@@ -75,6 +92,11 @@ function publishReadiness(state: AppReadinessState, error?: string): AppReadines
     root.dataset.runanywhereAiError = snapshot.error;
   } else {
     delete root.dataset.runanywhereAiError;
+  }
+  if (backendRegistrationError) {
+    root.dataset.runanywhereAiBackendError = backendRegistrationError;
+  } else {
+    delete root.dataset.runanywhereAiBackendError;
   }
 
   const app = document.getElementById('app');
@@ -168,6 +190,10 @@ async function waitForInteractiveShell(): Promise<AppReadinessSnapshot> {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   const snapshot = publishReadiness('interactive');
   if (!snapshot.ready) {
+    // The shell never reached interactive readiness AND the backend isn't
+    // explicitly degraded — that's a real failure, not a missing-WASM
+    // fallback path. Still report which probe field tripped so the error
+    // view tells the user what to look at.
     throw new Error(`App shell did not reach interactive readiness: ${snapshot.reason}`);
   }
   return snapshot;
@@ -280,17 +306,24 @@ async function initializeSDK(): Promise<void> {
     // Register the llamacpp WASM backend. This is best-effort: if the
     // WASM file is missing (e.g. a fresh dev cold-start before the build
     // ran), the rest of the app shell continues to load and views show
-    // their `feature-unavailable` placeholder.
+    // their `feature-unavailable` placeholder. Backend status is recorded
+    // on the readiness snapshot so the interactive probe can treat the
+    // disabled model picker as a degraded-but-interactive state instead
+    // of a fatal initialization failure.
     let activeAcceleration: 'cpu' | 'webgpu' = 'cpu';
     try {
       const { LlamaCPP } = await import('@runanywhere/web-llamacpp');
       await LlamaCPP.register({ acceleration: 'auto' });
       activeAcceleration = LlamaCPP.accelerationMode;
+      backendReadinessState = 'registered';
+      backendRegistrationError = undefined;
       console.log('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
     } catch (err) {
+      backendReadinessState = 'unavailable';
+      backendRegistrationError = err instanceof Error ? err.message : String(err);
       console.warn(
         '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
-        err instanceof Error ? err.message : String(err),
+        backendRegistrationError,
       );
     }
 

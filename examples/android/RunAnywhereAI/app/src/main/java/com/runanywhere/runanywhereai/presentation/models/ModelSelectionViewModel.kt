@@ -367,7 +367,16 @@ class ModelSelectionViewModel(
                     ModelSelectionContext.STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
                     ModelSelectionContext.TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
                     ModelSelectionContext.VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-                    ModelSelectionContext.VLM -> ModelCategory.MODEL_CATEGORY_VISION
+                    // The Android VLM catalog (ModelBootstrap.VLM_*) seeds entries with
+                    // MODEL_CATEGORY_MULTIMODAL and the rest of the app — including
+                    // currentModel(category = MULTIMODAL) and the Swift reference path —
+                    // queries them under that category. Loading under VISION would record
+                    // the loaded-model state in a category that no consumer reads from,
+                    // leaving the picker convinced the just-loaded VLM is "not loaded".
+                    ModelSelectionContext.VLM -> {
+                        val model = _uiState.value.models.find { it.id == modelId }
+                        model?.category ?: ModelCategory.MODEL_CATEGORY_MULTIMODAL
+                    }
                     ModelSelectionContext.VOICE -> {
                         val model = _uiState.value.models.find { it.id == modelId }
                         when (model?.category) {

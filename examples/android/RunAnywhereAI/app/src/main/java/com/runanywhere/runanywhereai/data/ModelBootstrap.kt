@@ -13,6 +13,7 @@ import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.core.onnx.ONNX
+import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
@@ -59,6 +60,12 @@ object ModelBootstrap {
         try {
             LlamaCPP.register()
             ONNX.register()
+            // Seeds the built-in `system-tts` ModelInfo into the proto registry so
+            // it surfaces through the same Model Selection path as downloadable
+            // voices (mirrors iOS, which exposes System TTS as a built-in model
+            // and routes selection through the regular FlatModelRow flow).
+            // Without this, the TTS picker shows only downloadable Sherpa voices.
+            SystemTTSModule.register()
             Timber.i("Core backends registered")
         } catch (e: Exception) {
             Timber.e(e, "Failed to register core backends")
@@ -111,12 +118,12 @@ object ModelBootstrap {
             }
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
-        for (m in VLM_SINGLE_MODELS) {
+        for (m in VLM_ARCHIVE_MODELS) {
             if (m.id in alreadyKnown) {
                 skipped++
                 continue
             }
-            if (tryRegisterSingle(m)) registered++ else failed++
+            if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in STT_MODELS) {
             if (m.id in alreadyKnown) {
@@ -172,7 +179,7 @@ object ModelBootstrap {
                     description = "Removes refusal behavior — model answers directly without disclaimers",
                     url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
                     filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-                    compatible_models = listOf("qwen2.5-0.5b-instruct-q8_0"),
+                    compatible_models = listOf("qwen2.5-0.5b-instruct-q6_k"),
                     size_bytes = 17_600_000,
                     default_scale = 1.0f,
                 ),
@@ -334,6 +341,11 @@ object ModelBootstrap {
 
     // MARK: - Curated catalog
 
+    // Baseline LLM catalog. Mirrors the iOS / Flutter / RN example apps —
+    // see `RunAnywhereAIApp.swift:registerModulesAndModels` and
+    // `runanywhere_ai_app.dart:_registerModulesAndModels`. Keep these in
+    // lockstep so cross-platform demos surface the same model IDs and the
+    // shared Solutions YAML resolves on every platform.
     private val LLM_MODELS =
         listOf(
             SingleFileModel(
@@ -345,9 +357,28 @@ object ModelBootstrap {
                 memoryBytes = 500_000_000,
             ),
             SingleFileModel(
-                id = "qwen2.5-0.5b-instruct-q8_0",
-                name = "Qwen 2.5 0.5B Instruct Q8_0",
-                url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf",
+                id = "llama-2-7b-chat-q4_k_m",
+                name = "Llama 2 7B Chat Q4_K_M",
+                url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                memoryBytes = 4_000_000_000,
+            ),
+            SingleFileModel(
+                id = "mistral-7b-instruct-q4_k_m",
+                name = "Mistral 7B Instruct Q4_K_M",
+                url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                memoryBytes = 4_000_000_000,
+            ),
+            // Q6_K matches the iOS / Flutter / RN catalogs. The abliterated
+            // LoRA above is f16 and applies cleanly across Qwen 2.5 0.5B
+            // quantizations, so `compatible_models` points to this ID.
+            SingleFileModel(
+                id = "qwen2.5-0.5b-instruct-q6_k",
+                name = "Qwen 2.5 0.5B Instruct Q6_K",
+                url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
                 category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
                 memoryBytes = 600_000_000,
@@ -380,12 +411,29 @@ object ModelBootstrap {
                 supportsThinking = true,
             ),
             SingleFileModel(
+                id = "qwen3-4b-q4_k_m",
+                name = "Qwen3 4B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                memoryBytes = 2_800_000_000,
+                supportsThinking = true,
+            ),
+            SingleFileModel(
                 id = "lfm2-350m-q4_k_m",
                 name = "LiquidAI LFM2 350M Q4_K_M",
                 url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
                 category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
                 memoryBytes = 250_000_000,
+            ),
+            SingleFileModel(
+                id = "lfm2-350m-q8_0",
+                name = "LiquidAI LFM2 350M Q8_0",
+                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                memoryBytes = 400_000_000,
             ),
             SingleFileModel(
                 id = "lfm2-1.2b-tool-q4_k_m",
@@ -395,17 +443,37 @@ object ModelBootstrap {
                 category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
                 memoryBytes = 800_000_000,
             ),
+            SingleFileModel(
+                id = "lfm2-1.2b-tool-q8_0",
+                name = "LiquidAI LFM2 1.2B Tool Q8_0",
+                url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
+                framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                memoryBytes = 1_400_000_000,
+            ),
         )
 
-    private val VLM_SINGLE_MODELS =
+    /**
+     * VLM tarballs that must extract into a per-model directory before load.
+     * Mirrors `RunAnywhereAIApp.swift` which uses `registerArchive(... archive:
+     * .tarGz, structure: .directoryBased)` for the same SmolVLM asset. Going
+     * through `tryRegisterArchive` sets `archive_artifact` /
+     * `MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE` so the C++ download orchestrator
+     * unpacks the archive into the directory layout the llama.cpp VLM backend
+     * expects; treating the same URL as a single file would land an
+     * unextracted .tar.gz on disk and the backend would fail to load.
+     */
+    private val VLM_ARCHIVE_MODELS =
         listOf(
-            SingleFileModel(
+            ArchiveModel(
                 id = "smolvlm-500m-instruct-q8_0",
                 name = "SmolVLM 500M Instruct",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
                 category = ModelCategory.MODEL_CATEGORY_MULTIMODAL,
                 memoryBytes = 600_000_000,
+                archiveType = ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
             ),
         )
 

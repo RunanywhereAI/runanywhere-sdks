@@ -49,9 +49,9 @@ fi
 if [ "${RUN_IOS}" = "1" ]; then
     require_command xcodebuild
     if [ "${RUN_PODS}" = "1" ]; then
-        require_command pod
-        log "Installing CocoaPods dependencies"
-        (cd ios && pod install)
+        require_command bundle
+        log "Installing CocoaPods dependencies via locked Bundler graph"
+        bash "${SCRIPT_DIR}/pod-install.sh"
     fi
 
     log "Building iOS simulator app"

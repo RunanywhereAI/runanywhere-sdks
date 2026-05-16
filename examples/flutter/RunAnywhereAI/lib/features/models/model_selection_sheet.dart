@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -45,16 +44,23 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       return widget.context.relevantCategories.contains(model.category);
     }).toList();
 
-    // Sort: Foundation Models first (built-in), then downloaded, then not downloaded
+    // Sort: built-in models first (Foundation Models / System TTS), then
+    // downloaded, then not downloaded. `isDownloaded` already collapses
+    // built-in + on-disk readiness into a single check (see
+    // ExampleModelInfoView.isDownloaded in model_types.dart).
+    int priorityFor(ModelInfo m) {
+      if (m.preferredFramework ==
+              LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+          m.preferredFramework ==
+              LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS) {
+        return 0;
+      }
+      return m.localPath.isNotEmpty ? 1 : 2;
+    }
+
     models.sort((a, b) {
-      final aPriority = a.preferredFramework ==
-              LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-          ? 0
-          : (a.localPath.isNotEmpty ? 1 : 2);
-      final bPriority = b.preferredFramework ==
-              LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-          ? 0
-          : (b.localPath.isNotEmpty ? 1 : 2);
+      final aPriority = priorityFor(a);
+      final bPriority = priorityFor(b);
       if (aPriority != bPriority) {
         return aPriority.compareTo(bPriority);
       }
@@ -241,21 +247,11 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
         if (_availableModels.isEmpty)
           _buildEmptyModelsMessage(context)
         else ...[
-          // System TTS option for TTS context.
-          //
-          // Apple-only — commons' `platform` engine plugin
-          // (AVSpeechSynthesizer-backed) is gated behind
-          // `if(APPLE AND RAC_BUILD_PLATFORM)` in
-          // sdk/runanywhere-commons/CMakeLists.txt:732. On Android there is
-          // no native route for `framework=platform`, so hide the row to
-          // avoid the "no backend route" error the router would otherwise
-          // raise. Mirrors Swift SDK behavior (System TTS only exists on
-          // Apple platforms).
-          if (widget.context == ModelSelectionContext.tts &&
-              (Platform.isIOS || Platform.isMacOS))
-            _buildSystemTTSRow(context),
-
-          // All models in a flat list
+          // System TTS is registered in runanywhere_ai_app.dart on Apple
+          // platforms with framework=INFERENCE_FRAMEWORK_SYSTEM_TTS, so it
+          // flows through the regular _FlatModelRow path below (treated as
+          // built-in alongside Foundation Models). A second manual row would
+          // produce duplicate entries on iOS/macOS.
           ..._availableModels.map((model) {
             return _FlatModelRow(
               model: model,
@@ -286,84 +282,6 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSystemTTSRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.large,
-        vertical: AppSpacing.smallMedium,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name with badge
-                Row(
-                  children: [
-                    Text(
-                      'System Voice',
-                      style: AppTypography.subheadline(context).copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.smallMedium),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.small,
-                        vertical: AppSpacing.xxSmall,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.textPrimary(context)
-                            .withValues(alpha: 0.1),
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.cornerRadiusSmall),
-                      ),
-                      child: Text(
-                        'System',
-                        style: AppTypography.caption2(context).copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xSmall),
-                // Status
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      size: 12,
-                      color: AppColors.statusGreen,
-                    ),
-                    const SizedBox(width: AppSpacing.xxSmall),
-                    Text(
-                      'Built-in • Always available',
-                      style: AppTypography.caption2(context).copyWith(
-                        color: AppColors.statusGreen,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: _isLoadingModel ? null : _selectSystemTTS,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.mediumLarge,
-                vertical: AppSpacing.small,
-              ),
-            ),
-            child: const Text('Use'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -467,51 +385,14 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     );
   }
 
-  Future<void> _selectSystemTTS() async {
-    setState(() {
-      _isLoadingModel = true;
-      _loadingProgress = 'Configuring System TTS...';
-    });
-
-    final systemTTSModel = ModelInfo(
-      id: 'system-tts',
-      name: 'System TTS',
-      category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      format: ModelFormat.MODEL_FORMAT_UNKNOWN,
-      framework: LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
-      builtIn: true,
-    );
-
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-
-    setState(() {
-      _loadingProgress = 'System TTS ready!';
-    });
-
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-
-    await widget.onModelSelected(systemTTSModel);
-
-    if (mounted) {
-      setState(() {
-        _isLoadingModel = false;
-      });
-      // Defer Navigator.pop until after the current frame completes
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      });
-    }
-  }
-
   Future<void> _selectAndLoadModel(ModelInfo model) async {
-    // Foundation Models don't need local path check
-    if (model.preferredFramework !=
-        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
-      if (model.localPath.isEmpty) {
-        return; // Model not downloaded yet
-      }
+    // Built-in models (Foundation Models, System TTS) have no local file and
+    // must skip the localPath readiness gate; both flow through the regular
+    // category-aware load path (e.g. SYSTEM_TTS -> RunAnywhere.tts.loadVoice
+    // in ModelListViewModel.loadModel). Other frameworks still require a
+    // downloaded artifact before we attempt to load them.
+    if (!model.isDownloaded) {
+      return; // Model not downloaded yet
     }
 
     setState(() {
@@ -521,13 +402,19 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     });
 
     try {
-      // RAG contexts record the selection only — do NOT pre-load into memory.
-      // The RAG pipeline loads models on demand when the document is ingested.
-      final isRagContext =
+      // Contexts where the generic ModelListViewModel preload must be skipped:
+      //  - RAG contexts record the selection only; the RAG pipeline loads
+      //    models on demand when documents are ingested.
+      //  - VLM context: ModelListViewModel.loadModel only knows about LLM /
+      //    STT / TTS, so multimodal entries fall through to RunAnywhere.llm.load.
+      //    The VLM `onModelSelected` callback (VLMViewModel) loads via
+      //    RunAnywhere.vlm.load, which is the only correct lifecycle here.
+      final skipPreload =
           widget.context == ModelSelectionContext.ragEmbedding ||
-              widget.context == ModelSelectionContext.ragLLM;
+              widget.context == ModelSelectionContext.ragLLM ||
+              widget.context == ModelSelectionContext.vlm;
 
-      if (!isRagContext) {
+      if (!skipPreload) {
         // Update view model selection state (loads the model into memory)
         await _viewModel.selectModel(model);
       }
@@ -623,30 +510,28 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     }
   }
 
+  bool get _isBuiltIn =>
+      widget.model.preferredFramework ==
+          LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+      widget.model.preferredFramework ==
+          LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
+
   IconData get _statusIcon {
-    if (widget.model.preferredFramework ==
-        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
+    if (_isBuiltIn || widget.model.localPath.isNotEmpty) {
       return Icons.check_circle;
-    } else if (widget.model.localPath.isNotEmpty) {
-      return Icons.check_circle;
-    } else {
-      return Icons.download;
     }
+    return Icons.download;
   }
 
   Color get _statusColor {
-    if (widget.model.preferredFramework ==
-            LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-        widget.model.localPath.isNotEmpty) {
+    if (_isBuiltIn || widget.model.localPath.isNotEmpty) {
       return AppColors.statusGreen;
-    } else {
-      return AppColors.primaryBlue;
     }
+    return AppColors.primaryBlue;
   }
 
   String get _statusText {
-    if (widget.model.preferredFramework ==
-        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
+    if (_isBuiltIn) {
       return 'Built-in';
     } else if (widget.model.localPath.isNotEmpty) {
       return 'Ready';
@@ -803,9 +688,11 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   Widget _buildActionButton(BuildContext context) {
-    if (widget.model.preferredFramework ==
-        LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
-      // Foundation Models are built-in
+    // Built-in models (Foundation Models, System TTS) are always loadable —
+    // they have no downloadable artifact, so show a Use button instead of a
+    // Get/download action. Mirrors Swift's FlatModelRow which treats both
+    // .foundationModels and .systemTts as `isBuiltIn`.
+    if (_isBuiltIn) {
       return ElevatedButton(
         onPressed:
             widget.isLoading || widget.isSelected ? null : widget.onSelectModel,

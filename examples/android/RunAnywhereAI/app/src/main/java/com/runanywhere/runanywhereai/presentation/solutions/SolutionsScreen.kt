@@ -39,13 +39,20 @@ import kotlinx.coroutines.launch
  * scrolling log so the demo stays readable without wiring up streaming
  * output yet.
  */
+// Use model IDs that ModelBootstrap.kt actually registers; the placeholder
+// IDs from sdk/runanywhere-commons/examples/solutions/*.yaml (whisper-base,
+// kokoro, silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3, qwen3-4b-q4_k_m)
+// are not seeded in any example catalog, so handing them to
+// RunAnywhere.solutions.run produces a "model not found in registry"
+// failure as soon as the operators load. rerank_model_id is omitted because
+// no example app seeds a reranker model.
 private val VOICE_AGENT_YAML =
     """
     voice_agent:
-      llm_model_id: "qwen3-4b-q4_k_m"
-      stt_model_id: "whisper-base"
-      tts_model_id: "kokoro"
-      vad_model_id: "silero-v5"
+      llm_model_id: "smollm2-360m-q8_0"
+      stt_model_id: "sherpa-onnx-whisper-tiny.en"
+      tts_model_id: "vits-piper-en_US-lessac-medium"
+      vad_model_id: "silero-vad"
 
       sample_rate_hz: 16000
       chunk_ms: 20
@@ -65,9 +72,8 @@ private val VOICE_AGENT_YAML =
 private val RAG_YAML =
     """
     rag:
-      embed_model_id: "bge-small-en-v1.5"
-      rerank_model_id: "bge-reranker-v2-m3"
-      llm_model_id: "qwen3-4b-q4_k_m"
+      embed_model_id: "all-minilm-l6-v2"
+      llm_model_id: "smollm2-360m-q8_0"
 
       vector_store: "usearch"
       vector_store_path: "/tmp/ra-rag.usearch"

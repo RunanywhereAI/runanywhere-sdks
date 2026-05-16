@@ -19,6 +19,7 @@
 import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
+  SDKErrorCode,
   VLMImageFormat,
   VLMModelFamily,
   isSDKException,
@@ -49,21 +50,58 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
   container = el;
 
   ensureCatalogRegistered();
+  void syncVisionLanguageProvider();
   renderView();
 
   // Re-render when the shared model state changes so the "Load model"
-  // button reflects real state without manual refresh.
-  unsubscribeState = onModelStateChange(() => renderView());
+  // button reflects real state without manual refresh. Also bridge the
+  // C++ lifecycle current-model into the Web VLM provider; without this
+  // call, RunAnywhere.processImage throws "No VLM model has been loaded
+  // through RunAnywhere.loadModel()." even after a successful load.
+  unsubscribeState = onModelStateChange(() => {
+    void syncVisionLanguageProvider();
+    renderView();
+  });
 
   return {
     onActivate: () => {
       ensureCatalogRegistered();
+      void syncVisionLanguageProvider();
       renderView();
     },
     onDeactivate: () => {
       stopCamera();
     },
   };
+}
+
+/**
+ * Mirror the C++ lifecycle's current VLM into the Web vision-language
+ * provider's private _modelLoaded flag. The shared model picker only loads
+ * the model into the C++ lifecycle; without this bridge call, the Web
+ * provider stays in its own unloaded state and rejects processImage even
+ * though the lifecycle reports a loaded multimodal model. Symmetric
+ * unloadModel keeps the provider state in sync when the active VLM is
+ * unloaded or replaced through the picker.
+ */
+async function syncVisionLanguageProvider(): Promise<void> {
+  try {
+    if (isVLMModelLoaded()) {
+      if (!RunAnywhere.visionLanguage.isModelLoaded) {
+        await RunAnywhere.visionLanguage.loadCurrentModel();
+        renderView();
+      }
+    } else if (RunAnywhere.visionLanguage.isModelLoaded) {
+      await RunAnywhere.visionLanguage.unloadModel();
+      renderView();
+    }
+  } catch (err) {
+    // Provider not registered yet (LlamaCPP backend missing or still
+    // initializing) is expected; surface real failures via status panel
+    // so the user can see why Analyze keeps rejecting.
+    if (isSDKException(err) && err.code === SDKErrorCode.BackendNotAvailable) return;
+    setStatus(`VLM provider sync failed: ${formatErr(err)}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

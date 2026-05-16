@@ -34,6 +34,15 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
   unmounted = false;
   renderSpeak();
   return {
+    // app.ts fires onDeactivate on every tab switch (not only on panel
+    // teardown). Treat the flag as a "currently inactive" guard for
+    // in-flight async renders and reset it on re-activation so a returning
+    // user doesn't see stuck Speak / Synthesizing controls or skipped
+    // post-ONNX-register re-renders.
+    onActivate: () => {
+      unmounted = false;
+      renderSpeak();
+    },
     onDeactivate: () => {
       unmounted = true;
       playback?.dispose();
