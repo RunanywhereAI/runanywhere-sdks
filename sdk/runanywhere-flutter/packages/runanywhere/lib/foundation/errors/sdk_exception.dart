@@ -29,6 +29,20 @@ class SDKException implements Exception {
   /// Convenience: error category from the underlying proto.
   pb_enum.ErrorCategory get category => error.category;
 
+  /// Dot-separated path to the field that triggered a validation failure
+  /// (e.g. `"STTOptions.sampleRate"`). Populated by the generated
+  /// `validate()` helpers under `lib/generated/convenience/` so callers can
+  /// programmatically identify the failing field without parsing the
+  /// human-readable message.
+  ///
+  /// Backed by `error.context.metadata["field_path"]` — the wire-canonical
+  /// carrier shared with Swift / Kotlin / TS.
+  String? get fieldPath {
+    if (!error.hasContext()) return null;
+    final m = error.context.metadata;
+    return m['field_path'];
+  }
+
   @override
   String toString() => 'SDKException(${error.code.name}): ${error.message}';
 
@@ -42,13 +56,18 @@ class SDKException implements Exception {
     required pb_enum.ErrorCategory category,
     required String message,
     Object? underlyingError,
+    String? fieldPath,
   }) {
+    final err = pb.SDKError(
+      code: code,
+      category: category,
+      message: message,
+    );
+    if (fieldPath != null) {
+      err.context = pb.ErrorContext(metadata: {'field_path': fieldPath});
+    }
     return SDKException(
-      pb.SDKError(
-        code: code,
-        category: category,
-        message: message,
-      ),
+      err,
       underlyingError: underlyingError,
     );
   }
@@ -257,11 +276,32 @@ class SDKException implements Exception {
         message: 'Invalid state: $reason',
       );
 
-  static SDKException validationFailed(String reason) => _build(
-        code: pb_enum.ErrorCode.ERROR_CODE_VALIDATION_FAILED,
-        category: pb_enum.ErrorCategory.ERROR_CATEGORY_VALIDATION,
-        message: 'Validation failed: $reason',
-      );
+  /// Validation failure.
+  ///
+  /// When [fieldPath] is provided (e.g. `"STTOptions.sampleRate"`), the
+  /// canonical proto code switches to `ERROR_CODE_INVALID_ARGUMENT` and
+  /// the field path is stored on `error.context.metadata["field_path"]` —
+  /// matching the shape emitted by `idl/codegen/generate_*_convenience.py`
+  /// across Swift / Kotlin / TS.
+  ///
+  /// Without [fieldPath], retains the legacy "Validation failed: …"
+  /// message form for backwards compatibility with hand-written call sites.
+  static SDKException validationFailed(
+    String reason, {
+    String? fieldPath,
+  }) =>
+      fieldPath != null
+          ? _build(
+              code: pb_enum.ErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+              category: pb_enum.ErrorCategory.ERROR_CATEGORY_VALIDATION,
+              message: reason,
+              fieldPath: fieldPath,
+            )
+          : _build(
+              code: pb_enum.ErrorCode.ERROR_CODE_VALIDATION_FAILED,
+              category: pb_enum.ErrorCategory.ERROR_CATEGORY_VALIDATION,
+              message: 'Validation failed: $reason',
+            );
 
   static SDKException unsupportedModality(String modality) => _build(
         code: pb_enum.ErrorCode.ERROR_CODE_UNSUPPORTED_MODALITY,

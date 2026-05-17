@@ -236,16 +236,21 @@ extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
 extension EmbeddingsConfigurationValidate on EmbeddingsConfiguration {
   void validate() {
     if (modelId.isEmpty) {
-      throw SDKException.validationFailed('model_id is required');
+      throw SDKException.validationFailed(
+        'model_id is required',
+        fieldPath: 'EmbeddingsConfiguration.model_id',
+      );
     }
     if (embeddingDimension < 1) {
       throw SDKException.validationFailed(
         'embedding_dimension must be in >= 1 (got $embeddingDimension)',
+        fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
       );
     }
     if (maxSequenceLength < 1) {
       throw SDKException.validationFailed(
         'max_sequence_length must be in >= 1 (got $maxSequenceLength)',
+        fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
       );
     }
   }
@@ -274,16 +279,19 @@ extension VADConfigurationValidate on VADConfiguration {
     if (sampleRate < 1 || sampleRate > 48000) {
       throw SDKException.validationFailed(
         'sample_rate must be in 1...48000 (got $sampleRate)',
+        fieldPath: 'VADConfiguration.sample_rate',
       );
     }
     if (frameLengthMs < 1 || frameLengthMs > 1000) {
       throw SDKException.validationFailed(
         'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
+        fieldPath: 'VADConfiguration.frame_length_ms',
       );
     }
     if (threshold < 0.0 || threshold > 1.0) {
       throw SDKException.validationFailed(
         'threshold must be in 0.0...1.0 (got $threshold)',
+        fieldPath: 'VADConfiguration.threshold',
       );
     }
   }
@@ -306,6 +314,7 @@ extension RAGConfigurationValidate on RAGConfiguration {
     if (similarityThreshold < 0.0 || similarityThreshold > 1.0) {
       throw SDKException.validationFailed(
         'similarity_threshold must be in 0.0...1.0 (got $similarityThreshold)',
+        fieldPath: 'RAGConfiguration.similarity_threshold',
       );
     }
   }
@@ -405,6 +414,7 @@ extension STTConfigurationValidate on STTConfiguration {
     if (sampleRate < 8000 || sampleRate > 48000) {
       throw SDKException.validationFailed(
         'sample_rate must be in 8000...48000 (got $sampleRate)',
+        fieldPath: 'STTConfiguration.sample_rate',
       );
     }
   }

@@ -92,8 +92,7 @@ TrackedLoRAState& ensure_tracked_lora_state_locked(void* backend_impl,
     return state;
 }
 
-TrackedLoRAState snapshot_tracked_lora_state(void* backend_impl,
-                                             const std::string& base_model_id) {
+TrackedLoRAState snapshot_tracked_lora_state(void* backend_impl, const std::string& base_model_id) {
     std::lock_guard<std::mutex> lock(tracked_lora_mutex());
     return ensure_tracked_lora_state_locked(backend_impl, base_model_id);
 }
@@ -628,8 +627,7 @@ rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes, size_t re
 
     if (!ref.ops || !ref.ops->remove_lora) {
         populate_tracked_state(backend_impl, base_model_id, &state);
-        mark_state_error(&state, RAC_ERROR_NOT_SUPPORTED,
-                         "Backend does not support LoRA remove");
+        mark_state_error(&state, RAC_ERROR_NOT_SUPPORTED, "Backend does not support LoRA remove");
         publish_failure(RAC_ERROR_NOT_SUPPORTED, "lora.remove",
                         "Backend does not support LoRA remove");
         return finish(copy_proto(state, out_state));

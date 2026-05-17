@@ -131,8 +131,7 @@ RAC_API rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes,
  * receives the generated per-backend runanywhere.v1.LoRAState snapshot
  * maintained by the C++ LoRA proto ABI.
  */
-RAC_API rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes,
-                                         size_t state_proto_size,
+RAC_API rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes, size_t state_proto_size,
                                          rac_proto_buffer_t* out_state);
 
 /**
@@ -142,8 +141,7 @@ RAC_API rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes,
  * receives the generated per-backend runanywhere.v1.LoRAState snapshot
  * maintained by the C++ LoRA proto ABI.
  */
-RAC_API rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes,
-                                          size_t state_proto_size,
+RAC_API rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes, size_t state_proto_size,
                                           rac_proto_buffer_t* out_state);
 
 #ifdef __cplusplus

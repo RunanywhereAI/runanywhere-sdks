@@ -60,11 +60,27 @@ object ModelBootstrap {
         try {
             LlamaCPP.register()
             ONNX.register()
-            // Seeds the built-in `system-tts` ModelInfo into the proto registry so
-            // it surfaces through the same Model Selection path as downloadable
-            // voices (mirrors iOS, which exposes System TTS as a built-in model
-            // and routes selection through the regular FlatModelRow flow).
-            // Without this, the TTS picker shows only downloadable Sherpa voices.
+            // Registers the built-in System TTS plugin so the native engine
+            // registry can route TTS requests at runtime. Note: System TTS is
+            // exposed differently in each example app today — this is
+            // intentionally a documented divergence rather than a single
+            // canonical pattern (no shared SDK affordance exists yet):
+            //
+            //   - Android (here): `SystemTTSModule.register()` registers the
+            //     plugin in the native registry only; the example does not
+            //     seed a separate `system-tts` ModelInfo, so the TTS picker
+            //     surfaces only downloadable Sherpa voices and the System TTS
+            //     row is rendered out-of-band by the UI.
+            //   - iOS: no `system-tts` ModelInfo is seeded either; the picker
+            //     short-circuits via a hardcoded `SystemTTSRow` SwiftUI view.
+            //   - Flutter (Apple only): seeds a real `system-tts` ModelInfo
+            //     via `RunAnywhere.models.register(...)`.
+            //   - React Native: builds a synthetic `system-tts`
+            //     `ModelInfoSummary` inline at click time.
+            //   - Web: System TTS is not currently surfaced.
+            //
+            // Convergence onto one pattern is tracked separately (pass2-syn-098)
+            // and is a non-blocking polish item.
             SystemTTSModule.register()
             Timber.i("Core backends registered")
         } catch (e: Exception) {

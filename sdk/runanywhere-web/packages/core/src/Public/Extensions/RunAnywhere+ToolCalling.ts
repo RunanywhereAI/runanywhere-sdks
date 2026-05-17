@@ -3,6 +3,13 @@
  *
  * Tool calling namespace — mirrors Swift's `RunAnywhere+ToolCalling.swift`.
  * Re-exports canonical proto-ts types + provides `RunAnywhere.toolCalling.*` surface.
+ *
+ * pass2-syn-026: the orchestration loop lives in commons. The Web SDK
+ * delegates `generateWithTools` to `rac_tool_calling_session_create_proto` +
+ * `rac_tool_calling_session_step_with_result_proto` so commons drives
+ * generate -> parse -> validate -> follow-up, and TS only owns the executor
+ * closure (which needs to await async JS APIs). Mirrors Kotlin's
+ * `ToolCallingOrchestrator.jvmAndroid.kt` session-based delegation.
  */
 
 export type {
@@ -31,6 +38,9 @@ import {
   ToolCallValidationResult as ToolCallValidationResultMessage,
   ToolCallingOptions as ToolCallingOptionsMessage,
   ToolCallingResult as ToolCallingResultMessage,
+  ToolCallingSessionCreateRequest as ToolCallingSessionCreateRequestMessage,
+  ToolCallingSessionEvent as ToolCallingSessionEventMessage,
+  ToolCallingSessionStepWithResultRequest as ToolCallingSessionStepWithResultRequestMessage,
   ToolChoiceMode,
   ToolParseRequest as ToolParseRequestMessage,
   ToolParseResult as ToolParseResultMessage,
@@ -42,6 +52,7 @@ import {
   type ToolCallValidationResult,
   type ToolCallingOptions,
   type ToolCallingResult,
+  type ToolCallingSessionEvent,
   type ToolDefinition,
   type ToolParseRequest,
   type ToolParseResult,
@@ -59,19 +70,16 @@ import {
 } from '../../runtime/EmscriptenModule';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
 
-async function generate(
-  prompt: string,
-  options: Partial<LLMGenerationOptions> & { toolCalling?: Partial<ToolCallingOptions> } = {},
-): Promise<LLMGenerationResult> {
-  return TextGeneration.generate({ ...options, prompt });
-}
-
 const logger = new SDKLogger('ToolCalling');
 
 type ToolCallingExport =
   | '_rac_tool_call_parse_proto'
   | '_rac_tool_call_format_prompt_proto'
-  | '_rac_tool_call_validate_proto';
+  | '_rac_tool_call_validate_proto'
+  | '_rac_tool_calling_session_create_proto'
+  | '_rac_tool_calling_session_step_with_result_proto'
+  | '_rac_tool_calling_session_destroy_proto'
+  | '_rac_tool_calling_session_cancel_proto';
 
 type RegisteredTool = {
   definition: ToolDefinition;
@@ -122,6 +130,11 @@ function buildPromptOptions(
     autoExecute: options.autoExecute ?? true,
     formatHint: options.formatHint ?? '',
     toolChoice: options.toolChoice ?? ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
+    // pass2-syn-006-followup-web: explicitly propagate forcedToolName so that
+    // tool_choice=SPECIFIC reaches the commons parse/format/validate primitives
+    // (and any future session/run-loop ABI). Spread alone is not sufficient
+    // when callers pass undefined keys.
+    forcedToolName: options.forcedToolName,
     parallelToolCalls: options.parallelToolCalls ?? false,
     requireJsonArguments: options.requireJsonArguments ?? true,
   });
@@ -248,6 +261,84 @@ function toolResultWithDefaults(
     startedAtMs: result.startedAtMs || startedAtMs,
     completedAtMs: result.completedAtMs || Date.now(),
   });
+}
+
+/**
+ * Build the ToolCallingSessionCreateRequest proto consumed by
+ * `_rac_tool_calling_session_create_proto`. Mirrors Swift's
+ * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:320) so the C++ loop
+ * receives identical input regardless of SDK.
+ */
+function buildSessionCreateRequest(
+  prompt: string,
+  tools: ToolDefinition[],
+  effectiveOptions: ToolCallingOptions,
+): Uint8Array {
+  const maxIterations =
+    (effectiveOptions.maxIterations ?? 0) > 0
+      ? effectiveOptions.maxIterations
+      : (effectiveOptions.maxToolCalls ?? 0);
+  const request = ToolCallingSessionCreateRequestMessage.fromPartial({
+    prompt,
+    maxTokens: effectiveOptions.maxTokens ?? 0,
+    temperature: effectiveOptions.temperature ?? 0,
+    topP: 0,
+    systemPrompt: effectiveOptions.systemPrompt ?? '',
+    tools,
+    formatHint: effectiveOptions.formatHint ?? '',
+    maxIterations: maxIterations ?? 0,
+    keepToolsAvailable: effectiveOptions.keepToolsAvailable ?? false,
+    // Commons default is validateCalls=true; pass true explicitly so that the
+    // C++ run loop validates each parsed tool call against the request's tools
+    // before invoking the JS executor (parity with Swift makeRunLoopRequest).
+    validateCalls: true,
+    // pass2-syn-006-followup-web: thread the OpenAI-style tool_choice /
+    // forced_tool_name knobs into the canonical request envelope (idl
+    // fields 7/8). Commons build_options_snapshot copies them onto every
+    // synthesized ToolCallingOptions before format/validate proto calls.
+    // TOOL_CHOICE_MODE_UNSPECIFIED = 0, so the truthy check excludes both
+    // undefined and the explicit "unspecified" sentinel.
+    toolChoice: effectiveOptions.toolChoice
+      ? effectiveOptions.toolChoice
+      : undefined,
+    forcedToolName:
+      effectiveOptions.forcedToolName && effectiveOptions.forcedToolName.length > 0
+        ? effectiveOptions.forcedToolName
+        : undefined,
+  });
+  return ToolCallingSessionCreateRequestMessage.encode(request).finish();
+}
+
+function decodeSessionEvent(
+  module: EmscriptenRunanywhereModule,
+  bytesPtr: number,
+  size: number,
+): ToolCallingSessionEvent | null {
+  if (!bytesPtr || size <= 0) return null;
+  const slice = module.HEAPU8.slice(bytesPtr, bytesPtr + size);
+  try {
+    return ToolCallingSessionEventMessage.decode(slice);
+  } catch (err) {
+    logger.warning(
+      `failed to decode ToolCallingSessionEvent: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return null;
+  }
+}
+
+function encodeStepRequest(
+  sessionHandle: number,
+  toolCallId: string,
+  resultJson: string,
+  error?: string,
+): Uint8Array {
+  const message = ToolCallingSessionStepWithResultRequestMessage.fromPartial({
+    sessionHandle,
+    toolCallId,
+    resultJson,
+    error,
+  });
+  return ToolCallingSessionStepWithResultRequestMessage.encode(message).finish();
 }
 
 export const ToolCalling = {
@@ -388,89 +479,202 @@ export const ToolCalling = {
     tools: ToolDefinition[],
     options?: ToolCallingGenerationOptions,
   ): Promise<LLMGenerationResult> {
-    return generate(prompt, {
+    return TextGeneration.generate({
       ...options,
+      prompt,
       toolCalling: buildToolCallingOptions(tools, options),
     });
   },
 
+  /**
+   * pass2-syn-026: delegates the generate -> parse -> validate -> execute ->
+   * follow-up loop to commons via the session ABI (`rac_tool_calling_session_*`).
+   * The Web SDK only owns the executor closure (which is async, so we cannot
+   * use the synchronous `rac_tool_calling_run_loop_proto` callback the way
+   * Swift does). Events flow out through an `addFunction` trampoline; tool
+   * results flow back in via `session_step_with_result_proto`. Mirrors
+   * Kotlin's `ToolCallingOrchestrator.jvmAndroid.kt` session-based delegation.
+   *
+   * The TS side is now a thin event-pump driver — no manual parse loop, no
+   * manual buildFollowupPrompt walk, no JS-side iteration cap. Every loop
+   * semantic (validation, max_iterations, format selection, validation policy
+   * on the W1 tool_choice=NONE fix) is owned by `tool_calling_run_loop.cpp` /
+   * `tool_calling_session.cpp`.
+   */
   async generateWithTools(
     prompt: string,
     options: Partial<ToolCallingOptions> = {},
+    extra: { signal?: AbortSignal } = {},
   ): Promise<ToolCallingResult> {
     const tools = options.tools && options.tools.length > 0
       ? options.tools
       : this.getRegisteredTools();
     const effectiveOptions = buildPromptOptions(tools, options);
-    const maxIterations = (
-      effectiveOptions.maxToolCalls ?? effectiveOptions.maxIterations
-    ) || 5;
-    const autoExecute = effectiveOptions.autoExecute;
 
-    let fullPrompt = this.buildInitialPrompt(prompt, tools, effectiveOptions);
-    let finalText = '';
-    let rawText = '';
-    let iterationsUsed = 0;
-    const toolCalls: ToolCall[] = [];
-    const toolResults: ToolResult[] = [];
-
-    for (let i = 0; i < maxIterations; i += 1) {
-      iterationsUsed = i + 1;
-      const generated = await generate(fullPrompt, {
-        maxTokens: effectiveOptions.maxTokens,
-        temperature: effectiveOptions.temperature,
-        systemPrompt: effectiveOptions.systemPrompt,
-        toolCalling: effectiveOptions,
-      });
-      rawText = generated.text;
-      const parsed = this.parseToolCall(rawText, effectiveOptions);
-      finalText = parsed.remainingText || rawText;
-
-      if (parsed.errorCode !== 0) {
-        return ToolCallingResultMessage.fromPartial({
-          text: finalText,
-          toolCalls,
-          toolResults,
-          isComplete: false,
-          iterationsUsed,
-          rawText,
-          errorCode: parsed.errorCode,
-          errorMessage: parsed.errorMessage,
-        });
-      }
-
-      if (!parsed.hasToolCall || parsed.toolCalls.length === 0) {
-        break;
-      }
-
-      const toolCall = parsed.toolCalls[0]!;
-      toolCalls.push(toolCall);
-      if (!autoExecute) {
-        return ToolCallingResultMessage.fromPartial({
-          text: finalText,
-          toolCalls,
-          toolResults: [],
-          isComplete: false,
-          iterationsUsed,
-          rawText,
-          errorCode: parsed.errorCode,
-          errorMessage: parsed.errorMessage,
-        });
-      }
-
-      const toolResult = await this.executeTool(toolCall);
-      toolResults.push(toolResult);
-      fullPrompt = this.buildFollowupPrompt(prompt, toolResult, effectiveOptions);
+    const module = requireToolCallingModule('toolCalling.generateWithTools', [
+      '_rac_tool_calling_session_create_proto',
+      '_rac_tool_calling_session_step_with_result_proto',
+      '_rac_tool_calling_session_destroy_proto',
+    ]);
+    if (!module.addFunction || !module.removeFunction || !module._malloc || !module._free) {
+      throw SDKException.backendNotAvailable(
+        'toolCalling.generateWithTools',
+        'WASM module is missing addFunction/removeFunction or heap helpers required for the tool-calling session bridge.',
+      );
     }
 
-    return ToolCallingResultMessage.fromPartial({
-      text: finalText,
-      toolCalls,
-      toolResults,
-      isComplete: true,
-      iterationsUsed,
-      rawText,
-      errorCode: 0,
-    });
+    const bridge = new ProtoWasmBridge(module, logger);
+    const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions);
+
+    // Event queue: the C session callback fires synchronously inside
+    // session_create_proto / session_step_with_result_proto. We buffer events
+    // and drain them on the JS side between commons calls.
+    const events: ToolCallingSessionEvent[] = [];
+    const callbackPtr = module.addFunction((bytesPtr: number, size: number /*, userData */) => {
+      const event = decodeSessionEvent(module, bytesPtr, size);
+      if (event) events.push(event);
+    }, 'viii');
+
+    // Reserve 8 bytes for the uint64 out-session-handle. Without WASM_BIGINT
+    // the WASM ABI returns uint64 via two i32s; we read low/high halves from
+    // the pointer.
+    const handlePtr = module._malloc(8);
+    if (!handlePtr) {
+      module.removeFunction(callbackPtr);
+      throw SDKException.backendNotAvailable(
+        'toolCalling.generateWithTools',
+        'failed to allocate session handle slot',
+      );
+    }
+    module.HEAPU32[handlePtr >>> 2] = 0;
+    module.HEAPU32[(handlePtr >>> 2) + 1] = 0;
+
+    let sessionHandle = 0;
+    // pass2-syn-007: wire AbortSignal into _rac_tool_calling_session_cancel_proto.
+    // The WASM module is single-threaded, so cancel fires after the current
+    // async tick returns to the event loop. It still lets us short-circuit
+    // multi-iteration loops between native calls.
+    const onAbort = () => {
+      if (
+        sessionHandle !== 0 &&
+        typeof module._rac_tool_calling_session_cancel_proto === 'function'
+      ) {
+        try {
+          module._rac_tool_calling_session_cancel_proto(sessionHandle);
+        } catch (err) {
+          logger.warning(
+            `session_cancel_proto failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    };
+    extra.signal?.addEventListener('abort', onAbort);
+    const cleanup = () => {
+      extra.signal?.removeEventListener('abort', onAbort);
+      try {
+        if (sessionHandle !== 0) {
+          module._rac_tool_calling_session_destroy_proto!(sessionHandle);
+        }
+      } catch (err) {
+        logger.warning(
+          `session_destroy_proto failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      module._free!(handlePtr);
+      module.removeFunction!(callbackPtr);
+    };
+
+    try {
+      const createRc = bridge.withHeapBytes(requestBytes, (ptr, size) => (
+        module._rac_tool_calling_session_create_proto!(ptr, size, callbackPtr, 0, handlePtr)
+      ));
+      if (createRc !== 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.BackendError,
+          'rac_tool_calling_session_create_proto failed',
+          `rc=${createRc}`,
+        );
+      }
+      const handleLow = module.HEAPU32[handlePtr >>> 2] ?? 0;
+      const handleHigh = module.HEAPU32[(handlePtr >>> 2) + 1] ?? 0;
+      // Session handles are sequential `uint64_t` counters starting at 1
+      // (tool_calling_session.cpp:104); they fit in 53 bits well into the
+      // future, so combining low/high as a JS Number is safe.
+      sessionHandle = handleLow + handleHigh * 0x100000000;
+      // pass2-syn-007: if the AbortSignal already fired before the session
+      // handle was published, fan that cancel through to commons now.
+      if (extra.signal?.aborted) {
+        onAbort();
+      }
+
+      // Pump the event queue. Commons fires either:
+      //  - final_result    -> done
+      //  - error_bytes     -> error
+      //  - tool_call       -> execute in TS, feed back via step_with_result_proto
+      // session_create / step_with_result are synchronous, so when they
+      // return the buffered events fully describe the next state.
+      while (true) {
+        const drained = events.splice(0, events.length);
+        let pendingToolCall: ToolCall | null = null;
+        let finalResult: ToolCallingResult | null = null;
+        let errorBytes: Uint8Array | null = null;
+        for (const event of drained) {
+          if (event.finalResult) {
+            finalResult = event.finalResult;
+          } else if (event.errorBytes && event.errorBytes.length > 0) {
+            errorBytes = event.errorBytes;
+          } else if (event.toolCall) {
+            pendingToolCall = event.toolCall;
+          }
+        }
+
+        if (finalResult) {
+          return finalResult;
+        }
+        if (errorBytes) {
+          throw SDKException.fromCode(
+            SDKErrorCode.BackendError,
+            'Tool-calling session failed',
+            `commons error_bytes (${errorBytes.length}B)`,
+          );
+        }
+        if (!pendingToolCall) {
+          // No tool call and no final/error event — commons should always emit
+          // one of these terminal events at end of the synchronous step.
+          // Treat as an internal protocol violation.
+          throw SDKException.fromCode(
+            SDKErrorCode.BackendError,
+            'Tool-calling session stalled',
+            'commons returned no event after step_with_result',
+          );
+        }
+
+        // Execute the tool in TS (async).
+        const toolResult = await this.executeTool(pendingToolCall);
+        const toolCallId = toolResult.toolCallId || pendingToolCall.callId || pendingToolCall.id;
+        const stepBytes = encodeStepRequest(
+          sessionHandle,
+          toolCallId,
+          toolResult.resultJson ?? '',
+          toolResult.success ? undefined : toolResult.error,
+        );
+        const stepRc = bridge.withHeapBytes(stepBytes, (ptr, size) => (
+          module._rac_tool_calling_session_step_with_result_proto!(ptr, size)
+        ));
+        if (stepRc !== 0) {
+          throw SDKException.fromCode(
+            SDKErrorCode.BackendError,
+            'rac_tool_calling_session_step_with_result_proto failed',
+            `rc=${stepRc}`,
+          );
+        }
+        // Loop back; the step call has refilled `events`.
+      }
+    } finally {
+      // Drop unused parse exports reference so the function isn't tree-shaken
+      // out of the typed module signature in non-session paths.
+      void ToolCallingResultMessage;
+      cleanup();
+    }
   },
 };

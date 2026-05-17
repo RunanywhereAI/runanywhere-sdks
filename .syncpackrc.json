@@ -71,7 +71,7 @@
     {
       "label": "Pinned: react-native-nitro-modules (centralized in dependencies/versions.json)",
       "dependencies": ["react-native-nitro-modules"],
-      "pinVersion": "^0.34.1"
+      "pinVersion": "^0.33.9"
     },
     {
       "label": "Pinned: nitrogen (centralized in dependencies/versions.json)",

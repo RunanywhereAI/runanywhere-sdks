@@ -3,6 +3,13 @@
  *
  * T6.1 — Web Worker thread script + shared protocol types.
  *
+ * @internal @experimental
+ *
+ * INTERNAL/EXPERIMENTAL — paired with `OffscreenRuntimeBridge.ts`. No
+ * production backend currently ships a worker bundle that calls
+ * `runStreamWorker`. See the removal contract on
+ * `OffscreenRuntimeBridge.ts` for disposition.
+ *
  * Two distinct concerns live in this file:
  *
  *  1. The discriminated-union message protocol shared between
@@ -177,6 +184,25 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
   let mod: StreamWorkerModule | null = null;
   const cancelled = new Set<string>();
 
+  /**
+   * Per-request bookkeeping needed for modality-correct cancel dispatch.
+   * Without this, cancelling an STT/TTS/VLM request would always poke
+   * `_rac_llm_cancel_proto` (pre-pass2-syn-096 behaviour), which is at
+   * best diagnostic noise and at worst a latent correctness bug once
+   * any export becomes Asyncify-style interruptible.
+   *
+   * `handle` is captured for VLM, which cancels per-instance via
+   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation is global
+   * (`_rac_llm_cancel_proto(0)`), and STT/TTS have no cancel ABI yet —
+   * those entries are removed silently when `done` is posted.
+   */
+  type InFlightModality =
+    | { kind: 'stream.llm.generate' }
+    | { kind: 'stream.stt.transcribe' }
+    | { kind: 'stream.tts.synthesize' }
+    | { kind: 'stream.vlm.process'; handle: number };
+  const inflight = new Map<string, InFlightModality>();
+
   const postError = (message: string, requestId?: string): void => {
     scope.postMessage({ type: 'error', requestId, message });
   };
@@ -200,7 +226,15 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       }
       try {
         const payloadBytes = moduleRef.HEAPU8.slice(bytesPtr, bytesPtr + size);
-        scope.postMessage({ type: 'callback', requestId, payloadBytes });
+        // Transfer the per-callback payload buffer rather than
+        // structured-cloning it. `HEAPU8.slice(...)` already produces a
+        // dedicated buffer the worker doesn't reuse, and the bridge
+        // consumes the bytes exactly once via `codec.decode(...)`.
+        // See pass2-syn-090.
+        scope.postMessage(
+          { type: 'callback', requestId, payloadBytes },
+          [payloadBytes.buffer],
+        );
         return callbackReturnsBool ? 1 : undefined;
       } catch (err) {
         postError(`callback marshal failed: ${(err as Error).message}`, requestId);
@@ -243,6 +277,11 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
   ): void => {
     const moduleRef = ensureModule();
     if (!moduleRef) {
+      // Module-missing path also needs to clean up the bookkeeping it
+      // would otherwise leak — `inflight` was populated by `onmessage`
+      // before this function ran.
+      inflight.delete(requestId);
+      cancelled.delete(requestId);
       scope.postMessage({ type: 'done', requestId, returnCode: -901 });
       return;
     }
@@ -255,6 +294,12 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       returnCode = -902;
     } finally {
       moduleRef.removeFunction(callbackPtr);
+      // Prune per-request bookkeeping. Once `done` is posted no further
+      // callbacks can arrive for this requestId, so retaining it in the
+      // `cancelled` set or the `inflight` map is dead weight that grows
+      // unbounded over the worker's lifetime. See pass2-syn-091.
+      inflight.delete(requestId);
+      cancelled.delete(requestId);
     }
     scope.postMessage({ type: 'done', requestId, returnCode });
   };
@@ -282,17 +327,34 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       }
       case 'cancel': {
         cancelled.add(msg.requestId);
-        // Best-effort: poke the matching cancel export. The worker has no
-        // way to know which modality the requestId belongs to without
-        // bookkeeping, so it pokes both modality-specific cancel verbs
-        // that exist and lets the C side ignore the no-op.
-        mod?._rac_llm_cancel_proto?.(0);
-        // VLM cancel takes a handle — we don't have it here. Document the
-        // gap: deep cancel for VLM requires per-requestId handle tracking,
-        // tracked as a follow-up in STREAM_DELIVERY_DESIGN.md.
+        // Dispatch to the modality-specific cancel verb iff we know what
+        // modality this requestId belongs to. Pre-pass2-syn-096 this
+        // unconditionally poked `_rac_llm_cancel_proto` for every
+        // requestId, which inflated LLM cancel telemetry on STT/TTS/VLM
+        // cancels and would become a latent correctness bug once any
+        // export becomes Asyncify-style interruptible.
+        const modality = inflight.get(msg.requestId);
+        if (modality && mod) {
+          switch (modality.kind) {
+            case 'stream.llm.generate':
+              mod._rac_llm_cancel_proto?.(0);
+              break;
+            case 'stream.vlm.process':
+              mod._rac_vlm_cancel_proto?.(modality.handle);
+              break;
+            case 'stream.stt.transcribe':
+            case 'stream.tts.synthesize':
+              // No cancel ABI yet — main-thread bridge has already
+              // stopped emitting; the worker-side `cancelled` set
+              // short-circuits the trampoline. Synchronous exports
+              // cannot be pre-empted from inside their own frame.
+              break;
+          }
+        }
         return;
       }
       case 'stream.llm.generate': {
+        inflight.set(msg.requestId, { kind: 'stream.llm.generate' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_llm_generate_stream_proto) return -801;
@@ -303,6 +365,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         return;
       }
       case 'stream.stt.transcribe': {
+        inflight.set(msg.requestId, { kind: 'stream.stt.transcribe' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_stt_component_transcribe_stream_proto) return -801;
@@ -323,6 +386,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         return;
       }
       case 'stream.tts.synthesize': {
+        inflight.set(msg.requestId, { kind: 'stream.tts.synthesize' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_tts_component_synthesize_stream_proto) return -801;
@@ -345,6 +409,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         return;
       }
       case 'stream.vlm.process': {
+        inflight.set(msg.requestId, { kind: 'stream.vlm.process', handle: msg.handle });
         runWithCallback(msg.requestId, true, (callbackPtr) => {
           const m = mod!;
           if (!m._rac_vlm_process_stream_proto) return -801;

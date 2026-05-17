@@ -117,6 +117,28 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 9,
   )
   public val validate_calls: Boolean? = null,
+  /**
+   * OpenAI-style tool_choice override surfaced through the high-level
+   * run-loop / session APIs. The same fields exist on ToolCallingOptions
+   * (fields 13/14); we re-publish them here so the canonical request
+   * envelope can carry the policy without forcing callers to pass an
+   * inline ToolCallingOptions. commons honors these on every
+   * format/validate primitive via build_options_snapshot.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.ToolChoiceMode#ADAPTER",
+    jsonName = "toolChoice",
+    schemaIndex = 10,
+  )
+  public val tool_choice: ToolChoiceMode? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "forcedToolName",
+    schemaIndex = 11,
+  )
+  public val forced_tool_name: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -148,6 +170,8 @@ public class ToolCallingSessionCreateRequest(
     if (max_iterations != other.max_iterations) return false
     if (keep_tools_available != other.keep_tools_available) return false
     if (validate_calls != other.validate_calls) return false
+    if (tool_choice != other.tool_choice) return false
+    if (forced_tool_name != other.forced_tool_name) return false
     return true
   }
 
@@ -165,6 +189,8 @@ public class ToolCallingSessionCreateRequest(
       result = result * 37 + max_iterations.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
       result = result * 37 + (validate_calls?.hashCode() ?: 0)
+      result = result * 37 + (tool_choice?.hashCode() ?: 0)
+      result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -182,6 +208,8 @@ public class ToolCallingSessionCreateRequest(
     result += """max_iterations=$max_iterations"""
     result += """keep_tools_available=$keep_tools_available"""
     if (validate_calls != null) result += """validate_calls=$validate_calls"""
+    if (tool_choice != null) result += """tool_choice=$tool_choice"""
+    if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ",
         postfix = "}")
   }
@@ -197,10 +225,12 @@ public class ToolCallingSessionCreateRequest(
     max_iterations: Int = this.max_iterations,
     keep_tools_available: Boolean = this.keep_tools_available,
     validate_calls: Boolean? = this.validate_calls,
+    tool_choice: ToolChoiceMode? = this.tool_choice,
+    forced_tool_name: String? = this.forced_tool_name,
     unknownFields: ByteString = this.unknownFields,
   ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens,
       temperature, top_p, system_prompt, tools, format_hint, max_iterations, keep_tools_available,
-      validate_calls, unknownFields)
+      validate_calls, tool_choice, forced_tool_name, unknownFields)
 
   public companion object {
     @JvmField
@@ -231,6 +261,8 @@ public class ToolCallingSessionCreateRequest(
         if (value.keep_tools_available != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
             value.keep_tools_available)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.validate_calls)
+        size += ToolChoiceMode.ADAPTER.encodedSizeWithTag(7, value.tool_choice)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.forced_tool_name)
         return size
       }
 
@@ -249,11 +281,15 @@ public class ToolCallingSessionCreateRequest(
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.keep_tools_available)
         ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
+        ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
+        ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
         ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
         if (value.keep_tools_available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.keep_tools_available)
@@ -281,6 +317,8 @@ public class ToolCallingSessionCreateRequest(
         var max_iterations: Int = 0
         var keep_tools_available: Boolean = false
         var validate_calls: Boolean? = null
+        var tool_choice: ToolChoiceMode? = null
+        var forced_tool_name: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -293,6 +331,12 @@ public class ToolCallingSessionCreateRequest(
             4 -> max_iterations = ProtoAdapter.UINT32.decode(reader)
             5 -> keep_tools_available = ProtoAdapter.BOOL.decode(reader)
             6 -> validate_calls = ProtoAdapter.BOOL.decode(reader)
+            7 -> try {
+              tool_choice = ToolChoiceMode.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            8 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -307,6 +351,8 @@ public class ToolCallingSessionCreateRequest(
           max_iterations = max_iterations,
           keep_tools_available = keep_tools_available,
           validate_calls = validate_calls,
+          tool_choice = tool_choice,
+          forced_tool_name = forced_tool_name,
           unknownFields = unknownFields
         )
       }

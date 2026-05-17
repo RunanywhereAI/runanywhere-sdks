@@ -133,11 +133,10 @@ class DartBridgeVLM {
         // it runs, the main isolate's event loop is frozen, so
         // NativeCallable.listener invocations queue up but do not execute.
         // The terminal event therefore arrives ASYNCHRONOUSLY after `fn()`
-        // returns. Yield to the event loop a few times so queued chunk/final
-        // callbacks can drain before the force-close branches below.
-        for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
-          await Future<void>.delayed(Duration.zero);
-        }
+        // returns. Yield via the shared [drainPendingStreamCallbacks] helper
+        // so queued chunk/final callbacks can drain before the force-close
+        // branches below. See [kStreamDrainMaxMicrotasks].
+        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (code != RacResultCode.success && !controller.isClosed) {
           controller.addError(StateError(
             'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(code)}',

@@ -470,6 +470,16 @@ bool SherpaSTT::unload_model() {
     SherpaOnnxDestroyOfflineRecognizer(sherpa_recognizer_);
     sherpa_recognizer_ = nullptr;
   }
+
+  // pass2-syn-066: also destroy any cached per-language recognizers parked
+  // by transcribe() when callers alternated languages.
+  for (auto &entry : recognizer_cache_) {
+    if (entry.second) {
+      SherpaOnnxDestroyOfflineRecognizer(entry.second);
+    }
+  }
+  recognizer_cache_.clear();
+  recognizer_lru_.clear();
 #endif
 
   model_loaded_ = false;
@@ -518,23 +528,89 @@ STTResult SherpaSTT::transcribe(const STTRequest &request) {
       result.text = "[Error: language not supported by recognizer]";
       return result;
     }
+
+    // pass2-syn-066: cache recognizers by language with a small LRU so a
+    // caller alternating between languages does not pay the multi-second
+    // SherpaOnnxCreateOfflineRecognizer cost on every utterance.
+    //
+    // Strategy: park the current recognizer in the cache under its current
+    // language key, then try to fetch the desired-language recognizer from
+    // the cache. Only on a cache miss do we incur a fresh build.
     const std::string previous_language = language_;
-    language_ = desired_language;
-    if (!build_offline_recognizer_locked()) {
-      RAC_LOG_ERROR("Sherpa.STT",
-                    "Failed to rebuild Whisper recognizer for language=\"%s\"; "
-                    "reverting to \"%s\"",
-                    desired_language.c_str(), previous_language.c_str());
-      language_ = previous_language;
-      // Try to restore the previous recognizer; if even that fails, mark the
-      // backend not-ready so subsequent calls fail fast instead of crashing.
+
+    // Park the in-use recognizer in the cache under its current language so
+    // subsequent calls to the same language hit the cache. Touch LRU.
+    if (sherpa_recognizer_) {
+      recognizer_cache_[previous_language] = sherpa_recognizer_;
+      recognizer_lru_.remove(previous_language);
+      recognizer_lru_.push_front(previous_language);
+      sherpa_recognizer_ = nullptr;
+    }
+
+    // Cache hit? Reuse without rebuilding.
+    auto hit = recognizer_cache_.find(desired_language);
+    if (hit != recognizer_cache_.end()) {
+      sherpa_recognizer_ = hit->second;
+      recognizer_cache_.erase(hit);
+      recognizer_lru_.remove(desired_language);
+      language_ = desired_language;
+      RAC_LOG_INFO("Sherpa.STT",
+                   "Reusing cached Whisper recognizer for language=\"%s\"",
+                   desired_language.c_str());
+    } else {
+      // Cache miss: build a fresh recognizer. build_offline_recognizer_locked
+      // first destroys sherpa_recognizer_ (already null here, so it's a
+      // no-op) and then constructs a new one using language_.
+      language_ = desired_language;
       if (!build_offline_recognizer_locked()) {
-        model_loaded_ = false;
-        result.text = "[Error: recognizer rebuild failed]";
+        RAC_LOG_ERROR(
+            "Sherpa.STT",
+            "Failed to build Whisper recognizer for language=\"%s\"; "
+            "restoring previous \"%s\" from cache",
+            desired_language.c_str(), previous_language.c_str());
+        // Recover the previous recognizer from the cache we just populated.
+        auto prev_hit = recognizer_cache_.find(previous_language);
+        if (prev_hit != recognizer_cache_.end()) {
+          sherpa_recognizer_ = prev_hit->second;
+          recognizer_cache_.erase(prev_hit);
+          recognizer_lru_.remove(previous_language);
+          language_ = previous_language;
+          result.text = "[Error: language not supported by recognizer]";
+          return result;
+        }
+        // Previous recognizer not in cache (initial build never ran or
+        // already-evicted) — last-ditch rebuild for the previous language.
+        language_ = previous_language;
+        if (!build_offline_recognizer_locked()) {
+          model_loaded_ = false;
+          result.text = "[Error: recognizer rebuild failed]";
+          return result;
+        }
+        result.text = "[Error: language not supported by recognizer]";
         return result;
       }
-      result.text = "[Error: language not supported by recognizer]";
-      return result;
+    }
+
+    // Enforce LRU cap. recognizer_lru_ tracks recently-parked entries; evict
+    // tail entries until the cache is within the cap. Note: the currently
+    // active recognizer is NOT in the cache, so the cap bounds *idle*
+    // recognizers — peak resident count is kRecognizerCacheCap + 1.
+    while (recognizer_cache_.size() > kRecognizerCacheCap) {
+      if (recognizer_lru_.empty()) {
+        break;
+      }
+      const std::string evict_key = recognizer_lru_.back();
+      recognizer_lru_.pop_back();
+      auto evict_it = recognizer_cache_.find(evict_key);
+      if (evict_it != recognizer_cache_.end()) {
+        if (evict_it->second) {
+          SherpaOnnxDestroyOfflineRecognizer(evict_it->second);
+        }
+        recognizer_cache_.erase(evict_it);
+        RAC_LOG_DEBUG("Sherpa.STT",
+                      "Evicted cached recognizer for language=\"%s\" (cap=%zu)",
+                      evict_key.c_str(), kRecognizerCacheCap);
+      }
     }
   }
 
@@ -1237,6 +1313,19 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
   TTSResult result;
 
 #if SHERPA_ONNX_AVAILABLE
+  // pass2-syn-065: serialize synthesize() under mutex_ across the entire
+  // call. Previously the lock was scoped only around the sherpa_tts_ read,
+  // so overlapping synthesize() invocations could clobber each other's
+  // cancel signals — call #2's `cancel_requested_.store(false, ...)` at
+  // entry would erase a cancel intended for an in-flight call #1, and #1
+  // would then emit audio the SDK had explicitly stopped. Holding mutex_
+  // for the whole call makes per-voice synthesize serial; cancel() and the
+  // post-generate drop still work because cancel() only writes the atomic
+  // flag (no lock) and we read the flag after the blocking generator
+  // returns. NOTE: synthesize() on a single SherpaTTS instance is no
+  // longer parallelism-safe — concurrent callers queue.
+  std::lock_guard<std::mutex> lock(mutex_);
+
   struct SynthesisGuard {
     std::atomic<int> &count_;
     SynthesisGuard(std::atomic<int> &count) : count_(count) { count_++; }
@@ -1248,20 +1337,16 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
   // synthesis so cancel() observed during THIS call's blocking
   // SherpaOnnxOfflineTtsGenerate is what we react to. The Sherpa-ONNX C TTS
   // API has no cancellation hook, so the flag is consulted post-generate to
-  // suppress the result instead of preempting compute.
+  // suppress the result instead of preempting compute. With the mutex held
+  // across the whole call, this reset cannot race a concurrent synthesize().
   cancel_requested_.store(false, std::memory_order_release);
 
-  const SherpaOnnxOfflineTts *tts_ptr = nullptr;
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!sherpa_tts_ || !model_loaded_) {
-      RAC_LOG_ERROR("Sherpa.TTS", "TTS not ready for synthesis");
-      return result;
-    }
-
-    tts_ptr = sherpa_tts_;
+  if (!sherpa_tts_ || !model_loaded_) {
+    RAC_LOG_ERROR("Sherpa.TTS", "TTS not ready for synthesis");
+    return result;
   }
+
+  const SherpaOnnxOfflineTts *tts_ptr = sherpa_tts_;
 
   RAC_LOG_INFO("Sherpa.TTS", "Synthesizing: \"%s...\"",
                request.text.substr(0, 50).c_str());
@@ -1364,6 +1449,38 @@ SherpaVAD::SherpaVAD(SherpaBackend *backend) : backend_(backend) {}
 
 SherpaVAD::~SherpaVAD() { unload_model(); }
 
+#if SHERPA_ONNX_AVAILABLE
+void SherpaVAD::fill_sherpa_vad_config_locked(
+    SherpaOnnxVadModelConfig &out) const {
+  // Translate VADConfig (ms-based, schema-aligned with Swift/Kotlin/Dart) into
+  // the Sherpa-ONNX SilerVadModelConfig (seconds / samples). Single source of
+  // truth used by both load_model() and configure_vad() so non-threshold
+  // fields are no longer silently dropped on the rebuild path
+  // (pass2-syn-064).
+  memset(&out, 0, sizeof(out));
+
+  out.silero_vad.model = model_path_.c_str();
+  out.silero_vad.threshold = config_.threshold;
+  // VADConfig durations are in milliseconds; SilerVAD expects seconds.
+  out.silero_vad.min_silence_duration =
+      static_cast<float>(config_.min_silence_duration_ms) / 1000.0f;
+  out.silero_vad.min_speech_duration =
+      static_cast<float>(config_.min_speech_duration_ms) / 1000.0f;
+  // max_speech_duration is not exposed via VADConfig; keep the prior default.
+  out.silero_vad.max_speech_duration = 15.0f;
+  // SilerVAD's window_size is in samples. Derive it from window_size_ms at
+  // the configured sample rate so a caller who passes the Silero-native
+  // window (e.g. 32 ms @ 16 kHz) gets the canonical 512-sample window.
+  const int derived_window =
+      (config_.window_size_ms * config_.sample_rate) / 1000;
+  out.silero_vad.window_size = derived_window > 0 ? derived_window : 512;
+  out.sample_rate = config_.sample_rate > 0 ? config_.sample_rate : 16000;
+  out.num_threads = 1;
+  out.debug = 0;
+  out.provider = "cpu";
+}
+#endif
+
 bool SherpaVAD::is_ready() const { return model_loaded_; }
 
 bool SherpaVAD::is_speech_active() const {
@@ -1416,24 +1533,29 @@ bool SherpaVAD::load_model(const std::string &model_path,
     }
   }
 
-  SherpaOnnxVadModelConfig vad_config;
-  memset(&vad_config, 0, sizeof(vad_config));
-
-  vad_config.silero_vad.model = model_path_.c_str();
-  vad_config.silero_vad.threshold = 0.5f;
-  vad_config.silero_vad.min_silence_duration = 0.5f;
-  vad_config.silero_vad.min_speech_duration = 0.25f;
-  vad_config.silero_vad.max_speech_duration = 15.0f;
-  vad_config.silero_vad.window_size = 512;
-  vad_config.sample_rate = 16000;
-  vad_config.num_threads = 1;
-  vad_config.debug = 0;
-  vad_config.provider = "cpu";
-
-  // Override threshold from config JSON if provided
+  // Hydrate `config_` from the JSON config first so the helper sees every
+  // VADConfig field. Defaults match the struct definition in
+  // sherpa_backend.h (VADConfig).
   if (config.contains("energy_threshold")) {
-    vad_config.silero_vad.threshold = config["energy_threshold"].get<float>();
+    config_.threshold = config["energy_threshold"].get<float>();
   }
+  if (config.contains("min_speech_duration_ms")) {
+    config_.min_speech_duration_ms =
+        config["min_speech_duration_ms"].get<int>();
+  }
+  if (config.contains("min_silence_duration_ms")) {
+    config_.min_silence_duration_ms =
+        config["min_silence_duration_ms"].get<int>();
+  }
+  if (config.contains("window_size_ms")) {
+    config_.window_size_ms = config["window_size_ms"].get<int>();
+  }
+  if (config.contains("sample_rate")) {
+    config_.sample_rate = config["sample_rate"].get<int>();
+  }
+
+  SherpaOnnxVadModelConfig vad_config;
+  fill_sherpa_vad_config_locked(vad_config);
 
   try {
     sherpa_vad_ = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
@@ -1482,30 +1604,29 @@ bool SherpaVAD::unload_model() {
 bool SherpaVAD::configure_vad(const VADConfig &config) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  const float old_threshold = config_.threshold;
+  const VADConfig old_config = config_;
   config_ = config;
 
 #if SHERPA_ONNX_AVAILABLE
-  // Sherpa-ONNX's SilerVAD captures the threshold at detector construction
-  // and exposes no setter, so a `set_threshold` that only mutates `config_`
+  // Sherpa-ONNX's SilerVAD captures every parameter at detector construction
+  // and exposes no setters, so a configure_vad() that only mutates `config_`
   // round-trips through the service layer as a successful no-op while the
-  // model-based VAD decision still uses the original threshold (see
-  // engine-sherpa-002). Rebuild the live detector when the threshold
-  // actually changes so the new value affects subsequent process() calls.
-  if (sherpa_vad_ != nullptr && !model_path_.empty() &&
-      old_threshold != config_.threshold) {
+  // model-based VAD decision still uses the original parameters (see
+  // engine-sherpa-002). Rebuild the live detector whenever any field that
+  // affects detection actually changes so the new values affect subsequent
+  // process() calls. pass2-syn-064: previously only `threshold` was
+  // considered, and the rebuild path hardcoded every other field — now the
+  // full VADConfig snapshot is threaded through fill_sherpa_vad_config_locked.
+  const bool detector_changed =
+      old_config.threshold != config_.threshold ||
+      old_config.min_speech_duration_ms != config_.min_speech_duration_ms ||
+      old_config.min_silence_duration_ms != config_.min_silence_duration_ms ||
+      old_config.window_size_ms != config_.window_size_ms ||
+      old_config.sample_rate != config_.sample_rate;
+
+  if (sherpa_vad_ != nullptr && !model_path_.empty() && detector_changed) {
     SherpaOnnxVadModelConfig vad_config;
-    memset(&vad_config, 0, sizeof(vad_config));
-    vad_config.silero_vad.model = model_path_.c_str();
-    vad_config.silero_vad.threshold = config_.threshold;
-    vad_config.silero_vad.min_silence_duration = 0.5f;
-    vad_config.silero_vad.min_speech_duration = 0.25f;
-    vad_config.silero_vad.max_speech_duration = 15.0f;
-    vad_config.silero_vad.window_size = 512;
-    vad_config.sample_rate = 16000;
-    vad_config.num_threads = 1;
-    vad_config.debug = 0;
-    vad_config.provider = "cpu";
+    fill_sherpa_vad_config_locked(vad_config);
 
     const SherpaOnnxVoiceActivityDetector *new_vad = nullptr;
     try {
@@ -1515,14 +1636,14 @@ bool SherpaVAD::configure_vad(const VADConfig &config) {
                     "configure_vad: failed to recreate VAD detector with "
                     "threshold=%.2f: %s",
                     config_.threshold, e.what());
-      config_.threshold = old_threshold;
+      config_ = old_config;
       return false;
     } catch (...) {
       RAC_LOG_ERROR("Sherpa.VAD",
                     "configure_vad: failed to recreate VAD detector with "
                     "threshold=%.2f",
                     config_.threshold);
-      config_.threshold = old_threshold;
+      config_ = old_config;
       return false;
     }
     if (!new_vad) {
@@ -1530,7 +1651,7 @@ bool SherpaVAD::configure_vad(const VADConfig &config) {
                     "configure_vad: SherpaOnnxCreateVoiceActivityDetector "
                     "returned null for threshold=%.2f",
                     config_.threshold);
-      config_.threshold = old_threshold;
+      config_ = old_config;
       return false;
     }
 
@@ -1539,8 +1660,16 @@ bool SherpaVAD::configure_vad(const VADConfig &config) {
     pending_samples_.clear();
     last_is_speech_ = false;
     RAC_LOG_INFO("Sherpa.VAD",
-                 "VAD detector recreated with threshold=%.2f (was %.2f)",
-                 config_.threshold, old_threshold);
+                 "VAD detector recreated: threshold=%.2f (was %.2f), "
+                 "min_speech_ms=%d (was %d), min_silence_ms=%d (was %d), "
+                 "window_ms=%d (was %d), sample_rate=%d (was %d)",
+                 config_.threshold, old_config.threshold,
+                 config_.min_speech_duration_ms,
+                 old_config.min_speech_duration_ms,
+                 config_.min_silence_duration_ms,
+                 old_config.min_silence_duration_ms, config_.window_size_ms,
+                 old_config.window_size_ms, config_.sample_rate,
+                 old_config.sample_rate);
   }
 #endif
 

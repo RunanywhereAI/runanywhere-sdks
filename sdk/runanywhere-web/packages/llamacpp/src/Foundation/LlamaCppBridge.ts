@@ -17,6 +17,7 @@ import {
   completeNativePhase1ForModule,
   HTTPAdapter,
   ModelRegistryAdapter,
+  RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKErrorCode,
   SDKLogger,
@@ -29,13 +30,6 @@ import {
 import { PlatformAdapter } from './PlatformAdapter';
 
 const logger = new SDKLogger('LlamaCppBridge');
-
-/**
- * Mirrors `RAC_ERROR_MODULE_ALREADY_REGISTERED` from `c-api/include/rac_error.h`.
- * Treated as success by the Swift LlamaCPP runtime gate so re-registration is
- * idempotent; we mirror that contract here.
- */
-const RAC_ERROR_MODULE_ALREADY_REGISTERED = -401;
 
 // ---------------------------------------------------------------------------
 // LlamaCppModule — extends the typed core module surface with the few

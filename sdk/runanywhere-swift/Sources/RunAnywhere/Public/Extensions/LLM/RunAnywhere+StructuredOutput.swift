@@ -103,7 +103,20 @@ public extension RunAnywhere {
                     continuation.finish()
                 }
             }
-            continuation.onTermination = { _ in task.cancel() }
+            // Defensive belt-and-braces cancellation (pass2-syn-073):
+            // The inner `generateStream` AsyncStream already wires its own
+            // `onCancel` to `rac_llm_cancel_proto` via the generated proto
+            // adapter (see pass2-syn-018), so cancelling `task` here will
+            // cascade through `for await` → inner stream `.cancelled` →
+            // native cancel. This block additionally invokes the public
+            // `cancelGeneration()` API directly so consumer cancellation
+            // (view-model deinit, navigation away, parent `Task.cancel()`)
+            // *always* tears down the native LLM, even if a future refactor
+            // of the inner generator drops or delays the cascade.
+            continuation.onTermination = { _ in
+                task.cancel()
+                Task { await RunAnywhere.cancelGeneration() }
+            }
         }
     }
 

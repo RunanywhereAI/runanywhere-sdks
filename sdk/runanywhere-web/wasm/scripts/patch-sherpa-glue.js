@@ -15,6 +15,7 @@
 //   5. ESM default export appended           (for dynamic import() in browser)
 //   6. instantiateWasm Promise → addRunDependency (fix async WASM init race)
 //   7. HEAP views exported on Module (HEAP32/HEAPF32 needed for audio sample copy)
+//   8. require("node:*") stub block        (top-level destructured node: requires)
 //
 // Usage:
 //   node patch-sherpa-glue.js <path-to-sherpa-onnx-glue.js>
@@ -312,7 +313,7 @@ const newSize = src.length;
 const delta = newSize - originalSize;
 
 console.log('');
-console.log(`  ${patchCount}/7 patches applied`);
+console.log(`  ${patchCount}/8 patches applied`);
 console.log(`  File size: ${originalSize} → ${newSize} bytes (${delta >= 0 ? '+' : ''}${delta})`);
 
 if (patchCount < 3) {

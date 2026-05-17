@@ -323,12 +323,12 @@ int test_seq_monotonic() {
 
     rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
     runanywhere::v1::VoiceEvent first;
-    first.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size()));
+    (void)first.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size()));
     uint64_t seq1 = first.seq();
 
     rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
     runanywhere::v1::VoiceEvent second;
-    second.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size()));
+    (void)second.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size()));
     ASSERT_TRUE(second.seq() > seq1);
 
     rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);

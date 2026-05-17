@@ -33,6 +33,7 @@
  */
 
 import {
+  RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKLogger,
   completeDeferredServicesInitialization,
@@ -45,7 +46,6 @@ import {
 import type { EmscriptenRunanywhereModule } from '@runanywhere/web/internal';
 
 const logger = new SDKLogger('SherpaONNXBridge');
-const RAC_ERROR_MODULE_ALREADY_REGISTERED = -401;
 
 /**
  * Subset of the Emscripten module surface we touch when the ONNX package

@@ -197,18 +197,14 @@ promote_with_component(runanywhere::v1::ComponentLifecycleState lifecycle_state,
 
 void fill_component_states(rac_voice_agent_handle_t handle,
                            runanywhere::v1::VoiceAgentComponentStates* out) {
-    const auto stt = promote_with_component(lifecycle_state_stt(),
-                                            handle ? handle->stt_handle : nullptr,
-                                            rac_stt_component_get_state);
-    const auto llm = promote_with_component(lifecycle_state_llm(),
-                                            handle ? handle->llm_handle : nullptr,
-                                            rac_llm_component_get_state);
-    const auto tts = promote_with_component(lifecycle_state_tts(),
-                                            handle ? handle->tts_handle : nullptr,
-                                            rac_tts_component_get_state);
-    const auto vad = promote_with_component(lifecycle_state_vad(),
-                                            handle ? handle->vad_handle : nullptr,
-                                            rac_vad_component_get_state);
+    const auto stt = promote_with_component(
+        lifecycle_state_stt(), handle ? handle->stt_handle : nullptr, rac_stt_component_get_state);
+    const auto llm = promote_with_component(
+        lifecycle_state_llm(), handle ? handle->llm_handle : nullptr, rac_llm_component_get_state);
+    const auto tts = promote_with_component(
+        lifecycle_state_tts(), handle ? handle->tts_handle : nullptr, rac_tts_component_get_state);
+    const auto vad = promote_with_component(
+        lifecycle_state_vad(), handle ? handle->vad_handle : nullptr, rac_vad_component_get_state);
     out->set_stt_state(stt);
     out->set_llm_state(llm);
     out->set_tts_state(tts);
@@ -1375,8 +1371,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
     // component handle, not the lifecycle entry). Mirrors the Phase 6j VLM
     // precedent in rac_vlm_process_proto.
     rac::lifecycle::LifecycleSttRef stt_ref{};
-    const bool have_lifecycle_stt =
-        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_stt = rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
 
     rac_stt_result_t stt = {};
     rac_result_t rc;
@@ -1384,8 +1379,8 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
         rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
     } else {
-        rc = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
-                                          &stt);
+        rc =
+            rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr, &stt);
     }
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_stt) {
@@ -1411,8 +1406,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                         stt.text);
 
     rac::llm::LifecycleLlmRef llm_ref{};
-    const bool have_lifecycle_llm =
-        rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
 
     rac_llm_result_t llm = {};
     if (have_lifecycle_llm) {
@@ -1436,8 +1430,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                         stt.text, llm.text);
 
     rac::lifecycle::LifecycleTtsRef tts_ref{};
-    const bool have_lifecycle_tts =
-        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
 
     rac_tts_result_t tts = {};
     if (have_lifecycle_tts) {
@@ -1917,8 +1910,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     // rac_voice_agent_load_*_model and never bound a global lifecycle model.
     // Both paths satisfy the component_states READY check above.
     rac::lifecycle::LifecycleSttRef stt_ref{};
-    const bool have_lifecycle_stt =
-        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_stt = rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
 
     rac_stt_result_t stt = {};
     rac_result_t rc;
@@ -1962,8 +1954,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   request_id, event_callback, user_data);
 
     rac::llm::LifecycleLlmRef llm_ref{};
-    const bool have_lifecycle_llm =
-        rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
     rac_llm_result_t llm = {};
     if (have_lifecycle_llm) {
         rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
@@ -1992,8 +1983,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   event_callback, user_data);
 
     rac::lifecycle::LifecycleTtsRef tts_ref{};
-    const bool have_lifecycle_tts =
-        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
     rac_tts_result_t tts = {};
     if (have_lifecycle_tts) {
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
@@ -2087,8 +2077,7 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
     // component-handle dispatch path so the test/legacy contract still
     // works end-to-end.
     rac::lifecycle::LifecycleSttRef stt_ref{};
-    const bool have_lifecycle_stt =
-        rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_stt = rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
     if (!have_lifecycle_stt &&
         (!handle->stt_handle ||
          rac_stt_component_get_state(handle->stt_handle) != RAC_LIFECYCLE_STATE_LOADED)) {
@@ -2167,8 +2156,7 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
     // through rac_voice_agent_load_tts_voice and never bound a global
     // lifecycle TTS model.
     rac::lifecycle::LifecycleTtsRef tts_ref{};
-    const bool have_lifecycle_tts =
-        rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
+    const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
     if (!have_lifecycle_tts &&
         (!handle->tts_handle ||
          rac_tts_component_get_state(handle->tts_handle) != RAC_LIFECYCLE_STATE_LOADED)) {
@@ -2182,8 +2170,8 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
         rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
         rc = rac_tts_synthesize(&tts_service, request.text().c_str(), nullptr, &tts);
     } else {
-        rc = rac_tts_component_synthesize(handle->tts_handle, request.text().c_str(), nullptr,
-                                          &tts);
+        rc =
+            rac_tts_component_synthesize(handle->tts_handle, request.text().c_str(), nullptr, &tts);
     }
     if (rc != RAC_SUCCESS) {
         if (have_lifecycle_tts) {

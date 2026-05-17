@@ -157,9 +157,16 @@ class ProtoBufferGuard {
 };
 
 // Set the runner's last-error detail with a uniform, operator-prefixed message.
+//
+// `rac_error_set_details` is thread_local — operators run inside scheduler
+// worker threads, so writing only there leaves the host thread blind to the
+// failure cause. We additionally stash the detail in a process-wide buffer
+// (record_operator_error_detail) that SolutionRunner::wait() drains on the
+// caller's thread and re-publishes via `rac_error_set_details`.
 void set_error_detail(const std::string& op, const std::string& message) {
     const std::string detail = "operator '" + op + "': " + message;
     rac_error_set_details(detail.c_str());
+    record_operator_error_detail(detail);
 }
 
 // Emit a terminal control signal so the SolutionRunner sees a clean failure

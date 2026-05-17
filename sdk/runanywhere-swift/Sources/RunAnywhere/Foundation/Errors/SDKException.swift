@@ -63,6 +63,19 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
     public var category: RAErrorCategory { proto.category }
     public var message: String { proto.message }
 
+    /// Dot-separated path to the field that triggered a validation failure
+    /// (e.g. `"STTOptions.sampleRate"`). Populated by the generated
+    /// `validate()` helpers under `Sources/RunAnywhere/Generated/...` so
+    /// callers can programmatically identify the failing field without
+    /// parsing the human-readable message.
+    ///
+    /// Backed by `proto.context.metadata["field_path"]`, which is the
+    /// wire-canonical carrier shared with Kotlin / Dart / TS.
+    public var fieldPath: String? {
+        guard proto.hasContext else { return nil }
+        return proto.context.metadata["field_path"]
+    }
+
     // MARK: LocalizedError
 
     public var errorDescription: String? { proto.message }
@@ -174,6 +187,38 @@ extension SDKException {
     /// Common shortcut: validation failed.
     public static func validationFailed(_ message: String) -> SDKException {
         make(code: .validationFailed, message: message, category: .validation)
+    }
+
+    /// Validation failure with a structured `fieldPath` discriminant
+    /// (e.g. `"STTOptions.sampleRate"`). Mirrors the canonical shape
+    /// emitted by `idl/codegen/generate_*_convenience.py`: every SDK
+    /// throws `{ code, category, fieldPath, message }`.
+    public static func validationFailed(
+        fieldPath: String,
+        message: String,
+        underlying: (any Error)? = nil
+    ) -> SDKException {
+        var context = RAErrorContext()
+        context.metadata = ["field_path": fieldPath]
+
+        var proto = RASDKError()
+        proto.code = .invalidArgument
+        proto.category = .validation
+        proto.message = message
+        proto.context = context
+        // Round-trip C ABI code: positive proto code ↔ negative rac_result_t.
+        let raw = RAErrorCode.invalidArgument.rawValue
+        if raw > 0 && raw <= 899 {
+            proto.cAbiCode = -Int32(raw)
+        }
+        if let unwrapped = underlying {
+            proto.nestedMessage = String(describing: unwrapped)
+        }
+        let ex = SDKException(proto: proto, underlying: underlying)
+        if !RAErrorCode.invalidArgument.isExpected {
+            ex.log()
+        }
+        return ex
     }
 
     /// Common shortcut: cancelled.

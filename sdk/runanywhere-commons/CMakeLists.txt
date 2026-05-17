@@ -858,10 +858,41 @@ endif()
 # link time. Use scripts/validation/check_rac_api_exports.sh to verify the
 # list stays in sync; update the count here when it changes materially.
 if(APPLE)
+    # pass2-syn-002: backend-conditional exports live in sibling files and
+    # are concatenated into a single per-build merged list under
+    # ${CMAKE_CURRENT_BINARY_DIR}. The Apple linker takes exactly one
+    # `-exported_symbols_list` argument, so we cannot list the conditional
+    # files separately; we have to materialize the merged list at configure
+    # time so the path passed to the linker is stable across reconfigures.
+    set(_rac_exports_core "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
+    set(_rac_exports_merged_inputs "${_rac_exports_core}")
+    if(RAC_BACKEND_RAG)
+        list(APPEND _rac_exports_merged_inputs
+            "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.rag.exports")
+    endif()
+    if(RAC_BACKEND_ONNX_EMBEDDINGS OR RAC_BACKEND_ONNX)
+        list(APPEND _rac_exports_merged_inputs
+            "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.onnx_embeddings.exports")
+    endif()
+    if(RAC_BACKEND_WHISPERKIT_COREML)
+        list(APPEND _rac_exports_merged_inputs
+            "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.whisperkit_coreml.exports")
+    endif()
+    set(_rac_exports_merged "${CMAKE_CURRENT_BINARY_DIR}/RACommons.merged.exports")
+    file(WRITE "${_rac_exports_merged}"
+        "# Auto-generated at configure time by sdk/runanywhere-commons/CMakeLists.txt.\n"
+        "# Concatenates RACommons.exports with the backend-conditional sibling\n"
+        "# exports files for whichever RAC_BACKEND_* flags are ON. DO NOT EDIT;\n"
+        "# edit the source files under exports/ instead.\n")
+    foreach(_rac_exports_part IN LISTS _rac_exports_merged_inputs)
+        file(READ "${_rac_exports_part}" _rac_exports_part_contents)
+        file(APPEND "${_rac_exports_merged}" "${_rac_exports_part_contents}\n")
+    endforeach()
+    unset(_rac_exports_part_contents)
     set_target_properties(rac_commons PROPERTIES
-        XCODE_ATTRIBUTE_EXPORTED_SYMBOLS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
+        XCODE_ATTRIBUTE_EXPORTED_SYMBOLS_FILE "${_rac_exports_merged}")
     target_link_options(rac_commons PRIVATE
-        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.exports")
+        "LINKER:-exported_symbols_list,${_rac_exports_merged}")
 endif()
 
 # libarchive - native archive extraction

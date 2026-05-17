@@ -320,32 +320,47 @@ func binaryTargets() -> [Target] {
         // it MUST appear in this list with a real URL + checksum before tagging
         // a release. `scripts/release-swift-binaries.sh` zips
         // `RABackendSherpa.xcframework` into `RABackendSherpa-ios-v<version>.zip`
-        // and `scripts/sync-checksums.sh` patches the checksum below. The
-        // placeholder checksum here is intentional: a release whose
-        // `release-swift-binaries.sh` run did not publish the Sherpa zip will
-        // fail `swift package resolve` with a wrong-checksum error rather than
-        // silently shipping a manifest that omits the Sherpa target.
+        // and `scripts/sync-checksums.sh` patches the checksum below.
+        //
+        // RELEASE PROCEDURE — checksums MUST be regenerated before tagging:
+        //   1. Build XCFrameworks (CI native_ios job, or locally via
+        //      `./scripts/build-core-xcframework.sh`).
+        //   2. Run `scripts/sync-checksums.sh <zip_dir>` against the directory
+        //      that holds the four `*-ios-v<version>.zip` artifacts. This
+        //      overwrites each `checksum:` line below with the real SHA-256.
+        //   3. The release workflow (`release.yml::publish`) runs the
+        //      checksum sync automatically right before creating the draft
+        //      Release, and CI asserts that no production binaryTarget
+        //      retains the all-zero sentinel value — the assertion will
+        //      fail the release if `sync-checksums.sh` did not run.
+        //
+        // The all-zero placeholder is a fail-fast sentinel for fresh checkouts
+        // pointing at a tag that hasn't had `sync-checksums.sh` run yet:
+        // `swift package resolve` will produce a wrong-checksum error rather
+        // than silently fetching unverified binaries. External consumers
+        // pulling a real tagged release will see the correct checksums (set
+        // by step 2/3 above before the tag commit was pushed).
         // =====================================================================
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+                checksum: "1685832e2b3a40b04ae27ad8d600e8f483bc355480677395241e0ab4ecdbd6fe"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+                checksum: "a551a2218e0fda0dab5aca8d803982db3ad7185021a0db16300b3d996ac1910d"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+                checksum: "cf2608b6f85622edf33ea23c73e5e6ddf9ef7f967050767c8b578428578d78c7"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+                checksum: "771b6d4273a2b3b7b1f459aaa5d29b4f42f7f341eed9018a8031cd80143556bb"
             ),
         ]
     }

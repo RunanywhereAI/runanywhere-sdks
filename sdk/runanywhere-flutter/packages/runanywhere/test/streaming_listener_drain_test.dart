@@ -8,9 +8,22 @@
 //   The three streaming surfaces all bottom out in `NativeCallable.listener`
 //   wired to a single-subscription `StreamController<T>`. The unit-test
 //   harness has no native library loaded, so we cannot exercise the real
-//   FFI. Instead we model the *exact same* listener-backed
-//   `StreamController<T>` pattern via `FakeNativeListenerStream<T>` and
-//   verify the three behaviours each bridge depends on:
+//   FFI binding directly. We use two complementary strategies:
+//
+//   (A) Contract-level cases (`FakeNativeListenerStream<T>` groups below)
+//       model the *exact same* listener-backed `StreamController<T>` pattern
+//       so we can pin the three queue/cancel/single-subscription behaviours
+//       cheaply against the proto element types each bridge yields.
+//
+//   (B) Real-wrapper cases (the `DartBridgeTTS.synthesizeStreamLifecycleProto
+//       — real wrapper, fake FFI` group, pass2-syn-023) drive the production
+//       bridge wrapper through injected seams
+//       (`setSynthesizeStreamLifecycleProtoForTesting` /
+//       `setStopLifecycleProtoForTesting`). The seam replaces only the FFI
+//       call itself; the dispatch closure, FLUTTER-IOS-001 drain loop,
+//       closed-controller guard, and `onCancel -> stopLifecycleProto` path
+//       are the real production code. Reverting either the drain loop or
+//       the cancel→stop block makes these cases fail.
 //
 //     1. Queue-N drain — listener pushes 10 typed events; consumer receives
 //        them in order, matching the `controller.add(event)` body in
@@ -36,6 +49,7 @@ import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/tts_options.pbenum.dart';
 import 'package:runanywhere/generated/vlm_options.pb.dart';
 import 'package:runanywhere/generated/vlm_options.pbenum.dart';
+import 'package:runanywhere/native/dart_bridge_tts.dart';
 
 import 'helpers/fake_native_listener.dart';
 
@@ -233,6 +247,125 @@ void main() {
         received.last.kind,
         equals(TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // TTS — REAL bridge wrapper, via the pass2-syn-023 injection seams.
+  //
+  // Unlike the fake-listener cases above, these tests drive
+  // `DartBridgeTTS.synthesizeStreamLifecycleProto` directly — exercising the
+  // production drain loop and `onCancel -> stopLifecycleProto` path. The
+  // seam (`setSynthesizeStreamLifecycleProtoForTesting`) replaces the FFI
+  // call with a Dart-side fake; the rest of the wrapper (dispatch closure,
+  // closed-controller guard, drain microtasks, controller.close) is the
+  // real code path.
+  // -------------------------------------------------------------------------
+  group('DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake FFI',
+      () {
+    tearDown(() {
+      DartBridgeTTS.setSynthesizeStreamLifecycleProtoForTesting(null);
+      DartBridgeTTS.setStopLifecycleProtoForTesting(null);
+    });
+
+    test(
+        'delivers 50 chunk events + terminal before close (production drain loop)',
+        () async {
+      // The fake FFI synchronously dispatches 50 chunk events then a terminal
+      // COMPLETED event, returning RAC_SUCCESS. This mirrors a chatty backend
+      // that emits many partial events in tight bursts before the terminal —
+      // the exact scenario the FLUTTER-IOS-001 drain loop must survive.
+      DartBridgeTTS.setSynthesizeStreamLifecycleProtoForTesting(
+        (request, dispatch, terminalObserved) async {
+          for (var i = 0; i < 50; i++) {
+            dispatch(TTSStreamEvent(
+              kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+            ));
+          }
+          dispatch(TTSStreamEvent(
+            kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED,
+          ));
+          return 0; // RAC_SUCCESS
+        },
+      );
+
+      final stream = DartBridgeTTS.shared.synthesizeStreamLifecycleProto(
+        TTSSynthesisRequest(text: 'hello'),
+      );
+
+      final received = await stream.toList();
+
+      expect(received, hasLength(51),
+          reason: 'All 50 chunks + the terminal COMPLETED event must reach '
+              'the subscriber before close — regression-tests the production '
+              'drain microtask loop and dispatch closure.');
+      expect(
+        received.last.kind,
+        equals(TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED),
+      );
+      final chunkCount = received
+          .where((e) =>
+              e.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK)
+          .length;
+      expect(chunkCount, equals(50));
+    });
+
+    test('subscription.cancel mid-stream invokes stopLifecycleProto exactly once',
+        () async {
+      var stopCalls = 0;
+      DartBridgeTTS.setStopLifecycleProtoForTesting(() {
+        stopCalls++;
+        return 0;
+      });
+
+      final cancelSignal = Completer<void>();
+      DartBridgeTTS.setSynthesizeStreamLifecycleProtoForTesting(
+        (request, dispatch, terminalObserved) async {
+          // Dispatch a couple of audio chunks then yield so the subscriber
+          // can observe + cancel, then verify dispatch becomes a no-op after
+          // close (the dispatch closure's closed-controller guard).
+          dispatch(TTSStreamEvent(
+            kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+          ));
+          dispatch(TTSStreamEvent(
+            kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+          ));
+          await cancelSignal.future;
+          // Late dispatch — must be silently dropped by the production
+          // closed-controller guard.
+          dispatch(TTSStreamEvent(
+            kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+          ));
+          return 0;
+        },
+      );
+
+      final stream = DartBridgeTTS.shared.synthesizeStreamLifecycleProto(
+        TTSSynthesisRequest(text: 'hello'),
+      );
+
+      final received = <TTSStreamEvent>[];
+      late StreamSubscription<TTSStreamEvent> sub;
+      final cancelled = Completer<void>();
+      sub = stream.listen((event) async {
+        received.add(event);
+        if (received.length == 2) {
+          await sub.cancel();
+          cancelSignal.complete();
+          cancelled.complete();
+        }
+      });
+
+      await cancelled.future;
+      // Let any post-cancel microtasks run.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(received, hasLength(2));
+      expect(stopCalls, equals(1),
+          reason: 'Production controller.onCancel must call '
+              'stopLifecycleProto exactly once on subscription cancel — '
+              'regression-tests the cancel cleanup path.');
     });
   });
 

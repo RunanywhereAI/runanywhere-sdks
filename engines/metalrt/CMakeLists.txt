@@ -126,3 +126,34 @@ target_link_libraries(rac_backend_metalrt PRIVATE
     "-framework Foundation"
     "-framework Accelerate"
 )
+
+# Self-registration shim — installs the MetalRT vtable into the unified
+# plugin registry via a file-scope ctor. Without this,
+# `rac_backend_metalrt_register()` has zero call sites in the monorepo
+# and routes pinned to RAC_FRAMEWORK_METALRT for any of LLM / STT / TTS
+# / VLM cannot resolve. Mirrors the carrier pattern used by llamacpp /
+# diffusion-coreml (see pass2-syn-016 for context).
+#
+# Static path only: when RAC_STATIC_PLUGINS=ON (iOS / WASM hosts), the
+# ctor lands inside rac_commons so it runs before main(). The MetalRT
+# OBJECT library above is also folded into rac_commons by the root
+# CMakeLists.txt, so by the time the ctor fires, the symbols backing
+# `rac_backend_metalrt_register()` are present in the same archive.
+#
+# Note: in stub-mode (RAC_METALRT_ENGINE_AVAILABLE=0) the register
+# function emits a single startup warning and marks the backend as
+# registered without installing a route, so the ctor is safe to fire
+# unconditionally.
+if(RAC_STATIC_PLUGINS)
+    if(NOT TARGET rac_commons)
+        message(FATAL_ERROR "engines/metalrt: rac_commons target not found. "
+                            "Did you call this before add_subdirectory(sdk/runanywhere-commons)?")
+    endif()
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_metalrt.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    )
+endif()

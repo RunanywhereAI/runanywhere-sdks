@@ -227,20 +227,28 @@ def _emit_message_validate(
         # extension receiver, so we reference the field by `field.name`.
         kt_field = field.name
 
+        def _throw(message_literal: str) -> list[str]:
+            """Canonical `{ code, category, fieldPath, message }` shape via
+            the `SDKException.validationFailed(fieldPath, message)`
+            factory. Threads `field_path` into `error.context.metadata`."""
+            field_path = f"{proto_msg_name}.{field.name}"
+            return [
+                "        throw SDKException.validationFailed(",
+                f"            fieldPath = \"{field_path}\",",
+                f"            message = {message_literal},",
+                "        )",
+            ]
+
         is_required = get_bool_option(field.options, RAC_REQUIRED_FIELD_NUM)
         if is_required:
             t = field.type
             if t == TYPE_STRING:
                 checks.append(f"    if ({kt_field}.isEmpty()) {{")
-                checks.append(
-                    f"        throw SDKException.validationFailed(\"{field.name} is required\")"
-                )
+                checks.extend(_throw(f"\"{field.name} is required\""))
                 checks.append("    }")
             elif t in INTEGER_TYPES or t in FLOAT_TYPES:
                 checks.append(f"    if ({kt_field} == 0) {{")
-                checks.append(
-                    f"        throw SDKException.validationFailed(\"{field.name} is required\")"
-                )
+                checks.extend(_throw(f"\"{field.name} is required\""))
                 checks.append("    }")
 
         min_int = get_int32_option(field.options, RAC_MIN_FIELD_NUM)
@@ -259,13 +267,9 @@ def _emit_message_validate(
             else:
                 range_desc = f"<= {max_int}"
             checks.append(f"    if ({cond}) {{")
-            checks.append(
-                f"        throw SDKException.validationFailed("
-            )
-            checks.append(
-                f"            \"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
-            )
-            checks.append("        )")
+            checks.extend(_throw(
+                f"\"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
+            ))
             checks.append("    }")
 
         min_f = get_double_option(field.options, RAC_MIN_FLOAT_FIELD_NUM)
@@ -284,13 +288,9 @@ def _emit_message_validate(
             else:
                 range_desc = f"<= {max_f}"
             checks.append(f"    if ({cond}) {{")
-            checks.append(
-                f"        throw SDKException.validationFailed("
-            )
-            checks.append(
-                f"            \"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
-            )
-            checks.append("        )")
+            checks.extend(_throw(
+                f"\"{field.name} must be in {range_desc} (got ${{{kt_field}}})\""
+            ))
             checks.append("    }")
 
     if not checks:

@@ -5,9 +5,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
-#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -445,9 +445,8 @@ std::string basename_of_path(const std::string& path) {
 }
 
 std::string lowercase_ascii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 
@@ -494,17 +493,16 @@ bool path_matches_proto_format(const std::string& path, ModelFormat format) {
             return path_has_extension(path, "gguf") || path_has_extension(path, "ggml") ||
                    path_has_extension(path, "onnx") || path_has_extension(path, "ort") ||
                    path_has_extension(path, "bin") || path_has_extension(path, "mlmodel") ||
-                   path_has_extension(path, "mlpackage") ||
-                   path_has_extension(path, "mlmodelc") || path_has_extension(path, "tflite") ||
-                   path_has_extension(path, "safetensors") || path_has_extension(path, "zip");
+                   path_has_extension(path, "mlpackage") || path_has_extension(path, "mlmodelc") ||
+                   path_has_extension(path, "tflite") || path_has_extension(path, "safetensors") ||
+                   path_has_extension(path, "zip");
     }
 }
 
 bool path_is_absolute(const std::string& path) {
-    return !path.empty() &&
-           (path[0] == '/' || path[0] == '\\' ||
-            (path.size() > 1 && std::isalpha(static_cast<unsigned char>(path[0])) &&
-             path[1] == ':'));
+    return !path.empty() && (path[0] == '/' || path[0] == '\\' ||
+                             (path.size() > 1 &&
+                              std::isalpha(static_cast<unsigned char>(path[0])) && path[1] == ':'));
 }
 
 std::string join_model_path(const std::string& root, const std::string& relative_or_absolute) {
@@ -591,8 +589,7 @@ void synthesize_artifact_resolution_from_descriptors(const ModelInfo& model,
             return;
         }
         const std::string absolute = join_model_path(artifact_root, rel);
-        if (file.role() == runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL &&
-            can_set_primary) {
+        if (file.role() == runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL && can_set_primary) {
             out->resolved_path = absolute;
         }
         if (descriptor_is_mmproj(file) && out->mmproj_path.empty()) {

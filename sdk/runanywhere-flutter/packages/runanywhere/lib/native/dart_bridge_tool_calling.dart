@@ -215,6 +215,27 @@ class DartBridgeToolCalling {
       _logger.warning('session destroy failed: $e');
     }
   }
+
+  /// pass2-syn-007: cancel an in-flight session. Safe to call from any
+  /// isolate; the native side latches the cancel and asks the in-flight
+  /// LifecycleLlmRef to abort. Idempotent for unknown handles. Returns
+  /// false when the cancel ABI is not exported by the loaded libcommons.
+  bool cancelSession(int sessionHandle) {
+    final fn = RacNative.bindings.rac_tool_calling_session_cancel_proto;
+    if (fn == null) {
+      _logger.warning(
+        'rac_tool_calling_session_cancel_proto is unavailable; falling back to destroy-only',
+      );
+      return false;
+    }
+    try {
+      fn(sessionHandle);
+      return true;
+    } catch (e) {
+      _logger.warning('session cancel failed: $e');
+      return false;
+    }
+  }
 }
 
 /// Owned handle for a tool-calling session — combines the C side session id,
@@ -245,5 +266,15 @@ class ToolCallingSessionHandle {
     DartBridgeToolCalling.shared.destroySession(sessionHandle);
     _nativeCb.close();
     await _events.close();
+  }
+
+  /// pass2-syn-007: cancel the in-flight native loop. Distinct from [close]:
+  /// cancel interrupts the underlying LLM generate from another isolate,
+  /// while [close] tears the session down. The recommended pattern is to
+  /// wire this into a `StreamSubscription.onCancel`, fanning consumer-side
+  /// cancellation into the native loop.
+  bool cancel() {
+    if (_closed) return false;
+    return DartBridgeToolCalling.shared.cancelSession(sessionHandle);
   }
 }

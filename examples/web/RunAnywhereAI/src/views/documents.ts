@@ -102,13 +102,28 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  await RunAnywhere.ragIngest(text, JSON.stringify({
-    docId,
-    docName: file.name,
-    sourceUri: `web-file:${file.name}`,
-    mediaType: file.type || 'text/plain',
-    sizeBytes: String(file.size),
-  }));
+  try {
+    await RunAnywhere.ragIngest(text, JSON.stringify({
+      docId,
+      docName: file.name,
+      sourceUri: `web-file:${file.name}`,
+      mediaType: file.type || 'text/plain',
+      sizeBytes: String(file.size),
+    }));
+  } catch (err) {
+    // The RAG bootstrap creates an in-memory session but does NOT
+    // pre-download / load the embedding or LLM models. If the user lands
+    // on Documents without having loaded those models elsewhere (Chat /
+    // Storage), the native session will surface a low-context "backend
+    // not available" / "no model loaded" error. Re-throw with a clearer
+    // hint so the user knows which models to load.
+    const raw = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `${raw} — Load the embedding model (${RAG_EMBEDDING_MODEL_ID}) ` +
+      `and the LLM (${RAG_LLM_MODEL_ID}) from the Storage or Chat tab ` +
+      `before ingesting documents.`,
+    );
+  }
 
   const stats = await RunAnywhere.ragGetStatistics();
   setStatus(`Indexed ${file.name}. ${stats.indexedChunks} chunks total.`);

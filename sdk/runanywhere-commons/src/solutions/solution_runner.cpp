@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "rac/core/rac_error.h"
+#include "rac/solutions/operator_registry.hpp"
 #include "rac/solutions/pipeline_executor.hpp"
 #include "rac/solutions/solution_converter.hpp"
 
@@ -112,6 +113,13 @@ void SolutionRunner::wait() {
     }
     sched.reset();
     exec.reset();
+    // Promote any cross-thread error detail recorded by an operator (in a
+    // scheduler worker thread) into the calling thread's thread_local
+    // `rac_error_set_details` slot so the C ABI reflects the honest cause.
+    std::string op_detail = rac::solutions::consume_operator_error_detail();
+    if (!op_detail.empty()) {
+        rac_error_set_details(op_detail.c_str());
+    }
 }
 
 bool SolutionRunner::running() const noexcept {

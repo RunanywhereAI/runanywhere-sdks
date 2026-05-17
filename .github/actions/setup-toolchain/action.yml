@@ -7,7 +7,7 @@ description: |
 inputs:
   platform:
     required: true
-    description: 'ios | macos | android | linux | windows | web | sdk-only'
+    description: 'ios | macos | android | linux | windows | web | sdk-only | flutter'
 
 runs:
   using: composite
@@ -76,6 +76,12 @@ runs:
       with:
         version: ${{ env.EMSCRIPTEN_VERSION }}
         actions-cache-folder: emsdk-cache
+
+    - name: Setup Flutter (Flutter / sdk-only)
+      if: inputs.platform == 'flutter' || inputs.platform == 'sdk-only'
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
 
     - name: Setup CMake (Linux/Windows native)
       if: inputs.platform == 'linux' || inputs.platform == 'windows'

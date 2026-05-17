@@ -403,12 +403,21 @@ message ToolCallingSessionCreateRequest {
     // use dynamic tool registries must explicitly set validate_calls=false.
     optional bool validate_calls = 6;
 
-    // 7-10 reserved: gap between session-control fields (1-6) and inline LLM
-    // generation params (11-14). Explicitly reserving prevents two concurrent
-    // patches from racing to claim a number here with conflicting semantics —
-    // a wire-compat hazard that would silently mis-decode data once both
-    // patches land.
-    reserved 7 to 10;
+    // OpenAI-style tool_choice override surfaced through the high-level
+    // run-loop / session APIs. The same fields exist on ToolCallingOptions
+    // (fields 13/14); we re-publish them here so the canonical request
+    // envelope can carry the policy without forcing callers to pass an
+    // inline ToolCallingOptions. commons honors these on every
+    // format/validate primitive via build_options_snapshot.
+    optional ToolChoiceMode tool_choice = 7;
+    optional string forced_tool_name = 8;
+
+    // 9-10 reserved: remaining gap between session-control fields and
+    // inline LLM generation params (11-14). Explicitly reserving prevents
+    // two concurrent patches from racing to claim a number here with
+    // conflicting semantics — a wire-compat hazard that would silently
+    // mis-decode data once both patches land.
+    reserved 9 to 10;
 }
 
 message ToolCallingSessionCreateResult {

@@ -1539,8 +1539,7 @@ struct ProtoToolCallingOptions {
     std::string tools_json = "[]";
     // Mirror of ToolCallingOptions.tool_choice (idl/tool_calling.proto:262).
     // UNSPECIFIED is treated as AUTO so legacy callers behave as before.
-    runanywhere::v1::ToolChoiceMode tool_choice =
-        runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
+    runanywhere::v1::ToolChoiceMode tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
     std::string forced_tool_name;
 };
 
@@ -1732,8 +1731,7 @@ collect_proto_tool_validation_errors(const runanywhere::v1::ToolCallValidationRe
     // forced_tool_name; the existing forced_tool_name check below also covers
     // this case but we keep the message specific to tool_choice when set.
     if (options.tool_choice() == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
-        errors.emplace_back(
-            "Tool calls are disabled by tool_choice=NONE");
+        errors.emplace_back("Tool calls are disabled by tool_choice=NONE");
     } else if (options.tool_choice() == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
                options.has_forced_tool_name() && !options.forced_tool_name().empty() &&
                tool_call.name() != options.forced_tool_name()) {
@@ -1882,11 +1880,9 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
     // user prompt verbatim (or empty if absent). For SPECIFIC, narrow the
     // advertised set to forced_tool_name so the model is steered to that
     // call. UNSPECIFIED/AUTO/REQUIRED keep today's full advertise-all behavior.
-    const bool suppress_tools =
-        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE;
+    const bool suppress_tools = converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE;
     std::string effective_tools_json = converted.tools_json;
-    if (!suppress_tools &&
-        converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+    if (!suppress_tools && converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
         !converted.forced_tool_name.empty() && request.has_options()) {
         json filtered = json::array();
         for (const auto& tool : request.options().tools()) {

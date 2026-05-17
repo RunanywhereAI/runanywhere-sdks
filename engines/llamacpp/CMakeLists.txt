@@ -189,9 +189,23 @@ if(RAC_VLM_USE_MTMD)
     # to be present at link time, otherwise ld.lld bails with
     #   ld.lld: error: undefined symbol: vtable for clip_graph_<name>
     # `CONFIGURE_DEPENDS` re-globs when the directory changes.
+    #
+    # pass2-syn-063: CONFIGURE_DEPENDS is best-effort on Visual Studio /
+    # Xcode generators (CMake docs: "a generator may not implement this
+    # feature"). All RAC CMakePresets that build this engine use Ninja
+    # (macos-debug, macos-release, linux-asan, android-arm64, ios-*),
+    # so re-glob fires reliably for our CI matrix. Developers who run an
+    # Xcode-driven CMake build of the C++ engine for direct on-device
+    # profiling MUST `cmake --reconfigure` after an upstream llama.cpp
+    # bump that adds a new tools/mtmd/models/*.cpp file; otherwise the
+    # build fails at link time with an undefined vtable for
+    # clip_graph_<new_model>. The STATUS message below prints the
+    # discovered count to make a silent drop loud during local builds.
     file(GLOB _RAC_MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
         "${llamacpp_SOURCE_DIR}/tools/mtmd/models/*.cpp"
     )
+    list(LENGTH _RAC_MTMD_MODEL_SOURCES _RAC_MTMD_MODEL_COUNT)
+    message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${LLAMACPP_VERSION})")
     list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 endif()
 

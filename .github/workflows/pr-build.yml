@@ -26,6 +26,29 @@ concurrency:
 
 jobs:
   # =============================================================================
+  # Centralization gates — defend the T4 invariant that toolchain + library
+  # pins live in a single source of truth (sdk/runanywhere-commons/VERSIONS,
+  # dependencies/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
+  # gradle/libs.versions.toml). Fast-fail before kicking off the SDK matrix.
+  # See docs/dependencies/CENTRALIZATION.md.
+  # =============================================================================
+
+  centralization:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: TypeScript / Web / RN centralization (syncpack)
+        run: bash scripts/validation/check_typescript_centralization.sh
+      - name: Flutter dependency centralization
+        # Soft warn-only by default — set STRICT=1 once the workspace is fully
+        # converged. Still surfaces drift on the PR page.
+        run: bash scripts/validation/check_flutter_centralization.sh
+      - name: Gradle / Kotlin centralization
+        run: bash scripts/validation/check_gradle_centralization.sh
+
+  # =============================================================================
   # Native core builds (one job per CMake preset family)
   # =============================================================================
 
@@ -178,10 +201,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        # T5.7: pin Flutter to the version recorded in
-        # sdk/runanywhere-flutter/.fvm/fvm_config.json so CI matches local FVM.
-        with: { flutter-version: '3.27.0' }
+      # FLUTTER_VERSION is sourced from sdk/runanywhere-commons/VERSIONS (single
+      # source of truth) by the setup-toolchain action. Bump the value in
+      # VERSIONS to roll the Flutter pin across pr-build, release, and FVM.
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: flutter
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
 
   rn-typecheck:

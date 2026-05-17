@@ -152,13 +152,29 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 }
 
 /**
+ * Optional cancellation signal accepted by [generateWithTools]. Mirrors the
+ * Web `fetch`-style `AbortSignal` so callers can cancel an in-flight run loop
+ * via `controller.abort()`.
+ *
+ * pass2-syn-007: wires through to `rac_tool_calling_run_loop_cancel_proto`.
+ */
+export interface GenerateWithToolsOptions {
+  signal?: AbortSignal;
+}
+
+/**
  * Generate a response with tool calling. Commons owns the multi-iteration
  * run loop through `rac_tool_calling_run_loop_proto`; this function only
  * forwards the request and supplies the JS executor trampoline.
+ *
+ * Pass an `AbortSignal` via `extra.signal` to cancel the in-flight loop —
+ * Nitro publishes the native run-loop handle synchronously so we can fan an
+ * `abort()` into `rac_tool_calling_run_loop_cancel_proto`.
  */
 export async function generateWithTools(
   prompt: string,
-  options?: Partial<ToolCallingOptions>
+  options?: Partial<ToolCallingOptions>,
+  extra?: GenerateWithToolsOptions
 ): Promise<ToolCallingResult> {
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
@@ -170,6 +186,15 @@ export async function generateWithTools(
       requestBytes: ArrayBuffer,
       onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
     ) => Promise<ArrayBuffer>;
+    // pass2-syn-007: optional cancel-aware variant. When the native module
+    // ships the with-handle variant, we drive that instead so AbortSignal
+    // can interrupt the in-flight C call.
+    toolRunLoopProtoWithHandle?: (
+      requestBytes: ArrayBuffer,
+      onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+      onHandle: (runLoopHandle: number) => void
+    ) => Promise<ArrayBuffer>;
+    toolRunLoopCancelProto?: (runLoopHandle: number) => void;
   };
 
   if (typeof bridge.toolRunLoopProto !== 'function') {
@@ -191,19 +216,72 @@ export async function generateWithTools(
     maxIterations: options?.maxIterations ?? options?.maxToolCalls ?? 5,
     keepToolsAvailable: options?.keepToolsAvailable ?? false,
     validateCalls: true,
+    // pass2-syn-006-followup-rn: thread the OpenAI-style tool_choice /
+    // forced_tool_name knobs into the canonical request envelope (idl
+    // fields 7/8). Commons build_options_snapshot copies them onto every
+    // synthesized ToolCallingOptions before format/validate proto calls.
+    toolChoice: options?.toolChoice,
+    forcedToolName: options?.forcedToolName,
   });
 
   logger.debug(
     `[ToolCalling] Delegating native run loop: format=${formatHint}, tools=${tools.length}`
   );
 
-  const resultBytes = await bridge.toolRunLoopProto(
-    bytesToArrayBuffer(ToolCallingSessionCreateRequest.encode(request).finish()),
-    async (toolCallBytes: ArrayBuffer) => {
-      const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
-      const result = await executeTool(toolCall);
-      return bytesToArrayBuffer(ToolResult.encode(result).finish());
+  const encodedRequest = bytesToArrayBuffer(
+    ToolCallingSessionCreateRequest.encode(request).finish()
+  );
+  const onExecute = async (toolCallBytes: ArrayBuffer) => {
+    const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
+    const result = await executeTool(toolCall);
+    return bytesToArrayBuffer(ToolResult.encode(result).finish());
+  };
+
+  const signal = extra?.signal;
+  // Prefer the cancel-aware variant when both halves of the ABI are exported.
+  if (
+    typeof bridge.toolRunLoopProtoWithHandle === 'function' &&
+    typeof bridge.toolRunLoopCancelProto === 'function'
+  ) {
+    let runLoopHandle = 0;
+    const onHandle = (handle: number) => {
+      runLoopHandle = handle;
+      if (signal?.aborted && runLoopHandle !== 0) {
+        bridge.toolRunLoopCancelProto!(runLoopHandle);
+      }
+    };
+    const abortListener = () => {
+      if (runLoopHandle !== 0) {
+        bridge.toolRunLoopCancelProto!(runLoopHandle);
+      }
+    };
+    signal?.addEventListener('abort', abortListener);
+    try {
+      const resultBytes = await bridge.toolRunLoopProtoWithHandle(
+        encodedRequest,
+        onExecute,
+        onHandle
+      );
+      const bytes = arrayBufferToBytes(resultBytes);
+      if (bytes.byteLength === 0) {
+        throw SDKException.protoDecodeFailed('toolRunLoopProtoWithHandle');
+      }
+      return ToolCallingResult.decode(bytes);
+    } finally {
+      signal?.removeEventListener('abort', abortListener);
     }
+  }
+
+  // Legacy ABI fallback — no cancellation possible on this path.
+  if (signal && !signal.aborted) {
+    logger.warning(
+      'toolRunLoopProtoWithHandle not exported by native module; AbortSignal will not interrupt the in-flight call'
+    );
+  }
+
+  const resultBytes = await bridge.toolRunLoopProto(
+    encodedRequest,
+    onExecute
   );
 
   const bytes = arrayBufferToBytes(resultBytes);

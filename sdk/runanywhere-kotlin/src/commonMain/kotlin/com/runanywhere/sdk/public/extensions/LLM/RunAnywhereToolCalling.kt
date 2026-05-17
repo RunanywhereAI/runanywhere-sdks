@@ -20,6 +20,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ToolChoiceMode
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingResult
@@ -126,11 +127,29 @@ expect suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult
  * @param options LLM generation options (optional)
  * @param toolOptions Tool-calling specific options. When non-null this
  *   overrides any `options.tool_calling` payload.
+ * @param toolChoice Optional override that forces
+ *   [RAToolCallingOptions.tool_choice]. Mirrors the OpenAI `tool_choice`
+ *   knob: callers can pin the LLM to NONE / AUTO / SPECIFIC without having
+ *   to manually mutate a `RAToolCallingOptions` proto. Mirrors Swift's
+ *   `toolChoice:` parameter on `RunAnywhere.generateWithTools`.
+ * @param forcedToolName Companion to `toolChoice = TOOL_CHOICE_MODE_SPECIFIC`
+ *   — the tool name the LLM is forced to invoke. Overrides
+ *   [RAToolCallingOptions.forced_tool_name] when non-null.
  * @return [RAToolCallingResult] with the final text, tool calls, and any
  *   executed tool results (matches the Swift surface).
+ *
+ * Note: `tool_choice` / `forced_tool_name` live on the `ToolCallingOptions`
+ * proto (fields 13/14, idl/tool_calling.proto). They are applied here on
+ * the effective options so future commons support (pass2-syn-006 parent)
+ * automatically picks them up; the session-create request itself has
+ * reserved-7-10 today, so end-to-end propagation to native parse/validate
+ * helpers is pending the commons builder that snapshots options from the
+ * request.
  */
 expect suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: RALLMGenerationOptions? = null,
     toolOptions: RAToolCallingOptions? = null,
+    toolChoice: ToolChoiceMode? = null,
+    forcedToolName: String? = null,
 ): RAToolCallingResult

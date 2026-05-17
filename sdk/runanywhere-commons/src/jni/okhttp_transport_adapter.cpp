@@ -571,10 +571,9 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
 
-    jobject j_resp =
-        env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid, j_method, j_url,
-                                    j_headers, j_body, j_timeout_ms, j_resume_from, j_native_cb,
-                                    j_native_ud);
+    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
+                                                 j_method, j_url, j_headers, j_body, j_timeout_ms,
+                                                 j_resume_from, j_native_cb, j_native_ud);
 
     if (env->ExceptionCheck() == JNI_TRUE) {
         env->ExceptionDescribe();

@@ -108,22 +108,23 @@ actual fun RunAnywhere.synthesizeStream(
         // fires when the collector cancels and we ask the lifecycle stop
         // ABI to interrupt the native side; the launched task then exits
         // when racTtsSynthesizeStreamLifecycleProto returns.
-        val driver = CoroutineScope(Dispatchers.IO).launch {
-            try {
-                CppBridgeTTS.synthesizeStream(text, options) { output ->
-                    if (cancelled.get() || isClosedForSend) {
-                        false
-                    } else {
-                        trySend(output)
-                        true
+        val driver =
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    CppBridgeTTS.synthesizeStream(text, options) { output ->
+                        if (cancelled.get() || isClosedForSend) {
+                            false
+                        } else {
+                            trySend(output)
+                            true
+                        }
                     }
+                } catch (t: Throwable) {
+                    ttsLogger.warn("synthesizeStream errored: ${t.message}")
+                } finally {
+                    close()
                 }
-            } catch (t: Throwable) {
-                ttsLogger.warn("synthesizeStream errored: ${t.message}")
-            } finally {
-                close()
             }
-        }
 
         awaitClose {
             cancelled.set(true)

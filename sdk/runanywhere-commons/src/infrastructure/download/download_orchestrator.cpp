@@ -23,7 +23,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -369,8 +368,7 @@ std::string join_path(const std::string& lhs, const std::string& rhs) {
 bool is_safe_path_segment(const std::string& component) {
     if (component.empty() || component == "." || component == "..")
         return false;
-    return component.find('/') == std::string::npos &&
-           component.find('\\') == std::string::npos;
+    return component.find('/') == std::string::npos && component.find('\\') == std::string::npos;
 }
 
 bool is_safe_relative_descriptor_path(const std::string& path) {
@@ -1006,10 +1004,11 @@ std::string destination_from_model_file(const std::string& model_folder,
         if (auto safe = safe_descriptor_path_under(model_folder, file.destination_path())) {
             return *safe;
         }
-        RAC_LOG_WARNING(LOG_TAG,
-                        "Rejecting unsafe descriptor destination_path '%s' for model_folder '%s' "
-                        "(security-privacy-storage-network-001); falling back to filename-only path.",
-                        file.destination_path().c_str(), model_folder.c_str());
+        RAC_LOG_WARNING(
+            LOG_TAG,
+            "Rejecting unsafe descriptor destination_path '%s' for model_folder '%s' "
+            "(security-privacy-storage-network-001); falling back to filename-only path.",
+            file.destination_path().c_str(), model_folder.c_str());
         // Intentionally fall through to the filename-based path below so the
         // download still completes safely instead of aborting the whole plan.
     }
@@ -1702,6 +1701,16 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     auto task = std::make_shared<proto_download_task>();
     task->model_id = model_id;
     task->files = files_from_plan(request.plan());
+    // files_from_plan() defensively skips entries with traversal-unsafe
+    // destination paths (security-privacy-storage-network-001). If every
+    // entry in the plan was skipped, reject the start request rather than
+    // proceeding into UB on the empty task->files vector below.
+    if (task->files.empty()) {
+        result.set_accepted(false);
+        result.set_error_message(
+            "start request rejected: every plan entry has a traversal-unsafe destination path");
+        return serialize_proto_to_buffer(result, out_result);
+    }
     task->task_id = "download-proto-" + std::to_string(proto_state().next_task_id.fetch_add(1));
     task->resume_token =
         !request.resume_token().empty()

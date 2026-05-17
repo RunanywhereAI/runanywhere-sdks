@@ -374,6 +374,16 @@ export interface ToolCallingSessionCreateRequest {
      * use dynamic tool registries must explicitly set validate_calls=false.
      */
     validateCalls?: boolean | undefined;
+    /**
+     * OpenAI-style tool_choice override surfaced through the high-level
+     * run-loop / session APIs. The same fields exist on ToolCallingOptions
+     * (fields 13/14); we re-publish them here so the canonical request
+     * envelope can carry the policy without forcing callers to pass an
+     * inline ToolCallingOptions. commons honors these on every
+     * format/validate primitive via build_options_snapshot.
+     */
+    toolChoice?: ToolChoiceMode | undefined;
+    forcedToolName?: string | undefined;
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;

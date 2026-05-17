@@ -21,8 +21,14 @@
  * Opt-in via `RA_RUN_SPEECH_E2E=1`. Downloads ~60 MB on first run.
  */
 import { test, expect } from '@playwright/test';
+import { resolve } from 'node:path';
 
 const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
+
+// Repo root, resolved from this file's location, so the Vite `/@fs/...`
+// imports work from any checkout location and in CI. Override with
+// `RA_REPO_ROOT` if running against a different layout.
+const REPO_ROOT = process.env.RA_REPO_ROOT ?? resolve(__dirname, '..', '..', '..', '..');
 
 interface AppReadinessSnapshot {
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -80,14 +86,12 @@ test.describe('RunAnywhere.synthesize via standalone Sherpa speech provider', ()
       { timeout: 60_000 },
     );
 
-    await page.evaluate(async () => {
+    await page.evaluate(async ({ repoRoot }) => {
       try {
-        const onnx = await import(
-          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/src/index.ts'
-        );
-        const catalog = await import(
-          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/examples/web/RunAnywhereAI/src/services/model-catalog.ts'
-        );
+        const onnxPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/src/index.ts`;
+        const catalogPath = `/@fs${repoRoot}/examples/web/RunAnywhereAI/src/services/model-catalog.ts`;
+        const onnx = await import(/* @vite-ignore */ onnxPath);
+        const catalog = await import(/* @vite-ignore */ catalogPath);
 
         const registered = catalog.registerModelCatalog();
         if (!registered) {
@@ -145,7 +149,7 @@ test.describe('RunAnywhere.synthesize via standalone Sherpa speech provider', ()
           error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
         };
       }
-    });
+    }, { repoRoot: REPO_ROOT });
 
     const result = await page.evaluate(() => window.__FACADE_TTS_RESULT__);
     expect(result, 'TTS result should be set').toBeDefined();

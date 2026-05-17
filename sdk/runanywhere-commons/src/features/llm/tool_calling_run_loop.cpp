@@ -23,9 +23,13 @@
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
@@ -43,6 +47,52 @@ namespace {
 
 constexpr const char* kTag = "ToolCallingRunLoop";
 constexpr uint32_t kDefaultMaxIterations = 5;
+
+// pass2-syn-007: per-loop cancellation state. Allocated on the heap, owned by
+// a per-process registry keyed by an opaque handle published to the host via
+// rac_tool_calling_run_loop_with_handle_proto. The cancel function is
+// thread-safe relative to the run loop (uses a separate active_ref_mu).
+struct LoopCancelState {
+    std::mutex active_ref_mu;
+    rac::llm::LifecycleLlmRef* active_ref = nullptr;
+    std::atomic<bool> cancel_requested{false};
+};
+
+struct LoopRegistry {
+    std::mutex mu;
+    std::atomic<uint64_t> next_handle{1};
+    std::unordered_map<uint64_t, std::shared_ptr<LoopCancelState>> states;
+};
+
+LoopRegistry& loop_registry() {
+    static LoopRegistry inst;
+    return inst;
+}
+
+uint64_t register_loop_state(std::shared_ptr<LoopCancelState> state) {
+    auto& reg = loop_registry();
+    uint64_t handle = reg.next_handle.fetch_add(1, std::memory_order_relaxed);
+    std::lock_guard<std::mutex> lg(reg.mu);
+    reg.states[handle] = std::move(state);
+    return handle;
+}
+
+void unregister_loop_state(uint64_t handle) {
+    if (handle == 0)
+        return;
+    auto& reg = loop_registry();
+    std::lock_guard<std::mutex> lg(reg.mu);
+    reg.states.erase(handle);
+}
+
+std::shared_ptr<LoopCancelState> lookup_loop_state(uint64_t handle) {
+    if (handle == 0)
+        return nullptr;
+    auto& reg = loop_registry();
+    std::lock_guard<std::mutex> lg(reg.mu);
+    auto it = reg.states.find(handle);
+    return it == reg.states.end() ? nullptr : it->second;
+}
 
 #if defined(RAC_HAVE_PROTOBUF)
 
@@ -64,6 +114,13 @@ struct LoopContext {
     bool keep_tools_available = false;
     bool validate_calls = true;
 
+    // pass2-syn-006: request-level tool_choice / forced_tool_name overrides.
+    // When present, build_options_snapshot copies them onto the synthesized
+    // ToolCallingOptions before every format/validate proto helper call.
+    bool has_tool_choice = false;
+    runanywhere::v1::ToolChoiceMode tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
+    std::string forced_tool_name;
+
     // Tools (and any other portable options) live inside this snapshot for
     // the parse/validate/format_prompt helpers.
     runanywhere::v1::ToolCallingOptions tool_options;
@@ -82,6 +139,17 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     }
     if (!ctx.system_prompt.empty()) {
         options.set_system_prompt(ctx.system_prompt);
+    }
+    // Honor ToolCallingSessionCreateRequest.tool_choice / forced_tool_name
+    // (pass2-syn-006). The request-level fields take precedence over any
+    // tool_options the caller might have pre-populated, so the high-level
+    // run-loop / session APIs surface the OpenAI-style tool_choice knob
+    // that the format/validate primitives already read.
+    if (ctx.has_tool_choice) {
+        options.set_tool_choice(ctx.tool_choice);
+    }
+    if (!ctx.forced_tool_name.empty()) {
+        options.set_forced_tool_name(ctx.forced_tool_name);
     }
     options.set_auto_execute(true);
     return options;
@@ -147,7 +215,7 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
 
     runanywhere::v1::ToolParseResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     rac_proto_buffer_free(&out);
 
@@ -182,7 +250,7 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
     rac_result_t rc = rac_tool_call_validate_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
                                                    req_bytes.size(), &out);
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
         result.set_error_message(out.error_message ? out.error_message
@@ -192,8 +260,8 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
     return result;
 }
 
-bool run_generate_once(const LoopContext& ctx, const std::string& prompt, std::string* out_response,
-                       rac_result_t* out_rc) {
+bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
+                       const std::string& prompt, std::string* out_response, rac_result_t* out_rc) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -224,8 +292,24 @@ bool run_generate_once(const LoopContext& ctx, const std::string& prompt, std::s
         return false;
     }
 
+    // pass2-syn-007: publish the in-flight ref so a cancel from another
+    // thread can interrupt. Latch a pre-arrived cancel onto the ref now.
+    if (cancel_state) {
+        std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
+        cancel_state->active_ref = &ref;
+        if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+            rac::llm::request_lifecycle_llm_cancel(&ref);
+        }
+    }
+
     rac_llm_result_t raw{};
     rc = ref.ops->generate(ref.impl, prompt.c_str(), &options, &raw);
+
+    if (cancel_state) {
+        std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
+        cancel_state->active_ref = nullptr;
+    }
+
     if (rc != RAC_SUCCESS) {
         rac_llm_result_free(&raw);
         rac::llm::release_lifecycle_llm(&ref);
@@ -262,13 +346,14 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 
 }  // namespace
 
-extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes,
-                                                        size_t in_size,
-                                                        rac_tool_execute_callback_fn on_execute,
-                                                        void* user_data,
-                                                        rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
     if (!on_execute || !out_result) {
         return RAC_ERROR_NULL_POINTER;
+    }
+    if (out_run_loop_handle) {
+        *out_run_loop_handle = 0;
     }
 
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -298,6 +383,19 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // pass2-syn-007: allocate the cancel state up-front so the host can
+    // cancel even while we're still building the initial prompt. RAII guard
+    // unregisters on every return path.
+    auto cancel_state = std::make_shared<LoopCancelState>();
+    uint64_t handle = register_loop_state(cancel_state);
+    if (out_run_loop_handle) {
+        *out_run_loop_handle = handle;
+    }
+    struct HandleScope {
+        uint64_t handle;
+        ~HandleScope() { unregister_loop_state(handle); }
+    } scope{handle};
+
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
     ctx.max_tokens = request.max_tokens();
@@ -315,6 +413,17 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
     // that delegate validation/authorization to their executor opt out by
     // explicitly setting validate_calls=false.
     ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
+    // pass2-syn-006: pick up the request-level OpenAI-style tool_choice and
+    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8) — these are
+    // copied onto every ToolCallingOptions snapshot the loop synthesizes for
+    // format/validate proto calls.
+    if (request.has_tool_choice()) {
+        ctx.has_tool_choice = true;
+        ctx.tool_choice = request.tool_choice();
+    }
+    if (request.has_forced_tool_name()) {
+        ctx.forced_tool_name = request.forced_tool_name();
+    }
     for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
     }
@@ -335,7 +444,7 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
 
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
-        if (!run_generate_once(ctx, current_prompt, &response, &rc)) {
+        if (!run_generate_once(ctx, cancel_state.get(), current_prompt, &response, &rc)) {
             final_result.set_text(final_text);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
@@ -403,7 +512,7 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
 
         runanywhere::v1::ToolResult tool_result;
         if (exec_rc == RAC_SUCCESS && exec_out.data && exec_out.size > 0) {
-            tool_result.ParseFromArray(exec_out.data, static_cast<int>(exec_out.size));
+            (void)tool_result.ParseFromArray(exec_out.data, static_cast<int>(exec_out.size));
         }
         // Always populate identifiers / fallback success state on the
         // returned result so the follow-up prompt formatter has stable input.
@@ -464,5 +573,40 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
         return RAC_ERROR_INTERNAL;
     }
     return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
+#endif
+}
+
+// Legacy ABI wrapper — preserves the original signature. Discards the handle
+// out-parameter for hosts that don't need cancellation (the in-flight loop
+// state is still registered / unregistered behind the scenes).
+extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_bytes,
+                                                        size_t in_size,
+                                                        rac_tool_execute_callback_fn on_execute,
+                                                        void* user_data,
+                                                        rac_proto_buffer_t* out_result) {
+    uint64_t discarded = 0;
+    return rac_tool_calling_run_loop_with_handle_proto(in_request_bytes, in_size, on_execute,
+                                                       user_data, &discarded, out_result);
+}
+
+extern "C" rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop_handle) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)run_loop_handle;
+    return RAC_SUCCESS;  // idempotent — protobuf-less builds never start a loop
+#else
+    auto state = lookup_loop_state(run_loop_handle);
+    if (!state) {
+        // Idempotent — handle already retired or never published. The SDK
+        // adapters fan structured-concurrency cancels into this entry point
+        // without coordinating with the loop's exit, so a stale handle is
+        // the normal race-loser path. Return success.
+        return RAC_SUCCESS;
+    }
+    state->cancel_requested.store(true, std::memory_order_release);
+    std::lock_guard<std::mutex> guard(state->active_ref_mu);
+    if (state->active_ref) {
+        rac::llm::request_lifecycle_llm_cancel(state->active_ref);
+    }
+    return RAC_SUCCESS;
 #endif
 }

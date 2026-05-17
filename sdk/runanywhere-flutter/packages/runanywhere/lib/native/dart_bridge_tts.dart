@@ -51,6 +51,29 @@ class DartBridgeTTS {
     _synthesizeLifecycleProtoForTesting = override;
   }
 
+  // Streaming test seam (pass2-syn-023). Symmetric to
+  // `setSynthesizeLifecycleProtoForTesting` but for the streaming path —
+  // tests use this to drive `synthesizeStreamLifecycleProto` without a real
+  // FFI binding. The override receives the same `dispatch` closure the
+  // production NativeCallable would invoke, so the real wrapper's drain loop
+  // + `controller.onCancel -> stopLifecycleProto()` path stays in-circuit.
+  static TTSStreamFakeFFI? _synthesizeStreamLifecycleProtoForTesting;
+  static int Function()? _stopLifecycleProtoForTesting;
+
+  /// Inject a fake native-stream driver. Pass `null` to clear.
+  static void setSynthesizeStreamLifecycleProtoForTesting(
+    TTSStreamFakeFFI? override,
+  ) {
+    _synthesizeStreamLifecycleProtoForTesting = override;
+  }
+
+  /// Inject a fake `stopLifecycleProto` invocation that
+  /// `synthesizeStreamLifecycleProto.onCancel` should call instead of the
+  /// real FFI binding. Pass `null` to clear.
+  static void setStopLifecycleProtoForTesting(int Function()? override) {
+    _stopLifecycleProtoForTesting = override;
+  }
+
   // MARK: - Handle Management
 
   /// Get or create the TTS component handle.
@@ -146,8 +169,16 @@ class DartBridgeTTS {
   ) {
     _validateLifecycleRequest(request);
 
-    final fn = RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto;
-    if (fn == null) {
+    final streamOverride = _synthesizeStreamLifecycleProtoForTesting;
+    // Defer the FFI lookup when a test seam is installed — accessing
+    // `RacNative.bindings` triggers a `dlopen` of librac_commons, which fails
+    // in the unit-test harness where no native library is staged. The test
+    // group `DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake
+    // FFI` (pass2-syn-023) covers the production wrapper without the FFI.
+    final fn = streamOverride == null
+        ? RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto
+        : null;
+    if (streamOverride == null && fn == null) {
       return Stream<TTSStreamEvent>.error(
         UnsupportedError(
           'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
@@ -159,7 +190,48 @@ class DartBridgeTTS {
     NativeCallable<RacTtsStreamEventCallbackNative>? callback;
     var sawTerminalEvent = false;
 
+    // Shared dispatch closure — used by both the real NativeCallable.listener
+    // and the test-injected fake FFI. Centralizing this guarantees the test
+    // path exercises the same listener-body behavior (closed-controller
+    // guard, terminal-kind tracking) as production. (pass2-syn-023)
+    void dispatchEvent(TTSStreamEvent event) {
+      if (controller.isClosed) return;
+      sawTerminalEvent = sawTerminalEvent ||
+          event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
+          event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
+      controller.add(event);
+    }
+
     Future<void> run() async {
+      // Test seam: skip FFI entirely; let the fake drive `dispatchEvent`
+      // synchronously then return an rc. Same drain + close semantics as
+      // the real path.
+      if (streamOverride != null) {
+        try {
+          final rc = await streamOverride(
+            request,
+            dispatchEvent,
+            () => sawTerminalEvent,
+          );
+          await drainPendingStreamCallbacks(() => sawTerminalEvent);
+          if (rc != RAC_SUCCESS && !controller.isClosed) {
+            controller.addError(StateError(
+              'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ));
+          }
+          if (!controller.isClosed) {
+            await controller.close();
+          }
+        } catch (e, st) {
+          if (!controller.isClosed) {
+            controller.addError(e, st);
+            await controller.close();
+          }
+        }
+        return;
+      }
+
       final bytes = request.writeToBuffer();
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
@@ -169,22 +241,16 @@ class DartBridgeTTS {
           int bytesLen,
           Pointer<Void> _,
         ) {
-          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
-            return;
-          }
+          if (bytesPtr == nullptr || bytesLen <= 0) return;
           try {
             final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            final event = TTSStreamEvent.fromBuffer(copy);
-            sawTerminalEvent = sawTerminalEvent ||
-                event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
-                event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
-            controller.add(event);
+            dispatchEvent(TTSStreamEvent.fromBuffer(copy));
           } catch (e, st) {
             controller.addError(e, st);
             unawaited(controller.close());
           }
         });
-        final rc = fn(
+        final rc = fn!(
           requestPtr,
           bytes.length,
           callback!.nativeFunction,
@@ -195,13 +261,12 @@ class DartBridgeTTS {
         // synchronous FFI call. While it runs the main isolate's event loop
         // is frozen, so NativeCallable.listener invocations queue up but do
         // not execute. The terminal COMPLETED/ERROR event therefore arrives
-        // ASYNCHRONOUSLY after `fn()` returns. Yield to the event loop a
-        // few times so queued callbacks can drain before deciding whether
-        // to force-close the controller; otherwise subscribers receive an
-        // empty stream even though native emitted started/audio/final.
-        for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
-          await Future<void>.delayed(Duration.zero);
-        }
+        // ASYNCHRONOUSLY after `fn()` returns. Yield via the shared
+        // [drainPendingStreamCallbacks] helper so queued callbacks can drain
+        // before deciding whether to force-close the controller; otherwise
+        // subscribers receive an empty stream even though native emitted
+        // started/audio/final. See [kStreamDrainMaxMicrotasks].
+        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (rc != RAC_SUCCESS && !controller.isClosed) {
           controller.addError(StateError(
             'rac_tts_synthesize_stream_lifecycle_proto failed: '
@@ -226,7 +291,12 @@ class DartBridgeTTS {
       // also stops the underlying lifecycle work. Errors are swallowed so
       // cancellation remains best-effort.
       try {
-        stopLifecycleProto();
+        final stopOverride = _stopLifecycleProtoForTesting;
+        if (stopOverride != null) {
+          stopOverride();
+        } else {
+          stopLifecycleProto();
+        }
       } catch (e) {
         _logger.debug('stopLifecycleProto on stream cancel failed: $e');
       }
@@ -426,3 +496,17 @@ class DartBridgeTTS {
     }
   }
 }
+
+/// Test seam type for [DartBridgeTTS.synthesizeStreamLifecycleProto]
+/// (pass2-syn-023). The override receives:
+///   - [request]: the TTSSynthesisRequest the production code received.
+///   - [dispatch]: the same closure the production NativeCallable invokes —
+///     pass a `TTSStreamEvent` to deliver it through the real wrapper's
+///     listener body (drain loop + closed-controller guard intact).
+///   - [terminalObserved]: closure the fake can check to short-circuit.
+/// Returning a non-zero result code drives the wrapper's error branch.
+typedef TTSStreamFakeFFI = Future<int> Function(
+  TTSSynthesisRequest request,
+  void Function(TTSStreamEvent) dispatch,
+  bool Function() terminalObserved,
+);

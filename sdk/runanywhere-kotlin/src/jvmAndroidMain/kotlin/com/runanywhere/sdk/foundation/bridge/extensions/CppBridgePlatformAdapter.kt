@@ -480,11 +480,12 @@ object CppBridgePlatformAdapter {
     }
 
     fun secureSet(key: String, value: String): Boolean {
-        val bytes = value.decodeBase64()
-            ?: run {
-                logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: invalid base64 payload")
-                return false
-            }
+        val bytes =
+            value.decodeBase64()
+                ?: run {
+                    logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: invalid base64 payload")
+                    return false
+                }
         return secureSetCallback(key, bytes.toByteArray())
     }
 

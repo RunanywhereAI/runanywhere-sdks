@@ -20,7 +20,6 @@
 #include <thread>
 #include <utility>
 
-#include "core/internal/platform_compat.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -860,6 +859,149 @@ static TestResult test_proto_plan_rejects_invalid_existing_bytes() {
     return r;
 }
 
+// security-privacy-storage-network-001 / pass2-syn-115 regression:
+// Malicious descriptor.destination_path values ("../escape.gguf",
+// "/etc/passwd", "..\\windows\\system32") must be rejected by the planner
+// (destination_from_model_file → safe_descriptor_path_under), causing the
+// emitted DownloadFilePlan.destination_path to fall back to a safe location
+// rooted under the per-model storage folder. The plan must still be
+// startable (the planner logs a warning and continues so a single malicious
+// descriptor doesn't poison the rest of the multi-file plan).
+static TestResult test_proto_plan_rejects_path_traversal_destination() {
+    TestResult r;
+    r.test_name = "proto_plan_rejects_path_traversal_destination";
+
+    std::string base_dir = create_temp_dir("proto_pathtrav");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    char model_folder[4096];
+    ASSERT_TRUE(rac_model_paths_get_model_folder("ptrav-model", RAC_FRAMEWORK_LLAMACPP,
+                                                 model_folder, sizeof(model_folder)) == RAC_SUCCESS,
+                "model folder should compute");
+    std::string folder(model_folder);
+
+    // Try several traversal vectors via descriptor.destination_path.
+    const std::vector<std::string> malicious_paths = {
+        "../escape.gguf",
+        "../../escape.gguf",
+        "subdir/../../escape.gguf",
+        "/etc/passwd",
+        "..\\windows\\system32\\evil.gguf",
+        ".",
+        "..",
+        "",
+    };
+
+    for (const auto& bad_path : malicious_paths) {
+        rav1::DownloadPlanRequest request;
+        request.set_model_id("ptrav-model");
+        rav1::ModelInfo* model = request.mutable_model();
+        model->set_id("ptrav-model");
+        model->set_download_url("http://fake/success/parent.tar.gz");
+        model->set_framework(rav1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+        model->set_format(rav1::MODEL_FORMAT_GGUF);
+
+        rav1::ExpectedModelFiles* expected = model->mutable_expected_files();
+        rav1::ModelFileDescriptor* file = expected->add_files();
+        file->set_url("http://fake/success/inner.gguf");
+        file->set_filename("inner.gguf");
+        file->set_is_required(true);
+        if (!bad_path.empty()) {
+            file->set_destination_path(bad_path);
+        } else {
+            // Force destination_path presence with an empty string by going
+            // through the explicit setter; proto3 optional semantics mean
+            // an unset value triggers a different branch.
+            file->set_destination_path("");
+        }
+
+        std::string bytes = serialize_msg(request);
+        rac_proto_buffer_t buffer;
+        rac_proto_buffer_init(&buffer);
+        ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                            bytes.size(), &buffer) == RAC_SUCCESS,
+                    "Plan call should succeed regardless of malicious destination_path");
+        rav1::DownloadPlanResult plan;
+        ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+        rac_proto_buffer_free(&buffer);
+
+        ASSERT_TRUE(plan.files_size() == 1, "Plan should still emit one file plan");
+        const std::string& planned = plan.files(0).destination_path();
+        ASSERT_TRUE(!planned.empty(), "Planned destination_path must not be empty");
+        // CRITICAL: the planned destination must stay under the per-model
+        // storage folder. We do not allow lexical escapes like "../" or
+        // absolute paths outside the storage root.
+        ASSERT_TRUE(planned.find("..") == std::string::npos,
+                    "Planned destination must not contain '..' traversal segments");
+        ASSERT_TRUE(planned.rfind(folder, 0) == 0,
+                    "Planned destination must remain rooted under model_folder");
+        // Sanity: the original malicious string must not survive verbatim.
+        if (!bad_path.empty()) {
+            ASSERT_TRUE(planned != bad_path,
+                        "Planner must not echo the malicious path verbatim");
+            ASSERT_TRUE(planned.find("escape.gguf") == std::string::npos ||
+                            planned.rfind(folder, 0) == 0,
+                        "If escape.gguf survives, it must be inside model_folder");
+        }
+    }
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
+// Companion regression: rac_download_start_proto must skip plan entries whose
+// destination_path contains traversal segments when callers bypass the
+// trusted planner. is_traversal_safe_destination is the defensive gate.
+static TestResult test_proto_start_skips_traversal_unsafe_plan_entry() {
+    TestResult r;
+    r.test_name = "proto_start_skips_traversal_unsafe_plan_entry";
+
+    FakeTransport fake;
+    ScopedFakeTransport scoped(&fake);
+
+    std::string base_dir = create_temp_dir("proto_start_trav");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    // Build a plan by hand that pretends to come from the trusted planner
+    // but slips in a traversal-unsafe destination_path on its single file.
+    rav1::DownloadPlanResult plan;
+    plan.set_can_start(true);
+    plan.set_model_id("ptrav-start");
+    plan.set_total_bytes(static_cast<int64_t>(fake.payload.size()));
+    rav1::DownloadFilePlan* f = plan.add_files();
+    f->mutable_file()->set_url("http://fake/success/model.gguf");
+    f->mutable_file()->set_filename("model.gguf");
+    f->set_destination_path("/tmp/../../etc/passwd");
+    f->set_expected_bytes(static_cast<int64_t>(fake.payload.size()));
+
+    rav1::DownloadStartRequest request;
+    request.set_model_id("ptrav-start");
+    *request.mutable_plan() = plan;
+    request.set_resume(false);
+
+    std::string bytes = serialize_msg(request);
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_start_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                          bytes.size(), &buffer) == RAC_SUCCESS,
+                "Start call should succeed");
+    rav1::DownloadStartResult start;
+    ASSERT_TRUE(parse_start(buffer, &start), "Start result should parse");
+    rac_proto_buffer_free(&buffer);
+
+    // With every entry skipped, start must report a clean rejection rather
+    // than accepting a download targeted at /etc/passwd.
+    ASSERT_TRUE(!start.accepted(),
+                "Start must reject a plan whose only file has a traversal-unsafe path");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_start_no_adapter() {
     TestResult r;
     r.test_name = "proto_start_no_adapter";
@@ -1113,6 +1255,11 @@ int main(int argc, char** argv) {
         suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
         suite.add("proto_plan_rejects_invalid_existing_bytes",
                   test_proto_plan_rejects_invalid_existing_bytes);
+        // pass2-syn-115 / security-privacy-storage-network-001 regression
+        suite.add("proto_plan_rejects_path_traversal_destination",
+                  test_proto_plan_rejects_path_traversal_destination);
+        suite.add("proto_start_skips_traversal_unsafe_plan_entry",
+                  test_proto_start_skips_traversal_unsafe_plan_entry);
         suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
         suite.add("proto_start_progress_callback_complete",
                   test_proto_start_progress_callback_complete);

@@ -91,6 +91,23 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
   const runSolution = async (name: string, yaml: string) => {
     if (running) return;
 
+    if (name === 'Voice Agent') {
+      // Mirror the RAG bootstrap guard and the Voice tab placeholder in
+      // src/views/voice.ts: the Voice Agent YAML references
+      // sherpa-onnx-whisper-tiny.en / vits-piper-en_US-lessac-medium /
+      // silero-vad, all of which require the ONNX/Sherpa WASM backend
+      // (gated by RAC_WASM_ONNX=ON). On the default Web build the
+      // example only registers `@runanywhere/web-llamacpp` and ships no
+      // ONNX dependency, so calling RunAnywhere.solutions.run is
+      // guaranteed to fail when the operators try to load their models.
+      // Short-circuit with a clear placeholder instead of letting the
+      // runner surface an opaque native error.
+      append(
+        'N/A Voice Agent: ONNX/Sherpa backend not registered (rebuild with RAC_WASM_ONNX=ON and load `@runanywhere/web-onnx` to enable STT/TTS/VAD).',
+      );
+      return;
+    }
+
     if (name === 'RAG') {
       let availability = RunAnywhere.rag.availability();
       // wasm-exports means the RAG WASM is healthy but no provider has
@@ -142,6 +159,13 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
   };
 
   updateRAGCapabilityState();
+
+  // Reflect the Voice Agent preflight in the button affordance: the default
+  // Web build cannot register ONNX/Sherpa so this button always falls into
+  // the placeholder branch. Keep it clickable (so the log explains why) but
+  // mark it visually as N/A via the tooltip.
+  voiceBtn.title =
+    'Voice Agent requires the ONNX/Sherpa backend (RAC_WASM_ONNX=ON). Click for details.';
 
   voiceBtn.addEventListener('click', () => runSolution('Voice Agent', VOICE_AGENT_YAML));
   ragBtn.addEventListener('click', () => runSolution('RAG', RAG_YAML));

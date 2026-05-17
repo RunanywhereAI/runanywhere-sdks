@@ -22,7 +22,6 @@
 #ifndef RAC_VLM_SERVICE_H
 #define RAC_VLM_SERVICE_H
 
-#include "rac/core/rac_error.h"
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -281,6 +280,16 @@ RAC_API rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes,
  * @brief Cancel lifecycle-owned VLM generation and return a cancellation event.
  */
 RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event);
+
+/**
+ * @brief Spin-wait until all in-flight VLM proto-byte stream/process entry
+ *        points have returned. Mirrors the voice_agent in_flight pattern
+ *        (voice_agent.cpp:594). Callers freeing user_data passed into
+ *        rac_vlm_process_stream_proto / rac_vlm_stream_proto, or tearing
+ *        down the lifecycle VLM, should call this before freeing the
+ *        user_data. Safe to call from any thread.
+ */
+RAC_API void rac_vlm_proto_quiesce(void);
 
 /**
  * @brief Cleanup and release model resources

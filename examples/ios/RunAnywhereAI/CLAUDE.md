@@ -63,10 +63,15 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 | Tab | View | Purpose |
 |-----|------|---------|
 | 0 | `ChatInterfaceView` | LLM chat with tool calling, LoRA, analytics |
-| 1 | `VisionHubView` | VLM camera + Image generation (Diffusion) |
+| 1 | `VisionHubView` | VLM camera |
 | 2 | `VoiceAssistantView` | Full voice agent (STT + LLM + TTS pipeline) |
 | 3 | `MoreHubView` | RAG, STT, TTS, VAD, Storage, Solutions, Voice Keyboard |
 | 4 | `CombinedSettingsView` | Generation params, API keys, tools, storage |
+
+> **Deferred backends.** MetalRT, WhisperKit, and Diffusion (image generation)
+> are excluded from the v1 build (`RunAnywhereAIApp.swift:12,443`). Their
+> products, registration calls, feature folders, and `generateImage` APIs are
+> intentionally absent from the shipped sources.
 
 ### Dependency Injection
 Three layers:
@@ -76,9 +81,9 @@ Three layers:
 
 ### SDK Initialization Gate
 The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. The boot sequence:
-1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, `ONNX.register(priority:100)`, `WhisperKitSTT.register(priority:200)`
+1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, `ONNX.register(priority:100)`
 2. `RunAnywhere.initialize()` — core C++ bridge init
-3. `registerModulesAndModels()` — registers ~30 models (LLMs, VLMs, STT, TTS, VAD, embeddings, diffusion, LoRA)
+3. `registerModulesAndModels()` — registers LLMs, VLMs, STT, TTS, VAD, embeddings, LoRA
 4. `RunAnywhere.discoverDownloadedModels()` then `RunAnywhere.listModels()` (refresh registry)
 
 Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
@@ -118,7 +123,6 @@ RunAnywhereAI/
 │   ├── Voice/                          # STT, TTS, VAD, VoiceAgent (11 files)
 │   ├── VoiceKeyboard/                  # Dictation keyboard flow (5 files)
 │   ├── Vision/                         # VLM camera (2 files)
-│   ├── Diffusion/                      # Image generation (2 files)
 │   ├── RAG/                            # Document Q&A (3 files)
 │   ├── Benchmarks/                     # Performance testing (11 files)
 │   ├── Models/                         # Model browser/downloader (7 files)
@@ -230,11 +234,7 @@ Real-time camera-based image description. `AVCaptureSession` with BGRA pixel for
 - **Photo library**: Same pipeline from selected image
 - **Auto-streaming**: Captures frame every 2.5s, shorter prompt (maxTokens: 100)
 
-### 8. Diffusion / Image Generation (`Features/Diffusion/`)
-
-Text-to-image via CoreML Stable Diffusion 1.5. `RunAnywhere.generateImage(prompt:options:)` with step-by-step progress callback. Resolution capped at 512px. Raw RGBA `Data` decoded to `CGImage` via `CGDataProvider`.
-
-### 9. RAG — Document Q&A (`Features/RAG/`)
+### 8. RAG — Document Q&A (`Features/RAG/`)
 
 PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
@@ -242,29 +242,29 @@ PDF/JSON document ingestion → on-device embedding + LLM pipeline.
 
 Path resolution handles multi-file embedding models (e.g., `all-minilm-l6-v2` with `model.onnx` + `vocab.txt`).
 
-### 10. Benchmarks (`Features/Benchmarks/`)
+### 9. Benchmarks (`Features/Benchmarks/`)
 
-Deterministic performance testing across 5 modalities (LLM, STT, TTS, VLM, Diffusion). Each has a `BenchmarkScenarioProvider`. `BenchmarkRunner` orchestrates with cooperative cancellation. Results persisted as JSON (max 50 runs). Exportable as Markdown, JSON, or CSV.
+Deterministic performance testing across 4 modalities (LLM, STT, TTS, VLM). Each has a `BenchmarkScenarioProvider`. `BenchmarkRunner` orchestrates with cooperative cancellation. Results persisted as JSON (max 50 runs). Exportable as Markdown, JSON, or CSV.
 
 **Synthetic inputs**: `SyntheticInputGenerator` creates silent/sine-wave audio, solid/gradient images.
 
 **LLM scenarios**: 50/256/512 token runs with TTFT and decode speed measurement.
 
-### 11. Models Management (`Features/Models/`)
+### 10. Models Management (`Features/Models/`)
 
 `ModelListViewModel` (singleton) is the canonical model registry. Subscribes to `RunAnywhere.events.events` for real-time load/unload state. `ModelSelectionSheet` is the universal model picker parameterized by `ModelSelectionContext` enum (`.llm`, `.stt`, `.tts`, `.vad`, `.vlm`, `.ragEmbedding`, `.ragLLM`). Custom model registration via URL in `AddModelFromURLView`.
 
-### 12. Storage (`Features/Storage/`)
+### 11. Storage (`Features/Storage/`)
 
 `RunAnywhere.getStorageInfo()` → disk usage display. Per-model deletion via `RunAnywhere.deleteStoredModel()`. Cache/temp clearing via `RunAnywhere.clearCache()` / `RunAnywhere.cleanTempFiles()`.
 
-### 13. Settings (`Features/Settings/`)
+### 12. Settings (`Features/Settings/`)
 
 `SettingsViewModel` (singleton): temperature, maxTokens, systemPrompt (UserDefaults), API key/baseURL (Keychain), thinking mode toggle. Auto-saves via Combine `debounce(0.5s)`.
 
 `ToolSettingsViewModel`: registers/clears demo tools via `RunAnywhere.registerTool(definition:executor:)`. Includes `SafeMathEvaluator` (recursive-descent parser) for the `calculate` tool.
 
-### 14. Solutions (`Features/Solutions/`)
+### 13. Solutions (`Features/Solutions/`)
 
 Minimal demo of `RunAnywhere.solutions.run(yaml:)` — the SDK's declarative pipeline API. Two hardcoded YAML strings (voice agent, RAG) submitted to SDK, lifecycle callbacks logged.
 
@@ -325,8 +325,7 @@ RunAnywhere.initializeVoiceAgent(_ config: RAVoiceAgentComposeConfig)
 RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>
 RunAnywhere.processVoiceTurn / cleanupVoiceAgent
 
-// Diffusion / RAG / Storage / LoRA / Solutions
-RunAnywhere.generateImage(options:) / generateImage(options:onProgress:) / cancelImageGeneration()
+// RAG / Storage / LoRA / Solutions
 RunAnywhere.ragCreatePipeline(config:) / ragIngest(_:) / ragQuery(_:)
 RunAnywhere.getStorageInfo() / clearCache() / cleanTempFiles() / planStorageDelete / deleteStorage
 RunAnywhere.lora.{apply,remove,list,state,register,listCatalog,allRegistered,...}
@@ -388,7 +387,7 @@ All styling is centralized — no inline magic numbers or color literals in view
 
 | File | Purpose |
 |------|---------|
-| `Package.swift` | SPM deps: local path `../../..` → RunAnywhere + ONNX + LlamaCPP + WhisperKit |
+| `Package.swift` | SPM deps: local path `../../..` → RunAnywhere + ONNX + LlamaCPP |
 | `Info.plist` | URL scheme `runanywhere`, background mode `audio`, Live Activities enabled |
 | `RunAnywhereAI.entitlements` | macOS sandbox, camera, mic, network, app group |
 | `RunAnywhereConfig-Debug.plist` | Dev API URL, debug logging, 30s timeout |

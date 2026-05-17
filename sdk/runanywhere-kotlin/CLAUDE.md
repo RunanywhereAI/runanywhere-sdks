@@ -106,13 +106,14 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `commonMain/pub
 
 | File | Capability |
 |------|-----------|
-| `RunAnywhere+TextGeneration.kt` | `chat()`, `generate()`, `generateStream()`, `cancelGeneration()` |
-| `RunAnywhere+STT.kt` | `transcribe()`, `transcribeStream()` generated `STTStreamEvent` flow |
-| `RunAnywhere+TTS.kt` | `synthesize()`, `speak()`, `synthesizeStream()`, voice management |
-| `RunAnywhere+VAD.kt` | `detectVoiceActivity()`, `streamVAD()`, VAD lifecycle & callbacks |
-| `RunAnywhere+VisionLanguage.kt` | `describeImage()`, `processImage()`, `processImageStream()` |
-| `RunAnywhere+VoiceAgent.kt` | Full voice pipeline: `initializeVoiceAgent()`, `streamVoiceAgent()` |
-| `RunAnywhere+ModelManagement.kt` | `registerModel()`, `downloadModel()`, `loadLLMModel()`, model CRUD |
+| `LLM/RunAnywhereTextGeneration.kt` | `generate(prompt, RALLMGenerationOptions?) → RALLMGenerationResult`, `generateStream(...) → Flow<RALLMStreamEvent>`, `cancelGeneration()` |
+| `STT/RunAnywhereSTT.kt` | `transcribe(audio, RASTTOptions)`, `transcribeStream(Flow<ByteArray>, RASTTOptions?) → Flow<RASTTPartialResult>` |
+| `TTS/RunAnywhereTTS.kt` | `synthesize(text, RATTSOptions)`, `speak()`, `synthesizeStream() → Flow<RATTSOutput>`, `stopSpeaking()`, `stopSynthesis()` |
+| `VAD/RunAnywhereVAD.kt` | `detectVoiceActivity()`, `streamVAD(Flow<FloatArray>, RAVADOptions)`, `resetVAD()` |
+| `VLM/RunAnywhereVisionLanguage.kt` | `describeImage()`, `processImage()`, `processImageStream()` |
+| `VoiceAgent/RunAnywhereVoiceAgent.kt` | Full voice pipeline: `initializeVoiceAgent(VoiceAgentConfig)`, `streamVoiceAgent() → Flow<VoiceEvent>`, `processVoiceTurn()`, `cleanupVoiceAgent()` |
+| `Models/RunAnywhereModelLifecycle.kt` | `loadModel(RAModelLoadRequest)`, `unloadModel(ModelUnloadRequest)`, `currentModel(CurrentModelRequest)`, `componentLifecycleSnapshot()` |
+| `Models/RunAnywhereModelRegistry.kt` | `registerModel()`, `downloadModel()`, `availableModels()`, `deleteModel()`, model CRUD |
 | `RunAnywhere+RAG.kt` | `ragCreatePipeline()`, `ragIngest()`, `ragQuery()` |
 | `RunAnywhere+ToolCalling.kt` | `registerTool()`, `generateWithTools()` |
 | `RunAnywhere+StructuredOutput.kt` | `generateStructured()`, JSON schema-constrained generation |

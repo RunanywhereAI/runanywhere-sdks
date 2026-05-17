@@ -21,7 +21,6 @@
 #ifndef RAC_VAD_SERVICE_H
 #define RAC_VAD_SERVICE_H
 
-#include "rac/core/rac_error.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -142,35 +141,12 @@ RAC_API rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
                                                 rac_vad_audio_callback_fn callback,
                                                 void* user_data);
 
-/**
- * @brief Start VAD processing
- *
- * Mirrors Swift's VADService.start()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_start(rac_handle_t handle);
-
-/**
- * @brief Stop VAD processing
- *
- * Mirrors Swift's VADService.stop()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_stop(rac_handle_t handle);
-
-/**
- * @brief Reset VAD state
- *
- * Mirrors Swift's VADService.reset()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_reset(rac_handle_t handle);
+// pass2-syn-002: rac_vad_{start,stop,reset} were declared RAC_API but never
+// implemented in commons. The lifecycle/component proto ABI
+// (rac_vad_{start,stop,reset}_lifecycle_proto, rac_vad_component_{start,stop,reset})
+// is the canonical surface; the bare service-level start/stop/reset variants
+// were stale carryovers from the pre-lifecycle V1 design. Decls deleted so
+// the RAC_API surface no longer advertises symbols that do not exist.
 
 /**
  * @brief Pause VAD processing

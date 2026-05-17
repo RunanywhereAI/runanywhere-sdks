@@ -3,12 +3,46 @@
 // Shared helpers for generated-proto C ABI calls. This file owns only byte
 // transport across FFI; modality behavior stays in commons.
 
+import 'dart:async';
 import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
+
+/// Maximum number of microtask yields the synchronous-FFI streaming wrappers
+/// use to drain queued `NativeCallable.listener` callbacks before deciding
+/// whether to force-close the controller (FLUTTER-IOS-001).
+///
+/// Rationale: `rac_*_stream*_proto` are synchronous FFI calls — they block the
+/// main isolate, so every `NativeCallable.listener` invocation made during the
+/// call queues onto the event loop instead of running. After the FFI returns,
+/// we must yield a bounded number of times to let those queued callbacks
+/// (including the terminal one) drain before closing the controller; otherwise
+/// subscribers receive an empty stream even though native emitted events.
+///
+/// The bound is intentionally small (we exit early as soon as a terminal event
+/// has been observed via `sawTerminalEvent`). 4 ticks is empirically enough
+/// for the bursty TTS/STT/VLM/LLM callback patterns we ship today. Bumping
+/// this only adds latency on misbehaving backends that never send a terminal
+/// event — increase if you observe tail-event loss in tests.
+const int kStreamDrainMaxMicrotasks = 4;
+
+/// Helper that yields up to [kStreamDrainMaxMicrotasks] microtask ticks,
+/// bailing out as soon as [terminalObserved] returns true. Centralizes the
+/// FLUTTER-IOS-001 drain loop used by every synchronous-FFI streaming
+/// wrapper (`DartBridgeTTS.synthesizeStreamLifecycleProto`,
+/// `DartBridgeVLM.processImageStreamProto`, `RunAnywhereSTT.transcribeStream`,
+/// `RunAnywhereLLM._generateStreamProto`).
+Future<void> drainPendingStreamCallbacks(
+  bool Function() terminalObserved,
+) async {
+  for (var i = 0; i < kStreamDrainMaxMicrotasks; i++) {
+    if (terminalObserved()) return;
+    await Future<void>.delayed(Duration.zero);
+  }
+}
 
 class DartBridgeProtoUtils {
   DartBridgeProtoUtils._();

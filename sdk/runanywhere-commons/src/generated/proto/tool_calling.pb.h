@@ -5092,10 +5092,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     kToolsFieldNumber = 2,
     kPromptFieldNumber = 1,
     kFormatHintFieldNumber = 3,
+    kForcedToolNameFieldNumber = 8,
     kSystemPromptFieldNumber = 14,
     kMaxIterationsFieldNumber = 4,
     kKeepToolsAvailableFieldNumber = 5,
     kValidateCallsFieldNumber = 6,
+    kToolChoiceFieldNumber = 7,
     kMaxTokensFieldNumber = 11,
     kTemperatureFieldNumber = 12,
     kTopPFieldNumber = 13,
@@ -5150,6 +5152,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
   ::std::string* PROTOBUF_NONNULL _internal_mutable_format_hint();
 
   public:
+  // optional string forced_tool_name = 8;
+  [[nodiscard]] bool has_forced_tool_name()
+      const;
+  void clear_forced_tool_name() ;
+  [[nodiscard]] const ::std::string& forced_tool_name() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_forced_tool_name(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_forced_tool_name();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_forced_tool_name();
+  void set_allocated_forced_tool_name(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_forced_tool_name() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_forced_tool_name(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_forced_tool_name();
+
+  public:
   // string system_prompt = 14;
   void clear_system_prompt() ;
   [[nodiscard]] const ::std::string& system_prompt() const;
@@ -5197,6 +5216,18 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
   void _internal_set_validate_calls(bool value);
 
   public:
+  // optional .runanywhere.v1.ToolChoiceMode tool_choice = 7;
+  [[nodiscard]] bool has_tool_choice()
+      const;
+  void clear_tool_choice() ;
+  [[nodiscard]] ::runanywhere::v1::ToolChoiceMode tool_choice() const;
+  void set_tool_choice(::runanywhere::v1::ToolChoiceMode value);
+
+  private:
+  ::runanywhere::v1::ToolChoiceMode _internal_tool_choice() const;
+  void _internal_set_tool_choice(::runanywhere::v1::ToolChoiceMode value);
+
+  public:
   // int32 max_tokens = 11;
   void clear_max_tokens() ;
   [[nodiscard]] ::int32_t max_tokens() const;
@@ -5231,8 +5262,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 10,
-                                   1, 93,
+  static const ::google::protobuf::internal::TcParseTable<4, 12,
+                                   1, 109,
                                    2>
       _table_;
 
@@ -5258,10 +5289,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::ToolDefinition > tools_;
     ::google::protobuf::internal::ArenaStringPtr prompt_;
     ::google::protobuf::internal::ArenaStringPtr format_hint_;
+    ::google::protobuf::internal::ArenaStringPtr forced_tool_name_;
     ::google::protobuf::internal::ArenaStringPtr system_prompt_;
     ::uint32_t max_iterations_;
     bool keep_tools_available_;
     bool validate_calls_;
+    int tool_choice_;
     ::int32_t max_tokens_;
     float temperature_;
     float top_p_;
@@ -12200,7 +12233,7 @@ inline void ToolCallingSessionCreateRequest::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000200U);
 }
 inline ::int32_t ToolCallingSessionCreateRequest::max_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.max_tokens)
@@ -12208,7 +12241,7 @@ inline ::int32_t ToolCallingSessionCreateRequest::max_tokens() const {
 }
 inline void ToolCallingSessionCreateRequest::set_max_tokens(::int32_t value) {
   _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.max_tokens)
 }
 inline ::int32_t ToolCallingSessionCreateRequest::_internal_max_tokens() const {
@@ -12225,7 +12258,7 @@ inline void ToolCallingSessionCreateRequest::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000400U);
 }
 inline float ToolCallingSessionCreateRequest::temperature() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.temperature)
@@ -12233,7 +12266,7 @@ inline float ToolCallingSessionCreateRequest::temperature() const {
 }
 inline void ToolCallingSessionCreateRequest::set_temperature(float value) {
   _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.temperature)
 }
 inline float ToolCallingSessionCreateRequest::_internal_temperature() const {
@@ -12250,7 +12283,7 @@ inline void ToolCallingSessionCreateRequest::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000200U);
+                  0x00000800U);
 }
 inline float ToolCallingSessionCreateRequest::top_p() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.top_p)
@@ -12258,7 +12291,7 @@ inline float ToolCallingSessionCreateRequest::top_p() const {
 }
 inline void ToolCallingSessionCreateRequest::set_top_p(float value) {
   _internal_set_top_p(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.top_p)
 }
 inline float ToolCallingSessionCreateRequest::_internal_top_p() const {
@@ -12275,7 +12308,7 @@ inline void ToolCallingSessionCreateRequest::clear_system_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.system_prompt_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000010U);
 }
 inline const ::std::string& ToolCallingSessionCreateRequest::system_prompt() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -12285,13 +12318,13 @@ inline const ::std::string& ToolCallingSessionCreateRequest::system_prompt() con
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void ToolCallingSessionCreateRequest::set_system_prompt(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.system_prompt_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.system_prompt)
 }
 inline ::std::string* PROTOBUF_NONNULL ToolCallingSessionCreateRequest::mutable_system_prompt()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_system_prompt();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ToolCallingSessionCreateRequest.system_prompt)
   return _s;
@@ -12311,10 +12344,10 @@ inline ::std::string* PROTOBUF_NONNULL ToolCallingSessionCreateRequest::_interna
 inline ::std::string* PROTOBUF_NULLABLE ToolCallingSessionCreateRequest::release_system_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.ToolCallingSessionCreateRequest.system_prompt)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.system_prompt_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.system_prompt_.Set("", GetArena());
@@ -12324,9 +12357,9 @@ inline ::std::string* PROTOBUF_NULLABLE ToolCallingSessionCreateRequest::release
 inline void ToolCallingSessionCreateRequest::set_allocated_system_prompt(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.system_prompt_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.system_prompt_.IsDefault()) {
@@ -12461,7 +12494,7 @@ inline void ToolCallingSessionCreateRequest::clear_max_iterations() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_iterations_ = 0u;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000020U);
 }
 inline ::uint32_t ToolCallingSessionCreateRequest::max_iterations() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.max_iterations)
@@ -12469,7 +12502,7 @@ inline ::uint32_t ToolCallingSessionCreateRequest::max_iterations() const {
 }
 inline void ToolCallingSessionCreateRequest::set_max_iterations(::uint32_t value) {
   _internal_set_max_iterations(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.max_iterations)
 }
 inline ::uint32_t ToolCallingSessionCreateRequest::_internal_max_iterations() const {
@@ -12486,7 +12519,7 @@ inline void ToolCallingSessionCreateRequest::clear_keep_tools_available() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.keep_tools_available_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000040U);
 }
 inline bool ToolCallingSessionCreateRequest::keep_tools_available() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.keep_tools_available)
@@ -12494,7 +12527,7 @@ inline bool ToolCallingSessionCreateRequest::keep_tools_available() const {
 }
 inline void ToolCallingSessionCreateRequest::set_keep_tools_available(bool value) {
   _internal_set_keep_tools_available(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.keep_tools_available)
 }
 inline bool ToolCallingSessionCreateRequest::_internal_keep_tools_available() const {
@@ -12508,14 +12541,14 @@ inline void ToolCallingSessionCreateRequest::_internal_set_keep_tools_available(
 
 // optional bool validate_calls = 6;
 inline bool ToolCallingSessionCreateRequest::has_validate_calls() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   return value;
 }
 inline void ToolCallingSessionCreateRequest::clear_validate_calls() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validate_calls_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000080U);
 }
 inline bool ToolCallingSessionCreateRequest::validate_calls() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.validate_calls)
@@ -12523,7 +12556,7 @@ inline bool ToolCallingSessionCreateRequest::validate_calls() const {
 }
 inline void ToolCallingSessionCreateRequest::set_validate_calls(bool value) {
   _internal_set_validate_calls(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.validate_calls)
 }
 inline bool ToolCallingSessionCreateRequest::_internal_validate_calls() const {
@@ -12533,6 +12566,104 @@ inline bool ToolCallingSessionCreateRequest::_internal_validate_calls() const {
 inline void ToolCallingSessionCreateRequest::_internal_set_validate_calls(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.validate_calls_ = value;
+}
+
+// optional .runanywhere.v1.ToolChoiceMode tool_choice = 7;
+inline bool ToolCallingSessionCreateRequest::has_tool_choice() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
+inline void ToolCallingSessionCreateRequest::clear_tool_choice() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.tool_choice_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline ::runanywhere::v1::ToolChoiceMode ToolCallingSessionCreateRequest::tool_choice() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.tool_choice)
+  return _internal_tool_choice();
+}
+inline void ToolCallingSessionCreateRequest::set_tool_choice(::runanywhere::v1::ToolChoiceMode value) {
+  _internal_set_tool_choice(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.tool_choice)
+}
+inline ::runanywhere::v1::ToolChoiceMode ToolCallingSessionCreateRequest::_internal_tool_choice() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ToolChoiceMode>(_impl_.tool_choice_);
+}
+inline void ToolCallingSessionCreateRequest::_internal_set_tool_choice(::runanywhere::v1::ToolChoiceMode value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.tool_choice_ = value;
+}
+
+// optional string forced_tool_name = 8;
+inline bool ToolCallingSessionCreateRequest::has_forced_tool_name() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  return value;
+}
+inline void ToolCallingSessionCreateRequest::clear_forced_tool_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.forced_tool_name_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& ToolCallingSessionCreateRequest::forced_tool_name() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingSessionCreateRequest.forced_tool_name)
+  return _internal_forced_tool_name();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ToolCallingSessionCreateRequest::set_forced_tool_name(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.forced_tool_name_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingSessionCreateRequest.forced_tool_name)
+}
+inline ::std::string* PROTOBUF_NONNULL ToolCallingSessionCreateRequest::mutable_forced_tool_name()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_forced_tool_name();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ToolCallingSessionCreateRequest.forced_tool_name)
+  return _s;
+}
+inline const ::std::string& ToolCallingSessionCreateRequest::_internal_forced_tool_name() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.forced_tool_name_.Get();
+}
+inline void ToolCallingSessionCreateRequest::_internal_set_forced_tool_name(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.forced_tool_name_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ToolCallingSessionCreateRequest::_internal_mutable_forced_tool_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.forced_tool_name_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ToolCallingSessionCreateRequest::release_forced_tool_name() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ToolCallingSessionCreateRequest.forced_tool_name)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.forced_tool_name_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.forced_tool_name_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ToolCallingSessionCreateRequest::set_allocated_forced_tool_name(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.forced_tool_name_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.forced_tool_name_.IsDefault()) {
+    _impl_.forced_tool_name_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingSessionCreateRequest.forced_tool_name)
 }
 
 // -------------------------------------------------------------------

@@ -489,7 +489,7 @@ Manually configured (no `applyDefaultHierarchyTemplate`). Use `expect/actual` on
 
 | Concern | iOS Swift | Kotlin KMP | Flutter | React Native | Web |
 |---------|-----------|-----------|---------|-------------|-----|
-| Entry point | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhereSDK.instance` | `RunAnywhere` object | `RunAnywhere` object |
+| Entry point | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhere` (abstract final class with static members) | `RunAnywhere` object | `RunAnywhere` object |
 | Two-phase init | `initialize()` + `completeServicesInitialization()` | Same | Same | Same | Same |
 | Bridge layer | `CppBridge` enum + extensions | `CppBridge` object + extensions | `DartBridge` + `DartBridge*.dart` | `HybridRunAnywhereCore` (Nitro) | `LlamaCppBridge` + `SherpaONNXBridge` |
 | Streaming | `AsyncStream` | `Flow` | `Stream` (via `StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |

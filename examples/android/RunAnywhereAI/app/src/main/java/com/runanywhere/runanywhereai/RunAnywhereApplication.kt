@@ -8,7 +8,7 @@ import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.configuration.wireString
+import com.runanywhere.sdk.generated.convenience.wireString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

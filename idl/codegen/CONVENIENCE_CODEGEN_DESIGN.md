@@ -952,12 +952,47 @@ combine multiple steps.
 
 ### 9.1 Error handling
 
-| Language   | Exception type / shape                                                                | Origin                                                                |
-| ---------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Swift      | `SDKException(code: .invalidArgument, message: ..., category: .validation)`           | `sdk/runanywhere-swift/.../SDKException.swift` (existing)             |
-| Kotlin     | `SDKException.validationFailed(message)` (factory on the existing exception class)    | `sdk/runanywhere-kotlin/.../foundation/errors/SDKException.kt`        |
-| Dart       | `SDKException.validationFailed(message)`                                              | `sdk/runanywhere-flutter/.../foundation/errors/sdk_exception.dart`    |
-| TypeScript | `ValidationError extends Error` (new, in `convenience/_errors.ts`)                    | New file; minimal blast radius vs introducing an SDK-specific shim    |
+**Canonical shape (cross-SDK contract)**:
+
+```
+{
+  code:      'invalid_argument',
+  category:  'validation',
+  fieldPath: '<MessageName>.<field_name>',   // e.g. 'STTOptions.sampleRate'
+  message:   '<human-readable description>'
+}
+```
+
+All four convenience generators emit this shape. The four exception types
+are byte-isomorphic via the proto `SDKError`:
+
+* `code` ↔ `SDKError.code` (`ERROR_CODE_INVALID_ARGUMENT` / the TS string
+  discriminant `'invalid_argument'`)
+* `category` ↔ `SDKError.category` (`ERROR_CATEGORY_VALIDATION` / the TS
+  string discriminant `'validation'`)
+* `fieldPath` ↔ `SDKError.context.metadata["field_path"]` (Swift /
+  Kotlin / Dart) or top-level property (TS)
+* `message` ↔ `SDKError.message`
+
+Cross-platform consumer code (the React Native ↔ shared validation
+layer, streaming-perf parity tests) can rely on the same discriminants
+on every platform:
+
+```ts
+if (e instanceof ValidationError && e.code === 'invalid_argument') {
+  console.error('Validation failed for', e.fieldPath, ':', e.message);
+}
+```
+```kotlin
+if (e is SDKException && e.fieldPath != null) { ... }
+```
+
+| Language   | Exception type / shape                                                                                   | Origin                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Swift      | `SDKException.validationFailed(fieldPath:message:)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-swift/.../SDKException.swift`                        |
+| Kotlin     | `SDKException.validationFailed(fieldPath, message)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-kotlin/.../foundation/errors/SDKException.kt`        |
+| Dart       | `SDKException.validationFailed(message, fieldPath: ...)` → exposes `.code`, `.category`, `.fieldPath`, `.message` | `sdk/runanywhere-flutter/.../foundation/errors/sdk_exception.dart`    |
+| TypeScript | `new ValidationError({fieldPath, message})` → exposes `.code`, `.category`, `.fieldPath`, `.message`     | `sdk/shared/proto-ts/src/convenience/_errors.ts` (hand-written)       |
 
 ### 9.2 Wire-format / runtime constraints
 

@@ -14,6 +14,7 @@ import type {
   LLMGenerationOptions,
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
+import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
 import {
   StructuredOutputMode,
   type StructuredOutputOptions,
@@ -106,6 +107,13 @@ function streamingResultFromEvents(
   let fullText = '';
   let tokenCount = 0;
   let finalEvent: LLMStreamEvent | undefined;
+  // pass2-syn-010-followup-web: surface LLMStreamEvent.toolCall (proto field 18)
+  // on the final LLMGenerationResult.toolCalls list so callers driving tool
+  // calling through the streaming path see the same shape they would see from
+  // the non-streaming `generate()` call. C++ producer emits this field when the
+  // backend supports streamed tool-call deltas (libprotobuf-enabled builds);
+  // on WASM the field is currently always absent (see syn-010 evidence).
+  const accumulatedToolCalls: ToolCall[] = [];
   const startedAt = performance.now();
 
   const result = new Promise<LLMGenerationResult>((resolve, reject) => {
@@ -121,12 +129,17 @@ function streamingResultFromEvents(
               tokenCount += 1;
               queue.push(event.token);
             }
+            if (event.toolCall) {
+              accumulatedToolCalls.push(event.toolCall);
+            }
             if (event.errorMessage) {
               throw SDKException.generationFailed(event.errorMessage);
             }
           }
           queue.complete();
-          resolve(finalLLMResult(fullText, tokenCount, startedAt, finalEvent));
+          resolve(
+            finalLLMResult(fullText, tokenCount, startedAt, finalEvent, accumulatedToolCalls),
+          );
         } catch (error) {
           queue.fail(error instanceof Error ? error : new Error(String(error)));
           reject(error);
@@ -148,8 +161,14 @@ function streamingResultFromEvents(
     cancel() {
       if (cancelled) return;
       cancelled = true;
+      // Fire the native cancel proto. The underlying `events` async iter
+      // terminates once the native stream finishes (immediately for sync
+      // backends, on next yield for async ones). The producer IIFE above
+      // calls `queue.complete()` when the upstream loop exits, so we
+      // intentionally do NOT close the queue here — tokens already emitted
+      // by the backend remain observable to consumers iterating after the
+      // cancel call.
       cancelNative();
-      queue.complete();
     },
   };
 }
@@ -159,11 +178,16 @@ function finalLLMResult(
   tokenCount: number,
   startedAt: number,
   finalEvent?: LLMStreamEvent,
+  streamedToolCalls: ToolCall[] = [],
 ): LLMGenerationResult {
   const final = finalEvent?.result;
   const generationTimeMs = final?.totalTimeMs ?? performance.now() - startedAt;
   const inputTokens = final?.promptTokens ?? 0;
   const tokensGenerated = final?.completionTokens ?? tokenCount;
+  // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
+  // when present; otherwise fall back to the per-event accumulator so callers
+  // still see streamed tool calls on backends that don't emit a final result.
+  const toolCalls = final?.toolCalls?.length ? final.toolCalls : streamedToolCalls;
   return {
     text: final?.text ?? fullText,
     thinkingContent: final?.thinkingContent,
@@ -183,8 +207,8 @@ function finalLLMResult(
     cachedPromptTokens: 0,
     promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
     decodeTimeMs: final?.decodeTimeMs ?? 0,
-    toolCalls: [],
-    toolResults: [],
+    toolCalls,
+    toolResults: final?.toolResults ?? [],
   };
 }
 

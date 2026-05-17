@@ -3,6 +3,36 @@
  *
  * T6.1 — Main-thread orchestrator for the Worker streaming path.
  *
+ * @internal @experimental
+ *
+ * INTERNAL/EXPERIMENTAL — NOT a stable public surface. The T6.1 Worker
+ * streaming path ships as scaffolding only: no production backend
+ * (`@runanywhere/web-llamacpp`, `@runanywhere/web-onnx`) currently
+ * installs the `StreamWorkerFactory` or calls `setStreamWorkerInit`, so
+ * `OffscreenRuntimeBridge.tryGet()` returns `null` in every production
+ * code path and adapters fall through to the main-thread
+ * `streamCallback` (queueMicrotask) path. The dispatch code below is
+ * exercised only by the unit tests under
+ * `tests/unit/runtime/StreamWorker.test.ts` until a backend lands its
+ * Worker bootstrap.
+ *
+ * REMOVAL CONTRACT:
+ *   Either (a) a backend package wires a worker bundle + calls
+ *   `setStreamWorkerFactory(...)` + `setStreamWorkerInit(...)` from its
+ *   `register()`, at which point this file flips to a stable public
+ *   surface (drop the `@internal @experimental` tag) — OR (b) the
+ *   Worker streaming path is abandoned in favour of the documented
+ *   SAB ring-buffer follow-up (Option C in
+ *   `docs/STREAM_DELIVERY_DESIGN.md`), at which point this file plus
+ *   `StreamWorker.ts` + `StreamWorkerFactoryRegistry.ts` are deleted
+ *   wholesale. Do NOT build new SDK features against the
+ *   `OffscreenRuntimeBridge` API surface until that disposition lands.
+ *
+ *   Tracked by:
+ *     - `comments/pr-494/addressing/comments/pass2-syn-027.json` —
+ *       "T6.1 Worker streaming path is dead code in production"
+ *     - `docs/STREAM_DELIVERY_DESIGN.md` — DECISION-3 + Recommended-next-step
+ *
  * Owns a lazily-spawned `Worker` and routes per-call streaming requests
  * (`stream.llm.generate`, `stream.stt.transcribe`, `stream.tts.synthesize`,
  * `stream.vlm.process`) to it. Each request returns an `AsyncIterable<T>`
@@ -108,10 +138,18 @@ export class OffscreenRuntimeBridge {
    * the current `streamingMode` preference. Returns `null` (and
    * adapters fall back to the main-thread path) when:
    *   - `mode === 'main'`, or
-   *   - no `streamWorkerFactory` is registered.
+   *   - no `streamWorkerFactory` is registered, or
+   *   - no `setStreamWorkerInit(...)` payload has been registered.
    *
    * `mode === 'worker'` with no factory logs a warning on first use,
    * then still returns `null` — adapters must not break.
+   *
+   * Mode sampling: `streamingMode` is read on every `tryGet()` call.
+   * Mid-session flips between `'auto'`/`'worker'` and `'main'` correctly
+   * short-circuit because `'main'` returns `null` immediately. Flips
+   * between `'auto'` and `'worker'` reuse the cached bridge singleton —
+   * both are Worker-eligible so no reconfiguration is needed. The
+   * Worker-mode-with-no-factory warning is reset on `dispose()`.
    */
   static tryGet(mode: StreamingMode = Runtime.streamingMode): OffscreenRuntimeBridge | null {
     if (mode === 'main') return null;
@@ -125,6 +163,18 @@ export class OffscreenRuntimeBridge {
       }
       return null;
     }
+    // Gate the bridge on a non-null init payload too: without it the
+    // worker can never receive its wasmBytes/moduleFactoryId and the
+    // handshake would hang. See pass2-syn-034.
+    if (!_init) {
+      if (mode === 'worker' && !_warnedNoInit) {
+        _warnedNoInit = true;
+        logger.warning(
+          'streamingMode="worker" requested but no setStreamWorkerInit payload registered — falling back to main-thread streaming',
+        );
+      }
+      return null;
+    }
     if (!_instance) _instance = new OffscreenRuntimeBridge(factory);
     return _instance;
   }
@@ -134,6 +184,19 @@ export class OffscreenRuntimeBridge {
     _instance?.dispose();
     _instance = null;
     _warnedNoFactory = false;
+    _warnedNoInit = false;
+  }
+
+  /**
+   * Public teardown — called by `RunAnywhere.shutdown()` to release the
+   * cached singleton + its worker thread + any pending iterators. Unlike
+   * `resetForTesting()` this is part of the SDK shutdown contract.
+   */
+  static disposeShared(): void {
+    _instance?.dispose();
+    _instance = null;
+    _warnedNoFactory = false;
+    _warnedNoInit = false;
   }
 
   private worker: Worker | null = null;
@@ -146,11 +209,39 @@ export class OffscreenRuntimeBridge {
   /**
    * Idempotent spawn — the first caller wins and every subsequent caller
    * awaits the same `ready` handshake.
+   *
+   * Bounded by {@link HANDSHAKE_TIMEOUT_MS}: a Worker bundle that fails
+   * silently (404, malformed wasm, throws before wiring `onmessage`)
+   * rejects every consumer iterator with an actionable
+   * `SDKException(WASMNotLoaded)` instead of hanging indefinitely.
+   * See pass2-syn-034 / pass2-syn-092.
    */
   async spawnWorker(): Promise<void> {
     if (this.readyPromise) return this.readyPromise;
     this.readyPromise = new Promise<void>((resolve, reject) => {
+      let handshakeTimer: ReturnType<typeof setTimeout> | null = null;
+      const settleReject = (err: unknown): void => {
+        if (handshakeTimer != null) {
+          clearTimeout(handshakeTimer);
+          handshakeTimer = null;
+        }
+        this._handshakeResolve = null;
+        // Best-effort terminate to release a stuck worker thread.
+        try { this.worker?.terminate(); } catch { /* swallow */ }
+        this.worker = null;
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
       try {
+        // Belt-and-braces: tryGet() already gates on a non-null _init,
+        // but if a caller raced setStreamWorkerInit(null) we must fail
+        // fast with a clear diagnostic rather than spawn a worker we
+        // can never initialise.
+        if (!_init) {
+          throw new SDKException(
+            SDKErrorCode.WASMNotLoaded,
+            'OffscreenRuntimeBridge.spawnWorker called with no setStreamWorkerInit payload registered',
+          );
+        }
         const worker = this.factory();
         this.worker = worker;
         worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
@@ -165,28 +256,41 @@ export class OffscreenRuntimeBridge {
         this.pending.set(handshakeKey, {
           emit() { /* unused for handshake */ },
           finish() { /* unused for handshake */ },
-          fail: (err: unknown) => reject(err instanceof Error ? err : new Error(String(err))),
+          fail: (err: unknown) => settleReject(err),
         });
         // The `handleResponse` switch resolves the handshake explicitly.
         this._handshakeResolve = () => {
+          if (handshakeTimer != null) {
+            clearTimeout(handshakeTimer);
+            handshakeTimer = null;
+          }
           this.pending.delete(handshakeKey);
           resolve();
         };
-        if (_init) {
-          const initMsg: WorkerRequest = {
-            type: 'init',
-            wasmBytes: _init.wasmBytes,
-            moduleFactoryId: _init.moduleFactoryId,
-          };
-          worker.postMessage(initMsg);
-        } else {
-          // No init payload supplied — used by tests whose fake worker
-          // posts `ready` on its own without an init exchange. Real
-          // backends MUST call `setStreamWorkerInit` first.
-          logger.debug('spawnWorker: no init payload registered (test-only path)');
-        }
+        // Upper-bound the handshake. The design doc budgets ~10-50 ms
+        // cold-path bootstrap; the timeout is two orders of magnitude
+        // looser so it only fires on real breakage.
+        handshakeTimer = setTimeout(() => {
+          handshakeTimer = null;
+          this.pending.delete(handshakeKey);
+          settleReject(
+            new SDKException(
+              SDKErrorCode.WASMNotLoaded,
+              `stream worker handshake timed out after ${HANDSHAKE_TIMEOUT_MS}ms — check streamWorkerFactory bundle and setStreamWorkerInit payload`,
+            ),
+          );
+        }, HANDSHAKE_TIMEOUT_MS);
+        const initMsg: WorkerRequest = {
+          type: 'init',
+          wasmBytes: _init.wasmBytes,
+          moduleFactoryId: _init.moduleFactoryId,
+        };
+        // Transfer wasmBytes (tens of MB) instead of structured-cloning
+        // — the main thread already owns its own instantiated module
+        // and does not need this buffer after init. See pass2-syn-089.
+        worker.postMessage(initMsg, [initMsg.wasmBytes]);
       } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
+        settleReject(err);
       }
     });
     return this.readyPromise;
@@ -352,6 +456,15 @@ export class OffscreenRuntimeBridge {
 }
 
 let _warnedNoFactory = false;
+let _warnedNoInit = false;
+
+/**
+ * Upper bound on the `init`→`ready` handshake. The design doc budgets
+ * ~10-50 ms for a healthy cold-path bootstrap; this gives 100× headroom
+ * so the timer only fires on genuine breakage (404 worker bundle,
+ * malformed wasm, throw-before-onmessage). See pass2-syn-092.
+ */
+const HANDSHAKE_TIMEOUT_MS = 10_000;
 
 function toRequestKind(req: BridgeStreamRequest): StreamRequestKind {
   return req.kind;

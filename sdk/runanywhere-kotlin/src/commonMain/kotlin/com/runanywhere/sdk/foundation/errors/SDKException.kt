@@ -14,6 +14,7 @@ import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.public.extensions.LogLevel
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
+import ai.runanywhere.proto.v1.ErrorContext as ProtoErrorContext
 import ai.runanywhere.proto.v1.SDKError as ProtoSDKError
 
 /**
@@ -45,6 +46,18 @@ class SDKException(
 
     /** Optional underlying error message captured at wrap time. */
     val nestedMessage: String? get() = error.nested_message
+
+    /**
+     * Dot-separated path to the field that triggered a validation failure
+     * (e.g. `"STTOptions.sample_rate"`). Populated by the generated
+     * `validate()` helpers under `commonMain/.../generated/convenience/`
+     * so callers can programmatically identify the failing field without
+     * parsing the human-readable message.
+     *
+     * Backed by `error.context.metadata["field_path"]` — the wire-canonical
+     * carrier shared with Swift / Dart / TS.
+     */
+    val fieldPath: String? get() = error.context?.metadata?.get("field_path")
 
     override fun toString(): String =
         "SDKException[$category] ${code.name}: ${error.message}"
@@ -131,6 +144,33 @@ class SDKException(
                 category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
                 message = message,
                 cAbiCode = -250,
+                cause = cause,
+            )
+
+        /**
+         * Validation failure with a structured `fieldPath` discriminant
+         * (e.g. `"STTOptions.sample_rate"`). Mirrors the canonical shape
+         * emitted by `idl/codegen/generate_*_convenience.py`: every SDK
+         * throws `{ code, category, fieldPath, message }`.
+         */
+        fun validationFailed(
+            fieldPath: String,
+            message: String,
+            cause: Throwable? = null,
+        ): SDKException =
+            SDKException(
+                error =
+                    ProtoSDKError(
+                        code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+                        category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
+                        message = message,
+                        context =
+                            ProtoErrorContext(
+                                metadata = mapOf("field_path" to fieldPath),
+                            ),
+                        c_abi_code = -259,
+                        nested_message = cause?.message,
+                    ),
                 cause = cause,
             )
 

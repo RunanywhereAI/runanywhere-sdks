@@ -11,6 +11,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ToolChoiceMode
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
@@ -46,18 +47,30 @@ actual suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: RALLMGenerationOptions?,
     toolOptions: RAToolCallingOptions?,
+    toolChoice: ToolChoiceMode?,
+    forcedToolName: String?,
 ): RAToolCallingResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     // Swift parity: explicit `toolOptions` overrides any embedded
     // `options.tool_calling` payload, otherwise we fall back to the SDK
     // defaults via `toToolCallingOptions()` (which honors
     // `options?.tool_calling` when present).
-    val effectiveToolOptions =
+    val baseToolOptions =
         toolOptions
             ?: options?.tool_calling
             ?: options
                 .toToolCallingOptions()
                 .takeIf { options != null }
             ?: RAToolCallingOptions.defaults()
+    // Apply `toolChoice` / `forcedToolName` overrides on top of the resolved
+    // options. Mirrors Swift's `RunAnywhere+ToolCalling.swift` `tcOpts`
+    // mutation. These live on `ToolCallingOptions` proto (fields 13/14) so
+    // they flow into the same per-options snapshot the commons run-loop /
+    // session helpers consume once they start honoring them.
+    val effectiveToolOptions =
+        baseToolOptions.copy(
+            tool_choice = toolChoice ?: baseToolOptions.tool_choice,
+            forced_tool_name = forcedToolName ?: baseToolOptions.forced_tool_name,
+        )
     return ToolCallingOrchestrator.generateWithTools(prompt, effectiveToolOptions)
 }

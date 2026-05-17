@@ -21,42 +21,24 @@ melos:
     bootstrap:
       runPubGetInParallel: true
 
-  # Centralized dependency version registry (Tier 4 - PR #494 T4.4).
+  # Flutter dependency centralization (Tier 4 - PR #494 T4.4).
   #
-  # Source of truth for every third-party dependency version that is shared
-  # across more than one Flutter package in this workspace. Per-package
-  # pubspec.yaml files should either:
-  #   (a) reference the same `^x.y.z` constraint listed below, or
-  #   (b) declare the dependency as `any` and rely on Dart pub workspace
-  #       resolution (`resolution: workspace`) to inherit the constraint
-  #       from the package that owns the version (typically `runanywhere`).
+  # Pub does NOT have a Gradle-version-catalog equivalent: there is no native
+  # workspace-level dependency override mechanism. The previously documented
+  # `melos.dependencies:` block was doc-only — Pub never read it, and
+  # `scripts/validation/check_flutter_centralization.sh` only caught the
+  # `^x.y.z` literal-drift case (not the `any` resolution-drift case). It has
+  # been removed to avoid false confidence.
   #
-  # The `scripts/validation/check_flutter_centralization.sh` script warns
-  # whenever a package outside this block hardcodes a `^x.y.z` version that
-  # differs from the entry below.
-  #
-  # Bumping versions: change here AND in the owning package's pubspec.yaml
-  # (the package that does NOT use `any`). Then run `melos bs --no-select`.
-  dependencies:
-    # Runtime
-    ffi: ^2.1.3
-    protobuf: ^3.1.0
-    fixnum: ^1.1.1
-    shared_preferences: ^2.5.3
-    path_provider: ^2.1.5
-    flutter_secure_storage: ^10.2.0
-    device_info_plus: '>=11.0.0 <11.3.2'
-    uuid: ^4.5.3
-
-    # Dev / tooling
-    flutter_lints: ^5.0.0
-    test: ^1.24.0
-    # Pinned (not caret) so local + CI codegen produces byte-identical output.
-    # Must stay in lockstep with scripts/setup-toolchain.sh and
-    # idl/codegen/generate_dart.sh (PROTOC_PLUGIN_DART_EXPECTED=22.0.0).
-    # 22.0.0 is the latest 22.x compatible with protobuf ^3.x; 22.1.0+ require
-    # protobuf ^4.x which is a breaking-change track we are not on yet.
-    protoc_plugin: 22.0.0
+  # Current centralization model:
+  #   - The `packages/runanywhere` package is the source of truth for every
+  #     third-party constraint shared across the workspace.
+  #   - Backend sub-packages (`runanywhere_llamacpp`, `runanywhere_onnx`,
+  #     `runanywhere_genie`) MUST declare any shared dependency as `any` and
+  #     rely on `resolution: workspace` to inherit from the root package.
+  #   - The linter still flags hardcoded `^x.y.z` literals in sub-packages.
+  #   - True enforcement (parsing each generated `pubspec.lock` and asserting
+  #     versions match) is tracked as future work — see pass2-syn-121.
 
   scripts:
     analyze:

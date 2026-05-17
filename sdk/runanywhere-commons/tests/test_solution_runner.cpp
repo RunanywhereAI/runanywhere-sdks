@@ -2,15 +2,8 @@
 //
 // test_solution_runner.cpp — T4.7 lifecycle + C ABI tests.
 
-#include <atomic>
-#include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <memory>
-#include <string>
-#include <thread>
-#include <utility>
-#include <vector>
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "pipeline.pb.h"
@@ -317,6 +310,11 @@ void cleanup_solution_standins() {
     for (const char* type : kTypes) {
         registry.unregister_factory(type);
     }
+    // `retrieve` ships as a built-in tagged stand-in (see
+    // register_builtin_operators). Re-register the built-in so subsequent
+    // tests can rely on `has_factory("retrieve") == true`, while any
+    // engine-backed or test-time override has been cleared above.
+    rac::solutions::register_builtin_operators(registry);
 }
 
 class ScopedSolutionStandins {
@@ -947,7 +945,13 @@ TEST(rag_solution_without_real_factories_is_unavailable) {
 
     SolutionRunner runner(cfg);
     CHECK(runner.start() == RAC_ERROR_FEATURE_NOT_AVAILABLE);
-    CHECK(last_error_detail_contains("embed"));
+    // RAG solution graph now expands to: query(source) → retrieve →
+    // context_build → llm(generate_text). `retrieve` and `context_build` are
+    // built-in stand-ins (so they have factories), `generate_text` is the
+    // first engine-backed operator with no real or stand-in factory after
+    // cleanup_solution_standins(), so it surfaces the FEATURE_NOT_AVAILABLE
+    // diagnostic.
+    CHECK(last_error_detail_contains("generate_text"));
     CHECK(last_error_detail_contains("explicit stand-in factory"));
 }
 

@@ -25,11 +25,18 @@
  */
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
-const SILERO_VAD_FIXTURE = readFileSync(
-  join(__dirname, 'fixtures', 'silero_vad.onnx'),
-);
+const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
+
+// Repo root, resolved from this file's location, so the Vite `/@fs/...`
+// imports work from any checkout location and in CI. Override with
+// `RA_REPO_ROOT` if running against a different layout.
+const REPO_ROOT = process.env.RA_REPO_ROOT ?? resolve(__dirname, '..', '..', '..', '..');
+
+const SILERO_VAD_FIXTURE = shouldRun
+  ? readFileSync(join(__dirname, 'fixtures', 'silero_vad.onnx'))
+  : Buffer.alloc(0);
 
 interface AppReadinessSnapshot {
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -60,6 +67,7 @@ declare global {
 }
 
 test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech provider', () => {
+  test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1).');
   test.setTimeout(60_000);
 
   test('dispatches through the speech provider and returns a typed VADResult', async ({ page }) => {
@@ -76,14 +84,12 @@ test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech prov
     );
 
     await page.evaluate(
-      async ({ vadBytes }) => {
+      async ({ vadBytes, repoRoot }) => {
         try {
-          const onnx = await import(
-            '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/src/index.ts'
-          );
-          const internal = await import(
-            '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/core/src/internal.ts'
-          );
+          const onnxPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/src/index.ts`;
+          const internalPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/core/src/internal.ts`;
+          const onnx = await import(/* @vite-ignore */ onnxPath);
+          const internal = await import(/* @vite-ignore */ internalPath);
 
           // Install the standalone Sherpa speech provider; skip the
           // unified-WASM proto-byte plugin path so we keep this test
@@ -166,7 +172,7 @@ test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech prov
           };
         }
       },
-      { vadBytes: new Uint8Array(SILERO_VAD_FIXTURE) },
+      { vadBytes: new Uint8Array(SILERO_VAD_FIXTURE), repoRoot: REPO_ROOT },
     );
 
     const result = await page.evaluate(() => window.__FACADE_VAD_RESULT__);

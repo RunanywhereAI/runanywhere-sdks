@@ -36,7 +36,6 @@
 #ifndef RAC_TOOL_CALLING_H
 #define RAC_TOOL_CALLING_H
 
-#include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
@@ -569,6 +568,21 @@ RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
 
 RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_handle);
 
+/**
+ * @brief Cancel an in-flight tool-calling session (pass2-syn-007).
+ *
+ * Sets the cancel flag on the session's in-flight LifecycleLlmRef so the
+ * underlying backend `ops->generate` returns at the next cancel boundary.
+ * The cancel does NOT touch the session registry — the host should still
+ * call rac_tool_calling_session_destroy_proto once the in-flight call has
+ * resolved. Safe to invoke from any thread (does not take the session
+ * mutex held by the generate caller).
+ *
+ * @param session_handle Handle returned by rac_tool_calling_session_create_proto.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_HANDLE if unknown.
+ */
+RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle);
+
 // =============================================================================
 // TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
 // =============================================================================
@@ -633,6 +647,45 @@ RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_b
                                                      rac_tool_execute_callback_fn on_execute,
                                                      void* user_data,
                                                      rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Same as rac_tool_calling_run_loop_proto but additionally publishes
+ *        an opaque handle the host can pass to rac_tool_calling_run_loop_cancel_proto
+ *        to interrupt the in-flight loop from another thread (pass2-syn-007).
+ *
+ * The handle is owned by commons; it is automatically reclaimed when this
+ * function returns, so the host MUST NOT use it past the return. A typical
+ * cancellation pattern wires this together with a Swift
+ * `withTaskCancellationHandler`, Kotlin `Job.invokeOnCompletion`,
+ * Flutter `StreamSubscription.onCancel`, RN `AbortSignal`, or Web
+ * `AbortController.abort()` so the structured-concurrency context can fan
+ * its cancel into the native loop.
+ *
+ * @param in_request_bytes    Serialized ToolCallingSessionCreateRequest.
+ * @param in_size             Size of in_request_bytes.
+ * @param on_execute          Synchronous tool-execute callback.
+ * @param user_data           Opaque pointer forwarded to on_execute.
+ * @param out_run_loop_handle Output handle for cancellation. 0 if unavailable.
+ * @param out_result          Owned serialized ToolCallingResult on success.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_proto(
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).
+ *
+ * Looks up the run-loop handle published by
+ * rac_tool_calling_run_loop_with_handle_proto and asks the in-flight
+ * LifecycleLlmRef to cancel. Safe to call from any thread; a no-op if
+ * the handle has already been retired (RAC_SUCCESS is still returned to
+ * make idempotent cancellation paths in the SDK adapters easy).
+ *
+ * @param run_loop_handle Handle out-parameter from with_handle_proto.
+ * @return RAC_SUCCESS even when the handle is stale (idempotent semantics).
+ */
+RAC_API rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop_handle);
 
 #ifdef __cplusplus
 }

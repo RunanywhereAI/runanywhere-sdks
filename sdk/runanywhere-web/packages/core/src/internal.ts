@@ -76,6 +76,15 @@ export type { AccelerationMode } from './Foundation/WASMBridge';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoSDKError, ProtoErrorContext } from './Foundation/SDKException';
+export {
+  RAC_ERROR_NETWORK_UNAVAILABLE,
+  RAC_ERROR_NETWORK_ERROR,
+  RAC_ERROR_INVALID_ARGUMENT,
+  RAC_ERROR_CANCELLED,
+  RAC_ERROR_MODULE_ALREADY_REGISTERED,
+  RAC_ERROR_NOT_FOUND,
+  RAC_ERROR_FEATURE_NOT_AVAILABLE,
+} from './Foundation/RACErrors';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, SDKEventEnvelope, Unsubscribe } from './Foundation/EventBus';
 

@@ -1,0 +1,19 @@
+# Python tooling required by the IDL codegen drivers and CI workflows.
+# Install with: pip install -r requirements-codegen.txt
+#
+# Mintfile pins Swift tooling, Brewfile pins Homebrew formulas. This file
+# pins the Python side so `idl/codegen/generate_*.sh` and idl-drift-check.yml
+# resolve the same versions on every contributor's machine and on CI.
+#
+# Lower bounds match scripts/setup-toolchain.sh GRPC* / PYTHON* constants.
+# Bump together with that script.
+
+# Protobuf Python runtime — consumed by the IDL convenience drivers.
+protobuf>=5.0
+
+# gRPC Python codegen — generate_kotlin.sh / generate_ts.sh wrappers and
+# the AsyncIterator client stubs introduced in GAP 09.
+grpcio-tools>=1.65
+
+# PyYAML — used by idl/codegen/swift-modality-abi/generate.py
+pyyaml>=6.0

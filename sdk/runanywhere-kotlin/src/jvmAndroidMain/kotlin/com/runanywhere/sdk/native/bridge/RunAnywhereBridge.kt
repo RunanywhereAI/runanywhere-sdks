@@ -1009,6 +1009,16 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racToolCallingSessionDestroyProto(sessionHandle: Long): Int
 
+    /**
+     * pass2-syn-007: Cancel an in-flight tool-calling session. Latches a
+     * cancel-requested flag on the session and asks the in-flight
+     * LifecycleLlmRef to abort the underlying backend `ops->generate`.
+     * Safe to call from any thread; does NOT take the session mutex held
+     * by the generate caller. Idempotent for unknown handles.
+     */
+    @JvmStatic
+    external fun racToolCallingSessionCancelProto(sessionHandle: Long): Int
+
     // ========================================================================
     // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
     // ========================================================================

@@ -17,6 +17,14 @@
  * the right path to wire speech through.
  */
 import { test, expect } from '@playwright/test';
+import { resolve } from 'node:path';
+
+const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
+
+// Repo root, resolved from this file's location, so the Vite `/@fs/...`
+// imports work from any checkout location and in CI. Override with
+// `RA_REPO_ROOT` if running against a different layout.
+const REPO_ROOT = process.env.RA_REPO_ROOT ?? resolve(__dirname, '..', '..', '..', '..');
 
 interface AppReadinessSnapshot {
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -37,7 +45,10 @@ declare global {
   }
 }
 
-test('standalone sherpa-onnx WASM loads and exposes C API exports', async ({ page }) => {
+test.describe('standalone sherpa-onnx WASM smoke', () => {
+  test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1).');
+
+  test('loads the standalone WASM module and exposes the expected C exports', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -53,17 +64,16 @@ test('standalone sherpa-onnx WASM loads and exposes C API exports', async ({ pag
     { timeout: 60_000 },
   );
 
-  await page.evaluate(async () => {
+  await page.evaluate(async ({ repoRoot }) => {
     try {
-      const glueModule = await import(
-        '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx-glue.js'
-      );
+      const gluePath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx-glue.js`;
+      const glueModule = await import(/* @vite-ignore */ gluePath);
       const createModule = (glueModule.default ?? glueModule) as (
         overrides?: Record<string, unknown>,
       ) => Promise<Record<string, unknown>>;
 
       const wasmUrl = new URL(
-        '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx.wasm',
+        `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx.wasm`,
         window.location.href,
       );
       const wasmResponse = await fetch(wasmUrl.href);
@@ -124,7 +134,7 @@ test('standalone sherpa-onnx WASM loads and exposes C API exports', async ({ pag
           : String(error),
       };
     }
-  });
+  }, { repoRoot: REPO_ROOT });
 
   const probe = await page.evaluate(() => window.__SHERPA_PROBE__);
 
@@ -141,4 +151,5 @@ test('standalone sherpa-onnx WASM loads and exposes C API exports', async ({ pag
     (err) => !err.includes('NO_COLOR') && !err.includes('Failed to load resource'),
   );
   expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
+  });
 });

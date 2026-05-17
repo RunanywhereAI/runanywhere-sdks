@@ -46,6 +46,33 @@ JAVA_VERSION=17
 # Gradle wrapper version baseline
 GRADLE_VERSION=8.11.1
 
+# Flutter SDK version. Single source of truth for:
+#   - .github/workflows/pr-build.yml (flutter-pubget job)
+#   - .github/workflows/release.yml (validate_consumer_flutter job)
+#   - sdk/runanywhere-flutter/.fvm/fvm_config.json (local FVM)
+# Bump here, then run setup-toolchain with platform=flutter (or sdk-only).
+FLUTTER_VERSION=3.27.0
+
+# =============================================================================
+# IDL Codegen Toolchain (single source of truth)
+# =============================================================================
+# Cross-language wire-compatibility depends on every generator emitting
+# identical bytes from identical .proto files. These pins are consumed by:
+#   - scripts/setup-toolchain.sh    (installs the pinned versions)
+#   - idl/codegen/generate_*.sh     (verifies the pinned versions at runtime)
+#   - gradle/libs.versions.toml     (Wire runtime, mirrored by hand)
+#   - Mintfile                      (swift-protobuf, mirrored by hand)
+#   - .syncpackrc.json              (ts-proto if added to centralized npm pins)
+#
+# When bumping any of these, update ALL mirrors in the same commit and
+# regenerate IDL bindings (idl/codegen/generate_all.sh) so idl-drift-check
+# stays green.
+TS_PROTO_VERSION=1.181.1
+WIRE_VERSION=5.3.5
+SWIFT_PROTOBUF_VERSION=1.38.0
+PROTOC_GEN_DART_VERSION=22.0.0
+PROTOC_VERSION_MAJOR=25
+
 # CMake version installed in CI. Toolchain present on the build host.
 CMAKE_VERSION=3.27
 

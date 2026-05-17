@@ -167,6 +167,12 @@ export class EventBus {
   // out to its registered listeners.
   private readonly subscribers = new Map<string, Set<EventListener>>();
   private readonly wildcardListeners = new Set<EventListener<SDKEventEnvelope>>();
+  // Category-keyed subscribers receive every proto SDKEvent whose
+  // `category` field matches, regardless of whether the dotted-name
+  // translator covers the payload. Mirrors Swift `events(for:)`,
+  // Kotlin `events(category)`, RN `eventsFor(category)` /
+  // `on(category, handler)`, and Flutter `onCategory(category)`.
+  private readonly categoryListeners = new Map<EventCategory, Set<EventListener<ProtoSDKEvent>>>();
 
   private transport: ProtoEventTransport | null;
   private transportUnsubscribe: SDKEventUnsubscribe | null = null;
@@ -210,6 +216,90 @@ export class EventBus {
     this.wildcardListeners.add(listener);
     return () => {
       this.wildcardListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Subscribe to every proto `SDKEvent` whose `category` matches.
+   *
+   * Cross-SDK parity helper. Mirrors Swift `events(for:)`, Kotlin
+   * `events(category)`, RN `eventsFor(category)` / `on(category, handler)`,
+   * and Flutter `onCategory(category)`. The handler receives the raw
+   * proto event (same surface as `RunAnywhere.sdkEvents`), so it works
+   * for native SDKEvent kinds that have no entry in `SDKEventMap`.
+   *
+   * Returns an unsubscribe fn.
+   */
+  onCategory(category: EventCategory, listener: EventListener<ProtoSDKEvent>): Unsubscribe {
+    this.ensureTransport();
+    let set = this.categoryListeners.get(category);
+    if (!set) {
+      set = new Set();
+      this.categoryListeners.set(category, set);
+    }
+    set.add(listener);
+
+    return () => {
+      const current = this.categoryListeners.get(category);
+      if (!current) return;
+      current.delete(listener);
+      if (current.size === 0) this.categoryListeners.delete(category);
+    };
+  }
+
+  /**
+   * Async iterable of every proto `SDKEvent` whose `category` matches.
+   *
+   * Cross-SDK parity helper. Equivalent to Swift `events(for:)`, Kotlin
+   * `events(category)`, RN `eventsFor(category)`, Flutter `onCategory()`.
+   */
+  eventsFor(category: EventCategory): AsyncIterable<ProtoSDKEvent> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const bus = this;
+    return {
+      [Symbol.asyncIterator](): AsyncIterator<ProtoSDKEvent> {
+        const queue: ProtoSDKEvent[] = [];
+        let resolver: ((value: IteratorResult<ProtoSDKEvent>) => void) | null = null;
+        let closed = false;
+
+        const unsubscribe = bus.onCategory(category, (event) => {
+          if (resolver) {
+            resolver({ value: event, done: false });
+            resolver = null;
+          } else {
+            queue.push(event);
+          }
+        });
+
+        return {
+          next(): Promise<IteratorResult<ProtoSDKEvent>> {
+            if (queue.length > 0) {
+              return Promise.resolve({ value: queue.shift()!, done: false });
+            }
+            if (closed) {
+              return Promise.resolve({
+                value: undefined as unknown as ProtoSDKEvent,
+                done: true,
+              });
+            }
+            return new Promise((resolve) => {
+              resolver = resolve;
+            });
+          },
+          return(): Promise<IteratorResult<ProtoSDKEvent>> {
+            closed = true;
+            unsubscribe();
+            if (resolver) {
+              resolver({ value: undefined as unknown as ProtoSDKEvent, done: true });
+              resolver = null;
+            }
+            return Promise.resolve({
+              value: undefined as unknown as ProtoSDKEvent,
+              done: true,
+            });
+          },
+        };
+      },
     };
   }
 
@@ -259,6 +349,7 @@ export class EventBus {
   removeAll(): void {
     this.subscribers.clear();
     this.wildcardListeners.clear();
+    this.categoryListeners.clear();
   }
 
   // ---------------------------------------------------------------------------
@@ -298,6 +389,11 @@ export class EventBus {
   }
 
   private onTransportEvent(event: ProtoSDKEvent): void {
+    // Always fan out to category subscribers first — they observe the
+    // raw proto regardless of whether the dotted-name translator
+    // recognizes the payload.
+    this.fireCategory(event);
+
     const translated = translateProtoEvent(event);
     if (!translated) {
       // Unknown payload shape — still surface the raw envelope to
@@ -316,6 +412,20 @@ export class EventBus {
       timestamp: event.timestampMs || Date.now(),
       data: translated.data,
     });
+  }
+
+  private fireCategory(event: ProtoSDKEvent): void {
+    const set = this.categoryListeners.get(event.category);
+    if (!set) return;
+    for (const listener of Array.from(set)) {
+      try {
+        listener(event);
+      } catch (error) {
+        logger.error(
+          `Category listener error for ${String(event.category)}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 
   private dispatch(envelope: SDKEventEnvelope): void {

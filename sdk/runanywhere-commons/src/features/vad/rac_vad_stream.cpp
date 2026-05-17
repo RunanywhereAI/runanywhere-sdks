@@ -101,8 +101,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
-                               const char* error_message, int error_code,
-                               uint64_t session_id = 0);
+                               const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::vad
 #endif
 
@@ -336,8 +335,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
-                               const char* error_message, int error_code,
-                               uint64_t session_id) {
+                               const char* error_message, int error_code, uint64_t session_id) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;

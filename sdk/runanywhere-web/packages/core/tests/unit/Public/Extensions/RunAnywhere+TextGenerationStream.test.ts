@@ -137,6 +137,21 @@ function makeFakeLLMModule(handlers: StreamHandlers): FakeModule {
     _rac_wasm_offsetof_proto_buffer_size: () => OFF_SIZE,
     _rac_wasm_offsetof_proto_buffer_status: () => OFF_STATUS,
     _rac_wasm_offsetof_proto_buffer_error_message: () => OFF_ERROR,
+    _rac_llm_generate_proto(
+      _requestPtr: number,
+      _requestSize: number,
+      outResult: number,
+    ): number {
+      // Non-streaming entry point — present so `supportsProtoLLM()` (which
+      // requires the trio of generate/generate_stream/cancel exports) returns
+      // true. The streaming tests below never exercise this code path; we
+      // simply leave the output proto-buffer empty so any accidental call
+      // surfaces as a "no result" decode rather than a silent corruption.
+      heapU32[(outResult + OFF_DATA) >>> 2] = 0;
+      heapU32[(outResult + OFF_SIZE) >>> 2] = 0;
+      heap32[(outResult + OFF_STATUS) >>> 2] = 0;
+      return 0;
+    },
     _rac_llm_generate_stream_proto(
       requestPtr: number,
       requestSize: number,
@@ -188,19 +203,20 @@ function terminalStreamEvent(text: string, tokenCount: number): ProtoLLMStreamEv
     isFinal: true,
     finishReason: 'stop',
     errorCode: 0,
+    // Field names match LLMStreamFinalResult in llm_service.proto, NOT
+    // LLMGenerationResult (a different proto used by the non-streaming
+    // path). `streamingResultFromEvents` reads these names directly.
     result: {
       text,
-      inputTokens: 0,
-      tokensGenerated: tokenCount,
-      modelUsed: 'fake-llm',
-      generationTimeMs: 1,
+      promptTokens: 0,
+      completionTokens: tokenCount,
+      totalTokens: tokenCount,
+      totalTimeMs: 1,
+      timeToFirstTokenMs: 0,
       tokensPerSecond: tokenCount,
       finishReason: 'stop',
-      thinkingTokens: 0,
-      responseTokens: tokenCount,
-      totalTokens: tokenCount,
       errorCode: 0,
-      cachedPromptTokens: 0,
+      errorMessage: '',
       promptEvalTimeMs: 0,
       decodeTimeMs: 1,
       toolCalls: [],

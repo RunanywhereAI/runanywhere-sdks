@@ -355,8 +355,8 @@ void rac_tts_destroy(rac_handle_t handle);
 
 ```c
 rac_result_t rac_vad_create(rac_handle_t* out_handle);
-rac_result_t rac_vad_start(rac_handle_t handle);
-rac_result_t rac_vad_stop(rac_handle_t handle);
+rac_result_t rac_vad_component_start(rac_handle_t handle);
+rac_result_t rac_vad_component_stop(rac_handle_t handle);
 rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples,
                                      size_t num_samples, rac_bool_t* out_is_speech);
 void rac_vad_destroy(rac_handle_t handle);

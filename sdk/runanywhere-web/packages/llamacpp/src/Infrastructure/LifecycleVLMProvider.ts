@@ -13,6 +13,7 @@ import {
   type VisionLanguageProvider,
 } from '@runanywhere/web/internal';
 import type { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import type {
   VLMGenerationOptions,
@@ -20,8 +21,16 @@ import type {
   VLMResult,
 } from '@runanywhere/proto-ts/vlm_options';
 
+function isVisionModelCategory(category: ModelCategory | undefined): boolean {
+  return (
+    category === ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
+    category === ModelCategory.MODEL_CATEGORY_VISION
+  );
+}
+
 export class LifecycleVLMProvider implements VisionLanguageProvider {
   private _modelLoaded = false;
+  private _loadedModelId: string | null = null;
 
   get isInitialized(): boolean {
     return VLMProtoAdapter.tryDefault()?.supportsProtoVLM() ?? false;
@@ -31,6 +40,10 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
     return this._modelLoaded;
   }
 
+  get loadedModelId(): string | null {
+    return this._loadedModelId;
+  }
+
   async loadCurrentModel(currentModel: CurrentModelResult): Promise<void> {
     if (!currentModel.modelId) {
       throw SDKException.componentNotReady(
@@ -38,11 +51,21 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
         'No C++ lifecycle VLM model is loaded.',
       );
     }
+    // Mirror iOS LlamaCPPVLMProvider: gate on MULTIMODAL/VISION category so an
+    // accidental LLM/STT/TTS load doesn't flip the VLM gate.
+    if (!isVisionModelCategory(currentModel.category)) {
+      throw SDKException.componentNotReady(
+        'vlm',
+        `Loaded model category (${currentModel.category}) is not MULTIMODAL/VISION; refusing to enable VLM gate.`,
+      );
+    }
+    this._loadedModelId = currentModel.modelId;
     this._modelLoaded = true;
   }
 
   async unloadModel(): Promise<void> {
     this._modelLoaded = false;
+    this._loadedModelId = null;
   }
 
   async processImage(

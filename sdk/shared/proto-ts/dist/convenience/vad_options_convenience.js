@@ -28,13 +28,22 @@ const vADConfigurationDefaults = () => ({
 exports.vADConfigurationDefaults = vADConfigurationDefaults;
 const validateVADConfiguration = (m) => {
     if (m.sampleRate < 1 || m.sampleRate > 48000) {
-        throw new _errors_1.ValidationError(`sample_rate must be in 1...48000 (got ${m.sampleRate})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADConfiguration.sample_rate',
+            message: `sample_rate must be in 1...48000 (got ${m.sampleRate})`,
+        });
     }
     if (m.frameLengthMs < 1 || m.frameLengthMs > 1000) {
-        throw new _errors_1.ValidationError(`frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADConfiguration.frame_length_ms',
+            message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
+        });
     }
     if (m.threshold < 0.0 || m.threshold > 1.0) {
-        throw new _errors_1.ValidationError(`threshold must be in 0.0...1.0 (got ${m.threshold})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADConfiguration.threshold',
+            message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,
+        });
     }
 };
 exports.validateVADConfiguration = validateVADConfiguration;

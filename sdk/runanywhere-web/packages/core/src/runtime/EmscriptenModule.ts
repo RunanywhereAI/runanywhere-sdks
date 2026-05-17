@@ -314,6 +314,59 @@ export interface EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  /**
+   * pass2-syn-026: Session-based tool-calling ABI. The Web SDK uses these
+   * (instead of the synchronous `_rac_tool_calling_run_loop_proto`) so that
+   * TypeScript executors returning `Promise<ToolResult>` can be awaited
+   * between commons-driven generate -> parse -> validate cycles.
+   *
+   * `_rac_tool_calling_session_create_proto(requestBytes, requestSize, callbackPtr, userData, outSessionHandle)`:
+   *   callbackPtr is a function-table index obtained from `addFunction(fn, 'viii')`
+   *   whose JS implementation receives `(eventBytesPtr, eventSize, userData)` and
+   *   decodes a serialized `runanywhere.v1.ToolCallingSessionEvent`. Out-handle is
+   *   written via the proto-buffer-or-uint64 contract (we pass a malloc'd 8-byte
+   *   slot and read low/high 32-bit halves to reconstruct the uint64).
+   */
+  _rac_tool_calling_session_create_proto?(
+    requestBytes: number,
+    requestSize: number,
+    callbackPtr: number,
+    userData: number,
+    outSessionHandlePtr: number,
+  ): number;
+  /**
+   * `_rac_tool_calling_session_step_with_result_proto(requestBytes, requestSize)`:
+   *   Accepts a serialized `runanywhere.v1.ToolCallingSessionStepWithResultRequest`
+   *   and synchronously resumes the run loop. Any new events (further tool_call,
+   *   final_result, or error) fire via the callback installed at session create.
+   */
+  _rac_tool_calling_session_step_with_result_proto?(
+    requestBytes: number,
+    requestSize: number,
+  ): number;
+  /**
+   * `_rac_tool_calling_session_destroy_proto(sessionHandle)`:
+   *   Tears down session state. Idempotent / safe to call after final_result.
+   *   Used by the TS `generateWithTools` for both normal completion and abort.
+   *   `sessionHandle` is the uint64 returned by session_create (matches
+   *   `_rac_sdk_event_unsubscribe` — accepts either number or bigint depending
+   *   on whether the WASM module was linked with `-sWASM_BIGINT`).
+   */
+  _rac_tool_calling_session_destroy_proto?(
+    sessionHandle: number | bigint,
+  ): number;
+  /**
+   * pass2-syn-007: `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
+   *   Latches a cancel-requested flag on the session and asks the in-flight
+   *   LifecycleLlmRef to interrupt the underlying backend `ops->generate`.
+   *   Distinct from `_rac_tool_calling_session_destroy_proto` — the host
+   *   should still call destroy once the in-flight call has resolved. Safe
+   *   to call from any context; the WASM module is single-threaded so this
+   *   actually fires after the current async tick returns control.
+   */
+  _rac_tool_calling_session_cancel_proto?(
+    sessionHandle: number | bigint,
+  ): number;
   _rac_structured_output_prepare_prompt_proto?(
     requestBytes: number,
     requestSize: number,

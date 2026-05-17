@@ -2617,6 +2617,8 @@ function createBaseToolCallingSessionCreateRequest() {
         maxIterations: 0,
         keepToolsAvailable: false,
         validateCalls: undefined,
+        toolChoice: undefined,
+        forcedToolName: undefined,
     };
 }
 exports.ToolCallingSessionCreateRequest = {
@@ -2650,6 +2652,12 @@ exports.ToolCallingSessionCreateRequest = {
         }
         if (message.validateCalls !== undefined) {
             writer.uint32(48).bool(message.validateCalls);
+        }
+        if (message.toolChoice !== undefined) {
+            writer.uint32(56).int32(message.toolChoice);
+        }
+        if (message.forcedToolName !== undefined) {
+            writer.uint32(66).string(message.forcedToolName);
         }
         return writer;
     },
@@ -2720,6 +2728,18 @@ exports.ToolCallingSessionCreateRequest = {
                     }
                     message.validateCalls = reader.bool();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.toolChoice = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.forcedToolName = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2740,6 +2760,8 @@ exports.ToolCallingSessionCreateRequest = {
             maxIterations: isSet(object.maxIterations) ? globalThis.Number(object.maxIterations) : 0,
             keepToolsAvailable: isSet(object.keepToolsAvailable) ? globalThis.Boolean(object.keepToolsAvailable) : false,
             validateCalls: isSet(object.validateCalls) ? globalThis.Boolean(object.validateCalls) : undefined,
+            toolChoice: isSet(object.toolChoice) ? toolChoiceModeFromJSON(object.toolChoice) : undefined,
+            forcedToolName: isSet(object.forcedToolName) ? globalThis.String(object.forcedToolName) : undefined,
         };
     },
     toJSON(message) {
@@ -2774,6 +2796,12 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.validateCalls !== undefined) {
             obj.validateCalls = message.validateCalls;
         }
+        if (message.toolChoice !== undefined) {
+            obj.toolChoice = toolChoiceModeToJSON(message.toolChoice);
+        }
+        if (message.forcedToolName !== undefined) {
+            obj.forcedToolName = message.forcedToolName;
+        }
         return obj;
     },
     create(base) {
@@ -2791,6 +2819,8 @@ exports.ToolCallingSessionCreateRequest = {
         message.maxIterations = object.maxIterations ?? 0;
         message.keepToolsAvailable = object.keepToolsAvailable ?? false;
         message.validateCalls = object.validateCalls ?? undefined;
+        message.toolChoice = object.toolChoice ?? undefined;
+        message.forcedToolName = object.forcedToolName ?? undefined;
         return message;
     },
 };

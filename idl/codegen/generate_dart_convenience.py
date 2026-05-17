@@ -507,13 +507,19 @@ def _emit_message_validate(
             continue
         dart_name = _snake_to_lower_camel(field.name)
 
+        field_path = f"{msg_name}.{field.name}"
+        field_path_escaped = _escape_dart_string(field_path)
+
         is_required = _get_bool_opt(field.options, RAC_REQUIRED_FIELD_NUM)
         if is_required:
             expr = _required_zero_check_expr(field, dart_name, int64_used)
             if expr is not None:
                 msg = _escape_dart_string(f"{field.name} is required")
                 checks.append(f"    if ({expr}) {{")
-                checks.append(f"      throw SDKException.validationFailed('{msg}');")
+                checks.append("      throw SDKException.validationFailed(")
+                checks.append(f"        '{msg}',")
+                checks.append(f"        fieldPath: '{field_path_escaped}',")
+                checks.append("      );")
                 checks.append("    }")
 
         min_int = _get_int32_opt(field.options, RAC_MIN_FIELD_NUM)
@@ -540,6 +546,7 @@ def _emit_message_validate(
             checks.append(f"    if ({cond}) {{")
             checks.append("      throw SDKException.validationFailed(")
             checks.append(f"        '{msg_prefix}${dart_name})',")
+            checks.append(f"        fieldPath: '{field_path_escaped}',")
             checks.append("      );")
             checks.append("    }")
 
@@ -562,6 +569,7 @@ def _emit_message_validate(
             checks.append(f"    if ({cond}) {{")
             checks.append("      throw SDKException.validationFailed(")
             checks.append(f"        '{msg_prefix}${dart_name})',")
+            checks.append(f"        fieldPath: '{field_path_escaped}',")
             checks.append("      );")
             checks.append("    }")
 

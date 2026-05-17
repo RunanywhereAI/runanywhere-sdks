@@ -46,6 +46,29 @@ rac_add_engine_plugin(whisperkit_coreml
     FORMATS             COREML
 )
 
+# Self-registration shim — installs the WhisperKit CoreML vtable into the
+# unified plugin registry via a file-scope ctor. Without this,
+# `rac_backend_whisperkit_coreml_register()` has zero call sites in the
+# monorepo and STT loads pinned to RAC_FRAMEWORK_WHISPERKIT_COREML cannot
+# route. Mirrors the carrier pattern used by llamacpp / diffusion-coreml
+# (see pass2-syn-015 for context).
+#
+# Static path only: when RAC_STATIC_PLUGINS=ON (iOS / WASM hosts), the
+# ctor lands inside rac_commons so it runs before main(). The Swift WhisperKit
+# bootstrap will install the Swift-side callbacks first; the register
+# function tolerates the inverse order by short-circuiting with
+# RAC_ERROR_BACKEND_UNAVAILABLE — which is fine because no callers depend
+# on this entry until the Swift callbacks land.
+if(RAC_STATIC_PLUGINS)
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_whisperkit_coreml.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+endif()
+
 message(STATUS "WhisperKit CoreML Backend Configuration:")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME} (Apple-only)")
 message(STATUS "  Note: Actual inference runs in Swift via CoreML callbacks")

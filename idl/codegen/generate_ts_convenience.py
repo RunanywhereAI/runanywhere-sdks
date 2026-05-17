@@ -483,6 +483,19 @@ def _emit_message_validate(
     msg_name = msg_desc.name
     checks: list[str] = []
 
+    def _throw(field_name: str, message_literal: str) -> list[str]:
+        """Emit a `throw new ValidationError({ ... })` block with the
+        canonical `{ code, category, fieldPath, message }` shape. The
+        `code` and `category` fields are filled in by the
+        ValidationError constructor's defaults."""
+        field_path = f"{msg_name}.{field_name}"
+        return [
+            "    throw new ValidationError({",
+            f"      fieldPath: '{field_path}',",
+            f"      message: {message_literal},",
+            "    });",
+        ]
+
     for field in msg_desc.field:
         if not field.HasField("options"):
             continue
@@ -505,9 +518,7 @@ def _emit_message_validate(
                 zero_check = f"m.{ts_field} === false"
             if zero_check is not None:
                 checks.append(f"  if ({zero_check}) {{")
-                checks.append(
-                    f"    throw new ValidationError('{field.name} is required');"
-                )
+                checks.extend(_throw(field.name, f"'{field.name} is required'"))
                 checks.append("  }")
 
         if (min_int is not None or max_int is not None) and field.type in _INTEGER_TYPES:
@@ -523,11 +534,9 @@ def _emit_message_validate(
                 range_desc = f">= {min_int}"
             else:
                 range_desc = f"<= {max_int}"
+            msg_literal = f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`"
             checks.append(f"  if ({cond}) {{")
-            checks.append(
-                f"    throw new ValidationError("
-                f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`);"
-            )
+            checks.extend(_throw(field.name, msg_literal))
             checks.append("  }")
 
         if (min_f is not None or max_f is not None) and field.type in _FLOAT_TYPES:
@@ -543,11 +552,9 @@ def _emit_message_validate(
                 range_desc = f">= {min_f}"
             else:
                 range_desc = f"<= {max_f}"
+            msg_literal = f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`"
             checks.append(f"  if ({cond}) {{")
-            checks.append(
-                f"    throw new ValidationError("
-                f"`{field.name} must be in {range_desc} (got ${{m.{ts_field}}})`);"
-            )
+            checks.extend(_throw(field.name, msg_literal))
             checks.append("  }")
 
     if not checks:

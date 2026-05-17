@@ -21,7 +21,6 @@
 
 #include "rac/features/llm/rac_llm_stream.h"
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -206,6 +205,13 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     if (p.final_result != nullptr) {
         *proto_event.mutable_result() = *p.final_result;
     }
+    // pass2-syn-010: emit proto field 18 (LLMStreamEvent.tool_call) when the
+    // caller has detected a tool-call boundary mid-stream. NULL leaves the
+    // field unset (proto3 default) so legacy text-only streams are byte-for-
+    // byte identical to before.
+    if (p.tool_call != nullptr) {
+        *proto_event.mutable_tool_call() = *p.tool_call;
+    }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
     if (out.size() < needed)
@@ -341,6 +347,20 @@ inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const c
     out.insert(out.end(), str, str + len);
 }
 
+// pass2-syn-010: length-delimited bytes (wire type 2) for a pre-serialized
+// nested message. Used for emitting LLMStreamEvent.tool_call (proto field
+// 18) on the hand-encoded WASM path — the caller passes already-encoded
+// ToolCall bytes (e.g. through a side channel that does have access to
+// libprotobuf, or that hand-encoded the ToolCall itself).
+inline void wire_bytes_field(std::vector<uint8_t>& out, uint32_t field, const uint8_t* bytes,
+                             size_t size) {
+    if (bytes == nullptr || size == 0)
+        return;
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, size);
+    out.insert(out.end(), bytes, bytes + size);
+}
+
 int32_t to_proto_kind_int(int internal_kind) {
     switch (internal_kind) {
         case 1:
@@ -383,6 +403,12 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     wire_int32_field(out, /*field=*/15, p.prompt_tokens_processed);
     wire_int32_field(out, /*field=*/16, p.completion_tokens_generated);
     wire_int64_field(out, /*field=*/17, p.elapsed_ms);
+    // pass2-syn-010: tool_call (field 18) — length-delimited nested message.
+    // The libprotobuf path uses `p.tool_call`; the hand-encoded path here
+    // accepts pre-serialized bytes via `p.tool_call_bytes` so a caller that
+    // already has encoded ToolCall bytes can still emit the field. NULL or
+    // zero size omits per proto3 defaults.
+    wire_bytes_field(out, /*field=*/18, p.tool_call_bytes, p.tool_call_bytes_size);
 
     return true;
 }

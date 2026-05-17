@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke test for the four convenience generators
+# (generate_{swift,kotlin,dart,ts}_convenience.py).
+#
+# pass2-syn-056: the production IDL only exercises rac_required against a
+# single string field and rac_min/max against int32 sample_rate fields,
+# leaving the int64, float, double, bool, and enum-default code paths in
+# the generators dormant. This test:
+#
+#   1. Builds a FileDescriptorSet covering idl/codegen/tests/fixtures/
+#      test_options.proto (which applies every rac_* option to every
+#      relevant scalar type) plus the canonical idl/rac_options.proto.
+#
+#   2. Runs each generator against that fixture FDS, writing the output
+#      to a temp directory.
+#
+#   3. Diffs the per-language output against the committed goldens at
+#      idl/codegen/tests/golden/{swift,kotlin,dart,ts}.expected.
+#
+# Approach: each generator's `main()` reads `proto_dir = repo_root / "idl"`
+# and writes to a fixed SDK output path, with `repo_root` computed from
+# `__file__`. To run them against the fixture in isolation, we copy the
+# entire idl/codegen/ tree into a tempdir sandbox and populate
+# `sandbox/idl/` with only `rac_options.proto` + the fixture. The
+# generators then compute their own paths via `Path(__file__).resolve()`
+# and operate purely on the sandbox — they never see or touch the real
+# repo's idl/ or SDK source trees.
+#
+# Usage
+# -----
+#
+#   # Bootstrap the goldens (first run, after fixture changes):
+#   python3 idl/codegen/tests/test_convenience_generators.py --update-golden
+#
+#   # Verify (CI / pre-commit):
+#   python3 idl/codegen/tests/test_convenience_generators.py
+#
+# Exit code: 0 on success, 1 if any generator output diverges from its
+# golden, 2 if the toolchain (protoc, python protobuf) is missing.
+#
+# CI integration: not currently wired into pr-build.yml. Running this in
+# CI requires protoc on PATH and the Python protobuf runtime installed —
+# both are already prerequisites for the existing idl-drift-check.yml
+# workflow, so the additional cost is two subprocess invocations per
+# language. A follow-up patch may add a `convenience-smoke` job that
+# invokes this script after idl-drift-check; see pass2-syn-056 for the
+# rationale and the dormant-bug surface this smoke test catches.
+
+from __future__ import annotations
+
+import argparse
+import difflib
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+TESTS_DIR  = SCRIPT_DIR
+REPO_ROOT  = SCRIPT_DIR.parent.parent.parent
+CODEGEN_DIR = REPO_ROOT / "idl" / "codegen"
+FIXTURE_DIR = TESTS_DIR / "fixtures"
+GOLDEN_DIR  = TESTS_DIR / "golden"
+
+FIXTURE_PROTO     = FIXTURE_DIR / "test_options.proto"
+RAC_OPTIONS_PROTO = REPO_ROOT / "idl" / "rac_options.proto"
+
+
+# Each tuple = (language label, generator filename, relative output path
+# under the sandbox repo). The relative output path mirrors each
+# generator's hard-coded SDK output location; we read the resulting file
+# from inside the sandbox after running the generator.
+GENERATORS: list[tuple[str, str, Path]] = [
+    (
+        "swift",
+        "generate_swift_convenience.py",
+        Path("sdk") / "runanywhere-swift" / "Sources" / "RunAnywhere"
+        / "Generated" / "RAConvenience.swift",
+    ),
+    (
+        "kotlin",
+        "generate_kotlin_convenience.py",
+        Path("sdk") / "runanywhere-kotlin" / "src" / "commonMain" / "kotlin"
+        / "com" / "runanywhere" / "sdk" / "generated" / "convenience"
+        / "RAConvenience.kt",
+    ),
+    (
+        "dart",
+        "generate_dart_convenience.py",
+        Path("sdk") / "runanywhere-flutter" / "packages" / "runanywhere"
+        / "lib" / "generated" / "convenience" / "ra_convenience.dart",
+    ),
+    (
+        "ts",
+        "generate_ts_convenience.py",
+        # The TS generator emits one file per .proto under the convenience/
+        # directory. For this fixture (single proto: test_options.proto) the
+        # output is test_options_convenience.ts.
+        Path("sdk") / "shared" / "proto-ts" / "src" / "convenience"
+        / "test_options_convenience.ts",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Toolchain checks.
+# ---------------------------------------------------------------------------
+
+def check_toolchain() -> int:
+    """Return 0 if protoc + python protobuf runtime are available, 2 otherwise."""
+    if shutil.which("protoc") is None:
+        print("error: protoc not found on PATH — required to build the FileDescriptorSet.",
+              file=sys.stderr)
+        return 2
+    try:
+        import google.protobuf  # noqa: F401
+    except ImportError:
+        print("error: python protobuf runtime not installed; "
+              "run `pip install protobuf`.", file=sys.stderr)
+        return 2
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Sandbox repo setup.
+# ---------------------------------------------------------------------------
+
+def build_sandbox(sandbox: Path) -> None:
+    """Create a minimal repo layout under `sandbox` that the generators can
+    operate on unchanged. The generators compute `repo_root` from
+    `Path(__file__).resolve().parent.parent.parent` — `.resolve()` follows
+    symlinks, so we cannot symlink the codegen dir; we must copy it so the
+    generator scripts physically live inside the sandbox.
+
+    Layout produced:
+      sandbox/
+        idl/
+          rac_options.proto          (copy of the real one)
+          test_options.proto         (copy of fixtures/test_options.proto)
+          codegen/                   (copy of the real codegen/ dir)
+            generate_swift_convenience.py
+            generate_kotlin_convenience.py
+            generate_dart_convenience.py
+            generate_ts_convenience.py
+            _convenience_common.py
+            templates/...
+    """
+    (sandbox / "idl").mkdir(parents=True)
+    shutil.copy(RAC_OPTIONS_PROTO, sandbox / "idl" / "rac_options.proto")
+    shutil.copy(FIXTURE_PROTO,     sandbox / "idl" / "test_options.proto")
+    # Copy the entire codegen/ tree so the generator scripts compute
+    # `repo_root` as the sandbox (their `.resolve()` chain stays inside
+    # `sandbox/`). The copy is shallow enough (<200 KB) that the cost is
+    # negligible per test run.
+    shutil.copytree(
+        CODEGEN_DIR,
+        sandbox / "idl" / "codegen",
+        ignore=shutil.ignore_patterns("__pycache__", "tests"),
+    )
+
+
+def run_generator(generator_script: str, sandbox: Path) -> tuple[int, str, str]:
+    """Run a single generator's main() against the sandbox idl/ dir."""
+    script_path = sandbox / "idl" / "codegen" / generator_script
+    proc = subprocess.run(
+        [sys.executable, str(script_path)],
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Compare / update goldens.
+# ---------------------------------------------------------------------------
+
+def diff_against_golden(language: str, generated: str) -> tuple[bool, str]:
+    """Return (matches, diff_text). When the golden is missing or differs,
+    `matches` is False and `diff_text` is the unified diff."""
+    golden_path = GOLDEN_DIR / f"{language}.expected"
+    if not golden_path.is_file():
+        return False, (
+            f"golden missing: {golden_path}\n"
+            f"  bootstrap with: python3 {Path(__file__).name} --update-golden"
+        )
+    golden = golden_path.read_text(encoding="utf-8")
+    if golden == generated:
+        return True, ""
+    diff = "\n".join(difflib.unified_diff(
+        golden.splitlines(),
+        generated.splitlines(),
+        fromfile=str(golden_path),
+        tofile=f"<generated:{language}>",
+        lineterm="",
+    ))
+    return False, diff
+
+
+def write_golden(language: str, generated: str) -> Path:
+    GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
+    golden_path = GOLDEN_DIR / f"{language}.expected"
+    golden_path.write_text(generated, encoding="utf-8")
+    return golden_path
+
+
+# ---------------------------------------------------------------------------
+# Main.
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Smoke test for idl/codegen convenience generators "
+                    "(pass2-syn-056).",
+    )
+    parser.add_argument(
+        "--update-golden",
+        action="store_true",
+        help="Re-bootstrap the golden files from the current generator output. "
+             "Run after changing the fixture or the generator implementation.",
+    )
+    parser.add_argument(
+        "--keep-sandbox",
+        action="store_true",
+        help="Print the sandbox path and skip cleanup. Useful for "
+             "debugging generator failures interactively.",
+    )
+    args = parser.parse_args()
+
+    rc = check_toolchain()
+    if rc != 0:
+        return rc
+
+    failures: list[str] = []
+    updated_paths: list[Path] = []
+
+    with tempfile.TemporaryDirectory(prefix="rac-convenience-test-") as tmp:
+        sandbox = Path(tmp) / "repo"
+        build_sandbox(sandbox)
+
+        for language, generator_script, out_rel_path in GENERATORS:
+            print(f"-- running {generator_script} (language={language}) ...")
+            code, stdout, stderr = run_generator(generator_script, sandbox)
+            if code != 0:
+                failures.append(
+                    f"[{language}] {generator_script} exited {code}\n"
+                    f"  stdout: {stdout}\n"
+                    f"  stderr: {stderr}"
+                )
+                continue
+
+            out_path = sandbox / out_rel_path
+            if not out_path.is_file():
+                failures.append(
+                    f"[{language}] generator did not produce expected output at "
+                    f"{out_rel_path}\n  stdout: {stdout}\n  stderr: {stderr}"
+                )
+                continue
+
+            generated = out_path.read_text(encoding="utf-8")
+
+            if args.update_golden:
+                p = write_golden(language, generated)
+                updated_paths.append(p)
+                print(f"   wrote golden -> {p}")
+                continue
+
+            ok, diff = diff_against_golden(language, generated)
+            if not ok:
+                failures.append(f"[{language}] golden mismatch:\n{diff}")
+            else:
+                print(f"   {language} ok ({len(generated)} bytes)")
+
+        if args.keep_sandbox:
+            # Re-root the sandbox so the TemporaryDirectory cleanup does
+            # not delete it. (shutil.copytree → /tmp/.../keep)
+            keep = Path(tempfile.mkdtemp(prefix="rac-convenience-keep-"))
+            shutil.copytree(sandbox, keep / "repo", symlinks=True)
+            print(f"-- sandbox copy retained at: {keep / 'repo'}")
+
+    if failures:
+        print(file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        print("FAIL: convenience generator smoke test", file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        for f in failures:
+            print(f, file=sys.stderr)
+            print(file=sys.stderr)
+        return 1
+
+    if updated_paths:
+        print()
+        print(f"Updated {len(updated_paths)} golden file(s). Commit these.")
+
+    print()
+    print("OK: convenience generator smoke test passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

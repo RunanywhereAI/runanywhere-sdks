@@ -77,7 +77,7 @@
 
 ### K. Cross-Tab Navigation
 
-1. Navigate to each tab and verify UI renders without errors: Chat, Vision, Voice, Transcribe, Speak, Storage, Settings
+1. Navigate to each tab and verify UI renders without errors: Chat, Vision, Voice, Transcribe, Speak, Docs, Storage, Solutions, Settings
 2. Navigate rapidly between tabs — verify no crashes
 
 ### L. Console Error Audit
@@ -144,7 +144,12 @@
 2. Verify the placeholder or disabled flow explains that `RunAnywhere.synthesize` requires `RAC_WASM_ONNX=ON`
 3. Verify no real synthesis is marked PASS until ONNX/Sherpa/Piper exports exist
 
-### S. Model-Switch Banner
+### S. Model-Switch Banner [planned]
+
+> **Planned feature.** No model-switch banner is implemented yet — only orphan
+> `.model-switch-banner` CSS selectors remain in `src/styles/components.css`.
+> Skip this section until the banner ships; the steps below describe the
+> intended behavior for the future implementation.
 
 1. Load an LLM model on Chat tab, then switch to Vision tab — verify model-switch banner appears
 2. Verify banner text explains model category difference
@@ -233,9 +238,9 @@ After loading an LLM model, verify a POST contains:
 | `framework` | `"llamacpp"` |
 | `platform` | `"web"` |
 
-#### U6. Telemetry — STT Transcription Event
+#### U6. Telemetry — STT Transcription Event [requires RAC_WASM_ONNX=ON]
 
-*(Requires ONNX backend loaded with a Whisper STT model and microphone input)*
+*(Requires a build with `RAC_WASM_ONNX=ON` plus an ONNX backend loaded with a Whisper STT model and microphone input. On the default Web build the Transcribe tab renders a placeholder per Section Q, so this telemetry assertion is unreachable.)*
 
 After a transcription completes, verify a POST contains:
 
@@ -251,9 +256,9 @@ After a transcription completes, verify a POST contains:
 | `framework` | `"onnx"` |
 | `platform` | `"web"` |
 
-#### U7. Telemetry — TTS Synthesis Event
+#### U7. Telemetry — TTS Synthesis Event [requires RAC_WASM_ONNX=ON]
 
-*(Requires ONNX backend loaded with a Piper TTS model and Speak tab usage)*
+*(Requires a build with `RAC_WASM_ONNX=ON` plus an ONNX backend loaded with a Piper TTS model and Speak tab usage. On the default Web build the Speak tab renders a placeholder per Section R, so this telemetry assertion is unreachable.)*
 
 After a TTS synthesis completes, verify a POST contains:
 
@@ -285,9 +290,9 @@ During/after model download, verify a POST contains:
 | `processing_time_ms` | Float > 0 (download duration) |
 | `platform` | `"web"` |
 
-#### U9. Telemetry — VAD Event
+#### U9. Telemetry — VAD Event [requires RAC_WASM_ONNX=ON]
 
-*(Requires Voice tab with VAD active and speech input)*
+*(Requires a build with `RAC_WASM_ONNX=ON` plus the Voice tab with VAD active and speech input. On the default Web build the Voice tab renders a placeholder per Section P, so this telemetry assertion is unreachable.)*
 
 When speech activity is detected and ends, verify a POST contains:
 

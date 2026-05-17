@@ -3,6 +3,12 @@
  *
  * T6.1 — Worker-path orchestrator support.
  *
+ * @internal @experimental
+ *
+ * INTERNAL/EXPERIMENTAL — paired with `OffscreenRuntimeBridge.ts`. No
+ * production backend currently calls `setStreamWorkerFactory(...)`. See
+ * the removal contract on `OffscreenRuntimeBridge.ts` for disposition.
+ *
  * Singleton registry that lets a backend package (`@runanywhere/web-llamacpp`,
  * `@runanywhere/web-onnx`) install the function that constructs the streaming
  * Web Worker. Core stays pure-TS (no bundler-specific `new Worker(new URL(...))`

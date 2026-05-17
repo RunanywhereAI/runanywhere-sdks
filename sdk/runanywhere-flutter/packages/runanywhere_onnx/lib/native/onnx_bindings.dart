@@ -114,33 +114,57 @@ class OnnxBindings {
   }
 
   void _bindFunctions() {
-    _register = _lookup<RacBackendOnnxRegisterNative,
-        RacBackendOnnxRegisterDart>('rac_backend_onnx_register');
-    _unregister = _lookup<RacBackendOnnxUnregisterNative,
-        RacBackendOnnxUnregisterDart>('rac_backend_onnx_unregister');
+    // dart:ffi requires concrete native function types at lookupFunction call
+    // sites - we cannot route through a generic helper. Each binding is
+    // wrapped in its own try/catch so a missing symbol on one platform
+    // (e.g. Sherpa wrapper on iOS static) does not crash the others.
+    try {
+      _register = _lib.lookupFunction<RacBackendOnnxRegisterNative,
+          RacBackendOnnxRegisterDart>('rac_backend_onnx_register');
+    } catch (_) {
+      _register = null;
+    }
+    try {
+      _unregister = _lib.lookupFunction<RacBackendOnnxUnregisterNative,
+          RacBackendOnnxUnregisterDart>('rac_backend_onnx_unregister');
+    } catch (_) {
+      _unregister = null;
+    }
 
     // Sherpa lifecycle. Prefer the explicit wrapper (Android dynamic linkage);
     // if absent (iOS XCFramework drops the wrapper), bind the plugin-entry
     // pair so we can register Sherpa through the unified plugin registry.
-    _sherpaRegister = _lookup<RacBackendSherpaRegisterNative,
-        RacBackendSherpaRegisterDart>('rac_backend_sherpa_register');
-    _sherpaUnregister = _lookup<RacBackendSherpaUnregisterNative,
-        RacBackendSherpaUnregisterDart>('rac_backend_sherpa_unregister');
-    _sherpaPluginEntry = _lookup<RacPluginEntrySherpaNative,
-        RacPluginEntrySherpaDart>('rac_plugin_entry_sherpa');
-    _pluginRegister =
-        _lookup<RacPluginRegisterNative, RacPluginRegisterDart>(
-            'rac_plugin_register');
-    _pluginUnregister =
-        _lookup<RacPluginUnregisterNative, RacPluginUnregisterDart>(
-            'rac_plugin_unregister');
-  }
-
-  T? _lookup<NF extends Function, T extends Function>(String symbol) {
     try {
-      return _lib.lookupFunction<NF, T>(symbol);
+      _sherpaRegister = _lib.lookupFunction<RacBackendSherpaRegisterNative,
+          RacBackendSherpaRegisterDart>('rac_backend_sherpa_register');
     } catch (_) {
-      return null;
+      _sherpaRegister = null;
+    }
+    try {
+      _sherpaUnregister = _lib.lookupFunction<RacBackendSherpaUnregisterNative,
+          RacBackendSherpaUnregisterDart>('rac_backend_sherpa_unregister');
+    } catch (_) {
+      _sherpaUnregister = null;
+    }
+    try {
+      _sherpaPluginEntry = _lib.lookupFunction<RacPluginEntrySherpaNative,
+          RacPluginEntrySherpaDart>('rac_plugin_entry_sherpa');
+    } catch (_) {
+      _sherpaPluginEntry = null;
+    }
+    try {
+      _pluginRegister =
+          _lib.lookupFunction<RacPluginRegisterNative, RacPluginRegisterDart>(
+              'rac_plugin_register');
+    } catch (_) {
+      _pluginRegister = null;
+    }
+    try {
+      _pluginUnregister = _lib
+          .lookupFunction<RacPluginUnregisterNative, RacPluginUnregisterDart>(
+              'rac_plugin_unregister');
+    } catch (_) {
+      _pluginUnregister = null;
     }
   }
 

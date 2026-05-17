@@ -268,7 +268,7 @@ rac_result_t executor_callback(const uint8_t* in_bytes, size_t in_size,
     auto* state = static_cast<ExecutorState*>(user_data);
     runanywhere::v1::ToolCall received;
     if (in_size > 0)
-        received.ParseFromArray(in_bytes, static_cast<int>(in_size));
+        (void)received.ParseFromArray(in_bytes, static_cast<int>(in_size));
 
     {
         std::lock_guard<std::mutex> lg(state->mu);
@@ -329,7 +329,7 @@ int test_no_tool_call_completes_immediately() {
 
     runanywhere::v1::ToolCallingResult result;
     if (out.data != nullptr && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     CHECK(result.is_complete() == true, "is_complete true");
     CHECK(result.tool_calls_size() == 0, "no tool_calls");
@@ -369,7 +369,7 @@ int test_one_tool_call_then_final_text() {
 
     runanywhere::v1::ToolCallingResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     CHECK(result.is_complete() == true, "is_complete true");
     CHECK(result.tool_calls_size() == 1, "one tool_call recorded");
@@ -414,7 +414,7 @@ int test_max_iterations_capped() {
 
     runanywhere::v1::ToolCallingResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     CHECK(result.iterations_used() == 2, "iterations_used == max_iterations");
     CHECK(result.tool_calls_size() == 2, "two tool_calls recorded");
@@ -449,7 +449,7 @@ int test_validation_failure_short_circuits() {
 
     runanywhere::v1::ToolCallingResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     CHECK(result.tool_calls_size() == 1, "one tool_call recorded");
     CHECK(result.tool_results_size() == 1, "one failed tool_result recorded");

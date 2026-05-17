@@ -25,12 +25,15 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -196,147 +199,172 @@ internal object ToolCallingOrchestrator {
     suspend fun generateWithTools(
         prompt: String,
         options: ToolCallingOptions? = null,
-    ): ToolCallingResult = coroutineScope {
-        require(RunAnywhere.isInitialized) { "SDK not initialized" }
+    ): ToolCallingResult =
+        coroutineScope {
+            require(RunAnywhere.isInitialized) { "SDK not initialized" }
 
-        val opts = options ?: ToolCallingOptions()
-        val registeredTools = ToolRegistry.getAll()
-        val tools = opts.tools.ifEmpty { registeredTools }
-        val effectiveOpts = opts.copy(tools = tools)
+            val opts = options ?: ToolCallingOptions()
+            val registeredTools = ToolRegistry.getAll()
+            val tools = opts.tools.ifEmpty { registeredTools }
+            val effectiveOpts = opts.copy(tools = tools)
 
-        val request =
-            ToolCallingSessionCreateRequest(
-                prompt = prompt,
-                max_tokens = effectiveOpts.max_tokens ?: 0,
-                temperature = effectiveOpts.temperature ?: 0f,
-                top_p = 0f,
-                system_prompt = effectiveOpts.system_prompt ?: "",
-                format_hint = effectiveOpts.effectiveToolFormatHint(),
-                max_iterations = effectiveOpts.effectiveMaxIterations(),
-                keep_tools_available = effectiveOpts.keep_tools_available ?: false,
-                validate_calls = true,
-                tools = tools,
-            )
+            val request =
+                ToolCallingSessionCreateRequest(
+                    prompt = prompt,
+                    max_tokens = effectiveOpts.max_tokens ?: 0,
+                    temperature = effectiveOpts.temperature ?: 0f,
+                    top_p = 0f,
+                    system_prompt = effectiveOpts.system_prompt ?: "",
+                    format_hint = effectiveOpts.effectiveToolFormatHint(),
+                    max_iterations = effectiveOpts.effectiveMaxIterations(),
+                    keep_tools_available = effectiveOpts.keep_tools_available ?: false,
+                    validate_calls = true,
+                    tools = tools,
+                    // pass2-syn-006-followup-kotlin: thread the OpenAI-style
+                    // tool_choice / forced_tool_name knobs all the way through to
+                    // the canonical request envelope (idl/tool_calling.proto
+                    // fields 7/8). Commons build_options_snapshot copies them onto
+                    // the synthesized ToolCallingOptions before every
+                    // format/validate proto call.
+                    tool_choice =
+                        effectiveOpts.tool_choice?.takeIf {
+                            it != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
+                        },
+                    forced_tool_name = effectiveOpts.forced_tool_name?.takeIf { it.isNotEmpty() },
+                )
 
-        // Decouple JNI callback thread from tool execution / step_with_result.
-        // The native session emits `tool_call` while holding session->mu (and
-        // before *out_session_handle is written), so calling step_with_result
-        // synchronously from the listener would either deadlock the session
-        // mutex or feed in session_handle=0. Instead, the listener does only
-        // non-blocking enqueue work; a worker coroutine drives step_with_result
-        // off-thread once the handle is known.
-        val completion = CompletableDeferred<ToolCallingResult>()
-        val handleDeferred = CompletableDeferred<Long>()
-        val toolCallChannel = Channel<ToolCall>(capacity = Channel.UNLIMITED)
+            // Decouple JNI callback thread from tool execution / step_with_result.
+            // The native session emits `tool_call` while holding session->mu (and
+            // before *out_session_handle is written), so calling step_with_result
+            // synchronously from the listener would either deadlock the session
+            // mutex or feed in session_handle=0. Instead, the listener does only
+            // non-blocking enqueue work; a worker coroutine drives step_with_result
+            // off-thread once the handle is known.
+            val completion = CompletableDeferred<ToolCallingResult>()
+            val handleDeferred = CompletableDeferred<Long>()
+            val toolCallChannel = Channel<ToolCall>(capacity = Channel.UNLIMITED)
 
-        val listener =
-            NativeProtoProgressListener { bytes ->
-                val event = ToolCallingSessionEvent.ADAPTER.decode(bytes)
-                when {
-                    event.final_result != null -> {
-                        if (!completion.isCompleted) completion.complete(event.final_result)
-                        toolCallChannel.close()
-                    }
-                    event.tool_call != null -> {
-                        // Non-blocking enqueue. Channel.UNLIMITED guarantees
-                        // trySend succeeds; this keeps the JNI callback thread
-                        // unblocked so native run_generate_loop can pause and
-                        // rac_tool_calling_session_create_proto can return,
-                        // making the session handle visible to the worker.
-                        toolCallChannel.trySend(event.tool_call)
-                    }
-                    event.error_bytes != null -> {
-                        val sdkError =
-                            try {
-                                SDKError.ADAPTER.decode(event.error_bytes.toByteArray())
-                            } catch (_: Exception) {
-                                null
+            val listener =
+                NativeProtoProgressListener { bytes ->
+                    val event = ToolCallingSessionEvent.ADAPTER.decode(bytes)
+                    when {
+                        event.final_result != null -> {
+                            if (!completion.isCompleted) completion.complete(event.final_result)
+                            toolCallChannel.close()
+                        }
+                        event.tool_call != null -> {
+                            // Non-blocking enqueue. Channel.UNLIMITED guarantees
+                            // trySend succeeds; this keeps the JNI callback thread
+                            // unblocked so native run_generate_loop can pause and
+                            // rac_tool_calling_session_create_proto can return,
+                            // making the session handle visible to the worker.
+                            toolCallChannel.trySend(event.tool_call)
+                        }
+                        event.error_bytes != null -> {
+                            val sdkError =
+                                try {
+                                    SDKError.ADAPTER.decode(event.error_bytes.toByteArray())
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            if (!completion.isCompleted) {
+                                completion.complete(
+                                    ToolCallingResult(
+                                        text = "",
+                                        is_complete = false,
+                                        error_message = sdkError?.message ?: "Tool calling session error",
+                                        error_code = sdkError?.c_abi_code ?: -1,
+                                    ),
+                                )
                             }
-                        if (!completion.isCompleted) {
-                            completion.complete(
-                                ToolCallingResult(
-                                    text = "",
-                                    is_complete = false,
-                                    error_message = sdkError?.message ?: "Tool calling session error",
-                                    error_code = sdkError?.c_abi_code ?: -1,
-                                ),
-                            )
+                            toolCallChannel.close()
                         }
-                        toolCallChannel.close()
+                    }
+                    true
+                }
+
+            // Worker drains queued tool_calls and feeds step_with_result on a
+            // separate thread, so it can re-acquire session->mu only after the
+            // create / previous step call has released it.
+            val worker =
+                launch(Dispatchers.IO) {
+                    val handle = handleDeferred.await()
+                    if (handle == 0L) return@launch
+                    for (toolCall in toolCallChannel) {
+                        val tool = ToolRegistry.get(toolCall.name)
+                        val stepRequest = buildStepRequest(handle, toolCall, tool)
+                        val rc =
+                            RunAnywhereBridge.racToolCallingSessionStepWithResultProto(
+                                ToolCallingSessionStepWithResultRequest.ADAPTER.encode(stepRequest),
+                            )
+                        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                            if (!completion.isCompleted) {
+                                completion.complete(
+                                    ToolCallingResult(
+                                        text = "",
+                                        is_complete = false,
+                                        error_message =
+                                            "racToolCallingSessionStepWithResultProto failed with rc=$rc",
+                                        error_code = rc,
+                                    ),
+                                )
+                            }
+                            toolCallChannel.close()
+                            break
+                        }
                     }
                 }
-                true
-            }
 
-        // Worker drains queued tool_calls and feeds step_with_result on a
-        // separate thread, so it can re-acquire session->mu only after the
-        // create / previous step call has released it.
-        val worker =
-            launch(Dispatchers.IO) {
-                val handle = handleDeferred.await()
-                if (handle == 0L) return@launch
-                for (toolCall in toolCallChannel) {
-                    val tool = ToolRegistry.get(toolCall.name)
-                    val stepRequest = buildStepRequest(handle, toolCall, tool)
-                    val rc =
-                        RunAnywhereBridge.racToolCallingSessionStepWithResultProto(
-                            ToolCallingSessionStepWithResultRequest.ADAPTER.encode(stepRequest),
+            val sessionHandle =
+                try {
+                    withContext(Dispatchers.IO) {
+                        RunAnywhereBridge.racToolCallingSessionCreateProto(
+                            ToolCallingSessionCreateRequest.ADAPTER.encode(request),
+                            listener,
                         )
-                    if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-                        if (!completion.isCompleted) {
-                            completion.complete(
-                                ToolCallingResult(
-                                    text = "",
-                                    is_complete = false,
-                                    error_message =
-                                        "racToolCallingSessionStepWithResultProto failed with rc=$rc",
-                                    error_code = rc,
-                                ),
-                            )
-                        }
-                        toolCallChannel.close()
-                        break
                     }
+                } catch (t: Throwable) {
+                    handleDeferred.complete(0L)
+                    toolCallChannel.close()
+                    worker.cancelAndJoin()
+                    throw t
                 }
+            handleDeferred.complete(sessionHandle)
+
+            if (sessionHandle == 0L) {
+                toolCallChannel.close()
+                worker.join()
+                return@coroutineScope ToolCallingResult(
+                    text = "",
+                    is_complete = false,
+                    error_message = "racToolCallingSessionCreateProto returned 0",
+                    error_code = -1,
+                )
             }
 
-        val sessionHandle =
-            try {
-                withContext(Dispatchers.IO) {
-                    RunAnywhereBridge.racToolCallingSessionCreateProto(
-                        ToolCallingSessionCreateRequest.ADAPTER.encode(request),
-                        listener,
-                    )
+            // pass2-syn-007: fan coroutine cancellation into the native loop.
+            // currentCoroutineContext()[Job]?.invokeOnCompletion fires once on
+            // any termination (cancel or normal); we only want to forward the
+            // cancellation case, so we guard on CancellationException. Cancel
+            // is idempotent on the native side, so a double-cancel is safe.
+            val cancelHandler =
+                currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
+                    if (cause is CancellationException && sessionHandle != 0L) {
+                        RunAnywhereBridge.racToolCallingSessionCancelProto(sessionHandle)
+                    }
                 }
-            } catch (t: Throwable) {
-                handleDeferred.complete(0L)
+
+            try {
+                completion.await()
+            } finally {
+                cancelHandler?.dispose()
                 toolCallChannel.close()
                 worker.cancelAndJoin()
-                throw t
-            }
-        handleDeferred.complete(sessionHandle)
-
-        if (sessionHandle == 0L) {
-            toolCallChannel.close()
-            worker.join()
-            return@coroutineScope ToolCallingResult(
-                text = "",
-                is_complete = false,
-                error_message = "racToolCallingSessionCreateProto returned 0",
-                error_code = -1,
-            )
-        }
-
-        try {
-            completion.await()
-        } finally {
-            toolCallChannel.close()
-            worker.cancelAndJoin()
-            withContext(NonCancellable + Dispatchers.IO) {
-                RunAnywhereBridge.racToolCallingSessionDestroyProto(sessionHandle)
+                withContext(NonCancellable + Dispatchers.IO) {
+                    RunAnywhereBridge.racToolCallingSessionDestroyProto(sessionHandle)
+                }
             }
         }
-    }
 
     private suspend fun buildStepRequest(
         sessionHandle: Long,

@@ -98,7 +98,10 @@ export const sTTConfigurationDefaults = (): STTConfiguration => ({
 
 export const validateSTTConfiguration = (m: STTConfiguration): void => {
   if (m.sampleRate < 8000 || m.sampleRate > 48000) {
-    throw new ValidationError(`sample_rate must be in 8000...48000 (got ${m.sampleRate})`);
+    throw new ValidationError({
+      fieldPath: 'STTConfiguration.sample_rate',
+      message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
+    });
   }
 };
 

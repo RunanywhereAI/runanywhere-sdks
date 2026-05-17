@@ -16,6 +16,20 @@ on:
       - 'idl/voice_agent_service.proto'
       - 'cmake/**'
       - '.github/workflows/streaming-perf.yml'
+      # Per-SDK streaming parity tests live inside each SDK tree, not under
+      # tests/streaming/. Trigger this workflow when any of those change so a
+      # silently-modified Swift/Kotlin/Dart/TS comparator can't pass without
+      # also exercising the C++ golden producer side.
+      - 'sdk/runanywhere-swift/Tests/**/Streaming/**'
+      - 'sdk/runanywhere-swift/Tests/**/streaming/**'
+      - 'sdk/runanywhere-kotlin/src/**/streaming/**'
+      - 'sdk/runanywhere-kotlin/src/**/Streaming/**'
+      - 'sdk/runanywhere-flutter/packages/*/test/**/streaming/**'
+      - 'sdk/runanywhere-flutter/packages/*/test/**/streaming*'
+      - 'sdk/runanywhere-react-native/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-react-native/packages/*/__tests__/**/streaming/**'
+      - 'sdk/runanywhere-web/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-web/packages/*/test/**/streaming/**'
   push:
     branches:
       - main
@@ -26,6 +40,20 @@ on:
       - 'sdk/runanywhere-commons/include/rac/features/voice_agent/**'
       - 'idl/voice_events.proto'
       - 'idl/voice_agent_service.proto'
+      - 'cmake/**'
+      - '.github/workflows/streaming-perf.yml'
+      # Mirror the per-SDK paths from the PR trigger so main-branch pushes
+      # that only change a per-SDK comparator still trip the parity gate.
+      - 'sdk/runanywhere-swift/Tests/**/Streaming/**'
+      - 'sdk/runanywhere-swift/Tests/**/streaming/**'
+      - 'sdk/runanywhere-kotlin/src/**/streaming/**'
+      - 'sdk/runanywhere-kotlin/src/**/Streaming/**'
+      - 'sdk/runanywhere-flutter/packages/*/test/**/streaming/**'
+      - 'sdk/runanywhere-flutter/packages/*/test/**/streaming*'
+      - 'sdk/runanywhere-react-native/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-react-native/packages/*/__tests__/**/streaming/**'
+      - 'sdk/runanywhere-web/packages/*/src/**/streaming/**'
+      - 'sdk/runanywhere-web/packages/*/test/**/streaming/**'
 
 jobs:
   cpp-producers-and-aggregators:

@@ -386,16 +386,18 @@ if (llamaRegistered) {
   });
 }
 
-await ONNX.register();
-await RunAnywhere.registerModel({
-  id: 'sherpa-onnx-whisper-tiny.en',
-  name: 'Sherpa Whisper Tiny (ONNX)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/...',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
-  memoryRequirement: 75_000_000,
-});
+const onnxRegistered = await ONNX.register();
+if (onnxRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Sherpa Whisper Tiny (ONNX)',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/...',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    memoryRequirement: 75_000_000,
+  });
+}
 ```
 
 ### Download & Load a Model

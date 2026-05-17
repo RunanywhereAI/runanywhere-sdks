@@ -15,9 +15,9 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <atomic>
-#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <exception>
@@ -118,6 +118,16 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
 // rac_http_download_execute resume-fallback path (Range: bytes=N- → HTTP 200).
 std::atomic<bool> g_resume_returns_200{false};
 
+// pass2-syn-116 regression: when a resume request returns 206 but the body
+// stream is truncated mid-way (network drop), the first resume attempt must
+// surface an error AND leave the partial file intact so that a second
+// resume from the new offset can complete cleanly without corruption.
+// `g_resume_truncate_after_bytes` controls the truncation point of the
+// SECOND resume call (the first call's truncation is governed by
+// `g_resume_first_attempt_truncate`).
+std::atomic<bool> g_resume_truncate_first_attempt{false};
+std::atomic<size_t> g_resume_truncate_after_bytes{0};
+
 rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_t resume_from_byte,
                                    rac_http_body_chunk_fn cb, void* cb_user_data,
                                    rac_http_response_t* out_resp_meta) {
@@ -140,6 +150,30 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
     }
     out_resp_meta->status = 206;
     size_t from = std::min<size_t>(static_cast<size_t>(resume_from_byte), g_payload.size());
+
+    // pass2-syn-116 regression: if the test asked us to truncate the first
+    // resume attempt mid-stream, deliver `g_resume_truncate_after_bytes`
+    // bytes starting at `from` and then return a network error. The runner
+    // must propagate the error and leave the on-disk bytes for the next
+    // resume attempt to pick up.
+    if (g_resume_truncate_first_attempt.load()) {
+        const size_t truncate_after = g_resume_truncate_after_bytes.load();
+        const size_t chunk = 4096;
+        uint64_t delivered = 0;
+        for (size_t offset = from; offset < g_payload.size() && delivered < truncate_after;
+             offset += chunk) {
+            size_t n = std::min(chunk, g_payload.size() - offset);
+            n = std::min(n, truncate_after - static_cast<size_t>(delivered));
+            delivered += n;
+            (void)cb(g_payload.data() + offset, n, delivered,
+                     static_cast<uint64_t>(g_payload.size() - from), cb_user_data);
+        }
+        // Signal a mid-stream failure. Disarm the flag so the NEXT resume
+        // attempt (from the new offset) succeeds normally.
+        g_resume_truncate_first_attempt.store(false);
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
     return stream_payload_from(from, cb, cb_user_data) == RAC_TRUE ? RAC_SUCCESS
                                                                    : RAC_ERROR_CANCELLED;
 }
@@ -696,6 +730,88 @@ void test_resume_with_200_full_body_replay_no_checksum() {
     fs::remove(dest);
 }
 
+// pass2-syn-116 regression: a partial resume that fails mid-stream must not
+// corrupt the on-disk file; a follow-up resume from the new offset must
+// complete cleanly and the final checksum must match the canonical payload.
+// This guards the shift-left fallback's interaction with the second-attempt
+// "retry from new offset" path: the partial bytes left after the first
+// attempt are *not* a Range-ignored full-body, so the shift-left fallback
+// must not fire on the retry.
+void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
+    auto dest = tmp_file("resume-midfail.bin");
+    std::string dest_str = dest.string();
+    const size_t initial_prefix = g_payload.size() / 4;
+
+    // Seed a partial prefix on disk (e.g. from a previous attempt).
+    {
+        std::ofstream out(dest, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(g_payload.data()),
+                  static_cast<std::streamsize>(initial_prefix));
+    }
+    T_CHECK(fs::file_size(dest) == initial_prefix);
+
+    // Arm the transport to deliver only `mid_stream_bytes` of the tail
+    // before returning a network error.
+    const size_t mid_stream_bytes = 16384;
+    g_resume_truncate_first_attempt.store(true);
+    g_resume_truncate_after_bytes.store(mid_stream_bytes);
+
+    rac_http_download_request_t req{};
+    auto u = url("/payload");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = initial_prefix;
+    req.expected_sha256_hex = g_expected_sha.c_str();
+
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    // First attempt must surface a network failure (NOT a checksum failure;
+    // the runner must not declare success on a truncated body).
+    T_CHECK(rc != RAC_HTTP_DL_OK);
+    T_CHECK(rc == RAC_HTTP_DL_NETWORK_ERROR);
+
+    // After the truncated first attempt, the on-disk file must have grown
+    // by at most `mid_stream_bytes` and must remain a valid prefix of the
+    // canonical payload so a second resume can pick up where it left off.
+    size_t after_fail = fs::file_size(dest);
+    T_CHECK(after_fail >= initial_prefix);
+    T_CHECK(after_fail <= initial_prefix + mid_stream_bytes);
+    {
+        std::ifstream in(dest, std::ios::binary);
+        std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
+                                      std::istreambuf_iterator<char>());
+        T_CHECK(on_disk.size() == after_fail);
+        // Must still match the canonical payload byte-for-byte at the prefix.
+        T_CHECK(std::equal(on_disk.begin(), on_disk.end(), g_payload.begin()));
+    }
+
+    // Disarm; the second resume attempt streams normally from the new offset.
+    g_resume_truncate_first_attempt.store(false);
+
+    rac_http_download_request_t req2{};
+    req2.url = u.c_str();
+    req2.destination_path = dest_str.c_str();
+    req2.timeout_ms = 10000;
+    req2.follow_redirects = RAC_TRUE;
+    req2.resume_from_byte = after_fail;
+    req2.expected_sha256_hex = g_expected_sha.c_str();
+
+    status = 0;
+    rc = rac_http_download_execute(&req2, nullptr, nullptr, &status);
+    T_CHECK(rc == RAC_HTTP_DL_OK);
+    T_CHECK(status == 206 || status == 200);
+    T_CHECK(fs::file_size(dest) == g_payload.size());
+
+    std::ifstream in(dest, std::ios::binary);
+    std::vector<uint8_t> final_bytes((std::istreambuf_iterator<char>(in)),
+                                      std::istreambuf_iterator<char>());
+    T_CHECK(final_bytes == g_payload);
+
+    fs::remove(dest);
+}
+
 }  // namespace
 
 int main() {
@@ -723,6 +839,8 @@ int main() {
         test_resume_rejects_stale_offset();
         test_resume_with_200_full_body_replay_checksum();
         test_resume_with_200_full_body_replay_no_checksum();
+        // pass2-syn-116 regression: mid-stream failure + retry must not corrupt.
+        test_resume_mid_stream_failure_then_retry_completes_cleanly();
 
         rac_http_transport_register(nullptr, nullptr);
         stop();

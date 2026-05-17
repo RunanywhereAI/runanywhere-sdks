@@ -27,13 +27,22 @@ const embeddingsConfigurationDefaults = () => ({
 exports.embeddingsConfigurationDefaults = embeddingsConfigurationDefaults;
 const validateEmbeddingsConfiguration = (m) => {
     if (m.modelId === '') {
-        throw new _errors_1.ValidationError('model_id is required');
+        throw new _errors_1.ValidationError({
+            fieldPath: 'EmbeddingsConfiguration.model_id',
+            message: 'model_id is required',
+        });
     }
     if (m.embeddingDimension < 1) {
-        throw new _errors_1.ValidationError(`embedding_dimension must be in >= 1 (got ${m.embeddingDimension})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'EmbeddingsConfiguration.embedding_dimension',
+            message: `embedding_dimension must be in >= 1 (got ${m.embeddingDimension})`,
+        });
     }
     if (m.maxSequenceLength < 1) {
-        throw new _errors_1.ValidationError(`max_sequence_length must be in >= 1 (got ${m.maxSequenceLength})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'EmbeddingsConfiguration.max_sequence_length',
+            message: `max_sequence_length must be in >= 1 (got ${m.maxSequenceLength})`,
+        });
     }
 };
 exports.validateEmbeddingsConfiguration = validateEmbeddingsConfiguration;

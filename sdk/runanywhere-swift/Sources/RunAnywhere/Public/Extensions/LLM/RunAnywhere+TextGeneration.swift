@@ -31,6 +31,17 @@ public extension RunAnywhere {
     }
 
     /// Stream text generation through the generated-proto C++ LLM service ABI.
+    ///
+    /// Each `RALLMStreamEvent` is decoded from the full proto envelope so all
+    /// optional fields are surfaced to consumers without any switch-case
+    /// filtering at the adapter layer:
+    ///   - `token` / `kind` / `tokenID` / `logprob` for streaming tokens
+    ///   - `eventKind` (proto `LLMStreamEventKind`) to classify the event
+    ///   - `toolCall` (proto field 18, hotspot-idl-002) when the event
+    ///     represents a structured tool-call boundary — consumers can read
+    ///     `event.hasToolCall` / `event.toolCall` directly without falling
+    ///     back to JSON-parsing the raw `token` text (pass2-syn-010 follow-up).
+    ///   - `result` (final aggregate metrics on terminal events).
     static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)

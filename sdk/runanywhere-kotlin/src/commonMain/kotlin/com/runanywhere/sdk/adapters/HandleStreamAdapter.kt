@@ -55,7 +55,7 @@
 package com.runanywhere.sdk.adapters
 
 import com.squareup.wire.Message
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -109,9 +109,10 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
      *
      * Calling `stream()` twice attaches two collectors to the same
      * per-handle native callback registration. Each collector observes
-     * every event in order, with its own bounded channel for
-     * backpressure (drops the oldest event on overflow rather than
-     * blocking the C dispatcher).
+     * every event in order, with its own unbounded channel so the C
+     * dispatcher never blocks. Mirrors Swift's `AsyncStream` (default
+     * `.unbounded`) and the React Native generateStream queue — a slow
+     * collector grows its own buffer rather than losing events.
      */
     fun stream(): Flow<Event> =
         callbackFlow<Event> {
@@ -130,12 +131,14 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
 
             awaitClose { fanOut.detach(channel) }
         }.buffer(
-            // Per-collector bounded channel that drops the oldest event on
-            // overflow rather than blocking the native dispatcher. Matches
-            // the class-doc backpressure contract above and Swift's
-            // AsyncStream parity (yield never blocks the C callback).
-            capacity = COLLECTOR_BUFFER_CAPACITY,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+            // Per-collector unbounded buffer. Matches Swift's `AsyncStream`
+            // (which defaults to `.unbounded`) and the React Native
+            // generateStream queue (an unbounded JS array). The C callback
+            // thread invokes `trySend` on this channel and must never
+            // block; `Channel.UNLIMITED` makes `trySend` non-blocking and
+            // lossless, so a slow collector grows its own buffer rather
+            // than dropping events that Swift/RN would have delivered.
+            capacity = Channel.UNLIMITED,
         )
 
     /**
@@ -180,20 +183,80 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         private var callbackId: Long = INVALID_CALLBACK_ID
 
         /**
+         * Installation state machine. Mirrors Swift's
+         * `HandleStreamAdapter` install state (see Swift comment
+         * record `mlt-002`): the C `register(...)` call MUST run outside
+         * the per-fan-out lock so that
+         *   (a) a same-thread synchronously-fired first callback observes
+         *       the just-added collector in `collectors` (rather than the
+         *       empty list it would see if we added AFTER register),
+         *   (b) a cross-thread synchronously-fired first callback does
+         *       not block on the lock the installer is still holding.
+         */
+        private enum class InstallState { NOT_INSTALLED, INSTALLING, INSTALLED, FAILED }
+
+        @Volatile
+        private var installState: InstallState = InstallState.NOT_INSTALLED
+
+        /**
          * Attach a collector. Returns `true` on success; returns `false`
          * (and leaves the fan-out state unchanged) if this was the
          * first subscriber AND the C-side registration failed, so the
          * caller can propagate the error to its own flow.
+         *
+         * Swift parity (mlt-002): the collector is appended to
+         * `collectors` BEFORE the C `register()` call runs, and
+         * `register()` runs OUTSIDE the per-fan-out lock. The first
+         * attacher takes the `INSTALLING` role and performs the C-side
+         * registration; concurrent attachers join as plain subscribers.
          */
         fun attach(channel: SendChannel<Event>): Boolean {
-            synchronized(lock) {
-                if (collectors.isEmpty()) {
-                    val id = register(handle) { bytes -> broadcast(bytes) }
-                    if (id == INVALID_CALLBACK_ID) return false
-                    callbackId = id
+            val installer: Boolean =
+                synchronized(lock) {
+                    collectors.add(channel)
+                    when (installState) {
+                        InstallState.NOT_INSTALLED -> {
+                            installState = InstallState.INSTALLING
+                            true
+                        }
+                        // Already installed (or another caller is mid-install).
+                        // Joining as a plain fan-out subscriber is sufficient;
+                        // a same-thread synchronously-fired callback during the
+                        // ongoing install will see this channel in `collectors`
+                        // and broadcast() will deliver to it.
+                        InstallState.INSTALLING, InstallState.INSTALLED -> false
+                        InstallState.FAILED -> {
+                            // Prior install attempt failed and the fan-out
+                            // was not torn down (e.g. still referenced by
+                            // the registry). Allow a fresh attempt.
+                            installState = InstallState.INSTALLING
+                            true
+                        }
+                    }
                 }
-                collectors.add(channel)
-                return true
+
+            if (!installer) return true
+
+            // The C registration runs OUTSIDE the lock so that
+            //   1. a synchronously-fired first callback that re-enters
+            //      broadcast() can take the lock (snapshot collectors)
+            //      and deliver the event,
+            //   2. a cross-thread synchronous callback does not block on
+            //      the installer's lock acquisition.
+            val id = register(handle) { bytes -> broadcast(bytes) }
+            return synchronized(lock) {
+                if (id == INVALID_CALLBACK_ID) {
+                    // Roll back: remove the channel we appended and
+                    // flip back to a state subsequent attaches can recover from.
+                    collectors.remove(channel)
+                    installState =
+                        if (collectors.isEmpty()) InstallState.NOT_INSTALLED else InstallState.FAILED
+                    false
+                } else {
+                    callbackId = id
+                    installState = InstallState.INSTALLED
+                    true
+                }
             }
         }
 
@@ -217,6 +280,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                     if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {
                         val id = callbackId
                         callbackId = INVALID_CALLBACK_ID
+                        installState = InstallState.NOT_INSTALLED
                         id
                     } else {
                         INVALID_CALLBACK_ID
@@ -245,6 +309,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                     collectors.clear()
                     val id = callbackId
                     callbackId = INVALID_CALLBACK_ID
+                    installState = InstallState.NOT_INSTALLED
                     id
                 }
             if (idToUnregister != INVALID_CALLBACK_ID) {
@@ -288,6 +353,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                             if (callbackId != INVALID_CALLBACK_ID) {
                                 callbackId = INVALID_CALLBACK_ID
                             }
+                            installState = InstallState.NOT_INSTALLED
                             id
                         }
                     if (idToUnregister != INVALID_CALLBACK_ID) {
@@ -314,6 +380,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                         if (callbackId != INVALID_CALLBACK_ID) {
                             callbackId = INVALID_CALLBACK_ID
                         }
+                        installState = InstallState.NOT_INSTALLED
                         id
                     } else {
                         INVALID_CALLBACK_ID
@@ -327,9 +394,10 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
 
             for (c in snapshot) {
                 // Non-blocking offer: the per-collector channel is
-                // configured with BufferOverflow.DROP_OLDEST (see stream()),
-                // so a saturated slow collector drops its oldest queued
-                // event instead of suspending this native callback thread.
+                // configured with `Channel.UNLIMITED` (see stream()), so
+                // `trySend` is lossless and never suspends this native
+                // callback thread. Matches Swift's `AsyncStream` yield
+                // semantics (unbounded buffer, non-blocking producer).
                 c.trySend(event)
                 if (isFinal) c.close()
             }
@@ -349,12 +417,11 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         const val INVALID_CALLBACK_ID: Long = 0L
 
         /**
-         * Per-collector channel capacity. Sized for typical proto stream
-         * burst (LLM token tail, voice-agent partial-transcripts) so a
-         * momentarily-paused collector tolerates a brief pile-up before
-         * DROP_OLDEST kicks in. Tuned conservatively — the cost of a
-         * dropped intermediate event is far lower than blocking the
-         * native callback thread.
+         * Historical name retained for reference: per-collector channel
+         * capacity used to be 64 with DROP_OLDEST. Since the policy
+         * switched to `Channel.UNLIMITED` for Swift `AsyncStream` parity,
+         * the constant is no longer wired in but is kept exposed for
+         * legacy tests that pinned the older bounded-buffer behavior.
          */
         internal const val COLLECTOR_BUFFER_CAPACITY: Int = 64
 

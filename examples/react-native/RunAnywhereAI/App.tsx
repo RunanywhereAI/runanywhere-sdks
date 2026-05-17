@@ -355,12 +355,21 @@ async function registerModulesAndModels(): Promise<void> {
   // =========================================================================
   // ONNX backend + STT/TTS models
   // =========================================================================
+  // Mirror the LlamaCPP gating: ONNX.register() returns Promise<boolean>;
+  // skip STT/TTS/VAD/embedding model registration when the native backend
+  // failed to install so the demo never routes inference to a backend that
+  // failed to register.
+  const onnxRegistered = ONNX ? await ONNX.register() : false;
   if (!ONNX) {
     logDiagnostic('[App] Skipping ONNX models - backend not available');
     return;
   }
-
-  await ONNX.register();
+  if (!onnxRegistered) {
+    logDiagnostic(
+      '[App] ONNX.register() returned false - skipping STT/TTS/VAD/embedding model registration'
+    );
+    return;
+  }
 
   await Promise.all([
     // Sherpa-ONNX speech models — served by the Sherpa engine plugin

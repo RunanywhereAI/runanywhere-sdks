@@ -37,16 +37,13 @@
 
 #include <jni.h>
 
-#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
-#include <fstream>
 #include <limits>
 #include <mutex>
-#include <new>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
@@ -60,7 +57,6 @@
 #include "../infrastructure/http/rac_http_internal.h"
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
-#include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -70,10 +66,8 @@
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/features/lora/rac_lora_service.h"
-#include "rac/features/rag/rac_rag.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -87,7 +81,6 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
-#include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"
@@ -96,9 +89,6 @@
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
 #include "rac/solutions/rac_solution.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
 #include "rac/features/llm/rac_llm_stream.h"
@@ -746,6 +736,20 @@ static int64_t jni_now_ms_callback(void* user_data) {
 //   * Cast jlong handles to opaque pointers via reinterpret_cast — that is
 //     the canonical JNI handle-passing idiom and the only way to round-trip
 //     a native handle through the JVM.
+// Wave D-4 / KOT-08 tool-calling session helpers. These return C++-only types
+// (std::mutex&, std::unordered_map&) so they must have C++ linkage, even though
+// the JNI thunks that call them live in the extern "C" block below.
+namespace {
+std::mutex& toolCallingCtxMutex() {
+    static std::mutex mu;
+    return mu;
+}
+std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
+    static std::unordered_map<uint64_t, ProtoListenerUserData*> m;
+    return m;
+}
+}  // namespace
+
 // NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 extern "C" {
 
@@ -3383,8 +3387,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsListVoicesLifecyc
 // the v2 lifecycle TTS path (racTtsSynthesizeStreamLifecycleProto) requires
 // this stop ABI to terminate synthesis without freeing the loaded voice.
 JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsStopLifecycleProto(
-    JNIEnv* env, jclass clazz) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsStopLifecycleProto(JNIEnv* env,
+                                                                                  jclass clazz) {
     (void)clazz;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
@@ -4379,17 +4383,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentSynthesize
 // Commons owns the full generate → parse → validate → execute → loop
 // cycle. Kotlin keeps only the tool registry + executor callback pipe.
 
-namespace {
-std::mutex& toolCallingCtxMutex() {
-    static std::mutex mu;
-    return mu;
-}
-std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
-    static std::unordered_map<uint64_t, ProtoListenerUserData*> m;
-    return m;
-}
-}  // namespace
-
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCreateProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes, jobject listener) {
@@ -4457,6 +4450,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionDe
         delete ctx;
     }
     return static_cast<jint>(rc);
+}
+
+// pass2-syn-007: JNI passthrough for the new cancel ABI. Does NOT touch the
+// listener registry — cancel is independent of destroy and the caller is
+// expected to invoke both (cancel from any thread to interrupt; destroy from
+// the orchestration coroutine once the in-flight call has resolved).
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCancelProto(
+    JNIEnv* env, jclass clazz, jlong sessionHandle) {
+    (void)env;
+    (void)clazz;
+    if (sessionHandle == 0L)
+        return RAC_ERROR_INVALID_HANDLE;
+    return static_cast<jint>(
+        rac_tool_calling_session_cancel_proto(static_cast<uint64_t>(sessionHandle)));
 }
 
 // =============================================================================

@@ -39,7 +39,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 COMMONS_INCLUDE="${REPO_ROOT}/sdk/runanywhere-commons/include"
-EXPORTS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/exports/RACommons.exports"
+EXPORTS_DIR="${REPO_ROOT}/sdk/runanywhere-commons/exports"
+EXPORTS_FILE="${EXPORTS_DIR}/RACommons.exports"
 
 if [[ ! -d "${COMMONS_INCLUDE}" ]]; then
     echo "ERROR: commons include tree not found at ${COMMONS_INCLUDE}" >&2
@@ -50,8 +51,21 @@ if [[ ! -f "${EXPORTS_FILE}" ]]; then
     exit 1
 fi
 
+# pass2-syn-002: backend-conditional sibling exports files are appended to
+# the main list by CMake at configure time. Treat them as part of the
+# canonical export surface for drift accounting so backend-conditional
+# RAC_API decls don't show up as missing.
+SIBLING_EXPORTS=()
+for sibling in "${EXPORTS_DIR}/RACommons.rag.exports" \
+               "${EXPORTS_DIR}/RACommons.onnx_embeddings.exports" \
+               "${EXPORTS_DIR}/RACommons.whisperkit_coreml.exports"; do
+    if [[ -f "${sibling}" ]]; then
+        SIBLING_EXPORTS+=("${sibling}")
+    fi
+done
+
 set +e
-python3 - "${COMMONS_INCLUDE}" "${EXPORTS_FILE}" "${STRICT}" <<'PYEOF'
+python3 - "${COMMONS_INCLUDE}" "${EXPORTS_FILE}" "${STRICT}" "${SIBLING_EXPORTS[@]}" <<'PYEOF'
 import os
 import re
 import sys
@@ -59,14 +73,20 @@ import sys
 include_root = sys.argv[1]
 exports_path = sys.argv[2]
 strict = sys.argv[3] == '1'
+sibling_paths = sys.argv[4:]
 
-# Collect exported symbols
+# Collect exported symbols from the main file plus all sibling
+# backend-conditional exports files (RAG, ONNX embeddings, WhisperKit
+# CoreML). The Apple linker concatenates these at link time based on
+# RAC_BACKEND_* flags; for drift accounting we treat all of them as
+# part of the canonical exported surface.
 exported = set()
-with open(exports_path) as f:
-    for line in f:
-        line = line.strip()
-        if line.startswith('_rac_'):
-            exported.add(line[1:])  # strip the leading underscore
+for path in (exports_path, *sibling_paths):
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('_rac_'):
+                exported.add(line[1:])  # strip the leading underscore
 
 # Walk headers and find RAC_API-decorated function decls
 decl_names = set()

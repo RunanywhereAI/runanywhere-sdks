@@ -8,5 +8,25 @@
       "matchUpdateTypes": ["patch"],
       "automerge": true
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Centralized JS/TS dep registry — pinned block in dependencies/versions.json is the source of truth. Renovate updates this file directly; `npx syncpack fix-mismatches` then propagates the bump to each package.json.",
+      "fileMatch": ["^dependencies/versions\\.json$"],
+      "matchStrings": [
+        "\"(?<depName>[^\"]+)\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "matchStringsStrategy": "any"
+    },
+    {
+      "customType": "regex",
+      "description": "Native-toolchain pins in sdk/runanywhere-commons/VERSIONS (shell KEY=VALUE). Renovate hits the file via per-key annotation comments like `# renovate: datasource=github-tags depName=foo/bar`.",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "# renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n[A-Z0-9_]+_VERSION=(?<currentValue>\\S+)"
+      ]
+    }
   ]
 }

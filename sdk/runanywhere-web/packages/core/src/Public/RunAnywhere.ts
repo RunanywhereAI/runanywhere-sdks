@@ -69,6 +69,8 @@ import {
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge';
+import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -1018,6 +1020,23 @@ export const RunAnywhere = {
     void disposeSpeechProvider().catch((err) => {
       logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
     });
+
+    // Tear down the T6.1 Worker streaming pipeline. The pass-1 fix
+    // established `clearRunanywhereModule()` + `disposeSpeechProvider()`
+    // as the WASM ownership boundary, but the Worker singletons
+    // (`OffscreenRuntimeBridge._instance`, `_init` payload, and the
+    // `StreamWorkerFactoryRegistry._factory`) live outside that
+    // boundary. Without explicit teardown the spawned worker keeps its
+    // mirror Emscripten module + loaded model weights alive across
+    // logout / account-switch / test reset, and the next `initialize()`
+    // would reuse the stale bridge. See pass2-syn-033.
+    try {
+      OffscreenRuntimeBridge.disposeShared();
+    } catch (err) {
+      logger.warning(`OffscreenRuntimeBridge.disposeShared threw during shutdown: ${String(err)}`);
+    }
+    setStreamWorkerFactory(null);
+    setStreamWorkerInit(null);
 
     EventBus.reset();
 

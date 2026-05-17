@@ -88,6 +88,17 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 /**
  * @brief Declare a plugin entry point in a public header.
  *
+ * The entry symbol is annotated with `RAC_API` (= default ELF/Mach-O
+ * visibility, dllexport on Windows). dlsym/static-lookup MUST be able to
+ * find this symbol regardless of how the host engine library was linked —
+ * notably, even when a SHARED carrier sets visibility=hidden globally and
+ * the real definition lives in a sibling static archive (e.g. the
+ * runanywhere_llamacpp_vlm shared carrier whose only effective contents come
+ * from rac_backend_llamacpp). Without an explicit annotation at declaration
+ * time, loadability depended on transitive default visibility of the host
+ * plugin target — a brittle invariant that a future visibility tightening
+ * would silently break (pass2-syn-062).
+ *
  * Example:
  * @code
  *   // sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry_llamacpp.h
@@ -95,7 +106,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   RAC_PLUGIN_ENTRY_DECL(llamacpp);
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DECL(name) const rac_engine_vtable_t* rac_plugin_entry_##name(void)
+#define RAC_PLUGIN_ENTRY_DECL(name) RAC_API const rac_engine_vtable_t* rac_plugin_entry_##name(void)
 
 /**
  * @brief Define a plugin entry point in the .cpp file.

@@ -3,8 +3,9 @@
 #
 # Generate shared TypeScript bindings via ts-proto for React Native and Web.
 #
-# Requirements:
-#   npm install -g ts-proto@1.181.1 protobufjs
+# Requirements: pinned ts-proto version sourced from
+#   sdk/runanywhere-commons/VERSIONS::TS_PROTO_VERSION
+# Install via: scripts/setup-toolchain.sh (or `npm install -g ts-proto@${TS_PROTO_VERSION}`).
 #
 # Output:
 #   sdk/shared/proto-ts/src/
@@ -14,6 +15,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
 TS_OUT_DIR="${REPO_ROOT}/sdk/shared/proto-ts/src"
+
+# Load TS_PROTO_VERSION from the centralized VERSIONS file so the install hint
+# below matches what setup-toolchain.sh actually installs.
+VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+if [ -f "${VERSIONS_FILE}" ]; then
+    set -a
+    eval "$(grep -E '^[A-Z_][A-Z0-9_]*=' "${VERSIONS_FILE}")"
+    set +a
+fi
+TS_PROTO_VERSION="${TS_PROTO_VERSION:-1.181.1}"
 
 mkdir -p "${TS_OUT_DIR}"
 
@@ -27,7 +38,7 @@ fi
 TS_PROTO_PLUGIN="$(npm root -g 2>/dev/null)/ts-proto/protoc-gen-ts_proto"
 if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
     echo "error: ts-proto plugin not found at ${TS_PROTO_PLUGIN}" >&2
-    echo "       Install via: npm install -g ts-proto@1.181.1" >&2
+    echo "       Install via: npm install -g ts-proto@${TS_PROTO_VERSION}" >&2
     exit 127
 fi
 

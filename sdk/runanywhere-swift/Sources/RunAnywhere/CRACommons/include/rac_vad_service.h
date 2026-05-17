@@ -132,35 +132,8 @@ RAC_API rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
                                                 rac_vad_audio_callback_fn callback,
                                                 void* user_data);
 
-/**
- * @brief Start VAD processing
- *
- * Mirrors Swift's VADService.start()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_start(rac_handle_t handle);
-
-/**
- * @brief Stop VAD processing
- *
- * Mirrors Swift's VADService.stop()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_stop(rac_handle_t handle);
-
-/**
- * @brief Reset VAD state
- *
- * Mirrors Swift's VADService.reset()
- *
- * @param handle Service handle
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_vad_reset(rac_handle_t handle);
+// pass2-syn-002: rac_vad_{start,stop,reset} bare-service-level decls removed.
+// Use rac_vad_component_{start,stop,reset} or the *_lifecycle_proto variants.
 
 /**
  * @brief Pause VAD processing

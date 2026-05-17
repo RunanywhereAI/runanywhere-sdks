@@ -3,7 +3,10 @@
 # Build Tools & Language
 # ============================================================================
 agp = "8.13.0"
-kotlin = "2.1.21" # T5.3: bumped to 2.2.0; rolled back due to kotlinOptions DSL removal in 2.2.x; modules/runanywhere-core-llamacpp/build.gradle.kts uses deprecated kotlinOptions.jvmTarget (out of scope to fix here). Deferred.
+kotlin = "2.1.21"
+# Bumping to Kotlin 2.2.x requires migrating the deprecated `kotlinOptions { jvmTarget = ... }`
+# DSL in sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts (lines 112, 124)
+# to the new `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` API. Tracked separately.
 pdfbox = "2.0.27.0"
 
 # ============================================================================

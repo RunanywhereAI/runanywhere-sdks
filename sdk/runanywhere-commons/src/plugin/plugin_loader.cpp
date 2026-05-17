@@ -185,8 +185,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
      * same path is reopened (dlopen returns the same handle and bumps the
      * refcount); the matching dlclose still has to happen so the OS refcount
      * returns to 1 after the redundant load. */
-    if (void* prior = rac_plugin_registry_take_dl_handle(vt->metadata.name);
-        prior != nullptr) {
+    if (void* prior = rac_plugin_registry_take_dl_handle(vt->metadata.name); prior != nullptr) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
 

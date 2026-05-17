@@ -312,4 +312,21 @@ void register_builtin_operators(OperatorRegistry& registry);
 /// on which proto APIs are linked in this build).
 std::size_t register_engine_backed_operators(OperatorRegistry& registry);
 
+/// Cross-thread error-detail capture for solution operator failures.
+///
+/// `rac_error_set_details` writes to a thread_local buffer. Operators run
+/// inside scheduler worker threads, so an error they record there is
+/// invisible to the host thread that issued `SolutionRunner::feed`/`wait`.
+/// These helpers stash the most recent operator detail in a
+/// process-wide mutex-guarded slot. SolutionRunner::wait() promotes the
+/// stashed value into the calling thread's `rac_error_set_details` so the
+/// C ABI `rac_error_get_details()` returns the honest cause of the
+/// cancel/failure.
+///
+/// Thread-safe; safe to call from any operator thread.
+void record_operator_error_detail(const std::string& detail);
+
+/// Snapshot the most recent operator error detail (empty string if none).
+std::string consume_operator_error_detail();
+
 }  // namespace rac::solutions

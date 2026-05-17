@@ -9,7 +9,6 @@
 
 #include "rac/features/vlm/rac_vlm_service.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -264,6 +263,11 @@ rac_result_t rac_vlm_cleanup(rac_handle_t handle) {
 void rac_vlm_destroy(rac_handle_t handle) {
     if (!handle)
         return;
+
+    // pass2-syn-001-followup-vlm: quiesce any in-flight rac_vlm_*_proto
+    // entry points before tearing down the backend impl. Defensive
+    // mirror of voice_agent.cpp:594.
+    rac_vlm_proto_quiesce();
 
     auto* service = static_cast<rac_vlm_service_t*>(handle);
 

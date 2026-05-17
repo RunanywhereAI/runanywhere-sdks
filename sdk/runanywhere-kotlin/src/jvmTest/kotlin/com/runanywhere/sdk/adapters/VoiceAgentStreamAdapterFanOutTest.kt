@@ -19,11 +19,13 @@ package com.runanywhere.sdk.adapters
 
 import ai.runanywhere.proto.v1.UserSaidEvent
 import ai.runanywhere.proto.v1.VoiceEvent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -173,18 +175,18 @@ class VoiceAgentStreamAdapterFanOutTest {
         }
 
     /**
-     * tests-and-coverage-003 regression coverage. The class doc for
-     * `HandleStreamAdapter` promises drop-oldest per-collector backpressure
-     * so a paused/slow collector can never stall the native callback
-     * thread. This test simulates a "slow collector" by deliberately not
-     * draining the Flow and verifies that:
+     * Slow-collector parity test (Swift `AsyncStream` / RN unbounded-queue
+     * parity). The class doc for `HandleStreamAdapter` promises that the
+     * C callback thread is never blocked by a slow collector. The buffer
+     * policy is `Channel.UNLIMITED` (matches Swift's
+     * `AsyncStream { ... }` default `.unbounded` and React Native's JS
+     * array queue), so a slow collector:
      *
-     *   1. `bridge.emit(...)` (executing on the simulated native callback
-     *      thread) returns promptly even when the per-collector channel is
-     *      fully saturated — i.e. no `trySendBlocking` waits for room.
-     *   2. After the collector starts draining, it observes a bounded
-     *      suffix of recent events (DROP_OLDEST drops older entries while
-     *      preserving the newest window).
+     *   1. NEVER stalls `bridge.emit(...)` (the simulated native
+     *      callback thread) — `trySend` on an unlimited channel is
+     *      non-blocking and lossless.
+     *   2. ALWAYS observes every event eventually (no DROP_OLDEST) —
+     *      every emitted event reaches the collector in producer order.
      */
     @Test
     fun `slow collector does not block native callback thread`() =
@@ -192,27 +194,30 @@ class VoiceAgentStreamAdapterFanOutTest {
             val bridge = FakeBridge()
             val adapter = VoiceAgentStreamAdapter(handle = 123L, bridge = bridge)
 
-            // Deliberately slow collector: delays before consuming each event.
-            // The first event unblocks the channel, then we hold it for long
-            // enough that subsequent emit() calls must rely on DROP_OLDEST,
-            // not on backpressure-induced blocking.
-            val capturedSize = 8
+            // Fire well over what would have been the old bounded buffer
+            // (64). With UNLIMITED, each emit() returns promptly because
+            // `trySend` on an unlimited channel is non-blocking — the
+            // events accumulate in the channel, not in the producer.
+            val burstSize = 256
+
+            // Collector takes ALL burst events so it remains attached
+            // for the duration of the producer loop. The "slow" property
+            // we are validating is the non-blocking trySend on the
+            // producer side; the consumer drains concurrently on
+            // Dispatchers.Default but its pace is irrelevant — UNLIMITED
+            // means the producer never waits for the consumer.
             val collected =
                 async(Dispatchers.Default) {
                     withTimeout(10_000) {
-                        adapter.stream()
-                            .take(capturedSize)
+                        adapter
+                            .stream()
+                            .take(burstSize)
                             .toList()
                     }
                 }
 
             awaitRegistered(bridge)
 
-            // Fire well over the buffer capacity (HandleStreamAdapter.
-            // COLLECTOR_BUFFER_CAPACITY = 64) from this single thread — if
-            // trySendBlocking had been retained, this loop would stall as
-            // soon as the channel filled and we'd time out.
-            val burstSize = 256
             val perEmitBudgetMs = 50L
             for (i in 1..burstSize) {
                 val t0 = System.nanoTime()
@@ -220,28 +225,164 @@ class VoiceAgentStreamAdapterFanOutTest {
                 val elapsedMs = (System.nanoTime() - t0) / 1_000_000
                 assertTrue(
                     "native callback emit #$i blocked for ${elapsedMs}ms — " +
-                        "DROP_OLDEST backpressure regressed (trySendBlocking?)",
+                        "trySend on Channel.UNLIMITED should never suspend",
                     elapsedMs < perEmitBudgetMs,
                 )
             }
 
-            // Let the slow collector wake up and drain whatever survived in
-            // the channel after DROP_OLDEST kicked in.
-            delay(100)
-            for (i in burstSize + 1..burstSize + capturedSize) {
-                bridge.emit(event(i.toLong(), "tail-$i"))
-            }
-
             val received = collected.await()
-            assertEquals(capturedSize, received.size)
-            // We can't assert exact sequence numbers because the DROP_OLDEST
-            // window depends on scheduler timing, but every received event
-            // must come from the original burst or the tail and must be
-            // monotonically increasing — proving native delivery was never
-            // blocked behind the slow collector.
-            received.zipWithNext().forEach { (a, b) ->
-                assertTrue("events out of order: ${a.seq} >= ${b.seq}", a.seq < b.seq)
-            }
+            assertEquals(burstSize, received.size)
+            // Swift `AsyncStream` parity: every event is delivered
+            // losslessly in order — no dropped suffix or shuffled window.
+            assertEquals(
+                "UNLIMITED buffer must deliver every event in producer order",
+                (1L..burstSize.toLong()).toList(),
+                received.map { it.seq },
+            )
+        }
+
+    /**
+     * Pass-2 syn-078 (a): cancelling one of N collectors mid-stream
+     * does NOT tear down the shared C registration; the surviving
+     * collector keeps receiving events with `registerCount == 1` and
+     * `unregisterCount == 0` until the last collector detaches.
+     *
+     * The capture-then-release lock rewrite in `HandleStreamAdapter` is
+     * specifically intended to make this transition safe.
+     */
+    @Test
+    fun `cancelling one of two collectors mid-stream leaves the other receiving events`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 555L, bridge = bridge)
+
+            val collectorScope = CoroutineScope(Dispatchers.Default)
+
+            // Collector A — will be cancelled mid-stream.
+            val receivedA = mutableListOf<Long>()
+            val jobA =
+                collectorScope.launch {
+                    adapter.stream().collect { receivedA += it.seq }
+                }
+
+            // Collector B — keeps collecting through and past A's cancel.
+            // Track partial progress in `receivedB` so the test can sync on
+            // B having drained the pre-cancel burst before A is cancelled.
+            val receivedB = java.util.Collections.synchronizedList(mutableListOf<Long>())
+            val jobB =
+                collectorScope.async {
+                    val out = mutableListOf<Long>()
+                    adapter
+                        .stream()
+                        .take(6)
+                        .collect { ev ->
+                            out += ev.seq
+                            receivedB += ev.seq
+                        }
+                    out
+                }
+
+            awaitCollectorCount(bridge, adapter, handle = 555L, expected = 2)
+            assertEquals(
+                "exactly one native registration for two collectors",
+                1,
+                bridge.registerCount.get(),
+            )
+
+            // Pre-cancel burst: both collectors observe events 1..3.
+            for (i in 1..3) bridge.emit(event(i.toLong(), "pre-$i"))
+
+            // Wait until B has actually drained the pre-cancel burst before
+            // cancelling A, otherwise A's cancellation may race with B's
+            // dispatcher and the assertion below can briefly see fewer
+            // than 3 events on B.
+            awaitCondition(1_000) { receivedB.size >= 3 }
+
+            // Cancel collector A.
+            jobA.cancelAndJoin()
+            awaitCollectorCount(bridge, adapter, handle = 555L, expected = 1)
+
+            // Post-cancel events 4..6 must still reach B; the shared
+            // registration is NOT torn down while B is still attached.
+            assertEquals(
+                "registration must survive A's cancel — still one register, no unregister",
+                1 to 0,
+                bridge.registerCount.get() to bridge.unregisterCount.get(),
+            )
+
+            for (i in 4..6) bridge.emit(event(i.toLong(), "post-$i"))
+
+            val finalB = jobB.await()
+            assertEquals(listOf(1L, 2L, 3L, 4L, 5L, 6L), finalB)
+
+            // After B finishes via take(6), the registration is torn down
+            // exactly once.
+            awaitUnregistered(bridge)
+            assertEquals(1, bridge.registerCount.get())
+            assertEquals(1, bridge.unregisterCount.get())
+        }
+
+    /**
+     * Pass-2 syn-078 (b): an event emitted AFTER one of N collectors
+     * detaches still reaches the surviving collectors with the same
+     * single registration (no spurious re-register, no unregister).
+     */
+    @Test
+    fun `event emitted after partial detach still reaches surviving collector`() =
+        runBlocking {
+            val bridge = FakeBridge()
+            val adapter = VoiceAgentStreamAdapter(handle = 777L, bridge = bridge)
+
+            val collectorScope = CoroutineScope(Dispatchers.Default)
+
+            val receivedA = java.util.Collections.synchronizedList(mutableListOf<Long>())
+            val jobA =
+                collectorScope.launch {
+                    adapter.stream().collect { receivedA += it.seq }
+                }
+
+            val receivedB = java.util.Collections.synchronizedList(mutableListOf<Long>())
+            val jobB =
+                collectorScope.async {
+                    val out = mutableListOf<Long>()
+                    adapter
+                        .stream()
+                        .take(2)
+                        .collect { ev ->
+                            out += ev.seq
+                            receivedB += ev.seq
+                        }
+                    out
+                }
+
+            awaitCollectorCount(bridge, adapter, handle = 777L, expected = 2)
+
+            // First event — both collectors observe it.
+            bridge.emit(event(1, "shared"))
+            awaitCondition(1_000) { receivedA.size >= 1 && receivedB.size >= 1 }
+
+            // Detach A.
+            jobA.cancelAndJoin()
+            awaitCollectorCount(bridge, adapter, handle = 777L, expected = 1)
+
+            // Post-detach: registerCount is still 1, unregisterCount is still 0.
+            assertEquals(
+                "post-detach registration state must be (register=1, unregister=0)",
+                1 to 0,
+                bridge.registerCount.get() to bridge.unregisterCount.get(),
+            )
+
+            // Event emitted AFTER A's detach must still reach B (this is the
+            // capture-then-release lock invariant the rewrite enforces).
+            bridge.emit(event(2, "post-detach"))
+
+            val finalB = jobB.await()
+            assertEquals(listOf(1L, 2L), finalB)
+            // A only saw the first event before it was cancelled.
+            assertEquals(listOf(1L), receivedA.toList())
+
+            awaitUnregistered(bridge)
+            assertEquals(1, bridge.unregisterCount.get())
         }
 
     @Test

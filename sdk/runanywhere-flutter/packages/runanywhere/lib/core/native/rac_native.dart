@@ -511,6 +511,12 @@ typedef RacToolCallingSessionDestroyProtoNative = ffi.Int32 Function(
 );
 typedef RacToolCallingSessionDestroyProtoDart = int Function(int);
 
+// pass2-syn-007: cancel ABI for the tool-calling session.
+typedef RacToolCallingSessionCancelProtoNative = ffi.Int32 Function(
+  ffi.Uint64,
+);
+typedef RacToolCallingSessionCancelProtoDart = int Function(int);
+
 // ============================================================================
 // Model format + artifact inference proto APIs (Wave D-3 / FLT-MODELS-REGISTER-INFER)
 // ============================================================================
@@ -1723,6 +1729,15 @@ class RacBindings {
             'rac_tool_calling_session_destroy_proto',
           ),
         ),
+        // pass2-syn-007: cancel ABI lookup. Optional so older xcframework
+        // bundles without the cancel symbol fall back to destroy-only.
+        rac_tool_calling_session_cancel_proto =
+            _lookupOptional<RacToolCallingSessionCancelProtoDart>(
+          () => lib.lookupFunction<RacToolCallingSessionCancelProtoNative,
+              RacToolCallingSessionCancelProtoDart>(
+            'rac_tool_calling_session_cancel_proto',
+          ),
+        ),
         rac_model_format_from_url_proto =
             _lookupOptional<RacModelFormatFromUrlProtoDart>(
           () => lib.lookupFunction<RacModelFormatFromUrlProtoNative,
@@ -2077,6 +2092,10 @@ class RacBindings {
 
   final RacToolCallingSessionDestroyProtoDart?
       rac_tool_calling_session_destroy_proto;
+
+  // pass2-syn-007: cancel an in-flight tool-calling session.
+  final RacToolCallingSessionCancelProtoDart?
+      rac_tool_calling_session_cancel_proto;
 
   // Model format + artifact inference proto APIs (Wave D-3) -----------------
 

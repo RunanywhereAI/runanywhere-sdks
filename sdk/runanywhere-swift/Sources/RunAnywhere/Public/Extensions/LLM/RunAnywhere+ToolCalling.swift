@@ -17,6 +17,7 @@
 
 import CRACommons
 import Foundation
+import os.lock
 import SwiftProtobuf
 
 // MARK: - Tool Registry (Thread-safe)
@@ -64,9 +65,25 @@ private enum ToolCallingRunLoopProtoABI {
         UnsafeMutableRawPointer?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
+    // pass2-syn-007: with-handle variant publishes a cancel handle.
+    typealias RunLoopWithHandle = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        ExecuteCallback?,
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<UInt64>?,
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+    typealias Cancel = @convention(c) (UInt64) -> rac_result_t
 
     static let runLoopName = "rac_tool_calling_run_loop_proto"
+    static let runLoopWithHandleName = "rac_tool_calling_run_loop_with_handle_proto"
+    static let cancelName = "rac_tool_calling_run_loop_cancel_proto"
+
     static let runLoop = NativeProtoABI.load(runLoopName, as: RunLoop.self)
+    static let runLoopWithHandle =
+        NativeProtoABI.load(runLoopWithHandleName, as: RunLoopWithHandle.self)
+    static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
 // MARK: - Tool Calling Extension
@@ -184,19 +201,42 @@ public extension RunAnywhere {
     ///   - toolOptions: Generated tool-calling options. If omitted, the
     ///                  `options.toolCalling` payload is used when present,
     ///                  otherwise SDK defaults are applied.
+    ///   - toolChoice: Optional override that forces `toolOptions.toolChoice`.
+    ///                 Mirrors the OpenAI `tool_choice` knob: callers can pin
+    ///                 the LLM to NONE / AUTO / SPECIFIC without having to
+    ///                 manually mutate a `RAToolCallingOptions` proto.
+    ///   - forcedToolName: Companion to `toolChoice=SPECIFIC` — the tool name
+    ///                     the LLM is forced to invoke. Overrides
+    ///                     `toolOptions.forcedToolName` when non-nil.
     /// - Returns: Generated `RAToolCallingResult` with final text, tool calls,
     ///            and any executed tool results.
+    ///
+    /// Note: `tool_choice` / `forced_tool_name` live on the
+    /// `RAToolCallingOptions` proto (fields 13/14, idl/tool_calling.proto).
+    /// They are applied here on the effective options so future commons
+    /// support (pass2-syn-006 parent) automatically picks them up; the
+    /// session-create request itself has reserved-7-10 today, so end-to-end
+    /// propagation to native parse/validate helpers is pending the commons
+    /// builder that snapshots options from the request.
     static func generateWithTools(
         prompt: String,
         options: RALLMGenerationOptions = .defaults(),
-        toolOptions: RAToolCallingOptions? = nil
+        toolOptions: RAToolCallingOptions? = nil,
+        toolChoice: RAToolChoiceMode? = nil,
+        forcedToolName: String? = nil
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
-        let tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions.defaults())
+        var tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions.defaults())
+        if let toolChoice {
+            tcOpts.toolChoice = toolChoice
+        }
+        if let forcedToolName {
+            tcOpts.forcedToolName = forcedToolName
+        }
         let registeredTools = await ToolRegistry.shared.getAll()
         let tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
 
@@ -207,6 +247,20 @@ public extension RunAnywhere {
             tools: tools
         )
         let requestBytes = try request.serializedData()
+        // pass2-syn-007: prefer the with-handle variant so the surrounding
+        // Task can cancel the in-flight native loop via
+        // `withTaskCancellationHandler`. Falls back to the legacy ABI if the
+        // newer entry point isn't exported by the loaded libcommons (e.g.
+        // running against an older build of the static framework).
+        let runLoopWithHandle = ToolCallingRunLoopProtoABI.runLoopWithHandle
+        let cancelFn = ToolCallingRunLoopProtoABI.cancel
+        if let runLoopWithHandle, let cancelFn {
+            return try await generateWithToolsCancellable(
+                requestBytes: requestBytes,
+                runLoopWithHandle: runLoopWithHandle,
+                cancelFn: cancelFn
+            )
+        }
         let runLoop = try NativeProtoABI.require(
             ToolCallingRunLoopProtoABI.runLoop,
             named: ToolCallingRunLoopProtoABI.runLoopName
@@ -250,6 +304,76 @@ public extension RunAnywhere {
                 } catch {
                     continuation.resume(throwing: error)
                 }
+            }
+        }
+    }
+
+    /// Cancellation-aware variant. Publishes the native run-loop handle via
+    /// the with-handle ABI and wires `withTaskCancellationHandler` to fan a
+    /// Swift Task cancel into `rac_tool_calling_run_loop_cancel_proto`.
+    private static func generateWithToolsCancellable(
+        requestBytes: Data,
+        runLoopWithHandle: ToolCallingRunLoopProtoABI.RunLoopWithHandle,
+        cancelFn: ToolCallingRunLoopProtoABI.Cancel
+    ) async throws -> RAToolCallingResult {
+        // The handle slot is shared between the DispatchQueue thread that
+        // owns the in-flight call and the (potentially earlier) cancel
+        // handler. A locked Atomic<UInt64> would be ideal — a class wrapper
+        // gives us reference semantics and an internal lock works fine here.
+        let handleBox = HandleBox()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let context = ToolExecuteContext()
+                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                    var outBuffer = rac_proto_buffer_t()
+                    var handle: UInt64 = 0
+                    let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
+                        runLoopWithHandle(
+                            rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            rawBuffer.count,
+                            toolExecuteTrampoline,
+                            contextPtr,
+                            &handle,
+                            &outBuffer
+                        )
+                    }
+                    handleBox.set(handle)
+                    // If the Task was already cancelled by the time the
+                    // handle was published, fan that into the loop now —
+                    // mirrors the latched cancel path in commons.
+                    if Task.isCancelled {
+                        _ = cancelFn(handle)
+                    }
+                    Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
+                    handleBox.set(0)
+
+                    defer { NativeProtoABI.free(&outBuffer) }
+                    guard status == RAC_SUCCESS else {
+                        let message = outBuffer.error_message.map { String(cString: $0) }
+                            ?? "Tool calling run loop failed: \(status)"
+                        continuation.resume(throwing: SDKException(
+                            code: .processingFailed,
+                            message: message,
+                            category: .component
+                        ))
+                        return
+                    }
+                    do {
+                        let result = try NativeProtoABI.decode(
+                            RAToolCallingResult.self,
+                            from: outBuffer
+                        )
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        } onCancel: {
+            let activeHandle = handleBox.value
+            if activeHandle != 0 {
+                _ = cancelFn(activeHandle)
             }
         }
     }
@@ -331,6 +455,16 @@ public extension RunAnywhere {
         request.maxIterations = UInt32(max(toolOptions.maxToolCallCount, 0))
         request.keepToolsAvailable = toolOptions.keepToolsAvailable
         request.validateCalls = true
+        // pass2-syn-006-followup-swift: thread tool_choice / forced_tool_name
+        // all the way through to the commons request envelope (fields 7/8 on
+        // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
+        // them — not just the inline RAToolCallingOptions snapshot.
+        if toolOptions.toolChoice != .unspecified {
+            request.toolChoice = toolOptions.toolChoice
+        }
+        if toolOptions.hasForcedToolName, !toolOptions.forcedToolName.isEmpty {
+            request.forcedToolName = toolOptions.forcedToolName
+        }
         return request
     }
 }
@@ -405,6 +539,22 @@ private final class ToolResultBox: @unchecked Sendable {
     }
 
     var value: RAToolResult? { stored }
+}
+
+/// pass2-syn-007: shared handle slot between the DispatchQueue thread that
+/// owns the in-flight C call and the `onCancel` closure that may fire from
+/// any thread. Uses OSAllocatedUnfairLock (the Swift 6 / iOS 16+
+/// replacement for NSLock; per CLAUDE.md, NSLock is outdated here).
+private final class HandleBox: @unchecked Sendable {
+    private let lock = OSAllocatedUnfairLock<UInt64>(initialState: 0)
+
+    func set(_ value: UInt64) {
+        lock.withLock { $0 = value }
+    }
+
+    var value: UInt64 {
+        lock.withLock { $0 }
+    }
 }
 
 private func failedResult(name: String, error: String) -> RAToolResult {

@@ -327,7 +327,7 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
   model_params.use_mmap = false;
 #endif
 
-  // If llama_params_fit aborts, use the user-provided value
+  // If common_fit_params aborts, use the user-provided value
   int user_gpu_layers = -1; // -1 = not set by user
   if (config.contains("gpu_layers")) {
     user_gpu_layers = config["gpu_layers"].get<int>();
@@ -336,7 +336,7 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
                  user_gpu_layers);
   }
 
-  // Set up context params early for llama_params_fit
+  // Set up context params early for common_fit_params
   llama_context_params ctx_params = llama_context_default_params();
   ctx_params.n_ctx = 0;
   ctx_params.n_threads = backend_->get_num_threads();
@@ -436,7 +436,7 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
 #if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) &&                     \
     !defined(GGML_USE_WEBGPU)
   if (fit_status == COMMON_PARAMS_FIT_STATUS_SUCCESS) {
-    RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: llama_params_fit fitted to "
+    RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: common_fit_params fitted to "
                                  "GPU memory but no GPU backend active. "
                                  "Applying conservative CPU defaults.");
   }

@@ -9,12 +9,12 @@
 #   macOS 13+ (Homebrew-driven)
 #   Ubuntu 22.04+ (apt + user-local pip/npm)
 #
-# Tools installed:
-#   protoc                 25.x     (shared, all languages)
-#   protoc-gen-swift       1.27.x   (swift-protobuf)
-#   wire-compiler          4.9.x    (Kotlin via Square Wire)
-#   protoc_plugin          22.0.0   (Dart — emits *.pb.dart and *.pbgrpc.dart)
-#   ts-proto               1.181.x  (TypeScript message types)
+# Tools installed (all pins sourced from sdk/runanywhere-commons/VERSIONS):
+#   protoc                 25.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
+#   protoc-gen-swift       1.38.x   (swift-protobuf)                — SWIFT_PROTOBUF_VERSION
+#   wire-compiler          5.3.x    (Kotlin via Square Wire)        — WIRE_VERSION
+#   protoc_plugin          22.0.0   (Dart — emits *.pb.dart)        — PROTOC_GEN_DART_VERSION
+#   ts-proto               1.181.x  (TypeScript message types)      — TS_PROTO_VERSION
 #   google-protobuf Python 4.25.x   (Python message types)
 #
 # GAP 09 streaming services (server-streaming gRPC client stubs):
@@ -41,11 +41,28 @@ for arg in "$@"; do
     esac
 done
 
-PROTOC_EXPECTED_MAJOR="25"
-SWIFT_PROTOBUF_EXPECTED="1.27"
-WIRE_EXPECTED="4.9"
-PROTOC_PLUGIN_DART_EXPECTED="22.0.0"
-TS_PROTO_EXPECTED="1.181"
+# Single source of truth for codegen toolchain pins lives in
+# sdk/runanywhere-commons/VERSIONS so this script, idl/codegen/generate_*.sh,
+# gradle/libs.versions.toml, and Mintfile all agree. Load it here; fall back to
+# documented defaults if anything is missing so the script still works on a
+# minimal checkout.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+if [ -f "${VERSIONS_FILE}" ]; then
+    # shellcheck disable=SC1090
+    set -a
+    # Strip comments and source KEY=VALUE lines. Avoid sourcing the raw file
+    # because YAML-like dep-pin comments may include shell metachars.
+    eval "$(grep -E '^[A-Z_][A-Z0-9_]*=' "${VERSIONS_FILE}")"
+    set +a
+fi
+
+PROTOC_EXPECTED_MAJOR="${PROTOC_VERSION_MAJOR:-25}"
+SWIFT_PROTOBUF_EXPECTED="${SWIFT_PROTOBUF_VERSION:-1.38.0}"
+WIRE_EXPECTED="${WIRE_VERSION:-5.3.5}"
+PROTOC_PLUGIN_DART_EXPECTED="${PROTOC_GEN_DART_VERSION:-22.0.0}"
+TS_PROTO_EXPECTED="${TS_PROTO_VERSION:-1.181.1}"
 PYTHON_PROTOBUF_EXPECTED="4.25"
 # GAP 09 streaming additions:
 GRPC_SWIFT_EXPECTED="1.21"

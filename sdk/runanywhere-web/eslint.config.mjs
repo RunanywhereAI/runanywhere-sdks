@@ -33,11 +33,20 @@ export default tseslint.config(
         // Use the TS-ESLint project service so each package's tsconfig.json
         // is resolved automatically across the workspace packages.
         projectService: {
+          // typescript-eslint disallows `**` here, so enumerate each
+          // unit-test subdirectory explicitly. Add the new directory here
+          // when introducing a fresh `tests/unit/<NewDir>/*.test.ts` file
+          // — otherwise the typed-lint lane will fail with
+          // `Parsing error: ... was not found by the project service`.
           allowDefaultProject: [
             'packages/core/tests/unit/Adapters/*.test.ts',
+            'packages/core/tests/unit/Foundation/*.test.ts',
             'packages/core/tests/unit/Public/Extensions/*.test.ts',
             'packages/core/tests/unit/runtime/*.test.ts',
           ],
+          // Default cap is 8; we already exceed that across these subdirs.
+          // Bump in lockstep when new test files land.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },

@@ -1,4 +1,4 @@
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 
 project(RunAnywhereWebWASM
@@ -491,6 +491,17 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
     "_rac_tool_calling_run_loop_proto"
+    # pass2-syn-026: Session-based orchestration so the Web SDK can delegate
+    # the tool-calling run loop to commons even when TS executors are async
+    # (the run-loop-proto callback is synchronous and cannot await a JS Promise).
+    "_rac_tool_calling_session_create_proto"
+    "_rac_tool_calling_session_step_with_result_proto"
+    "_rac_tool_calling_session_destroy_proto"
+    # pass2-syn-007: cancel ABI so AbortSignal-driven Web hosts can interrupt
+    # the in-flight tool-calling session generate from JS.
+    "_rac_tool_calling_session_cancel_proto"
+    "_rac_tool_calling_run_loop_with_handle_proto"
+    "_rac_tool_calling_run_loop_cancel_proto"
 
     # STT service
     "_rac_stt_create"
@@ -553,9 +564,11 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_initialize"
     "_rac_vad_set_activity_callback"
     "_rac_vad_set_audio_callback"
-    "_rac_vad_start"
-    "_rac_vad_stop"
-    "_rac_vad_reset"
+    # pass2-syn-002: rac_vad_{start,stop,reset} bare-service decls deleted;
+    # use rac_vad_component_{start,stop,reset} / *_lifecycle_proto.
+    "_rac_vad_component_start"
+    "_rac_vad_component_stop"
+    "_rac_vad_component_reset"
     "_rac_vad_pause"
     "_rac_vad_resume"
     "_rac_vad_process_samples"
@@ -1217,19 +1230,16 @@ add_custom_command(TARGET runanywhere_wasm POST_BUILD
     COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
 )
 
-# When pthreads are enabled, Emscripten emits a companion worker script
-# (`<output>.worker.js`) that the main module fetches at runtime to spawn
-# pthread workers. The package layout requires this file next to the glue
-# JS / .wasm pair; without it, browser module init fails with a worker
-# fetch error. Stage it post-build and fail the build if it's missing —
-# build.sh defaults PTHREADS=ON, so a missing worker would silently break
-# every release artifact.
+# When pthreads are enabled with older Emscripten (<5.x), the toolchain emits
+# a separate `<output>.worker.js` next to the main glue. Emscripten 5.x bundles
+# the pthread worker into the main .js file, so the companion file may or may
+# not exist. Copy it post-build IF PRESENT, no-op otherwise. This keeps the
+# package layout correct for both toolchain generations without failing on the
+# 5.x bundled-worker path.
 if(RAC_WASM_PTHREADS)
     add_custom_command(TARGET runanywhere_wasm POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-            "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-        COMMENT "Copying ${WASM_OUTPUT_NAME}.worker.js (pthread worker) to packages/llamacpp/wasm/"
+        COMMAND ${CMAKE_COMMAND} -E env bash -c "if [ -f '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' ]; then cp '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' '${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js'; echo 'Staged pthread worker companion'; else echo 'No separate .worker.js (Emscripten 5.x bundles worker into main glue)'; fi"
+        COMMENT "Staging ${WASM_OUTPUT_NAME}.worker.js if present (Emscripten <5.x emits it; 5.x bundles into main glue)"
         VERBATIM
     )
 endif()

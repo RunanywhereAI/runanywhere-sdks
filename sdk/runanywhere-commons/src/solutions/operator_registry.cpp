@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -902,6 +903,33 @@ void OperatorRegistry::clear() noexcept {
     port_schemas_.clear();
 }
 
+namespace {
+// Process-wide last operator-error-detail buffer. Operators write here from
+// scheduler worker threads; SolutionRunner::wait() drains it on the host
+// thread and promotes the value into the thread_local
+// `rac_error_set_details` slot so the C ABI surfaces the honest cause.
+std::mutex& operator_error_detail_mutex() {
+    static std::mutex m;
+    return m;
+}
+std::string& operator_error_detail_value() {
+    static std::string v;
+    return v;
+}
+}  // namespace
+
+void record_operator_error_detail(const std::string& detail) {
+    std::lock_guard<std::mutex> lock(operator_error_detail_mutex());
+    operator_error_detail_value() = detail;
+}
+
+std::string consume_operator_error_detail() {
+    std::lock_guard<std::mutex> lock(operator_error_detail_mutex());
+    std::string out;
+    out.swap(operator_error_detail_value());
+    return out;
+}
+
 void register_builtin_operators(OperatorRegistry& registry) {
     // Neutral scaffolding and portable glue types.
     registry.register_factory("source", make_echo_factory(), make_schema({"in"}, {"out"}));
@@ -909,6 +937,12 @@ void register_builtin_operators(OperatorRegistry& registry) {
     registry.register_factory("window", make_window_factory(), default_schema());
     registry.register_factory("context_build", make_context_build_factory(), default_schema());
     registry.register_factory("sink", make_sink_factory(), make_schema({"in"}, {}));
+    // Tagged stand-in for `retrieve` so RAG solutions can be validated without
+    // an engine-backed RAG provider. The real engine-backed factory (from
+    // op_engine_backed.cpp::register_engine_backed_operators) overrides this at
+    // host registration time. The stand-in echoes the input on port "results"
+    // so the L5 graph remains schedulable for unit tests and dry-runs.
+    registry.register_factory("retrieve", make_echo_factory(), make_schema({"in"}, {"results"}));
 }
 
 }  // namespace rac::solutions

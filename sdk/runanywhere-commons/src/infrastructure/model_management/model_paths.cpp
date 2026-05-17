@@ -49,8 +49,7 @@ bool is_safe_model_id_segment(const char* model_id) {
     if (sv == "." || sv == "..") {
         return false;
     }
-    return sv.find('/') == std::string_view::npos &&
-           sv.find('\\') == std::string_view::npos;
+    return sv.find('/') == std::string_view::npos && sv.find('\\') == std::string_view::npos;
 }
 }  // namespace
 

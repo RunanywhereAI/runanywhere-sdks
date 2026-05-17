@@ -30,7 +30,10 @@ const rAGConfigurationDefaults = () => ({
 exports.rAGConfigurationDefaults = rAGConfigurationDefaults;
 const validateRAGConfiguration = (m) => {
     if (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0) {
-        throw new _errors_1.ValidationError(`similarity_threshold must be in 0.0...1.0 (got ${m.similarityThreshold})`);
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGConfiguration.similarity_threshold',
+            message: `similarity_threshold must be in 0.0...1.0 (got ${m.similarityThreshold})`,
+        });
     }
 };
 exports.validateRAGConfiguration = validateRAGConfiguration;

@@ -212,24 +212,29 @@ def _emit_message_validate(
             continue
         swift_field = proto_field_to_camel(field.name, id_uppercase=True)
 
+        def _throw(message_literal: str) -> list[str]:
+            """Canonical `{ code, category, fieldPath, message }` shape.
+            Uses the `SDKException.validationFailed(fieldPath:message:)`
+            factory which threads field_path through
+            `proto.context.metadata["field_path"]`."""
+            field_path = f"{proto_msg_name}.{field.name}"
+            return [
+                "        throw SDKException.validationFailed(",
+                f'            fieldPath: "{field_path}",',
+                f"            message: {message_literal}",
+                "        )",
+            ]
+
         is_required = get_bool_option(field.options, RAC_REQUIRED_FIELD_NUM)
         if is_required:
             t = field.type
             if t == TYPE_STRING:
                 checks.append(f"        if {swift_field}.isEmpty {{")
-                checks.append(f"            throw SDKException(")
-                checks.append(f"                code: .invalidArgument,")
-                checks.append(f'                message: "{field.name} is required",')
-                checks.append(f"                category: .validation")
-                checks.append(f"            )")
+                checks.extend(_throw(f'"{field.name} is required"'))
                 checks.append(f"        }}")
             elif t in INTEGER_TYPES or t in FLOAT_TYPES:
                 checks.append(f"        if {swift_field} == 0 {{")
-                checks.append(f"            throw SDKException(")
-                checks.append(f"                code: .invalidArgument,")
-                checks.append(f'                message: "{field.name} is required",')
-                checks.append(f"                category: .validation")
-                checks.append(f"            )")
+                checks.extend(_throw(f'"{field.name} is required"'))
                 checks.append(f"        }}")
 
         min_int = get_int32_option(field.options, RAC_MIN_FIELD_NUM)
@@ -248,11 +253,9 @@ def _emit_message_validate(
             else:
                 range_desc = f"<= {max_int}"
             checks.append(f"        if {cond} {{")
-            checks.append(f"            throw SDKException(")
-            checks.append(f"                code: .invalidArgument,")
-            checks.append(f'                message: "{field.name} must be in {range_desc} (got \\({swift_field}))",')
-            checks.append(f"                category: .validation")
-            checks.append(f"            )")
+            checks.extend(_throw(
+                f'"{field.name} must be in {range_desc} (got \\({swift_field}))"'
+            ))
             checks.append(f"        }}")
 
         min_f = get_double_option(field.options, RAC_MIN_FLOAT_FIELD_NUM)
@@ -271,11 +274,9 @@ def _emit_message_validate(
             else:
                 range_desc = f"<= {max_f}"
             checks.append(f"        if {cond} {{")
-            checks.append(f"            throw SDKException(")
-            checks.append(f"                code: .invalidArgument,")
-            checks.append(f'                message: "{field.name} must be in {range_desc} (got \\({swift_field}))",')
-            checks.append(f"                category: .validation")
-            checks.append(f"            )")
+            checks.extend(_throw(
+                f'"{field.name} must be in {range_desc} (got \\({swift_field}))"'
+            ))
             checks.append(f"        }}")
 
     if not checks:

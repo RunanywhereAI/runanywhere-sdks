@@ -18,8 +18,12 @@ let package = Package(
     name: "RunAnywhereAI",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14)
+        // Must be ≥ the root Package.swift platform floor so the local-path
+        // dependency on RunAnywhere / RunAnywhereONNX / RunAnywhereLlamaCPP
+        // resolves cleanly (root manifest was bumped to iOS 17.5 / macOS
+        // 14.5 in T5.4).
+        .iOS("17.5"),
+        .macOS("14.5")
     ],
     products: [
         .library(

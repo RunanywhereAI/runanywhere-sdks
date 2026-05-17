@@ -1101,11 +1101,37 @@ public struct RAToolCallingSessionCreateRequest: Sendable {
   /// Clears the value of `validateCalls`. Subsequent reads from it will return its default value.
   public mutating func clearValidateCalls() {self._validateCalls = nil}
 
+  /// OpenAI-style tool_choice override surfaced through the high-level
+  /// run-loop / session APIs. The same fields exist on ToolCallingOptions
+  /// (fields 13/14); we re-publish them here so the canonical request
+  /// envelope can carry the policy without forcing callers to pass an
+  /// inline ToolCallingOptions. commons honors these on every
+  /// format/validate primitive via build_options_snapshot.
+  public var toolChoice: RAToolChoiceMode {
+    get {_toolChoice ?? .unspecified}
+    set {_toolChoice = newValue}
+  }
+  /// Returns true if `toolChoice` has been explicitly set.
+  public var hasToolChoice: Bool {self._toolChoice != nil}
+  /// Clears the value of `toolChoice`. Subsequent reads from it will return its default value.
+  public mutating func clearToolChoice() {self._toolChoice = nil}
+
+  public var forcedToolName: String {
+    get {_forcedToolName ?? String()}
+    set {_forcedToolName = newValue}
+  }
+  /// Returns true if `forcedToolName` has been explicitly set.
+  public var hasForcedToolName: Bool {self._forcedToolName != nil}
+  /// Clears the value of `forcedToolName`. Subsequent reads from it will return its default value.
+  public mutating func clearForcedToolName() {self._forcedToolName = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _validateCalls: Bool? = nil
+  fileprivate var _toolChoice: RAToolChoiceMode? = nil
+  fileprivate var _forcedToolName: String? = nil
 }
 
 public struct RAToolCallingSessionCreateResult: Sendable {
@@ -2463,7 +2489,7 @@ extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{4}\u{5}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0\u{c}\u{7}\u{4}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{4}\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0\u{c}\u{9}\u{2}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2477,6 +2503,8 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.maxIterations) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self._validateCalls) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self._toolChoice) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._forcedToolName) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
       case 12: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
       case 13: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
@@ -2509,6 +2537,12 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
     try { if let v = self._validateCalls {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
     } }()
+    try { if let v = self._toolChoice {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._forcedToolName {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
     if self.maxTokens != 0 {
       try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 11)
     }
@@ -2535,6 +2569,8 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
     if lhs.maxIterations != rhs.maxIterations {return false}
     if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
     if lhs._validateCalls != rhs._validateCalls {return false}
+    if lhs._toolChoice != rhs._toolChoice {return false}
+    if lhs._forcedToolName != rhs._forcedToolName {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

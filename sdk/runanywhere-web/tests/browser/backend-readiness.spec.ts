@@ -1,4 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { resolve } from 'node:path';
+
+const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
+
+// Repo root, resolved from this file's location, so the Vite `/@fs/...`
+// imports work from any checkout location and in CI. Override with
+// `RA_REPO_ROOT` if running against a different layout.
+const REPO_ROOT = process.env.RA_REPO_ROOT ?? resolve(__dirname, '..', '..', '..', '..');
 
 interface AppReadinessSnapshot {
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -25,6 +33,7 @@ declare global {
 }
 
 test.describe('Web SDK backend readiness', () => {
+  test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1); needs the standalone Sherpa-ONNX WASM artifact.');
   test('registers ONNX/Sherpa and exposes speech plus RAG native exports', async ({ page }) => {
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];
@@ -49,10 +58,9 @@ test.describe('Web SDK backend readiness', () => {
       timeout: 30_000,
     });
 
-    const result = await page.evaluate(async () => {
-      const onnx = await import(
-        '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/src/index.ts'
-      );
+    const result = await page.evaluate(async ({ repoRoot }) => {
+      const onnxPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/src/index.ts`;
+      const onnx = await import(/* @vite-ignore */ onnxPath);
       await onnx.ONNX.register();
       const sdk = window.__RUNANYWHERE_SDK__!;
       return {
@@ -61,7 +69,7 @@ test.describe('Web SDK backend readiness', () => {
         vad: sdk.vad.supportsProtoVAD(),
         rag: sdk.rag.availability(),
       };
-    });
+    }, { repoRoot: REPO_ROOT });
 
     expect(result.stt, 'STT proto/component exports should be available').toBe(true);
     expect(result.tts, 'TTS proto/component exports should be available').toBe(true);

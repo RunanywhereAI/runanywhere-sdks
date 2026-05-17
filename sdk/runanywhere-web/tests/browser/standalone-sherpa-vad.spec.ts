@@ -21,8 +21,14 @@
  * for the V2 STT / TTS / VAD facade integration.
  */
 import { test, expect } from '@playwright/test';
+import { resolve } from 'node:path';
 
 const shouldRun = process.env.RA_RUN_SPEECH_E2E === '1';
+
+// Repo root, resolved from this file's location, so the Vite `/@fs/...`
+// imports work from any checkout location and in CI. Override with
+// `RA_REPO_ROOT` if running against a different layout.
+const REPO_ROOT = process.env.RA_REPO_ROOT ?? resolve(__dirname, '..', '..', '..', '..');
 
 interface AppReadinessSnapshot {
   state: 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -60,7 +66,7 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
       { timeout: 60_000 },
     );
 
-    await page.evaluate(async () => {
+    await page.evaluate(async ({ repoRoot }) => {
       // Capture unhandled rejections inside the page so we never surface
       // an `Uncaught` to Playwright before our try/catch fires.
       window.addEventListener('unhandledrejection', (event) => {
@@ -75,16 +81,15 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
         console.log('[probe]', msg);
       };
       try {
-        const glueModule = await import(
-          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx-glue.js'
-        );
+        const gluePath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx-glue.js`;
+        const glueModule = await import(/* @vite-ignore */ gluePath);
         const createModule = (glueModule.default ?? glueModule) as (
           overrides?: Record<string, unknown>,
         ) => Promise<Record<string, unknown>>;
         note('glue imported');
 
         const wasmHref = new URL(
-          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx.wasm',
+          `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/wasm/sherpa/sherpa-onnx.wasm`,
           window.location.href,
         ).href;
         const wasmBinary = await (await fetch(wasmHref)).arrayBuffer();
@@ -140,7 +145,7 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
         // tests directory; Vite serves it via the example app's `tests/`
         // path through the dev server (`/@fs/...`).
         const vadUrl = new URL(
-          '/@fs/Users/sanchitmonga/development/ODLM/MONOREPOOO/runanywhere-sdks3/runanywhere-sdks-main/sdk/runanywhere-web/tests/browser/fixtures/silero_vad.onnx',
+          `/@fs${repoRoot}/sdk/runanywhere-web/tests/browser/fixtures/silero_vad.onnx`,
           window.location.href,
         ).href;
         const vadResponse = await fetch(vadUrl);
@@ -217,7 +222,7 @@ test.describe('Standalone Sherpa-ONNX VAD end-to-end', () => {
           error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
         };
       }
-    });
+    }, { repoRoot: REPO_ROOT });
 
     const result = await page.evaluate(() => window.__SHERPA_VAD_RESULT__);
     expect(result, 'VAD probe should be set').toBeDefined();

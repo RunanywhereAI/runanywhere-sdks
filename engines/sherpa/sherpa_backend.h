@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -285,11 +286,27 @@ private:
   // detect-language requests on Whisper recognizers (engine-sherpa-001).
   bool build_offline_recognizer_locked();
 
+  // pass2-syn-066: cap on the LRU cache of per-language Whisper recognizers.
+  // Each entry holds a fully constructed SherpaOnnxOfflineRecognizer whose
+  // ONNX-runtime session is the heavy part of init, so we keep this small to
+  // bound resident model memory. With Whisper-small at ~hundreds of MB per
+  // recognizer, 3 entries is the practical ceiling for mobile/web.
+  static constexpr size_t kRecognizerCacheCap = 3;
+
   SherpaBackend *backend_;
 #if SHERPA_ONNX_AVAILABLE
   const SherpaOnnxOfflineRecognizer *sherpa_recognizer_ = nullptr;
   std::unordered_map<std::string, const SherpaOnnxOfflineStream *>
       sherpa_streams_;
+  // LRU cache of recognizers keyed by language (empty string == auto-detect).
+  // Populated lazily on first transcribe() per language, hit on subsequent
+  // calls so alternating-language workloads don't pay the multi-second
+  // SherpaOnnxCreateOfflineRecognizer cost every utterance (pass2-syn-066).
+  // recognizer_lru_ front = most-recently-used. Both structures are guarded
+  // by mutex_.
+  std::unordered_map<std::string, const SherpaOnnxOfflineRecognizer *>
+      recognizer_cache_;
+  std::list<std::string> recognizer_lru_;
 #else
   void *sherpa_recognizer_ = nullptr;
 #endif
@@ -386,6 +403,17 @@ public:
   VADConfig get_vad_config() const;
 
 private:
+#if SHERPA_ONNX_AVAILABLE
+  // Translate the current `config_` snapshot (plus `model_path_`) into the
+  // Sherpa-ONNX SilerVAD model config. Used by both `load_model()` (after
+  // `config_` is populated from JSON) and `configure_vad()` (rebuild path) so
+  // that every VADConfig field — threshold, min_silence_duration_ms,
+  // min_speech_duration_ms, window_size_ms, sample_rate — actually reaches the
+  // detector instead of getting silently dropped (pass2-syn-064).
+  // Caller MUST hold mutex_.
+  void fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig &out) const;
+#endif
+
   SherpaBackend *backend_;
 #if SHERPA_ONNX_AVAILABLE
   const SherpaOnnxVoiceActivityDetector *sherpa_vad_ = nullptr;

@@ -50,6 +50,17 @@ expect suspend fun RunAnywhere.generate(
  * }
  * ```
  *
+ * Each `RALLMStreamEvent` is decoded from the full proto envelope so all
+ * optional fields are surfaced to collectors without any when-branch
+ * filtering at the adapter layer:
+ *   - `token` / `kind` / `token_id` / `logprob` for streaming tokens
+ *   - `event_kind` (proto `LLMStreamEventKind`) to classify the event
+ *   - `tool_call` (proto field 18, hotspot-idl-002) when the event
+ *     represents a structured tool-call boundary — collectors can read
+ *     `event.tool_call` directly without falling back to JSON-parsing
+ *     the raw `token` text (pass2-syn-010 follow-up).
+ *   - `result` (final aggregate metrics on terminal events).
+ *
  * @param prompt The text prompt
  * @param options Generation options (optional)
  * @return Flow of proto-decoded events as they are generated.

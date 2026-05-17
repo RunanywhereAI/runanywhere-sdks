@@ -71,6 +71,17 @@ struct ToolCallingSession {
     uint64_t handle = 0;
     std::mutex mu;
 
+    // pass2-syn-007: in-flight LifecycleLlmRef tracking for cancel. The
+    // generate caller holds `mu` while ops->generate runs; cancel calls must
+    // come from another thread and CANNOT take `mu` (would deadlock). Instead
+    // we publish a pointer to the in-flight ref under `active_ref_mu` (a
+    // distinct mutex) and a `cancel_requested` atomic that latches a
+    // pre-generate cancel so a cancel that arrives before active_ref is
+    // published is still honored when generate eventually starts.
+    std::mutex active_ref_mu;
+    rac::llm::LifecycleLlmRef* active_ref = nullptr;
+    std::atomic<bool> cancel_requested{false};
+
     rac_tool_calling_session_event_callback_fn callback = nullptr;
     void* user_data = nullptr;
 
@@ -86,6 +97,11 @@ struct ToolCallingSession {
     float temperature = 0.0f;
     float top_p = 0.0f;
     std::string system_prompt;
+
+    // pass2-syn-006: request-level tool_choice / forced_tool_name overrides.
+    bool has_tool_choice = false;
+    runanywhere::v1::ToolChoiceMode tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
+    std::string forced_tool_name;
 
     runanywhere::v1::ToolCallingOptions tool_options;
 
@@ -123,7 +139,7 @@ void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSession
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0) {
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()));
+        (void)event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()));
     }
     if (session.callback) {
         session.callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), session.user_data);
@@ -137,7 +153,7 @@ void emit_error_event(ToolCallingSession& session, int32_t c_abi_code, const std
     sdk_error.set_component("llm");
     sdk_error.set_timestamp_ms(now_ms());
     std::string error_bytes;
-    sdk_error.SerializeToString(&error_bytes);
+    (void)sdk_error.SerializeToString(&error_bytes);
 
     runanywhere::v1::ToolCallingSessionEvent event;
     event.set_error_bytes(error_bytes);
@@ -174,7 +190,7 @@ void emit_llm_chunk(ToolCallingSession& session, const std::string& text, bool i
         stream.set_event_kind(runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN);
     }
     std::string stream_bytes;
-    stream.SerializeToString(&stream_bytes);
+    (void)stream.SerializeToString(&stream_bytes);
 
     runanywhere::v1::ToolCallingSessionEvent event;
     event.set_llm_stream_event_bytes(stream_bytes);
@@ -200,6 +216,14 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSess
     }
     if (!session.system_prompt.empty()) {
         options.set_system_prompt(session.system_prompt);
+    }
+    // pass2-syn-006: honor request-level tool_choice / forced_tool_name on the
+    // snapshot consumed by the format/validate proto helpers.
+    if (session.has_tool_choice) {
+        options.set_tool_choice(session.tool_choice);
+    }
+    if (!session.forced_tool_name.empty()) {
+        options.set_forced_tool_name(session.forced_tool_name);
     }
     options.set_auto_execute(true);
     return options;
@@ -228,7 +252,7 @@ std::string build_initial_prompt(const ToolCallingSession& session) {
 
     runanywhere::v1::ToolPromptFormatResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     rac_proto_buffer_free(&out);
     return result.formatted_prompt();
@@ -259,7 +283,7 @@ std::string build_followup_prompt(const ToolCallingSession& session,
 
     runanywhere::v1::ToolPromptFormatResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     rac_proto_buffer_free(&out);
     return result.formatted_prompt();
@@ -291,7 +315,7 @@ bool parse_tool_call_from_output(const ToolCallingSession& session, const std::s
 
     runanywhere::v1::ToolParseResult result;
     if (out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     }
     rac_proto_buffer_free(&out);
 
@@ -330,7 +354,7 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
 
     runanywhere::v1::ToolCallValidationResult result;
     if (rc == RAC_SUCCESS && out.data && out.size > 0) {
-        result.ParseFromArray(out.data, static_cast<int>(out.size));
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
         result.set_error_message(out.error_message ? out.error_message
@@ -340,7 +364,7 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
     return result;
 }
 
-bool run_generate_once(const ToolCallingSession& session, const std::string& prompt,
+bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
                        std::string* out_response, rac_result_t* out_rc) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
@@ -373,7 +397,25 @@ bool run_generate_once(const ToolCallingSession& session, const std::string& pro
         return false;
     }
 
+    // pass2-syn-007: publish the in-flight ref so cancel calls from other
+    // threads can interrupt this generate. If a cancel arrived before we
+    // got here, latch it onto the ref now.
+    {
+        std::lock_guard<std::mutex> guard(session.active_ref_mu);
+        session.active_ref = &ref;
+        if (session.cancel_requested.load(std::memory_order_acquire)) {
+            rac::llm::request_lifecycle_llm_cancel(&ref);
+        }
+    }
+
     rc = ref.ops->generate(ref.impl, prompt.c_str(), &options, &raw);
+
+    // Unpublish before the ref goes out of scope.
+    {
+        std::lock_guard<std::mutex> guard(session.active_ref_mu);
+        session.active_ref = nullptr;
+    }
+
     if (rc != RAC_SUCCESS) {
         rac_llm_result_free(&raw);
         rac::llm::release_lifecycle_llm(&ref);
@@ -519,8 +561,16 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     // (validate=true) when the caller did not set it, while still letting hosts
     // that delegate validation/authorization to their executor opt out by
     // explicitly setting validate_calls=false.
-    session->validate_calls =
-        request.has_validate_calls() ? request.validate_calls() : true;
+    session->validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
+    // pass2-syn-006: pick up the OpenAI-style request-level tool_choice and
+    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8).
+    if (request.has_tool_choice()) {
+        session->has_tool_choice = true;
+        session->tool_choice = request.tool_choice();
+    }
+    if (request.has_forced_tool_name()) {
+        session->forced_tool_name = request.forced_tool_name();
+    }
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
@@ -619,4 +669,29 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     std::lock_guard<std::mutex> lg(reg.mu);
     reg.sessions.erase(session_handle);
     return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session_handle;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (session_handle == 0) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    auto session = lookup_session(session_handle);
+    if (!session) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    // pass2-syn-007: latch the cancel request first so a generate that
+    // hasn't yet published active_ref will pick it up when it starts, then
+    // forward to the in-flight ref if one is currently published. We hold
+    // active_ref_mu (NOT session.mu, which the generate caller holds).
+    session->cancel_requested.store(true, std::memory_order_release);
+    std::lock_guard<std::mutex> guard(session->active_ref_mu);
+    if (session->active_ref) {
+        rac::llm::request_lifecycle_llm_cancel(session->active_ref);
+    }
+    return RAC_SUCCESS;
+#endif
 }

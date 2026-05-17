@@ -32,6 +32,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORKSPACE_ROOT_PUBSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/pubspec.yaml"
+# Source-of-truth package (per pass2-syn-121: melos.dependencies block was
+# removed because Pub does not read it; the `packages/runanywhere` pubspec
+# is now the authoritative pin set for shared third-party deps).
+SOURCE_OF_TRUTH_PUBSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml"
 
 if [[ ! -f "${WORKSPACE_ROOT_PUBSPEC}" ]]; then
   echo "error: workspace root pubspec not found at ${WORKSPACE_ROOT_PUBSPEC}" >&2
@@ -82,16 +86,57 @@ parse_registry() {
   ' "$1"
 }
 
+# Extract `^x.y.z` / `x.y.z` pins from a package pubspec's top-level
+# `dependencies:` / `dev_dependencies:` blocks. Returns `name<TAB>version`.
+# Used as the source-of-truth registry when the (deprecated)
+# `melos.dependencies:` block is absent — see pass2-syn-121.
+parse_package_registry() {
+  awk '
+    BEGIN { in_deps = 0 }
+    /^dependencies:[[:space:]]*$/ { in_deps = 1; next }
+    /^dev_dependencies:[[:space:]]*$/ { in_deps = 1; next }
+    /^[a-zA-Z_]/ { in_deps = 0; next }
+    in_deps && /^  [a-zA-Z_][a-zA-Z0-9_]*:[[:space:]]*\^?[0-9]+\.[0-9]+\.[0-9]+/ {
+      line = $0
+      sub(/^  /, "", line)
+      colon = index(line, ":")
+      if (colon == 0) next
+      name = substr(line, 1, colon - 1)
+      version = substr(line, colon + 1)
+      sub(/^[[:space:]]+/, "", version)
+      sub(/[[:space:]]+$/, "", version)
+      sub(/[[:space:]]*#.*$/, "", version)
+      if (version == "") next
+      printf "%s\t%s\n", name, version
+    }
+  ' "$1"
+}
+
 REGISTRY_TSV="$(parse_registry "${WORKSPACE_ROOT_PUBSPEC}")"
+REGISTRY_SOURCE="workspace-root melos.dependencies"
 if [[ -z "${REGISTRY_TSV}" ]]; then
-  echo "error: no centralized dependencies parsed from melos.dependencies block in" >&2
-  echo "       ${WORKSPACE_ROOT_PUBSPEC}" >&2
-  echo "       Did the block format change?" >&2
+  # pass2-syn-121: the workspace `melos.dependencies` block was removed
+  # because Pub does not consume it. Fall back to the
+  # packages/runanywhere pubspec as the source of truth.
+  if [[ ! -f "${SOURCE_OF_TRUTH_PUBSPEC}" ]]; then
+    echo "error: no centralized dependencies parsed from melos.dependencies block in" >&2
+    echo "       ${WORKSPACE_ROOT_PUBSPEC}" >&2
+    echo "       and source-of-truth package pubspec not found at" >&2
+    echo "       ${SOURCE_OF_TRUTH_PUBSPEC}" >&2
+    exit 2
+  fi
+  REGISTRY_TSV="$(parse_package_registry "${SOURCE_OF_TRUTH_PUBSPEC}")"
+  REGISTRY_SOURCE="packages/runanywhere/pubspec.yaml"
+fi
+
+if [[ -z "${REGISTRY_TSV}" ]]; then
+  echo "error: source-of-truth pubspec parsed empty registry:" >&2
+  echo "       ${SOURCE_OF_TRUTH_PUBSPEC}" >&2
   exit 2
 fi
 
 REGISTRY_COUNT="$(printf "%s\n" "${REGISTRY_TSV}" | wc -l | tr -d ' ')"
-printf "✓ Loaded %s centralized dependency entries from workspace root.\n" "${REGISTRY_COUNT}"
+printf "✓ Loaded %s centralized dependency entries from %s.\n" "${REGISTRY_COUNT}" "${REGISTRY_SOURCE}"
 
 # Build a lookup function over REGISTRY_TSV.
 registry_version_for() {
@@ -142,8 +187,13 @@ scan_package_pins() {
 for pubspec in "${PUBSPEC_TARGETS[@]}"; do
   rel="${pubspec#${REPO_ROOT}/}"
 
-  # Skip the source of truth itself.
+  # Skip the source of truth itself (both the workspace root and the
+  # packages/runanywhere pubspec when the latter acts as the registry).
   if [[ "${pubspec}" == "${WORKSPACE_ROOT_PUBSPEC}" ]]; then
+    continue
+  fi
+  if [[ "${REGISTRY_SOURCE}" == "packages/runanywhere/pubspec.yaml" \
+        && "${pubspec}" == "${SOURCE_OF_TRUTH_PUBSPEC}" ]]; then
     continue
   fi
 

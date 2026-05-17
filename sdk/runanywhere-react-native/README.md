@@ -180,17 +180,20 @@ if (llamaRegistered) {
 }
 
 // Register ONNX module and add STT/TTS models. ONNX.register() is also async
-// and must be awaited before registering Sherpa-backed STT/TTS models.
-await ONNX.register();
-await RunAnywhere.registerModel({
-  id: 'sherpa-onnx-whisper-tiny.en',
-  name: 'Sherpa Whisper Tiny (ONNX)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
-  memoryRequirement: 75_000_000,
-});
+// and returns `Promise<boolean>` — `false` means the native backend was not
+// installed, so don't register Sherpa-backed models in that case.
+const onnxRegistered = await ONNX.register();
+if (onnxRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Sherpa Whisper Tiny (ONNX)',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    memoryRequirement: 75_000_000,
+  });
+}
 
 console.log('SDK initialized');
 ```

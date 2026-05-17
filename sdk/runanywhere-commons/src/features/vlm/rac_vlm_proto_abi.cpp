@@ -10,6 +10,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
@@ -25,6 +26,34 @@
 #endif
 
 namespace {
+
+// pass2-syn-001-followup-vlm: lift the voice_agent in_flight quiesce pattern
+// to the VLM proto-byte dispatcher. Even though VLM does NOT publish a
+// registry-style set/unset stream-callback ABI (each rac_vlm_*_stream_proto
+// entry point owns a per-call StreamCtx / GeneratedStreamCtx and invokes
+// ops->process_stream synchronously), a defensive in_flight counter still
+// closes two real race windows:
+//   1. A buggy backend that fires a stray trampoline invocation AFTER
+//      ops->process_stream has returned (the Phase 6f EXC_BAD_ACCESS that
+//      motivated the existing unique_ptr<StreamCtx> heap allocation).
+//   2. Any caller that tears down the lifecycle VLM (rac_vlm_component_destroy
+//      / rac_lifecycle_destroy) while a stream entry-point is still mid-call
+//      on another thread — release_lifecycle_vlm currently has no quiesce
+//      contract, so a destroy thread can race the dispatch thread.
+// We increment the counter on entry to each stream entry-point and decrement
+// just before returning. rac_vlm_component_destroy spin-waits for the counter
+// to drain to zero, exactly mirroring voice_agent.cpp:594.
+std::atomic<int>& vlm_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct VlmInFlightGuard {
+    VlmInFlightGuard() { vlm_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~VlmInFlightGuard() { vlm_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    VlmInFlightGuard(const VlmInFlightGuard&) = delete;
+    VlmInFlightGuard& operator=(const VlmInFlightGuard&) = delete;
+};
 
 #if defined(RAC_HAVE_PROTOBUF)
 
@@ -376,6 +405,16 @@ rac_result_t feature_unavailable(rac_proto_buffer_t* out) {
 
 extern "C" {
 
+// Public quiesce helper. Callers (rac_vlm_component_destroy, lifecycle
+// teardown paths in SDK bridges) spin-wait here before freeing any
+// user_data that may have been passed into a rac_vlm_*_stream_proto call.
+// Mirrors the contract documented in pass2-syn-001 for the LLM dispatcher.
+void rac_vlm_proto_quiesce(void) {
+    while (vlm_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
+}
+
 rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
                                    size_t image_proto_size, const uint8_t* options_proto_bytes,
                                    size_t options_proto_size, rac_proto_buffer_t* out_result) {
@@ -389,6 +428,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     (void)options_proto_size;
     return feature_unavailable(out_result);
 #else
+    VlmInFlightGuard in_flight_guard;
     // Phase 6j fix: prefer the lifecycle-owned VLM service over the caller's
     // handle. iOS SDK's `CppBridge.VLM` passes a `rac_vlm_component*` into this
     // proto ABI (the only VLM handle it owns), not a `rac_vlm_service_t*`.
@@ -487,6 +527,7 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
     (void)user_data;
     return feature_unavailable(out_result);
 #else
+    VlmInFlightGuard in_flight_guard;
     // Phase 6j fix: mirror rac_vlm_process_proto -- prefer the lifecycle-owned
     // VLM service so Swift's component-handle and Kotlin's service-handle paths
     // converge on the correct ops vtable.
@@ -586,6 +627,7 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     (void)handle;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
+    VlmInFlightGuard in_flight_guard;
     // Phase 6j fix: prefer the lifecycle-owned VLM to avoid the handle-type
     // mismatch that crashed `rac_vlm_process_proto` on iOS. The `handle`
     // parameter is kept only as a legacy fallback for struct-API smoke tests.
@@ -645,6 +687,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     (void)request_proto_size;
     return feature_unavailable(out_result);
 #else
+    VlmInFlightGuard in_flight_guard;
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -718,6 +761,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         return RAC_ERROR_NULL_POINTER;
     }
 
+    VlmInFlightGuard in_flight_guard;
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -815,6 +859,7 @@ rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event) {
 #if !defined(RAC_HAVE_PROTOBUF)
     return feature_unavailable(out_event);
 #else
+    VlmInFlightGuard in_flight_guard;
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {

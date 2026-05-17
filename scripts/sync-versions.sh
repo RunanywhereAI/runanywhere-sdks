@@ -16,16 +16,31 @@
 #   sdk/runanywhere-commons/VERSION                        (single line)
 #   sdk/runanywhere-commons/VERSIONS                       (PROJECT_VERSION line)
 #   Package.swift                                          (sdkVersion line)
-#   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion)
+#   sdk/runanywhere-swift/.../SDKConstants.swift           (public `RunAnywhere.version`)
+#   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
+#   sdk/runanywhere-kotlin/.../SDKConstants.kt             (Kotlin VERSION constant)
+#   sdk/shared/proto-ts/package.json                       (proto-ts package version)
 #   sdk/runanywhere-web/package.json                       (root version)
 #   sdk/runanywhere-web/packages/*/package.json            (each package version)
+#   sdk/runanywhere-web/.../Version.ts                     (web SDK_VERSION constant)
 #   sdk/runanywhere-react-native/package.json              (root)
-#   sdk/runanywhere-react-native/packages/*/package.json   (each package)
+#   sdk/runanywhere-react-native/packages/*/package.json   (each package + proto-ts dep)
+#   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
 #   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version: line)
+#   sdk/runanywhere-flutter/.../sdk_constants.dart         (Flutter version constant)
 #
-# Does NOT touch (intentional):
-#   - SwiftPM XCFramework checksums (use sync-checksums.sh after release artifacts exist)
-#   - VERSIONS file dependency versions (those track upstream library versions, not our release)
+# Does NOT touch (intentional, documented SoT for distinct domains):
+#   - SwiftPM XCFramework checksums — use sync-checksums.sh after release zips exist.
+#   - sdk/runanywhere-commons/VERSIONS dep-pin lines (ONNX/Sherpa/llama.cpp) —
+#     those track UPSTREAM library versions, not OUR release version.
+#   - sdk/runanywhere-flutter/.fvm/fvm_config.json — Flutter TOOLCHAIN pin
+#     (drives `flutter pub get` host), not the SDK release version. The
+#     toolchain pin is centralized in `sdk/runanywhere-commons/VERSIONS`
+#     (`FLUTTER_VERSION`); bumping the toolchain is a separate concern.
+#   - dependencies/versions.json — centralized THIRD-PARTY library pins,
+#     not the RunAnywhere SDK release version. Edit by hand when bumping
+#     a vendored library.
+#   - .syncpackrc.json — derived from dependencies/versions.json; mirror by hand.
 # =============================================================================
 
 set -euo pipefail
@@ -86,6 +101,17 @@ bump_pubspec_runanywhere_dep() {
         "  runanywhere: ^${NEW_VERSION}"
 }
 
+# Update `"@runanywhere/proto-ts": "^x.y.z"` lines (dependencies / peer ranges)
+# across npm package.json files. The published proto-ts package versions are
+# kept in lockstep with the SDK suite by sync-versions, so all consumers
+# advance to `^${NEW_VERSION}` in the same commit.
+bump_npm_proto_ts_dep() {
+    local file="$1"
+    bump_line "$file" \
+        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+"' \
+        "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
+}
+
 echo ">> Syncing versions to ${NEW_VERSION}"
 echo ">> Repo root: ${REPO_ROOT}"
 echo ""
@@ -113,7 +139,7 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Con
     'public static let version = "[^"]+"' \
     "public static let version = \"${NEW_VERSION}\""
 
-# 3. Kotlin gradle.properties
+# 3. Kotlin gradle.properties + SDKConstants.kt
 echo ""
 echo ">> Kotlin SDK:"
 KOTLIN_PROPS="${REPO_ROOT}/sdk/runanywhere-kotlin/gradle.properties"
@@ -130,6 +156,16 @@ if [ -f "$KOTLIN_PROPS" ]; then
             '^SDK_VERSION=.*' "SDK_VERSION=${NEW_VERSION}"
     fi
 fi
+# Kotlin public `RunAnywhere.version` surface (mirrors Swift SDKConstants.version).
+bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
+    'const val VERSION = "[^"]+"' \
+    "const val VERSION = \"${NEW_VERSION}\""
+
+# 3a. Shared proto-ts package — pinned to suite version so RN/Web @runanywhere/*
+# packages can use `^${NEW_VERSION}` as a single moving target.
+echo ""
+echo ">> Shared proto-ts:"
+bump_json_version "${REPO_ROOT}/sdk/shared/proto-ts/package.json"
 
 # 4. Web SDK packages
 echo ""
@@ -140,6 +176,7 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/llamacpp/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/onnx/package.json"; do
     bump_json_version "$pkg"
+    bump_npm_proto_ts_dep "$pkg"
 done
 # Web SDK public `RunAnywhere.version` surface — keeps the TS constant in
 # sync with the commons VERSION file and the package.json versions above.
@@ -156,7 +193,13 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/package.json" \
     "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/package.json"; do
     bump_json_version "$pkg"
+    bump_npm_proto_ts_dep "$pkg"
 done
+# React Native public `RunAnywhere.version` surface — keeps the TS constant
+# (consumed by Public/RunAnywhere.ts during initialize) aligned with commons.
+bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/Foundation/Constants/SDKConstants.ts" \
+    "version: '[^']+'" \
+    "version: '${NEW_VERSION}'"
 
 # 6. Flutter SDK packages
 echo ""
@@ -177,6 +220,12 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
     bump_pubspec_runanywhere_dep "$pkg"
 done
+
+# Flutter public `RunAnywhere.version` surface — Dart constant consumed by
+# `RunAnywhere.version` getter and by the native init payload.
+bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
+    "static const String version = '[^']+'" \
+    "static const String version = '${NEW_VERSION}'"
 
 echo ""
 echo ">> Done. Verify with:"

@@ -180,8 +180,7 @@ namespace rac::stt {
 void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
                                const runanywhere::v1::STTPartialResult* partial,
                                const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code,
-                               uint64_t session_id = 0);
+                               const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::stt
 #endif
 
@@ -410,11 +409,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                     it->second.backend_stream_unsupported = true;
                 }
             } else {
-                rac::stt::dispatch_stt_stream_event(component_handle,
-                                                    runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-                                                    /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming start failed", create_rc,
-                                                    session_id);
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr, "STT streaming start failed",
+                    create_rc, session_id);
                 return create_rc;
             }
         }
@@ -449,8 +447,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
                     final_output.set_language(c->language);
                     rac::stt::dispatch_stt_stream_event(
                         c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL, &partial,
-                        &final_output, /*error_message=*/nullptr, /*error_code=*/0,
-                        c->session_id);
+                        &final_output, /*error_message=*/nullptr, /*error_code=*/0, c->session_id);
                 } else {
                     rac::stt::dispatch_stt_stream_event(
                         c->handle, runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL, &partial,
@@ -462,11 +459,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
             rac_result_t feed_rc = rac_stt_component_stream_feed_audio_chunk(
                 component_handle, backend_stream_handle, samples, count, bridge, &ctx);
             if (feed_rc != RAC_SUCCESS) {
-                rac::stt::dispatch_stt_stream_event(component_handle,
-                                                    runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
-                                                    /*partial=*/nullptr, /*final_output=*/nullptr,
-                                                    "STT streaming chunk failed", feed_rc,
-                                                    session_id);
+                rac::stt::dispatch_stt_stream_event(
+                    component_handle, runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR,
+                    /*partial=*/nullptr, /*final_output=*/nullptr, "STT streaming chunk failed",
+                    feed_rc, session_id);
             }
             return feed_rc;
         }
@@ -599,8 +595,7 @@ namespace rac::stt {
 void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
                                const runanywhere::v1::STTPartialResult* partial,
                                const runanywhere::v1::STTOutput* final_output,
-                               const char* error_message, int error_code,
-                               uint64_t session_id) {
+                               const char* error_message, int error_code, uint64_t session_id) {
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;

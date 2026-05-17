@@ -474,8 +474,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             src.seekg(static_cast<std::streamoff>(req->resume_from_byte));
             std::vector<char> shift_buf(static_cast<size_t>(64) * 1024);
             while (src.good()) {
-                src.read(shift_buf.data(),
-                         static_cast<std::streamsize>(shift_buf.size()));
+                src.read(shift_buf.data(), static_cast<std::streamsize>(shift_buf.size()));
                 std::streamsize n = src.gcount();
                 if (n <= 0)
                     break;

@@ -342,6 +342,13 @@ extern "C" void rac_vlm_component_destroy(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_vlm_component*>(handle);
 
+    // pass2-syn-001-followup-vlm: Mirror voice_agent.cpp:594. Spin-wait
+    // until all in-flight rac_vlm_*_stream_proto / rac_vlm_*_proto entry
+    // points have returned before tearing down the lifecycle. Otherwise a
+    // racing dispatch thread that already acquired the lifecycle VLM ref
+    // can dereference ops vtable / impl pointers after they're freed.
+    rac_vlm_proto_quiesce();
+
     // Destroy lifecycle manager (will cleanup service if loaded)
     if (component->lifecycle) {
         rac_lifecycle_destroy(component->lifecycle);
