@@ -156,6 +156,11 @@ jobs:
       ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
       - uses: actions/checkout@v4
+      - name: Set up JDK 17 (Android Gradle Plugin 8.x requires Java 17+)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Install Android NDK
         run: |
           curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip

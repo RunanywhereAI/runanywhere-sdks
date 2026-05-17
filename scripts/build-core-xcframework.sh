@@ -254,7 +254,7 @@ merge_llamacpp_backend_slice() {
     local inputs=(
         "${build_root}/engines/llamacpp/${slice_dir}/librac_backend_llamacpp.a"
         "${build_root}/_deps/llamacpp-build/src/${slice_dir}/libllama.a"
-        "${build_root}/_deps/llamacpp-build/common/${slice_dir}/libcommon.a"
+        "${build_root}/_deps/llamacpp-build/common/${slice_dir}/libllama-common.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-base.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-cpu.a"
