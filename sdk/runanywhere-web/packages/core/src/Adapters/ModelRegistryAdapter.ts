@@ -14,6 +14,12 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger';
 import {
+  RAC_OK as RAC_SUCCESS,
+  RAC_ERROR_NOT_FOUND,
+  RAC_ERROR_FEATURE_NOT_AVAILABLE,
+  RAC_ERROR_INVALID_ARGUMENT,
+} from '../Foundation/RACErrors';
+import {
   ModelInfo as ProtoModelInfoCodec,
   ModelInfoList as ProtoModelInfoListCodec,
   ModelQuery as ProtoModelQueryCodec,
@@ -23,9 +29,6 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 
 const logger = new SDKLogger('ModelRegistryAdapter');
-const RAC_SUCCESS = 0;
-const RAC_ERROR_NOT_FOUND = -423;
-const RAC_ERROR_FEATURE_NOT_AVAILABLE = -801;
 const OUT_PTR_SIZE = 4;
 
 export type ModelInfoList = ProtoModelInfoList;
@@ -491,7 +494,7 @@ function formatRacResult(rc: number): string {
       return 'RAC_ERROR_NOT_FOUND';
     case RAC_ERROR_FEATURE_NOT_AVAILABLE:
       return 'RAC_ERROR_FEATURE_NOT_AVAILABLE';
-    case -259:
+    case RAC_ERROR_INVALID_ARGUMENT:
       return 'RAC_ERROR_INVALID_ARGUMENT';
     case -252:
       return 'RAC_ERROR_INVALID_FORMAT';

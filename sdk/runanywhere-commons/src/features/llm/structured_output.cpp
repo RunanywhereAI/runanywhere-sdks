@@ -554,7 +554,12 @@ static rac_result_t structured_result_from_text(const std::string& raw_text,
 
     rac_structured_output_parse_result_t parsed{};
     const rac_result_t rc = rac_structured_output_parse(parse_text.c_str(), config, &parsed);
-    if (rc != RAC_SUCCESS) {
+    // Treat ordinary invalid output (INVALID_FORMAT/VALIDATION_FAILED) as a
+    // typed StructuredOutputResult payload — the parsed struct still carries
+    // the populated validation envelope (error_code, error_message,
+    // validation_errors_json). Only ABI/IO failures (null args, OOM, etc.)
+    // escape as a non-success rc to the caller.
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT && rc != RAC_ERROR_VALIDATION_FAILED) {
         rac_structured_output_parse_result_free(&parsed);
         return rc;
     }
@@ -724,18 +729,26 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
 
     runanywhere::v1::StructuredOutputResult result;
     rac_result_t result_rc = structured_result_from_text(ctx->raw_text, ctx->config, &result);
-    if (result_rc != RAC_SUCCESS) {
+    // Treat INVALID_FORMAT/VALIDATION_FAILED as typed semantic outcomes carried
+    // by the StructuredOutputResult envelope, not as transport errors. Only
+    // ABI/IO failures (null args, OOM, serialization) emit an ERROR event with
+    // no result payload — mirrors rac_structured_output_parse_proto.
+    if (result_rc != RAC_SUCCESS && result_rc != RAC_ERROR_INVALID_FORMAT &&
+        result_rc != RAC_ERROR_VALIDATION_FAILED) {
         dispatch_structured_stream_event(
             ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR, nullptr, nullptr,
             nullptr, rac_error_message(result_rc), result_rc);
         return;
     }
 
+    // The stream completed at the transport layer — even if the generated text
+    // failed JSON parsing or schema validation, surface a COMPLETED event with
+    // the populated result so callers can render validation_errors via the
+    // typed envelope. Reserve the ERROR kind for transport-layer failures.
     const bool transport_ok = status == RAC_SUCCESS;
+    const auto kind = transport_ok ? runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
+                                   : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
     const bool validation_ok = result.error_code() == static_cast<int32_t>(RAC_SUCCESS);
-    const auto kind = transport_ok && validation_ok
-                          ? runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
-                          : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
     const char* message = nullptr;
     if (!transport_ok) {
         message = finish_reason != nullptr && finish_reason[0] != '\0' ? finish_reason
@@ -1296,7 +1309,12 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
                                      has_options ? &converted.config : nullptr, &result);
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
-    if (rc != RAC_SUCCESS) {
+    // Mirrors rac_structured_output_parse_proto: INVALID_FORMAT and
+    // VALIDATION_FAILED are typed semantic outcomes that travel via the
+    // StructuredOutputResult.error_code / validation envelope, not transport
+    // errors. Reserve rac_proto_buffer_set_error for malformed request bytes,
+    // null pointers, missing lifecycle model, serialization/allocation failures.
+    if (rc != RAC_SUCCESS && rc != RAC_ERROR_INVALID_FORMAT && rc != RAC_ERROR_VALIDATION_FAILED) {
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
     return copy_serialized_proto(result, out_result, "StructuredOutputResult");

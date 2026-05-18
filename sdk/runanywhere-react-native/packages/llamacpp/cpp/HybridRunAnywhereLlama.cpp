@@ -17,8 +17,6 @@ extern "C" {
 }
 
 #include "rac/core/rac_error.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_plugin_entry_llamacpp.h"
 
 // Unified logging via rac_logger.h
 #include "rac_logger.h"
@@ -62,19 +60,18 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_DEBUG(LOG_CATEGORY, "Registering LlamaCPP backend with C++ registry");
 
+    // rac_backend_llamacpp_register() internally registers both the module and
+    // the plugin entry (rac_plugin_entry_llamacpp()) — see
+    // engines/llamacpp/rac_backend_llamacpp_register.cpp:462-478, which plugs
+    // the Android dynamic-loading gap where the RAC_STATIC_PLUGIN_REGISTER ctor
+    // never fires (Kotlin/JNI loads librac_backend_llamacpp_jni.so directly,
+    // not the carrier librunanywhere_llamacpp.so). Matches the iOS Swift
+    // source-of-truth in sdk/runanywhere-swift/Sources/LlamaCPPRuntime which
+    // also relies on the in-engine registration only.
     rac_result_t result = rac_backend_llamacpp_register();
     if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP registration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP registration failed with error: " + std::to_string(result));
-    }
-
-    // Android loads the backend as a dynamic shared library. Unlike iOS static
-    // linking, the plugin auto-registration shim intentionally does not run in
-    // that mode, so the RN host must register the unified router vtable here.
-    result = rac_plugin_register(rac_plugin_entry_llamacpp());
-    if (!isRegistrationSuccess(result)) {
-      RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP plugin registration failed with code: %d", result);
-      throw std::runtime_error("LlamaCPP plugin registration failed with error: " + std::to_string(result));
     }
 
     RAC_LOG_INFO(LOG_CATEGORY, "LlamaCPP backend registered successfully");
@@ -111,16 +108,16 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerVLMBackend() {
   return Promise<bool>::async([this]() {
     RAC_LOG_DEBUG(VLM_LOG_CATEGORY, "Registering LlamaCPP VLM backend with C++ registry");
 
+    // rac_backend_llamacpp_vlm_register() internally registers both the module
+    // and the VLM plugin entry — see
+    // engines/llamacpp/rac_backend_llamacpp_vlm_register.cpp:237-252, which
+    // mirrors the LLM-side dynamic-plugin fix. The RN host therefore does not
+    // need a separate rac_plugin_register() call; the in-engine registration
+    // matches the iOS source-of-truth pattern in LlamaCPPRuntime.
     rac_result_t result = rac_backend_llamacpp_vlm_register();
     if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM registration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP VLM registration failed with error: " + std::to_string(result));
-    }
-
-    result = rac_plugin_register(rac_plugin_entry_llamacpp_vlm());
-    if (!isRegistrationSuccess(result)) {
-      RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM plugin registration failed with code: %d", result);
-      throw std::runtime_error("LlamaCPP VLM plugin registration failed with error: " + std::to_string(result));
     }
 
     RAC_LOG_INFO(VLM_LOG_CATEGORY, "LlamaCPP VLM backend registered successfully");

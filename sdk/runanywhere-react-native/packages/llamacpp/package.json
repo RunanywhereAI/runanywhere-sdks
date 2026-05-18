@@ -47,7 +47,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@runanywhere/proto-ts": "^0.21.0"
+    "@runanywhere/proto-ts": "^0.99.99-test"
   },
   "peerDependencies": {
     "@runanywhere/core": ">=0.19.13",

@@ -450,10 +450,14 @@ modalities:
           facade is silently a no-op when the symbol isn't exported.
 
   # --------------------------------------------------------------------------
-  # LoRA -- lives on CppBridge.LLM extension (operates on the LLM handle)
+  # LoRA -- lives on CppBridge.LLM extension. LoRA went handle-less in Tier 2:
+  # the C ABI resolves the active LLM service via
+  # `rac_model_lifecycle_acquire_proto` rather than threading a Swift-owned
+  # `rac_handle_t`. The generator never reads `modality.handle` either, so
+  # carrying a stale `handle: rac_handle_t` here misleads anyone reading the
+  # manifest as a contract.
   # --------------------------------------------------------------------------
   - name: LoRA
-    handle: rac_handle_t
     extension: CppBridge.LLM
     methods:
       - swift_name: applyLoraAdapters

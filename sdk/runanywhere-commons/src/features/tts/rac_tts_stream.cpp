@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -33,6 +34,23 @@
 #endif
 
 namespace {
+
+// pass2-syn-001-followup-tts: lift the voice_agent in_flight quiesce pattern
+// to the TTS proto-byte dispatcher. See rac_llm_stream.cpp and
+// rac_vlm_proto_abi.cpp for the canonical reference; this guards
+// dispatch_tts_stream_event so destroy/teardown can spin-wait until any
+// in-flight slot.fn() returns before freeing user_data.
+std::atomic<int>& tts_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct TtsInFlightGuard {
+    TtsInFlightGuard() { tts_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~TtsInFlightGuard() { tts_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    TtsInFlightGuard(const TtsInFlightGuard&) = delete;
+    TtsInFlightGuard& operator=(const TtsInFlightGuard&) = delete;
+};
 
 struct CallbackSlot {
     rac_tts_stream_proto_callback_fn fn = nullptr;
@@ -98,6 +116,18 @@ rac_result_t rac_tts_unset_stream_proto_callback(rac_handle_t handle) {
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
     return RAC_SUCCESS;
+}
+
+// pass2-syn-001-followup-tts: public quiesce helper. Mirrors
+// rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
+// in-flight dispatch_tts_stream_event invocation has returned. Callers
+// freeing user_data registered via rac_tts_set_stream_proto_callback, or
+// tearing down the TTS component, MUST call this after the unset to avoid
+// a use-after-free in the dispatch thread.
+void rac_tts_proto_quiesce(void) {
+    while (tts_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
 }
 
 rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* request_proto_bytes,
@@ -171,6 +201,10 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
                                const runanywhere::v1::TTSPhonemeTimestamp* phoneme,
                                const runanywhere::v1::TTSSpeakResult* speak_result,
                                const char* error_message, int error_code) {
+    // pass2-syn-001-followup-tts: hold the InFlightGuard across the whole
+    // dispatch so rac_tts_proto_quiesce() can spin-wait on the counter
+    // before user_data is freed by a concurrent teardown thread.
+    TtsInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq = 0;
     {

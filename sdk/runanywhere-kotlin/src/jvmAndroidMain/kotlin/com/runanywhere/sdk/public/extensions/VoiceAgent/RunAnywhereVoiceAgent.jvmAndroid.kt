@@ -49,11 +49,21 @@ private fun getMissingComponents(): List<String> {
 actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
+    // pass3-syn-030 / pass3-syn-025: prefer the caller-supplied tts_voice_id
+    // (added to VoiceAgentConfig in idl/solutions.proto) over the legacy
+    // tts_model_id fallback. Multi-voice TTS engines (Piper, eSpeak-NG,
+    // Sherpa-ONNX-TTS multi-voice) need a distinct voice id; single-voice
+    // engines pass empty tts_voice_id and the fallback uses tts_model_id.
+    //
+    // Until the generated VoiceAgentConfig is regenerated with the new
+    // tts_voice_id field, the access goes through a reflective lookup so
+    // this code compiles against both the pre- and post-codegen shapes.
+    val resolvedTtsVoiceId = resolveTtsVoiceId(config)
     val composeConfig =
         RAVoiceAgentComposeConfig(
             stt_model_id = config.stt_model_id.takeIf { it.isNotBlank() },
             llm_model_id = config.llm_model_id.takeIf { it.isNotBlank() },
-            tts_voice_id = config.tts_model_id.takeIf { it.isNotBlank() },
+            tts_voice_id = resolvedTtsVoiceId,
             vad_sample_rate = config.sample_rate_hz,
         )
     val states =
@@ -63,6 +73,31 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
         )
     voiceAgentInitialized = states.ready
     voiceAgentLogger.info("Voice agent initialized from VoiceAgentConfig: ready=${states.ready}")
+}
+
+/**
+ * pass3-syn-030: resolves the TTS voice id for a [VoiceAgentConfig], preferring
+ * the new `tts_voice_id` field added in pass3-syn-025 over the legacy
+ * `tts_model_id` fallback.
+ *
+ * Uses reflection so this compiles regardless of whether the Wire-generated
+ * proto has been regenerated to include `tts_voice_id`. Once the codegen
+ * lands the field, this helper can be inlined to a direct accessor:
+ *
+ *     val resolved = config.tts_voice_id.takeIf { it.isNotBlank() }
+ *         ?: config.tts_model_id.takeIf { it.isNotBlank() }
+ */
+private fun resolveTtsVoiceId(config: VoiceAgentConfig): String? {
+    val newField =
+        try {
+            val getter =
+                config::class.java.methods
+                    .firstOrNull { it.name == "getTts_voice_id" || it.name == "getTtsVoiceId" }
+            (getter?.invoke(config) as? String)?.takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
+    return newField ?: config.tts_model_id.takeIf { it.isNotBlank() }
 }
 
 actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {

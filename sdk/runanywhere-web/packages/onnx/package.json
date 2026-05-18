@@ -11,10 +11,12 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./wasm/*": "./wasm/*"
   },
   "files": [
     "dist/",
+    "wasm/",
     "README.md"
   ],
   "scripts": {
@@ -24,7 +26,7 @@
     "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test ! -d wasm/sherpa || (echo 'ERROR: legacy wasm/sherpa bundle must not be published. Use unified RACommons WASM backend registration.' && exit 1)"
+    "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/sherpa/sherpa-onnx-glue.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-glue.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx.wasm || (echo 'ERROR: wasm/sherpa/sherpa-onnx.wasm missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-asr.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-asr.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-tts.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-tts.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-vad.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-vad.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1)"
   },
   "keywords": [
     "runanywhere",

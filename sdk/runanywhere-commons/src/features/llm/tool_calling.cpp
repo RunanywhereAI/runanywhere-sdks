@@ -1880,10 +1880,21 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
     // user prompt verbatim (or empty if absent). For SPECIFIC, narrow the
     // advertised set to forced_tool_name so the model is steered to that
     // call. UNSPECIFIED/AUTO/REQUIRED keep today's full advertise-all behavior.
+    //
+    // Note: tool_choice=NONE means "do not advertise new tools / do not emit
+    // new tool calls" — it does NOT mean "discard prior tool_results". When a
+    // caller runs a manual orchestration loop (parse → execute → format
+    // follow-up) and forces tool_choice=NONE on the final synthesis turn, we
+    // must still weave the prior tool_results into the follow-up prompt so
+    // the model can synthesize a final assistant message. We therefore force
+    // effective_tools_json to "[]" when suppress_tools is set, and only
+    // short-circuit to the bare user_prompt when there are no tool_results.
     const bool suppress_tools = converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE;
     std::string effective_tools_json = converted.tools_json;
-    if (!suppress_tools && converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
-        !converted.forced_tool_name.empty() && request.has_options()) {
+    if (suppress_tools) {
+        effective_tools_json = "[]";
+    } else if (converted.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+               !converted.forced_tool_name.empty() && request.has_options()) {
         json filtered = json::array();
         for (const auto& tool : request.options().tools()) {
             if (tool.name() == converted.forced_tool_name) {
@@ -1893,7 +1904,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_proto(const uint8_t* request
         effective_tools_json = filtered.dump();
     }
 
-    if (suppress_tools) {
+    if (suppress_tools && request.tool_results_size() == 0) {
         prompt = dup_owned_string(request.user_prompt());
         rc = prompt ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     } else if (request.tool_results_size() == 0) {

@@ -55,6 +55,7 @@ public:
   using ToolRunLoopExecuteCallback = std::function<
       std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(
           const std::shared_ptr<ArrayBuffer>&)>;
+  using ToolRunLoopHandleCallback = std::function<void(double)>;
 
   HybridRunAnywhereCore();
   ~HybridRunAnywhereCore();
@@ -361,6 +362,11 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolRunLoopProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes,
     const ToolRunLoopExecuteCallback& onExecuteToolBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolRunLoopProtoWithHandle(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const ToolRunLoopExecuteCallback& onExecuteToolBytes,
+    const ToolRunLoopHandleCallback& onHandle) override;
+  std::shared_ptr<Promise<bool>> toolRunLoopCancelProto(double runLoopHandle) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputParseProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputPreparePromptProto(

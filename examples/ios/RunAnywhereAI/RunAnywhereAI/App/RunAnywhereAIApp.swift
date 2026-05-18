@@ -24,9 +24,10 @@ import AppKit
 // Registers the default example-app model catalog with the SDK registry.
 // Mirrors the Flutter example's `_registerModulesAndModels()` and matches
 // the Kotlin / RN / Web examples so every SDK surfaces the same baseline
-// set of LLM / VLM / STT / TTS / VAD / embedding / diffusion models. The
-// example apps are each responsible for seeding their own catalog — the
-// SDK does not ship a default list. See BUG-SWIFT-IOS-002.
+// set of LLM / VLM / STT / TTS / VAD / embedding models (six modalities
+// total — diffusion is deferred from the Swift v1 build). The example
+// apps are each responsible for seeding their own catalog — the SDK does
+// not ship a default list. See BUG-SWIFT-IOS-002.
 
 // swiftlint:disable type_body_length
 @main
@@ -105,9 +106,10 @@ struct RunAnywhereAIApp: App {
 
             try runSDKInitialize()
 
-            // Seed the example-app model catalog (~30 LLM / VLM / STT / TTS /
-            // VAD / embedding / diffusion entries). Each SDK's example owns its
-            // own catalog; the SDK does not ship a default list.
+            // Seed the example-app model catalog (~20 entries across six
+            // modalities: LLM / VLM / STT / TTS / VAD / embedding). Each SDK's
+            // example owns its own catalog; the SDK does not ship a default list.
+            // Diffusion is deferred from the Swift v1 build.
             await registerModulesAndModels()
 
             // Refresh generated model/catalog state.

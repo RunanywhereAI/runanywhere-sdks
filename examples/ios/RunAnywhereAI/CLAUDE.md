@@ -11,16 +11,13 @@ This file documents the iOS example application for the RunAnywhere on-device AI
 cd examples/ios/RunAnywhereAI/
 
 # Simulator (handles SDK + XCFramework dependencies automatically)
-./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
+./scripts/build_and_run_ios_sample.sh simulator "iPhone 16 Pro" --build-sdk
 
 # Physical device
-./scripts/build_and_run.sh device
+./scripts/build_and_run_ios_sample.sh device
 
 # macOS Catalyst / native
-./scripts/build_and_run.sh mac
-
-# Clean build artifacts
-./scripts/clean_build_and_run.sh
+./scripts/build_and_run_ios_sample.sh mac
 ```
 
 ### Manual Setup
@@ -89,7 +86,7 @@ The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. 
 Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
 
 ### Cross-Platform Strategy
-The app targets iOS 17+ and macOS 14+. Platform differences are handled via:
+The app targets iOS 17.5+ and macOS 14.5+ (matches `Package.swift` platform floor). Platform differences are handled via:
 - `#if os(iOS)` / `#if os(macOS)` conditional compilation
 - `AdaptiveLayout.swift` — `DeviceFormFactor` detection + `AdaptiveSizing` constants for phone/tablet/desktop
 - `ViewCompatibility.swift` — shims like `navigationBarTitleDisplayModeCompat`

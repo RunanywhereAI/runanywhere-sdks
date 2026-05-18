@@ -87,9 +87,23 @@ struct LlamaCppVLMBackend {
   // Detected model type for chat template
   VLMModelType model_type = static_cast<VLMModelType>(0); // Unknown
 
-  // Cached sampler parameters to avoid unnecessary rebuilds
+  // Cached sampler parameters to avoid unnecessary rebuilds.
+  // pass3-syn-128: extended to cover the full rac_vlm_options_t sampling
+  // surface (top_k / seed / repetition_penalty / min_p) so any call that
+  // touches them invalidates the cached chain and forces a rebuild.
   float cached_temperature = -1.0f;
   float cached_top_p = -1.0f;
+  int32_t cached_top_k = -1;
+  int64_t cached_seed = 0;
+  float cached_repetition_penalty = -1.0f;
+  float cached_min_p = -1.0f;
+
+  // pass3-syn-128: caller toggle for image-embedding emission. Stored on the
+  // backend so both streaming and non-streaming paths see the same value.
+  // No mtmd hook surfaces embeddings today; the flag is recorded for future
+  // proto-event emission and so callers see the bool round-trip through the
+  // C ABI without silent loss.
+  bool emit_image_embeddings = false;
 
   // Thread safety
   mutable std::mutex mutex;
@@ -227,6 +241,55 @@ VLMModelType detect_vlm_model_type(llama_model *model) {
 }
 
 /**
+ * Apply a caller-supplied custom chat template by substituting the
+ * `{system}` / `{image}` / `{prompt}` placeholders documented on
+ * `rac_vlm_chat_template_t`. Returns an empty string if the template has no
+ * usable template_str.
+ *
+ * The substitution is intentionally simple (single-pass find/replace) — this
+ * mirrors the contract documented on rac_vlm_chat_template_t.template_str.
+ */
+std::string
+apply_custom_chat_template(const rac_vlm_chat_template_t *custom_template,
+                           const std::string &user_prompt,
+                           const char *image_marker, bool has_image,
+                           const char *effective_system) {
+  if (!custom_template || !custom_template->template_str ||
+      custom_template->template_str[0] == '\0') {
+    return {};
+  }
+
+  std::string out(custom_template->template_str);
+
+  // Resolve {system} — caller's explicit value wins; otherwise use the
+  // template's default_system_prompt; otherwise empty.
+  const char *system_value = effective_system
+                                 ? effective_system
+                                 : (custom_template->default_system_prompt
+                                        ? custom_template->default_system_prompt
+                                        : "");
+
+  auto replace_placeholder = [](std::string &dst, const std::string &needle,
+                                const std::string &value) {
+    size_t pos = dst.find(needle);
+    while (pos != std::string::npos) {
+      dst.replace(pos, needle.size(), value);
+      pos = dst.find(needle, pos + value.size());
+    }
+  };
+
+  replace_placeholder(out, "{system}",
+                      system_value ? std::string(system_value) : std::string());
+  replace_placeholder(out, "{image}",
+                      has_image ? std::string(image_marker) : std::string());
+  replace_placeholder(out, "{prompt}", user_prompt);
+
+  RAC_LOG_DEBUG(LOG_CAT, "Custom-template-formatted prompt (%d chars): %s",
+                (int)out.length(), out.c_str());
+  return out;
+}
+
+/**
  * Format prompt using model's built-in chat template via
  * llama_chat_apply_template. Falls back to manual formatting if template
  * application fails.
@@ -235,12 +298,10 @@ VLMModelType detect_vlm_model_type(llama_model *model) {
  * For models that expect a system message (e.g. Qwen2-VL), a default is
  * injected based on the detected model_type when no explicit prompt is given.
  */
-std::string format_vlm_prompt_with_template(llama_model *model,
-                                            const std::string &user_prompt,
-                                            const char *image_marker,
-                                            bool has_image,
-                                            const char *system_prompt,
-                                            VLMModelType model_type) {
+std::string format_vlm_prompt_with_template(
+    llama_model *model, const std::string &user_prompt,
+    const char *image_marker, bool has_image, const char *system_prompt,
+    VLMModelType model_type, const rac_vlm_chat_template_t *custom_template) {
   // Build user content with image marker if present
   std::string user_content;
   if (has_image) {
@@ -254,6 +315,20 @@ std::string format_vlm_prompt_with_template(llama_model *model,
       (system_prompt && system_prompt[0] != '\0') ? system_prompt : nullptr;
   if (!effective_system && model_type == VLMModelType::Qwen2VL) {
     effective_system = "You are a helpful assistant.";
+  }
+
+  // Caller-supplied custom chat template overrides the model/family default.
+  // Resolved only when the caller picked RAC_VLM_MODEL_FAMILY_CUSTOM (i.e.
+  // VLMModelType::Generic was returned by resolve_effective_model_type for the
+  // CUSTOM family). We accept any non-NULL custom_template though, because a
+  // caller might want to override even when keeping the detected family.
+  if (custom_template) {
+    std::string applied =
+        apply_custom_chat_template(custom_template, user_prompt, image_marker,
+                                   has_image, effective_system);
+    if (!applied.empty()) {
+      return applied;
+    }
   }
 
 #ifdef __EMSCRIPTEN__
@@ -288,8 +363,7 @@ std::string format_vlm_prompt_with_template(llama_model *model,
           if (result > 0) {
             std::string formatted(buf.data(), result);
             RAC_LOG_DEBUG(
-                LOG_CAT,
-                "Template-formatted prompt with system (%d chars): %s",
+                LOG_CAT, "Template-formatted prompt with system (%d chars): %s",
                 (int)formatted.length(), formatted.c_str());
             return formatted;
           }
@@ -299,8 +373,7 @@ std::string format_vlm_prompt_with_template(llama_model *model,
                         "llama_chat_apply_template with system threw: %s",
                         ex.what());
       } catch (...) {
-        RAC_LOG_WARNING(LOG_CAT,
-                        "llama_chat_apply_template with system threw");
+        RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system threw");
       }
       if (effective_system) {
         RAC_LOG_WARNING(
@@ -377,12 +450,23 @@ const char *get_image_marker() {
  * Configure the sampler chain with the given generation parameters.
  * Only rebuilds the sampler when parameters actually change, avoiding
  * unnecessary heap allocations on every inference call.
+ *
+ * pass3-syn-128: honors the full sampling surface of rac_vlm_options_t
+ * (top_k / seed / repetition_penalty / min_p), mirroring the LLM backend at
+ * engines/llamacpp/llamacpp_backend.cpp:905-947. Zero/default values fall
+ * back to the historical engine constants so callers that left them at
+ * defaults continue to see identical behavior.
  */
 void configure_sampler(LlamaCppVLMBackend *backend,
                        const rac_vlm_options_t *options) {
-  // Determine parameters from options or use defaults
+  // Defaults match the historical hard-coded VLM behavior so callers that
+  // didn't set these fields don't see a behavioral regression.
   float temperature = 0.7f;
   float top_p = 0.9f;
+  int32_t top_k = 0; // 0 = no top_k sampler in chain
+  int64_t seed = LLAMA_DEFAULT_SEED;
+  float repetition_penalty = 1.3f; // pre-IDL engine default
+  float min_p = 0.1f;              // pre-IDL engine default
 
   if (options) {
     if (options->temperature >= 0.0f) {
@@ -391,11 +475,29 @@ void configure_sampler(LlamaCppVLMBackend *backend,
     if (options->top_p > 0.0f && options->top_p <= 1.0f) {
       top_p = options->top_p;
     }
+    if (options->top_k > 0) {
+      top_k = options->top_k;
+    }
+    if (options->seed != 0) {
+      // Negative seed signals "fresh random per call" — feed it straight to
+      // llama_sampler_init_dist, which interprets uint32_t LLAMA_DEFAULT_SEED
+      // for "auto". Cast preserves the caller's bit pattern.
+      seed = options->seed;
+    }
+    if (options->repetition_penalty > 0.0f) {
+      repetition_penalty = options->repetition_penalty;
+    }
+    if (options->min_p > 0.0f) {
+      min_p = options->min_p;
+    }
   }
 
   // Skip rebuild if params haven't changed and sampler already exists
   if (backend->sampler && backend->cached_temperature == temperature &&
-      backend->cached_top_p == top_p) {
+      backend->cached_top_p == top_p && backend->cached_top_k == top_k &&
+      backend->cached_seed == seed &&
+      backend->cached_repetition_penalty == repetition_penalty &&
+      backend->cached_min_p == min_p) {
     return;
   }
 
@@ -406,9 +508,9 @@ void configure_sampler(LlamaCppVLMBackend *backend,
   }
 
   // Build new sampler chain.
-  // Order follows llama.cpp common_sampler_init: penalties → DRY → top_p →
-  // min_p → temp → dist. Penalties and DRY must be applied to raw logits before
-  // temperature softens them.
+  // Order follows llama.cpp common_sampler_init: penalties → DRY → top_k →
+  // top_p → min_p → temp → dist. Penalties and DRY must be applied to raw
+  // logits before temperature softens them.
   llama_sampler_chain_params sampler_params =
       llama_sampler_chain_default_params();
   sampler_params.no_perf =
@@ -416,9 +518,12 @@ void configure_sampler(LlamaCppVLMBackend *backend,
   backend->sampler = llama_sampler_chain_init(sampler_params);
 
   if (temperature > 0.0f) {
-    // Token-level repetition penalty + frequency/presence penalties
+    // Token-level repetition penalty + frequency/presence penalties.
+    // Repetition penalty is caller-controlled now (pass3-syn-128); freq/pres
+    // stay at the pre-IDL engine defaults until callers request a knob.
     llama_sampler_chain_add(
-        backend->sampler, llama_sampler_init_penalties(256, 1.3f, 0.1f, 0.1f));
+        backend->sampler,
+        llama_sampler_init_penalties(256, repetition_penalty, 0.1f, 0.1f));
 
     // DRY sampler: catches n-gram (sequence) repetition like "gó gó gó" where
     // individual tokens may alternate. Multiplier=0.8, base=1.75,
@@ -430,14 +535,25 @@ void configure_sampler(LlamaCppVLMBackend *backend,
         llama_sampler_init_dry(vocab, llama_model_n_ctx_train(backend->model),
                                0.8f, 1.75f, 2, 256, dry_breakers, 4));
 
+    // top_k only when caller requested it; mirrors LLM backend at
+    // engines/llamacpp/llamacpp_backend.cpp:928-931.
+    if (top_k > 0) {
+      llama_sampler_chain_add(backend->sampler,
+                              llama_sampler_init_top_k(top_k));
+    }
+
     llama_sampler_chain_add(backend->sampler,
                             llama_sampler_init_top_p(top_p, 1));
     llama_sampler_chain_add(backend->sampler,
-                            llama_sampler_init_min_p(0.1f, 1));
+                            llama_sampler_init_min_p(min_p, 1));
     llama_sampler_chain_add(backend->sampler,
                             llama_sampler_init_temp(temperature));
+    // Seed: negative means "pick a fresh random seed". llama.cpp expects a
+    // uint32_t — LLAMA_DEFAULT_SEED stands in for "engine-picked random".
+    const uint32_t dist_seed =
+        (seed < 0) ? LLAMA_DEFAULT_SEED : static_cast<uint32_t>(seed);
     llama_sampler_chain_add(backend->sampler,
-                            llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+                            llama_sampler_init_dist(dist_seed));
   } else {
     llama_sampler_chain_add(backend->sampler, llama_sampler_init_greedy());
   }
@@ -445,12 +561,16 @@ void configure_sampler(LlamaCppVLMBackend *backend,
   // Cache the params for next comparison
   backend->cached_temperature = temperature;
   backend->cached_top_p = top_p;
+  backend->cached_top_k = top_k;
+  backend->cached_seed = seed;
+  backend->cached_repetition_penalty = repetition_penalty;
+  backend->cached_min_p = min_p;
 
-  RAC_LOG_INFO(
-      LOG_CAT,
-      "[v3] Sampler: temp=%.2f top_p=%.2f repeat=1.3 freq=0.1 pres=0.1 DRY=0.8 "
-      "min_p=0.1 + repeat_guard=4",
-      temperature, top_p);
+  RAC_LOG_INFO(LOG_CAT,
+               "[v3] Sampler: temp=%.2f top_p=%.2f top_k=%d seed=%lld "
+               "repeat=%.2f min_p=%.2f DRY=0.8 + repeat_guard=4",
+               temperature, top_p, top_k, static_cast<long long>(seed),
+               repetition_penalty, min_p);
 }
 
 /**
@@ -489,6 +609,20 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
                                  const char *prompt,
                                  const rac_vlm_options_t *options) {
   backend->cancel_requested = false;
+  // pass3-syn-128: surface emit_image_embeddings on the backend so both
+  // process() and process_stream() see the same caller toggle. No mtmd hook
+  // exposes raw image embeddings today; recording it here keeps the C ABI
+  // round-trip lossless and prepares the contract for future event surfaces.
+  backend->emit_image_embeddings =
+      (options && options->emit_image_embeddings == RAC_TRUE);
+  if (backend->emit_image_embeddings) {
+    // Logged at debug to make the no-op explicit until the mtmd path lands a
+    // real producer — callers that flipped the toggle still see proof their
+    // request was observed end-to-end.
+    RAC_LOG_DEBUG(LOG_CAT,
+                  "emit_image_embeddings=true requested; no producer wired "
+                  "today, flag tracked for future event surfaces");
+  }
   configure_sampler(backend, options);
   RAC_LOG_INFO(LOG_CAT,
                "[v3-prep] start image=%d format=%d width=%u height=%u data=%zu",
@@ -509,10 +643,23 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
   const char *system_prompt =
       (options && options->system_prompt) ? options->system_prompt : nullptr;
 
-  // Build prompt with image handling
+  // Build prompt with image handling.
+  // image_marker_override (rac_vlm_options_t) takes precedence; otherwise use
+  // the marker from custom_chat_template when supplied; fall back to the
+  // backend default marker (mtmd / "<image>").
   std::string full_prompt;
   bool has_image = false;
   const char *image_marker = get_image_marker();
+  if (options) {
+    if (options->image_marker_override &&
+        options->image_marker_override[0] != '\0') {
+      image_marker = options->image_marker_override;
+    } else if (options->custom_chat_template &&
+               options->custom_chat_template->image_marker &&
+               options->custom_chat_template->image_marker[0] != '\0') {
+      image_marker = options->custom_chat_template->image_marker;
+    }
+  }
 
 #ifdef RAC_VLM_USE_MTMD
   mtmd_bitmap *bitmap = nullptr;
@@ -545,10 +692,14 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     }
   }
 
+  const rac_vlm_chat_template_t *custom_chat_template =
+      (options && options->custom_chat_template) ? options->custom_chat_template
+                                                 : nullptr;
+
   RAC_LOG_INFO(LOG_CAT, "[v3-prep] formatting prompt");
   full_prompt = format_vlm_prompt_with_template(
       backend->model, prompt, image_marker, has_image, system_prompt,
-      effective_model_type);
+      effective_model_type, custom_chat_template);
 
   RAC_LOG_INFO(LOG_CAT, "[v3-prep] Prompt ready (chars=%d, img=%d, type=%d)",
                (int)full_prompt.length(), has_image ? 1 : 0,
@@ -583,7 +734,8 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
         backend->config.batch_size > 0 ? backend->config.batch_size
                                        : kDefaultBatchSize,
         true, &new_n_past);
-    RAC_LOG_INFO(LOG_CAT, "[v3-prep] image/text chunks evaluated rc=%d n_past=%d",
+    RAC_LOG_INFO(LOG_CAT,
+                 "[v3-prep] image/text chunks evaluated rc=%d n_past=%d",
                  eval_result, (int)new_n_past);
 
     mtmd_bitmap_free(bitmap);
@@ -601,7 +753,7 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     // Text-only mode - still apply chat template for consistent formatting
     full_prompt = format_vlm_prompt_with_template(
         backend->model, prompt, image_marker, false, system_prompt,
-        effective_model_type);
+        effective_model_type, custom_chat_template);
 
     const llama_vocab *vocab = llama_model_get_vocab(backend->model);
     std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -642,6 +794,63 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
 // large member additions that might hurt cache locality).
 static_assert(sizeof(LlamaCppVLMBackend) <= 512,
               "LlamaCppVLMBackend grew unexpectedly — review member layout");
+
+/**
+ * Collect caller-supplied stop sequences from rac_vlm_options_t.
+ *
+ * Mirrors the LLM backend's handling — empty strings are dropped, NULL entries
+ * are skipped. Returns an empty vector when options is NULL, num is 0, or every
+ * entry was dropped.
+ */
+std::vector<std::string>
+collect_stop_sequences(const rac_vlm_options_t *options) {
+  std::vector<std::string> result;
+  if (!options || !options->stop_sequences ||
+      options->num_stop_sequences == 0) {
+    return result;
+  }
+  result.reserve(options->num_stop_sequences);
+  for (size_t i = 0; i < options->num_stop_sequences; ++i) {
+    const char *seq = options->stop_sequences[i];
+    if (seq && seq[0] != '\0') {
+      result.emplace_back(seq);
+    }
+  }
+  return result;
+}
+
+/**
+ * Find the earliest occurrence of any caller-supplied stop sequence in the
+ * decode window. Returns std::string::npos when no stop sequence is matched.
+ *
+ * Matches the LLM backend's loop semantics
+ * (engines/llamacpp/llamacpp_backend.cpp:1020).
+ */
+size_t find_first_stop_sequence(const std::string &window,
+                                const std::vector<std::string> &stops) {
+  size_t earliest = std::string::npos;
+  for (const auto &stop_seq : stops) {
+    const size_t pos = window.find(stop_seq);
+    if (pos != std::string::npos &&
+        (earliest == std::string::npos || pos < earliest)) {
+      earliest = pos;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Compute the longest length across all caller-supplied stop sequences so the
+ * scan window can be trimmed to that horizon without losing potential matches.
+ */
+size_t max_stop_length(const std::vector<std::string> &stops) {
+  size_t m = 0;
+  for (const auto &s : stops) {
+    if (s.size() > m)
+      m = s.size();
+  }
+  return m;
+}
 
 } // namespace
 
@@ -841,8 +1050,7 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   mparams.print_timings = false;
   mparams.warmup = true;
 
-  backend->mtmd_ctx =
-      mtmd_init_from_file(mmproj_path, backend->model, mparams);
+  backend->mtmd_ctx = mtmd_init_from_file(mmproj_path, backend->model, mparams);
   if (!backend->mtmd_ctx) {
     RAC_LOG_ERROR(LOG_CAT, "Failed to load vision projector: %s", mmproj_path);
     llama_sampler_free(backend->sampler);
@@ -974,6 +1182,12 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
   int repeat_run = 0;
   constexpr int MAX_CONSECUTIVE_REPEATS = 4;
 
+  // Caller-supplied stop sequences (mirrors LLM backend at
+  // engines/llamacpp/llamacpp_backend.cpp:1020). Empty when no caller stops are
+  // provided so the scan is short-circuited to a single emptiness check.
+  const std::vector<std::string> user_stops = collect_stop_sequences(options);
+  const size_t user_stop_max_len = max_stop_length(user_stops);
+
   for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
     // Diagnostic: on first token, inspect logits for NaN/corruption
 #ifdef RAC_VLM_ENABLE_DIAGNOSTICS
@@ -1055,6 +1269,26 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
     }
     tokens_generated++;
 
+    // Stop-sequence detection: scan only the tail of the accumulated response
+    // bounded by the longest caller stop length so the check stays O(maxlen)
+    // per token instead of O(|response|).
+    if (!user_stops.empty()) {
+      const size_t scan_window = user_stop_max_len * 2;
+      const size_t scan_start =
+          response.size() > scan_window ? response.size() - scan_window : 0;
+      const size_t local_pos =
+          find_first_stop_sequence(response.substr(scan_start), user_stops);
+      if (local_pos != std::string::npos) {
+        // Trim the response at the first match (preserves text before stop).
+        const size_t cut = scan_start + local_pos;
+        response.resize(cut);
+        RAC_LOG_INFO(LOG_CAT,
+                     "Caller stop sequence matched at offset %zu, halting",
+                     cut);
+        break;
+      }
+    }
+
     // Prepare next token
     batch.token[0] = token;
     batch.pos[0] = backend->n_past++;
@@ -1134,6 +1368,17 @@ rac_result_t rac_vlm_llamacpp_process_stream(
   // returning RAC_SUCCESS after emitting the terminal callback.
   bool decode_failed = false;
 
+  // Caller-supplied stop sequences: track a rolling tail so a stop sequence
+  // can span multiple token pieces (mirrors
+  // engines/llamacpp/llamacpp_backend.cpp:1020). Empty when no stops were
+  // supplied so per-token cost is just an emptiness check.
+  const std::vector<std::string> user_stops = collect_stop_sequences(options);
+  const size_t user_stop_max_len = max_stop_length(user_stops);
+  std::string stop_window;
+  if (user_stop_max_len > 0) {
+    stop_window.reserve(user_stop_max_len * 2);
+  }
+
   for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
     llama_token token =
         llama_sampler_sample(backend->sampler, backend->ctx, -1);
@@ -1170,6 +1415,24 @@ rac_result_t rac_vlm_llamacpp_process_stream(
       }
       if (cb_rc == RAC_FALSE) {
         break; // Callback requested stop
+      }
+
+      // Maintain a tail buffer for caller-supplied stop sequences. Tokens are
+      // emitted to the callback before this check, so we cannot "unsend" a
+      // partial match — but we can terminate the stream the moment any stop
+      // sequence first appears in the accumulated tail.
+      if (!user_stops.empty()) {
+        stop_window.append(buf, len);
+        if (stop_window.size() > user_stop_max_len * 2) {
+          stop_window.erase(0, stop_window.size() - user_stop_max_len * 2);
+        }
+        if (find_first_stop_sequence(stop_window, user_stops) !=
+            std::string::npos) {
+          RAC_LOG_INFO(LOG_CAT, "Caller stop sequence matched, halting stream");
+          callback("", RAC_TRUE, user_data);
+          terminal_emitted = true;
+          break;
+        }
       }
     }
 

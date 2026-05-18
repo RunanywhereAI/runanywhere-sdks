@@ -36,6 +36,7 @@ import {
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKLogger,
+  clearRunanywhereModule,
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
@@ -65,6 +66,7 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
   _rac_wasm_sizeof_config?(): number;
   _rac_set_platform_adapter?(adapterPtr: number): number;
   _rac_init?(configPtr: number): number;
+  _rac_shutdown?(): void;
   _rac_backend_onnx_register?(): number;
   _rac_backend_onnx_unregister?(): number;
   _rac_backend_sherpa_register?(): number;
@@ -100,6 +102,15 @@ export class SherpaONNXBridge {
   private _sherpaBackendRegistered = false;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
+  /**
+   * `true` when this bridge owned the commons module install (i.e.
+   * `_doLoad` had to load the WASM glue + call `_rac_init` + install via
+   * `setRunanywhereModule` because `tryRunanywhereModule()` returned null).
+   * When ownership is held, `unregister()` mirrors LlamaCppBridge._teardown
+   * and calls `_rac_shutdown` + `clearRunanywhereModule()`. Otherwise the
+   * commons module belongs to a sibling backend and we leave it alone.
+   */
+  private _bridgeOwnedInit = false;
 
   /** Override URL to `racommons-llamacpp.js`. Set before `register()`. */
   wasmUrl: string | null = null;
@@ -134,10 +145,36 @@ export class SherpaONNXBridge {
     }
   }
 
-  /** Unregister the ONNX/Sherpa backend vtables. Idempotent. */
+  /**
+   * Unregister the ONNX/Sherpa backend vtables. Idempotent.
+   *
+   * When this bridge owned the commons module install (no sibling backend
+   * had pre-installed it before `register()`), this also mirrors
+   * `LlamaCppBridge._teardown`'s symmetric clear path: calls `_rac_shutdown`
+   * (best-effort) and `clearRunanywhereModule()` so a subsequent
+   * `LlamaCPP.register()` is free to install a fresh module without
+   * silently piggy-backing on this bridge's now-stale WASM instance. When a
+   * sibling owns the install, only the ONNX/Sherpa vtables are unregistered;
+   * the module stays put.
+   */
   unregister(): void {
     if (!this._module || (!this._onnxBackendRegistered && !this._sherpaBackendRegistered)) {
       this._loaded = false;
+      if (this._bridgeOwnedInit) {
+        // No backend vtables to unregister, but we still own the module
+        // install — clear it so the next register() (any backend) starts
+        // from a clean slate.
+        try {
+          this._module?._rac_shutdown?.();
+        } catch (err) {
+          logger.warning(
+            `rac_shutdown threw: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        clearRunanywhereModule();
+        this._module = null;
+        this._bridgeOwnedInit = false;
+      }
       return;
     }
     if (this._sherpaBackendRegistered) {
@@ -167,6 +204,21 @@ export class SherpaONNXBridge {
     this._sherpaBackendRegistered = false;
     this._onnxBackendRegistered = false;
     this._loaded = false;
+
+    if (this._bridgeOwnedInit) {
+      // Mirror LlamaCppBridge._teardown semantics — this bridge owned the
+      // module install, so unwind it fully so siblings can install fresh.
+      try {
+        this._module._rac_shutdown?.();
+      } catch (err) {
+        logger.warning(
+          `rac_shutdown threw: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      clearRunanywhereModule();
+      this._module = null;
+      this._bridgeOwnedInit = false;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -181,6 +233,7 @@ export class SherpaONNXBridge {
     if (installed) {
       logger.info('Using already-installed RACommons module from sibling backend');
       this._module = installed;
+      this._bridgeOwnedInit = false;
     } else {
       this._module = await this._loadCommonsModule(options);
 
@@ -189,6 +242,9 @@ export class SherpaONNXBridge {
       await this._initCommons(this._module);
       completeNativePhase1ForModule(this._module);
       setRunanywhereModule(this._module);
+      // Track ownership so `unregister()` can mirror LlamaCppBridge._teardown's
+      // symmetric `_rac_shutdown` + `clearRunanywhereModule()` clear path.
+      this._bridgeOwnedInit = true;
     }
 
     // Phase 2: Register the ONNX + Sherpa backend vtables. Generic speech

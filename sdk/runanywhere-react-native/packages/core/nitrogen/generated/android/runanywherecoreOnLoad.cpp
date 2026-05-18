@@ -24,51 +24,54 @@
 namespace margelo::nitro::runanywhere {
 
 int initialize(JavaVM* vm) {
+  return facebook::jni::initialize(vm, []() {
+    ::margelo::nitro::runanywhere::registerAllNatives();
+  });
+}
+
+void registerAllNatives() {
   using namespace margelo::nitro;
   using namespace margelo::nitro::runanywhere;
-  using namespace facebook;
 
-  return facebook::jni::initialize(vm, [] {
-    // Register native JNI methods
-    margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
+  // Register native JNI methods
+  margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
 
-    // Register Nitro Hybrid Objects
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "RunAnywhereCore",
-      []() -> std::shared_ptr<HybridObject> {
-        static_assert(std::is_default_constructible_v<HybridRunAnywhereCore>,
-                      "The HybridObject \"HybridRunAnywhereCore\" is not default-constructible! "
-                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
-        return std::make_shared<HybridRunAnywhereCore>();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "RunAnywhereDeviceInfo",
-      []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridRunAnywhereDeviceInfoSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo");
-        auto instance = object.create();
-        return instance->cthis()->shared();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "LLM",
-      []() -> std::shared_ptr<HybridObject> {
-        static_assert(std::is_default_constructible_v<HybridLLM>,
-                      "The HybridObject \"HybridLLM\" is not default-constructible! "
-                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
-        return std::make_shared<HybridLLM>();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "VoiceAgent",
-      []() -> std::shared_ptr<HybridObject> {
-        static_assert(std::is_default_constructible_v<HybridVoiceAgent>,
-                      "The HybridObject \"HybridVoiceAgent\" is not default-constructible! "
-                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
-        return std::make_shared<HybridVoiceAgent>();
-      }
-    );
-  });
+  // Register Nitro Hybrid Objects
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "RunAnywhereCore",
+    []() -> std::shared_ptr<HybridObject> {
+      static_assert(std::is_default_constructible_v<HybridRunAnywhereCore>,
+                    "The HybridObject \"HybridRunAnywhereCore\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridRunAnywhereCore>();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "RunAnywhereDeviceInfo",
+    []() -> std::shared_ptr<HybridObject> {
+      static DefaultConstructableObject<JHybridRunAnywhereDeviceInfoSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo");
+      auto instance = object.create();
+      return instance->cthis()->shared();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "LLM",
+    []() -> std::shared_ptr<HybridObject> {
+      static_assert(std::is_default_constructible_v<HybridLLM>,
+                    "The HybridObject \"HybridLLM\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridLLM>();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "VoiceAgent",
+    []() -> std::shared_ptr<HybridObject> {
+      static_assert(std::is_default_constructible_v<HybridVoiceAgent>,
+                    "The HybridObject \"HybridVoiceAgent\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridVoiceAgent>();
+    }
+  );
 }
 
 } // namespace margelo::nitro::runanywhere

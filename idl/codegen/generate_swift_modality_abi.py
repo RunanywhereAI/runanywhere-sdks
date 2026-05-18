@@ -98,6 +98,44 @@ STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
 }
 
 # ----------------------------------------------------------------------------
+# Per-stream cancel closures (mirrors the hand-written `onCancel:` in
+# CppBridge+ModalityProtoABI.swift). Keyed by c_symbol. When set, the
+# generated stream method passes the closure to `runRequestStream(onCancel:)`
+# so consumer cancellation (`AsyncStream` termination = .cancelled) tears down
+# the native producer.
+#
+# LLM + StructuredOutput both route through the lifecycle-LLM cancel symbol
+# `rac_llm_cancel_proto` (parameter-less, proto-out — the result is discarded
+# here because the consumer has already cancelled). STT/TTS streams are
+# session-id-owned; the session handle isn't visible at this layer, so we
+# emit an empty closure that satisfies the parameter contract while leaving
+# the session to be torn down by `runRequestStream`'s native unwind.
+STREAM_ON_CANCEL_FACTORIES: dict[str, str] = {
+    "rac_llm_generate_stream_proto": """{
+                var outBuffer = rac_proto_buffer_t()
+                defer { NativeProtoABI.free(&outBuffer) }
+                _ = rac_llm_cancel_proto(&outBuffer)
+            }""",
+    "rac_structured_output_generate_stream_proto": """{
+                var outBuffer = rac_proto_buffer_t()
+                defer { NativeProtoABI.free(&outBuffer) }
+                _ = rac_llm_cancel_proto(&outBuffer)
+            }""",
+    "rac_stt_transcribe_stream_lifecycle_proto": """{
+                // STT stream cancellation is session-id-owned (see
+                // rac_stt_stream_cancel_proto). The session handle is not
+                // visible from this scope; the native producer unwinds when
+                // the C call returns after `isCancelled` flips.
+            }""",
+    "rac_tts_synthesize_stream_lifecycle_proto": """{
+                // TTS stream cancellation is session-id-owned (see
+                // rac_tts_stream_cancel_proto). The session handle is not
+                // visible from this scope; the native producer unwinds when
+                // the C call returns after `isCancelled` flips.
+            }""",
+}
+
+# ----------------------------------------------------------------------------
 # Manifest helpers
 
 
@@ -415,6 +453,17 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
     else:
         on_error_clause = f"\n            onError: {factory},"
 
+    # pass3-syn-038: every stream method must emit an `onCancel:` closure so
+    # consumer cancellation tears down the native producer. Per-method bodies
+    # live in STREAM_ON_CANCEL_FACTORIES; methods without an entry fall
+    # through to an empty closure so the parameter contract is still
+    # satisfied (no special-case handling at the call site).
+    cancel_factory = STREAM_ON_CANCEL_FACTORIES.get(c_symbol)
+    if cancel_factory is None:
+        on_cancel_clause = "\n            onCancel: { },"
+    else:
+        on_cancel_clause = f"\n            onCancel: {cancel_factory},"
+
     vis = visibility(method)
     keyword = f"{vis} static func" if is_static else f"{vis} func"
     # Category mirrors the hand-written file: `CppBridge.<Name>.ProtoStream`
@@ -436,7 +485,7 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
         )
         return try ProtoStreamContext<{response_proto}>.runRequestStream(
             request: {request_var},
-            category: "{category}",{on_error_clause}
+            category: "{category}",{on_error_clause}{on_cancel_clause}
             body: {{ bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)
             }}

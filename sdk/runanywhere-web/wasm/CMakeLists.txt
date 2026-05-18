@@ -564,11 +564,6 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_initialize"
     "_rac_vad_set_activity_callback"
     "_rac_vad_set_audio_callback"
-    # pass2-syn-002: rac_vad_{start,stop,reset} bare-service decls deleted;
-    # use rac_vad_component_{start,stop,reset} / *_lifecycle_proto.
-    "_rac_vad_component_start"
-    "_rac_vad_component_stop"
-    "_rac_vad_component_reset"
     "_rac_vad_pause"
     "_rac_vad_resume"
     "_rac_vad_process_samples"
@@ -577,6 +572,8 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_vad_destroy"
 
     # VAD component
+    # pass2-syn-002: rac_vad_{start,stop,reset} bare-service decls deleted;
+    # use rac_vad_component_{start,stop,reset} / *_lifecycle_proto.
     "_rac_vad_component_create"
     "_rac_vad_component_configure"
     "_rac_vad_component_is_initialized"
@@ -1230,18 +1227,43 @@ add_custom_command(TARGET runanywhere_wasm POST_BUILD
     COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
 )
 
-# When pthreads are enabled with older Emscripten (<5.x), the toolchain emits
-# a separate `<output>.worker.js` next to the main glue. Emscripten 5.x bundles
-# the pthread worker into the main .js file, so the companion file may or may
-# not exist. Copy it post-build IF PRESENT, no-op otherwise. This keeps the
-# package layout correct for both toolchain generations without failing on the
-# 5.x bundled-worker path.
+# Pthread worker staging policy (single source of truth — mirrored by
+# wasm/scripts/build.sh:275-285):
+#   * Emscripten < 5.x : toolchain emits a separate `<output>.worker.js` next
+#     to the main glue. The companion MUST be present; missing it is a real
+#     bug (e.g. linker dropped pthread output) and we hard-fail the build.
+#   * Emscripten >= 5.x: toolchain bundles the pthread worker into the main
+#     .js file, so no companion file is produced. Tolerate its absence.
+#
+# Emscripten's CMake toolchain file sets `CMAKE_C_COMPILER_VERSION` to the
+# emcc version, so we can gate the policy at configure time without an extra
+# subprocess call. Currently `VERSIONS:38` pins `EMSCRIPTEN_VERSION=3.1.51`,
+# so the strict path is the active one today.
 if(RAC_WASM_PTHREADS)
-    add_custom_command(TARGET runanywhere_wasm POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E env bash -c "if [ -f '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' ]; then cp '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' '${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js'; echo 'Staged pthread worker companion'; else echo 'No separate .worker.js (Emscripten 5.x bundles worker into main glue)'; fi"
-        COMMENT "Staging ${WASM_OUTPUT_NAME}.worker.js if present (Emscripten <5.x emits it; 5.x bundles into main glue)"
-        VERBATIM
-    )
+    if(DEFINED CMAKE_C_COMPILER_VERSION
+       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "5.0")
+        set(_rac_pthread_worker_tolerant ON)
+    else()
+        set(_rac_pthread_worker_tolerant OFF)
+    endif()
+    message(STATUS "Pthread worker companion policy: "
+        "tolerant=${_rac_pthread_worker_tolerant} "
+        "(emcc=${CMAKE_C_COMPILER_VERSION})")
+
+    if(_rac_pthread_worker_tolerant)
+        add_custom_command(TARGET runanywhere_wasm POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E env bash -c "if [ -f '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' ]; then cp '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' '${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js'; echo 'Staged pthread worker companion'; else echo 'No separate .worker.js (Emscripten >=5.x bundles worker into main glue)'; fi"
+            COMMENT "Staging ${WASM_OUTPUT_NAME}.worker.js if present (Emscripten >=5.x bundles into main glue)"
+            VERBATIM
+        )
+    else()
+        add_custom_command(TARGET runanywhere_wasm POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+                "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
+                "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
+            COMMENT "Copying ${WASM_OUTPUT_NAME}.worker.js (Emscripten <5.x always emits a companion worker)"
+        )
+    endif()
 endif()
 
 # =============================================================================

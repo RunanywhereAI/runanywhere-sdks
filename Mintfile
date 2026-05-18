@@ -3,10 +3,14 @@ peripheryapp/periphery@3.7.4
 apple/swift-format@602.0.0
 apple/swift-protobuf@1.38.0
 # Mintfile covers Swift-package tooling only. Companion SoT files for the
-# rest of the toolchain (referenced from docs/dependencies/CENTRALIZATION.md
-# §5.1):
+# rest of the toolchain (each is self-documenting at its own file header):
 #   - Brewfile               → Homebrew formulas (protobuf, protoc-gen-grpc-swift)
 #   - requirements-codegen.txt → Python tooling (grpcio-tools, protobuf, pyyaml)
+#
+# docs/dependencies/CENTRALIZATION.md §5 documents the Swift/iOS centralization
+# pattern (Mintfile, Package.swift, Package.resolved). The Brewfile + Python
+# requirements files are language-tier siblings — see each file's header for
+# the consumption model.
 #
 # Note: protoc-gen-grpc-swift comes from Homebrew (`brew install
 # protoc-gen-grpc-swift`) and is pulled into the IDL drift workflow

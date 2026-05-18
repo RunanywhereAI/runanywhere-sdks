@@ -871,7 +871,9 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
     out->set_max_tokens(in->max_tokens);
     out->set_temperature(in->temperature);
     out->set_top_p(in->top_p);
-    out->set_top_k(0);  // C ABI has no top_k on rac_vlm_options_t.
+    if (in->top_k > 0) {
+        out->set_top_k(in->top_k);
+    }
     out->set_streaming_enabled(in->streaming_enabled == RAC_TRUE);
     if (in->max_image_size > 0)
         out->set_max_image_size(in->max_image_size);
@@ -896,6 +898,39 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
             out->set_model_family(::runanywhere::v1::VLM_MODEL_FAMILY_AUTO);
             break;
     }
+
+    // hotspot-syn-091: round-trip the chat-template + image-marker overrides
+    // that the C ABI carries (rac_vlm_options_t.custom_chat_template,
+    // .image_marker_override). VLMChatTemplate has 3 string fields
+    // (template_text, image_marker, default_system_prompt) — only set the
+    // ones the caller actually populated so the wire stays sparse.
+    if (in->custom_chat_template) {
+        const rac_vlm_chat_template_t* tpl = in->custom_chat_template;
+        auto* proto_tpl = out->mutable_custom_chat_template();
+        if (tpl->template_str)
+            proto_tpl->set_template_text(tpl->template_str);
+        if (tpl->image_marker)
+            proto_tpl->set_image_marker(tpl->image_marker);
+        if (tpl->default_system_prompt)
+            proto_tpl->set_default_system_prompt(tpl->default_system_prompt);
+    }
+    if (in->image_marker_override) {
+        out->set_image_marker_override(in->image_marker_override);
+    }
+
+    // pass3-syn-128: extended sampling knobs added to rac_vlm_options_t so the
+    // proto/C ABI boundary stays in sync. Only emit non-default scalars so the
+    // wire stays sparse (matches the convention used for top_k above).
+    if (in->seed != 0) {
+        out->set_seed(in->seed);
+    }
+    if (in->repetition_penalty != 1.0f) {
+        out->set_repetition_penalty(in->repetition_penalty);
+    }
+    if (in->min_p > 0.0f) {
+        out->set_min_p(in->min_p);
+    }
+    out->set_emit_image_embeddings(in->emit_image_embeddings == RAC_TRUE);
     return true;
 }
 
@@ -970,6 +1005,47 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         }
     }
 
+    // hotspot-syn-091: allocate a heap rac_vlm_chat_template_t and its owned
+    // strings when the proto carries a custom_chat_template, and rac_strdup
+    // image_marker_override. rac_vlm_options_free_owned releases both.
+    if (in.has_custom_chat_template()) {
+        const auto& proto_tpl = in.custom_chat_template();
+        auto* tpl =
+            static_cast<rac_vlm_chat_template_t*>(rac_alloc(sizeof(rac_vlm_chat_template_t)));
+        if (tpl) {
+            tpl->template_str = proto_tpl.template_text().empty()
+                                    ? nullptr
+                                    : rac_strdup(proto_tpl.template_text().c_str());
+            tpl->image_marker = proto_tpl.has_image_marker()
+                                    ? rac_strdup(proto_tpl.image_marker().c_str())
+                                    : nullptr;
+            tpl->default_system_prompt = proto_tpl.has_default_system_prompt()
+                                             ? rac_strdup(proto_tpl.default_system_prompt().c_str())
+                                             : nullptr;
+            out->custom_chat_template = tpl;
+        }
+    }
+    if (in.has_image_marker_override() && !in.image_marker_override().empty()) {
+        out->image_marker_override = rac_strdup(in.image_marker_override().c_str());
+    }
+
+    // pass3-syn-128: extended sampling knobs round-trip into the C struct so
+    // the llama.cpp VLM engine can honor them in configure_sampler(). All
+    // scalars — no allocation needed; rac_vlm_options_free_owned is unaffected.
+    if (in.top_k() > 0) {
+        out->top_k = in.top_k();
+    }
+    if (in.seed() != 0) {
+        out->seed = in.seed();
+    }
+    if (in.repetition_penalty() > 0.0f) {
+        out->repetition_penalty = in.repetition_penalty();
+    }
+    if (in.min_p() > 0.0f) {
+        out->min_p = in.min_p();
+    }
+    out->emit_image_embeddings = in.emit_image_embeddings() ? RAC_TRUE : RAC_FALSE;
+
     if (out_prompt) {
         *out_prompt = in.prompt().empty() ? nullptr : rac_strdup(in.prompt().c_str());
     }
@@ -994,6 +1070,30 @@ void rac_vlm_options_free_owned(rac_vlm_options_t* options) {
     }
     options->stop_sequences = nullptr;
     options->num_stop_sequences = 0;
+
+    // hotspot-syn-091: free adapter-owned chat-template + marker override
+    // allocations produced by rac_vlm_options_from_proto.
+    if (options->custom_chat_template) {
+        auto* tpl = const_cast<rac_vlm_chat_template_t*>(options->custom_chat_template);
+        if (tpl->template_str) {
+            rac_free(const_cast<char*>(tpl->template_str));
+            tpl->template_str = nullptr;
+        }
+        if (tpl->image_marker) {
+            rac_free(const_cast<char*>(tpl->image_marker));
+            tpl->image_marker = nullptr;
+        }
+        if (tpl->default_system_prompt) {
+            rac_free(const_cast<char*>(tpl->default_system_prompt));
+            tpl->default_system_prompt = nullptr;
+        }
+        rac_free(tpl);
+        options->custom_chat_template = nullptr;
+    }
+    if (options->image_marker_override) {
+        rac_free(const_cast<char*>(options->image_marker_override));
+        options->image_marker_override = nullptr;
+    }
 }
 
 bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out) {

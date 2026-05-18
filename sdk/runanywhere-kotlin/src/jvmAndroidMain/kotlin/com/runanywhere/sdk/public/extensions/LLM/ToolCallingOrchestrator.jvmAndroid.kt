@@ -27,6 +27,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -342,22 +343,40 @@ internal object ToolCallingOrchestrator {
                 )
             }
 
-            // pass2-syn-007: fan coroutine cancellation into the native loop.
-            // currentCoroutineContext()[Job]?.invokeOnCompletion fires once on
-            // any termination (cancel or normal); we only want to forward the
-            // cancellation case, so we guard on CancellationException. Cancel
-            // is idempotent on the native side, so a double-cancel is safe.
-            val cancelHandler =
-                currentCoroutineContext()[Job]?.invokeOnCompletion { cause ->
-                    if (cause is CancellationException && sessionHandle != 0L) {
-                        RunAnywhereBridge.racToolCallingSessionCancelProto(sessionHandle)
+            // pass2-syn-007 + pass3-syn-042: fan coroutine cancellation into
+            // the native loop eagerly via a dedicated cancel-watcher launched
+            // on a NonCancellable context. The watcher suspends on the parent
+            // Job's `join()` and inspects the cancellation state once awoken
+            // — which happens on the Active → Cancelling transition (parent
+            // Job's `join()` resumes as soon as the Job is cancelled, before
+            // children have finished). This achieves the same effect as the
+            // deprecated `invokeOnCompletion(onCancelling = true)` internal
+            // API but uses only public coroutines primitives.
+            // Cancel is idempotent on the native side (pass3-syn-083), so a
+            // double-cancel from this watcher + finally-block teardown is
+            // safe. Mirrors Swift's `withTaskCancellationHandler { ... } onCancel:`
+            // (RunAnywhere+ToolCalling.swift:346/409-414) and Web's
+            // `signal.addEventListener('abort', ...)` — both fire eagerly on
+            // cancellation, before the operation returns.
+            val parentJob = currentCoroutineContext()[Job]
+            val cancelWatcher =
+                parentJob?.let { pj ->
+                    CoroutineScope(Dispatchers.Default + NonCancellable).launch {
+                        try {
+                            pj.join()
+                        } catch (_: CancellationException) {
+                            // join() doesn't throw on cancel; defensive only.
+                        }
+                        if (pj.isCancelled && sessionHandle != 0L) {
+                            RunAnywhereBridge.racToolCallingSessionCancelProto(sessionHandle)
+                        }
                     }
                 }
 
             try {
                 completion.await()
             } finally {
-                cancelHandler?.dispose()
+                cancelWatcher?.cancel()
                 toolCallChannel.close()
                 worker.cancelAndJoin()
                 withContext(NonCancellable + Dispatchers.IO) {

@@ -781,6 +781,38 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<ArrayBuffer>;
 
   /**
+   * Cancellation-aware variant of toolRunLoopProto (pass2-syn-007).
+   *
+   * Backed by `rac_tool_calling_run_loop_with_handle_proto`. Commons publishes
+   * an opaque `run_loop_handle` synchronously, before the iteration loop
+   * begins; the bridge surfaces it to JS via `onHandle(handle)` so a fan-out
+   * `AbortSignal.abort()` can call `toolRunLoopCancelProto(handle)` to
+   * interrupt the in-flight loop from another thread.
+   *
+   * The handle is owned by commons and reclaimed when this Promise resolves;
+   * callers MUST NOT use it past resolution. A handle of `0` indicates the
+   * with-handle ABI is unavailable on this commons build.
+   *
+   * Mirrors Swift `generateWithToolsCancellable` in
+   * `RunAnywhere+ToolCalling.swift` (pass3-syn-047).
+   */
+  toolRunLoopProtoWithHandle(
+    requestBytes: ArrayBuffer,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    onHandle: (runLoopHandle: number) => void
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel an in-flight tool-calling run loop started via
+   * `toolRunLoopProtoWithHandle` (pass2-syn-007).
+   *
+   * Backed by `rac_tool_calling_run_loop_cancel_proto`. Idempotent: safe to
+   * call after the loop has already returned (the handle will be stale and
+   * commons treats this as a no-op).
+   */
+  toolRunLoopCancelProto(runLoopHandle: number): Promise<boolean>;
+
+  /**
    * Parse/extract structured output from serialized
    * runanywhere.v1.StructuredOutputParseRequest bytes.
    *

@@ -11,13 +11,18 @@
 
 import Foundation
 
+// pass3-syn-110: `generate(_:)` + its `generateName`/`generate` symbol-cache
+// properties were deleted because no Swift call site invoked them — the
+// public `RunAnywhere.generateStructured(...)` facade routes through the
+// LLM path (`LLM.generate(...)`), and the streaming variant lives in the
+// generated `Generated/ModalityProtoABI+Generated.swift` extension.
+// Periphery flagged them as dead at HEAD a2de2a4d6. Per repo MEMORY.md
+// "no backwards compat — aggressive deletions OK".
 private enum StructuredOutputGeneratedProtoABI {
     static let parseName = "rac_structured_output_parse_proto"
-    static let generateName = "rac_structured_output_generate_proto"
     static let preparePromptName = "rac_structured_output_prepare_prompt_proto"
 
     static let parse = NativeProtoABI.load(parseName, as: NativeProtoABI.ProtoRequest.self)
-    static let generate = NativeProtoABI.load(generateName, as: NativeProtoABI.ProtoRequest.self)
     static let preparePrompt = NativeProtoABI.load(preparePromptName, as: NativeProtoABI.ProtoRequest.self)
 }
 
@@ -28,18 +33,6 @@ extension CppBridge {
                 request,
                 symbol: StructuredOutputGeneratedProtoABI.parse,
                 symbolName: StructuredOutputGeneratedProtoABI.parseName,
-                responseType: RAStructuredOutputResult.self
-            )
-        }
-
-        /// Full structured-output generation: commons handles prompt preparation,
-        /// LLM generation, thinking-tag stripping, JSON extraction, and schema
-        /// validation. Returns the canonical `RAStructuredOutputResult`.
-        static func generate(_ request: RAStructuredOutputRequest) throws -> RAStructuredOutputResult {
-            try NativeProtoABI.invoke(
-                request,
-                symbol: StructuredOutputGeneratedProtoABI.generate,
-                symbolName: StructuredOutputGeneratedProtoABI.generateName,
                 responseType: RAStructuredOutputResult.self
             )
         }

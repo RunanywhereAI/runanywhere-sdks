@@ -51,6 +51,34 @@ typedef void (*rac_tts_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
  *
  * One registration per handle. Calling again replaces the previous slot.
  * Pass NULL to clear.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ *          contract — see rac_llm_stream.h for the canonical recipe). The C
+ *          runtime may invoke `callback(bytes, size, user_data)` on a
+ *          background thread AFTER rac_tts_unset_stream_proto_callback(handle)
+ *          has returned, because the dispatcher copies the callback slot
+ *          under its internal mutex and releases the mutex BEFORE invoking
+ *          the user callback (see rac_tts_stream.cpp
+ *          lock-release-before-callback comment). The caller MUST ensure no
+ *          in-flight invocation is executing on a background thread before
+ *          freeing @p user_data.
+ *
+ *          Recommended teardown sequence:
+ *            (a) call rac_tts_unset_stream_proto_callback(handle) — clears
+ *                the slot atomically so no NEW dispatches will fire;
+ *            (b) call rac_tts_proto_quiesce() — spin-waits until every
+ *                in-flight callback invocation has returned;
+ *            (c) free @p user_data.
+ *
+ *          Modalities that currently expose proto_quiesce: LLM
+ *          (rac_llm_stream.h), STT (rac_stt_stream.h), TTS (this header),
+ *          VAD (rac_vad_stream.h), Diffusion (rac_diffusion_stream.h), VLM
+ *          (rac_vlm_service.h). voice_agent quiesces in-flight callbacks as
+ *          part of rac_voice_agent_destroy() rather than exposing a
+ *          standalone quiesce entry point. SDK fan-out helpers
+ *          (Swift HandleStreamAdapter, Kotlin/Flutter/RN equivalents)
+ *          centralize this dance for their host language; refer to the
+ *          canonical adapter implementation when porting a new SDK.
  */
 RAC_API rac_result_t rac_tts_set_stream_proto_callback(rac_handle_t handle,
                                                        rac_tts_stream_proto_callback_fn callback,
@@ -60,6 +88,16 @@ RAC_API rac_result_t rac_tts_set_stream_proto_callback(rac_handle_t handle,
  * @brief Unregister the proto-byte stream callback for a handle.
  */
 RAC_API rac_result_t rac_tts_unset_stream_proto_callback(rac_handle_t handle);
+
+/**
+ * @brief Spin-wait until all in-flight TTS proto-byte stream dispatches have
+ *        returned. Mirrors rac_vlm_proto_quiesce / rac_llm_proto_quiesce.
+ *        Callers freeing user_data passed into
+ *        rac_tts_set_stream_proto_callback, or tearing down the TTS
+ *        component, should call this after the unset before freeing the
+ *        user_data. Safe to call from any thread.
+ */
+RAC_API void rac_tts_proto_quiesce(void);
 
 /**
  * @brief Start a streaming TTS synthesis session.

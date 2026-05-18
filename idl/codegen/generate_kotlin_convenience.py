@@ -74,6 +74,7 @@ from _convenience_common import (
     iter_top_level_messages,
     load_file_descriptor_set,
     to_default_literal,
+    zero_literal_for_required,
 )
 
 # ---------------------------------------------------------------------------
@@ -112,11 +113,12 @@ def _emit_enum_accessor(
     field_num: int,
 ) -> str | None:
     """Emit `val <Enum>.<accessor>: String` as a switch over the proto
-    SCREAMING_SNAKE constants. Drops the `else -> ""` fallback when every
-    declared enum value carries the annotation, keeping the Kotlin
-    compiler from flagging a redundant-else warning; falls back to `""`
-    only when at least one value is unannotated, mirroring Swift's
-    `default: return ""` safety net for partial coverage."""
+    SCREAMING_SNAKE constants. Always emits an `else -> ""` fall-through to
+    mirror Swift's `default: return ""` safety net — Wire enums include an
+    `UNRECOGNIZED` member that is structurally distinct from the declared
+    cases, so `when` without an `else` would fail to compile as an
+    expression even when every declared value carries the annotation.
+    (pass3-syn-038)"""
     cases: list[tuple[str, str]] = []
     for value in enum_desc.value:
         if not value.HasField("options"):
@@ -128,16 +130,13 @@ def _emit_enum_accessor(
     if not cases:
         return None
 
-    fully_covered = len(cases) == len(enum_desc.value)
-
     lines: list[str] = []
     lines.append(f"/** Generated from `(runanywhere.v1.{annotation_name(field_num)})` annotations in idl/. */")
     lines.append(f"public val {proto_enum_name}.{accessor_name}: String")
     lines.append("    get() = when (this) {")
     for case_name, value in cases:
         lines.append(f"        {proto_enum_name}.{case_name} -> \"{value}\"")
-    if not fully_covered:
-        lines.append("        else -> \"\"")
+    lines.append("        else -> \"\"")
     lines.append("    }")
     return "\n".join(lines)
 
@@ -247,7 +246,15 @@ def _emit_message_validate(
                 checks.extend(_throw(f"\"{field.name} is required\""))
                 checks.append("    }")
             elif t in INTEGER_TYPES or t in FLOAT_TYPES:
-                checks.append(f"    if ({kt_field} == 0) {{")
+                # pass3-syn-038: Kotlin's `Long == Int` / `Float == Int` are
+                # structurally false (different concrete types) — comparing a
+                # Long field against the bare `0` literal silently neuters
+                # the required-check for proto3 zero. Emit the type-correct
+                # literal via _convenience_common.zero_literal_for_required:
+                # INT64 -> `0L`, INT32 -> `0`, FLOAT -> `0.0f`,
+                # DOUBLE -> `0.0`.
+                zero = zero_literal_for_required(field, KOTLIN_PROFILE) or "0"
+                checks.append(f"    if ({kt_field} == {zero}) {{")
                 checks.extend(_throw(f"\"{field.name} is required\""))
                 checks.append("    }")
 

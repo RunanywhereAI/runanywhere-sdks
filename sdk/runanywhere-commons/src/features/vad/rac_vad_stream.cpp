@@ -24,7 +24,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -38,6 +40,23 @@
 #endif
 
 namespace {
+
+// pass2-syn-001-followup-vad: lift the voice_agent in_flight quiesce pattern
+// to the VAD proto-byte dispatcher. See rac_llm_stream.cpp and
+// rac_vlm_proto_abi.cpp for the canonical reference; this guards
+// dispatch_vad_stream_event so destroy/teardown can spin-wait until any
+// in-flight slot.fn() returns before freeing user_data.
+std::atomic<int>& vad_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct VadInFlightGuard {
+    VadInFlightGuard() { vad_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~VadInFlightGuard() { vad_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    VadInFlightGuard(const VadInFlightGuard&) = delete;
+    VadInFlightGuard& operator=(const VadInFlightGuard&) = delete;
+};
 
 struct CallbackSlot {
     rac_vad_stream_proto_callback_fn fn = nullptr;
@@ -71,6 +90,36 @@ std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
 
 std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     static std::unordered_map<uint64_t, StreamSession> m;
+    return m;
+}
+
+// pass3-syn-088: per-handle mutex serializing the get/set/process/restore
+// threshold sequence below. Without it, two threads feeding different
+// sessions on the same VAD component handle can interleave their
+// rac_vad_component_{get,set}_energy_threshold calls and the second
+// thread's "restore" can clobber the first thread's persistent threshold
+// with a stale value. The lock is held for the entire get→set→process→
+// restore window so the component-level mutex acquisitions inside
+// vad_component.cpp become a single critical section from the streaming
+// path's point of view. The map is owned via shared_ptr because we
+// release g_mu() before locking the per-handle mutex (we must not call
+// into the VAD component while holding g_mu(), which is also taken by
+// the dispatch path); shared_ptr keeps the mutex alive across that gap
+// even if a teardown thread erases the map entry concurrently.
+std::unordered_map<rac_handle_t, std::shared_ptr<std::mutex>>& g_threshold_mutexes() {
+    static std::unordered_map<rac_handle_t, std::shared_ptr<std::mutex>> m;
+    return m;
+}
+
+std::shared_ptr<std::mutex> get_or_create_threshold_mutex(rac_handle_t handle) {
+    std::lock_guard<std::mutex> lock(g_mu());
+    auto& mutexes = g_threshold_mutexes();
+    auto it = mutexes.find(handle);
+    if (it != mutexes.end()) {
+        return it->second;
+    }
+    auto m = std::make_shared<std::mutex>();
+    mutexes.emplace(handle, m);
     return m;
 }
 
@@ -127,6 +176,18 @@ rac_result_t rac_vad_unset_stream_proto_callback(rac_handle_t handle) {
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
     return RAC_SUCCESS;
+}
+
+// pass2-syn-001-followup-vad: public quiesce helper. Mirrors
+// rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
+// in-flight dispatch_vad_stream_event invocation has returned. Callers
+// freeing user_data registered via rac_vad_set_stream_proto_callback, or
+// tearing down the VAD component, MUST call this after the unset to avoid
+// a use-after-free in the dispatch thread.
+void rac_vad_proto_quiesce(void) {
+    while (vad_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
 }
 
 rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* options_proto_bytes,
@@ -238,21 +299,31 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041).
     // Without this gate the streaming proto path silently ignored every
     // per-call threshold tuning while the one-shot proto path honored it.
-    const float original_threshold =
-        threshold_override > 0.0f ? rac_vad_component_get_energy_threshold(component_handle) : 0.0f;
-    if (threshold_override > 0.0f) {
-        (void)rac_vad_component_set_energy_threshold(component_handle, threshold_override);
-    }
-
-    // Forward to the VAD component. Speech-activity transitions still flow
-    // through whichever activity callback is registered (energy VAD's
-    // internal callback or rac_vad_component_set_activity_proto_callback).
+    //
+    // pass3-syn-088: serialize the entire get→set→process→restore window
+    // on a per-handle mutex so concurrent sessions on the same component
+    // handle cannot interleave each other's overrides and leave the
+    // persistent threshold drifted. We only acquire the per-handle mutex
+    // when an override is in effect; the common no-override path stays
+    // lock-free w.r.t. this stream-level mutex.
     rac_bool_t is_speech = RAC_FALSE;
-    rac_result_t rc =
-        rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
-
+    rac_result_t rc = RAC_SUCCESS;
     if (threshold_override > 0.0f) {
+        auto handle_mutex = get_or_create_threshold_mutex(component_handle);
+        std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
+        const float original_threshold = rac_vad_component_get_energy_threshold(component_handle);
+        (void)rac_vad_component_set_energy_threshold(component_handle, threshold_override);
+        rc =
+            rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
         (void)rac_vad_component_set_energy_threshold(component_handle, original_threshold);
+    } else {
+        // No override → fall back to the component's persistent threshold.
+        // Forward to the VAD component. Speech-activity transitions still
+        // flow through whichever activity callback is registered (energy
+        // VAD's internal callback or
+        // rac_vad_component_set_activity_proto_callback).
+        rc =
+            rac_vad_component_process(component_handle, samples.data(), samples.size(), &is_speech);
     }
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::VADResult err_payload;
@@ -336,6 +407,10 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
                                const char* error_message, int error_code, uint64_t session_id) {
+    // pass2-syn-001-followup-vad: hold the InFlightGuard across the whole
+    // dispatch so rac_vad_proto_quiesce() can spin-wait on the counter
+    // before user_data is freed by a concurrent teardown thread.
+    VadInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;

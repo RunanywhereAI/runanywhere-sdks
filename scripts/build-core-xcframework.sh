@@ -638,30 +638,6 @@ sync_flutter_frameworks() {
     if [ -d "${DEST}/RACommons.xcframework" ]; then
         run rm -rf "${flutter_core}/RACommons.xcframework"
         run cp -R "${DEST}/RACommons.xcframework" "${flutter_core}/"
-
-        # Flutter's iOS integration links vendored static frameworks with
-        # -all_load (set in runanywhere.podspec) so Dart FFI can resolve
-        # RACommons / backend C symbols via dlsym() at runtime. -all_load
-        # unfortunately also drags in engines/whisperkit_coreml/
-        # rac_plugin_entry_whisperkit_coreml.o, whose vtable references
-        # `g_whisperkit_coreml_stt_ops` with C linkage — but the definition
-        # in rac_backend_whisperkit_coreml_register.cpp lives inside an
-        # anonymous C++ namespace (so the symbol is mangled + internal).
-        # Swift SPM + React Native avoid this because they don't force-load
-        # commons.
-        #
-        # Until engines/whisperkit_coreml/ gets a proper fix (move
-        # `g_whisperkit_coreml_stt_ops` out of the anonymous namespace and
-        # wrap it in `extern "C"`), strip the offending entry TU from
-        # Flutter's copy only. Swift + RN archives are untouched.
-        local slice archive
-        for slice in ios-arm64 ios-arm64-simulator; do
-            archive="${flutter_core}/RACommons.xcframework/${slice}/librac_commons.a"
-            if [ -f "${archive}" ]; then
-                run ar -d "${archive}" rac_plugin_entry_whisperkit_coreml.o \
-                    >/dev/null 2>&1 || true
-            fi
-        done
     fi
 
     if [ -d "${DEST}/RABackendLLAMACPP.xcframework" ]; then

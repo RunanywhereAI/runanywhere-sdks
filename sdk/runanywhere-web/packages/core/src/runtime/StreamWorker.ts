@@ -37,6 +37,8 @@
  * so they don't fit the request/response message pattern used here.
  */
 
+import { RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors';
+
 // ---------------------------------------------------------------------------
 // Wire protocol — shared with `OffscreenRuntimeBridge` via `import type`.
 // ---------------------------------------------------------------------------
@@ -357,7 +359,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         inflight.set(msg.requestId, { kind: 'stream.llm.generate' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
-          if (!m._rac_llm_generate_stream_proto) return -801;
+          if (!m._rac_llm_generate_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
           return withHeapBytes(m, msg.requestBytes, (requestPtr, requestSize) =>
             m._rac_llm_generate_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
           );
@@ -368,7 +370,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         inflight.set(msg.requestId, { kind: 'stream.stt.transcribe' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
-          if (!m._rac_stt_component_transcribe_stream_proto) return -801;
+          if (!m._rac_stt_component_transcribe_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
           return withHeapBytes(m, msg.audioBytes, (audioPtr, audioSize) =>
             withHeapBytes(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
               m._rac_stt_component_transcribe_stream_proto!(
@@ -389,7 +391,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         inflight.set(msg.requestId, { kind: 'stream.tts.synthesize' });
         runWithCallback(msg.requestId, false, (callbackPtr) => {
           const m = mod!;
-          if (!m._rac_tts_component_synthesize_stream_proto) return -801;
+          if (!m._rac_tts_component_synthesize_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
           const textPtr = allocUtf8(m, msg.text);
           try {
             return withHeapBytes(m, msg.optionsBytes, (optionsPtr, optionsSize) =>
@@ -412,7 +414,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         inflight.set(msg.requestId, { kind: 'stream.vlm.process', handle: msg.handle });
         runWithCallback(msg.requestId, true, (callbackPtr) => {
           const m = mod!;
-          if (!m._rac_vlm_process_stream_proto) return -801;
+          if (!m._rac_vlm_process_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
           // VLM also needs an out-result pointer; allocate a small scratch
           // slot. The actual result envelope is delivered via callbacks
           // (mirrors the main-thread `streamEvents` adapter contract); the

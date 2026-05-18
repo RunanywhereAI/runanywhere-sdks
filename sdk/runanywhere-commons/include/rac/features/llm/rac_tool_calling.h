@@ -576,10 +576,14 @@ RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_han
  * The cancel does NOT touch the session registry — the host should still
  * call rac_tool_calling_session_destroy_proto once the in-flight call has
  * resolved. Safe to invoke from any thread (does not take the session
- * mutex held by the generate caller).
+ * mutex held by the generate caller). Idempotent — a stale or zero handle
+ * is a no-op and still returns RAC_SUCCESS so SDK adapters can fan
+ * structured-concurrency cancels into this entry point without
+ * coordinating with session destroy (matches
+ * rac_tool_calling_run_loop_cancel_proto semantics).
  *
  * @param session_handle Handle returned by rac_tool_calling_session_create_proto.
- * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_HANDLE if unknown.
+ * @return RAC_SUCCESS even when the handle is stale (idempotent semantics).
  */
 RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle);
 
@@ -661,6 +665,22 @@ RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_b
  * `AbortController.abort()` so the structured-concurrency context can fan
  * its cancel into the native loop.
  *
+ * @warning Handle-publication races (pass3-syn-028 / cross-SDK contract):
+ *          @p out_run_loop_handle is written SYNCHRONOUSLY inside this call
+ *          before the iteration loop begins, but the call itself is
+ *          synchronous from the caller's perspective. SDKs that need to
+ *          observe the handle from a DIFFERENT thread (Swift's actor,
+ *          Kotlin's coroutine, RN's JS thread) must publish the handle into
+ *          a thread-safe sink BEFORE invoking this function — typical
+ *          patterns:
+ *            - capture @p out_run_loop_handle inside the worker thread and
+ *              push it to a Mailbox/CompletableDeferred/AtomicReference the
+ *              outer scope reads before issuing cancel;
+ *            - or use rac_tool_calling_run_loop_with_handle_and_cb_proto()
+ *              (preferred — see below) which invokes a publication callback
+ *              the moment the handle is minted, letting the SDK fan the
+ *              value into its own thread-safe destination synchronously.
+ *
  * @param in_request_bytes    Serialized ToolCallingSessionCreateRequest.
  * @param in_size             Size of in_request_bytes.
  * @param on_execute          Synchronous tool-execute callback.
@@ -672,6 +692,57 @@ RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_b
 RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_proto(
     const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
     void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Callback fired synchronously from inside the run-loop the moment a
+ *        cancellable handle is minted (pass3-syn-028 / cross-SDK contract).
+ *
+ * @param run_loop_handle Just-minted handle. Identical to the value that
+ *                        rac_tool_calling_run_loop_with_handle_proto would
+ *                        write into out_run_loop_handle. Valid only for the
+ *                        lifetime of the run-loop call.
+ * @param user_data       Opaque pointer registered with
+ *                        rac_tool_calling_run_loop_with_handle_and_cb_proto.
+ *
+ * @warning Execution context: this callback fires on the THREAD THAT
+ *          INVOKED the run-loop. It runs BEFORE the first generate iteration
+ *          starts, so SDK callers can safely route the handle into a
+ *          thread-safe sink (Swift `HandleBox.set`, Kotlin
+ *          `CompletableDeferred.complete`, RN `onHandle` JS callback,
+ *          Flutter `Completer.complete`, Web synchronous capture) and
+ *          arrange for cancel to fan in via
+ *          rac_tool_calling_run_loop_cancel_proto. Keep the callback work
+ *          minimal — long-running publication blocks the generate loop.
+ *          MUST NOT reentrantly call any rac_tool_calling_* API.
+ */
+typedef void (*rac_tool_calling_run_loop_on_handle_published_cb_t)(uint64_t run_loop_handle,
+                                                                   void* user_data);
+
+/*
+ * @brief (pass3-syn-028 future ABI) Variant of
+ *        rac_tool_calling_run_loop_with_handle_proto that adds a
+ *        synchronous handle-publication callback. This signature is
+ *        DECLARATION-RESERVED — implementation lands in a follow-up so
+ *        SDKs can converge on this shape rather than reinventing per-SDK
+ *        handle-publication races (Swift `HandleBox.set` from a different
+ *        thread, RN Nitro `onHandle` not exposed, Kotlin
+ *        `invokeOnCompletion` disposal timing). The typedef
+ *        rac_tool_calling_run_loop_on_handle_published_cb_t above is
+ *        already stable so SDK code can type its trampolines today; once
+ *        the commons-side implementation lands the function below will be
+ *        un-commented and SDKs flip from the pointer-shape to the
+ *        callback-shape uniformly. See the @warning block above
+ *        rac_tool_calling_run_loop_with_handle_proto for the rationale.
+ *
+ *        Followup tracker: pass3-syn-028-followup-commons.json
+ *
+ * RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
+ *     const uint8_t* in_request_bytes, size_t in_size,
+ *     rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+ *     rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+ *     void* on_handle_user_data, uint64_t* out_run_loop_handle,
+ *     rac_proto_buffer_t* out_result);
+ */
 
 /**
  * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).

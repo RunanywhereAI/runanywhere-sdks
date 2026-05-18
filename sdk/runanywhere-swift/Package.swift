@@ -226,7 +226,9 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
-        // Unit tests (AudioCaptureManager — see Issue #198)
+        // Unit tests: HandleStreamAdapter lifecycle, proto helpers
+        // (LoRA / model-import / lifecycle / structured-output / tool-calling),
+        // error mapping.
         //
         // `SwiftProtobuf` is listed alongside `RunAnywhere` because the
         // HandleStreamAdapter coverage in Tests/RunAnywhereTests/Adapters/

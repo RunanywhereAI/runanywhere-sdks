@@ -1089,16 +1089,21 @@ void append_planned_file(rav1::DownloadPlanResult* result,
     out_file->set_is_resume_candidate(is_resume_candidate);
 }
 
-// security-privacy-storage-network-001: defensive check applied to plan
-// entries flowing in via rac_download_start_proto (which lets callers skip
-// the trusted planner). The trusted planner always emits absolute paths
-// rooted under a per-model folder, so we accept absolute paths but reject
-// any '..' / '.' / empty / backslash path components — those are the
-// traversal vectors that allow a malicious plan to escape the storage root
-// even when the path looks rooted.
-bool is_traversal_safe_destination(const std::string& path) {
+// security-privacy-storage-network-001 / pass3-syn-104: defensive check
+// applied to plan entries flowing in via rac_download_start_proto (which
+// lets callers skip the trusted planner). The trusted planner always emits
+// absolute paths rooted under either the per-model folder
+// (rac_model_paths_get_model_folder) or the shared archive-staging
+// downloads dir (rac_model_paths_get_downloads_directory), so we accept
+// absolute paths but require lexical containment under one of those known
+// roots. Reject any '..' / '.' / empty / backslash path components — those
+// are the traversal vectors that allow a malicious plan to escape the
+// storage root even when the path looks rooted. Without the containment
+// check, well-formed absolute paths outside model_folder (e.g.
+// `/etc/passwd`, `/Users/victim/.ssh/authorized_keys`) would pass.
+bool path_has_unsafe_components(const std::string& path) {
     if (path.empty())
-        return false;
+        return true;
     size_t start = 0;
     while (start < path.size()) {
         size_t end = path.find_first_of("/\\", start);
@@ -1112,33 +1117,69 @@ bool is_traversal_safe_destination(const std::string& path) {
                 start = end + 1;
                 continue;
             }
-            return false;  // double separator inside the path
+            return true;  // double separator inside the path
         }
         std::string component = path.substr(start, end - start);
         if (component == "." || component == "..")
-            return false;
+            return true;
         if (end == path.size())
             break;
         start = end + 1;
     }
-    return true;
+    return false;
 }
 
-std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& plan) {
+// Returns true if `path` is lexically rooted under `root` after both have
+// been normalized. Empty `root` makes this vacuously false (we never accept
+// a bypass-plan path when we couldn't resolve a containment root).
+bool path_is_under_root(const std::string& path, const std::string& root) {
+    if (path.empty() || root.empty())
+        return false;
+    fs::path norm_path = fs::path(path).lexically_normal();
+    fs::path norm_root = fs::path(root).lexically_normal();
+    auto root_it = norm_root.begin();
+    auto path_it = norm_path.begin();
+    for (; root_it != norm_root.end() && path_it != norm_path.end(); ++root_it, ++path_it) {
+        if (*root_it != *path_it)
+            return false;
+    }
+    return root_it == norm_root.end();
+}
+
+bool is_traversal_safe_destination(const std::string& path, const std::string& model_folder,
+                                   const std::string& downloads_dir) {
+    if (path_has_unsafe_components(path))
+        return false;
+    // Require lexical containment under at least one known-safe root:
+    // either the per-model folder (direct-write destinations) or the
+    // shared archive-staging downloads dir (extraction-bearing files).
+    if (path_is_under_root(path, model_folder))
+        return true;
+    if (path_is_under_root(path, downloads_dir))
+        return true;
+    return false;
+}
+
+std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& plan,
+                                             const std::string& model_folder,
+                                             const std::string& downloads_dir) {
     std::vector<proto_plan_file> files;
     files.reserve(static_cast<size_t>(plan.files_size()));
     for (const auto& input : plan.files()) {
-        // security-privacy-storage-network-001: DownloadPlanResult.files
-        // can originate from rac_download_plan_proto (trusted, already
-        // validated by destination_from_model_file) OR from a
-        // caller-supplied DownloadStartRequest.plan_files that bypasses
-        // planning. The traversal-safe check defends the bypass path.
+        // security-privacy-storage-network-001 / pass3-syn-104:
+        // DownloadPlanResult.files can originate from rac_download_plan_proto
+        // (trusted, already validated by destination_from_model_file) OR from
+        // a caller-supplied DownloadStartRequest.plan_files that bypasses
+        // planning. The traversal-safe check defends the bypass path by
+        // requiring containment under model_folder or the downloads staging
+        // dir, in addition to rejecting '..'/'.'/empty components.
         const std::string& destination = input.destination_path();
-        if (!is_traversal_safe_destination(destination)) {
+        if (!is_traversal_safe_destination(destination, model_folder, downloads_dir)) {
             RAC_LOG_WARNING(LOG_TAG,
                             "Skipping plan entry with unsafe destination_path '%s' "
-                            "(security-privacy-storage-network-001).",
-                            destination.c_str());
+                            "(not contained under model_folder='%s' or downloads_dir='%s'; "
+                            "security-privacy-storage-network-001).",
+                            destination.c_str(), model_folder.c_str(), downloads_dir.c_str());
             continue;
         }
 
@@ -1700,23 +1741,6 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
 
     auto task = std::make_shared<proto_download_task>();
     task->model_id = model_id;
-    task->files = files_from_plan(request.plan());
-    // files_from_plan() defensively skips entries with traversal-unsafe
-    // destination paths (security-privacy-storage-network-001). If every
-    // entry in the plan was skipped, reject the start request rather than
-    // proceeding into UB on the empty task->files vector below.
-    if (task->files.empty()) {
-        result.set_accepted(false);
-        result.set_error_message(
-            "start request rejected: every plan entry has a traversal-unsafe destination path");
-        return serialize_proto_to_buffer(result, out_result);
-    }
-    task->task_id = "download-proto-" + std::to_string(proto_state().next_task_id.fetch_add(1));
-    task->resume_token =
-        !request.resume_token().empty()
-            ? request.resume_token()
-            : (!request.plan().resume_token().empty() ? request.plan().resume_token()
-                                                      : make_resume_token(task->task_id, model_id));
 
     // Resolve the canonical per-model folder + archive structure from the
     // registry. The download plan stages archive-bearing files under the
@@ -1735,6 +1759,11 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // path (see `orchestrate_http_complete` below) which already computes
     // `model_folder_path` via `rac_model_paths_get_model_folder` and then
     // calls `rac_find_model_path_after_extraction` post-extract.
+    //
+    // pass3-syn-104: also drives the per-file destination-path containment
+    // check performed by files_from_plan() below — must run BEFORE
+    // files_from_plan() so the bypass-planner path validation has known-
+    // safe roots to assert containment against.
     rac_model_info_t* model_registry_info = nullptr;
     if (rac_get_model(model_id.c_str(), &model_registry_info) == RAC_SUCCESS &&
         model_registry_info) {
@@ -1744,6 +1773,72 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         rac_model_info_free(model_registry_info);
         model_registry_info = nullptr;
     }
+
+    // pass3-syn-104: resolve the two known-safe roots BEFORE validating the
+    // bypass-planner plan entries. files_from_plan() requires each
+    // destination_path to be lexically rooted under model_folder OR under
+    // downloads_dir (archive staging), in addition to rejecting '..'/'.'
+    // components. The trusted planner always emits paths under one of
+    // these roots, so any plan entry whose path falls outside both is a
+    // bypass-planner attempt to write to an arbitrary filesystem location.
+    //
+    // When the framework cannot be resolved (model not registered yet, as
+    // in the plan-then-start happy path), fall back to the parent
+    // `{base}/RunAnywhere/Models/` root which is the lexical parent of
+    // every per-framework model folder — this still rejects /etc/passwd
+    // while admitting the trusted planner's outputs.
+    std::string containment_model_folder;
+    std::string containment_downloads_dir;
+    if (task->framework != RAC_FRAMEWORK_UNKNOWN) {
+        char model_folder_buf[4096];
+        if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework, model_folder_buf,
+                                             sizeof(model_folder_buf)) == RAC_SUCCESS) {
+            containment_model_folder = model_folder_buf;
+        }
+    }
+    if (containment_model_folder.empty()) {
+        char models_dir_buf[4096];
+        if (rac_model_paths_get_models_directory(models_dir_buf, sizeof(models_dir_buf)) ==
+            RAC_SUCCESS) {
+            containment_model_folder = models_dir_buf;
+        }
+    }
+    {
+        char downloads_dir_buf[4096];
+        if (rac_model_paths_get_downloads_directory(downloads_dir_buf, sizeof(downloads_dir_buf)) ==
+            RAC_SUCCESS) {
+            containment_downloads_dir = downloads_dir_buf;
+        }
+    }
+    if (containment_model_folder.empty() && containment_downloads_dir.empty()) {
+        // Without any resolved root we cannot safely admit caller-supplied
+        // absolute paths; reject the start request rather than fall back
+        // to the syntactic-only check (which accepted /etc/passwd).
+        result.set_accepted(false);
+        result.set_error_message(
+            "start request rejected: cannot resolve a model-folder or downloads-dir root "
+            "to validate plan destination paths against (security-privacy-storage-network-001)");
+        return serialize_proto_to_buffer(result, out_result);
+    }
+
+    task->files =
+        files_from_plan(request.plan(), containment_model_folder, containment_downloads_dir);
+    // files_from_plan() defensively skips entries with traversal-unsafe
+    // destination paths (security-privacy-storage-network-001). If every
+    // entry in the plan was skipped, reject the start request rather than
+    // proceeding into UB on the empty task->files vector below.
+    if (task->files.empty()) {
+        result.set_accepted(false);
+        result.set_error_message(
+            "start request rejected: every plan entry has a traversal-unsafe destination path");
+        return serialize_proto_to_buffer(result, out_result);
+    }
+    task->task_id = "download-proto-" + std::to_string(proto_state().next_task_id.fetch_add(1));
+    task->resume_token =
+        !request.resume_token().empty()
+            ? request.resume_token()
+            : (!request.plan().resume_token().empty() ? request.plan().resume_token()
+                                                      : make_resume_token(task->task_id, model_id));
 
     bool any_archive = false;
     for (const auto& file : task->files) {

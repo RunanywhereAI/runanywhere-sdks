@@ -268,20 +268,44 @@ if [ -f "${WASM_FILE}" ] && [ -f "${JS_FILE}" ]; then
     echo "  ${OUTPUT_NAME}.wasm: ${WASM_SIZE}"
     echo "  ${OUTPUT_NAME}.js:   ${JS_SIZE}"
 
-    # When pthreads are ON the Emscripten glue spawns workers from a
-    # companion `<output>.worker.js`. The CMake POST_BUILD step stages it,
-    # but verify here so a missing worker fails the build (rather than
-    # silently producing a partial release artifact).
+    # Pthread worker policy (single source of truth — mirrored by
+    # wasm/CMakeLists.txt around the `_rac_pthread_worker_tolerant` block):
+    #   * Emscripten <5.x : companion `<output>.worker.js` MUST exist;
+    #                       missing it is a real bug and we hard-fail.
+    #   * Emscripten >=5.x: companion is bundled into the main glue; absence
+    #                       is expected.
+    # Pinned `EMSCRIPTEN_VERSION` lives in sdk/runanywhere-commons/VERSIONS.
     if [ "$PTHREADS" = "ON" ]; then
         WORKER_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js"
-        if [ ! -f "${WORKER_FILE}" ]; then
-            echo "ERROR: pthread worker missing!"
-            echo "  Expected: ${WORKER_FILE}"
-            echo "  PTHREADS=ON requires the Emscripten companion worker."
-            exit 1
+
+        # Detect emcc major version (default to "0" so unknown toolchains
+        # take the strict path).
+        EMCC_MAJOR="0"
+        if command -v emcc >/dev/null 2>&1; then
+            EMCC_VER_LINE="$(emcc --version 2>/dev/null | head -n1 || true)"
+            # Match the first dotted version triple, e.g. "3.1.51" → "3".
+            EMCC_MAJOR_DETECTED="$(printf '%s' "${EMCC_VER_LINE}" \
+                | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' \
+                | head -n1 \
+                | cut -d. -f1 || true)"
+            if [ -n "${EMCC_MAJOR_DETECTED}" ]; then
+                EMCC_MAJOR="${EMCC_MAJOR_DETECTED}"
+            fi
         fi
-        WORKER_SIZE=$(du -h "${WORKER_FILE}" | cut -f1)
-        echo "  ${OUTPUT_NAME}.worker.js: ${WORKER_SIZE}"
+
+        if [ ! -f "${WORKER_FILE}" ]; then
+            if [ "${EMCC_MAJOR}" -ge 5 ] 2>/dev/null; then
+                echo "  ${OUTPUT_NAME}.worker.js: bundled into main glue (Emscripten ${EMCC_MAJOR}.x)"
+            else
+                echo "ERROR: pthread worker missing!"
+                echo "  Expected: ${WORKER_FILE}"
+                echo "  emcc major version: ${EMCC_MAJOR} (Emscripten <5.x must emit a companion worker)"
+                exit 1
+            fi
+        else
+            WORKER_SIZE=$(du -h "${WORKER_FILE}" | cut -f1)
+            echo "  ${OUTPUT_NAME}.worker.js: ${WORKER_SIZE}"
+        fi
     fi
 else
     echo "ERROR: Build outputs not found!"

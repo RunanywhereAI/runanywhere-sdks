@@ -193,7 +193,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
          *   (b) a cross-thread synchronously-fired first callback does
          *       not block on the lock the installer is still holding.
          */
-        private enum class InstallState { NOT_INSTALLED, INSTALLING, INSTALLED, FAILED }
+        private enum class InstallState { NOT_INSTALLED, INSTALLING, INSTALLED }
 
         @Volatile
         private var installState: InstallState = InstallState.NOT_INSTALLED
@@ -225,13 +225,6 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                         // ongoing install will see this channel in `collectors`
                         // and broadcast() will deliver to it.
                         InstallState.INSTALLING, InstallState.INSTALLED -> false
-                        InstallState.FAILED -> {
-                            // Prior install attempt failed and the fan-out
-                            // was not torn down (e.g. still referenced by
-                            // the registry). Allow a fresh attempt.
-                            installState = InstallState.INSTALLING
-                            true
-                        }
                     }
                 }
 
@@ -244,19 +237,38 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             //   2. a cross-thread synchronous callback does not block on
             //      the installer's lock acquisition.
             val id = register(handle) { bytes -> broadcast(bytes) }
+            if (id == INVALID_CALLBACK_ID) {
+                // Roll back: drop EVERY collector that joined the
+                // in-flight install (installer + joiners that appended
+                // while we were INSTALLING), reset state to NOT_INSTALLED
+                // so a fresh first subscriber can retry cleanly, then
+                // close every snapshotted channel OUTSIDE the lock.
+                //
+                // Mirrors Swift's `install()` rollback at
+                // HandleStreamAdapter.swift:189-207 which calls
+                // `lockedState.continuations.removeAll()` and
+                // `installation = .notInstalled`, then finishes every
+                // pending continuation. Without dropping joiners here,
+                // their flows hang forever in `awaitClose` on a fan-out
+                // that has no live C registration to feed it.
+                //
+                // Lock-ordering rule (mirrors decode-failure path in
+                // broadcast()): snapshot + clear under the lock, then
+                // RELEASE the lock before closing channels.
+                val snapshot: List<SendChannel<Event>> =
+                    synchronized(lock) {
+                        val s = collectors.toList()
+                        collectors.clear()
+                        installState = InstallState.NOT_INSTALLED
+                        s
+                    }
+                for (c in snapshot) c.close()
+                return false
+            }
             return synchronized(lock) {
-                if (id == INVALID_CALLBACK_ID) {
-                    // Roll back: remove the channel we appended and
-                    // flip back to a state subsequent attaches can recover from.
-                    collectors.remove(channel)
-                    installState =
-                        if (collectors.isEmpty()) InstallState.NOT_INSTALLED else InstallState.FAILED
-                    false
-                } else {
-                    callbackId = id
-                    installState = InstallState.INSTALLED
-                    true
-                }
+                callbackId = id
+                installState = InstallState.INSTALLED
+                true
             }
         }
 

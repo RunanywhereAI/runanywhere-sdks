@@ -513,9 +513,15 @@ def _emit_message_validate(
                 zero_check = f"m.{ts_field} === ''"
             elif t in _INTEGER_TYPES or t in _FLOAT_TYPES:
                 zero_check = f"m.{ts_field} === 0"
-            elif t == TYPE_BOOL:
-                # `rac_required` on bool is rare, but treat false as the proto3 zero.
-                zero_check = f"m.{ts_field} === false"
+            # pass3-syn-038: TYPE_BOOL deliberately skips the required-check
+            # to match Swift / Kotlin / Dart cross-SDK behaviour. The other
+            # three generators treat `bool + rac_required` as a no-op
+            # (Dart documents the skip explicitly at
+            # generate_dart_convenience.py:475-478; Swift / Kotlin fall
+            # through because TYPE_BOOL is in neither INTEGER_TYPES nor
+            # FLOAT_TYPES). Emitting `m.field === false` here would create
+            # a silent business-logic skew for any future proto that adopts
+            # the `bool + rac_required` pattern.
             if zero_check is not None:
                 checks.append(f"  if ({zero_check}) {{")
                 checks.extend(_throw(field.name, f"'{field.name} is required'"))

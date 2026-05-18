@@ -318,6 +318,17 @@ using ToolRunLoopProtoFn = rac_result_t (*)(
     ToolExecuteCallbackFn,
     void*,
     rac_proto_buffer_t*);
+// pass3-syn-047: cancellation-aware variant — publishes a run-loop handle
+// before the iteration loop begins so RN AbortSignal / Swift task cancel can
+// fan into rac_tool_calling_run_loop_cancel_proto from another thread.
+using ToolRunLoopWithHandleProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    ToolExecuteCallbackFn,
+    void*,
+    uint64_t*,
+    rac_proto_buffer_t*);
+using ToolRunLoopCancelProtoFn = rac_result_t (*)(uint64_t);
 
 using EmbeddingsCreateFn = rac_result_t (*)(
     const char*,

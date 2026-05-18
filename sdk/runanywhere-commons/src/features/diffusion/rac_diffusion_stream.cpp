@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -35,6 +36,23 @@
 #endif
 
 namespace {
+
+// pass2-syn-001-followup-diffusion: lift the voice_agent in_flight quiesce
+// pattern to the diffusion proto-byte dispatcher. See rac_llm_stream.cpp
+// and rac_vlm_proto_abi.cpp for the canonical reference; this guards
+// dispatch_diffusion_stream_event so destroy/teardown can spin-wait until
+// any in-flight slot.fn() returns before freeing user_data.
+std::atomic<int>& diffusion_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct DiffusionInFlightGuard {
+    DiffusionInFlightGuard() { diffusion_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~DiffusionInFlightGuard() { diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    DiffusionInFlightGuard(const DiffusionInFlightGuard&) = delete;
+    DiffusionInFlightGuard& operator=(const DiffusionInFlightGuard&) = delete;
+};
 
 struct CallbackSlot {
     rac_diffusion_stream_proto_callback_fn fn = nullptr;
@@ -102,6 +120,18 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
     return RAC_SUCCESS;
+}
+
+// pass2-syn-001-followup-diffusion: public quiesce helper. Mirrors
+// rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
+// in-flight dispatch_diffusion_stream_event invocation has returned. Callers
+// freeing user_data registered via rac_diffusion_set_stream_proto_callback,
+// or tearing down the diffusion component, MUST call this after the unset to
+// avoid a use-after-free in the dispatch thread.
+void rac_diffusion_proto_quiesce(void) {
+    while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
 }
 
 rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
@@ -181,6 +211,10 @@ void dispatch_diffusion_stream_event(rac_handle_t handle,
                                      const runanywhere::v1::DiffusionProgress* progress,
                                      const runanywhere::v1::DiffusionResult* result,
                                      const char* error_message, int error_code) {
+    // pass2-syn-001-followup-diffusion: hold the InFlightGuard across the
+    // whole dispatch so rac_diffusion_proto_quiesce() can spin-wait on the
+    // counter before user_data is freed by a concurrent teardown thread.
+    DiffusionInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq = 0;
     {

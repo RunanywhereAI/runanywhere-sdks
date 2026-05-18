@@ -18,10 +18,13 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
+#include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <future>
 #include <stdexcept>
+#include <thread>
 
 namespace margelo::nitro::runanywhere {
 
@@ -386,6 +389,123 @@ HybridRunAnywhereCore::toolRunLoopProto(
 
             return copyRequiredToolsProtoBuffer(out, "toolRunLoopProto");
         });
+}
+
+// pass3-syn-047: cancellation-aware variant of toolRunLoopProto. Wires the
+// commons `rac_tool_calling_run_loop_with_handle_proto` ABI to JS via a Nitro
+// callback (`onHandle`) so an AbortSignal can fan into
+// `rac_tool_calling_run_loop_cancel_proto(handle)` from another thread.
+//
+// The C ABI writes `out_run_loop_handle` synchronously, BEFORE the iteration
+// loop begins, then proceeds to drive the tool-calling loop (which blocks the
+// async worker thread). To surface the handle to JS while the call is still
+// in flight, we spawn a short-lived watcher thread that polls a shared atomic
+// slot and invokes the JS `onHandle` callback as soon as commons has stored
+// the handle.
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
+    const std::shared_ptr<ArrayBuffer>& requestBytes,
+    const ToolRunLoopExecuteCallback& onExecuteToolBytes,
+    const ToolRunLoopHandleCallback& onHandle) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [bytes = std::move(bytes), onExecuteToolBytes, onHandle]() {
+            auto runLoopFn =
+                proto_compat::symbol<proto_compat::ToolRunLoopWithHandleProtoFn>(
+                    "rac_tool_calling_run_loop_with_handle_proto");
+            if (!runLoopFn) {
+                LOGE(
+                    "toolRunLoopProtoWithHandle: "
+                    "rac_tool_calling_run_loop_with_handle_proto unavailable");
+                throw std::runtime_error(
+                    "toolRunLoopProtoWithHandle: commons export "
+                    "rac_tool_calling_run_loop_with_handle_proto unavailable");
+            }
+
+            ToolRunLoopExecutorState state{onExecuteToolBytes};
+            rac_proto_buffer_t out;
+            proto_compat::initBuffer(&out);
+
+            // Shared slot the C ABI writes synchronously before its loop
+            // begins. The watcher thread reads it and fans the value into JS.
+            std::atomic<uint64_t> handleSlot{0};
+            std::atomic<bool> watcherDone{false};
+            std::thread watcher([&handleSlot, &watcherDone, &onHandle]() {
+                // Poll on millisecond granularity. The commons ABI publishes
+                // the handle before the iteration loop begins, typically
+                // within microseconds of the call.
+                while (!watcherDone.load(std::memory_order_acquire)) {
+                    uint64_t observed =
+                        handleSlot.load(std::memory_order_acquire);
+                    if (observed != 0) {
+                        if (onHandle) {
+                            try {
+                                onHandle(static_cast<double>(observed));
+                            } catch (...) {
+                                LOGE(
+                                    "toolRunLoopProtoWithHandle: onHandle "
+                                    "callback threw");
+                            }
+                        }
+                        return;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            });
+
+            uint64_t runLoopHandle = 0;
+            const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+            rac_result_t rc = runLoopFn(
+                data,
+                bytes.size(),
+                toolRunLoopExecuteCallback,
+                &state,
+                &runLoopHandle,
+                &out);
+
+            // Make sure the watcher observes the handle (or terminates if the
+            // call returned without publishing one) before we join it.
+            handleSlot.store(runLoopHandle, std::memory_order_release);
+            watcherDone.store(true, std::memory_order_release);
+            if (watcher.joinable()) {
+                watcher.join();
+            }
+
+            if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+                LOGE("toolRunLoopProtoWithHandle: rc=%d", rc);
+                proto_compat::freeBuffer(&out);
+                throw std::runtime_error(
+                    "toolRunLoopProtoWithHandle: commons call failed rc=" +
+                    std::to_string(rc));
+            }
+
+            return copyRequiredToolsProtoBuffer(out, "toolRunLoopProtoWithHandle");
+        });
+}
+
+// pass3-syn-047: cancel an in-flight tool-calling run loop. Idempotent per the
+// commons contract — a stale or already-retired handle still returns
+// RAC_SUCCESS, so callers can wire this directly to AbortSignal abort events.
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::toolRunLoopCancelProto(
+    double runLoopHandle) {
+    return Promise<bool>::async([runLoopHandle]() -> bool {
+        auto cancelFn =
+            proto_compat::symbol<proto_compat::ToolRunLoopCancelProtoFn>(
+                "rac_tool_calling_run_loop_cancel_proto");
+        if (!cancelFn) {
+            LOGE(
+                "toolRunLoopCancelProto: "
+                "rac_tool_calling_run_loop_cancel_proto unavailable");
+            return false;
+        }
+        const auto handle = static_cast<uint64_t>(runLoopHandle);
+        rac_result_t rc = cancelFn(handle);
+        if (rc != RAC_SUCCESS) {
+            LOGE("toolRunLoopCancelProto: rc=%d", rc);
+            return false;
+        }
+        return true;
+    });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>

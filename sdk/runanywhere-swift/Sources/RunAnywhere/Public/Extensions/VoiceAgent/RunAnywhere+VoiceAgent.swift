@@ -39,11 +39,21 @@ public extension RunAnywhere {
     /// forwards to `initializeVoiceAgent(_:)`. Mirrors the Kotlin / Web SDKs'
     /// `initializeVoiceAgentWithLoadedModels()` API.
     ///
+    /// - Parameter ttsVoiceID: Optional explicit voice id to pass through to
+    ///   the TTS engine. For multi-voice TTS engines (e.g., Sherpa-ONNX-TTS
+    ///   with Piper multi-speaker models), the voice id selects which voice
+    ///   within the loaded model to use and is semantically distinct from the
+    ///   TTS model id. When `nil` (the default), the engine's default voice
+    ///   is used — appropriate for single-voice models. Callers using
+    ///   multi-voice engines should pass the desired voice id explicitly.
+    ///   Never reuse the TTS model id here — model id ≠ voice id.
     /// - Throws: `SDKException(code: .notInitialized, message: ..., category: .internal)` if the SDK has
     ///           not completed Phase 1 initialization.
     /// - Throws: `SDKException(code: .modelNotLoaded, message: ..., category: .component)` if STT, LLM,
     ///           or TTS has no model loaded.
-    static func initializeVoiceAgentWithLoadedModels() async throws {
+    static func initializeVoiceAgentWithLoadedModels(
+        ttsVoiceID: String? = nil
+    ) async throws {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
@@ -82,7 +92,16 @@ public extension RunAnywhere {
         var config = RAVoiceAgentComposeConfig()
         config.sttModelID = sttSnap.modelID
         config.llmModelID = llmSnap.modelID
-        config.ttsVoiceID = ttsSnap.modelID
+        // ttsVoiceID is the voice id *within* the loaded TTS model, NOT the
+        // model id. For single-voice engines, leaving it unset lets the
+        // engine pick its default voice. For multi-voice engines (Piper,
+        // eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller must supply
+        // the desired voice id explicitly via the `ttsVoiceID` parameter.
+        // Previous releases conflated `ttsSnap.modelID` with the voice id,
+        // which produced an invalid voice selection for multi-voice models.
+        if let voiceID = ttsVoiceID, !voiceID.isEmpty {
+            config.ttsVoiceID = voiceID
+        }
 
         let handle = try await CppBridge.VoiceAgent.shared.getHandle()
         _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)

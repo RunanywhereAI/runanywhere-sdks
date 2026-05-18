@@ -103,19 +103,36 @@ public extension RunAnywhere {
                     continuation.finish()
                 }
             }
-            // Defensive belt-and-braces cancellation (pass2-syn-073):
-            // The inner `generateStream` AsyncStream already wires its own
-            // `onCancel` to `rac_llm_cancel_proto` via the generated proto
-            // adapter (see pass2-syn-018), so cancelling `task` here will
-            // cascade through `for await` → inner stream `.cancelled` →
-            // native cancel. This block additionally invokes the public
-            // `cancelGeneration()` API directly so consumer cancellation
-            // (view-model deinit, navigation away, parent `Task.cancel()`)
-            // *always* tears down the native LLM, even if a future refactor
-            // of the inner generator drops or delays the cascade.
-            continuation.onTermination = { _ in
-                task.cancel()
-                Task { await RunAnywhere.cancelGeneration() }
+            // Manual cancellation fallback (pass3-syn-058):
+            // The inner `generateStream` AsyncStream does NOT yet wire its
+            // own `onCancel` to `rac_llm_cancel_proto` — the proto-ABI
+            // codegen template still omits the `onCancel:` argument on the
+            // LLM builder (see Generated/ModalityProtoABI+Generated.swift
+            // around lines 308-329). Until the generator is fixed (tracked
+            // by pass3-syn-059 / pass3-syn-061), this block manually
+            // invokes `cancelGeneration()` on consumer cancellation so
+            // view-model deinit, navigation away, or a parent
+            // `Task.cancel()` always tears down the native LLM.
+            //
+            // IMPORTANT: switch on `termination` and only fire the native
+            // cancel on `.cancelled`. `.finished` means the producer Task
+            // above already called `continuation.finish()` after the
+            // terminal `.completed` / `.error` event — calling
+            // `cancelGeneration()` there would invoke
+            // `rac_llm_cancel_proto` on the lifecycle LLM handle and race
+            // with any follow-up `RunAnywhere.generate(...)` the caller
+            // kicks off immediately after the stream completes. See the
+            // canonical pattern in CppBridge+ModalityProtoABI.swift.
+            continuation.onTermination = { termination in
+                switch termination {
+                case .cancelled:
+                    task.cancel()
+                    Task { await RunAnywhere.cancelGeneration() }
+                case .finished:
+                    break
+                @unknown default:
+                    break
+                }
             }
         }
     }

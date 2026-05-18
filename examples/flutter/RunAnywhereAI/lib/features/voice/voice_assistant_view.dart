@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -496,25 +497,32 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             const SizedBox(height: AppSpacing.smallMedium),
             // B-FL-13-002: short-circuit row for the platform's built-in
             // TTS engine — bypasses the model selection sheet entirely.
-            SwitchListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Use system voice (no model required)'),
-              subtitle: const Text(
-                'Routes TTS through the OS engine instead of an on-device model.',
-              ),
-              value: _currentTTSModel == 'system-tts',
-              onChanged: (enabled) async {
-                if (enabled) {
-                  try {
-                    await sdk.RunAnywhere.tts.loadVoice('system-tts');
-                    await _refreshComponentStates();
-                  } catch (e) {
-                    debugPrint('Failed to load system-tts: $e');
+            // Apple-only: the commons `platform` engine plugin is gated
+            // behind `if(APPLE AND RAC_BUILD_PLATFORM)` and
+            // `runanywhere_ai_app.dart` only seeds the `system-tts`
+            // pseudo-model on iOS/macOS, so on Android tapping the toggle
+            // would silently fail with `model not found`. Mirrors the gate
+            // applied in `features/models/model_status_components.dart`.
+            if (Platform.isIOS || Platform.isMacOS)
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use system voice (no model required)'),
+                subtitle: const Text(
+                  'Routes TTS through the OS engine instead of an on-device model.',
+                ),
+                value: _currentTTSModel == 'system-tts',
+                onChanged: (enabled) async {
+                  if (enabled) {
+                    try {
+                      await sdk.RunAnywhere.tts.loadVoice('system-tts');
+                      await _refreshComponentStates();
+                    } catch (e) {
+                      debugPrint('Failed to load system-tts: $e');
+                    }
                   }
-                }
-              },
-            ),
+                },
+              ),
 
             const Spacer(),
 

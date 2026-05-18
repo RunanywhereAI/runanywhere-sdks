@@ -101,7 +101,7 @@ jobs:
           fi
           for fw in "${xcframeworks[@]}"; do
             fw_name="$(basename "$fw")"
-            zip_path="$DEST/${fw_name%.xcframework}.zip"
+            zip_path="$DEST/${fw_name%.xcframework}-ios-v${{ needs.validate.outputs.version }}.zip"
             echo "▶ Packaging $fw_name → $zip_path"
             (cd "$SRC" && zip -ry "$zip_path" "$fw_name")
           done
@@ -212,6 +212,17 @@ jobs:
           if [ -d include ]; then
             cp -R include/. "$DIST/include/"
           fi
+          # Refuse to package an empty tarball — `find ... -exec cp` exits 0
+          # even with zero matches, and `tar czf .` would produce a valid
+          # archive of just directory entries. Combined with the symmetric
+          # `if-no-files-found: error` upload + `== 'success'` publish gate
+          # (see pass3-syn-007 + pass3-syn-009), a missing input now fails
+          # the job rather than silently shipping an empty tarball.
+          SO_COUNT=$(find "$DIST/lib" -name '*.so' -type f | wc -l | tr -d ' ')
+          if [ "$SO_COUNT" -lt 1 ]; then
+            echo "::error::No .so files found in linux-release build — refusing to package empty tarball"
+            exit 1
+          fi
           (cd "$DIST" && tar czf "../RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" .)
           shasum -a 256 "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" \
             > "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
@@ -223,7 +234,9 @@ jobs:
             sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz
             sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz.sha256
           retention-days: 7
-          if-no-files-found: warn
+          # Strict: matches iOS/Android/Web uploads + the `== 'success'`
+          # publish gate (pass3-syn-007). A missing tarball blocks publish.
+          if-no-files-found: error
 
   native_windows:
     needs: validate
@@ -242,13 +255,23 @@ jobs:
         working-directory: sdk/runanywhere-commons
         shell: bash
         run: |
-          if [ -d dist/windows ]; then
-            (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
-            sha256sum "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
-              > "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
-          else
-            echo "::warning::dist/windows missing; build-windows.bat may have used a different output path"
+          set -euo pipefail
+          # Hard-fail when dist/windows is missing. Previously this branch
+          # emitted a warning and exited 0, allowing the upload step
+          # (`if-no-files-found: warn`) and publish gate (`!= 'failure'`) to
+          # ship a release with no Windows artifact at all. Now symmetric
+          # with the iOS/Android/Web policy via pass3-syn-007 + pass3-syn-010.
+          if [ ! -d dist/windows ]; then
+            echo "::error::dist/windows missing — build-windows.bat may have failed or used a different output path"
+            exit 1
           fi
+          (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
+          if [ ! -f "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" ]; then
+            echo "::error::Windows zip not produced — refusing to publish without artifact"
+            exit 1
+          fi
+          sha256sum "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
+            > "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -257,7 +280,9 @@ jobs:
             sdk/runanywhere-commons/dist/RACommons-windows-*.zip
             sdk/runanywhere-commons/dist/RACommons-windows-*.zip.sha256
           retention-days: 7
-          if-no-files-found: warn
+          # Strict: matches iOS/Android/Web uploads + the `== 'success'`
+          # publish gate (pass3-syn-007). A missing zip blocks publish.
+          if-no-files-found: error
 
   native_web:
     needs: validate
@@ -400,6 +425,12 @@ jobs:
           npm install
           npm run build:ts
       - name: npm pack each Web package
+        # @runanywhere/proto-ts is treated as a FIRST-PARTY package that tracks
+        # the SDK version. scripts/sync-versions.sh bumps its package.json on
+        # every release, and this step republishes the matching tgz alongside
+        # the Web SDK packages. If a separately-versioned policy is desired
+        # in the future, remove proto-ts from sync-versions.sh AND from this
+        # `for pkg` loop. See pass3-syn-069 / build-release-pass2-001 §3.
         working-directory: sdk/runanywhere-web
         run: |
           mkdir -p ../../sdk-staging/web
@@ -497,13 +528,23 @@ jobs:
   # and build it against the freshly-produced artifacts. Catches "looked
   # right, actually broken" regressions before the release goes out.
   #
-  # These are BEST-EFFORT: they warn on failure rather than failing the
-  # release, because starter repos evolve independently and a transient
-  # break shouldn't block a native-library release.
+  # Policy: STRICT. Every consumer-validation job must succeed for `publish`
+  # to fire (the gate at publish.if asserts `result == 'success'` on each).
+  # The prior mixed BEST-EFFORT/STRICT mode let starter-app regressions ship
+  # silently while one job (validate_consumer_flutter) blocked releases on
+  # unrelated lint drift. Unify on strict: a starter-app break holds the
+  # release until the starter is fixed. If a starter is intentionally
+  # mid-flight, gate that job with a workflow_dispatch input rather than
+  # a blanket `|| true`. See pass3-syn-008.
   # ---------------------------------------------------------------------------
 
   validate_consumer_swift:
-    needs: [validate, native_ios, sdk_kotlin]  # native_ios produces the iOS artifact this job downloads
+    # native_ios produces the iOS artifact this job downloads. Do NOT add
+    # sdk_kotlin here — the Swift consumer doesn't touch any Kotlin AAR/JAR
+    # and serializing macos-15 Swift validation behind ubuntu Kotlin
+    # packaging (~15-25 min on the release-day critical path) is wasteful.
+    # See pass3-syn-008.
+    needs: [validate, native_ios]
     if: always() && needs.validate.result == 'success'
     runs-on: macos-15
     timeout-minutes: 20
@@ -519,7 +560,9 @@ jobs:
           path: native-ios-staging
       - name: Build swift-starter-example against local artifacts
         run: |
+          set -euo pipefail
           cd consumer-swift
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           # If the starter has an obvious build script, prefer it.
           if [ -x scripts/build.sh ]; then
             scripts/build.sh
@@ -527,9 +570,10 @@ jobs:
             swift package resolve
             swift build
           elif ls *.xcodeproj >/dev/null 2>&1 || ls *.xcworkspace >/dev/null 2>&1; then
-            xcodebuild -scheme "$(ls -d *.xcodeproj *.xcworkspace 2>/dev/null | head -1 | sed 's/\.xc[a-z]*$//')" -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build || true
+            xcodebuild -scheme "$(ls -d *.xcodeproj *.xcworkspace 2>/dev/null | head -1 | sed 's/\.xc[a-z]*$//')" -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
           else
-            echo "::warning::no recognizable Swift project in swift-starter-example"
+            echo "::error::no recognizable Swift project in swift-starter-example"
+            exit 1
           fi
 
   validate_consumer_kotlin:
@@ -554,13 +598,16 @@ jobs:
           path: sdk-kotlin-staging
       - name: Build kotlin-starter-example
         run: |
+          set -euo pipefail
           cd consumer-kotlin
-          # Point the starter at our locally-packaged AAR via flatDir (best effort)
+          # Policy: STRICT (see comment block above validate_consumer_swift).
+          # Point the starter at our locally-packaged AAR via flatDir.
           if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
             ls -la ../sdk-kotlin-staging/ || true
-            ./gradlew build --no-daemon || echo "::warning::kotlin-starter-example build failed"
+            ./gradlew build --no-daemon
           else
-            echo "::warning::no Gradle project in kotlin-starter-example"
+            echo "::error::no Gradle project in kotlin-starter-example"
+            exit 1
           fi
 
   validate_consumer_web:
@@ -584,16 +631,24 @@ jobs:
           path: sdk-web-staging
       - name: Install starter with locally-packed tarballs
         run: |
+          set -euo pipefail
           cd consumer-web
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           if [ -f package.json ]; then
-            # Install each locally-packed tarball into the starter
+            # Install each locally-packed tarball into the starter.
             for tgz in ../sdk-web-staging/*.tgz; do
-              [ -f "$tgz" ] && npm install --no-save "$tgz" || true
+              [ -f "$tgz" ] || continue
+              npm install --no-save "$tgz"
             done
             npm install
-            npm run build || npm run typecheck || echo "::warning::web-starter-app build failed"
+            if npm run | grep -q '^  build$'; then
+              npm run build
+            else
+              npm run typecheck
+            fi
           else
-            echo "::warning::no package.json in web-starter-app"
+            echo "::error::no package.json in web-starter-app"
+            exit 1
           fi
 
   validate_consumer_flutter:
@@ -694,18 +749,24 @@ jobs:
           path: sdk-rn-staging
       - name: Install RN starter with locally-packed tarballs
         run: |
+          set -euo pipefail
           cd consumer-rn
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           if [ -f package.json ]; then
             # Install each locally-packed tarball into the starter so we
             # validate the release candidates produced by this workflow,
             # not whatever the registry happens to resolve.
             for tgz in ../sdk-rn-staging/*.tgz; do
-              [ -f "$tgz" ] && (npm install --no-save --legacy-peer-deps "$tgz" || true)
+              [ -f "$tgz" ] || continue
+              npm install --no-save --legacy-peer-deps "$tgz"
             done
-            npm install --legacy-peer-deps || yarn install || echo "::warning::install failed"
-            npx tsc --noEmit 2>/dev/null || echo "::warning::RN typecheck failed"
+            if ! npm install --legacy-peer-deps; then
+              yarn install
+            fi
+            npx tsc --noEmit
           else
-            echo "::warning::no package.json in react-native-starter-app"
+            echo "::error::no package.json in react-native-starter-app"
+            exit 1
           fi
 
   # ---------------------------------------------------------------------------
@@ -732,8 +793,8 @@ jobs:
       needs.validate.result == 'success' &&
       needs.native_ios.result == 'success' &&
       needs.native_android.result == 'success' &&
-      needs.native_linux.result != 'failure' &&
-      needs.native_windows.result != 'failure' &&
+      needs.native_linux.result == 'success' &&
+      needs.native_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result == 'success' &&
       needs.sdk_web.result == 'success' &&
@@ -751,9 +812,29 @@ jobs:
         with:
           path: release-artifacts
       - name: Flatten + index assets
+        # Collision-detecting flatten. The previous `find ... -exec cp` form
+        # silently overwrote same-basename files coming from different artifact
+        # bundles (e.g. a future backend AAR rename or RN package layout
+        # change could drop assets with no CI signal). Use `cp -n` (no-clobber)
+        # and fail fast when any destination would be overwritten. See
+        # pass3-syn-070 / pass3-syn-071.
         run: |
+          set -euo pipefail
           mkdir -p release-flat
-          find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.aar" -o -name "*.jar" -o -name "*.tgz" -o -name "*.sha256" \) -exec cp {} release-flat/ \;
+          collisions=0
+          while IFS= read -r -d '' src; do
+            dest="release-flat/$(basename "$src")"
+            if [ -e "$dest" ]; then
+              echo "::error::flatten collision: $dest already exists (incoming $src)"
+              collisions=$((collisions + 1))
+              continue
+            fi
+            cp "$src" "$dest"
+          done < <(find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.aar" -o -name "*.jar" -o -name "*.tgz" -o -name "*.sha256" \) -print0)
+          if [ "$collisions" -ne 0 ]; then
+            echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
+            exit 1
+          fi
           (cd release-flat && ls -la > MANIFEST.txt)
           cat release-flat/MANIFEST.txt
       - name: Assert release manifest contains every required client-SDK family

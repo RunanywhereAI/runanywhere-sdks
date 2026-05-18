@@ -18,12 +18,15 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_llm_thinking.h"
+#include "rac/features/llm/rac_tool_calling.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "llm_options.pb.h"
 #include "llm_service.pb.h"
 #include "sdk_events.pb.h"
+#include "tool_calling.pb.h"
 #endif
 
 namespace {
@@ -316,9 +319,16 @@ size_t find_earliest_tag(const std::string& text, const char* const* tags, size_
 // 13-field emitter shared with `rac_llm_stream.cpp`. All callers
 // populate the same LLMStreamEvent shape so Swift iOS, Web, and Kotlin
 // Android consumers see identical wire bytes for identical inputs.
+//
+// pass3-syn-039: optional `tool_call` populates proto field 18 on
+// LLMStreamEvent (idl/llm_service.proto:179). Producers pass it on the
+// synthesized TOOL_CALL boundary event when the streaming output contains
+// a parseable tool call; non-tool-call events leave it nullptr so legacy
+// streams are byte-for-byte identical.
 void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_final,
                            TokenKind kind, const char* finish_reason, const char* error_message,
-                           const LLMStreamFinalResult* result = nullptr) {
+                           const LLMStreamFinalResult* result = nullptr,
+                           const runanywhere::v1::ToolCall* tool_call = nullptr) {
     if (!ctx || !ctx->callback) {
         return;
     }
@@ -334,12 +344,60 @@ void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_f
     params.completion_tokens_generated = ctx->token_count;
     params.elapsed_ms = now_ms() - ctx->started_ms;
     params.final_result = result;
+    params.tool_call = tool_call;
 
     thread_local std::vector<uint8_t> scratch;
     if (!rac::llm::serialize_llm_stream_event(++ctx->seq, params, scratch)) {
         return;
     }
     ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);
+}
+
+// pass3-syn-039: parse the accumulated streaming response_text for a tool
+// call boundary using the canonical commons parser (rac_tool_call_parse_proto
+// over runanywhere.v1.ToolParseRequest/Result). Returns true and populates
+// out_tool_call when a structured tool call is recognized; false when the
+// output contains no tool-call markers. The parser is format-aware
+// (DEFAULT <tool_call>JSON</tool_call> and LFM2 <|tool_call_start|>...) and
+// requires no ToolCallingOptions on the request because LLMGenerateRequest
+// does not carry tool definitions (idl/llm_service.proto:42-51) — auto-format
+// detection is sufficient to surface the structured payload on the
+// LLMStreamEvent.tool_call slot when the model emitted one.
+bool parse_response_tool_call(const std::string& response_text,
+                              runanywhere::v1::ToolCall* out_tool_call) {
+    if (response_text.empty() || !out_tool_call) {
+        return false;
+    }
+    runanywhere::v1::ToolParseRequest request;
+    request.set_text(response_text);
+
+    const size_t req_size = request.ByteSizeLong();
+    std::vector<uint8_t> req_bytes(req_size);
+    if (req_size > 0 &&
+        !request.SerializeToArray(req_bytes.data(), static_cast<int>(req_bytes.size()))) {
+        return false;
+    }
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_tool_call_parse_proto(req_bytes.empty() ? nullptr : req_bytes.data(),
+                                                req_bytes.size(), &out);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&out);
+        return false;
+    }
+
+    runanywhere::v1::ToolParseResult result;
+    if (out.data && out.size > 0) {
+        (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
+    }
+    rac_proto_buffer_free(&out);
+
+    if (result.has_tool_call() && result.tool_calls_size() > 0) {
+        *out_tool_call = result.tool_calls(0);
+        return true;
+    }
+    return false;
 }
 
 void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, TokenKind kind) {
@@ -444,6 +502,25 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     }
     flush_pending_stream_text(ctx);
     ctx->terminal_sent = true;
+
+    // pass3-syn-039: surface a structured tool call on LLMStreamEvent.tool_call
+    // (proto field 18) when the streaming output contains one. The terminal
+    // event still carries the same finish_reason / result; this emission is
+    // an additional in-stream event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL
+    // and tool_call=<parsed ToolCall>, mirroring the
+    // TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED semantics from
+    // tool_calling_session.cpp but on the canonical LLM stream so direct
+    // consumers (Swift LLMStreamEvent.toolCall, Kotlin event.tool_call, etc.)
+    // observe the structured payload without parsing the raw token text.
+    if (error_message == nullptr || error_message[0] == '\0') {
+        runanywhere::v1::ToolCall parsed_tool_call;
+        if (parse_response_tool_call(ctx->response_text, &parsed_tool_call)) {
+            dispatch_stream_event(ctx, /*token=*/"", /*is_final=*/false,
+                                  runanywhere::v1::TOKEN_KIND_TOOL_CALL,
+                                  /*finish_reason=*/nullptr, /*error_message=*/nullptr,
+                                  /*result=*/nullptr, &parsed_tool_call);
+        }
+    }
 
     LLMStreamFinalResult final_result;
     final_result.set_text(ctx->response_text);

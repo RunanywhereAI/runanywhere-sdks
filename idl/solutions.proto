@@ -79,6 +79,14 @@ message VoiceAgentConfig {
     string tts_model_id = 3;     // e.g. "kokoro"
     string vad_model_id = 4;     // e.g. "silero-v5"
 
+    // pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
+    // (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
+    // fall back to using tts_model_id as the voice id — correct for
+    // single-voice engines, wrong for multi-voice. Aligns the caller-facing
+    // VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
+    // (voice_agent_service.proto:214) which already exposes tts_voice_id.
+    string tts_voice_id = 17;
+
     // Audio configuration.
     int32  sample_rate_hz = 5;   // default 16000
     int32  chunk_ms       = 6;   // default 20

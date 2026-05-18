@@ -16,6 +16,14 @@
  * complex enough that re-implementing its byte layout in TypeScript is
  * a maintenance burden; using the upstream helper keeps us aligned with
  * sherpa-onnx upstream changes for free.
+ *
+ * UPSTREAM PIN: Targets sherpa-onnx 1.12.x CJS-flavoured helpers. When
+ * `wasm/scripts/build-sherpa-onnx.sh` is bumped to a newer upstream, the
+ * `loadHelper()` post-import validation will surface a clear error listing
+ * which expected names are missing on the resolved namespace, so the
+ * failure mode is "loud and pointing at the upstream bump" rather than a
+ * confusing SyntaxError / ReferenceError at first speech call. Bump the
+ * pin in this docstring AND in `wasm/scripts/build-sherpa-onnx.sh` together.
  */
 
 import { SDKLogger } from '@runanywhere/web/internal';
@@ -37,6 +45,20 @@ function defaultBaseUrl(): string {
   return new URL('../../wasm/sherpa/', import.meta.url).href;
 }
 
+/**
+ * Detect whether the fetched upstream text already has a top-level
+ * `export { ... }` declaration. Uses a line-anchored regex rather than a
+ * raw substring check so the presence of `export {` inside a comment,
+ * string literal, or unrelated construct does not cause us to skip the
+ * append. The pattern is anchored to a line start (possibly preceded by
+ * whitespace) and requires the literal `export` keyword to be followed
+ * by `{`, which is the form `wasm/scripts/build-sherpa-onnx.sh` would
+ * produce in any future ESM-ified release.
+ */
+function hasTopLevelExportDeclaration(code: string): boolean {
+  return /^\s*export\s*\{/m.test(code);
+}
+
 async function loadHelper<T>(filename: string, exports: readonly string[]): Promise<T> {
   const cached = cache.get(filename);
   if (cached) return cached as Promise<T>;
@@ -50,16 +72,36 @@ async function loadHelper<T>(filename: string, exports: readonly string[]): Prom
     }
     let code = await response.text();
     code = PRELUDE + code;
-    if (!code.includes('export {')) {
+    if (!hasTopLevelExportDeclaration(code)) {
       code += `\nexport { ${exports.join(', ')} };\n`;
     }
     const blob = new Blob([code], { type: 'text/javascript' });
     const blobUrl = URL.createObjectURL(blob);
+    let imported: Record<string, unknown>;
     try {
-      return (await import(/* @vite-ignore */ blobUrl)) as T;
+      imported = (await import(/* @vite-ignore */ blobUrl)) as Record<string, unknown>;
     } finally {
       URL.revokeObjectURL(blobUrl);
     }
+
+    // Verify every expected name resolved as a callable on the namespace.
+    // A missing/renamed export here means the upstream sherpa-onnx version
+    // shipped by `wasm/scripts/build-sherpa-onnx.sh` no longer matches the
+    // pin in this file's docstring. Surface a typed, actionable error rather
+    // than letting the consumer chase a downstream ReferenceError at the
+    // first speech call.
+    const missing = exports.filter((name) => typeof imported[name] !== 'function');
+    if (missing.length > 0) {
+      throw new Error(
+        `Upstream Sherpa helper ${filename} is missing expected exports: ${missing.join(
+          ', ',
+        )}. The sherpa-onnx upstream shape this loader targets has drifted; ` +
+          `bump the pin in SherpaUpstreamHelpers.ts AND verify ` +
+          `wasm/scripts/build-sherpa-onnx.sh fetches a compatible release.`,
+      );
+    }
+
+    return imported as T;
   })();
 
   cache.set(filename, promise);

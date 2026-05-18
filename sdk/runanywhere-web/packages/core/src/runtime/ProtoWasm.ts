@@ -1,8 +1,12 @@
 import type { SDKLogger } from '../Foundation/SDKLogger';
+import {
+  RAC_OK as RAC_SUCCESS,
+  RAC_ERROR_NOT_FOUND,
+  RAC_ERROR_FEATURE_NOT_AVAILABLE,
+  RAC_ERROR_INVALID_ARGUMENT,
+} from '../Foundation/RACErrors';
 
 const OUT_PTR_SIZE = 4;
-const RAC_SUCCESS = 0;
-const RAC_ERROR_NOT_FOUND = -423;
 
 export interface ProtoWasmModule {
   _malloc?(size: number): number;
@@ -306,9 +310,9 @@ export function formatRacResult(rc: number): string {
       return 'RAC_SUCCESS';
     case RAC_ERROR_NOT_FOUND:
       return 'RAC_ERROR_NOT_FOUND';
-    case -801:
+    case RAC_ERROR_FEATURE_NOT_AVAILABLE:
       return 'RAC_ERROR_FEATURE_NOT_AVAILABLE';
-    case -259:
+    case RAC_ERROR_INVALID_ARGUMENT:
       return 'RAC_ERROR_INVALID_ARGUMENT';
     case -252:
       return 'RAC_ERROR_INVALID_FORMAT';

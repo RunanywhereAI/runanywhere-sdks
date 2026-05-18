@@ -1,16 +1,21 @@
 /**
  * ONNX - Public facade for `@runanywhere/web-onnx`.
  *
- * The package now ships TWO speech runtimes side by side:
+ * The package ships TWO speech runtimes side by side:
  *
- *   1. **Standalone Sherpa-ONNX module** (`packages/onnx/wasm/sherpa/`)
- *      built by `wasm/scripts/build-sherpa-onnx.sh`. This is the proven
- *      production path from `main`: a self-contained Emscripten link of
- *      ONNX Runtime + Sherpa-ONNX with consistent exception/threading
+ *   1. **Standalone Sherpa-ONNX module** (shipped under
+ *      `packages/onnx/wasm/sherpa/`, built by
+ *      `wasm/scripts/build-sherpa-onnx.sh`). This is currently the only
+ *      end-to-end-working speech path: a self-contained Emscripten link
+ *      of ONNX Runtime + Sherpa-ONNX with consistent exception/threading
  *      flags, loaded as a separate WASM file. Driven through the V2
  *      `SpeechProvider` interface so `RunAnywhere.transcribe`,
  *      `RunAnywhere.synthesize`, and `RunAnywhere.detectVoiceActivity`
- *      work end-to-end.
+ *      work in the browser today. TEMPORARY WORKAROUND — kept until the
+ *      proto-byte path (option 2) is healthy, at which point this bundle
+ *      can be deleted and the package will become pure proto-byte. The
+ *      package.json `prepublishOnly` guard intentionally REQUIRES this
+ *      bundle so a partial migration cannot ship a broken artifact.
  *
  *   2. **Proto-byte plugin registration** against the unified RACommons
  *      WASM module (`SherpaONNXBridge`). This is the V2 architecture's

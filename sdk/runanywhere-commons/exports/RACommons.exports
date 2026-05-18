@@ -20,13 +20,17 @@
 # sibling exports files and appended to this list by CMake when the matching
 # RAC_BACKEND_* flag is ON:
 #   - RACommons.rag.exports               (RAC_BACKEND_RAG)
-#   - RACommons.onnx_embeddings.exports   (RAC_BACKEND_ONNX_EMBEDDINGS)
-#   - RACommons.whisperkit_coreml.exports (RAC_BACKEND_WHISPERKIT_COREML)
 # When commons is built as a dynamic lib, the appended list keeps every
-# RAG / ONNX-embeddings / WhisperKit symbol resolvable to its backend
-# implementation. When the flag is OFF, the symbol does not exist in
-# librac_commons and the Apple `-exported_symbols_list` linker would
-# reject an entry naming it — hence the split.
+# RAG symbol resolvable to its backend implementation. When the flag is
+# OFF, the symbol does not exist in librac_commons and the Apple
+# `-exported_symbols_list` linker would reject an entry naming it —
+# hence the split.
+#
+# pass3-syn-002 (2026-05-18): the previous onnx_embeddings and
+# whisperkit_coreml sibling exports were dropped because those
+# `_rac_backend_*_register` symbols live in the engine targets
+# (engines/onnx, engines/whisperkit_coreml), not in librac_commons.
+# Each engine target publishes its own exports list.
 #
 # pass2-syn-002: the previously-stale rac_vad_{start,stop,reset} RAC_API
 # decls have been deleted from include/rac/features/vad/rac_vad_service.h.
@@ -117,6 +121,7 @@ _rac_device_set_callbacks
 # CPP-03: STT lifecycle-owned proto-byte stream ABI
 _rac_stt_set_stream_proto_callback
 _rac_stt_unset_stream_proto_callback
+_rac_stt_proto_quiesce
 _rac_stt_stream_start_proto
 _rac_stt_stream_feed_audio_proto
 _rac_stt_stream_stop_proto
@@ -133,6 +138,7 @@ _rac_stt_stream_cancel_proto
 # CPP-03: TTS lifecycle-owned proto-byte stream ABI
 _rac_tts_set_stream_proto_callback
 _rac_tts_unset_stream_proto_callback
+_rac_tts_proto_quiesce
 _rac_tts_stream_start_proto
 _rac_tts_stream_stop_proto
 _rac_tts_stream_cancel_proto
@@ -140,6 +146,7 @@ _rac_tts_stream_cancel_proto
 # CPP-03: VAD lifecycle-owned proto-byte stream ABI
 _rac_vad_set_stream_proto_callback
 _rac_vad_unset_stream_proto_callback
+_rac_vad_proto_quiesce
 _rac_vad_stream_start_proto
 _rac_vad_stream_feed_audio_proto
 _rac_vad_stream_stop_proto
@@ -196,6 +203,7 @@ _rac_tool_calling_run_loop_proto
 # CPP-03: Diffusion lifecycle-owned proto-byte stream ABI
 _rac_diffusion_set_stream_proto_callback
 _rac_diffusion_unset_stream_proto_callback
+_rac_diffusion_proto_quiesce
 _rac_diffusion_stream_start_proto
 _rac_diffusion_stream_stop_proto
 _rac_diffusion_stream_cancel_proto
@@ -279,6 +287,7 @@ _rac_storage_analyzer_delete_plan_proto
 _rac_storage_analyzer_delete_proto
 
 # LLM and speech generated-proto ABI
+_rac_llm_proto_quiesce
 _rac_llm_set_stream_proto_callback
 _rac_llm_unset_stream_proto_callback
 _rac_llm_generate_proto
@@ -828,9 +837,8 @@ _rac_log_metadata_should_redact
 # missing from the curated exports list. These 477 symbols were reported by
 # scripts/validation/check_rac_api_exports.sh --strict and are unconditional
 # core symbols (no backend gating). Sorted alphabetically; backend-conditional
-# symbols live in sibling files (RACommons.rag.exports,
-# RACommons.onnx_embeddings.exports, RACommons.whisperkit_coreml.exports)
-# and are appended by CMake when the matching RAC_BACKEND_* flag is ON.
+# symbols live in sibling files (RACommons.rag.exports) and are appended by
+# CMake when the matching RAC_BACKEND_* flag is ON.
 # ============================================================================
 
 _rac_analytics_emit_model_download_completed

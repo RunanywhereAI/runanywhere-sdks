@@ -222,6 +222,36 @@ RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_i
  * Token events are delivered to callback as serialized runanywhere.v1.SDKEvent
  * bytes. The optional out_result receives the aggregate runanywhere.v1.VLMResult
  * when generation completes.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ *          contract — see rac_llm_stream.h for the canonical recipe). The C
+ *          runtime may invoke `callback(bytes, size, user_data)` on a
+ *          background thread AFTER this entry point has returned, because
+ *          the dispatcher copies the callback slot under its internal mutex
+ *          and releases the mutex BEFORE invoking the user callback (see
+ *          rac_vlm_proto_abi.cpp lock-release-before-callback comment). The
+ *          caller MUST ensure no in-flight invocation is executing on a
+ *          background thread before freeing @p user_data.
+ *
+ *          Recommended teardown sequence:
+ *            (a) drive the stream to its terminal event or call
+ *                rac_vlm_cancel_proto(handle) / rac_vlm_cancel_lifecycle_proto()
+ *                — no NEW dispatches will fire once cancellation has been
+ *                observed by the generator loop;
+ *            (b) call rac_vlm_proto_quiesce() — spin-waits until every
+ *                in-flight callback invocation has returned;
+ *            (c) free @p user_data.
+ *
+ *          Modalities that currently expose proto_quiesce: LLM
+ *          (rac_llm_stream.h), STT (rac_stt_stream.h), TTS
+ *          (rac_tts_stream.h), VAD (rac_vad_stream.h), Diffusion
+ *          (rac_diffusion_stream.h), VLM (this header). voice_agent
+ *          quiesces in-flight callbacks as part of rac_voice_agent_destroy()
+ *          rather than exposing a standalone quiesce entry point. SDK
+ *          fan-out helpers (Swift HandleStreamAdapter, Kotlin/Flutter/RN
+ *          equivalents) centralize this dance for their host language;
+ *          refer to the canonical adapter implementation when porting a new
+ *          SDK.
  */
 RAC_API rac_result_t rac_vlm_process_stream_proto(
     rac_handle_t handle, const uint8_t* image_proto_bytes, size_t image_proto_size,
@@ -270,6 +300,23 @@ RAC_API rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes,
  * Uses the lifecycle-owned VLM model. The callback receives serialized
  * runanywhere.v1.VLMStreamEvent bytes including token deltas and exactly one
  * terminal event.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ *          contract — see rac_llm_stream.h for the canonical recipe). The C
+ *          runtime may invoke `callback(bytes, size, user_data)` on a
+ *          background thread AFTER this entry point has returned, because
+ *          the dispatcher copies the callback slot under its internal mutex
+ *          and releases the mutex BEFORE invoking the user callback. The
+ *          caller MUST ensure no in-flight invocation is executing on a
+ *          background thread before freeing @p user_data.
+ *
+ *          Recommended teardown sequence:
+ *            (a) drive the stream to its terminal event or call
+ *                rac_vlm_cancel_lifecycle_proto() — no NEW dispatches will
+ *                fire once cancellation has been observed;
+ *            (b) call rac_vlm_proto_quiesce() — spin-waits until every
+ *                in-flight callback invocation has returned;
+ *            (c) free @p user_data.
  */
 RAC_API rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes,
                                           size_t request_proto_size,

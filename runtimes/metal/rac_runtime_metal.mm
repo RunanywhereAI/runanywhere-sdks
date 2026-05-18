@@ -100,6 +100,33 @@ rac_result_t metal_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
         desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_MANAGED) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
+    /* Reject descriptor fields we cannot currently honor rather than silently
+     * dropping them. `newBufferWithLength:` returns at least 16-byte aligned
+     * memory on Apple silicon (256-byte on AMD/Intel); we do not currently
+     * route a posix_memalign'd pointer through `newBufferWithBytesNoCopy:` to
+     * satisfy stricter requests. device_index != 0 has no meaning while we
+     * always allocate from the default `MTLCreateSystemDefaultDevice()`. usage
+     * flags are advisory in this runtime (the backing MTLBuffer is always
+     * StorageModeShared with map-read/map-write), so any flags outside that
+     * set would be a silent contract violation. Mirror the shape of
+     * cpu_alloc_buffer_v2 at runtimes/cpu/rac_runtime_cpu.cpp:415-417. */
+    const uint32_t k_metal_natural_alignment = 16u;
+    if (desc->alignment > k_metal_natural_alignment) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (desc->device_index != 0) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    const uint64_t k_supported_usage_flags =
+        RAC_RUNTIME_BUFFER_USAGE_INPUT |
+        RAC_RUNTIME_BUFFER_USAGE_OUTPUT |
+        RAC_RUNTIME_BUFFER_USAGE_TEMPORARY |
+        RAC_RUNTIME_BUFFER_USAGE_CONSTANT |
+        RAC_RUNTIME_BUFFER_USAGE_MAP_READ |
+        RAC_RUNTIME_BUFFER_USAGE_MAP_WRITE;
+    if (desc->usage_flags & ~k_supported_usage_flags) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
     return metal_alloc_buffer(desc->bytes, out);
 }
 
@@ -188,16 +215,34 @@ rac_result_t metal_device_info(rac_runtime_device_info_t* out) {
     return RAC_SUCCESS;
 }
 
+// Forward declarations so metal_capabilities can inspect session-op pointers
+// before the vtable aggregates are defined below.
+extern const rac_runtime_vtable_v2_t k_metal_vtable_v2;
+extern const rac_runtime_vtable_t k_metal_vtable;
+
 rac_result_t metal_capabilities(rac_runtime_capabilities_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
-    out->capability_flags =
+    /* Buffer-related capabilities are unconditional: the runtime itself
+     * implements alloc/map/copy regardless of session-op presence. */
+    uint64_t flags =
         RAC_RUNTIME_CAP_FP16           |
         RAC_RUNTIME_CAP_ZERO_COPY      |
         RAC_RUNTIME_CAP_BUFFER_MAPPING |
         RAC_RUNTIME_CAP_BUFFER_COPY    |
-        RAC_RUNTIME_CAP_DEVICE_ALLOC   |
-        RAC_RUNTIME_CAP_OWNED_OUTPUTS;
+        RAC_RUNTIME_CAP_DEVICE_ALLOC;
+    /* Only advertise OWNED_OUTPUTS when an execution path can actually return
+     * runtime-owned outputs. Today the Metal adapter is buffer-allocator +
+     * device probe only (V1 create/run/destroy session and V2 run_session_v2
+     * are all nullptr). Mirrors cpu_capabilities's `any_v2` condition at
+     * runtimes/cpu/rac_runtime_cpu.cpp:214. */
+    const bool has_session_ops =
+        k_metal_vtable_v2.run_session_v2 != nullptr ||
+        k_metal_vtable.run_session != nullptr;
+    if (has_session_ops) {
+        flags |= RAC_RUNTIME_CAP_OWNED_OUTPUTS;
+    }
+    out->capability_flags = flags;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
     // Capability shrunk: Metal runtime is buffer-allocator + device probe only; no session ops.

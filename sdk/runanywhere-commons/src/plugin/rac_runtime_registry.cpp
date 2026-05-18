@@ -272,35 +272,68 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
     }
 
     auto& s = state();
-    std::unique_lock<std::mutex> lock(s.mu);
+    /* Eviction-and-insertion is a SINGLE critical section. The registry
+     * mutex MUST NOT be dropped between erasing the existing entry and
+     * inserting the replacement: a concurrent rac_runtime_register for
+     * the same id could otherwise observe an empty slot and insert its
+     * own entry, leaving the registry with two entries sharing one id
+     * (one silently leaked — unreachable from rac_runtime_unregister
+     * / rac_runtime_get_by_id, which only return the first match).
+     *
+     * Pattern: under the lock, steal the evicted entry into a local
+     * (removing it from `s.entries`) AND insert the replacement in the
+     * same critical section. Only AFTER lock release do we call
+     * destroy() + close_dynamic_handle on the locally-stolen entry —
+     * by then it is no longer reachable from the registry, so other
+     * threads cannot race with the tear-down. */
+    Entry evicted{
+        .id = RAC_RUNTIME_UNSPECIFIED, .priority = 0, .vtable = nullptr, .dl_handle = nullptr};
+    bool has_evicted = false;
+    bool rejected_duplicate = false;
+    {
+        std::lock_guard<std::mutex> lock(s.mu);
 
-    auto existing = std::ranges::find_if(
-        s.entries, [&](const Entry& e) { return e.id == vtable->metadata.id; });
-    if (existing != s.entries.end()) {
-        if (vtable->metadata.priority < existing->priority) {
-            RAC_LOG_DEBUG(
-                LOG_CAT, "rac_runtime_register: '%s' rejected (priority %d < existing %d)",
-                vtable->metadata.name, (int)vtable->metadata.priority, (int)existing->priority);
-            lock.unlock();
-            /* Unwind the init() we just performed. The existing runtime
-             * keeps its registration. */
-            vtable->destroy();
-            return RAC_ERROR_PLUGIN_DUPLICATE;
+        auto existing = std::ranges::find_if(
+            s.entries, [&](const Entry& e) { return e.id == vtable->metadata.id; });
+        if (existing != s.entries.end()) {
+            if (vtable->metadata.priority < existing->priority) {
+                RAC_LOG_DEBUG(
+                    LOG_CAT, "rac_runtime_register: '%s' rejected (priority %d < existing %d)",
+                    vtable->metadata.name, (int)vtable->metadata.priority, (int)existing->priority);
+                /* Existing entry stays registered. We defer destroy() of
+                 * the rejected vtable until after lock release. */
+                rejected_duplicate = true;
+            } else {
+                /* Steal the evicted entry into a local AND insert the
+                 * replacement, atomically, under the same lock. There is
+                 * no observable gap in which another thread could see an
+                 * empty slot for this id. */
+                evicted = *existing;
+                has_evicted = true;
+                s.entries.erase(existing);
+            }
         }
-        /* Tear down the evicted vtable with its own destroy(), still outside
-         * the registry mutex. */
-        Entry evicted = *existing;
-        s.entries.erase(existing);
-        lock.unlock();
-        evicted.vtable->destroy();
-        close_dynamic_handle(evicted.dl_handle);
-        lock.lock();
+
+        if (!rejected_duplicate) {
+            insert_locked(s, Entry{.id = vtable->metadata.id,
+                                   .priority = vtable->metadata.priority,
+                                   .vtable = vtable,
+                                   .dl_handle = nullptr});
+        }
     }
 
-    insert_locked(s, Entry{.id = vtable->metadata.id,
-                           .priority = vtable->metadata.priority,
-                           .vtable = vtable,
-                           .dl_handle = nullptr});
+    /* Lock released. The evicted entry (if any) is now unreachable from
+     * the registry; destroy + dlclose are safe to run without holding the
+     * registry mutex. Likewise the rejected vtable was never installed,
+     * so its destroy() races with nothing. */
+    if (rejected_duplicate) {
+        vtable->destroy();
+        return RAC_ERROR_PLUGIN_DUPLICATE;
+    }
+    if (has_evicted) {
+        evicted.vtable->destroy();
+        close_dynamic_handle(evicted.dl_handle);
+    }
 
     RAC_LOG_DEBUG(LOG_CAT, "rac_runtime_register: '%s' (id=%d) ok", vtable->metadata.name,
                   (int)vtable->metadata.id);

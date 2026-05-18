@@ -17,6 +17,7 @@
 #   sdk/runanywhere-commons/VERSIONS                       (PROJECT_VERSION line)
 #   Package.swift                                          (sdkVersion line)
 #   sdk/runanywhere-swift/.../SDKConstants.swift           (public `RunAnywhere.version`)
+#   sdk/runanywhere-swift/.../Generated/Versions.swift     (RAVersions.sdkVersion)
 #   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
 #   sdk/runanywhere-kotlin/.../SDKConstants.kt             (Kotlin VERSION constant)
 #   sdk/shared/proto-ts/package.json                       (proto-ts package version)
@@ -26,8 +27,10 @@
 #   sdk/runanywhere-react-native/package.json              (root)
 #   sdk/runanywhere-react-native/packages/*/package.json   (each package + proto-ts dep)
 #   sdk/runanywhere-react-native/.../SDKConstants.ts       (RN version constant)
+#   sdk/runanywhere-react-native/packages/*/android/build.gradle (def coreVersion)
 #   sdk/runanywhere-flutter/packages/*/pubspec.yaml        (each version: line)
 #   sdk/runanywhere-flutter/.../sdk_constants.dart         (Flutter version constant)
+#   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
 #   - SwiftPM XCFramework checksums — use sync-checksums.sh after release zips exist.
@@ -37,9 +40,11 @@
 #     (drives `flutter pub get` host), not the SDK release version. The
 #     toolchain pin is centralized in `sdk/runanywhere-commons/VERSIONS`
 #     (`FLUTTER_VERSION`); bumping the toolchain is a separate concern.
-#   - dependencies/versions.json — centralized THIRD-PARTY library pins,
-#     not the RunAnywhere SDK release version. Edit by hand when bumping
-#     a vendored library.
+#   - dependencies/versions.json third-party pins (long, protobufjs, typescript,
+#     eslint, vite, react-native, etc.) — those track upstream library
+#     versions, not OUR release version. Only the first-party
+#     @runanywhere/proto-ts pin (published from this repo in lockstep with
+#     the SDK suite) is bumped by this script.
 #   - .syncpackrc.json — derived from dependencies/versions.json; mirror by hand.
 # =============================================================================
 
@@ -112,6 +117,29 @@ bump_npm_proto_ts_dep() {
         "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
 }
 
+# Update the first-party `@runanywhere/proto-ts` pin inside
+# `dependencies/versions.json`. While that file is otherwise a third-party
+# library registry, `@runanywhere/proto-ts` is published from THIS repo in
+# lockstep with the SDK suite — leaving the pin behind ships a stale
+# version every release. See pass3-syn-015.
+bump_versions_json_proto_ts_pin() {
+    local file="$1"
+    bump_line "$file" \
+        '"@runanywhere/proto-ts": "\^[0-9]+\.[0-9]+\.[0-9]+"' \
+        "\"@runanywhere/proto-ts\": \"^${NEW_VERSION}\""
+}
+
+# Update `def coreVersion = "x.y.z"` in RN backend Android build.gradle files.
+# Each backend package's Gradle script derives its native-asset download URL
+# from `coreVersion`, so it must track the SDK suite version or `assemble*`
+# will try to fetch a release tag that doesn't exist (or fetch the wrong one).
+bump_rn_backend_core_version() {
+    local file="$1"
+    bump_line "$file" \
+        'def coreVersion = "[0-9]+\.[0-9]+\.[0-9]+"' \
+        "def coreVersion = \"${NEW_VERSION}\""
+}
+
 echo ">> Syncing versions to ${NEW_VERSION}"
 echo ">> Repo root: ${REPO_ROOT}"
 echo ""
@@ -138,6 +166,14 @@ fi
 bump_line "${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift" \
     'public static let version = "[^"]+"' \
     "public static let version = \"${NEW_VERSION}\""
+# Versions.swift — RAVersions.sdkVersion (centralized version constant whose
+# file header explicitly states `Do not hand-edit; run scripts/sync-versions.sh
+# to refresh.`). The other RAVersions literals (swiftToolsVersion, dep floors)
+# track Package.swift's `.upToNextMinor(from:)` constraints and are managed
+# alongside dep bumps in the same commit — not by this release-version script.
+bump_line "${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift" \
+    'public static let sdkVersion = "[^"]+"' \
+    "public static let sdkVersion = \"${NEW_VERSION}\""
 
 # 3. Kotlin gradle.properties + SDKConstants.kt
 echo ""
@@ -166,6 +202,14 @@ bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanyw
 echo ""
 echo ">> Shared proto-ts:"
 bump_json_version "${REPO_ROOT}/sdk/shared/proto-ts/package.json"
+# Also bump the first-party `@runanywhere/proto-ts` pin in
+# `dependencies/versions.json` (the central TS-deps registry that
+# renovate.json's customManager and syncpack read). The proto-ts package is
+# published from this repo in lockstep with the SDK suite, so its pin must
+# advance with every release — otherwise downstream consumers (and any tool
+# reading versions.json as source-of-truth) resolve to the prior release's
+# proto-ts. See pass3-syn-015.
+bump_versions_json_proto_ts_pin "${REPO_ROOT}/dependencies/versions.json"
 
 # 4. Web SDK packages
 echo ""
@@ -200,6 +244,17 @@ done
 bump_line "${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/Foundation/Constants/SDKConstants.ts" \
     "version: '[^']+'" \
     "version: '${NEW_VERSION}'"
+
+# RN backend Android build.gradle `coreVersion` — each backend package
+# derives its native-asset download URL from this constant
+# (`core-v${coreVersion}` GitHub Release tag), so it must track the SDK suite
+# version. Leaving it stale causes assemble tasks to fetch wrong/missing
+# artifacts on release builds. See pass3-syn-078.
+for gradle_file in \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/build.gradle" \
+    "${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/build.gradle"; do
+    bump_rn_backend_core_version "$gradle_file"
+done
 
 # 6. Flutter SDK packages
 echo ""

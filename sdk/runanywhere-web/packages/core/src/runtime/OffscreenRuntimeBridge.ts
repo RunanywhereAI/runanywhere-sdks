@@ -229,6 +229,11 @@ export class OffscreenRuntimeBridge {
         // Best-effort terminate to release a stuck worker thread.
         try { this.worker?.terminate(); } catch { /* swallow */ }
         this.worker = null;
+        // pass3-syn-155: clear the cached readyPromise on rejection so
+        // a subsequent spawnWorker() can retry instead of returning the
+        // sticky rejected promise (which would force a full SDK shutdown
+        // just to recover from a transient handshake failure).
+        this.readyPromise = null;
         reject(err instanceof Error ? err : new Error(String(err)));
       };
       try {
@@ -280,15 +285,28 @@ export class OffscreenRuntimeBridge {
             ),
           );
         }, HANDSHAKE_TIMEOUT_MS);
+        // pass3-syn-154: clone wasmBytes into a fresh ArrayBuffer for
+        // each spawn before transferring. The previous code transferred
+        // `_init.wasmBytes` directly, which detached the original buffer
+        // and left a zero-length view in `_init` — every spawn after the
+        // first (e.g. retry after settleReject() clears readyPromise, or
+        // a future second bridge instantiation) would post an empty
+        // wasmBytes to the worker. Cloning costs one extra copy of the
+        // wasm payload (tens of MB) per spawn but is the only correct
+        // option: we cannot re-fetch the bytes from here, because the
+        // original source is owned by the backend that called
+        // `setStreamWorkerInit`. Spawns are rare (singleton + sticky
+        // success caching) so the perf impact is negligible.
+        const wasmBytesCopy = _init.wasmBytes.slice(0);
         const initMsg: WorkerRequest = {
           type: 'init',
-          wasmBytes: _init.wasmBytes,
+          wasmBytes: wasmBytesCopy,
           moduleFactoryId: _init.moduleFactoryId,
         };
-        // Transfer wasmBytes (tens of MB) instead of structured-cloning
-        // — the main thread already owns its own instantiated module
-        // and does not need this buffer after init. See pass2-syn-089.
-        worker.postMessage(initMsg, [initMsg.wasmBytes]);
+        // Transfer the fresh copy (not the original) — the worker
+        // takes ownership and the main thread does not need it after
+        // init. See pass2-syn-089 / pass3-syn-154.
+        worker.postMessage(initMsg, [wasmBytesCopy]);
       } catch (err) {
         settleReject(err);
       }

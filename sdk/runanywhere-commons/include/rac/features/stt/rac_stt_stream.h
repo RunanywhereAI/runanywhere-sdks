@@ -64,6 +64,34 @@ typedef void (*rac_stt_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
  *
  * @retval RAC_SUCCESS                     Callback registered.
  * @retval RAC_ERROR_INVALID_HANDLE        @p handle is null or invalid.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ *          contract — see rac_llm_stream.h for the canonical recipe). The C
+ *          runtime may invoke `callback(bytes, size, user_data)` on a
+ *          background thread AFTER rac_stt_unset_stream_proto_callback(handle)
+ *          has returned, because the dispatcher copies the callback slot
+ *          under its internal mutex and releases the mutex BEFORE invoking
+ *          the user callback (see rac_stt_stream.cpp
+ *          lock-release-before-callback comment). The caller MUST ensure no
+ *          in-flight invocation is executing on a background thread before
+ *          freeing @p user_data.
+ *
+ *          Recommended teardown sequence:
+ *            (a) call rac_stt_unset_stream_proto_callback(handle) — clears
+ *                the slot atomically so no NEW dispatches will fire;
+ *            (b) call rac_stt_proto_quiesce() — spin-waits until every
+ *                in-flight callback invocation has returned;
+ *            (c) free @p user_data.
+ *
+ *          Modalities that currently expose proto_quiesce: LLM
+ *          (rac_llm_stream.h), STT (this header), TTS (rac_tts_stream.h),
+ *          VAD (rac_vad_stream.h), Diffusion (rac_diffusion_stream.h), VLM
+ *          (rac_vlm_service.h). voice_agent quiesces in-flight callbacks as
+ *          part of rac_voice_agent_destroy() rather than exposing a
+ *          standalone quiesce entry point. SDK fan-out helpers
+ *          (Swift HandleStreamAdapter, Kotlin/Flutter/RN equivalents)
+ *          centralize this dance for their host language; refer to the
+ *          canonical adapter implementation when porting a new SDK.
  */
 RAC_API rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
                                                        rac_stt_stream_proto_callback_fn callback,
@@ -75,6 +103,16 @@ RAC_API rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
  * Equivalent to `rac_stt_set_stream_proto_callback(handle, NULL, NULL)`.
  */
 RAC_API rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle);
+
+/**
+ * @brief Spin-wait until all in-flight STT proto-byte stream dispatches have
+ *        returned. Mirrors rac_vlm_proto_quiesce / rac_llm_proto_quiesce.
+ *        Callers freeing user_data passed into
+ *        rac_stt_set_stream_proto_callback, or tearing down the STT
+ *        component, should call this after the unset before freeing the
+ *        user_data. Safe to call from any thread.
+ */
+RAC_API void rac_stt_proto_quiesce(void);
 
 /**
  * @brief Start a streaming transcription session.

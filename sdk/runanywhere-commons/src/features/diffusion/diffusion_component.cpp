@@ -21,6 +21,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diffusion/rac_diffusion_stream.h"
 #include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
 // =============================================================================
@@ -326,6 +327,18 @@ extern "C" void rac_diffusion_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
+    // B-FL-5-001 sibling fix: clear any lingering proto-stream callback
+    // registration keyed by this component handle BEFORE freeing the memory.
+    // Even though rac_diffusion_stream_start_proto is currently NOT_IMPLEMENTED,
+    // the slot registry is live and reachable via the public ABI — clearing
+    // here prevents stale wire-seq / stale user_data when the handle heap
+    // address is reused by a fresh component.
+    rac_diffusion_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-diffusion: spin-wait for any in-flight
+    // dispatch_diffusion_stream_event() invocation on another thread before
+    // freeing the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
+    rac_diffusion_proto_quiesce();
+
     RAC_LOG_INFO("Diffusion.Component", "Diffusion component destroyed");
 
     delete component;
@@ -344,6 +357,16 @@ extern "C" rac_result_t rac_diffusion_component_load_model(rac_handle_t handle,
 
     auto* component = reinterpret_cast<rac_diffusion_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // registration BEFORE loading a new model. The load_model path elides
+    // destroy → original destroy-time fix never fires for handle reuse, so
+    // the wire-seq counter in g_slots() would retain its prior value.
+    rac_diffusion_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-diffusion: drain any in-flight dispatcher bound
+    // to the previous model before swapping in the new one so user_data
+    // captured by the previous registration can be safely freed.
+    rac_diffusion_proto_quiesce();
 
     // Delegate to lifecycle manager
     rac_handle_t service = nullptr;

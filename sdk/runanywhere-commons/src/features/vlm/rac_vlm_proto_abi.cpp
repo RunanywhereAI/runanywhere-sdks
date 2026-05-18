@@ -43,16 +43,48 @@ namespace {
 // We increment the counter on entry to each stream entry-point and decrement
 // just before returning. rac_vlm_component_destroy spin-waits for the counter
 // to drain to zero, exactly mirroring voice_agent.cpp:594.
+//
+// pass3-syn-089: complete the voice_agent pattern by adding an
+// is_shutting_down barrier (voice_agent.cpp:569 / 1212-1221). Without it, a
+// new caller could acquire the in_flight counter mid-quiesce and extend the
+// spin-wait indefinitely (and worse, dispatch on a legacy struct-API service
+// whose backend is being freed). VlmInFlightGuard now performs the canonical
+// TOCTOU-safe sequence: check flag, increment counter, re-check flag, and
+// expose admitted() so entry points can early-return without dispatching.
 std::atomic<int>& vlm_in_flight() {
     static std::atomic<int> counter{0};
     return counter;
 }
 
+std::atomic<bool>& vlm_proto_shutting_down() {
+    static std::atomic<bool> flag{false};
+    return flag;
+}
+
 struct VlmInFlightGuard {
-    VlmInFlightGuard() { vlm_in_flight().fetch_add(1, std::memory_order_acq_rel); }
-    ~VlmInFlightGuard() { vlm_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    VlmInFlightGuard() {
+        if (vlm_proto_shutting_down().load(std::memory_order_acquire)) {
+            return;
+        }
+        vlm_in_flight().fetch_add(1, std::memory_order_acq_rel);
+        // Re-check after incrementing to avoid TOCTOU with rac_vlm_proto_quiesce.
+        if (vlm_proto_shutting_down().load(std::memory_order_acquire)) {
+            vlm_in_flight().fetch_sub(1, std::memory_order_acq_rel);
+            return;
+        }
+        admitted_ = true;
+    }
+    ~VlmInFlightGuard() {
+        if (admitted_) {
+            vlm_in_flight().fetch_sub(1, std::memory_order_acq_rel);
+        }
+    }
+    bool admitted() const { return admitted_; }
     VlmInFlightGuard(const VlmInFlightGuard&) = delete;
     VlmInFlightGuard& operator=(const VlmInFlightGuard&) = delete;
+
+   private:
+    bool admitted_{false};
 };
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -409,7 +441,18 @@ extern "C" {
 // teardown paths in SDK bridges) spin-wait here before freeing any
 // user_data that may have been passed into a rac_vlm_*_stream_proto call.
 // Mirrors the contract documented in pass2-syn-001 for the LLM dispatcher.
+//
+// pass3-syn-089: set the is_shutting_down barrier FIRST so any caller that
+// tries to enter the dispatcher after quiesce begins is rejected by
+// VlmInFlightGuard, then spin-wait until currently-in-flight calls drain.
+// This mirrors voice_agent.cpp:569-592 exactly. The flag is intentionally
+// process-lifetime sticky: there is no resume contract — once VLM proto-byte
+// dispatch is quiesced, the lifecycle has already been torn down and the
+// only valid next step is destroying the SDK or re-initializing it (which
+// constructs a fresh process). If a future caller needs to resume, add a
+// matching rac_vlm_proto_resume() that clears the flag.
 void rac_vlm_proto_quiesce(void) {
+    vlm_proto_shutting_down().store(true, std::memory_order_release);
     while (vlm_in_flight().load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
@@ -429,6 +472,10 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     return feature_unavailable(out_result);
 #else
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                          "VLM proto ABI is shutting down");
+    }
     // Phase 6j fix: prefer the lifecycle-owned VLM service over the caller's
     // handle. iOS SDK's `CppBridge.VLM` passes a `rac_vlm_component*` into this
     // proto ABI (the only VLM handle it owns), not a `rac_vlm_service_t*`.
@@ -528,6 +575,11 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
     return feature_unavailable(out_result);
 #else
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return out_result ? rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                                       "VLM proto ABI is shutting down")
+                          : RAC_ERROR_INVALID_STATE;
+    }
     // Phase 6j fix: mirror rac_vlm_process_proto -- prefer the lifecycle-owned
     // VLM service so Swift's component-handle and Kotlin's service-handle paths
     // converge on the correct ops vtable.
@@ -628,6 +680,9 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return RAC_ERROR_INVALID_STATE;
+    }
     // Phase 6j fix: prefer the lifecycle-owned VLM to avoid the handle-type
     // mismatch that crashed `rac_vlm_process_proto` on iOS. The `handle`
     // parameter is kept only as a legacy fallback for struct-API smoke tests.
@@ -688,6 +743,10 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     return feature_unavailable(out_result);
 #else
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                          "VLM proto ABI is shutting down");
+    }
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -762,6 +821,9 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
     }
 
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return RAC_ERROR_INVALID_STATE;
+    }
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {
@@ -860,6 +922,10 @@ rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event) {
     return feature_unavailable(out_event);
 #else
     VlmInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return rac_proto_buffer_set_error(out_event, RAC_ERROR_INVALID_STATE,
+                                          "VLM proto ABI is shutting down");
+    }
     rac::vlm::LifecycleVlmRef ref;
     rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
     if (rc != RAC_SUCCESS) {

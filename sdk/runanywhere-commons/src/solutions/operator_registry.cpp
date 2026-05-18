@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -904,29 +905,49 @@ void OperatorRegistry::clear() noexcept {
 }
 
 namespace {
-// Process-wide last operator-error-detail buffer. Operators write here from
-// scheduler worker threads; SolutionRunner::wait() drains it on the host
-// thread and promotes the value into the thread_local
-// `rac_error_set_details` slot so the C ABI surfaces the honest cause.
+// Per-writer-thread operator-error-detail slots. Operators write here from
+// scheduler worker threads (each scheduler-owned thread has its own slot);
+// SolutionRunner::wait() drains the slots on the host thread and promotes
+// the value into the thread_local `rac_error_set_details` slot so the C ABI
+// surfaces the honest cause.
+//
+// Indexing by writer std::thread::id avoids the previous last-writer-wins
+// race between concurrent operator threads on a single process-wide string.
+// Drain semantics (consume() pops every entry) keep the host-side view
+// behaviourally identical to the prior single-slot design for single-runner
+// hosts. Multi-runner hosts still observe cross-runner attribution because
+// no per-runner token is threaded through the operator factory; that
+// remaining limitation is documented on consume_operator_error_detail.
 std::mutex& operator_error_detail_mutex() {
     static std::mutex m;
     return m;
 }
-std::string& operator_error_detail_value() {
-    static std::string v;
-    return v;
+std::unordered_map<std::thread::id, std::string>& operator_error_detail_slots() {
+    static std::unordered_map<std::thread::id, std::string> slots;
+    return slots;
 }
 }  // namespace
 
 void record_operator_error_detail(const std::string& detail) {
     std::lock_guard<std::mutex> lock(operator_error_detail_mutex());
-    operator_error_detail_value() = detail;
+    operator_error_detail_slots()[std::this_thread::get_id()] = detail;
 }
 
 std::string consume_operator_error_detail() {
     std::lock_guard<std::mutex> lock(operator_error_detail_mutex());
+    auto& slots = operator_error_detail_slots();
+    if (slots.empty())
+        return {};
+    // Return the longest detail string as a heuristic for "most informative",
+    // then drain all slots so the next consume() starts from a clean state.
+    // We do not attempt to attribute by runner because no token is threaded
+    // through the operator factory at construction time.
     std::string out;
-    out.swap(operator_error_detail_value());
+    for (auto& [tid, value] : slots) {
+        if (value.size() > out.size())
+            out = std::move(value);
+    }
+    slots.clear();
     return out;
 }
 

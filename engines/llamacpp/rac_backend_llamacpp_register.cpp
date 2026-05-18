@@ -21,6 +21,7 @@
 #include "rac/plugin/rac_cpu_runtime_provider.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_llamacpp.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
@@ -465,7 +466,9 @@ rac_result_t rac_backend_llamacpp_register(void) {
   // links the backend directly). Register the plugin entry here so
   // rac_plugin_route(framework=llamacpp) can find the LLM vtable. Mirrors
   // the pattern in rac_backend_onnx_register.cpp.
-  extern const rac_engine_vtable_t *rac_plugin_entry_llamacpp(void);
+  // pass3-syn-166: forward decl now comes via rac_plugin_entry_llamacpp.h so
+  // the RAC_API visibility attribute (stamped by RAC_PLUGIN_ENTRY_DECL) is
+  // consistent across all consumers of this symbol.
   const rac_engine_vtable_t *vt = rac_plugin_entry_llamacpp();
   if (vt != nullptr) {
     rac_result_t plugin_rc = rac_plugin_register(vt);

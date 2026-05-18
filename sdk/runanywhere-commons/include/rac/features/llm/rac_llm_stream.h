@@ -74,6 +74,33 @@ typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
  *                                         Protobuf (no rac_idl target);
  *                                         frontend should fall back to
  *                                         the struct callback path.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ *          contract). The C runtime may invoke
+ *          `callback(bytes, size, user_data)` on a background thread AFTER
+ *          rac_llm_unset_stream_proto_callback(handle) has returned, because
+ *          the dispatcher copies the callback slot under its internal mutex
+ *          and releases the mutex BEFORE invoking the user callback (see
+ *          rac_llm_stream.cpp lock-release-before-callback comment). The
+ *          caller MUST ensure no in-flight invocation is executing on a
+ *          background thread before freeing @p user_data.
+ *
+ *          Recommended teardown sequence:
+ *            (a) call rac_llm_unset_stream_proto_callback(handle) — clears
+ *                the slot atomically so no NEW dispatches will fire;
+ *            (b) call rac_llm_proto_quiesce() — spin-waits until every
+ *                in-flight callback invocation has returned;
+ *            (c) free @p user_data.
+ *
+ *          Modalities that currently expose proto_quiesce: LLM (this
+ *          header), VLM (rac_vlm_service.h), voice_agent. Modalities
+ *          without a public quiesce (STT/TTS/VAD/Diffusion at HEAD) must
+ *          coordinate teardown through their own caller-side in-flight
+ *          counter on the user_data wrapper, or rely on the
+ *          lifecycle-refcount unload semantics. SDK fan-out helpers
+ *          (Swift HandleStreamAdapter, Kotlin/Flutter/RN equivalents)
+ *          centralize this dance for their host language; refer to the
+ *          canonical adapter implementation when porting a new SDK.
  */
 RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t handle,
                                                        rac_llm_stream_proto_callback_fn callback,
@@ -89,6 +116,16 @@ RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t handle,
  * @retval RAC_ERROR_INVALID_HANDLE @p handle is null.
  */
 RAC_API rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);
+
+/**
+ * @brief Spin-wait until all in-flight LLM proto-byte stream dispatches have
+ *        returned. Mirrors the voice_agent in_flight pattern
+ *        (voice_agent.cpp:594) and rac_vlm_proto_quiesce. Callers freeing
+ *        user_data passed into rac_llm_set_stream_proto_callback, or tearing
+ *        down the LLM component, should call this before freeing the
+ *        user_data. Safe to call from any thread.
+ */
+RAC_API void rac_llm_proto_quiesce(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

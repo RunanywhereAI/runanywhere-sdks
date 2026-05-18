@@ -350,6 +350,174 @@ final class HandleStreamAdapterTests: XCTestCase {
         consumerB.cancel()
     }
 
+    // MARK: - Test 5: Synchronous unregister callback must not deadlock tearDown
+
+    /// Regression guard for `pass3-syn-057`: `tearDown` must release the
+    /// per-handle lock BEFORE calling the C `unregister(...)` closure.
+    /// If a future commons unset path synchronously delivers a final
+    /// event (the contract the install() comment was added to defend
+    /// against), the trampoline re-enters `broadcast` →
+    /// `state.withLock`. `OSAllocatedUnfairLock` is non-recursive, so
+    /// the old code (which held the lock across `unregister(handle)`)
+    /// would deadlock. With the fixed ordering this test completes
+    /// inside the 1-second timeout and `unregister` fires exactly once.
+    func testSynchronousUnregisterCallbackDoesNotDeadlockTearDown() async throws {
+        let registerCount = OSAllocatedUnfairLock<Int>(initialState: 0)
+        let unregisterCount = OSAllocatedUnfairLock<Int>(initialState: 0)
+        let capture = OSAllocatedUnfairLock<CapturedTrampoline>(initialState: .init())
+        let handle = CollidingHandle(id: 42)
+        let streamKey = uniqueStreamKey()
+
+        let adapter = HandleStreamAdapter<CollidingHandle, RAChatMessage>(
+            handle: handle,
+            streamKey: streamKey,
+            register: { _, callback, userPtr in
+                registerCount.withLock { $0 += 1 }
+                let snapshot = CapturedTrampoline(callback: callback, userPtr: userPtr)
+                capture.withLock { $0 = snapshot }
+                return 0
+            },
+            unregister: { _ in
+                // Simulate a commons unset path that synchronously
+                // delivers a final byte during deregistration. The
+                // trampoline re-enters `deliverBytes` → `broadcast` →
+                // `state.withLock`. If `tearDown` holds the lock across
+                // this call, `OSAllocatedUnfairLock` (non-recursive)
+                // deadlocks. With the fix, the lock is released before
+                // this closure runs and re-entry is safe.
+                let snapshot = capture.withLock { $0 }
+                if let callback = snapshot.callback {
+                    var finalEvent = RAChatMessage()
+                    finalEvent.id = "final-from-unregister"
+                    if let bytes = try? finalEvent.serializedData() {
+                        bytes.withUnsafeBytes { raw in
+                            let base = raw.bindMemory(to: UInt8.self).baseAddress
+                            callback(base, bytes.count, snapshot.userPtr)
+                        }
+                    }
+                }
+                unregisterCount.withLock { $0 += 1 }
+            }
+        )
+
+        let consumer = Task {
+            for await _ in adapter.stream() {
+                // Drain. The synchronous final byte will fan out here
+                // before the consumer is torn down.
+            }
+        }
+
+        let installed = await waitFor { registerCount.withLock { $0 } == 1 }
+        XCTAssertTrue(installed, "register must fire exactly once for the sole subscriber")
+
+        // Drive tearDown via cancellation. With the fix this completes
+        // well inside the 1-second budget; pre-fix this hangs forever
+        // because tearDown's lock contends with the re-entered
+        // broadcast's lock acquisition.
+        let teardownStart = Date()
+        consumer.cancel()
+        let torn = await waitFor(timeout: 1.0) { unregisterCount.withLock { $0 } == 1 }
+        let elapsed = Date().timeIntervalSince(teardownStart)
+
+        XCTAssertTrue(
+            torn,
+            "tearDown must complete within 1 second; synchronous unregister callback must not deadlock"
+        )
+        XCTAssertLessThan(elapsed, 1.0, "tearDown elapsed = \(elapsed)s")
+        XCTAssertEqual(
+            unregisterCount.withLock { $0 },
+            1,
+            "unregister must fire exactly once even when it synchronously re-enters broadcast"
+        )
+        XCTAssertEqual(
+            registerCount.withLock { $0 },
+            1,
+            "tearDown must not re-enter register()"
+        )
+    }
+
+    // MARK: - Test 6: Cancel-to-native latency parity contract (pass3-syn-032)
+
+    /// Cross-SDK cancellation contract regression test.
+    ///
+    /// `pass3-syn-032`: Swift is the reference SDK for the streaming
+    /// fan-out adapters; Kotlin/Flutter/RN/Web mirror this shape. The
+    /// cross-SDK contract is: when the LAST consumer of a fan-out cancels
+    /// (or, equivalently, when a terminal event arrives), the C-side
+    /// `unregister(handle)` MUST fire exactly once and the latency from
+    /// `cancel()` to the unregister callback firing must be bounded
+    /// (here: <250ms on a CI runner — generously slack to absorb
+    /// scheduler jitter).
+    ///
+    /// The test installs a fresh trampoline, attaches N consumers,
+    /// cancels them all at once, and asserts:
+    ///   1. `unregister` fires exactly once,
+    ///   2. the elapsed wall-clock from the cancel() call to the
+    ///      observed unregister is < 250ms,
+    ///   3. `register` is not re-entered as a side-effect of teardown.
+    func testCancelToNativeLatencyContract() async throws {
+        let registerCount = OSAllocatedUnfairLock<Int>(initialState: 0)
+        let unregisterCount = OSAllocatedUnfairLock<Int>(initialState: 0)
+        let handle = UniqueHandle(id: UUID())
+        let streamKey = uniqueStreamKey()
+
+        let adapter = HandleStreamAdapter<UniqueHandle, RAChatMessage>(
+            handle: handle,
+            streamKey: streamKey,
+            register: { _, _, _ in
+                registerCount.withLock { $0 += 1 }
+                return 0
+            },
+            unregister: { _ in
+                unregisterCount.withLock { $0 += 1 }
+            }
+        )
+
+        let consumerCount = 5
+        var consumers: [Task<Void, Never>] = []
+        for _ in 0..<consumerCount {
+            consumers.append(Task {
+                for await _ in adapter.stream() {
+                    // No events; we cancel below.
+                }
+            })
+        }
+
+        let installed = await waitFor { registerCount.withLock { $0 } == 1 }
+        XCTAssertTrue(installed, "register must run exactly once for the consumer cohort")
+
+        // Cross-SDK cancellation latency budget. Each SDK adapter has an
+        // analogous test (Kotlin `LLMStreamAdapter`, Flutter
+        // `dart_bridge_*` proto callbacks, RN HybridLLM, Web StreamWorker)
+        // that fans cancel from a structured-concurrency primitive into
+        // commons. The 250 ms budget is the parity contract.
+        let cancelStart = Date()
+        for task in consumers { task.cancel() }
+
+        let torn = await waitFor(timeout: 0.25) { unregisterCount.withLock { $0 } == 1 }
+        let elapsed = Date().timeIntervalSince(cancelStart)
+
+        XCTAssertTrue(
+            torn,
+            "cross-SDK cancel-to-native latency contract violated: \(elapsed)s > 250ms"
+        )
+        XCTAssertLessThan(
+            elapsed,
+            0.25,
+            "cancel-to-native unregister fired in \(elapsed * 1000) ms (budget: 250 ms)"
+        )
+        XCTAssertEqual(
+            unregisterCount.withLock { $0 },
+            1,
+            "unregister must fire exactly once regardless of how many consumers cancel"
+        )
+        XCTAssertEqual(
+            registerCount.withLock { $0 },
+            1,
+            "teardown must not re-enter register()"
+        )
+    }
+
     // MARK: - Private helpers
 
     /// Invoke a captured `@convention(c)` trampoline with the proto-byte

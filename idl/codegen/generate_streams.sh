@@ -64,9 +64,28 @@ const tuples = [
     ['SDKEvents',        'sdk_events',        'SDKEventSubscribeRequest',   'SDKEvent',                    'Subscribe',      '../sdk_events',          '../sdk_events'],
     ['StructuredOutput', 'structured_output', 'StructuredOutputRequest',    'StructuredOutputStreamEvent', 'GenerateStream', '../structured_output',   '../structured_output'],
 ];
+// Derive source_proto from request_module: '../voice_agent_service' ->
+// 'idl/voice_agent_service.proto'. Previously the Nunjucks template
+// hard-coded 'idl/<service_lower>_service.proto' which was wrong for 10
+// of the 12 tuples below (e.g. VLM lives in vlm_options.proto, not
+// vlm_service.proto). Keeping the derivation in this driver lets the
+// template stay agnostic of any per-service naming exceptions.
+function sourceProtoFromRequestModule(reqMod) {
+    const base = reqMod.replace(/^\.\.\//, '');
+    return 'idl/' + base + '.proto';
+}
 for (const [s, l, req, resp, rpc, reqMod, respMod] of tuples) {
     const out = '${OUT_DIR}/' + l + '_service_stream.ts';
-    const vars = { service_name: s, service_lower: l, request_type: req, response_type: resp, rpc_name: rpc, request_module: reqMod, response_module: respMod };
+    const vars = {
+        service_name: s,
+        service_lower: l,
+        request_type: req,
+        response_type: resp,
+        rpc_name: rpc,
+        request_module: reqMod,
+        response_module: respMod,
+        source_proto: sourceProtoFromRequestModule(reqMod),
+    };
     fs.writeFileSync(out, render(vars));
     console.log('  wrote', out);
 }

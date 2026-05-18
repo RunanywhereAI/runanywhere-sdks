@@ -21,10 +21,12 @@
 
 #include "rac/features/llm/rac_llm_stream.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -32,6 +34,30 @@
 #include "rac/core/rac_logger.h"
 
 namespace {
+
+// pass2-syn-001-followup-llm: lift the voice_agent in_flight quiesce pattern
+// to the LLM proto-byte dispatcher. The dispatch_llm_stream_event() function
+// copies the (callback, user_data) pair out of g_slots() under g_mu(), then
+// drops the lock before invoking slot.fn(). A concurrent
+// rac_llm_unset_stream_proto_callback() / rac_llm_component_destroy() can
+// race the dispatch thread and free the user_data while slot.fn() is still
+// running on another thread, yielding EXC_BAD_ACCESS in the trampoline (iOS
+// Swift) or SIGSEGV in the std::function copy (RN Android/iOS). The in_flight
+// counter is incremented at entry to dispatch_llm_stream_event() and
+// decremented just before returning. rac_llm_proto_quiesce() spin-waits for
+// the counter to drain to zero, exactly mirroring voice_agent.cpp:594 and
+// rac_vlm_proto_abi.cpp:412.
+std::atomic<int>& llm_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct LlmInFlightGuard {
+    LlmInFlightGuard() { llm_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~LlmInFlightGuard() { llm_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    LlmInFlightGuard(const LlmInFlightGuard&) = delete;
+    LlmInFlightGuard& operator=(const LlmInFlightGuard&) = delete;
+};
 
 struct CallbackSlot {
     rac_llm_stream_proto_callback_fn fn = nullptr;
@@ -93,6 +119,16 @@ rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
+// Public quiesce helper. Callers (rac_llm_component_destroy, lifecycle
+// teardown paths in SDK bridges) spin-wait here before freeing any
+// user_data that may have been captured by a concurrent
+// dispatch_llm_stream_event invocation. Mirrors rac_vlm_proto_quiesce().
+void rac_llm_proto_quiesce(void) {
+    while (llm_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
+}
+
 }  // extern "C"
 
 namespace rac::llm {
@@ -104,15 +140,25 @@ int derive_event_kind(int kind, bool is_final, const char* error_message) {
     constexpr int kUnspecified = 0;
     constexpr int kToken = 2;
     constexpr int kThinking = 3;
+    constexpr int kToolCall = 4;
     constexpr int kCompleted = 6;
     constexpr int kError = 7;
-    constexpr int kTokenKindThought = 2;  // TOKEN_KIND_THOUGHT
+    constexpr int kTokenKindThought = 2;   // TOKEN_KIND_THOUGHT
+    constexpr int kTokenKindToolCall = 3;  // TOKEN_KIND_TOOL_CALL
 
     if (is_final) {
         return (error_message && error_message[0] != '\0') ? kError : kCompleted;
     }
     if (kind == kTokenKindThought) {
         return kThinking;
+    }
+    // pass3-syn-039: surface tool-call events on the canonical LLMStreamEvent
+    // path. The proto-service producer emits an event with
+    // kind=TOKEN_KIND_TOOL_CALL + tool_call payload when the tool-calling
+    // parser detects a call mid-stream; LLM_STREAM_EVENT_KIND_TOOL_CALL is the
+    // matching event_kind so consumers can branch on field 12 alone.
+    if (kind == kTokenKindToolCall) {
+        return kToolCall;
     }
     if (kind == 0) {
         return kUnspecified;
@@ -257,11 +303,24 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
 //  15: int32  prompt_tokens_processed     (varint)
 //  16: int32  completion_tokens_generated (varint)
 //  17: int64  elapsed_ms                  (varint)
+//  18: bytes  tool_call                   (length-delimited, pre-serialized
+//                                          runanywhere.v1.ToolCall bytes via
+//                                          LLMStreamEventParams::tool_call_bytes;
+//                                          omitted when tool_call_bytes == NULL
+//                                          or tool_call_bytes_size == 0)
 //
 // Field 10 (nested LLMStreamFinalResult) is NOT emitted on the
 // hand-encoded path because no caller sets LLMStreamEventParams::final_result
 // without libprotobuf (proto_service, the only populator of `result`,
 // runs only with RAC_HAVE_PROTOBUF defined).
+//
+// Field 18 (nested runanywhere.v1.ToolCall) is emitted as opaque
+// length-delimited bytes on this path: the libprotobuf build sets
+// LLMStreamEventParams::tool_call (typed pointer) and the typed serializer
+// writes field 18 via the generated message; the hand-encoded build accepts
+// pre-serialized ToolCall bytes via LLMStreamEventParams::tool_call_bytes /
+// tool_call_bytes_size and writes them directly. NULL / zero size omits the
+// field (proto3 default).
 //
 // proto3 default-value omission semantics are preserved: scalars equal
 // to their type's default (0, false, empty string) are skipped on the
@@ -436,6 +495,11 @@ namespace rac::llm {
  * different threads do not contend on heap allocation.
  */
 void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p) {
+    // pass2-syn-001-followup-llm: hold an InFlightGuard for the entirety of
+    // the dispatch (lock acquire → callback fire). rac_llm_proto_quiesce()
+    // spin-waits on the counter so destroy/teardown threads can be sure no
+    // slot.fn invocation is still in flight before freeing user_data.
+    LlmInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq;
     {

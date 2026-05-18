@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%2017.0%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.0+" />
-  <img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+" />
+  <img src="https://img.shields.io/badge/Platform-iOS%2017.5%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.5+" />
+  <img src="https://img.shields.io/badge/Platform-macOS%2014.5%2B-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.5+" />
   <img src="https://img.shields.io/badge/Swift-5.9%2B-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+" />
   <img src="https://img.shields.io/badge/SwiftUI-Modern%20UI-0D96F6?style=flat-square&logo=swift&logoColor=white" alt="SwiftUI" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
@@ -30,7 +30,7 @@
 
 Prerequisites:
 
-- Xcode 15+ with iOS 17+ simulator runtimes and command line tools selected.
+- Xcode 15+ with iOS 17.5+ simulator runtimes and command line tools selected.
 - Swift 5.9+.
 - CMake and Ninja for root native artifact generation.
 - Enough disk for XCFramework output and downloaded AI models.
@@ -259,7 +259,7 @@ RunAnywhereAI/
 ### Prerequisites
 
 - **Xcode** 15.0 or later
-- **iOS** 17.0+ / **macOS** 14.0+
+- **iOS** 17.5+ / **macOS** 14.5+
 - **Swift** 5.9+
 - **Device/Simulator** with Apple Silicon (recommended: physical device for best performance)
 - **~500MB-2GB** free storage for AI models

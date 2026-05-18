@@ -271,10 +271,16 @@ void main() {
     test(
         'delivers 50 chunk events + terminal before close (production drain loop)',
         () async {
-      // The fake FFI synchronously dispatches 50 chunk events then a terminal
-      // COMPLETED event, returning RAC_SUCCESS. This mirrors a chatty backend
-      // that emits many partial events in tight bursts before the terminal —
-      // the exact scenario the FLUTTER-IOS-001 drain loop must survive.
+      // The fake FFI dispatches 50 chunk events synchronously, then schedules
+      // the terminal COMPLETED event onto a `Future.microtask`, then returns
+      // RAC_SUCCESS. This mirrors how `NativeCallable.listener` queues
+      // callbacks during a blocking FFI call: the production callbacks land
+      // on the event loop AFTER the synchronous FFI returns. The only path
+      // that lets the terminal arrive before `controller.close()` is the
+      // production `await drainPendingStreamCallbacks(...)` microtask loop —
+      // remove that line in `dart_bridge_tts.dart` and this test must fail
+      // (the COMPLETED event would be dropped because the controller closes
+      // before the queued microtask runs). (pass3-syn-121)
       DartBridgeTTS.setSynthesizeStreamLifecycleProtoForTesting(
         (request, dispatch, terminalObserved) async {
           for (var i = 0; i < 50; i++) {
@@ -282,9 +288,15 @@ void main() {
               kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
             ));
           }
-          dispatch(TTSStreamEvent(
-            kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED,
-          ));
+          // Terminal event arrives asynchronously, simulating the production
+          // NativeCallable.listener queueing behavior. Without the production
+          // drain loop, `controller.close()` runs before this microtask fires
+          // and the COMPLETED event is silently dropped.
+          unawaited(Future<void>.microtask(() {
+            dispatch(TTSStreamEvent(
+              kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED,
+            ));
+          }));
           return 0; // RAC_SUCCESS
         },
       );
@@ -315,7 +327,7 @@ void main() {
       var stopCalls = 0;
       DartBridgeTTS.setStopLifecycleProtoForTesting(() {
         stopCalls++;
-        return 0;
+        return TTSServiceState();
       });
 
       final cancelSignal = Completer<void>();

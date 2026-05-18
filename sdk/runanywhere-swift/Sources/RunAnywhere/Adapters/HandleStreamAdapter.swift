@@ -262,9 +262,17 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         }
 
         func tearDown() {
+            // Mirror install()'s lock-then-release pattern. The C
+            // `unregister(...)` call must NOT run while `state.withLock`
+            // is held: `OSAllocatedUnfairLock` is non-recursive, and on
+            // platforms where the unset path synchronously delivers a
+            // final byte the C trampoline re-enters `deliverBytes` →
+            // `broadcast` → `state.withLock` and deadlocks. We snapshot
+            // the state under the lock, release it, then make the C
+            // call. This matches the install() invariant at lines
+            // 129-132 above.
             let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { lockedState in
                 guard lockedState.installation == .installed else { return nil }
-                unregister(handle)
                 lockedState.installation = .notInstalled
                 let ptr = lockedState.userPtr
                 lockedState.userPtr = nil
@@ -272,6 +280,10 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             }
 
             if let ptrToRelease {
+                // Lock has been released — safe to call the C unregister
+                // even if it synchronously fires a final byte that
+                // re-enters broadcast().
+                unregister(handle)
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
             }
             HandleStreamAdapter.removeFanOut(for: storeKey)

@@ -183,12 +183,17 @@ export class StandaloneSherpaTts {
   }
 
   private releaseConfigHandle(): void {
-    if (!this.cfgHandle) return;
-    try {
-      void getTTSHelpers().then((helpers) => helpers.freeConfig(this.cfgHandle!, this.module));
-    } catch (err) {
-      logger.warning(`Failed to free TTS config handle: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    // Capture into a local BEFORE nulling so the async free closure does not
+    // observe a null field (mirrors StandaloneSherpaVad.releaseConfigHandle).
+    const cfg = this.cfgHandle;
     this.cfgHandle = null;
+    if (!cfg) return;
+    void getTTSHelpers()
+      .then((helpers) => helpers.freeConfig(cfg, this.module))
+      .catch((err) => {
+        logger.warning(
+          `Failed to free TTS config handle: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   }
 }

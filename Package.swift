@@ -330,16 +330,15 @@ func binaryTargets() -> [Target] {
         //      overwrites each `checksum:` line below with the real SHA-256.
         //   3. The release workflow (`release.yml::publish`) runs the
         //      checksum sync automatically right before creating the draft
-        //      Release, and CI asserts that no production binaryTarget
-        //      retains the all-zero sentinel value — the assertion will
-        //      fail the release if `sync-checksums.sh` did not run.
+        //      Release.
         //
-        // The all-zero placeholder is a fail-fast sentinel for fresh checkouts
-        // pointing at a tag that hasn't had `sync-checksums.sh` run yet:
-        // `swift package resolve` will produce a wrong-checksum error rather
-        // than silently fetching unverified binaries. External consumers
-        // pulling a real tagged release will see the correct checksums (set
-        // by step 2/3 above before the tag commit was pushed).
+        // Real SHA-256 checksums for the current `sdkVersion` ship on `main`
+        // (committed alongside each release-bumping PR). A stale checkout that
+        // points `sdkVersion` at a future tag whose zips have not yet been
+        // refreshed by `sync-checksums.sh` will surface as a `swift package
+        // resolve` "wrong checksum" error against the new release URL — which
+        // means: the release tooling did not re-run on this tag commit. Re-run
+        // `scripts/sync-checksums.sh` and commit before re-tagging.
         // =====================================================================
         return [
             .binaryTarget(

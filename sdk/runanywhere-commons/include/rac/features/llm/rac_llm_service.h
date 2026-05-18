@@ -301,6 +301,19 @@ RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
  * shape as rac_llm_generate_proto above — tool_calling, thinking_pattern,
  * structured_output, enable_real_time_tracking, and repeat_last_n cannot be
  * carried over the streaming path either until idl-002 lands.
+ *
+ * @warning user_data ownership and lifetime (pass3-syn-026 / cross-SDK
+ *          contract). The C runtime may invoke
+ *          `callback(bytes, size, user_data)` on a background thread AFTER
+ *          this function has returned to its caller, because the
+ *          dispatcher copies the callback slot under its internal mutex and
+ *          releases the mutex BEFORE invoking the user callback. Callers
+ *          MUST NOT delete @p user_data inside the trampoline, MUST call
+ *          rac_llm_proto_quiesce() (declared in rac_llm_stream.h) before
+ *          freeing @p user_data, and MUST clear the slot via
+ *          rac_llm_unset_stream_proto_callback() first. See
+ *          rac_llm_stream.h for the canonical unset → quiesce → free
+ *          recipe applied across SDK fan-out adapters.
  */
 RAC_API rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                                    size_t request_proto_size,

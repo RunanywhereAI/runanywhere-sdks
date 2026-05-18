@@ -594,7 +594,14 @@ STTResult SherpaSTT::transcribe(const STTRequest &request) {
     // Enforce LRU cap. recognizer_lru_ tracks recently-parked entries; evict
     // tail entries until the cache is within the cap. Note: the currently
     // active recognizer is NOT in the cache, so the cap bounds *idle*
-    // recognizers — peak resident count is kRecognizerCacheCap + 1.
+    // recognizers. pass3-syn-132: peak transient resident count is
+    // kRecognizerCacheCap + 2 — at this point we have (a) the freshly-built
+    // active recognizer in `sherpa_recognizer_`, (b) up to kRecognizerCacheCap
+    // legitimate idle entries in the cache, and (c) one stale entry that was
+    // parked above but is about to be evicted in the loop below. The transient
+    // (c) only exists between the park-step and this loop iteration; the
+    // steady-state resident count after the loop is kRecognizerCacheCap + 1
+    // (cap idle + 1 active).
     while (recognizer_cache_.size() > kRecognizerCacheCap) {
       if (recognizer_lru_.empty()) {
         break;
@@ -1286,13 +1293,12 @@ bool SherpaTTS::unload_model() {
 #if SHERPA_ONNX_AVAILABLE
   model_loaded_ = false;
 
-  if (active_synthesis_count_ > 0) {
-    RAC_LOG_WARNING(
-        "Sherpa.TTS",
-        "Unloading model while %d synthesis operation(s) may be in progress",
-        active_synthesis_count_.load());
-  }
-
+  // pass3-syn-130: previously a warning logged when active_synthesis_count_ > 0
+  // here, but pass2-syn-065 made synthesize() hold mutex_ for its entire
+  // duration and unload_model() takes the same mutex on entry — so no
+  // synthesize() can be in flight when we reach this point. The counter and
+  // its SynthesisGuard RAII helper inside synthesize() are now dead and the
+  // warning was unreachable; both are removed.
   voices_.clear();
 
   if (sherpa_tts_) {
@@ -1326,12 +1332,14 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
   // longer parallelism-safe — concurrent callers queue.
   std::lock_guard<std::mutex> lock(mutex_);
 
-  struct SynthesisGuard {
-    std::atomic<int> &count_;
-    SynthesisGuard(std::atomic<int> &count) : count_(count) { count_++; }
-    ~SynthesisGuard() { count_--; }
-  };
-  SynthesisGuard guard(active_synthesis_count_);
+  // pass3-syn-130: the former SynthesisGuard RAII helper (and the matching
+  // active_synthesis_count_ atomic + warning in unload_model()) used to track
+  // concurrent synthesize() callers. After pass2-syn-065 made synthesize()
+  // hold mutex_ across its full duration, at most one synthesize() can be
+  // running at a time and unload_model() must wait for it to release the
+  // mutex before tearing the model down — so the counter could only ever be
+  // 0 when observed under the same mutex. Both the guard and the warning are
+  // dead and have been removed.
 
   // hotspot-engine-sherpa-004: clear any stale cancel signal from a prior
   // synthesis so cancel() observed during THIS call's blocking
@@ -1450,6 +1458,12 @@ SherpaVAD::SherpaVAD(SherpaBackend *backend) : backend_(backend) {}
 SherpaVAD::~SherpaVAD() { unload_model(); }
 
 #if SHERPA_ONNX_AVAILABLE
+// VADConfig.padding_ms default mirrors the struct definition in
+// sherpa_backend.h (currently 30). Used to detect non-default values that the
+// caller may have set expecting them to take effect — they won't, since the
+// Sherpa SilerVad ABI has no equivalent slot (pass3-syn-131).
+static constexpr int kSherpaVadDefaultPaddingMs = 30;
+
 void SherpaVAD::fill_sherpa_vad_config_locked(
     SherpaOnnxVadModelConfig &out) const {
   // Translate VADConfig (ms-based, schema-aligned with Swift/Kotlin/Dart) into
@@ -1457,6 +1471,14 @@ void SherpaVAD::fill_sherpa_vad_config_locked(
   // truth used by both load_model() and configure_vad() so non-threshold
   // fields are no longer silently dropped on the rebuild path
   // (pass2-syn-064).
+  //
+  // pass3-syn-131: VADConfig.padding_ms (used by other backends to extend
+  // detected speech segments) has no equivalent slot in
+  // SherpaOnnxSileroVadModelConfig — Sherpa's SilerVad C ABI exposes only
+  // threshold / min_silence_duration / min_speech_duration / window_size /
+  // max_speech_duration. We therefore intentionally do NOT thread padding_ms
+  // through to the detector; configure_vad() emits a one-time warning if a
+  // non-default value is observed so callers can detect the silent drop.
   memset(&out, 0, sizeof(out));
 
   out.silero_vad.model = model_path_.c_str();
@@ -1608,6 +1630,22 @@ bool SherpaVAD::configure_vad(const VADConfig &config) {
   config_ = config;
 
 #if SHERPA_ONNX_AVAILABLE
+  // pass3-syn-131: Sherpa SilerVad has no padding equivalent. Warn (once per
+  // change) when the caller passes a non-default padding_ms so the silent drop
+  // is observable in logs. Intentionally NOT failing the call: this matches
+  // the other VAD backends' best-effort posture and keeps configure_vad a
+  // total function. padding_ms is also deliberately excluded from
+  // detector_changed below since a rebuild can't apply a value Sherpa won't
+  // accept.
+  if (config_.padding_ms != kSherpaVadDefaultPaddingMs &&
+      config_.padding_ms != old_config.padding_ms) {
+    RAC_LOG_WARNING(
+        "Sherpa.VAD",
+        "configure_vad: VADConfig.padding_ms=%d has no equivalent in "
+        "Sherpa-ONNX SilerVad and will be ignored (default=%d)",
+        config_.padding_ms, kSherpaVadDefaultPaddingMs);
+  }
+
   // Sherpa-ONNX's SilerVAD captures every parameter at detector construction
   // and exposes no setters, so a configure_vad() that only mutates `config_`
   // round-trips through the service layer as a successful no-op while the
@@ -1617,6 +1655,7 @@ bool SherpaVAD::configure_vad(const VADConfig &config) {
   // process() calls. pass2-syn-064: previously only `threshold` was
   // considered, and the rebuild path hardcoded every other field — now the
   // full VADConfig snapshot is threaded through fill_sherpa_vad_config_locked.
+  // padding_ms is omitted by design (pass3-syn-131); see helper comment.
   const bool detector_changed =
       old_config.threshold != config_.threshold ||
       old_config.min_speech_duration_ms != config_.min_speech_duration_ms ||

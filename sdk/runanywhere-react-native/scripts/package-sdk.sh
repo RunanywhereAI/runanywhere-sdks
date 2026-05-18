@@ -125,14 +125,32 @@ if [ -n "$YARN_CWD" ] && command -v yarn >/dev/null 2>&1; then
     (cd "$YARN_CWD" && (yarn install --immutable 2>/dev/null || yarn install))
     HAS_YARN=1
 elif [ "${RAC_ALLOW_NPM_FALLBACK:-0}" = "1" ]; then
+    # RELEASE REPRODUCIBILITY TRADEOFF (see pass3-syn-079):
+    # RAC_ALLOW_NPM_FALLBACK=1 lets the release packager fall back to
+    # `npm install` when Yarn Berry / Corepack are unavailable. This is
+    # intentionally an explicit opt-in because:
+    #   - Yarn Berry resolves @runanywhere/proto-ts via the workspace:*
+    #     protocol against the repo-root yarn.lock; npm install does not
+    #     honour the yarn-locked workspace pins and instead resolves
+    #     `react-native-nitro-modules` (and other transitive peers) from
+    #     the npm registry at packaging time.
+    #   - A release .tgz built via npm fallback may therefore ship with
+    #     a different nitro-modules ABI than the workspace's yarn.lock
+    #     was tested against, surfacing as HybridObject ABI mismatches
+    #     at consumer runtime.
+    # The sentinel log line below is intentionally distinctive so release
+    # publish gates / manifest assertions can grep for it (e.g.
+    # `grep -q RAC_ALLOW_NPM_FALLBACK_USED=true` over the job log) and
+    # refuse to ship a release when the npm fallback path was taken.
     echo ">> npm install --legacy-peer-deps (RAC_ALLOW_NPM_FALLBACK=1)"
+    echo "::warning::RAC_ALLOW_NPM_FALLBACK_USED=true — release reproducibility weakened (npm-resolved deps instead of yarn workspace lock)"
     npm install --legacy-peer-deps
     HAS_YARN=0
 else
     echo "ERROR: Yarn workspace install required but yarn/corepack is unavailable." >&2
     echo "       Install Node 18+ with Corepack (or 'npm i -g corepack') so 'yarn@3.6.1'" >&2
     echo "       can be activated, or set RAC_ALLOW_NPM_FALLBACK=1 to opt into the" >&2
-    echo "       legacy npm install path explicitly." >&2
+    echo "       legacy npm install path explicitly (NOT recommended for release builds — see comment above)." >&2
     exit 1
 fi
 

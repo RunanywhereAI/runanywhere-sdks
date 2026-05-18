@@ -220,6 +220,15 @@ export interface VoiceAgentConfig {
   ttsModelId: string;
   /** e.g. "silero-v5" */
   vadModelId: string;
+  /**
+   * pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
+   * (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
+   * fall back to using tts_model_id as the voice id — correct for
+   * single-voice engines, wrong for multi-voice. Aligns the caller-facing
+   * VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
+   * (voice_agent_service.proto:214) which already exposes tts_voice_id.
+   */
+  ttsVoiceId: string;
   /** Audio configuration. */
   sampleRateHz: number;
   /** default 20 */
@@ -577,6 +586,7 @@ function createBaseVoiceAgentConfig(): VoiceAgentConfig {
     sttModelId: "",
     ttsModelId: "",
     vadModelId: "",
+    ttsVoiceId: "",
     sampleRateHz: 0,
     chunkMs: 0,
     audioSource: 0,
@@ -605,6 +615,9 @@ export const VoiceAgentConfig = {
     }
     if (message.vadModelId !== "") {
       writer.uint32(34).string(message.vadModelId);
+    }
+    if (message.ttsVoiceId !== "") {
+      writer.uint32(138).string(message.ttsVoiceId);
     }
     if (message.sampleRateHz !== 0) {
       writer.uint32(40).int32(message.sampleRateHz);
@@ -679,6 +692,13 @@ export const VoiceAgentConfig = {
           }
 
           message.vadModelId = reader.string();
+          continue;
+        case 17:
+          if (tag !== 138) {
+            break;
+          }
+
+          message.ttsVoiceId = reader.string();
           continue;
         case 5:
           if (tag !== 40) {
@@ -779,6 +799,7 @@ export const VoiceAgentConfig = {
       sttModelId: isSet(object.sttModelId) ? globalThis.String(object.sttModelId) : "",
       ttsModelId: isSet(object.ttsModelId) ? globalThis.String(object.ttsModelId) : "",
       vadModelId: isSet(object.vadModelId) ? globalThis.String(object.vadModelId) : "",
+      ttsVoiceId: isSet(object.ttsVoiceId) ? globalThis.String(object.ttsVoiceId) : "",
       sampleRateHz: isSet(object.sampleRateHz) ? globalThis.Number(object.sampleRateHz) : 0,
       chunkMs: isSet(object.chunkMs) ? globalThis.Number(object.chunkMs) : 0,
       audioSource: isSet(object.audioSource) ? audioSourceFromJSON(object.audioSource) : 0,
@@ -807,6 +828,9 @@ export const VoiceAgentConfig = {
     }
     if (message.vadModelId !== "") {
       obj.vadModelId = message.vadModelId;
+    }
+    if (message.ttsVoiceId !== "") {
+      obj.ttsVoiceId = message.ttsVoiceId;
     }
     if (message.sampleRateHz !== 0) {
       obj.sampleRateHz = Math.round(message.sampleRateHz);
@@ -856,6 +880,7 @@ export const VoiceAgentConfig = {
     message.sttModelId = object.sttModelId ?? "";
     message.ttsModelId = object.ttsModelId ?? "";
     message.vadModelId = object.vadModelId ?? "";
+    message.ttsVoiceId = object.ttsVoiceId ?? "";
     message.sampleRateHz = object.sampleRateHz ?? 0;
     message.chunkMs = object.chunkMs ?? 0;
     message.audioSource = object.audioSource ?? 0;

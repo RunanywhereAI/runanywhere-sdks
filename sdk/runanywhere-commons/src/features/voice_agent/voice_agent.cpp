@@ -577,6 +577,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     // The pipeline's cancel_all() is non-blocking and idempotent, so
     // racing destroy() against an in-flight run is safe once the
     // shared_ptr copy is established without UB.
+    //
+    // pass3-syn-090: First-pass snapshot may be empty if a process_stream
+    // call won the outer mutex before destroy and has not yet stored its
+    // pipeline. We always re-snapshot and re-cancel AFTER acquiring the
+    // outer mutex below (cancel is idempotent) to close that gap. The
+    // matching guard in process_stream (is_shutting_down check under the
+    // outer mutex) ensures any process_stream call that observes the
+    // shutdown flag bails out without storing a pipeline at all.
     std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
     {
         std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
@@ -593,6 +601,22 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
+
+        // pass3-syn-090: re-snapshot pipeline under the outer mutex and
+        // cancel again. If a process_stream call interleaved between the
+        // first snapshot above and this lock acquire, it may have stored
+        // a fresh pipeline before observing is_shutting_down. The outer
+        // mutex's acquire here synchronizes with process_stream's release
+        // when it dropped the mutex, so this snapshot sees any pipeline
+        // stored by such a call. cancel() is non-blocking and idempotent.
+        std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> late_snapshot;
+        {
+            std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+            late_snapshot = handle->pipeline;
+        }
+        if (late_snapshot && late_snapshot != pipeline_snapshot) {
+            late_snapshot->cancel();
+        }
 
         // Drop the pipeline before component handles so its nodes (which
         // call into stt/llm/tts/vad) cannot outlive the handles they use.
@@ -894,6 +918,21 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
 
     RAC_LOG_INFO("VoiceAgent", "Cleaning up Voice Agent");
 
+    // pass3-syn-090: re-snapshot pipeline under the outer mutex and cancel
+    // again. A process_stream call may have won the outer mutex first and
+    // stored a pipeline AFTER our pre-lock snapshot ran. The outer mutex's
+    // acquire here synchronizes with process_stream's release when it
+    // dropped the mutex, so this snapshot sees any pipeline stored by
+    // such a call. cancel() is non-blocking and idempotent.
+    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> late_snapshot;
+    {
+        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
+        late_snapshot = handle->pipeline;
+    }
+    if (late_snapshot && late_snapshot != pipeline_snapshot) {
+        late_snapshot->cancel();
+    }
+
     // Tear the pipeline down before the underlying components so its
     // worker threads cannot dispatch into stt/llm/tts/vad after cleanup.
     {
@@ -1055,6 +1094,22 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     // the legacy in-line orchestration. The GAP 05 Phase 2 pipeline drains
     // synchronously inside `run_once()`, so the lock duration is unchanged.
     std::lock_guard<std::mutex> lock(handle->mutex);
+
+    // pass3-syn-090: bail out if destroy/cleanup has begun. The outer-mutex
+    // acquire above synchronizes with destroy's release of the same mutex,
+    // so the release-store of `is_shutting_down` performed before destroy
+    // acquires the mutex is visible here. Without this check, a thread that
+    // wins the outer mutex first can store a fresh pipeline after destroy
+    // has already taken its cancel snapshot — leaving an uncancellable
+    // in-flight run that destroy must block on for the full run_once
+    // duration.
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        rac_voice_agent_event_t error_event = {};
+        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+        error_event.data.error_code = RAC_ERROR_NOT_INITIALIZED;
+        rac_va_emit(handle, &error_event, callback, user_data);
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
 
     if (!handle->is_configured.load(std::memory_order_acquire)) {
         rac_voice_agent_event_t error_event = {};

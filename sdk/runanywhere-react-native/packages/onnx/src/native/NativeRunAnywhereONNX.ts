@@ -33,11 +33,13 @@ export function requireNativeONNXModule(): NativeRunAnywhereONNXModule {
 }
 
 /**
- * Check if the native ONNX module is available
+ * Check if the native ONNX module is available.
+ * Uses the singleton getter to avoid creating throwaway HybridObject instances
+ * whose C++ destructors could tear down shared bridge state.
  */
 export function isNativeONNXModuleAvailable(): boolean {
   try {
-    requireNativeONNXModule();
+    getNativeONNXModule();
     return true;
   } catch {
     return false;

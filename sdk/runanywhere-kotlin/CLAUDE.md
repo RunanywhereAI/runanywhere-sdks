@@ -185,7 +185,7 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 
 ## Build System Details
 
-**Gradle version:** 8.13 | **Kotlin:** 2.1.21 | **AGP:** 8.11.2 | **JVM target:** 17 | **Android minSdk:** 24 | **compileSdk:** 35
+**Gradle version:** 8.13 | **Kotlin:** 2.1.21 | **AGP:** 8.13.0 | **JVM target:** 17 | **Android minSdk:** 24 | **compileSdk:** 35
 
 **Version catalog:** Shared at `../../gradle/libs.versions.toml` (monorepo-level, used by all SDKs).
 

@@ -262,7 +262,11 @@ class RunAnywhereVAD {
       effective.sampleRate = 16000;
     }
     if (!effective.hasFrameLengthMs()) {
-      effective.frameLengthMs = 30;
+      // Canonical IDL default from `idl/vad_options.proto`:
+      //   int32 frame_length_ms = 3 [(runanywhere.v1.rac_default) = "100"];
+      // Aligns with the convenience-generated `VADConfiguration.defaults()`
+      // (ra_convenience.dart) and matches Swift/Kotlin/RN/Web. (pass3-syn-164)
+      effective.frameLengthMs = 100;
     }
     return effective;
   }

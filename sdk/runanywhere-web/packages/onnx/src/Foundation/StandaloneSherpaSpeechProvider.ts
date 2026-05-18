@@ -143,6 +143,15 @@ class StandaloneSherpaSpeechProvider implements SpeechProvider {
     if (!this.vad?.isLoaded()) {
       throw new Error('StandaloneSherpaSpeechProvider: VAD not loaded. Call loadVAD() first.');
     }
+    // pass3-syn-061: Silero VAD is a recurrent NN. The SpeechProvider
+    // `detectVoiceActivity` verb is documented as a one-shot, stateless
+    // operation per call — so reset the recurrent (h/c) hidden state
+    // before feeding new audio. Without this, the n-th call's first
+    // chunk inherits hidden state from the (n-1)-th call's tail, which
+    // contaminates the detection result and is a public-API correctness
+    // violation. `reset()` also clears the upstream segment queue per
+    // sherpa-onnx semantics.
+    this.vad.reset();
     const sampleRate = input.sampleRate ?? input.config?.sampleRate ?? 16000;
     const window = 512;
     let isSpeech = false;
@@ -342,19 +351,91 @@ async function stageModelInputBytes(
   return request.path;
 }
 
+/**
+ * Stage a model path (either a directory subtree or a single file) from the
+ * RACommons MEMFS into the Sherpa module's MEMFS. The function name predates
+ * pass3-syn-063 — both file and directory inputs are now supported.
+ *
+ * pass3-syn-062: This staging path hard-requires the RACommons FS bridge
+ * which is installed by `@runanywhere/web-llamacpp`'s WASM module. The
+ * speech-only install path advertised in `packages/onnx/README.md` has no
+ * commons FS available, so we throw a precise, actionable error here — and
+ * make the dependency explicit at the install boundary (see
+ * `installStandaloneSherpaSpeechProvider`).
+ *
+ * pass3-syn-063: Earlier versions called `ensureParentDirs(module, path)`
+ * unconditionally, which treats every path segment as a directory. For a
+ * single-file model (e.g. single-file Whisper tiny, single-file Piper voice),
+ * this creates a phantom directory at the filename and then
+ * `stageFromCommonsFs` tries to write a regular file at the same path,
+ * causing a silent MEMFS collision. We now stat the path first and call
+ * `ensureParentDirs` on the directory itself (when input is a directory) or
+ * on the file's parent (when input is a file).
+ */
 async function stageDirectoryFromCommons(
   module: StandaloneSherpaModule,
   path: string,
 ): Promise<string> {
   const commons = tryRunanywhereModule() as CommonsFsModule | null;
   if (!commons?.FS) {
+    // pass3-syn-062: clearer, actionable error. Speech model staging is
+    // gated on the commons FS bridge installed by `@runanywhere/web-llamacpp`.
     throw new Error(
-      'StandaloneSherpaSpeechProvider: cannot stage directory — RACommons module FS bridge is not installed. ' +
-      'Did you call a llamacpp/onnx backend.register() before invoking speech?',
+      'StandaloneSherpaSpeechProvider: cannot stage speech model — the RACommons MEMFS bridge is not installed. ' +
+      'Install `@runanywhere/web-llamacpp` and call `LlamaCPP.register()` before `ONNX.register()` so the unified ' +
+      'RACommons WASM module is available for speech model staging. ' +
+      'Alternatively, await `installStandaloneSherpaSpeechProvider()` only after the commons module is online.',
     );
   }
-  ensureParentDirs(module, path);
+  // pass3-syn-063: stat the path before treating it as a directory.
+  const stat = safeFsStat(commons, path);
+  if (!stat) {
+    throw new Error(
+      `StandaloneSherpaSpeechProvider: model path "${path}" does not exist in the RACommons MEMFS.`,
+    );
+  }
+  if (isCommonsDir(commons, path, stat.mode)) {
+    // Directory layout (tarball-extracted bundle) — preserve every segment.
+    ensureParentDirs(module, path);
+  } else {
+    // File layout (single-blob STT/TTS model) — only create the parent tree;
+    // the file itself will be written by `stageFromCommonsFs` via stageBytes.
+    const slash = path.lastIndexOf('/');
+    const parent = slash > 0 ? path.slice(0, slash) : '/';
+    ensureParentDirs(module, parent);
+  }
   return stageFromCommonsFs(module, path);
+}
+
+/**
+ * Local stat helper that mirrors `safeStat` in SherpaFsStaging. Returns the
+ * Emscripten stat record (with `mode`) or `null` when the path is not present.
+ */
+function safeFsStat(commons: CommonsFsModule, path: string): { mode: number } | null {
+  if (!commons.FS) return null;
+  try {
+    return commons.FS.stat(path);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Local directory-detection helper that mirrors the logic in
+ * `SherpaFsStaging.isDirectoryPath` but only uses the narrow `CommonsFsModule`
+ * FS surface defined in this file.
+ */
+function isCommonsDir(commons: CommonsFsModule, path: string, mode: number): boolean {
+  if (!commons.FS) return false;
+  if (typeof commons.FS.isDir === 'function') {
+    return commons.FS.isDir(mode);
+  }
+  try {
+    commons.FS.readdir(path);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function safeStat(commons: CommonsFsModule, path: string): boolean {
@@ -481,20 +562,49 @@ let _activeProvider: StandaloneSherpaSpeechProvider | null = null;
  * Install the standalone Sherpa speech provider on the V2 facade. Idempotent.
  * Does NOT eagerly load the WASM module — that happens lazily on the first
  * `loadVAD` / `loadTTS` / `loadSTT` call.
+ *
+ * pass3-syn-062: model-file staging (`stageDirectoryFromCommons`) requires
+ * the RACommons MEMFS bridge installed by `@runanywhere/web-llamacpp`. We
+ * log a clear warning here when the commons module is not yet online so
+ * speech-only install paths surface the dependency at install time rather
+ * than as an opaque "RACommons module FS bridge is not installed" error on
+ * the first `transcribe()` call.
  */
 export function installStandaloneSherpaSpeechProvider(): SpeechProvider {
   if (!_activeProvider) {
     _activeProvider = new StandaloneSherpaSpeechProvider();
   }
   setSpeechProvider(_activeProvider);
+  const commons = tryRunanywhereModule() as CommonsFsModule | null;
+  if (!commons?.FS) {
+    logger.warning(
+      'Standalone Sherpa speech provider installed without an active RACommons MEMFS bridge. ' +
+      'STT/TTS model staging will fail until `@runanywhere/web-llamacpp` is installed and ' +
+      '`LlamaCPP.register()` has completed. VAD loadVAD() can still accept http/blob/absolute paths.',
+    );
+  }
   return _activeProvider;
 }
 
-export function uninstallStandaloneSherpaSpeechProvider(): void {
-  if (_activeProvider) {
-    void _activeProvider.unloadVAD();
-    void _activeProvider.unloadTTS();
-    void _activeProvider.unloadSTT();
+/**
+ * Tear down the active standalone Sherpa speech provider.
+ *
+ * pass3-syn-159: Previously this scheduled `unloadVAD/TTS/STT` via
+ * `void provider.unloadX()` and nulled `_activeProvider` synchronously,
+ * so destruction work — including async config-buffer frees inside
+ * StandaloneSherpaStt/Tts — could race a subsequent `installStandaloneSherpaSpeechProvider()`
+ * call. The function is now async and awaits every unload before clearing
+ * the active-provider reference so consumers get a deterministic
+ * `uninstall(); install()` cycle.
+ */
+export async function uninstallStandaloneSherpaSpeechProvider(): Promise<void> {
+  const provider = _activeProvider;
+  if (provider) {
+    await Promise.allSettled([
+      provider.unloadVAD(),
+      provider.unloadTTS(),
+      provider.unloadSTT(),
+    ]);
   }
   _activeProvider = null;
   setSpeechProvider(null);

@@ -181,6 +181,25 @@ rac_link_archive_deps(test_voice_agent_pipeline)
 target_compile_features(test_voice_agent_pipeline PRIVATE cxx_std_17)
 add_test(NAME voice_agent_pipeline_tests COMMAND test_voice_agent_pipeline)
 
+# --- commons-features-voice-003: pipeline_mutex shared_ptr race regression --
+# Backend-free concurrent stress test for the `rac_voice_agent::pipeline`
+# shared_ptr slot. Drives the same store/snapshot/reset pattern that
+# `rac_voice_agent_process_stream()` and `rac_voice_agent_destroy()` use
+# internally from many threads to verify `pipeline_mutex` serializes access
+# to the control block. Designed to be run under TSAN as the primary gate
+# (see test header for `-fsanitize=thread` invocation), but also runs as a
+# regular ctest target under all presets so a future revert of the lock is
+# caught even without sanitizers.
+add_executable(test_voice_agent_pipeline_race test_voice_agent_pipeline_race.cpp)
+target_include_directories(test_voice_agent_pipeline_race PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_voice_agent_pipeline_race PRIVATE rac_commons)
+rac_link_archive_deps(test_voice_agent_pipeline_race)
+target_compile_features(test_voice_agent_pipeline_race PRIVATE cxx_std_17)
+add_test(NAME voice_agent_pipeline_race_tests COMMAND test_voice_agent_pipeline_race)
+
 # --- T4.7: PipelineExecutor + SolutionRunner (Solutions-gated) ---------------
 # The executor / runner / C ABI live behind RAC_ENABLE_SOLUTIONS. Each test
 # TU compiles a SKIP-style stub when the symbol is undefined (e.g. CI
@@ -279,6 +298,31 @@ rac_link_archive_deps(test_tool_calling_run_loop)
 target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
+
+# --- pass3-syn-086: tool-calling cancel ABI concurrency regression -----------
+# Covers the new run_loop_with_handle / run_loop_cancel / session_cancel C
+# ABIs added by the pass-2/pass-3 fix commits. Exercises:
+#   1. cancel-during-publish: cancel fires while generate is blocked on
+#      another thread; the cancel ABI returns RAC_SUCCESS concurrently and
+#      the loop returns RAC_ERROR_CANCELLED in bounded time (no deadlock).
+#   2. cancel-after-natural-completion: stale-handle cancel is idempotent
+#      RAC_SUCCESS (matches pass3-syn-083 semantics).
+#   3. sticky cancel non-regression (pass3-syn-021): step_with_result after
+#      session_cancel returns RAC_ERROR_INVALID_STATE.
+#   4. idempotent session cancel on stale/destroyed/zero handles
+#      (pass3-syn-083).
+# Designed to be TSAN-clean — mirrors test_voice_agent_pipeline_race.cpp.
+add_executable(test_tool_calling_cancel test_tool_calling_cancel.cpp)
+target_include_directories(test_tool_calling_cancel PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_tool_calling_cancel PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_cancel)
+target_compile_features(test_tool_calling_cancel PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_cancel)
+add_test(NAME tool_calling_cancel_tests COMMAND test_tool_calling_cancel)
 
 # --- CPP-09A: structured-output helper tests --------------------------------
 add_executable(test_structured_output test_structured_output.cpp)

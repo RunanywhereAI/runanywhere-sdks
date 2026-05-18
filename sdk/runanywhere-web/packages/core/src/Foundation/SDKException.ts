@@ -176,6 +176,24 @@ export class SDKException extends Error {
     return this.proto.nestedMessage;
   }
 
+  /**
+   * Structured validation field-path accessor.
+   *
+   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
+   * Reads `context.metadata['field_path']` populated by
+   * `SDKException.validationFailed(...)` (see below). Cross-SDK consumer
+   * code can rely on `e.fieldPath === 'X.y'` regardless of which SDK
+   * threw the exception. Returns `undefined` when the metadata entry is
+   * absent (e.g. non-validation exceptions).
+   */
+  get fieldPath(): string | undefined {
+    const meta = this.proto.context?.metadata;
+    if (!meta) return undefined;
+    // proto-ts emits map<string,string> as a JS object literal.
+    const raw = (meta as Record<string, string>)['field_path'];
+    return raw && raw.length > 0 ? raw : undefined;
+  }
+
   /** Whether the result code indicates success (code === 0). */
   static isSuccess(resultCode: number): boolean {
     return resultCode === 0;
@@ -237,6 +255,54 @@ export class SDKException extends Error {
 
   static invalidInput(message: string, details?: string): SDKException {
     return SDKException.fromCode(SDKErrorCode.InvalidParameter, message, details);
+  }
+
+  /**
+   * Structured validation failure.
+   *
+   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN
+   * `SDKException.validationFailed(...)`. Encodes the structured field
+   * path into `proto.context.metadata['field_path']` so consumers can
+   * read it back uniformly across SDKs via {@link fieldPath}.
+   *
+   * Recommended usage from generated `validate<Msg>` helpers:
+   *
+   *     throw SDKException.validationFailed({
+   *       fieldPath: 'VADConfiguration.sample_rate',
+   *       message: 'sample_rate must be > 0',
+   *     });
+   *
+   * Code / category / cAbiCode mirror the Swift / Kotlin / Flutter / RN
+   * wire shape (ERROR_CODE_INVALID_ARGUMENT = 259, ERROR_CATEGORY_VALIDATION,
+   * cAbiCode = -259).
+   */
+  static validationFailed(args: {
+    fieldPath: string;
+    message: string;
+    cause?: Error;
+  }): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
+      code: ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+      cAbiCode: -259,
+      message: args.message,
+      nestedMessage: args.cause?.message,
+      // ErrorContext.metadata carries the structured field path so the
+      // accessor `e.fieldPath` returns the value across SDKs.
+      context: {
+        metadata: { field_path: args.fieldPath },
+        sourceFile: undefined,
+        sourceLine: undefined,
+        operation: undefined,
+      },
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: 'validation',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
   }
 }
 

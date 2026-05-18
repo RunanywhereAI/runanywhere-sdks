@@ -5,10 +5,15 @@
 #
 # Tier 4 / PR #494 T4.4 — Flutter dependency centralization linter.
 #
-# Reads the centralized `melos.dependencies` block in
-# sdk/runanywhere-flutter/pubspec.yaml and warns when any other pubspec.yaml
-# in the repo hardcodes a `^x.y.z` (or `x.y.z`) version that differs from
-# the centralized value for the same dependency name.
+# Reads the `dependencies:` / `dev_dependencies:` blocks of
+# sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml (the workspace
+# source of truth for shared third-party deps — see pass2-syn-121) and
+# warns when any other pubspec.yaml in the repo hardcodes a `^x.y.z` (or
+# `x.y.z`) version that differs from the source-of-truth value for the
+# same dependency name.
+#
+# Backwards-compat fallback: if the workspace pubspec ever reintroduces a
+# `melos.dependencies:` block, parse_registry() will pick it up first.
 #
 # This is a CONVENTION LINTER. It is intentionally a warning-only / soft
 # failure tool by default: per-package pinning may be legitimate (e.g. for
@@ -46,7 +51,7 @@ STRICT="${FLUTTER_CENTRALIZATION_STRICT:-0}"
 WARN_COUNT=0
 DRIFT_COUNT=0
 
-# --- Parse melos.dependencies block ----------------------------------------
+# --- Parse workspace registry (melos.dependencies block, then fallback) ---
 # Extract the registry into a `name => version` map serialized as `name<TAB>version`
 # lines, e.g.:
 #   ffi    ^2.1.0

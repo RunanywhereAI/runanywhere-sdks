@@ -65,6 +65,7 @@ enum class SessionState {
     kWaitingForTool,
     kCompleted,
     kFailed,
+    kCancelled,
 };
 
 struct ToolCallingSession {
@@ -442,8 +443,14 @@ void run_generate_loop(ToolCallingSession& session) {
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(session, session.current_prompt, &response, &rc)) {
-            emit_error_event(session, static_cast<int32_t>(rc), "LLM generation failed");
-            session.state = SessionState::kFailed;
+            // pass3-syn-021: distinguish cancel from other generate failures.
+            // A cancel that landed before or during generate makes the session
+            // terminal — emit a cancel error and mark state kCancelled so the
+            // public step_with_result_proto guard rejects further steps.
+            const bool cancelled = session.cancel_requested.load(std::memory_order_acquire);
+            const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
+            emit_error_event(session, static_cast<int32_t>(rc), msg);
+            session.state = cancelled ? SessionState::kCancelled : SessionState::kFailed;
             return;
         }
 
@@ -623,6 +630,18 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
     }
 
     std::lock_guard<std::mutex> session_lock(session->mu);
+    // pass3-syn-021: a cancelled session is terminal. Once
+    // rac_tool_calling_session_cancel_proto has latched cancel_requested, any
+    // follow-up step_with_result_proto must be rejected so the host cannot
+    // silently feed the cancelled session more iterations (which would then
+    // auto-cancel at the first generate boundary because the per-session
+    // atomic survives every state transition). The host must destroy and
+    // recreate the session to continue.
+    if (session->cancel_requested.load(std::memory_order_acquire) ||
+        session->state == SessionState::kCancelled) {
+        RAC_LOG_WARNING(kTag, "step_with_result called on cancelled session");
+        return RAC_ERROR_INVALID_STATE;
+    }
     if (session->state != SessionState::kWaitingForTool) {
         RAC_LOG_WARNING(kTag, "step_with_result called in state %d (expected kWaitingForTool)",
                         static_cast<int>(session->state));
@@ -674,19 +693,37 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
 extern "C" rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)session_handle;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    return RAC_SUCCESS;  // idempotent — protobuf-less builds never start a session
 #else
     if (session_handle == 0) {
-        return RAC_ERROR_INVALID_HANDLE;
+        // Idempotent — zero handle means the SDK adapter raced cancel
+        // against create/destroy. Treat as a successful no-op so adapters
+        // can fan structured-concurrency cancels in without coordinating
+        // with session lifetime (matches run_loop_cancel_proto semantics).
+        return RAC_SUCCESS;
     }
     auto session = lookup_session(session_handle);
     if (!session) {
-        return RAC_ERROR_INVALID_HANDLE;
+        // Idempotent — handle already retired or never published. The SDK
+        // adapters fan structured-concurrency cancels into this entry point
+        // without coordinating with session destroy, so a stale handle is
+        // the normal race-loser path. Return success (matches
+        // run_loop_cancel_proto semantics).
+        return RAC_SUCCESS;
     }
     // pass2-syn-007: latch the cancel request first so a generate that
     // hasn't yet published active_ref will pick it up when it starts, then
     // forward to the in-flight ref if one is currently published. We hold
     // active_ref_mu (NOT session.mu, which the generate caller holds).
+    //
+    // pass3-syn-021: setting cancel_requested makes the session terminal —
+    // subsequent rac_tool_calling_session_step_with_result_proto calls will
+    // be rejected with RAC_ERROR_INVALID_STATE (see the guard at the top of
+    // that function). Hosts must destroy the session and create a new one
+    // to continue tool-calling after a cancel. We cannot also write
+    // session->state here because the generate caller holds session.mu;
+    // run_generate_loop maps the cancelled-generate exit to
+    // SessionState::kCancelled when it observes cancel_requested.
     session->cancel_requested.store(true, std::memory_order_release);
     std::lock_guard<std::mutex> guard(session->active_ref_mu);
     if (session->active_ref) {

@@ -4,13 +4,47 @@
  * Bridges `rac_llm_set_stream_proto_callback` through Nitro so the
  * TypeScript `RunAnywhere.generateStream` consumer can decode canonical
  * `LLMStreamEvent` proto bytes from the raw `ArrayBuffer` callbacks.
+ *
+ * --- Lifetime / concurrency protocol (pass3-syn-045) ----------------
+ *
+ * The commons LLM stream dispatcher (`rac_llm_stream.cpp`) copies the
+ * registered slot {fn, user_data} under its lock, RELEASES the lock,
+ * and then calls the trampoline. The trampoline therefore runs WITHOUT
+ * the commons lock held, which means our unsubscribe path cannot
+ * assume that a successful `rac_llm_unset_stream_proto_callback` is
+ * sufficient to free the Registration: a generation-thread dispatcher
+ * may still be mid-call with the raw `user_data` pointer it snapshotted
+ * before the unset.
+ *
+ * Naive `delete reg` after `unset` therefore opens a UAF window where
+ * the trampoline reads `reg->active` from freed memory.
+ *
+ * Fix: ownership is held by a process-global `shared_ptr<Registration>`
+ * registry keyed by the raw Registration address. The trampoline looks
+ * the registration up under a short mutex, takes its OWN strong copy of
+ * the `shared_ptr`, drops the mutex, and only then dereferences the
+ * Registration. The unsubscribe lambda calls `unset` (so no NEW
+ * dispatch will start) and then erases the registry entry. Any
+ * dispatcher that snapshotted the slot before unset and is racing the
+ * unsubscribe lambda either:
+ *   (a) wins the registry lookup → it owns a strong ref, Registration
+ *       stays alive for the duration of its dispatch; or
+ *   (b) loses the registry lookup → it observes a null shared_ptr and
+ *       returns without touching freed memory.
+ *
+ * Mirrors the spirit of Swift's HandleStreamAdapter (which keeps a
+ * per-handle fan-out alive via `Unmanaged.passRetained` + a static
+ * dictionary) and Kotlin's 2-phase install/uninstall.
  */
 
 #include "HybridLLM.hpp"
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "rac_llm_stream.h"
 #include "rac_types.h"
@@ -27,12 +61,41 @@ struct Registration {
   std::atomic<bool> active{true};
 };
 
+// Process-global registry: maps a Registration's raw address (the value
+// we pass to the C ABI as `user_data`) to the owning `shared_ptr`.
+// The mutex guards both lookups (from the dispatcher trampoline) and
+// erasures (from the unsubscribe lambda). We never dereference the raw
+// pointer as a Registration* — it's only ever used as a map key — so
+// even a stale raw pointer from a freed Registration is safe to look up.
+std::mutex& llm_registry_mu() {
+  static std::mutex m;
+  return m;
+}
+
+std::unordered_map<void*, std::shared_ptr<Registration>>& llm_registry() {
+  static std::unordered_map<void*, std::shared_ptr<Registration>> reg;
+  return reg;
+}
+
+// Acquire a strong reference for the duration of one dispatch. Returns
+// nullptr if the registration has already been unsubscribed.
+std::shared_ptr<Registration> acquire_llm_registration(void* user_data) {
+  std::lock_guard<std::mutex> lock(llm_registry_mu());
+  auto it = llm_registry().find(user_data);
+  if (it == llm_registry().end()) return nullptr;
+  return it->second;  // copy, bumps refcount
+}
+
 void llm_trampoline(const uint8_t* event_bytes,
                     size_t event_size,
                     void* user_data) {
   if (user_data == nullptr || event_bytes == nullptr) return;
 
-  auto* reg = static_cast<Registration*>(user_data);
+  // Take a strong reference BEFORE dereferencing. If the unsubscribe
+  // lambda has already won the race and removed the entry, this
+  // returns null and we exit without touching freed memory.
+  auto reg = acquire_llm_registration(user_data);
+  if (!reg) return;
   if (!reg->active.load(std::memory_order_acquire) || !reg->onBytes) return;
 
   auto buffer = ArrayBuffer::copy(event_bytes, event_size);
@@ -41,6 +104,9 @@ void llm_trampoline(const uint8_t* event_bytes,
   } catch (...) {
     // Keep native dispatch isolated from JS exceptions.
   }
+  // `reg` strong reference released here; if the unsubscribe lambda
+  // removed the registry entry concurrently, the Registration is
+  // destroyed when our local strong ref drops.
 }
 
 }  // namespace
@@ -57,30 +123,61 @@ std::function<void()> HybridLLM::subscribeProtoEvents(
   auto llm_handle = reinterpret_cast<rac_handle_t>(
       static_cast<uintptr_t>(static_cast<int64_t>(handle)));
 
-  auto* reg = new Registration();
+  auto reg = std::make_shared<Registration>();
   reg->onBytes = onBytes;
   reg->onDone = onDone;
   reg->onError = onError;
   reg->handle = llm_handle;
 
+  // Identity for the C ABI's `user_data` slot. The raw Registration*
+  // is used solely as a map key — never dereferenced via this pointer.
+  void* user_data = reg.get();
+
+  // Publish the strong reference into the registry BEFORE installing
+  // the C callback. If we install first and the callback fires
+  // synchronously, the trampoline would observe an empty registry and
+  // drop the event.
+  {
+    std::lock_guard<std::mutex> lock(llm_registry_mu());
+    llm_registry()[user_data] = reg;
+  }
+
   rac_result_t rc = rac_llm_set_stream_proto_callback(
-      llm_handle, &llm_trampoline, reg);
+      llm_handle, &llm_trampoline, user_data);
 
   if (rc != RAC_SUCCESS) {
+    {
+      std::lock_guard<std::mutex> lock(llm_registry_mu());
+      llm_registry().erase(user_data);
+    }
     std::string msg = "rac_llm_set_stream_proto_callback failed: code=";
     msg += std::to_string(static_cast<int>(rc));
     try {
       if (onError) onError(msg);
     } catch (...) {}
-    delete reg;
     return []() {};
   }
 
-  return [reg, llm_handle]() {
+  // The unsubscribe lambda owns its own strong reference (`reg`). The
+  // registry holds another. The unsubscribe:
+  //   1. Flips `active` (cheap fast-path skip for any dispatcher whose
+  //      registry lookup happens to win the race with us).
+  //   2. Calls `rac_llm_unset_stream_proto_callback` so no NEW dispatch
+  //      starts after this point.
+  //   3. Erases the registry entry — drops the registry's strong ref.
+  //      If a concurrent dispatcher already acquired its own strong
+  //      ref before step 3 ran, Registration stays alive until that
+  //      dispatcher's local `reg` shared_ptr falls out of scope.
+  //   4. Drops the lambda's `reg` capture when the lambda is destroyed.
+  return [reg, llm_handle, user_data]() mutable {
     bool was_active = reg->active.exchange(false, std::memory_order_acq_rel);
     if (!was_active) return;
     rac_llm_unset_stream_proto_callback(llm_handle);
-    delete reg;
+    {
+      std::lock_guard<std::mutex> lock(llm_registry_mu());
+      llm_registry().erase(user_data);
+    }
+    // `reg` drops here when the lambda goes out of scope.
   };
 }
 

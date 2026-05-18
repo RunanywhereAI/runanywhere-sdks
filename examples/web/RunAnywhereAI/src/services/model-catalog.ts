@@ -134,6 +134,21 @@ const CATALOG: readonly CatalogEntry[] = [
     contextLength: 4096,
     supportsThinking: true,
   },
+  {
+    // pass3-syn-097: parity with Android/iOS/Flutter/RN catalogs.
+    id: 'qwen3-4b-q4_k_m',
+    name: 'Qwen3 4B Q4_K_M',
+    description: 'Qwen3 series larger LLM with thinking-mode support.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
+    downloadSizeBytes: 2_500_000_000,
+    memoryRequiredBytes: 3_000_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
 
   // ---------- Multimodal (VLM) ----------
   {

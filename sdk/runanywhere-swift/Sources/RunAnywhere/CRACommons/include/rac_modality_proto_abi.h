@@ -183,24 +183,19 @@ RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
     size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_lora_compatibility_proto(
-    rac_handle_t llm_component,
     const uint8_t* config_proto_bytes,
     size_t config_proto_size,
     rac_proto_buffer_t* out_result);
-RAC_API rac_result_t rac_lora_apply_proto(rac_handle_t llm_component,
-                                          const uint8_t* request_proto_bytes,
+RAC_API rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes,
                                           size_t request_proto_size,
                                           rac_proto_buffer_t* out_result);
-RAC_API rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
-                                           const uint8_t* request_proto_bytes,
+RAC_API rac_result_t rac_lora_remove_proto(const uint8_t* request_proto_bytes,
                                            size_t request_proto_size,
                                            rac_proto_buffer_t* out_state);
-RAC_API rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
-                                         const uint8_t* state_proto_bytes,
+RAC_API rac_result_t rac_lora_list_proto(const uint8_t* state_proto_bytes,
                                          size_t state_proto_size,
                                          rac_proto_buffer_t* out_state);
-RAC_API rac_result_t rac_lora_state_proto(rac_handle_t llm_component,
-                                          const uint8_t* state_proto_bytes,
+RAC_API rac_result_t rac_lora_state_proto(const uint8_t* state_proto_bytes,
                                           size_t state_proto_size,
                                           rac_proto_buffer_t* out_state);
 

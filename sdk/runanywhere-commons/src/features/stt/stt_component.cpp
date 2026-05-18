@@ -27,6 +27,7 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/stt/rac_stt_stream.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -451,6 +452,18 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
+    // B-FL-5-001 sibling fix: clear any lingering proto-stream callback
+    // registration keyed by this component handle BEFORE freeing the memory.
+    // If the allocator later hands the same address back to a fresh component
+    // (rac_stt_component_create), the new component would otherwise inherit
+    // the previous slot's stale seq counter / callback pointer — corrupting
+    // the STT stream wire seq and pointing user_data at freed SDK memory.
+    rac_stt_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-stt: spin-wait for any in-flight
+    // dispatch_stt_stream_event() invocation on another thread before freeing
+    // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
+    rac_stt_proto_quiesce();
+
     RAC_LOG_INFO("STT.Component", "STT component destroyed");
 
     delete component;
@@ -467,6 +480,18 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // registration BEFORE re-creating the internal service for a new model.
+    // Without this, the wire-seq counter in g_slots() retains its prior value
+    // and corrupts the proto stream on the very first transcribe after a model
+    // switch (the load_model path elides destroy → original destroy-time fix
+    // never fires for handle reuse).
+    rac_stt_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-stt: drain any in-flight dispatcher bound to the
+    // previous model before swapping in the new service so user_data captured
+    // by the previous registration can be safely freed.
+    rac_stt_proto_quiesce();
 
     // Emit model load started event
     {

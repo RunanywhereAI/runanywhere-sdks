@@ -76,9 +76,13 @@ Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegister(JNIEnv *env,
       dlopen("librac_backend_sherpa.so", RTLD_NOW | RTLD_GLOBAL);
   if (sherpa_handle == nullptr) {
     // Fall back to RTLD_DEFAULT in case the .so is already global (iOS / WASM).
+    // Cache dlerror() once: POSIX semantics clear the per-thread error after
+    // the first read, so calling it twice (once for the test, once for the
+    // value) would always log "no error" on a real failure.
+    const char *err = dlerror();
     LOGw("dlopen(librac_backend_sherpa.so) failed (%s); falling back to "
          "RTLD_DEFAULT",
-         dlerror() ? dlerror() : "no error");
+         err ? err : "no error");
   }
   auto *sherpa_register = reinterpret_cast<rac_backend_sherpa_register_fn>(
       sherpa_handle != nullptr

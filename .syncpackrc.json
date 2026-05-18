@@ -14,22 +14,15 @@
   "dependencyTypes": ["dev", "prod", "peer"],
   "versionGroups": [
     {
-      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges)",
+      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges). NOTE: @runanywhere/proto-ts is a published npm package centralized in dependencies/versions.json, so it is NOT ignored here — see its own pin below.",
       "dependencies": [
         "@runanywhere/core",
         "@runanywhere/llamacpp",
         "@runanywhere/onnx",
         "@runanywhere/web",
         "@runanywhere/web-llamacpp",
-        "@runanywhere/web-onnx",
-        "@runanywhere/proto-ts"
+        "@runanywhere/web-onnx"
       ],
-      "isIgnored": true
-    },
-    {
-      "label": "Peer dependencies: skipped by design (lower-bound >= ranges are intentional for consumer flexibility)",
-      "dependencyTypes": ["peer"],
-      "dependencies": ["**"],
       "isIgnored": true
     },
     {
@@ -99,6 +92,31 @@
       "pinVersion": "^6.4.2"
     },
     {
+      "label": "Pinned: @runanywhere/proto-ts (centralized in dependencies/versions.json) — published npm package, schema-sensitive lockstep with all TS SDK packages",
+      "dependencies": ["@runanywhere/proto-ts"],
+      "pinVersion": "^0.21.0"
+    },
+    {
+      "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version",
+      "dependencies": ["react-native"],
+      "pinVersion": "0.83.1"
+    },
+    {
+      "label": "Pinned: react (centralized in dependencies/versions.json) — RN peer dep, kept aligned with supported RN range",
+      "dependencies": ["react"],
+      "pinVersion": "19.0.0"
+    },
+    {
+      "label": "Pinned: @eslint/js (centralized in dependencies/versions.json) — tracks eslint major, prevents drift across web SDK packages",
+      "dependencies": ["@eslint/js"],
+      "pinVersion": "^9.39.4"
+    },
+    {
+      "label": "Pinned: tsd (centralized in dependencies/versions.json) — type-definition test runner, kept reproducible across packages",
+      "dependencies": ["tsd"],
+      "pinVersion": "^0.33.0"
+    },
+    {
       "label": "Catch-all: dependencies not centralized in dependencies/versions.json (left to each package). Add to versions.json to enforce.",
       "dependencies": ["**"],
       "isIgnored": true
@@ -106,7 +124,7 @@
   ],
   "semverGroups": [
     {
-      "label": "Default range: prefer caret across all centrally-pinned deps",
+      "label": "Default range: prefer caret across all centrally-pinned deps that use caret ranges",
       "range": "^",
       "dependencies": [
         "long",
@@ -120,8 +138,17 @@
         "lerna",
         "prettier",
         "@playwright/test",
-        "vite"
+        "vite",
+        "@runanywhere/proto-ts",
+        "@eslint/js",
+        "tsd"
       ],
+      "packages": ["**"]
+    },
+    {
+      "label": "Exact range: react + react-native are pinned to exact versions (RN ABI lockstep with native bridges)",
+      "range": "",
+      "dependencies": ["react", "react-native"],
       "packages": ["**"]
     }
   ]

@@ -222,7 +222,12 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
         return result;
     }
 
-    RAC_LOG_INFO("Diffusion.Tokenizer", "Downloading %s from %s", filename, url);
+    // pass3-syn-100: HuggingFace tokenizer endpoints may include redirect-
+    // chain query parameters; downgrade from INFO to DEBUG so the URL does
+    // not reach the platform logger in production builds. The filename is
+    // safe to keep at the call site below (filename-only log).
+    RAC_LOG_DEBUG("Diffusion.Tokenizer", "Downloading %s from %s", filename, url);
+    RAC_LOG_INFO("Diffusion.Tokenizer", "Downloading tokenizer file %s", filename);
 
     // Stage 2 HTTP refactor: route through the internal C++ facade.
     // The facade does a synchronous streaming download + disk write,

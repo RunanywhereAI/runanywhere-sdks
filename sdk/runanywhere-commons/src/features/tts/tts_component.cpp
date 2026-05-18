@@ -26,6 +26,7 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/tts/rac_tts_stream.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -365,6 +366,18 @@ extern "C" void rac_tts_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
+    // B-FL-5-001 sibling fix: clear any lingering proto-stream callback
+    // registration keyed by this component handle BEFORE freeing the memory.
+    // Even though rac_tts_stream_start_proto is currently NOT_IMPLEMENTED,
+    // the slot registry is live and reachable via the public ABI — clearing
+    // here prevents stale wire-seq / stale user_data when the handle heap
+    // address is reused by a fresh component.
+    rac_tts_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-tts: spin-wait for any in-flight
+    // dispatch_tts_stream_event() invocation on another thread before freeing
+    // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
+    rac_tts_proto_quiesce();
+
     RAC_LOG_INFO("TTS.Component", "TTS component destroyed");
 
     delete component;
@@ -381,6 +394,16 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
 
     auto* component = reinterpret_cast<rac_tts_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // registration BEFORE re-loading the voice. The load_voice path elides
+    // destroy → original destroy-time fix never fires for handle reuse, so
+    // the wire-seq counter in g_slots() would retain its prior value.
+    rac_tts_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-tts: drain any in-flight dispatcher bound to the
+    // previous voice before swapping in the new one so user_data captured by
+    // the previous registration can be safely freed.
+    rac_tts_proto_quiesce();
 
     // Emit voice load started event
     {

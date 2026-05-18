@@ -212,17 +212,23 @@ def _emit_message_validate(
             continue
         swift_field = proto_field_to_camel(field.name, id_uppercase=True)
 
-        def _throw(message_literal: str) -> list[str]:
+        def _throw(message_literal: str, indent: str = "            ") -> list[str]:
             """Canonical `{ code, category, fieldPath, message }` shape.
             Uses the `SDKException.validationFailed(fieldPath:message:)`
             factory which threads field_path through
-            `proto.context.metadata["field_path"]`."""
+            `proto.context.metadata["field_path"]`.
+
+            `indent` is the leading whitespace for the `throw` keyword
+            itself. Default is 12 spaces because every caller in this
+            generator emits the helper INSIDE an `if`-block already
+            opened at 8 spaces, so the throw body must be one
+            indentation level deeper to render idiomatically."""
             field_path = f"{proto_msg_name}.{field.name}"
             return [
-                "        throw SDKException.validationFailed(",
-                f'            fieldPath: "{field_path}",',
-                f"            message: {message_literal}",
-                "        )",
+                f"{indent}throw SDKException.validationFailed(",
+                f'{indent}    fieldPath: "{field_path}",',
+                f"{indent}    message: {message_literal}",
+                f"{indent})",
             ]
 
         is_required = get_bool_option(field.options, RAC_REQUIRED_FIELD_NUM)

@@ -32,6 +32,7 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/features/vad/rac_vad_stream.h"
 #include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -508,6 +509,17 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     // Cleanup first
     rac_vad_component_cleanup(handle);
 
+    // B-FL-5-001 sibling fix: clear the SECOND proto-stream callback registry
+    // (g_slots in rac_vad_stream.cpp, set via rac_vad_set_stream_proto_callback)
+    // in addition to the proto_activity_slot cleared above. Without this, the
+    // wire-seq + stale user_data UAF triggers when the handle heap address is
+    // reused by a fresh component (rac_vad_component_create).
+    rac_vad_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-vad: spin-wait for any in-flight
+    // dispatch_vad_stream_event() invocation on another thread before freeing
+    // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
+    rac_vad_proto_quiesce();
+
     RAC_LOG_INFO("VAD.Component", "VAD component destroyed");
 
     delete component;
@@ -626,6 +638,18 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // registration BEFORE re-creating the internal model service. The
+    // load_model path elides destroy → original destroy-time fix never fires
+    // for handle reuse, so the wire-seq counter in g_slots() would retain its
+    // prior value and corrupt the proto stream on the very first detect call
+    // after a model switch.
+    rac_vad_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-vad: drain any in-flight dispatcher bound to the
+    // previous model before swapping in the new one so user_data captured by
+    // the previous registration can be safely freed.
+    rac_vad_proto_quiesce();
 
     // Unload any previously loaded model
     if (component->model_service) {

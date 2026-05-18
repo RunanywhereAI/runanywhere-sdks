@@ -340,21 +340,25 @@ bool rac_vlm_config_to_proto(const rac_vlm_config_t* in, ::runanywhere::v1::VLMC
 bool rac_vlm_config_from_proto(const ::runanywhere::v1::VLMConfiguration& in,
                                rac_vlm_config_t* out);
 
-// VLM proto VLMGenerationOptions carries the C ABI's scalar runtime fields.
-// Owned strings such as system_prompt, stop_sequences, and custom templates are
-// intentionally excluded here until the public C struct has a companion free
-// helper for adapter-owned option allocations.
+// VLM proto VLMGenerationOptions round-trips the full C ABI rac_vlm_options_t
+// surface: prompt, max_tokens, temperature, top_p, max_image_size, n_threads,
+// use_gpu, model_family, streaming_enabled, system_prompt, stop_sequences[],
+// custom_chat_template (heap-allocated rac_vlm_chat_template_t with its owned
+// template_str / image_marker / default_system_prompt strings), and
+// image_marker_override. Adapter-owned allocations produced by
+// `rac_vlm_options_from_proto` must be released with `rac_vlm_options_free_owned`.
 bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt /*can be NULL*/,
                               ::runanywhere::v1::VLMGenerationOptions* out);
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
                                 rac_vlm_options_t* out, const char** out_prompt /*optional*/);
 
 /**
- * Frees the request-scoped strings (`system_prompt`,
- * `stop_sequences`/`num_stop_sequences`) that
- * `rac_vlm_options_from_proto` allocated into `options`. Safe to call on
- * a default-initialized `rac_vlm_options_t`. Resets freed pointers to RAC_NULL
- * so the struct is safe to re-use.
+ * Frees the request-scoped allocations (`system_prompt`,
+ * `stop_sequences`/`num_stop_sequences`, `custom_chat_template` and its owned
+ * `template_str`/`image_marker`/`default_system_prompt`, and
+ * `image_marker_override`) that `rac_vlm_options_from_proto` allocated into
+ * `options`. Safe to call on a default-initialized `rac_vlm_options_t`. Resets
+ * freed pointers to RAC_NULL so the struct is safe to re-use.
  */
 void rac_vlm_options_free_owned(rac_vlm_options_t* options);
 

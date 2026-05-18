@@ -152,27 +152,40 @@ class SDKException(
          * (e.g. `"STTOptions.sample_rate"`). Mirrors the canonical shape
          * emitted by `idl/codegen/generate_*_convenience.py`: every SDK
          * throws `{ code, category, fieldPath, message }`.
+         *
+         * Mirrors Swift's identical factory at SDKException.swift:196-222
+         * which auto-logs the exception via `ex.log()` when the code is
+         * not classified as expected. Validation failures (proto code
+         * `ERROR_CODE_INVALID_ARGUMENT`) are never expected, so this path
+         * always emits an ERROR-level log entry — keeping Kotlin / Swift
+         * telemetry symmetric for the same misconfigured input.
          */
         fun validationFailed(
             fieldPath: String,
             message: String,
             cause: Throwable? = null,
-        ): SDKException =
-            SDKException(
-                error =
-                    ProtoSDKError(
-                        code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
-                        category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
-                        message = message,
-                        context =
-                            ProtoErrorContext(
-                                metadata = mapOf("field_path" to fieldPath),
-                            ),
-                        c_abi_code = -259,
-                        nested_message = cause?.message,
-                    ),
-                cause = cause,
-            )
+        ): SDKException {
+            val ex =
+                SDKException(
+                    error =
+                        ProtoSDKError(
+                            code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+                            category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
+                            message = message,
+                            context =
+                                ProtoErrorContext(
+                                    metadata = mapOf("field_path" to fieldPath),
+                                ),
+                            c_abi_code = -259,
+                            nested_message = cause?.message,
+                        ),
+                    cause = cause,
+                )
+            if (!ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT.isExpected) {
+                ex.log()
+            }
+            return ex
+        }
 
         // ====================================================================
         // MODEL FACTORIES

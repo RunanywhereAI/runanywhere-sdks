@@ -2,31 +2,30 @@
 # check_no_pii_logging.sh
 #
 # pass2-syn-117 / security-privacy-storage-network-003 regression guard.
+# Widened in pass3-syn-098 to scan all of commons features/ and
+# infrastructure/, and to flag URL-shaped values in INFO/WARN logs even
+# without a destination-path token in the same line.
 #
-# Prevents reintroduction of the Android logcat leak where signed URLs +
-# user-specific filesystem paths were emitted together (a common
-# fingerprint: `url=...dest=...` at INFO level in the HTTP download
-# runner). The original leak was in
-# `sdk/runanywhere-commons/src/infrastructure/http/rac_http_download.cpp`
-# and was removed in the security-privacy-storage-network-003 fix.
+# Prevents reintroduction of the Android logcat leak where signed URLs
+# were emitted at INFO level — originally in
+# `sdk/runanywhere-commons/src/infrastructure/http/rac_http_download.cpp`,
+# but the same hazard exists across any code path that touches signed URLs
+# or per-user filesystem paths (features/diffusion, features/rag,
+# infrastructure/model_management, infrastructure/network, etc.).
 #
-# Heuristic (narrow on purpose — a noisy guard would just get disabled):
+# Heuristic:
 #
-#   1. Scan only files under
-#      sdk/runanywhere-commons/src/infrastructure/http/
-#      and the platform glue at
-#      sdk/runanywhere-commons/src/infrastructure/download/rac_http_*.cpp
-#      — i.e. the active-download code paths that handle signed URLs and
-#      live destination paths.
+#   1. Scan files under
+#      sdk/runanywhere-commons/src/features/
+#      sdk/runanywhere-commons/src/infrastructure/
+#      — anywhere signed URLs or per-user paths can show up.
 #   2. Inside those files, treat as a violation any __android_log_print(...)
-#      or RAC_LOG_INFO(...) call whose JOINED argument list contains BOTH:
-#         - a %s formatter, AND
-#         - a `url`-shaped token (`url`, `download_url`, `signed_url`), AND
-#         - a `dest`/path-shaped token (`dest`, `dest_path`,
-#           `destination_path`, `local_path`).
-#      This is exactly the combination the original leak emitted; logging
-#      either alone is allowed (model-id+local_path debug lines elsewhere
-#      in commons are not in scope and serve legitimate diagnosis).
+#      or RAC_LOG_INFO(...) call whose JOINED argument list contains a %s
+#      formatter AND mentions a URL-shaped token (`url`, `download_url`,
+#      `signed_url`, `endpoint`, `hf_url`) — independent of any
+#      destination-path token. The pre-pass3 AND-only heuristic only
+#      caught the exact pass-2 fingerprint and missed renamed-variable
+#      leaks (e.g. `endpoint=%s into %s`).
 #
 # Exits 0 when no offending call sites are found, 1 otherwise.
 
@@ -41,9 +40,11 @@ if [[ ! -d "${COMMONS_SRC}" ]]; then
   exit 2
 fi
 
-# Active-download code paths only.
+# pass3-syn-098: widened scope. Any URL-shaped token at INFO is now a
+# potential leak regardless of whether a destination is co-logged.
 SCAN_PATHS=(
-  "${COMMONS_SRC}/infrastructure/http"
+  "${COMMONS_SRC}/features"
+  "${COMMONS_SRC}/infrastructure"
 )
 
 # Logging macros / functions to guard.
@@ -52,8 +53,7 @@ GUARDED_LOGGERS=(
   "RAC_LOG_INFO"
 )
 
-URL_TOKEN_PATTERN='(^|[^A-Za-z_])(url|download_url|signed_url)([^A-Za-z0-9_]|$)'
-DEST_TOKEN_PATTERN='(^|[^A-Za-z_])(dest|dest_path|destination_path|local_path)([^A-Za-z0-9_]|$)'
+URL_TOKEN_PATTERN='(^|[^A-Za-z_])(url|download_url|signed_url|endpoint|hf_url)([^A-Za-z0-9_]|$)'
 
 violations=0
 
@@ -90,15 +90,15 @@ scan_one_file() {
       if ! printf "%s" "${call_text}" | grep -Fq "%s"; then
         continue
       fi
-      # Must mention BOTH a URL-ish token AND a destination/path token.
-      if printf "%s" "${call_text}" | grep -Eq "${URL_TOKEN_PATTERN}" &&
-         printf "%s" "${call_text}" | grep -Eq "${DEST_TOKEN_PATTERN}"; then
+      # pass3-syn-098: flag any URL-shaped token (no longer requires a
+      # destination-path token in the same line).
+      if printf "%s" "${call_text}" | grep -Eq "${URL_TOKEN_PATTERN}"; then
         hits+="line ${line_no}: ${call_text}"$'\n'
       fi
     done <<< "${joined_calls}"
 
     if [[ -n "${hits}" ]]; then
-      printf "\nFAIL: PII-bearing %s call (URL + destination together) in %s:\n" "${logger}" "${file}" >&2
+      printf "\nFAIL: PII-bearing %s call (URL-shaped token at INFO) in %s:\n" "${logger}" "${file}" >&2
       printf "%s" "${hits}" >&2
       violations=$((violations + 1))
     fi
@@ -116,12 +116,13 @@ done
 
 if (( violations > 0 )); then
   printf "\ncheck_no_pii_logging.sh: %d violation(s) found.\n" "${violations}" >&2
-  printf "Rationale: pass2-syn-117 / security-privacy-storage-network-003 — signed URLs\n" >&2
-  printf "  combined with destination paths must not reach logcat at INFO level.\n" >&2
-  printf "  Either remove the URL or the destination from the log line, or downgrade\n" >&2
-  printf "  the call to RAC_LOG_DEBUG with a redaction comment.\n" >&2
+  printf "Rationale: pass2-syn-117 / pass3-syn-098 — signed URLs must not reach\n" >&2
+  printf "  logcat at INFO level (URL query params can carry tokens; HuggingFace\n" >&2
+  printf "  endpoints can carry redirect-chain metadata).\n" >&2
+  printf "  Downgrade the call to RAC_LOG_DEBUG with a redaction comment, or\n" >&2
+  printf "  emit only the filename/identifier without the URL.\n" >&2
   exit 1
 fi
 
-printf "check_no_pii_logging.sh: OK (no URL+destination INFO logs under active-download paths)\n"
+printf "check_no_pii_logging.sh: OK (no URL-shaped INFO logs under features/ or infrastructure/)\n"
 exit 0

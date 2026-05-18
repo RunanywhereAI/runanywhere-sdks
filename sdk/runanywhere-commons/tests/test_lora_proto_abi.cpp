@@ -394,6 +394,235 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+// Negative-case coverage for the v2 proto ABI. These pin the typed-error
+// contract that platform SDKs rely on so future ABI changes cannot silently
+// weaken the error path.
+
+// NULL output buffer arguments must surface RAC_ERROR_NULL_POINTER directly
+// (no typed result is producible without a buffer to copy into). NULL request
+// bytes with non-zero size route through rac_proto_bytes_validate and surface
+// a typed RAC_ERROR_DECODING_ERROR via the out buffer status.
+int test_null_inputs_return_typed_errors() {
+    reset_environment();
+
+    // NULL out_result → RAC_ERROR_NULL_POINTER.
+    CHECK(rac_lora_apply_proto(nullptr, 0, nullptr) == RAC_ERROR_NULL_POINTER,
+          "apply with NULL out_result returns NULL_POINTER");
+    CHECK(rac_lora_remove_proto(nullptr, 0, nullptr) == RAC_ERROR_NULL_POINTER,
+          "remove with NULL out_state returns NULL_POINTER");
+    CHECK(rac_lora_state_proto(nullptr, 0, nullptr) == RAC_ERROR_NULL_POINTER,
+          "state with NULL out_state returns NULL_POINTER");
+    CHECK(rac_lora_list_proto(nullptr, 0, nullptr) == RAC_ERROR_NULL_POINTER,
+          "list with NULL out_state returns NULL_POINTER");
+    CHECK(rac_lora_compatibility_proto(nullptr, 0, nullptr) == RAC_ERROR_NULL_POINTER,
+          "compatibility with NULL out_result returns NULL_POINTER");
+
+    // NULL bytes + non-zero size → DECODING_ERROR on the out buffer status.
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_lora_apply_proto(nullptr, 8, &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "apply with NULL bytes + non-zero size returns DECODING_ERROR");
+    CHECK(out.status == RAC_ERROR_DECODING_ERROR,
+          "apply NULL-bytes propagates DECODING_ERROR to out.status");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_remove_proto(nullptr, 8, &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "remove with NULL bytes + non-zero size returns DECODING_ERROR");
+    rac_proto_buffer_free(&out);
+
+    reset_environment();
+    return 0;
+}
+
+// Malformed proto bytes must surface a typed RAC_ERROR_DECODING_ERROR via the
+// out buffer status — not crash and not silently succeed. Truncated payloads
+// and arbitrary garbage both exercise the ParseFromArray failure branch in
+// parse_message().
+int test_malformed_proto_bytes_return_decoding_error() {
+    reset_environment();
+
+    // Bytes that are highly unlikely to parse as a valid LoRAApplyRequest:
+    // 0xFF tags with bogus varint lengths.
+    const uint8_t garbage[] = {0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_lora_apply_proto(garbage, sizeof(garbage), &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "apply with malformed bytes returns DECODING_ERROR");
+    CHECK(out.status == RAC_ERROR_DECODING_ERROR,
+          "apply malformed-bytes propagates DECODING_ERROR to out.status");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_remove_proto(garbage, sizeof(garbage), &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "remove with malformed bytes returns DECODING_ERROR");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_list_proto(garbage, sizeof(garbage), &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "list with malformed bytes returns DECODING_ERROR");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_state_proto(garbage, sizeof(garbage), &out);
+    CHECK(rc == RAC_ERROR_DECODING_ERROR,
+          "state with malformed bytes returns DECODING_ERROR");
+    rac_proto_buffer_free(&out);
+
+    reset_environment();
+    return 0;
+}
+
+// All LoRA proto entry points must report COMPONENT_NOT_READY (via the typed
+// result message, not the C return code) when no LLM has been loaded through
+// the lifecycle service. This is the v2 "no caller-supplied handle" contract.
+int test_apis_before_load_report_component_not_ready() {
+    reset_environment();
+
+    // Apply against the empty lifecycle — must return a typed
+    // LoRAApplyResult with error_code == COMPONENT_NOT_READY.
+    runanywhere::v1::LoRAApplyRequest apply;
+    apply.set_request_id("apply-before-load");
+    auto* adapter = apply.add_adapters();
+    adapter->set_adapter_id("never");
+    adapter->set_adapter_path("/tmp/never.gguf");
+    std::vector<uint8_t> apply_bytes;
+    CHECK(serialize(apply, &apply_bytes), "apply-before-load serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
+    runanywhere::v1::LoRAApplyResult apply_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
+          "apply-before-load returns typed LoRAApplyResult");
+    CHECK(!apply_result.success(), "apply-before-load reports failure");
+    CHECK(apply_result.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+          "apply-before-load reports COMPONENT_NOT_READY");
+    rac_proto_buffer_free(&out);
+
+    // Remove (clear_all) against the empty lifecycle — must return a typed
+    // LoRAState with error_code == COMPONENT_NOT_READY.
+    runanywhere::v1::LoRARemoveRequest remove;
+    remove.set_clear_all(true);
+    std::vector<uint8_t> remove_bytes;
+    CHECK(serialize(remove, &remove_bytes), "remove-before-load serializes");
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_remove_proto(remove_bytes.data(), remove_bytes.size(), &out);
+    runanywhere::v1::LoRAState remove_state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &remove_state),
+          "remove-before-load returns typed LoRAState");
+    CHECK(remove_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+          "remove-before-load reports COMPONENT_NOT_READY");
+    rac_proto_buffer_free(&out);
+
+    // list_proto and state_proto on a never-loaded lifecycle must surface the
+    // same typed COMPONENT_NOT_READY on the LoRAState message.
+    runanywhere::v1::LoRAState state_request;
+    std::vector<uint8_t> state_bytes;
+    CHECK(serialize(state_request, &state_bytes), "state request serializes");
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_list_proto(state_bytes.data(), state_bytes.size(), &out);
+    runanywhere::v1::LoRAState list_state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &list_state),
+          "list-before-load returns typed LoRAState");
+    CHECK(list_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+          "list-before-load reports COMPONENT_NOT_READY");
+    rac_proto_buffer_free(&out);
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_state_proto(state_bytes.data(), state_bytes.size(), &out);
+    runanywhere::v1::LoRAState lora_state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &lora_state),
+          "state-before-load returns typed LoRAState");
+    CHECK(lora_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+          "state-before-load reports COMPONENT_NOT_READY");
+    rac_proto_buffer_free(&out);
+
+    reset_environment();
+    return 0;
+}
+
+// Removing/clearing twice in a row must be idempotent — the second call
+// returns a successful (error-free) LoRAState reflecting the same empty
+// adapter set as the first. This guards against the ABI silently regressing
+// to "double-unload returns INVALID_HANDLE" or similar.
+int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
+    reset_environment();
+
+    rac_llm_service_ops_t ops = make_ops(/*supports_lora=*/true);
+    rac_engine_vtable_t vtable = make_vtable(&ops);
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "double-clear plugin registers");
+    CHECK(register_test_llm(registry, build_test_llm("double.clear", "Double Clear")),
+          "double.clear model registers");
+    CHECK(lifecycle_load(registry, "double.clear"), "lifecycle loads double.clear");
+
+    // Apply one adapter so we have non-empty state to clear.
+    runanywhere::v1::LoRAApplyRequest apply;
+    apply.set_request_id("apply-pre-clear");
+    auto* adapter = apply.add_adapters();
+    adapter->set_adapter_id("only");
+    adapter->set_adapter_path("/tmp/only.gguf");
+    adapter->set_scale(0.5f);
+    std::vector<uint8_t> apply_bytes;
+    CHECK(serialize(apply, &apply_bytes), "apply-pre-clear serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_lora_apply_proto(apply_bytes.data(), apply_bytes.size(), &out);
+    runanywhere::v1::LoRAApplyResult apply_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
+          "apply-pre-clear returns LoRAApplyResult");
+    CHECK(apply_result.success(), "apply-pre-clear succeeds");
+    rac_proto_buffer_free(&out);
+
+    // First clear_all → state empties.
+    runanywhere::v1::LoRARemoveRequest clear_request;
+    clear_request.set_clear_all(true);
+    std::vector<uint8_t> clear_bytes;
+    CHECK(serialize(clear_request, &clear_bytes), "clear request serializes");
+
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
+    runanywhere::v1::LoRAState first_state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_state),
+          "first clear_all returns LoRAState");
+    CHECK(first_state.error_code() == 0,
+          "first clear_all carries no error");
+    CHECK(first_state.loaded_adapters_size() == 0,
+          "first clear_all empties tracked adapters");
+    CHECK(!first_state.has_active_adapters(),
+          "first clear_all sets has_active_adapters=false");
+    rac_proto_buffer_free(&out);
+
+    // Second clear_all on already-empty state must remain idempotent — no
+    // error code, no adapters, no INVALID_HANDLE leak.
+    rac_proto_buffer_init(&out);
+    rc = rac_lora_remove_proto(clear_bytes.data(), clear_bytes.size(), &out);
+    runanywhere::v1::LoRAState second_state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_state),
+          "second clear_all returns LoRAState");
+    CHECK(second_state.error_code() == 0,
+          "second clear_all carries no error (idempotent)");
+    CHECK(second_state.loaded_adapters_size() == 0,
+          "second clear_all leaves tracked adapters empty");
+    CHECK(!second_state.has_active_adapters(),
+          "second clear_all keeps has_active_adapters=false");
+    CHECK(second_state.base_model_id() == "double.clear",
+          "second clear_all preserves base model id");
+    rac_proto_buffer_free(&out);
+
+    reset_environment();
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -413,6 +642,10 @@ int main() {
     try {
         test_apply_remove_via_lifecycle_only(registry);
         test_unload_reverts_to_not_ready(registry);
+        test_null_inputs_return_typed_errors();
+        test_malformed_proto_bytes_return_decoding_error();
+        test_apis_before_load_report_component_not_ready();
+        test_double_clear_is_idempotent(registry);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "  FATAL: %s\n", e.what());
         reset_environment();

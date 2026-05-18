@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_llamacpp.h"
 #include "rac/plugin/rac_stream_adapter.h"
 
 static const char *LOG_CAT = "VLM.LlamaCPP";
@@ -239,7 +240,9 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
   // RAC_STATIC_PLUGIN_REGISTER ctor never fires. Register the VLM plugin
   // entry here so rac_plugin_route(framework=llamacpp, primitive=vlm)
   // resolves to this vtable.
-  extern const rac_engine_vtable_t *rac_plugin_entry_llamacpp_vlm(void);
+  // pass3-syn-166: forward decl now comes via rac_plugin_entry_llamacpp.h so
+  // the RAC_API visibility attribute (stamped by RAC_PLUGIN_ENTRY_DECL) is
+  // consistent across all consumers of this symbol.
   const rac_engine_vtable_t *vt = rac_plugin_entry_llamacpp_vlm();
   if (vt != nullptr) {
     rac_result_t plugin_rc = rac_plugin_register(vt);

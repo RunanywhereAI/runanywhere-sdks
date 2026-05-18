@@ -79,6 +79,22 @@ public class VoiceAgentConfig(
   )
   public val vad_model_id: String = "",
   /**
+   * pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
+   * (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
+   * fall back to using tts_model_id as the voice id — correct for
+   * single-voice engines, wrong for multi-voice. Aligns the caller-facing
+   * VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
+   * (voice_agent_service.proto:214) which already exposes tts_voice_id.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "ttsVoiceId",
+    schemaIndex = 4,
+  )
+  public val tts_voice_id: String = "",
+  /**
    * Audio configuration.
    * default 16000
    */
@@ -87,7 +103,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sampleRateHz",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val sample_rate_hz: Int = 0,
   /**
@@ -98,7 +114,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chunkMs",
-    schemaIndex = 5,
+    schemaIndex = 6,
   )
   public val chunk_ms: Int = 0,
   @field:WireField(
@@ -106,7 +122,7 @@ public class VoiceAgentConfig(
     adapter = "ai.runanywhere.proto.v1.AudioSource#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioSource",
-    schemaIndex = 6,
+    schemaIndex = 7,
   )
   public val audio_source: AudioSource = AudioSource.AUDIO_SOURCE_UNSPECIFIED,
   /**
@@ -118,7 +134,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioFilePath",
-    schemaIndex = 7,
+    schemaIndex = 8,
   )
   public val audio_file_path: String = "",
   /**
@@ -130,7 +146,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "enableBargeIn",
-    schemaIndex = 8,
+    schemaIndex = 9,
   )
   public val enable_barge_in: Boolean = false,
   /**
@@ -141,7 +157,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "bargeInThresholdMs",
-    schemaIndex = 9,
+    schemaIndex = 10,
   )
   public val barge_in_threshold_ms: Int = 0,
   /**
@@ -152,7 +168,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "systemPrompt",
-    schemaIndex = 10,
+    schemaIndex = 11,
   )
   public val system_prompt: String = "",
   @field:WireField(
@@ -160,14 +176,14 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxContextTokens",
-    schemaIndex = 11,
+    schemaIndex = 12,
   )
   public val max_context_tokens: Int = 0,
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 12,
+    schemaIndex = 13,
   )
   public val temperature: Float = 0f,
   /**
@@ -178,7 +194,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "emitPartials",
-    schemaIndex = 13,
+    schemaIndex = 14,
   )
   public val emit_partials: Boolean = false,
   /**
@@ -189,7 +205,7 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "emitThoughts",
-    schemaIndex = 14,
+    schemaIndex = 15,
   )
   public val emit_thoughts: Boolean = false,
   /**
@@ -201,7 +217,7 @@ public class VoiceAgentConfig(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
     jsonName = "typeKind",
-    schemaIndex = 15,
+    schemaIndex = 16,
   )
   public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -221,6 +237,7 @@ public class VoiceAgentConfig(
     if (stt_model_id != other.stt_model_id) return false
     if (tts_model_id != other.tts_model_id) return false
     if (vad_model_id != other.vad_model_id) return false
+    if (tts_voice_id != other.tts_voice_id) return false
     if (sample_rate_hz != other.sample_rate_hz) return false
     if (chunk_ms != other.chunk_ms) return false
     if (audio_source != other.audio_source) return false
@@ -244,6 +261,7 @@ public class VoiceAgentConfig(
       result = result * 37 + stt_model_id.hashCode()
       result = result * 37 + tts_model_id.hashCode()
       result = result * 37 + vad_model_id.hashCode()
+      result = result * 37 + tts_voice_id.hashCode()
       result = result * 37 + sample_rate_hz.hashCode()
       result = result * 37 + chunk_ms.hashCode()
       result = result * 37 + audio_source.hashCode()
@@ -267,6 +285,7 @@ public class VoiceAgentConfig(
     result += """stt_model_id=${sanitize(stt_model_id)}"""
     result += """tts_model_id=${sanitize(tts_model_id)}"""
     result += """vad_model_id=${sanitize(vad_model_id)}"""
+    result += """tts_voice_id=${sanitize(tts_voice_id)}"""
     result += """sample_rate_hz=$sample_rate_hz"""
     result += """chunk_ms=$chunk_ms"""
     result += """audio_source=$audio_source"""
@@ -287,6 +306,7 @@ public class VoiceAgentConfig(
     stt_model_id: String = this.stt_model_id,
     tts_model_id: String = this.tts_model_id,
     vad_model_id: String = this.vad_model_id,
+    tts_voice_id: String = this.tts_voice_id,
     sample_rate_hz: Int = this.sample_rate_hz,
     chunk_ms: Int = this.chunk_ms,
     audio_source: AudioSource = this.audio_source,
@@ -301,7 +321,7 @@ public class VoiceAgentConfig(
     type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentConfig = VoiceAgentConfig(llm_model_id, stt_model_id, tts_model_id, vad_model_id,
-      sample_rate_hz, chunk_ms, audio_source, audio_file_path, enable_barge_in,
+      tts_voice_id, sample_rate_hz, chunk_ms, audio_source, audio_file_path, enable_barge_in,
       barge_in_threshold_ms, system_prompt, max_context_tokens, temperature, emit_partials,
       emit_thoughts, type_kind, unknownFields)
 
@@ -325,6 +345,8 @@ public class VoiceAgentConfig(
             value.tts_model_id)
         if (value.vad_model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4,
             value.vad_model_id)
+        if (value.tts_voice_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(17,
+            value.tts_voice_id)
         if (value.sample_rate_hz != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
             value.sample_rate_hz)
         if (value.chunk_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.chunk_ms)
@@ -359,6 +381,8 @@ public class VoiceAgentConfig(
             value.tts_model_id)
         if (value.vad_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
             value.vad_model_id)
+        if (value.tts_voice_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 17,
+            value.tts_voice_id)
         if (value.sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.sample_rate_hz)
         if (value.chunk_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_ms)
@@ -408,6 +432,8 @@ public class VoiceAgentConfig(
         if (value.chunk_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_ms)
         if (value.sample_rate_hz != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
             value.sample_rate_hz)
+        if (value.tts_voice_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 17,
+            value.tts_voice_id)
         if (value.vad_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
             value.vad_model_id)
         if (value.tts_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
@@ -423,6 +449,7 @@ public class VoiceAgentConfig(
         var stt_model_id: String = ""
         var tts_model_id: String = ""
         var vad_model_id: String = ""
+        var tts_voice_id: String = ""
         var sample_rate_hz: Int = 0
         var chunk_ms: Int = 0
         var audio_source: AudioSource = AudioSource.AUDIO_SOURCE_UNSPECIFIED
@@ -441,6 +468,7 @@ public class VoiceAgentConfig(
             2 -> stt_model_id = ProtoAdapter.STRING.decode(reader)
             3 -> tts_model_id = ProtoAdapter.STRING.decode(reader)
             4 -> vad_model_id = ProtoAdapter.STRING.decode(reader)
+            17 -> tts_voice_id = ProtoAdapter.STRING.decode(reader)
             5 -> sample_rate_hz = ProtoAdapter.INT32.decode(reader)
             6 -> chunk_ms = ProtoAdapter.INT32.decode(reader)
             7 -> try {
@@ -469,6 +497,7 @@ public class VoiceAgentConfig(
           stt_model_id = stt_model_id,
           tts_model_id = tts_model_id,
           vad_model_id = vad_model_id,
+          tts_voice_id = tts_voice_id,
           sample_rate_hz = sample_rate_hz,
           chunk_ms = chunk_ms,
           audio_source = audio_source,

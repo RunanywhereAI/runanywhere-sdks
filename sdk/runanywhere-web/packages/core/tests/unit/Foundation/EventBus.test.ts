@@ -263,4 +263,255 @@ describe('EventBus (proto-backed)', () => {
     expect(wildcardReceived).toHaveLength(1);
     expect(wildcardReceived[0]?.type).toBe('');
   });
+
+  // ---------------------------------------------------------------------------
+  // onCategory / eventsFor — cross-SDK parity helpers
+  // ---------------------------------------------------------------------------
+  //
+  // Semantic contract (mirrors Swift `EventBus.events(for:)` /
+  // `EventBus.on(category:)`, which filter the same `PassthroughSubject` by
+  // `event.category`):
+  //
+  //   • Category subscribers receive the raw `SDKEvent` proto whose
+  //     `category` field equals the requested category, regardless of
+  //     whether the dotted-name translator recognizes the payload.
+  //   • A subscriber registered for category X must NOT see events whose
+  //     proto `category` field is anything other than X.
+  //   • Unsubscribe releases the per-listener slot and, once the listener
+  //     set for that category is empty, prunes the category entry entirely
+  //     so a later subscribe re-creates the slot from scratch.
+  //   • `eventsFor(category)` returns an `AsyncIterable<ProtoSDKEvent>`
+  //     that is wire-equivalent to `onCategory(category, …)`. Each
+  //     iterator installs its own `onCategory` subscription; calling
+  //     `.return()` (e.g. via `break` in `for await … of`) releases it.
+
+  describe('onCategory (Swift events(for:) parity)', () => {
+    test('receives raw proto events whose category matches', () => {
+      const received: ProtoSDKEvent[] = [];
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (event) => received.push(event));
+
+      transport.trigger(modelLoadCompletedEvent('gemma-2b'));
+
+      expect(received).toHaveLength(1);
+      // onCategory delivers the *raw* proto, not the translated envelope —
+      // so the model.kind / model.modelId fields are preserved verbatim.
+      expect(received[0]?.category).toBe(EventCategory.EVENT_CATEGORY_MODEL);
+      expect(received[0]?.model?.modelId).toBe('gemma-2b');
+      expect(received[0]?.model?.kind).toBe(ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED);
+    });
+
+    test('does NOT receive events whose category does not match', () => {
+      const modelReceived: ProtoSDKEvent[] = [];
+      const downloadReceived: ProtoSDKEvent[] = [];
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (event) => modelReceived.push(event));
+      bus.onCategory(EventCategory.EVENT_CATEGORY_DOWNLOAD, (event) => downloadReceived.push(event));
+
+      // One MODEL event and one DOWNLOAD event — each subscriber should
+      // only see its own category, mirroring Swift's `.filter { $0.category == category }`.
+      transport.trigger(modelLoadCompletedEvent('gemma-2b'));
+      transport.trigger(modelDownloadProgressEvent('llama-3b', 0.5, 5_000, 10_000));
+
+      expect(modelReceived).toHaveLength(1);
+      expect(modelReceived[0]?.category).toBe(EventCategory.EVENT_CATEGORY_MODEL);
+      expect(downloadReceived).toHaveLength(1);
+      expect(downloadReceived[0]?.category).toBe(EventCategory.EVENT_CATEGORY_DOWNLOAD);
+    });
+
+    test('unsubscribe stops further delivery and prunes the listener set', () => {
+      // Pruning is internal (categoryListeners is private), so we verify it
+      // by *behaviour*: after unsubscribing, no event is delivered. After
+      // a fresh subscribe to the same category, the new listener sees
+      // subsequent events — proving the slot was re-created cleanly.
+      const received: ProtoSDKEvent[] = [];
+      const unsubscribe = bus.onCategory(
+        EventCategory.EVENT_CATEGORY_MODEL,
+        (event) => received.push(event),
+      );
+
+      transport.trigger(modelLoadCompletedEvent('m1'));
+      expect(received).toHaveLength(1);
+
+      unsubscribe();
+
+      transport.trigger(modelLoadCompletedEvent('m2'));
+      transport.trigger(modelLoadCompletedEvent('m3'));
+      expect(received).toHaveLength(1);
+
+      // After pruning, a brand-new subscriber wires up cleanly.
+      const reSubscribed: ProtoSDKEvent[] = [];
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (event) => reSubscribed.push(event));
+      transport.trigger(modelLoadCompletedEvent('m4'));
+
+      expect(reSubscribed).toHaveLength(1);
+      expect(reSubscribed[0]?.model?.modelId).toBe('m4');
+      // Original listener stays unsubscribed.
+      expect(received).toHaveLength(1);
+    });
+
+    test('multiple subscribers on the same category each receive every event', () => {
+      const a: ProtoSDKEvent[] = [];
+      const b: ProtoSDKEvent[] = [];
+      const unsubA = bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (e) => a.push(e));
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (e) => b.push(e));
+
+      transport.trigger(modelLoadCompletedEvent('shared'));
+      expect(a).toHaveLength(1);
+      expect(b).toHaveLength(1);
+
+      // Unsubscribing just one of them must not prune the other. The
+      // pruning condition is "set is empty", so B must keep firing.
+      unsubA();
+      transport.trigger(modelLoadCompletedEvent('after-unsub'));
+      expect(a).toHaveLength(1);
+      expect(b).toHaveLength(2);
+    });
+
+    test('listener throw is isolated and does not break peer listeners', () => {
+      // Swift's Combine pipeline isolates `.sink` closures per subscriber;
+      // a throw in one sink does not cancel its siblings. Web mirrors this
+      // by wrapping each listener invocation in try/catch (EventBus.ts:421-427).
+      const survivor: ProtoSDKEvent[] = [];
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, () => {
+        throw new Error('boom');
+      });
+      bus.onCategory(EventCategory.EVENT_CATEGORY_MODEL, (e) => survivor.push(e));
+
+      transport.trigger(modelLoadCompletedEvent('still-delivered'));
+
+      expect(survivor).toHaveLength(1);
+      expect(survivor[0]?.model?.modelId).toBe('still-delivered');
+    });
+  });
+
+  describe('eventsFor (AsyncIterable parity)', () => {
+    test('returns an AsyncIterable whose iterator yields matching events', async () => {
+      const iterable = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL);
+      expect(typeof iterable[Symbol.asyncIterator]).toBe('function');
+
+      const iterator = iterable[Symbol.asyncIterator]();
+
+      // Pump events *after* iteration starts; the resolver path must
+      // resolve `next()` with the queued event.
+      const firstPromise = iterator.next();
+      transport.trigger(modelLoadCompletedEvent('async-1'));
+      const first = await firstPromise;
+
+      expect(first.done).toBe(false);
+      expect(first.value?.category).toBe(EventCategory.EVENT_CATEGORY_MODEL);
+      expect(first.value?.model?.modelId).toBe('async-1');
+
+      // Buffered path: trigger first, then call next() — the event must
+      // come out of the internal queue.
+      transport.trigger(modelLoadCompletedEvent('async-2'));
+      const second = await iterator.next();
+      expect(second.done).toBe(false);
+      expect(second.value?.model?.modelId).toBe('async-2');
+
+      // Cleanly close.
+      await iterator.return?.();
+    });
+
+    test('only yields events for its own category', async () => {
+      const iterator = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL)[Symbol.asyncIterator]();
+
+      const nextPromise = iterator.next();
+      // Off-category event must be filtered out.
+      transport.trigger(modelDownloadProgressEvent('off', 0.1, 1, 10));
+      // On-category event must be the one that resolves the promise.
+      transport.trigger(modelLoadCompletedEvent('match'));
+
+      const result = await nextPromise;
+      expect(result.done).toBe(false);
+      expect(result.value?.category).toBe(EventCategory.EVENT_CATEGORY_MODEL);
+      expect(result.value?.model?.modelId).toBe('match');
+
+      await iterator.return?.();
+    });
+
+    test('iterator.return() releases the underlying onCategory subscription', async () => {
+      // After return(), further triggers must not push to the iterator's
+      // internal queue — the wrapper unsubscribed from the bus. We verify
+      // this by checking that next() resolves with done=true (no value
+      // is buffered) even though the transport keeps firing.
+      const iterator = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL)[Symbol.asyncIterator]();
+
+      const closeResult = await iterator.return?.();
+      expect(closeResult?.done).toBe(true);
+
+      transport.trigger(modelLoadCompletedEvent('post-return-1'));
+      transport.trigger(modelLoadCompletedEvent('post-return-2'));
+
+      const after = await iterator.next();
+      expect(after.done).toBe(true);
+      expect(after.value).toBeUndefined();
+    });
+
+    test('return() while a waiter is pending resolves the waiter with done=true', async () => {
+      // Mid-stream cancel: simulate `for await … of` breaking out before
+      // any event arrives. The pending resolver must be settled with
+      // { done: true } so the consumer's loop exits cleanly. This is the
+      // subtle correctness trap called out in the finding.
+      const iterator = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL)[Symbol.asyncIterator]();
+
+      const pending = iterator.next();
+      await iterator.return?.();
+
+      const result = await pending;
+      expect(result.done).toBe(true);
+      expect(result.value).toBeUndefined();
+    });
+
+    test('multiple iterators on the same category each get their own subscription', async () => {
+      // Each `eventsFor(category)` call installs an independent onCategory
+      // subscription. Both iterators must observe every event, mirroring
+      // Swift's multicast publisher semantics where every `.sink` is a
+      // separate downstream.
+      const itA = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL)[Symbol.asyncIterator]();
+      const itB = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL)[Symbol.asyncIterator]();
+
+      const aPromise = itA.next();
+      const bPromise = itB.next();
+      transport.trigger(modelLoadCompletedEvent('multi'));
+
+      const [a, b] = await Promise.all([aPromise, bPromise]);
+      expect(a.value?.model?.modelId).toBe('multi');
+      expect(b.value?.model?.modelId).toBe('multi');
+
+      // Closing one iterator must NOT release the other's subscription.
+      await itA.return?.();
+
+      const bSecondPromise = itB.next();
+      transport.trigger(modelLoadCompletedEvent('only-b'));
+      const bSecond = await bSecondPromise;
+      expect(bSecond.value?.model?.modelId).toBe('only-b');
+
+      await itB.return?.();
+    });
+
+    test('integrates with for-await-of and breaks cleanly mid-stream', async () => {
+      // End-to-end shape parity with Swift `for await event in
+      // EventBus.shared.events(for: .model) { … break }`.
+      const collected: string[] = [];
+      const iterable = bus.eventsFor(EventCategory.EVENT_CATEGORY_MODEL);
+
+      // Drive the loop on a microtask so the trigger calls below get
+      // observed by the bus before the iterator's first `next()` settles.
+      const loop = (async () => {
+        for await (const event of iterable) {
+          collected.push(event.model?.modelId ?? '');
+          if (collected.length === 2) break;
+        }
+      })();
+
+      // Fire three events; the for-await loop should break after the
+      // second, leaving the third unobserved (subscription released by
+      // the iterator's implicit return()).
+      transport.trigger(modelLoadCompletedEvent('e1'));
+      transport.trigger(modelLoadCompletedEvent('e2'));
+      transport.trigger(modelLoadCompletedEvent('e3'));
+
+      await loop;
+      expect(collected).toEqual(['e1', 'e2']);
+    });
+  });
 });

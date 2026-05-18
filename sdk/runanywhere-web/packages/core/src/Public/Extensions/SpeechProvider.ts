@@ -3,6 +3,33 @@
  * backend escape hatch. NOT a stable public API.
  *
  * @internal @experimental
+ * @deprecated pass3-syn-035 — SpeechProvider duplicates the proto-byte
+ *             STT/TTS/VAD path. It is retained only until the unified
+ *             `racommons-llamacpp.wasm` artifact passes its STT/TTS/VAD
+ *             smoke tests with ORT + Sherpa linked in (see REMOVAL
+ *             CONTRACT below for the gating workstream and verification
+ *             gate). Do not design new app code or backend features
+ *             around the SpeechProvider routing layer — call
+ *             `RunAnywhere.transcribe` / `synthesize` /
+ *             `detectVoiceActivity` and route through the proto-byte
+ *             adapter contract. SDK-internal references are tracked for
+ *             deletion under
+ *             `duplicate-abstractions-and-SOLID-001-followup-web.json`.
+ *
+ *             Retirement timeline:
+ *               1. Land the unified WASM artifact passing
+ *                  `tests/browser/facade-speech-vad.spec.ts` with
+ *                  `skipProtoBytePlugins: false`.
+ *               2. Flip
+ *                  `RunAnywhere+STT/+TTS/+VAD` to skip the SpeechProvider
+ *                  branch and go straight to the proto-byte adapter.
+ *               3. Delete this file + all `setSpeechProvider /
+ *                  getSpeechProvider / hasSpeechProviderSTT / disposeSpeechProvider`
+ *                  call sites; remove the internal re-export from
+ *                  `packages/core/src/internal.ts`.
+ *               4. Drop `web-onnx`'s SpeechProvider registration path
+ *                  (its STT/TTS/VAD shall route through the proto-byte
+ *                  adapter exclusively).
  *
  * The V2 architecture's canonical path for STT/TTS/VAD is the proto-byte
  * RACommons C ABI (`STTProtoAdapter` / `TTSProtoAdapter` /
@@ -114,6 +141,11 @@ export interface SpeechProviderDetectVoiceInput {
   options?: Partial<VADOptions>;
 }
 
+/**
+ * @deprecated pass3-syn-035 — use the proto-byte STT/TTS/VAD adapter contract
+ *             instead. See file header REMOVAL CONTRACT for the retirement
+ *             timeline and verification gate.
+ */
 export interface SpeechProvider {
   /** Stable identifier — used for diagnostics and idempotent registration. */
   readonly id: string;
@@ -159,7 +191,12 @@ export interface SpeechProvider {
 
 let _activeProvider: SpeechProvider | null = null;
 
-/** Install a speech provider. Pass `null` to clear. */
+/**
+ * Install a speech provider. Pass `null` to clear.
+ *
+ * @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT. New code
+ *             should route through the proto-byte STT/TTS/VAD adapters.
+ */
 export function setSpeechProvider(provider: SpeechProvider | null): void {
   _activeProvider = provider;
 }
@@ -169,6 +206,8 @@ export function setSpeechProvider(provider: SpeechProvider | null): void {
  * then clearing the singleton slot. Safe to call when no provider is set.
  * Any error thrown by `dispose()` is caught and surfaced to the caller via
  * the returned promise so SDK shutdown can still complete.
+ *
+ * @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT.
  */
 export async function disposeSpeechProvider(): Promise<void> {
   const provider = _activeProvider;
@@ -178,20 +217,24 @@ export async function disposeSpeechProvider(): Promise<void> {
   }
 }
 
+/** @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT. */
 export function getSpeechProvider(): SpeechProvider | null {
   return _activeProvider;
 }
 
+/** @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT. */
 export function hasSpeechProviderSTT(): boolean {
   return !!_activeProvider && _activeProvider.supportsSTT !== false
     && typeof _activeProvider.transcribe === 'function';
 }
 
+/** @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT. */
 export function hasSpeechProviderTTS(): boolean {
   return !!_activeProvider && _activeProvider.supportsTTS !== false
     && typeof _activeProvider.synthesize === 'function';
 }
 
+/** @deprecated pass3-syn-035 — see file header REMOVAL CONTRACT. */
 export function hasSpeechProviderVAD(): boolean {
   return !!_activeProvider && _activeProvider.supportsVAD !== false
     && typeof _activeProvider.detectVoiceActivity === 'function';

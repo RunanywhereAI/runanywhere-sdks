@@ -85,6 +85,12 @@ public enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+/// pass3-syn-025: structured field gaps below are intentional and documented;
+/// the wire schema is consciously decoupled from llm_options.proto to avoid
+/// the sdk_events ↔ llm_options package cycle. The companion fix for
+/// VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
+/// proto carries tts_model_id but not tts_voice_id" issue) lives in
+/// idl/solutions.proto where VoiceAgentConfig is declared.
 public struct RALLMGenerateRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for

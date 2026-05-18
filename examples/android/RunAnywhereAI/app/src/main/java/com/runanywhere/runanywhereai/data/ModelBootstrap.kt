@@ -66,20 +66,31 @@ object ModelBootstrap {
             // intentionally a documented divergence rather than a single
             // canonical pattern (no shared SDK affordance exists yet):
             //
-            //   - Android (here): `SystemTTSModule.register()` registers the
-            //     plugin in the native registry only; the example does not
-            //     seed a separate `system-tts` ModelInfo, so the TTS picker
-            //     surfaces only downloadable Sherpa voices and the System TTS
-            //     row is rendered out-of-band by the UI.
-            //   - iOS: no `system-tts` ModelInfo is seeded either; the picker
+            //   - Android (here): `SystemTTSModule.register()` seeds a real
+            //     built-in `system-tts` `RAModelInfo` (framework =
+            //     INFERENCE_FRAMEWORK_SYSTEM_TTS, built_in = true,
+            //     is_downloaded = true) into the proto registry via
+            //     `registerModelInternal(...)` → `CppBridgeModelRegistry.save`.
+            //     `listModels()` returns it like any other ready entry, and
+            //     `ModelSelectionBottomSheet` treats
+            //     `INFERENCE_FRAMEWORK_SYSTEM_TTS` as built-in alongside
+            //     `FOUNDATION_MODELS`, so the picker surfaces System TTS as a
+            //     normal registry-backed row (no out-of-band UI plumbing).
+            //   - Flutter (Apple only): same SDK-module-seeds-ModelInfo
+            //     pattern as Android, gated to iOS/macOS at the example-app
+            //     level via `RunAnywhere.models.register('system-tts', ...)`
+            //     because the commons `platform` engine plugin is
+            //     Apple-only (CMakeLists `if(APPLE AND RAC_BUILD_PLATFORM)`).
+            //   - iOS: no `system-tts` ModelInfo is seeded; the picker
             //     short-circuits via a hardcoded `SystemTTSRow` SwiftUI view.
-            //   - Flutter (Apple only): seeds a real `system-tts` ModelInfo
-            //     via `RunAnywhere.models.register(...)`.
             //   - React Native: builds a synthetic `system-tts`
             //     `ModelInfoSummary` inline at click time.
             //   - Web: System TTS is not currently surfaced.
             //
-            // Convergence onto one pattern is tracked separately (pass2-syn-098)
+            // Canonical pattern (what Android + Flutter Apple already share):
+            // an SDK module registers a real `system-tts` `RAModelInfo` so the
+            // picker treats it like any other ready row. Convergence of iOS
+            // and RN onto this pattern is tracked separately (pass2-syn-098)
             // and is a non-blocking polish item.
             SystemTTSModule.register()
             Timber.i("Core backends registered")

@@ -192,22 +192,22 @@ extension RAEmbeddingsConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if modelID.isEmpty {
-        throw SDKException.validationFailed(
-            fieldPath: "EmbeddingsConfiguration.model_id",
-            message: "model_id is required"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "EmbeddingsConfiguration.model_id",
+                message: "model_id is required"
+            )
         }
         if embeddingDimension < 1 {
-        throw SDKException.validationFailed(
-            fieldPath: "EmbeddingsConfiguration.embedding_dimension",
-            message: "embedding_dimension must be in >= 1 (got \(embeddingDimension))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "EmbeddingsConfiguration.embedding_dimension",
+                message: "embedding_dimension must be in >= 1 (got \(embeddingDimension))"
+            )
         }
         if maxSequenceLength < 1 {
-        throw SDKException.validationFailed(
-            fieldPath: "EmbeddingsConfiguration.max_sequence_length",
-            message: "max_sequence_length must be in >= 1 (got \(maxSequenceLength))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "EmbeddingsConfiguration.max_sequence_length",
+                message: "max_sequence_length must be in >= 1 (got \(maxSequenceLength))"
+            )
         }
     }
 }
@@ -236,22 +236,22 @@ extension RAVADConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if sampleRate < 1 || sampleRate > 48000 {
-        throw SDKException.validationFailed(
-            fieldPath: "VADConfiguration.sample_rate",
-            message: "sample_rate must be in 1...48000 (got \(sampleRate))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.sample_rate",
+                message: "sample_rate must be in 1...48000 (got \(sampleRate))"
+            )
         }
         if frameLengthMs < 1 || frameLengthMs > 1000 {
-        throw SDKException.validationFailed(
-            fieldPath: "VADConfiguration.frame_length_ms",
-            message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.frame_length_ms",
+                message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
+            )
         }
         if threshold < 0.0 || threshold > 1.0 {
-        throw SDKException.validationFailed(
-            fieldPath: "VADConfiguration.threshold",
-            message: "threshold must be in 0.0...1.0 (got \(threshold))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.threshold",
+                message: "threshold must be in 0.0...1.0 (got \(threshold))"
+            )
         }
     }
 }
@@ -273,10 +273,10 @@ extension RARAGConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if similarityThreshold < 0.0 || similarityThreshold > 1.0 {
-        throw SDKException.validationFailed(
-            fieldPath: "RAGConfiguration.similarity_threshold",
-            message: "similarity_threshold must be in 0.0...1.0 (got \(similarityThreshold))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RAGConfiguration.similarity_threshold",
+                message: "similarity_threshold must be in 0.0...1.0 (got \(similarityThreshold))"
+            )
         }
     }
 }
@@ -353,10 +353,10 @@ extension RASTTConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if sampleRate < 8000 || sampleRate > 48000 {
-        throw SDKException.validationFailed(
-            fieldPath: "STTConfiguration.sample_rate",
-            message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "STTConfiguration.sample_rate",
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
+            )
         }
     }
 }

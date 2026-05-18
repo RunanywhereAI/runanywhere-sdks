@@ -208,6 +208,19 @@ public extension RunAnywhere {
     ///   - forcedToolName: Companion to `toolChoice=SPECIFIC` — the tool name
     ///                     the LLM is forced to invoke. Overrides
     ///                     `toolOptions.forcedToolName` when non-nil.
+    ///   - validateCalls: Optional override for the IDL-level
+    ///                    `validate_calls` knob on
+    ///                    `ToolCallingSessionCreateRequest`
+    ///                    (idl/tool_calling.proto:404). When `nil` the field
+    ///                    is left unset and commons applies its default
+    ///                    (`true` — i.e. enforce schema + registry checks
+    ///                    before invoking the executor). Hosts that delegate
+    ///                    validation/authorization to the executor closure
+    ///                    (dynamic tool registries, executor-side argument
+    ///                    inspection) MUST pass `validateCalls: false` so the
+    ///                    C++ loop forwards every parsed call to the executor
+    ///                    without short-circuiting on registry / schema
+    ///                    mismatches.
     /// - Returns: Generated `RAToolCallingResult` with final text, tool calls,
     ///            and any executed tool results.
     ///
@@ -223,7 +236,8 @@ public extension RunAnywhere {
         options: RALLMGenerationOptions = .defaults(),
         toolOptions: RAToolCallingOptions? = nil,
         toolChoice: RAToolChoiceMode? = nil,
-        forcedToolName: String? = nil
+        forcedToolName: String? = nil,
+        validateCalls: Bool? = nil
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -244,7 +258,8 @@ public extension RunAnywhere {
             prompt: prompt,
             options: options,
             toolOptions: tcOpts,
-            tools: tools
+            tools: tools,
+            validateCalls: validateCalls
         )
         let requestBytes = try request.serializedData()
         // pass2-syn-007: prefer the with-handle variant so the surrounding
@@ -311,15 +326,22 @@ public extension RunAnywhere {
     /// Cancellation-aware variant. Publishes the native run-loop handle via
     /// the with-handle ABI and wires `withTaskCancellationHandler` to fan a
     /// Swift Task cancel into `rac_tool_calling_run_loop_cancel_proto`.
+    ///
+    /// pass3-syn-059: the handle slot MUST be stable cross-thread storage
+    /// that the C ABI writes to synchronously (commons writes
+    /// `*out_run_loop_handle = handle` at
+    /// `tool_calling_run_loop.cpp:391-393`, BEFORE any iteration work
+    /// starts). `HandleBox` owns a heap-allocated `UInt64` cell whose
+    /// address is passed directly into the C call — so the cancel handler
+    /// observes the real handle the instant the native call publishes it,
+    /// not after the entire synchronous loop returns. This mirrors the RN
+    /// `onHandle: (handle: number) => void` synchronous-publish pattern
+    /// from `RunAnywhere+ToolCalling.ts:247-252`.
     private static func generateWithToolsCancellable(
         requestBytes: Data,
         runLoopWithHandle: ToolCallingRunLoopProtoABI.RunLoopWithHandle,
         cancelFn: ToolCallingRunLoopProtoABI.Cancel
     ) async throws -> RAToolCallingResult {
-        // The handle slot is shared between the DispatchQueue thread that
-        // owns the in-flight call and the (potentially earlier) cancel
-        // handler. A locked Atomic<UInt64> would be ideal — a class wrapper
-        // gives us reference semantics and an internal lock works fine here.
         let handleBox = HandleBox()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
@@ -327,26 +349,40 @@ public extension RunAnywhere {
                     let context = ToolExecuteContext()
                     let contextPtr = Unmanaged.passRetained(context).toOpaque()
                     var outBuffer = rac_proto_buffer_t()
-                    var handle: UInt64 = 0
-                    let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
-                        runLoopWithHandle(
-                            rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                            rawBuffer.count,
-                            toolExecuteTrampoline,
-                            contextPtr,
-                            &handle,
-                            &outBuffer
-                        )
+                    // Drive the C call through the HandleBox's heap cell so
+                    // the handle written by commons is visible to onCancel
+                    // mid-call, not just after the synchronous run loop
+                    // returns.
+                    let status = handleBox.withHandlePointer { handlePtr in
+                        requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
+                            runLoopWithHandle(
+                                rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                                rawBuffer.count,
+                                toolExecuteTrampoline,
+                                contextPtr,
+                                handlePtr,
+                                &outBuffer
+                            )
+                        }
                     }
-                    handleBox.set(handle)
+                    // Snapshot before clearing so the post-return cancel
+                    // check (and any onCancel races against the same
+                    // handleBox.clear) can still see the value the C call
+                    // published.
+                    let publishedHandle = handleBox.value
                     // If the Task was already cancelled by the time the
-                    // handle was published, fan that into the loop now —
-                    // mirrors the latched cancel path in commons.
-                    if Task.isCancelled {
-                        _ = cancelFn(handle)
+                    // native call returned, fan that into the loop's
+                    // latched cancel slot — commons swallows cancels for
+                    // already-completed handles, so this is a safe no-op
+                    // when the loop finished cleanly.
+                    if Task.isCancelled, publishedHandle != 0 {
+                        _ = cancelFn(publishedHandle)
                     }
                     Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
-                    handleBox.set(0)
+                    // Clear AFTER the post-call cancel fan-out so any
+                    // onCancel firing concurrently with this teardown
+                    // still observes the real handle.
+                    handleBox.clear()
 
                     defer { NativeProtoABI.free(&outBuffer) }
                     guard status == RAC_SUCCESS else {
@@ -422,7 +458,8 @@ public extension RunAnywhere {
         prompt: String,
         options: RALLMGenerationOptions,
         toolOptions: RAToolCallingOptions,
-        tools: [RAToolDefinition]
+        tools: [RAToolDefinition],
+        validateCalls: Bool? = nil
     ) -> RAToolCallingSessionCreateRequest {
         var request = RAToolCallingSessionCreateRequest()
         request.prompt = prompt
@@ -454,7 +491,15 @@ public extension RunAnywhere {
         request.formatHint = toolOptions.resolvedFormatName
         request.maxIterations = UInt32(max(toolOptions.maxToolCallCount, 0))
         request.keepToolsAvailable = toolOptions.keepToolsAvailable
-        request.validateCalls = true
+        // pass3-syn-149: `validate_calls` is `optional bool` on the proto so
+        // hosts that delegate validation/authorization to their executor (or
+        // use dynamic tool registries where argument inspection happens
+        // inside the executor) can opt out via `validateCalls: false`. When
+        // the caller did not supply a value, leave the field unset so
+        // commons applies its documented default (true).
+        if let validateCalls {
+            request.validateCalls = validateCalls
+        }
         // pass2-syn-006-followup-swift: thread tool_choice / forced_tool_name
         // all the way through to the commons request envelope (fields 7/8 on
         // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
@@ -541,19 +586,56 @@ private final class ToolResultBox: @unchecked Sendable {
     var value: RAToolResult? { stored }
 }
 
-/// pass2-syn-007: shared handle slot between the DispatchQueue thread that
-/// owns the in-flight C call and the `onCancel` closure that may fire from
-/// any thread. Uses OSAllocatedUnfairLock (the Swift 6 / iOS 16+
-/// replacement for NSLock; per CLAUDE.md, NSLock is outdated here).
+/// pass2-syn-007 / pass3-syn-059: shared handle slot between the
+/// DispatchQueue thread that owns the in-flight C call and the `onCancel`
+/// closure that may fire from any thread.
+///
+/// The handle lives in a heap-allocated `UnsafeMutablePointer<UInt64>` cell
+/// so its address is stable for the lifetime of the box and can be passed
+/// directly to the C ABI. Commons writes `*out_run_loop_handle = handle`
+/// synchronously inside `rac_tool_calling_run_loop_with_handle_proto`
+/// before the iteration loop begins
+/// (sdk/runanywhere-commons/src/features/llm/tool_calling_run_loop.cpp:391-393),
+/// so `onCancel` reading `value` while the C call is in flight observes
+/// the real handle — not zero. Reads/writes are coordinated through
+/// OSAllocatedUnfairLock (the Swift 6 / iOS 16+ replacement for NSLock).
 private final class HandleBox: @unchecked Sendable {
-    private let lock = OSAllocatedUnfairLock<UInt64>(initialState: 0)
+    // Stateless lock — the value lives in `cell` (a heap pointer) because
+    // OSAllocatedUnfairLock's internal state has no stable address that
+    // could be handed to the C ABI.
+    private let lock = OSAllocatedUnfairLock<Void>(initialState: ())
+    private let cell: UnsafeMutablePointer<UInt64>
 
-    func set(_ value: UInt64) {
-        lock.withLock { $0 = value }
+    init() {
+        cell = UnsafeMutablePointer<UInt64>.allocate(capacity: 1)
+        cell.initialize(to: 0)
     }
 
+    deinit {
+        cell.deinitialize(count: 1)
+        cell.deallocate()
+    }
+
+    /// Run `body` with the cell pointer so the C ABI can write the handle
+    /// directly into shared storage. The lock is NOT held across `body`
+    /// because the C call is synchronous on the caller's thread and the
+    /// only concurrent reader (`value` from onCancel) takes the lock for
+    /// its read; UnsafeMutablePointer load/store of UInt64 on supported
+    /// platforms is naturally atomic for the read-after-write the cancel
+    /// handler performs.
+    func withHandlePointer<T>(_ body: (UnsafeMutablePointer<UInt64>) -> T) -> T {
+        body(cell)
+    }
+
+    /// Current handle value. Safe to call from any thread.
     var value: UInt64 {
-        lock.withLock { $0 }
+        lock.withLock { _ in cell.pointee }
+    }
+
+    /// Reset the handle to zero. Called after the C call returns so a
+    /// late-firing `onCancel` no-ops instead of cancelling a stale handle.
+    func clear() {
+        lock.withLock { _ in cell.pointee = 0 }
     }
 }
 

@@ -346,9 +346,23 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 
 }  // namespace
 
-extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
+// pass3-syn-028: internal helper that owns the full run-loop body. Both the
+// pointer-shape (rac_tool_calling_run_loop_with_handle_proto) and the
+// callback-shape (rac_tool_calling_run_loop_with_handle_and_cb_proto) entry
+// points funnel through this helper. The handle is allocated FIRST — before
+// any LLM work — and published two ways:
+//   1. *out_run_loop_handle (when non-null) — for hosts that observe the
+//      handle from the SAME thread that called the run-loop.
+//   2. on_handle_published(handle, on_handle_user_data) (when non-null) —
+//      fired synchronously the moment the handle is minted so hosts can fan
+//      the value into a thread-safe sink (Swift HandleBox, Kotlin
+//      CompletableDeferred, RN JS-thread callback, Flutter Completer, Web
+//      synchronous capture) BEFORE the first generate iteration runs.
+static rac_result_t run_loop_impl(
     const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+    void* on_execute_user_data,
+    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
     if (!on_execute || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -359,7 +373,9 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)in_request_bytes;
     (void)in_size;
-    (void)user_data;
+    (void)on_execute_user_data;
+    (void)on_handle_published;
+    (void)on_handle_user_data;
     rac_proto_buffer_init(out_result);
     rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                "protobuf runtime unavailable");
@@ -369,6 +385,28 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
         return RAC_ERROR_NULL_POINTER;
     }
     rac_proto_buffer_init(out_result);
+
+    // pass3-syn-028: mint the cancel state and handle FIRST — before any
+    // proto parsing or LLM work — so the host can race the handle into its
+    // own thread-safe sink synchronously from on_handle_published. RAII
+    // guard unregisters on every return path.
+    auto cancel_state = std::make_shared<LoopCancelState>();
+    uint64_t handle = register_loop_state(cancel_state);
+    if (out_run_loop_handle) {
+        *out_run_loop_handle = handle;
+    }
+    struct HandleScope {
+        uint64_t handle;
+        ~HandleScope() { unregister_loop_state(handle); }
+    } scope{handle};
+
+    // Fire the publication callback SYNCHRONOUSLY before any other work.
+    // The callback runs on this thread, with the handle already registered
+    // in the loop_registry, so a concurrent cancel from another thread
+    // (e.g. Swift withTaskCancellationHandler) will land on the live state.
+    if (on_handle_published) {
+        on_handle_published(handle, on_handle_user_data);
+    }
 
     // Reuse the existing ToolCallingSessionCreateRequest as the input shape
     // (identical fields: prompt, tools, max_iterations, format_hint, etc.).
@@ -382,19 +420,6 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
         emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, "prompt is required");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-
-    // pass2-syn-007: allocate the cancel state up-front so the host can
-    // cancel even while we're still building the initial prompt. RAII guard
-    // unregisters on every return path.
-    auto cancel_state = std::make_shared<LoopCancelState>();
-    uint64_t handle = register_loop_state(cancel_state);
-    if (out_run_loop_handle) {
-        *out_run_loop_handle = handle;
-    }
-    struct HandleScope {
-        uint64_t handle;
-        ~HandleScope() { unregister_loop_state(handle); }
-    } scope{handle};
 
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
@@ -508,7 +533,7 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
         rac_proto_buffer_t exec_out;
         rac_proto_buffer_init(&exec_out);
         rac_result_t exec_rc = on_execute(call_bytes.empty() ? nullptr : call_bytes.data(),
-                                          call_bytes.size(), &exec_out, user_data);
+                                          call_bytes.size(), &exec_out, on_execute_user_data);
 
         runanywhere::v1::ToolResult tool_result;
         if (exec_rc == RAC_SUCCESS && exec_out.data && exec_out.size > 0) {
@@ -576,6 +601,34 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
 #endif
 }
 
+// Public entry: pointer-shape (handle written into out_run_loop_handle).
+// Hosts that observe the handle from the same thread that called the loop
+// use this. SDKs that need cross-thread publication should prefer
+// rac_tool_calling_run_loop_with_handle_and_cb_proto below.
+extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+    return run_loop_impl(in_request_bytes, in_size, on_execute, user_data,
+                         /*on_handle_published=*/nullptr,
+                         /*on_handle_user_data=*/nullptr, out_run_loop_handle, out_result);
+}
+
+// pass3-syn-028: callback-shape entry — fires on_handle_published(handle, ud)
+// SYNCHRONOUSLY the moment a cancellable handle is minted, BEFORE the first
+// generate iteration runs. This lets Swift/Kotlin/Flutter/RN/Web SDKs route
+// the handle into a thread-safe sink (HandleBox, CompletableDeferred,
+// Completer, JS callback, synchronous capture) without racing the worker
+// thread that owns the run-loop. The pointer-shape out_run_loop_handle is
+// still populated so legacy hosts that observe both have a stable contract.
+extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* on_execute_user_data,
+    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+    return run_loop_impl(in_request_bytes, in_size, on_execute, on_execute_user_data,
+                         on_handle_published, on_handle_user_data, out_run_loop_handle, out_result);
+}
+
 // Legacy ABI wrapper — preserves the original signature. Discards the handle
 // out-parameter for hosts that don't need cancellation (the in-flight loop
 // state is still registered / unregistered behind the scenes).
@@ -585,8 +638,9 @@ extern "C" rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_reques
                                                         void* user_data,
                                                         rac_proto_buffer_t* out_result) {
     uint64_t discarded = 0;
-    return rac_tool_calling_run_loop_with_handle_proto(in_request_bytes, in_size, on_execute,
-                                                       user_data, &discarded, out_result);
+    return run_loop_impl(in_request_bytes, in_size, on_execute, user_data,
+                         /*on_handle_published=*/nullptr,
+                         /*on_handle_user_data=*/nullptr, &discarded, out_result);
 }
 
 extern "C" rac_result_t rac_tool_calling_run_loop_cancel_proto(uint64_t run_loop_handle) {

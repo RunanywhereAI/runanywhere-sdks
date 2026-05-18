@@ -48,6 +48,7 @@ fi
 COMMONS_INCLUDE="${REPO_ROOT}/sdk/runanywhere-commons/include"
 EXPORTS_DIR="${REPO_ROOT}/sdk/runanywhere-commons/exports"
 EXPORTS_FILE="${EXPORTS_DIR}/RACommons.exports"
+RAG_EXPORTS_FILE="${EXPORTS_DIR}/RACommons.rag.exports"
 
 if [[ ! -d "${COMMONS_INCLUDE}" ]]; then
     echo "ERROR: commons include tree not found at ${COMMONS_INCLUDE}" >&2
@@ -60,16 +61,19 @@ fi
 
 # pass2-syn-002: collect sibling backend-conditional exports too so
 # symbols listed there are not re-appended into the main file.
+# pass3-syn-080: RACommons.rag.exports is the only remaining sibling
+# (RACommons.onnx_embeddings.exports and RACommons.whisperkit_coreml.exports
+# were deleted by pass3-syn-002 when their decls were folded into the main
+# exports list). The list still iterates so this stays forward-compatible
+# if a new sibling file is added.
 SIBLING_EXPORTS=()
-for sibling in "${EXPORTS_DIR}/RACommons.rag.exports" \
-               "${EXPORTS_DIR}/RACommons.onnx_embeddings.exports" \
-               "${EXPORTS_DIR}/RACommons.whisperkit_coreml.exports"; do
+for sibling in "${RAG_EXPORTS_FILE}"; do
     if [[ -f "${sibling}" ]]; then
         SIBLING_EXPORTS+=("${sibling}")
     fi
 done
 
-python3 - "${COMMONS_INCLUDE}" "${EXPORTS_FILE}" "${SIBLING_EXPORTS[@]}" <<'PYEOF'
+python3 - "${COMMONS_INCLUDE}" "${EXPORTS_FILE}" "${RAG_EXPORTS_FILE}" "${SIBLING_EXPORTS[@]}" <<'PYEOF'
 import os
 import re
 import sys
@@ -77,7 +81,8 @@ from datetime import datetime, timezone
 
 include_root = sys.argv[1]
 exports_path = sys.argv[2]
-sibling_paths = sys.argv[3:]
+rag_exports_path = sys.argv[3]
+sibling_paths = sys.argv[4:]
 
 # pass2-syn-002: the stale rac_vad_{start,stop,reset} decls have been
 # deleted from the headers, and backend-conditional symbols now live in
@@ -89,6 +94,28 @@ sibling_paths = sys.argv[3:]
 # removed.
 EXCLUDE = set()
 
+# pass3-syn-080: path-aware routing policy. Each RAC_API decl is routed to
+# a target exports file based on the header path it was declared in. The
+# default route is the main RACommons.exports list (the unconditional
+# Apple `-exported_symbols_list`). Backend-conditional headers route to
+# their sibling .exports file, which CMake appends only when the matching
+# backend flag is ON.
+#
+# Add a new (path_marker, target_path, label) tuple here when a new
+# backend-conditional sibling file is introduced. The first marker that
+# is a substring of the header path wins; main is used as the fallback.
+ROUTING_RULES = [
+    ("/features/rag/", rag_exports_path, "RACommons.rag.exports"),
+]
+
+def route_for_path(header_path):
+    """Return (target_exports_path, label) for the given header path."""
+    norm = header_path.replace(os.sep, "/")
+    for marker, target, label in ROUTING_RULES:
+        if marker in norm:
+            return target, label
+    return exports_path, "RACommons.exports"
+
 # Collect currently exported symbols from the main file PLUS every
 # sibling backend-conditional file.
 exported = set()
@@ -99,8 +126,10 @@ for path in (exports_path, *sibling_paths):
             if line.startswith('_rac_'):
                 exported.add(line[1:])
 
-# Walk headers and collect RAC_API-decorated function decls
-decl_names = set()
+# Walk headers and collect RAC_API-decorated function decls along with the
+# header path they were found in (used by route_for_path to pick a target
+# exports file).
+decl_to_path = {}
 for root, _, files in os.walk(include_root):
     for fname in files:
         if not (fname.endswith('.h') or fname.endswith('.hpp')):
@@ -116,34 +145,53 @@ for root, _, files in os.walk(include_root):
                 continue
             name = m.group(1)
             if name.startswith('rac_'):
-                decl_names.add(name)
+                # First declaration wins for routing (headers should not
+                # re-declare a RAC_API symbol across paths).
+                decl_to_path.setdefault(name, path)
 
-new_symbols = sorted((decl_names - exported) - EXCLUDE)
+decl_names = set(decl_to_path.keys())
+new_symbols_all = sorted((decl_names - exported) - EXCLUDE)
 
-if not new_symbols:
+if not new_symbols_all:
     print(f"OK: no new RAC_API symbols to add ({len(decl_names)} decls, "
           f"{len(exported)} exported, {len(EXCLUDE)} excluded by policy).")
     sys.exit(0)
 
+# Partition new symbols by target exports file via route_for_path.
+buckets = {}  # target_path -> (label, [names])
+for name in new_symbols_all:
+    target, label = route_for_path(decl_to_path[name])
+    if target not in buckets:
+        buckets[target] = (label, [])
+    buckets[target][1].append(name)
+
 ts = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-header = [
-    "",
-    "# ============================================================================",
-    f"# AUTO-SYNC ({ts}): symbols appended by sync_rac_api_exports.sh.",
-    "# Net-new RAC_API-decorated decls discovered in the commons headers and",
-    "# not already covered by an earlier curated section. Excluded set lives",
-    f"# in scripts/validation/sync_rac_api_exports.sh (EXCLUDE).",
-    f"# Added {len(new_symbols)} symbols, sorted alphabetically.",
-    "# ============================================================================",
-]
+total_appended = 0
+for target_path, (label, names) in buckets.items():
+    if not names:
+        continue
+    if not os.path.exists(target_path):
+        print(f"ERROR: target exports file not found: {target_path}", file=sys.stderr)
+        sys.exit(1)
+    header = [
+        "",
+        "# ============================================================================",
+        f"# AUTO-SYNC ({ts}): symbols appended by sync_rac_api_exports.sh.",
+        "# Net-new RAC_API-decorated decls discovered in the commons headers and",
+        "# not already covered by an earlier curated section. Routing rules live",
+        f"# in scripts/validation/sync_rac_api_exports.sh (ROUTING_RULES).",
+        f"# Added {len(names)} symbols to {label}, sorted alphabetically.",
+        "# ============================================================================",
+    ]
+    with open(target_path, 'a') as f:
+        for line in header:
+            f.write(line + "\n")
+        for name in names:
+            f.write(f"_{name}\n")
+    print(f"Appended {len(names)} symbol(s) to {target_path}")
+    for name in names:
+        print(f"  + _{name}  ({label})")
+    total_appended += len(names)
 
-with open(exports_path, 'a') as f:
-    for line in header:
-        f.write(line + "\n")
-    for name in new_symbols:
-        f.write(f"_{name}\n")
-
-print(f"Appended {len(new_symbols)} symbol(s) to {exports_path}")
-for name in new_symbols:
-    print(f"  + _{name}")
+print(f"Total: {total_appended} symbol(s) across {len(buckets)} file(s).")
 PYEOF

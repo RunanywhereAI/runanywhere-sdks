@@ -30,24 +30,19 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        // Use the TS-ESLint project service so each package's tsconfig.json
-        // is resolved automatically across the workspace packages.
-        projectService: {
-          // typescript-eslint disallows `**` here, so enumerate each
-          // unit-test subdirectory explicitly. Add the new directory here
-          // when introducing a fresh `tests/unit/<NewDir>/*.test.ts` file
-          // — otherwise the typed-lint lane will fail with
-          // `Parsing error: ... was not found by the project service`.
-          allowDefaultProject: [
-            'packages/core/tests/unit/Adapters/*.test.ts',
-            'packages/core/tests/unit/Foundation/*.test.ts',
-            'packages/core/tests/unit/Public/Extensions/*.test.ts',
-            'packages/core/tests/unit/runtime/*.test.ts',
-          ],
-          // Default cap is 8; we already exceed that across these subdirs.
-          // Bump in lockstep when new test files land.
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
-        },
+        // Use per-package tsconfigs (one for sources, one for tests) so
+        // tests participate in typed-lint without invoking the typescript-
+        // eslint project service's `allowDefaultProject` slow path. The
+        // explicit project list is finite and bounded — adding a new test
+        // file under any covered package's `tests/**` requires no eslint
+        // config edit because each tsconfig.test.json `include` already
+        // covers `tests/**/*.ts`.
+        project: [
+          './packages/core/tsconfig.json',
+          './packages/core/tsconfig.test.json',
+          './packages/llamacpp/tsconfig.json',
+          './packages/onnx/tsconfig.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },

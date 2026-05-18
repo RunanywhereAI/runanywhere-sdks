@@ -309,20 +309,34 @@ function buildSessionCreateRequest(
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
 
+/**
+ * Result of attempting to decode a ToolCallingSessionEvent emitted by the
+ * commons callback. pass3-syn-152: a `null` return previously silently dropped
+ * decode failures, which then surfaced as a misleading "session stalled"
+ * error in the drain loop. The discriminated shape lets the caller propagate
+ * a structured error pointing at the real cause (proto decode break) instead
+ * of the symptom (no terminal event observed).
+ */
+type SessionEventDecode =
+  | { kind: 'event'; event: ToolCallingSessionEvent }
+  | { kind: 'decode-error'; error: Error }
+  | { kind: 'empty' };
+
 function decodeSessionEvent(
   module: EmscriptenRunanywhereModule,
   bytesPtr: number,
   size: number,
-): ToolCallingSessionEvent | null {
-  if (!bytesPtr || size <= 0) return null;
+): SessionEventDecode {
+  if (!bytesPtr || size <= 0) return { kind: 'empty' };
   const slice = module.HEAPU8.slice(bytesPtr, bytesPtr + size);
   try {
-    return ToolCallingSessionEventMessage.decode(slice);
+    return { kind: 'event', event: ToolCallingSessionEventMessage.decode(slice) };
   } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
     logger.warning(
-      `failed to decode ToolCallingSessionEvent: ${err instanceof Error ? err.message : String(err)}`,
+      `failed to decode ToolCallingSessionEvent: ${error.message}`,
     );
-    return null;
+    return { kind: 'decode-error', error };
   }
 }
 
@@ -506,6 +520,23 @@ export const ToolCalling = {
     options: Partial<ToolCallingOptions> = {},
     extra: { signal?: AbortSignal } = {},
   ): Promise<ToolCallingResult> {
+    // pass3-syn-153: short-circuit when the AbortSignal is already aborted
+    // BEFORE allocating the trampoline / handle slot or calling commons.
+    // DOM AbortSignal does NOT re-fire the 'abort' event on a signal that is
+    // already aborted, and under WASM single-threaded execution the
+    // synchronous `_rac_tool_calling_session_create_proto` call runs an
+    // entire `run_generate_loop` (one full LLM generate, multi-second on
+    // realistic models) before returning. Catching the already-aborted case
+    // here mirrors Swift's eager `Task.checkCancellation()` pattern and
+    // saves the wasted generate cycle.
+    if (extra.signal?.aborted) {
+      throw SDKException.fromCode(
+        SDKErrorCode.GenerationCancelled,
+        'Tool-calling generation cancelled',
+        'AbortSignal was already aborted before generateWithTools was invoked',
+      );
+    }
+
     const tools = options.tools && options.tools.length > 0
       ? options.tools
       : this.getRegisteredTools();
@@ -530,9 +561,18 @@ export const ToolCalling = {
     // session_create_proto / session_step_with_result_proto. We buffer events
     // and drain them on the JS side between commons calls.
     const events: ToolCallingSessionEvent[] = [];
+    // pass3-syn-152: latch the first decode failure so the drain loop can
+    // surface a structured error (instead of falling through to the
+    // misleading "session stalled" branch). Decode failures are rare but
+    // when they happen the diagnostic should point at the actual cause.
+    let decodeFailure: Error | null = null;
     const callbackPtr = module.addFunction((bytesPtr: number, size: number /*, userData */) => {
-      const event = decodeSessionEvent(module, bytesPtr, size);
-      if (event) events.push(event);
+      const decoded = decodeSessionEvent(module, bytesPtr, size);
+      if (decoded.kind === 'event') {
+        events.push(decoded.event);
+      } else if (decoded.kind === 'decode-error' && !decodeFailure) {
+        decodeFailure = decoded.error;
+      }
     }, 'viii');
 
     // Reserve 8 bytes for the uint64 out-session-handle. Without WASM_BIGINT
@@ -639,6 +679,20 @@ export const ToolCalling = {
           );
         }
         if (!pendingToolCall) {
+          // pass3-syn-152: if the synchronous callback observed at least one
+          // proto-decode failure since the last drain, surface that as the
+          // root cause — the "stalled" symptom is downstream of the dropped
+          // event. Without this, telemetry/Sentry would chase the C++
+          // session state machine for what is actually a JS-side decode
+          // break (e.g. a backwards-incompatible proto rev in a custom
+          // build, or an addFunction wiring bug).
+          if (decodeFailure) {
+            throw SDKException.fromCode(
+              SDKErrorCode.BackendError,
+              'Tool-calling session event decode failed',
+              `failed to decode ToolCallingSessionEvent: ${(decodeFailure as Error).message}`,
+            );
+          }
           // No tool call and no final/error event — commons should always emit
           // one of these terminal events at end of the synchronous step.
           // Treat as an internal protocol violation.

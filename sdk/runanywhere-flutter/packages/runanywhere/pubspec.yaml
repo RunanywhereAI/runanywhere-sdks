@@ -49,8 +49,9 @@ dev_dependencies:
   # Pinned (not caret) so local + CI codegen produces byte-identical output.
   # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup-toolchain.sh and
   # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
-  # the workspace `melos.dependencies` block at
-  # sdk/runanywhere-flutter/pubspec.yaml in the same change.
+  # this pin (the packages/runanywhere pubspec is the workspace source of
+  # truth for shared deps — see the centralization comment block in
+  # sdk/runanywhere-flutter/pubspec.yaml).
   protoc_plugin: 22.0.0
 
 flutter:

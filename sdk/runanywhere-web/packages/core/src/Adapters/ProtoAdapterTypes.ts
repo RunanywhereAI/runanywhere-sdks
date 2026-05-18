@@ -312,6 +312,42 @@ export function streamYield(): Promise<void> {
   return new Promise<void>((resolve) => queueMicrotask(resolve));
 }
 
+/**
+ * Web-side slot.fn(user_data) lifetime contract (pass3-syn-033 / cross-SDK
+ * mirror of rac_llm_stream.h `@warning` block).
+ *
+ * The Web SDK runs RACommons as a single-threaded WASM module, so the
+ * "callback may fire on a background thread AFTER unset returns" race
+ * that affects native SDKs (Swift, Kotlin, RN) does NOT apply here: every
+ * Emscripten export, every C-side callback, and every JS microtask runs
+ * sequentially on the main thread. The contract below still holds and is
+ * worth documenting so SDK-internal adapters stay correct when:
+ *
+ *   1. The Asyncify / Worker backend lands (see
+ *      docs/STREAM_DELIVERY_DESIGN.md) — at that point the callback can
+ *      be invoked while a JS microtask is queued, and the closure capturing
+ *      `this` / `userData` MUST remain alive until `streamYield()` /
+ *      Asyncify's resumption point completes.
+ *   2. Adapters wrap the native call in `Promise.resolve()` then call
+ *      `removeFunction(callbackPtr)` — the closure passed to
+ *      `addFunction(...)` is what the C runtime holds via `userData`; the
+ *      adapter MUST NOT remove it while the call is still in flight
+ *      (tracked via `callActive` below).
+ *
+ * Recommended teardown sequence (mirrors the canonical native recipe of
+ * unset → quiesce → free):
+ *
+ *   (a) Issue the native unset (e.g. `_rac_llm_unset_stream_proto_callback`)
+ *       OR rely on the natural completion of the native call.
+ *   (b) Wait for `callActive === false` (the WASM export's promise has
+ *       resolved). This is the WASM analogue of `rac_*_proto_quiesce()`.
+ *   (c) Call `module.removeFunction(callbackPtr)` to release the JS
+ *       trampoline and let GC reclaim the user_data closure.
+ *
+ * The implementation in `streamCallback` below enforces this contract: it
+ * only calls `removeFunction` from `cleanup()` when `callActive` is false,
+ * deferring the cleanup until the WASM call settles.
+ */
 export function streamCallback<T>(
   module: ModalityProtoModule,
   codec: ProtoCodec<T>,

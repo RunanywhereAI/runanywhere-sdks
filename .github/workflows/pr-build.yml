@@ -42,8 +42,11 @@ jobs:
       - name: TypeScript / Web / RN centralization (syncpack)
         run: bash scripts/validation/check_typescript_centralization.sh
       - name: Flutter dependency centralization
-        # Soft warn-only by default — set STRICT=1 once the workspace is fully
-        # converged. Still surfaces drift on the PR page.
+        # Strict by default — drift in ffi / http / protobuf is runtime-critical
+        # because these deps lockstep with the C ABI surface. Use STRICT=0 only
+        # for short-lived investigations; the workflow should not ship soft.
+        env:
+          FLUTTER_CENTRALIZATION_STRICT: '1'
         run: bash scripts/validation/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
         run: bash scripts/validation/check_gradle_centralization.sh
@@ -171,6 +174,25 @@ jobs:
         run: ./scripts/build-core-xcframework.sh
       - name: swift build
         run: swift build --target RunAnywhere
+      # pass3-syn-024: per-SDK lint lane — fail PRs that introduce SwiftLint
+      # violations or unused declarations. Soft (continue-on-error) until the
+      # baseline is clean; flip to required gate once the backlog clears.
+      - name: SwiftLint (lint lane)
+        continue-on-error: true
+        run: |
+          if command -v swiftlint >/dev/null 2>&1; then
+            swiftlint --strict --quiet || swiftlint --quiet
+          else
+            brew install swiftlint && swiftlint --quiet
+          fi
+      - name: Periphery unused-code scan (lint lane)
+        continue-on-error: true
+        run: |
+          if command -v periphery >/dev/null 2>&1; then
+            periphery scan --quiet || true
+          else
+            echo "periphery not installed on runner; skipping"
+          fi
 
   kotlin-android:
     runs-on: ubuntu-22.04
@@ -196,6 +218,12 @@ jobs:
         run: ./scripts/build-core-android.sh
       - name: gradle assembleDebug
         run: ./gradlew :runanywhere-kotlin:assembleDebug
+      # pass3-syn-024: per-SDK lint lane — run ktlint + detekt on the kotlin
+      # multiplatform module. Soft (continue-on-error) until baseline is clean;
+      # flip to required gate once the backlog clears.
+      - name: ktlintCheck + detekt (lint lane)
+        continue-on-error: true
+        run: ./gradlew :runanywhere-kotlin:ktlintCheck :runanywhere-kotlin:detekt --no-daemon
 
   flutter-pubget:
     runs-on: ubuntu-22.04
@@ -208,6 +236,20 @@ jobs:
         with:
           platform: flutter
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
+      # pass3-syn-024: per-SDK lint lane — run melos analyze across the full
+      # Flutter workspace (not just the single `runanywhere` package). Soft
+      # gate (continue-on-error) until baseline is clean.
+      - name: melos bootstrap + analyze (workspace lint lane)
+        continue-on-error: true
+        working-directory: sdk/runanywhere-flutter
+        run: |
+          if command -v melos >/dev/null 2>&1; then
+            melos bootstrap && melos run analyze
+          else
+            dart pub global activate melos
+            export PATH="$PATH:$HOME/.pub-cache/bin"
+            melos bootstrap && melos run analyze
+          fi
 
   rn-typecheck:
     runs-on: ubuntu-22.04
@@ -232,6 +274,12 @@ jobs:
         run: yarn install --immutable
       - name: Typecheck @runanywhere/core
         run: yarn workspace @runanywhere/core typecheck
+      # pass3-syn-024: per-SDK lint lane — run eslint via the package's lint
+      # script when an eslint config is present. Soft (continue-on-error) until
+      # the lint config is committed and baseline is clean.
+      - name: ESLint (@runanywhere/core lint lane)
+        continue-on-error: true
+        run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
 
   web-typecheck:
     runs-on: ubuntu-22.04
@@ -259,3 +307,25 @@ jobs:
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: sdk/runanywhere-web
         run: npm run typecheck
+      # pass3-syn-024: per-SDK lint lane — run eslint across the web workspace.
+      # Soft (continue-on-error) until baseline is clean.
+      - name: ESLint (web workspace lint lane)
+        continue-on-error: true
+        working-directory: sdk/runanywhere-web
+        run: npm run lint || echo "eslint not yet wired"
+
+  # pass3-syn-024: dedicated validation lane — runs the source-of-truth
+  # validation scripts so deprecated-surface drift and RAC_API export drift
+  # are caught in CI rather than landing silently. Soft (continue-on-error)
+  # while we baseline; flip to required gate once both scripts exit 0 cleanly
+  # on every supported commit.
+  validation:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deprecated surface check
+        continue-on-error: true
+        run: bash scripts/validation/check_deprecated_surfaces.sh
+      - name: RAC_API export drift check (strict)
+        continue-on-error: true
+        run: bash scripts/validation/check_rac_api_exports.sh --strict

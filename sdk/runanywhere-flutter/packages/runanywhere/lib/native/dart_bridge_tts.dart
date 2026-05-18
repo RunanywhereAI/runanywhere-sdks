@@ -58,7 +58,12 @@ class DartBridgeTTS {
   // production NativeCallable would invoke, so the real wrapper's drain loop
   // + `controller.onCancel -> stopLifecycleProto()` path stays in-circuit.
   static TTSStreamFakeFFI? _synthesizeStreamLifecycleProtoForTesting;
-  static int Function()? _stopLifecycleProtoForTesting;
+  // Type matches production `stopLifecycleProto()` return type
+  // (`TTSServiceState`) so the seam contract is identical to the real call.
+  // The override's return value is discarded at the call site today, but
+  // aligning the type eliminates refactor friction when commons-side stop
+  // state is propagated. (pass3-syn-163)
+  static TTSServiceState Function()? _stopLifecycleProtoForTesting;
 
   /// Inject a fake native-stream driver. Pass `null` to clear.
   static void setSynthesizeStreamLifecycleProtoForTesting(
@@ -70,7 +75,9 @@ class DartBridgeTTS {
   /// Inject a fake `stopLifecycleProto` invocation that
   /// `synthesizeStreamLifecycleProto.onCancel` should call instead of the
   /// real FFI binding. Pass `null` to clear.
-  static void setStopLifecycleProtoForTesting(int Function()? override) {
+  static void setStopLifecycleProtoForTesting(
+    TTSServiceState Function()? override,
+  ) {
     _stopLifecycleProtoForTesting = override;
   }
 

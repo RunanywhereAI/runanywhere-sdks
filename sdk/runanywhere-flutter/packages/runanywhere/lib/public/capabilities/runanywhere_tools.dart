@@ -24,6 +24,7 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolCallingSessionEvent,
         ToolCallingSessionEvent_Kind,
         ToolCallingSessionStepWithResultRequest,
+        ToolChoiceMode,
         ToolDefinition,
         ToolParseRequest,
         ToolPromptFormatRequest,
@@ -59,6 +60,15 @@ class RunAnywhereTools {
   static final Map<String, ToolExecutor> _toolExecutors = {};
   static final Map<String, ToolDefinition> _toolDefinitions = {};
   static final _logger = SDKLogger('RunAnywhere.ToolCalling');
+
+  // pass3-syn-029: tracks the in-flight session handle so callers can issue
+  // a structured-cancel via `cancelGeneration()`. Mirrors the Swift
+  // `withTaskCancellationHandler` / Kotlin `invokeOnCompletion` /
+  // RN `AbortSignal` / Web `AbortController.abort()` surfaces. Single
+  // active generation at a time — concurrent calls overwrite the prior
+  // handle (consistent with the rest of the Flutter capability surface,
+  // which is single-active-call per capability instance).
+  static int _activeSessionHandle = 0;
 
   // -- registration ---------------------------------------------------------
 
@@ -166,13 +176,41 @@ class RunAnywhereTools {
   /// parse-execute-loop to commons via
   /// `rac_tool_calling_session_create_proto`; Dart only runs registered
   /// executors when commons emits a `tool_call` event.
+  ///
+  /// [toolChoice] mirrors the OpenAI `tool_choice` knob: callers can pin
+  /// the LLM to NONE / AUTO / SPECIFIC without having to manually mutate
+  /// a [ToolCallingOptions] proto. When non-null it overrides
+  /// `options.toolChoice` for this call.
+  /// [forcedToolName] is the companion to `toolChoice=SPECIFIC` — the
+  /// tool name the LLM is forced to invoke. Overrides
+  /// `options.forcedToolName` when non-null.
+  ///
+  /// Mirrors Swift `RunAnywhere.generateWithTools(prompt:options:toolOptions:toolChoice:forcedToolName:)`
+  /// (`RunAnywhere+ToolCalling.swift:234-253`, `makeRunLoopRequest:457-514`).
   Future<ToolCallingResult> generateWithTools(
     String prompt, {
     ToolCallingOptions? options,
+    ToolChoiceMode? toolChoice,
+    String? forcedToolName,
   }) async {
     final opts = options ?? ToolCallingOptions();
     final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
+
+    // pass2-syn-006-followup-flutter: thread tool_choice / forced_tool_name
+    // all the way through to the commons request envelope (fields 7/8 on
+    // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
+    // them — not just the inline ToolCallingOptions snapshot. Top-level
+    // kw args override the options snapshot to mirror Swift behavior.
+    final ToolChoiceMode? effectiveToolChoice = toolChoice ??
+        (opts.hasToolChoice() &&
+                opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
+            ? opts.toolChoice
+            : null);
+    final String? effectiveForcedToolName = forcedToolName ??
+        (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty
+            ? opts.forcedToolName
+            : null);
 
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
@@ -182,11 +220,17 @@ class RunAnywhereTools {
       keepToolsAvailable:
           opts.hasKeepToolsAvailable() ? opts.keepToolsAvailable : false,
       validateCalls: true,
+      toolChoice: effectiveToolChoice,
+      forcedToolName: effectiveForcedToolName,
       maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
       temperature: opts.hasTemperature() ? opts.temperature : 0.3,
     );
 
     final session = DartBridgeToolCalling.shared.createSession(request);
+    // pass3-syn-029: publish the active session handle so consumers can
+    // call `RunAnywhereTools.shared.cancelGeneration()` to interrupt the
+    // in-flight loop (mirrors RunAnywhereLLM.cancelGeneration).
+    _activeSessionHandle = session.sessionHandle;
     final collectedCalls = <ToolCall>[];
     final collectedResults = <ToolResult>[];
     final completer = Completer<ToolCallingResult>();
@@ -266,8 +310,40 @@ class RunAnywhereTools {
     try {
       return await completer.future;
     } finally {
+      // pass3-syn-029: clear the published handle BEFORE close — once close
+      // returns, any pending cancelGeneration() call would race a freshly
+      // started session.
+      if (_activeSessionHandle == session.sessionHandle) {
+        _activeSessionHandle = 0;
+      }
       await session.close();
     }
+  }
+
+  /// Cancel the in-flight `generateWithTools` call, if any.
+  ///
+  /// pass3-syn-029: routes through `rac_tool_calling_session_cancel_proto`
+  /// via [DartBridgeToolCalling.cancelSession]. Idempotent — a no-op when no
+  /// session is in flight (returns `false`). Safe to call from any isolate
+  /// for which the bridge is loaded; the underlying ABI is documented as
+  /// thread-safe and idempotent.
+  ///
+  /// Mirrors Swift `withTaskCancellationHandler`, Kotlin `invokeOnCompletion`,
+  /// RN `AbortSignal`, and Web `AbortController.abort()` behavior on
+  /// `generateWithTools`.
+  ///
+  /// Returns `true` when a cancel was issued to a live session; `false` when
+  /// no session was active (idempotent no-op) or when the underlying ABI
+  /// rejected the request.
+  bool cancelGeneration() {
+    final handle = _activeSessionHandle;
+    if (handle == 0) {
+      _logger.debug(
+          'cancelGeneration: no active tool-calling session to cancel');
+      return false;
+    }
+    _logger.info('Cancelling in-flight tool-calling session: handle=$handle');
+    return DartBridgeToolCalling.shared.cancelSession(handle);
   }
 
   /// Continue generation after manual tool execution (used when

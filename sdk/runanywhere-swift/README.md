@@ -1,6 +1,6 @@
 # RunAnywhere Swift SDK
 
-A production-grade, on-device AI SDK for iOS, macOS, tvOS, and watchOS. The SDK enables low-latency, privacy-preserving inference for large language models, speech recognition, and voice synthesis with modular backend support.
+A production-grade, on-device AI SDK for iOS and macOS. The SDK enables low-latency, privacy-preserving inference for large language models, speech recognition, and voice synthesis with modular backend support.
 
 ## Table of Contents
 
@@ -92,10 +92,8 @@ The SDK provides a unified interface to multiple AI capabilities, including larg
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 17.0+           |
-| macOS    | 14.0+           |
-| tvOS     | 17.0+           |
-| watchOS  | 10.0+           |
+| iOS      | 17.5+           |
+| macOS    | 14.5+           |
 
 **Swift Version:** 5.9+
 
@@ -153,7 +151,7 @@ This repository contains **two** `Package.swift` files for different use cases:
 
 **For app developers:** Use the root-level package via the GitHub URL (as shown above).
 
-**For SDK contributors:** Use the local package with `useLocalNatives = true` in `sdk/runanywhere-swift/Package.swift` after building the XCFrameworks (see [Local Development & Contributing](#local-development--contributing) below).
+**For SDK contributors:** Set `useLocalNatives = true` in the root `Package.swift` (NOT `sdk/runanywhere-swift/Package.swift`, which is always-local and has no flag) after building the XCFrameworks (see [Local Development & Contributing](#local-development--contributing) below).
 
 ---
 
@@ -207,7 +205,7 @@ var request = options.toRALLMGenerateRequest(
 
 let result = try await RunAnywhere.generate(request)
 print("Response: \(result.text)")
-print("Tokens used: \(result.tokensUsed)")
+print("Tokens generated: \(result.tokensGenerated)")
 ```
 
 ### 3. Load a Model
@@ -297,7 +295,7 @@ let request = options.toRALLMGenerateRequest(
 
 let stream = try await RunAnywhere.generateStream(request)
 for await event in stream {
-    if event.kind == .token {
+    if event.kind == .answer {
         print(event.token, terminator: "")
     }
 }
@@ -308,25 +306,31 @@ for await event in stream {
 ```swift
 // Commons owns the full structured-output pipeline (prepare → generate →
 // strip thinking tags → extract JSON → validate). Build a `RAJSONSchema`
-// from your schema string and call the proto-backed v2 API.
+// by populating its typed proto fields (the canonical JSON Schema text is
+// produced by the read-only `jsonSchemaString` computed property).
 var schema = RAJSONSchema()
-schema.json = """
-{
-  "type": "object",
-  "properties": {
-    "question": { "type": "string" },
-    "options":  { "type": "array", "items": { "type": "string" } },
-    "correctAnswer": { "type": "integer" }
-  },
-  "required": ["question", "options", "correctAnswer"]
-}
-"""
+schema.type = .object
+schema.required = ["question", "options", "correctAnswer"]
+
+var questionProp = RAJSONSchemaProperty()
+questionProp.type = .string
+schema.properties["question"] = questionProp
+
+var optionsProp = RAJSONSchemaProperty()
+optionsProp.type = .array
+optionsProp.itemsSchema.type = .string
+schema.properties["options"] = optionsProp
+
+var correctAnswerProp = RAJSONSchemaProperty()
+correctAnswerProp.type = .integer
+schema.properties["correctAnswer"] = correctAnswerProp
 
 let result = try await RunAnywhere.generateStructured(
     prompt: "Create a quiz question about Swift programming",
     schema: schema
 )
-print("Validated JSON:", result.json)
+let jsonString = String(data: result.parsedJson, encoding: .utf8) ?? ""
+print("Validated JSON:", jsonString)
 ```
 
 ### Speech-to-Text Transcription
@@ -378,7 +382,7 @@ try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
 let audioData: Data = // recorded audio
 let result = try await RunAnywhere.processVoiceTurn(audioData)
 print("User said:", result.transcription)
-print("AI response:", result.responseText)
+print("AI response:", result.assistantResponse)
 ```
 
 ### Subscribing to Events
@@ -393,13 +397,13 @@ class ViewModel: ObservableObject {
         RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { event in
-                print("Event: \(event.type)")
+                print("Event: \(event.category)")
             }
             .store(in: &cancellables)
 
         RunAnywhere.events.events(for: .llm)
             .sink { event in
-                print("LLM Event: \(event.type)")
+                print("LLM Event: \(event.category)")
             }
             .store(in: &cancellables)
     }
@@ -409,15 +413,20 @@ class ViewModel: ObservableObject {
 ### Model Download with Progress
 
 ```swift
-let models = try await RunAnywhere.availableModels()
-let model = models.first { $0.id == "llama-3.2-1b-instruct-q4" }!
-
-let task = try await Download.shared.downloadModel(model)
-
-for await progress in task.progress {
-    let percent = Int(progress.overallProgress * 100)
-    print("\(progress.stage.displayName): \(percent)%")
+// List registered models via the public proto-backed registry API.
+let listResult = await RunAnywhere.listModels()
+guard let model = listResult.models.models.first(where: { $0.id == "llama-3.2-1b-instruct-q4" }) else {
+    return
 }
+
+// Download with the closure-based progress callback. Commons owns plan →
+// start → progress polling → registry import; the closure receives each
+// `RADownloadProgress` snapshot in real time.
+let final = try await RunAnywhere.downloadModel(model) { progress in
+    let percent = Int(progress.overallProgress * 100)
+    print("\(progress.stage): \(percent)%")
+}
+print("Local path: \(final.localPath)")
 ```
 
 ---
@@ -472,9 +481,9 @@ The RunAnywhere SDK follows a modular, provider-based architecture that separate
 
 ```swift
 RunAnywhere.setLogLevel(.debug)
-RunAnywhere.configureLocalLogging(enabled: true)
+RunAnywhere.setLocalLoggingEnabled(true)
 RunAnywhere.setDebugMode(true)
-await RunAnywhere.flushAll()
+RunAnywhere.flushLogs()
 ```
 
 ### Log Levels
@@ -585,7 +594,7 @@ options.streamingEnabled = true
 let request = options.toRALLMGenerateRequest(prompt: prompt)
 
 let stream = try await RunAnywhere.generateStream(request)
-for await event in stream where event.kind == .token {
+for await event in stream where event.kind == .answer {
     await MainActor.run { self.text += event.token }
 }
 ```
@@ -622,7 +631,7 @@ Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alo
 
 ### How do I handle model updates?
 
-Call `fetchModelAssignments(forceRefresh: true)` to sync the latest model catalog. New versions can be downloaded alongside existing models.
+Call `RunAnywhere.listModels()` (or `RunAnywhere.queryModels(_:)` / `RunAnywhere.downloadedModels()`) to refresh the in-memory model catalog from the registry, then call `RunAnywhere.downloadModel(_:onProgress:)` to fetch any new or updated entries alongside existing models. Model assignment discovery runs automatically as part of the SDK's Phase-2 initialization.
 
 ### Is user data sent to the cloud?
 
@@ -676,7 +685,7 @@ cd runanywhere-sdks
 
 ### Understanding useLocalNatives
 
-The SDK has two modes controlled by `useLocalNatives` in `Package.swift`:
+The SDK has two modes controlled by `useLocalNatives` in the root `Package.swift` (the flag does not exist in `sdk/runanywhere-swift/Package.swift`, which is always-local):
 
 | Mode | Setting | Description |
 |------|---------|-------------|

@@ -432,8 +432,18 @@ class LangProfile:
     float_suffix: str = ""
 
 
-SWIFT_PROFILE  = LangProfile(int64_wrapper=None, int64_suffix="",  float_suffix="")
-KOTLIN_PROFILE = LangProfile(int64_wrapper=None, int64_suffix="L", float_suffix="f")
+SWIFT_PROFILE  = LangProfile(int64_wrapper=None,             int64_suffix="",  float_suffix="")
+KOTLIN_PROFILE = LangProfile(int64_wrapper=None,             int64_suffix="L", float_suffix="f")
+# Dart's protoc_plugin generates int64 fields as ``Int64`` from the
+# ``fixnum`` package — callers must wrap literal integer values rather
+# than emit a bare ``L``/``int64`` suffix. TYPE_DOUBLE and TYPE_FLOAT are
+# both Dart ``double`` (no float suffix).
+DART_PROFILE   = LangProfile(int64_wrapper="Int64",          int64_suffix="",  float_suffix="")
+# ts-proto emits int64 as JS ``number`` by default (the project does not
+# enable the ``Long`` runtime), so bare integer literals are correct.
+# TypeScript has no float suffix — TYPE_FLOAT and TYPE_DOUBLE are both
+# ``number``.
+TS_PROFILE     = LangProfile(int64_wrapper=None,             int64_suffix="",  float_suffix="")
 
 
 def build_enum_case_map(
@@ -467,6 +477,35 @@ def build_enum_case_map(
                 for v in e.value:
                     out[f"{e.name}.{v.name}"] = emit(e.name, v.name)
     return out
+
+
+def zero_literal_for_required(
+    field: descriptor_pb2.FieldDescriptorProto,
+    profile: LangProfile,
+) -> Optional[str]:
+    """Return the language-typed proto3 zero literal for a numeric scalar field,
+    or ``None`` when the field's type is not a scalar number (caller should
+    skip the required-check or handle it specially).
+
+    Used by per-language ``validate()`` emitters when they need to compare an
+    INT64 / INT32 / FLOAT / DOUBLE field against its proto3 zero. Kotlin in
+    particular MUST emit ``0L`` for Long fields (``Long == Int`` is
+    structurally false) and ``0.0f`` for Float fields, so a generic ``== 0``
+    silently neuters required-checks on those types. Swift / Dart / TS use a
+    bare ``0`` here because their scalar arithmetic is structurally unified.
+    """
+    t = field.type
+    if t in INTEGER_TYPES:
+        if t in INT64_TYPES:
+            if profile.int64_wrapper:
+                return f"{profile.int64_wrapper}(0)"
+            return f"0{profile.int64_suffix}"
+        return "0"
+    if t in FLOAT_TYPES:
+        if t == TYPE_FLOAT:
+            return f"0.0{profile.float_suffix}"
+        return "0.0"
+    return None
 
 
 def to_default_literal(

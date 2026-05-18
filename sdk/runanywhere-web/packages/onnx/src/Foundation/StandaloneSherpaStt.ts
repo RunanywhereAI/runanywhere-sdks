@@ -120,12 +120,17 @@ export class StandaloneSherpaStt {
     if (this.handle && typeof m._SherpaOnnxDestroyOfflineRecognizer === 'function') {
       m._SherpaOnnxDestroyOfflineRecognizer(this.handle);
     }
-    if (this.helperConfig) {
-      // Best-effort free of the helper-allocated config blocks.
-      void loadSherpaASRHelpers().then((helpers) => helpers.freeConfig(this.helperConfig!, m)).catch(() => undefined);
-    }
+    // Capture into a local BEFORE nulling so the async free closure does not
+    // observe a null field (mirrors StandaloneSherpaVad.releaseConfigHandle).
+    const cfg = this.helperConfig;
     this.handle = 0;
     this.helperConfig = null;
+    if (cfg) {
+      // Best-effort free of the helper-allocated config blocks.
+      void loadSherpaASRHelpers()
+        .then((helpers) => helpers.freeConfig(cfg, m))
+        .catch(() => undefined);
+    }
   }
 
   /**

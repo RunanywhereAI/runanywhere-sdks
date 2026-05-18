@@ -61,7 +61,7 @@
     "@runanywhere/web": ">=0.19.13 <1"
   },
   "dependencies": {
-    "@runanywhere/proto-ts": "^0.21.0"
+    "@runanywhere/proto-ts": "^0.99.99-test"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

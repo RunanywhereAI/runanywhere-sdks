@@ -2113,6 +2113,8 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     $core.int? maxIterations,
     $core.bool? keepToolsAvailable,
     $core.bool? validateCalls,
+    ToolChoiceMode? toolChoice,
+    $core.String? forcedToolName,
     $core.int? maxTokens,
     $core.double? temperature,
     $core.double? topP,
@@ -2136,6 +2138,12 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     }
     if (validateCalls != null) {
       $result.validateCalls = validateCalls;
+    }
+    if (toolChoice != null) {
+      $result.toolChoice = toolChoice;
+    }
+    if (forcedToolName != null) {
+      $result.forcedToolName = forcedToolName;
     }
     if (maxTokens != null) {
       $result.maxTokens = maxTokens;
@@ -2162,6 +2170,8 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     ..a<$core.int>(4, _omitFieldNames ? '' : 'maxIterations', $pb.PbFieldType.OU3)
     ..aOB(5, _omitFieldNames ? '' : 'keepToolsAvailable')
     ..aOB(6, _omitFieldNames ? '' : 'validateCalls')
+    ..e<ToolChoiceMode>(7, _omitFieldNames ? '' : 'toolChoice', $pb.PbFieldType.OE, defaultOrMaker: ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED, valueOf: ToolChoiceMode.valueOf, enumValues: ToolChoiceMode.values)
+    ..aOS(8, _omitFieldNames ? '' : 'forcedToolName')
     ..a<$core.int>(11, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
     ..a<$core.double>(12, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
     ..a<$core.double>(13, _omitFieldNames ? '' : 'topP', $pb.PbFieldType.OF)
@@ -2245,39 +2255,63 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearValidateCalls() => clearField(6);
 
+  /// OpenAI-style tool_choice override surfaced through the high-level
+  /// run-loop / session APIs. The same fields exist on ToolCallingOptions
+  /// (fields 13/14); we re-publish them here so the canonical request
+  /// envelope can carry the policy without forcing callers to pass an
+  /// inline ToolCallingOptions. commons honors these on every
+  /// format/validate primitive via build_options_snapshot.
+  @$pb.TagNumber(7)
+  ToolChoiceMode get toolChoice => $_getN(6);
+  @$pb.TagNumber(7)
+  set toolChoice(ToolChoiceMode v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasToolChoice() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearToolChoice() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get forcedToolName => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set forcedToolName($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasForcedToolName() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearForcedToolName() => clearField(8);
+
   @$pb.TagNumber(11)
-  $core.int get maxTokens => $_getIZ(6);
+  $core.int get maxTokens => $_getIZ(8);
   @$pb.TagNumber(11)
-  set maxTokens($core.int v) { $_setSignedInt32(6, v); }
+  set maxTokens($core.int v) { $_setSignedInt32(8, v); }
   @$pb.TagNumber(11)
-  $core.bool hasMaxTokens() => $_has(6);
+  $core.bool hasMaxTokens() => $_has(8);
   @$pb.TagNumber(11)
   void clearMaxTokens() => clearField(11);
 
   @$pb.TagNumber(12)
-  $core.double get temperature => $_getN(7);
+  $core.double get temperature => $_getN(9);
   @$pb.TagNumber(12)
-  set temperature($core.double v) { $_setFloat(7, v); }
+  set temperature($core.double v) { $_setFloat(9, v); }
   @$pb.TagNumber(12)
-  $core.bool hasTemperature() => $_has(7);
+  $core.bool hasTemperature() => $_has(9);
   @$pb.TagNumber(12)
   void clearTemperature() => clearField(12);
 
   @$pb.TagNumber(13)
-  $core.double get topP => $_getN(8);
+  $core.double get topP => $_getN(10);
   @$pb.TagNumber(13)
-  set topP($core.double v) { $_setFloat(8, v); }
+  set topP($core.double v) { $_setFloat(10, v); }
   @$pb.TagNumber(13)
-  $core.bool hasTopP() => $_has(8);
+  $core.bool hasTopP() => $_has(10);
   @$pb.TagNumber(13)
   void clearTopP() => clearField(13);
 
   @$pb.TagNumber(14)
-  $core.String get systemPrompt => $_getSZ(9);
+  $core.String get systemPrompt => $_getSZ(11);
   @$pb.TagNumber(14)
-  set systemPrompt($core.String v) { $_setString(9, v); }
+  set systemPrompt($core.String v) { $_setString(11, v); }
   @$pb.TagNumber(14)
-  $core.bool hasSystemPrompt() => $_has(9);
+  $core.bool hasSystemPrompt() => $_has(11);
   @$pb.TagNumber(14)
   void clearSystemPrompt() => clearField(14);
 }

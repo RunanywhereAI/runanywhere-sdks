@@ -8,7 +8,7 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking Swift SDK call coverage"
-grep -R -E "RunAnywhere\.(initialize|registerModel|downloadModel|loadModel|generateStream|generate\(|loadSTTModel|transcribe|loadTTSModel|synthesize|deleteModel|clearCache|storageInfo)" \
+grep -R -E "RunAnywhere\.(initialize|registerModel|downloadModel|loadModel|generateStream|generate\(|transcribe|speak|processImage|processImageStream|detectVoiceActivity|getStorageInfo|clearCache|cleanTempFiles|cancelGeneration|listModels|initializeVoiceAgent|streamVoiceAgent|ragCreatePipeline|ragIngest|ragQuery)" \
     RunAnywhereAI >/dev/null
 
 grep -R -E "Voice|Pipeline|RAG|rag|cancelGeneration" RunAnywhereAI >/dev/null

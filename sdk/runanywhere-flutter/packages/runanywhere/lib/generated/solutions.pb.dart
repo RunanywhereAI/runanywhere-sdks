@@ -288,6 +288,7 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     $core.bool? emitThoughts,
     $core.String? audioFilePath,
     SolutionType? typeKind,
+    $core.String? ttsVoiceId,
   }) {
     final $result = create();
     if (llmModelId != null) {
@@ -338,6 +339,9 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     if (typeKind != null) {
       $result.typeKind = typeKind;
     }
+    if (ttsVoiceId != null) {
+      $result.ttsVoiceId = ttsVoiceId;
+    }
     return $result;
   }
   VoiceAgentConfig._() : super();
@@ -361,6 +365,7 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     ..aOB(14, _omitFieldNames ? '' : 'emitThoughts')
     ..aOS(15, _omitFieldNames ? '' : 'audioFilePath')
     ..e<SolutionType>(16, _omitFieldNames ? '' : 'typeKind', $pb.PbFieldType.OE, defaultOrMaker: SolutionType.SOLUTION_TYPE_UNSPECIFIED, valueOf: SolutionType.valueOf, enumValues: SolutionType.values)
+    ..aOS(17, _omitFieldNames ? '' : 'ttsVoiceId')
     ..hasRequiredFields = false
   ;
 
@@ -539,6 +544,18 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   $core.bool hasTypeKind() => $_has(15);
   @$pb.TagNumber(16)
   void clearTypeKind() => clearField(16);
+
+  /// Optional voice id within the TTS model (multi-voice engines). Distinct
+  /// from `tts_model_id` which selects the model artifact. Leave unset for
+  /// engine default. Added by pass3-syn-025 / -030 / -150 (cross-SDK).
+  @$pb.TagNumber(17)
+  $core.String get ttsVoiceId => $_getSZ(16);
+  @$pb.TagNumber(17)
+  set ttsVoiceId($core.String v) { $_setString(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasTtsVoiceId() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearTtsVoiceId() => clearField(17);
 }
 
 /// ---------------------------------------------------------------------------

@@ -260,6 +260,10 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     // protobuf decoder to throw "end-group tag did not match" on the first
     // generate after a model switch.
     rac_llm_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-llm: spin-wait for any in-flight
+    // dispatch_llm_stream_event() invocation on another thread before freeing
+    // the component. Mirrors rac_vlm_component_destroy:350.
+    rac_llm_proto_quiesce();
     rac_lora_forget_component_state(handle);
 
     RAC_LOG_INFO("LLM.Component", "LLM component destroyed");
@@ -286,6 +290,13 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
     // load_model path elides destroy → original B-FL-5-001 fix in destroy()
     // never fires for handle reuse).
     rac_llm_unset_stream_proto_callback(handle);
+    // pass2-syn-001-followup-llm: drain any in-flight dispatcher invocation
+    // bound to the previous model before swapping in the new service. The
+    // unset above clears the slot but a concurrent dispatcher that already
+    // copied the slot keeps running until it finishes; spin-wait until that
+    // pending invocation has returned so the user_data captured by the
+    // previous registration can be safely freed.
+    rac_llm_proto_quiesce();
 
     // Emit model load started event
     {

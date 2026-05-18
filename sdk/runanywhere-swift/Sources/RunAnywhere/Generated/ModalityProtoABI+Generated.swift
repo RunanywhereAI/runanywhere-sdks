@@ -322,6 +322,11 @@ extension CppBridge.LLM {
                 event.errorMessage = mapped?.message ?? "LLM stream failed: \(rc)"
                 return event
             },
+            onCancel: {
+                var outBuffer = rac_proto_buffer_t()
+                defer { NativeProtoABI.free(&outBuffer) }
+                _ = rac_llm_cancel_proto(&outBuffer)
+            },
             body: { bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)
             }
@@ -362,6 +367,11 @@ extension CppBridge.StructuredOutput {
                 event.errorMessage = "Structured output stream failed: \(rc)"
                 return event
             },
+            onCancel: {
+                var outBuffer = rac_proto_buffer_t()
+                defer { NativeProtoABI.free(&outBuffer) }
+                _ = rac_llm_cancel_proto(&outBuffer)
+            },
             body: { bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)
             }
@@ -394,6 +404,12 @@ extension CppBridge.STT {
                 final.isFinal = true
                 final.text = "STT stream failed: \(rc)"
                 return final
+            },
+            onCancel: {
+                // STT stream cancellation is session-id-owned (see
+                // rac_stt_stream_cancel_proto). The session handle is not
+                // visible from this scope; the native producer unwinds when
+                // the C call returns after `isCancelled` flips.
             },
             body: { bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)
@@ -442,6 +458,12 @@ extension CppBridge.TTS {
                 var output = RATTSOutput()
                 output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
                 return output
+            },
+            onCancel: {
+                // TTS stream cancellation is session-id-owned (see
+                // rac_tts_stream_cancel_proto). The session handle is not
+                // visible from this scope; the native producer unwinds when
+                // the C call returns after `isCancelled` flips.
             },
             body: { bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)

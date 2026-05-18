@@ -317,16 +317,26 @@ std::size_t register_engine_backed_operators(OperatorRegistry& registry);
 /// `rac_error_set_details` writes to a thread_local buffer. Operators run
 /// inside scheduler worker threads, so an error they record there is
 /// invisible to the host thread that issued `SolutionRunner::feed`/`wait`.
-/// These helpers stash the most recent operator detail in a
-/// process-wide mutex-guarded slot. SolutionRunner::wait() promotes the
-/// stashed value into the calling thread's `rac_error_set_details` so the
-/// C ABI `rac_error_get_details()` returns the honest cause of the
+/// These helpers stash the most recent operator detail in a process-wide
+/// mutex-guarded map indexed by writer std::thread::id, so concurrent
+/// operator threads no longer race on a single string slot.
+/// SolutionRunner::wait() drains the map and promotes the longest
+/// observed detail into the calling thread's `rac_error_set_details` so
+/// the C ABI `rac_error_get_details()` returns the honest cause of the
 /// cancel/failure.
 ///
 /// Thread-safe; safe to call from any operator thread.
+///
+/// Caveat: cross-runner attribution is not enforced — if a host runs
+/// multiple SolutionRunners concurrently, consume() returns whatever
+/// detail any worker thread wrote since the last drain. Hosts that
+/// require strict per-runner attribution should capture failures inside
+/// the operator itself rather than via this slot.
 void record_operator_error_detail(const std::string& detail);
 
-/// Snapshot the most recent operator error detail (empty string if none).
+/// Drain and return the most informative pending operator error detail
+/// (the longest non-empty string across all writer-thread slots; empty
+/// string if no operator has written since the last drain).
 std::string consume_operator_error_detail();
 
 }  // namespace rac::solutions
