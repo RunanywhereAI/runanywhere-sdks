@@ -75,9 +75,7 @@ object AppColors {
      * Theme-aware solid color for user message bubbles (no gradient).
      */
     @Composable
-    fun userBubbleColor(): Color {
-        return if (isSystemInDarkTheme()) userBubbleSolidDark else userBubbleSolid
-    }
+    fun userBubbleColor(): Color = if (isSystemInDarkTheme()) userBubbleSolidDark else userBubbleSolid
 
     // LoRA Colors
     val loraBadgeBg = primaryPurple.copy(alpha = 0.10f)
@@ -195,13 +193,12 @@ object AppColors {
      * Returns white in dark mode, dark text in light mode
      */
     @Composable
-    fun assistantBubbleTextColor(): Color {
-        return if (isSystemInDarkTheme()) {
+    fun assistantBubbleTextColor(): Color =
+        if (isSystemInDarkTheme()) {
             Color.White
         } else {
             textPrimary
         }
-    }
 
     /**
      * Thinking section background gradient (orange-red brand color)
@@ -232,26 +229,24 @@ object AppColors {
     /**
      * Get framework-specific badge color
      */
-    fun frameworkBadgeColor(framework: String): Color {
-        return when (framework.uppercase()) {
+    fun frameworkBadgeColor(framework: String): Color =
+        when (framework.uppercase()) {
             "LLAMA_CPP", "LLAMACPP" -> primaryAccent.copy(alpha = 0.2f) // Brand primary
             "WHISPERKIT", "WHISPER" -> badgeGreen
             "MLKIT", "ML_KIT" -> badgePurple
             "COREML", "CORE_ML" -> badgeOrange
             else -> primaryAccent.copy(alpha = 0.2f)
         }
-    }
 
     /**
      * Get framework-specific text color
      */
-    fun frameworkTextColor(framework: String): Color {
-        return when (framework.uppercase()) {
+    fun frameworkTextColor(framework: String): Color =
+        when (framework.uppercase()) {
             "LLAMA_CPP", "LLAMACPP" -> primaryAccent // Brand primary
             "WHISPERKIT", "WHISPER" -> primaryGreen
             "MLKIT", "ML_KIT" -> primaryPurple
             "COREML", "CORE_ML" -> primaryOrange
             else -> primaryAccent
         }
-    }
 }

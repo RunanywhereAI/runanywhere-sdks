@@ -19,9 +19,8 @@ import {
 
 export class DiffusionProtoAdapter {
   static tryDefault(): DiffusionProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new DiffusionProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.diffusion;
+    return mod ? new DiffusionProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum DeviceAffinity {
     DEVICE_AFFINITY_UNSPECIFIED = 0,
@@ -149,78 +149,15 @@ export interface PipelineStopResult {
     errorMessage?: string | undefined;
     errorCode: number;
 }
-export declare const PipelineSpec: {
-    encode(message: PipelineSpec, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineSpec;
-    fromJSON(object: any): PipelineSpec;
-    toJSON(message: PipelineSpec): unknown;
-    create<I extends Exact<DeepPartial<PipelineSpec>, I>>(base?: I): PipelineSpec;
-    fromPartial<I extends Exact<DeepPartial<PipelineSpec>, I>>(object: I): PipelineSpec;
-};
-export declare const OperatorSpec: {
-    encode(message: OperatorSpec, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): OperatorSpec;
-    fromJSON(object: any): OperatorSpec;
-    toJSON(message: OperatorSpec): unknown;
-    create<I extends Exact<DeepPartial<OperatorSpec>, I>>(base?: I): OperatorSpec;
-    fromPartial<I extends Exact<DeepPartial<OperatorSpec>, I>>(object: I): OperatorSpec;
-};
-export declare const OperatorSpec_ParamsEntry: {
-    encode(message: OperatorSpec_ParamsEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): OperatorSpec_ParamsEntry;
-    fromJSON(object: any): OperatorSpec_ParamsEntry;
-    toJSON(message: OperatorSpec_ParamsEntry): unknown;
-    create<I extends Exact<DeepPartial<OperatorSpec_ParamsEntry>, I>>(base?: I): OperatorSpec_ParamsEntry;
-    fromPartial<I extends Exact<DeepPartial<OperatorSpec_ParamsEntry>, I>>(object: I): OperatorSpec_ParamsEntry;
-};
-export declare const EdgeSpec: {
-    encode(message: EdgeSpec, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EdgeSpec;
-    fromJSON(object: any): EdgeSpec;
-    toJSON(message: EdgeSpec): unknown;
-    create<I extends Exact<DeepPartial<EdgeSpec>, I>>(base?: I): EdgeSpec;
-    fromPartial<I extends Exact<DeepPartial<EdgeSpec>, I>>(object: I): EdgeSpec;
-};
-export declare const PipelineOptions: {
-    encode(message: PipelineOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineOptions;
-    fromJSON(object: any): PipelineOptions;
-    toJSON(message: PipelineOptions): unknown;
-    create<I extends Exact<DeepPartial<PipelineOptions>, I>>(base?: I): PipelineOptions;
-    fromPartial<I extends Exact<DeepPartial<PipelineOptions>, I>>(object: I): PipelineOptions;
-};
-export declare const PipelineCompileResult: {
-    encode(message: PipelineCompileResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineCompileResult;
-    fromJSON(object: any): PipelineCompileResult;
-    toJSON(message: PipelineCompileResult): unknown;
-    create<I extends Exact<DeepPartial<PipelineCompileResult>, I>>(base?: I): PipelineCompileResult;
-    fromPartial<I extends Exact<DeepPartial<PipelineCompileResult>, I>>(object: I): PipelineCompileResult;
-};
-export declare const PipelineStartRequest: {
-    encode(message: PipelineStartRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineStartRequest;
-    fromJSON(object: any): PipelineStartRequest;
-    toJSON(message: PipelineStartRequest): unknown;
-    create<I extends Exact<DeepPartial<PipelineStartRequest>, I>>(base?: I): PipelineStartRequest;
-    fromPartial<I extends Exact<DeepPartial<PipelineStartRequest>, I>>(object: I): PipelineStartRequest;
-};
-export declare const PipelineHandle: {
-    encode(message: PipelineHandle, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineHandle;
-    fromJSON(object: any): PipelineHandle;
-    toJSON(message: PipelineHandle): unknown;
-    create<I extends Exact<DeepPartial<PipelineHandle>, I>>(base?: I): PipelineHandle;
-    fromPartial<I extends Exact<DeepPartial<PipelineHandle>, I>>(object: I): PipelineHandle;
-};
-export declare const PipelineStopResult: {
-    encode(message: PipelineStopResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineStopResult;
-    fromJSON(object: any): PipelineStopResult;
-    toJSON(message: PipelineStopResult): unknown;
-    create<I extends Exact<DeepPartial<PipelineStopResult>, I>>(base?: I): PipelineStopResult;
-    fromPartial<I extends Exact<DeepPartial<PipelineStopResult>, I>>(object: I): PipelineStopResult;
-};
+export declare const PipelineSpec: MessageFns<PipelineSpec>;
+export declare const OperatorSpec: MessageFns<OperatorSpec>;
+export declare const OperatorSpec_ParamsEntry: MessageFns<OperatorSpec_ParamsEntry>;
+export declare const EdgeSpec: MessageFns<EdgeSpec>;
+export declare const PipelineOptions: MessageFns<PipelineOptions>;
+export declare const PipelineCompileResult: MessageFns<PipelineCompileResult>;
+export declare const PipelineStartRequest: MessageFns<PipelineStartRequest>;
+export declare const PipelineHandle: MessageFns<PipelineHandle>;
+export declare const PipelineStopResult: MessageFns<PipelineStopResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -231,4 +168,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

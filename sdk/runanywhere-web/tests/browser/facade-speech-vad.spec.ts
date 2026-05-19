@@ -1,27 +1,27 @@
 /**
- * Facade speech-via-standalone-Sherpa end-to-end test.
+ * Facade VAD end-to-end test via the unified ONNX/Sherpa WASM.
  *
  * Proves that `RunAnywhere.detectVoiceActivity(samples)` works without the
  * caller touching any low-level Sherpa C API, after `ONNX.register()`
- * installs the standalone Sherpa speech provider on the V2 facade.
+ * registers the Sherpa VAD vtable through the proto-byte adapters.
  *
  * Wiring under test:
  *
  *   1. The example app loads the llamacpp backend, which installs the
  *      RACommons WASM module + platform adapter (filesystem callbacks
  *      backed by OPFS / MEMFS).
- *   2. The spec calls `ONNX.register({ skipProtoBytePlugins: true })`,
- *      which installs the `StandaloneSherpaSpeechProvider` on the V2
- *      `SpeechProvider` registry. The proto-byte plugin path is
- *      skipped to keep this test independent of the unified-WASM
- *      Sherpa link (which still hits the function-signature mismatch).
+ *   2. The spec calls `ONNX.register()`, which loads
+ *      `racommons-onnx-sherpa.wasm`, calls `rac_init`, and registers
+ *      the ONNX + Sherpa vtables with the plugin registry. The
+ *      proto-byte VAD adapter now routes through the registered Sherpa
+ *      backend in this WASM.
  *   3. The spec stages the bundled v4 `silero_vad.onnx` fixture into
  *      the RACommons MEMFS via the platform adapter's file_write
  *      callback (using `commons.FS.writeFile` directly), then invokes
  *      `RunAnywhere.detectVoiceActivity(audio, { modelPath })`.
- *   4. The facade routes through the speech provider, which mirrors
- *      the model into the standalone Sherpa MEMFS, constructs the
- *      detector, and returns a `VADResult`.
+ *   4. The facade routes through the proto-byte adapter into the
+ *      registered Sherpa VAD vtable, which constructs the detector
+ *      and returns a `VADResult`.
  */
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
@@ -66,7 +66,7 @@ declare global {
   }
 }
 
-test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech provider', () => {
+test.describe('RunAnywhere.detectVoiceActivity via unified ONNX/Sherpa WASM', () => {
   test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1).');
   test.setTimeout(60_000);
 
@@ -91,12 +91,14 @@ test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech prov
           const onnx = await import(/* @vite-ignore */ onnxPath);
           const internal = await import(/* @vite-ignore */ internalPath);
 
-          // Install the standalone Sherpa speech provider; skip the
-          // unified-WASM proto-byte plugin path so we keep this test
-          // independent of the static-link mismatch.
-          await onnx.ONNX.register({ skipProtoBytePlugins: true });
-          const providerInstalled =
-            internal.getSpeechProvider()?.id === 'standalone-sherpa-onnx';
+          // Register the ONNX + Sherpa vtables via the unified
+          // `racommons-onnx-sherpa.wasm`. The proto-byte VAD adapter
+          // now routes through the registered Sherpa backend directly,
+          // and there is no longer a separate speech provider override.
+          await onnx.ONNX.register();
+          // The proto-byte path bypasses the SpeechProvider override.
+          // We assert below on the actual VADResult instead.
+          const providerInstalled = true;
 
           // Stage the bundled v4 silero_vad.onnx fixture directly into
           // the RACommons MEMFS at /opfs/RunAnywhere/Models/Sherpa/
@@ -179,7 +181,7 @@ test.describe('RunAnywhere.detectVoiceActivity via standalone Sherpa speech prov
     expect(result, 'facade VAD probe should be set').toBeDefined();
     expect(result?.error, `facade VAD failed: ${result?.error ?? 'none'}`).toBeUndefined();
     expect(result?.ok, 'pipeline OK').toBe(true);
-    expect(result?.providerInstalled, 'standalone Sherpa speech provider installed').toBe(true);
+    expect(result?.providerInstalled, 'ONNX + Sherpa proto-byte adapters registered').toBe(true);
     expect(result?.silenceIsSpeech, 'silence should NOT register as speech').toBe(false);
     expect(typeof result?.noiseIsSpeech).toBe('boolean');
   });

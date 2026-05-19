@@ -227,17 +227,32 @@ private fun CodeBlockView(
 // Markdown Parsing
 
 private sealed class MarkdownBlock {
-    data class Paragraph(val text: String) : MarkdownBlock()
+    data class Paragraph(
+        val text: String,
+    ) : MarkdownBlock()
 
-    data class Header(val level: Int, val text: String) : MarkdownBlock()
+    data class Header(
+        val level: Int,
+        val text: String,
+    ) : MarkdownBlock()
 
-    data class CodeBlock(val code: String, val language: String?) : MarkdownBlock()
+    data class CodeBlock(
+        val code: String,
+        val language: String?,
+    ) : MarkdownBlock()
 
-    data class BulletItem(val text: String) : MarkdownBlock()
+    data class BulletItem(
+        val text: String,
+    ) : MarkdownBlock()
 
-    data class NumberedItem(val number: Int, val text: String) : MarkdownBlock()
+    data class NumberedItem(
+        val number: Int,
+        val text: String,
+    ) : MarkdownBlock()
 
-    data class Blockquote(val text: String) : MarkdownBlock()
+    data class Blockquote(
+        val text: String,
+    ) : MarkdownBlock()
 
     data object HorizontalRule : MarkdownBlock()
 }
@@ -351,8 +366,8 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
 private fun parseInlineMarkdown(
     text: String,
     defaultColor: Color,
-): AnnotatedString {
-    return buildAnnotatedString {
+): AnnotatedString =
+    buildAnnotatedString {
         var i = 0
         val len = text.length
 
@@ -461,4 +476,3 @@ private fun parseInlineMarkdown(
             }
         }
     }
-}

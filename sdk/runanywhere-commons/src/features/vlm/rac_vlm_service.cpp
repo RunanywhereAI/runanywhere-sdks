@@ -27,7 +27,11 @@ static const char* LOG_CAT = "VLM.Service";
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
         case RAC_FRAMEWORK_LLAMACPP:
-            return "llamacpp_vlm";
+            // After the LLM/VLM plugin unification, llama.cpp publishes ONE
+            // vtable named "llamacpp" with both llm_ops and vlm_ops slots
+            // filled. The router dispatches by primitive (VLM) on the same
+            // plugin entry.
+            return "llamacpp";
         case RAC_FRAMEWORK_ONNX:
             return "onnx";
         case RAC_FRAMEWORK_METALRT:

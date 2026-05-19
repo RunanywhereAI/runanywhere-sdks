@@ -47,7 +47,9 @@ data class ToolSettingsUiState(
  * Manages tool calling configuration and demo tool registration.
  * Mirrors iOS ToolSettingsViewModel.swift functionality.
  */
-class ToolSettingsViewModel private constructor(application: Application) : AndroidViewModel(application) {
+class ToolSettingsViewModel private constructor(
+    application: Application,
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(ToolSettingsUiState())
     val uiState: StateFlow<ToolSettingsUiState> = _uiState.asStateFlow()
 
@@ -66,11 +68,10 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
         @Volatile
         private var instance: ToolSettingsViewModel? = null
 
-        fun getInstance(application: Application): ToolSettingsViewModel {
-            return instance ?: synchronized(this) {
+        fun getInstance(application: Application): ToolSettingsViewModel =
+            instance ?: synchronized(this) {
                 instance ?: ToolSettingsViewModel(application).also { instance = it }
             }
-        }
     }
 
     init {
@@ -331,8 +332,8 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     /**
      * Evaluate a math expression
      */
-    private fun evaluateMathExpression(expression: String): Map<String, RAToolValue> {
-        return try {
+    private fun evaluateMathExpression(expression: String): Map<String, RAToolValue> =
+        try {
             // Clean the expression
             val cleaned =
                 expression
@@ -355,13 +356,14 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 "expression" to RAToolValue.string(expression),
             )
         }
-    }
 
     /**
      * Token parser with index-based iteration supporting peek operations.
      * Enables lookahead for recursive descent parsing without consuming tokens.
      */
-    private class TokenParser(private val tokens: List<String>) {
+    private class TokenParser(
+        private val tokens: List<String>,
+    ) {
         private var index = 0
 
         /** Returns true if there are more tokens to consume */

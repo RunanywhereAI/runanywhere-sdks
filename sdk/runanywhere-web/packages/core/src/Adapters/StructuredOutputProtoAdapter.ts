@@ -15,9 +15,8 @@ import {
 
 export class StructuredOutputProtoAdapter {
   static tryDefault(): StructuredOutputProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new StructuredOutputProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots['structured-output'];
+    return mod ? new StructuredOutputProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

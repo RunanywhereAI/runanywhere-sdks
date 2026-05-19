@@ -11,10 +11,10 @@
  *   5. object (recursive — mixed scalars + nested array)
  */
 
-#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -68,19 +68,32 @@ namespace {
 
 // Helper: encode a ToolValue proto, run rac_tool_value_to_json_proto, decode
 // ToolValueJSON, return JSON text.
+//
+// IMPORTANT: never wrap a call-with-side-effects in `assert()`. Release builds
+// (-DNDEBUG) erase the expression entirely, so `assert(x.Serialize(&y))` would
+// silently skip the serialization and leave `y` empty. Use `RAC_HARD_CHECK`
+// instead — it always evaluates its argument and throws on failure so the
+// test harness reports the failure clearly.
+#define RAC_HARD_CHECK(expr)                                          \
+    do {                                                              \
+        if (!(expr)) {                                                \
+            throw std::runtime_error("RAC_HARD_CHECK failed: " #expr); \
+        }                                                             \
+    } while (0)
+
 std::string to_json(const runanywhere::v1::ToolValue& value) {
     std::string bytes;
-    assert(value.SerializeToString(&bytes));
+    RAC_HARD_CHECK(value.SerializeToString(&bytes));
 
     rac_proto_buffer_t out{};
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_tool_value_to_json_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
                                                    bytes.size(), &out);
-    assert(rc == RAC_SUCCESS);
-    assert(out.status == RAC_SUCCESS);
+    RAC_HARD_CHECK(rc == RAC_SUCCESS);
+    RAC_HARD_CHECK(out.status == RAC_SUCCESS);
 
     runanywhere::v1::ToolValueJSON wrapper;
-    assert(wrapper.ParseFromArray(out.data, static_cast<int>(out.size)));
+    RAC_HARD_CHECK(wrapper.ParseFromArray(out.data, static_cast<int>(out.size)));
     std::string json = wrapper.json();
     rac_proto_buffer_free(&out);
     return json;
@@ -92,17 +105,17 @@ runanywhere::v1::ToolValue from_json(const std::string& json_text) {
     runanywhere::v1::ToolValueJSON wrapper;
     wrapper.set_json(json_text);
     std::string bytes;
-    assert(wrapper.SerializeToString(&bytes));
+    RAC_HARD_CHECK(wrapper.SerializeToString(&bytes));
 
     rac_proto_buffer_t out{};
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_tool_value_from_json_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
                                                      bytes.size(), &out);
-    assert(rc == RAC_SUCCESS);
-    assert(out.status == RAC_SUCCESS);
+    RAC_HARD_CHECK(rc == RAC_SUCCESS);
+    RAC_HARD_CHECK(out.status == RAC_SUCCESS);
 
     runanywhere::v1::ToolValue value;
-    assert(value.ParseFromArray(out.data, static_cast<int>(out.size)));
+    RAC_HARD_CHECK(value.ParseFromArray(out.data, static_cast<int>(out.size)));
     rac_proto_buffer_free(&out);
     return value;
 }
@@ -260,7 +273,13 @@ int main(int argc, char** argv) {
     int failures = 0;
     for (const auto& tc : cases) {
         std::fprintf(stderr, "[RUN ] %s\n", tc.name);
-        int rc = tc.fn();
+        int rc = 0;
+        try {
+            rc = tc.fn();
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "  exception: %s\n", e.what());
+            rc = 1;
+        }
         if (rc == 0) {
             std::fprintf(stderr, "[OK  ] %s\n", tc.name);
         } else {

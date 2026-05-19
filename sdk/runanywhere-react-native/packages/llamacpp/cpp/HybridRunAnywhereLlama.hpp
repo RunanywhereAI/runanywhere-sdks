@@ -5,7 +5,7 @@
  * This single C++ file works on both iOS and Android.
  *
  * Llama-specific implementation:
- * - Backend registration hooks for LLM and VLM providers
+ * - Backend registration hook (single call covers both LLM and VLM modalities)
  *
  * Matches Swift SDK: LlamaCPPRuntime/LlamaCPP.swift
  *
@@ -44,17 +44,8 @@ public:
   std::shared_ptr<Promise<bool>> unregisterBackend() override;
   std::shared_ptr<Promise<bool>> isBackendRegistered() override;
 
-  // ============================================================================
-  // VLM Backend Registration
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> registerVLMBackend() override;
-  std::shared_ptr<Promise<bool>> unregisterVLMBackend() override;
-  std::shared_ptr<Promise<bool>> isVLMBackendRegistered() override;
-
 private:
   bool isRegistered_ = false;
-  bool isVLMRegistered_ = false;
 };
 
 } // namespace margelo::nitro::runanywhere::llama

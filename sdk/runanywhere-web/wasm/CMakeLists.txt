@@ -23,14 +23,30 @@ message(STATUS "Building RACommons for WebAssembly (Emscripten)")
 # =============================================================================
 # OPTIONS
 # =============================================================================
+#
+# Web SDK WASM build now produces up to four self-contained Emscripten
+# executables, one per npm package + an optional WebGPU variant of llamacpp:
+#
+#   RAC_WASM_BUILD_CORE     -> packages/core/wasm/racommons.{js,wasm}
+#                              (commons-only — no backend engines)
+#   RAC_WASM_LLAMACPP       -> packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}
+#                              (commons + llama.cpp engine: LLM + VLM)
+#   RAC_WASM_LLAMACPP +
+#   RAC_WASM_WEBGPU         -> packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}
+#                              (extra GPU variant of llamacpp)
+#   RAC_WASM_ONNX           -> packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}
+#                              (commons + ONNX + Sherpa for STT/TTS/VAD)
+#
+# Each is a standalone Emscripten module with its own EXPORT_NAME so the TS
+# layer can host them side-by-side without symbol clashes.
 
-option(RAC_WASM_PTHREADS "Enable pthreads (requires SharedArrayBuffer)" OFF)
-option(RAC_WASM_DEBUG "Enable debug assertions and verbose logging" OFF)
-option(RAC_WASM_LLAMACPP "Build with llama.cpp LLM backend" OFF)
-option(RAC_WASM_VLM "Build with VLM (Vision Language Model) support via llama.cpp mtmd" OFF)
-option(RAC_WASM_WHISPERCPP "Build with whisper.cpp STT backend" OFF)
-option(RAC_WASM_ONNX "Build with sherpa-onnx TTS/VAD backend" OFF)
-option(RAC_WASM_WEBGPU "Enable WebGPU acceleration for llama.cpp (requires JSPI-capable browser)" OFF)
+option(RAC_WASM_PTHREADS    "Enable pthreads (requires SharedArrayBuffer)" OFF)
+option(RAC_WASM_DEBUG       "Enable debug assertions and verbose logging" OFF)
+option(RAC_WASM_BUILD_CORE  "Build the commons-only Web SDK WASM target" OFF)
+option(RAC_WASM_LLAMACPP    "Build the llama.cpp Web SDK WASM target (LLM + VLM)" OFF)
+option(RAC_WASM_WHISPERCPP  "Build with whisper.cpp STT backend (legacy)" OFF)
+option(RAC_WASM_ONNX        "Build the ONNX + Sherpa Web SDK WASM target" OFF)
+option(RAC_WASM_WEBGPU      "Also emit the WebGPU variant of the llama.cpp target (requires JSPI)" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -60,8 +76,13 @@ set(RAC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(RAC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
 
-# Enable backends based on options
-if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX)
+# Enable backends based on options.
+# NOTE: Each WASM target picks which static archives it links from the unified
+# set of backend libraries below. We always build llama.cpp + ONNX archives
+# whenever ANY backend WASM target is requested, so the same RACommons tree
+# can satisfy multiple per-package binaries in one configure step (option (a)
+# from plan P4 — keeps things simple, dead-strip handles unused engines).
+if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX OR RAC_WASM_BUILD_CORE)
     set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
 else()
     set(RAC_BUILD_BACKENDS OFF CACHE BOOL "" FORCE)
@@ -71,17 +92,6 @@ endif()
 set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
-
-# VLM support via llama.cpp mtmd (multimodal vision encoder)
-if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
-    set(RAC_VLM_USE_MTMD ON CACHE BOOL "" FORCE)
-    message(STATUS "VLM multimodal support ENABLED via mtmd (CLIP/SigLIP)")
-else()
-    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
-    if(RAC_WASM_VLM AND NOT RAC_WASM_LLAMACPP)
-        message(WARNING "VLM requires llama.cpp backend (--llamacpp). Disabling VLM.")
-    endif()
-endif()
 
 # =============================================================================
 # BACKEND-SPECIFIC CONFIGURATION
@@ -108,16 +118,14 @@ if(RAC_WASM_LLAMACPP)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
     set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
 
-    # WebGPU acceleration (optional, produces separate build variant)
+    # WebGPU acceleration (optional, produces a separate executable target)
     if(RAC_WASM_WEBGPU)
         message(STATUS "WebGPU acceleration ENABLED for llama.cpp")
         set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
         # JSPI bridges async WebGPU calls from synchronous C code
         set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
-        set(WASM_OUTPUT_NAME "racommons-llamacpp-webgpu")
     else()
         set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
-        set(WASM_OUTPUT_NAME "racommons-llamacpp")
     endif()
 
     # Disable wasm64 / MEMORY64 mode -- not yet widely supported in browsers
@@ -169,8 +177,8 @@ endif()
 # output or an engine-less commons-only build.
 if(NOT TARGET rac_commons)
     message(FATAL_ERROR
-        "runanywhere_wasm must be configured from the repository root.\n"
-        "Use: cmake --preset wasm && cmake --build --preset wasm --target runanywhere_wasm"
+        "WASM targets must be configured from the repository root.\n"
+        "Use: cmake --preset wasm && cmake --build --preset wasm --target racommons_llamacpp_wasm"
     )
 endif()
 
@@ -203,29 +211,29 @@ if(RAC_WASM_ONNX AND NOT TARGET rac_backend_sherpa)
 endif()
 
 # =============================================================================
-# WASM PLATFORM SHIMS
+# WASM PLATFORM SHIMS + EXPORTS SOURCE
 # =============================================================================
+# Both source files are compiled into EVERY WASM executable target. The
+# wasm_exports.cpp translation unit re-compiles per-target with target-specific
+# preprocessor definitions (RAC_WASM_LLAMACPP / RAC_WASM_ONNX / ...) so each
+# binary contains only the symbols for its backends.
 
-# Platform-specific shims for Emscripten (backtrace, platform detection, etc.)
 set(WASM_PLATFORM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/wasm_platform_shims.cpp
 )
-
-# =============================================================================
-# WASM EXPORTS MODULE
-# =============================================================================
 
 set(WASM_EXPORT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/wasm_exports.cpp
 )
 
 # =============================================================================
-# EXPORTED FUNCTIONS
+# EXPORTED FUNCTIONS — COMMONS BASE LIST
 # =============================================================================
-# All rac_* C API functions that need to be callable from JavaScript.
-# Prefix each with underscore for Emscripten convention.
+# All rac_* C API functions in the commons-only set. Each per-target list is
+# this base + backend-specific symbols appended below.
+# Underscore prefix follows Emscripten's name-mangling convention.
 
-set(RAC_EXPORTED_FUNCTIONS
+set(RAC_EXPORTED_FUNCTIONS_BASE
     # Memory management
     "_rac_free"
     "_rac_alloc"
@@ -904,366 +912,426 @@ set(RAC_EXPORTED_FUNCTIONS
     "_free"
 )
 
-# Add llama.cpp backend exports if enabled
-if(RAC_WASM_LLAMACPP)
-    list(APPEND RAC_EXPORTED_FUNCTIONS
-        "_rac_llm_llamacpp_create"
-        "_rac_llm_llamacpp_unload_model"
-        "_rac_llm_llamacpp_is_model_loaded"
-        "_rac_llm_llamacpp_generate"
-        "_rac_llm_llamacpp_generate_stream"
-        "_rac_llm_llamacpp_cancel"
-        "_rac_llm_llamacpp_get_model_info"
-        "_rac_llm_llamacpp_destroy"
-        "_rac_backend_llamacpp_register"
-        "_rac_backend_llamacpp_unregister"
-    )
-endif()
-
-# Add llama.cpp VLM backend exports if enabled
-if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
-    list(APPEND RAC_EXPORTED_FUNCTIONS
-        "_rac_vlm_llamacpp_create"
-        "_rac_vlm_llamacpp_load_model"
-        "_rac_vlm_llamacpp_unload_model"
-        "_rac_vlm_llamacpp_is_model_loaded"
-        "_rac_vlm_llamacpp_process"
-        "_rac_vlm_llamacpp_process_stream"
-        "_rac_vlm_llamacpp_cancel"
-        "_rac_vlm_llamacpp_get_model_info"
-        "_rac_vlm_llamacpp_destroy"
-        "_rac_backend_llamacpp_vlm_register"
-        "_rac_backend_llamacpp_vlm_unregister"
-    )
-endif()
-
-# Add whisper.cpp backend exports if enabled
-if(RAC_WASM_WHISPERCPP)
-    list(APPEND RAC_EXPORTED_FUNCTIONS
-        "_rac_stt_whispercpp_create"
-        "_rac_stt_whispercpp_transcribe"
-        "_rac_stt_whispercpp_get_language"
-        "_rac_stt_whispercpp_is_ready"
-        "_rac_stt_whispercpp_destroy"
-        "_rac_backend_whispercpp_register"
-        "_rac_backend_whispercpp_unregister"
-    )
-endif()
-
-# Add sherpa-onnx backend exports if enabled (TTS + VAD)
-if(RAC_WASM_ONNX)
-    list(APPEND RAC_EXPORTED_FUNCTIONS
-        # TTS (Piper via ONNX)
-        "_rac_tts_onnx_create"
-        "_rac_tts_onnx_synthesize"
-        "_rac_tts_onnx_get_voices"
-        "_rac_tts_onnx_stop"
-        "_rac_tts_onnx_destroy"
-        # VAD (Silero via ONNX)
-        "_rac_vad_onnx_create"
-        "_rac_vad_onnx_process"
-        "_rac_vad_onnx_start"
-        "_rac_vad_onnx_stop"
-        "_rac_vad_onnx_reset"
-        "_rac_vad_onnx_set_threshold"
-        "_rac_vad_onnx_is_speech_active"
-        "_rac_vad_onnx_destroy"
-        "_rac_backend_onnx_register"
-        "_rac_backend_onnx_unregister"
-    )
-    # Sherpa backend (STT/TTS/VAD via Sherpa-ONNX C API) exports are added
-    # when the rac_backend_sherpa target was configured by the root build.
-    # See CPP-13 / WEB-01 — requires the vendored WASM static archives at
-    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.
-    if(TARGET rac_backend_sherpa)
-        list(APPEND RAC_EXPORTED_FUNCTIONS
-            "_rac_backend_sherpa_register"
-            "_rac_backend_sherpa_unregister"
-        )
-    endif()
-endif()
-
-# Join into a comma-separated list for Emscripten
-string(JOIN "," RAC_EXPORTED_FUNCTIONS_STR ${RAC_EXPORTED_FUNCTIONS})
-
 # =============================================================================
-# WASM BUILD TARGET
+# BACKEND-SPECIFIC EXPORT LISTS
 # =============================================================================
+# Per-backend export deltas — only appended when the matching backend is being
+# linked into a target. Each list is closed (no `if(RAC_WASM_*)` here; gating
+# happens at target construction time).
 
-add_executable(runanywhere_wasm
-    ${WASM_EXPORT_SOURCES}
-    ${WASM_PLATFORM_SOURCES}
+set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
+    # LLM ops
+    "_rac_llm_llamacpp_create"
+    "_rac_llm_llamacpp_unload_model"
+    "_rac_llm_llamacpp_is_model_loaded"
+    "_rac_llm_llamacpp_generate"
+    "_rac_llm_llamacpp_generate_stream"
+    "_rac_llm_llamacpp_cancel"
+    "_rac_llm_llamacpp_get_model_info"
+    "_rac_llm_llamacpp_destroy"
+    # VLM ops (vision-language is a modality of the same engine)
+    "_rac_vlm_llamacpp_create"
+    "_rac_vlm_llamacpp_load_model"
+    "_rac_vlm_llamacpp_unload_model"
+    "_rac_vlm_llamacpp_is_model_loaded"
+    "_rac_vlm_llamacpp_process"
+    "_rac_vlm_llamacpp_process_stream"
+    "_rac_vlm_llamacpp_cancel"
+    "_rac_vlm_llamacpp_get_model_info"
+    "_rac_vlm_llamacpp_destroy"
+    # Single unified register/unregister for the whole engine
+    "_rac_backend_llamacpp_register"
+    "_rac_backend_llamacpp_unregister"
 )
 
-target_link_libraries(runanywhere_wasm PRIVATE rac_commons)
-
-if(RAC_WASM_LLAMACPP)
-    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_llamacpp)
-endif()
-
-if(RAC_WASM_WHISPERCPP)
-    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_whispercpp)
-endif()
-
-if(RAC_WASM_ONNX)
-    target_link_libraries(runanywhere_wasm PRIVATE rac_backend_onnx)
-    # Sherpa STT/TTS/VAD backend links in when its target was configured by
-    # the root build (requires vendored WASM static archives — see CPP-13 /
-    # WEB-01).
-    if(TARGET rac_backend_sherpa)
-        target_link_libraries(runanywhere_wasm PRIVATE rac_backend_sherpa)
-    endif()
-endif()
-
-target_include_directories(runanywhere_wasm PRIVATE
-    ${RAC_COMMONS_DIR}/include
-    ${RAC_COMMONS_DIR}/src
+set(RAC_EXPORTED_FUNCTIONS_WHISPERCPP
+    "_rac_stt_whispercpp_create"
+    "_rac_stt_whispercpp_transcribe"
+    "_rac_stt_whispercpp_get_language"
+    "_rac_stt_whispercpp_is_ready"
+    "_rac_stt_whispercpp_destroy"
+    "_rac_backend_whispercpp_register"
+    "_rac_backend_whispercpp_unregister"
 )
 
-# Emscripten compile definitions
-target_compile_definitions(runanywhere_wasm PRIVATE
-    RAC_PLATFORM_WASM=1
-    RAC_PLATFORM_NAME="Emscripten"
-    # WASM exports include legacy internal event headers
-    # (rac_analytics_events.h, rac_events.h) to keep the analytics/telemetry
-    # bridge alive for in-process Web SDK shims. Marking the TU as internal
-    # avoids the public-API #warning these headers emit.
-    RAC_INTERNAL_TRANSLATION_UNIT=1
+set(RAC_EXPORTED_FUNCTIONS_ONNX
+    # TTS (Piper via ONNX)
+    "_rac_tts_onnx_create"
+    "_rac_tts_onnx_synthesize"
+    "_rac_tts_onnx_get_voices"
+    "_rac_tts_onnx_stop"
+    "_rac_tts_onnx_destroy"
+    # VAD (Silero via ONNX)
+    "_rac_vad_onnx_create"
+    "_rac_vad_onnx_process"
+    "_rac_vad_onnx_start"
+    "_rac_vad_onnx_stop"
+    "_rac_vad_onnx_reset"
+    "_rac_vad_onnx_set_threshold"
+    "_rac_vad_onnx_is_speech_active"
+    "_rac_vad_onnx_destroy"
+    "_rac_backend_onnx_register"
+    "_rac_backend_onnx_unregister"
 )
 
-
-if(RAC_WASM_LLAMACPP)
-    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_LLAMACPP=1)
-endif()
-
-if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
-    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1)
-endif()
-
-if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
-    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_VLM=1)
-endif()
-
-if(RAC_WASM_WHISPERCPP)
-    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_WHISPERCPP=1)
-endif()
-
-if(RAC_WASM_ONNX)
-    target_compile_definitions(runanywhere_wasm PRIVATE RAC_WASM_ONNX=1)
-endif()
-
-# =============================================================================
-# EMSCRIPTEN LINKER FLAGS
-# =============================================================================
-
-set(EMSCRIPTEN_LINK_FLAGS
-    # Output format
-    "-sWASM=1"
-    "-sMODULARIZE=1"
-    "-sEXPORT_ES6=1"
-    "-sEXPORT_NAME=createLlamaCppModule"
-    "-sENVIRONMENT=web,worker"
-
-    # Memory
-    "-sALLOW_MEMORY_GROWTH=1"
-    "-sINITIAL_MEMORY=33554432"    # 32 MB initial
-    "-sMAXIMUM_MEMORY=4294967296"  # 4 GB max (needed for large VLM models + mmproj)
-    "-sSTACK_SIZE=1048576"         # 1 MB stack
-
-    # Function exports
-    "-sEXPORTED_FUNCTIONS=[${RAC_EXPORTED_FUNCTIONS_STR}]"
-    "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=\\$wasmTable"
-    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
-
-    # Allow JS function pointers (needed for platform adapter callbacks).
-    # Web downloads are scheduled on the main Emscripten runtime so JS callback
-    # pointers are invoked against the table that addFunction() mutates.
-    "-sALLOW_TABLE_GROWTH=1"
-
-    # Filesystem
-    "-sFORCE_FILESYSTEM=1"
-
-    # No auto-exit
-    "-sNO_EXIT_RUNTIME=1"
-
-    # Error handling (overridden below for WebGPU builds)
-    "-sDISABLE_EXCEPTION_CATCHING=0"
-
-    # Allow undefined symbols for core-only builds (feature stubs).
-    # Functions that don't exist will be null at runtime; the TypeScript
-    # wrappers already check for this and throw descriptive errors.
-    "-sERROR_ON_UNDEFINED_SYMBOLS=0"
-    "-Wno-undefined"
-)
-
-# Threading (optional)
-if(RAC_WASM_PTHREADS)
-    list(APPEND EMSCRIPTEN_LINK_FLAGS
-        "-pthread"
-        "-sPTHREAD_POOL_SIZE=4"
-        "-sPTHREAD_POOL_SIZE_STRICT=0"
-    )
-    target_compile_options(runanywhere_wasm PRIVATE "-pthread")
-    message(STATUS "pthreads ENABLED (requires Cross-Origin Isolation headers)")
-else()
-    message(STATUS "pthreads DISABLED (single-threaded mode)")
-endif()
-
-# WebGPU / JSPI (optional, for GPU-accelerated LLM inference)
-if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
-    # JSPI + wasm-exceptions replace the older JS-based exception mechanism.
-    # Remove the conflicting flag and replace it.
-    list(REMOVE_ITEM EMSCRIPTEN_LINK_FLAGS "-sDISABLE_EXCEPTION_CATCHING=0")
-    # Only the functions that may suspend during WebGPU operations are
-    # listed in JSPI_EXPORTS.  Everything else stays synchronous so that
-    # direct calls like m._rac_wasm_ping() keep returning plain numbers.
-    #
-    # NOTE: WASM export names do NOT have the leading underscore that
-    # -sEXPORTED_FUNCTIONS uses.  The JSPI regex in the glue JS matches
-    # against the raw export names, so we must omit the underscore here.
-    set(RAC_JSPI_EXPORTS
-        # Module init (static constructors probe for WebGPU adapter)
-        "__wasm_call_ctors"
-        # SDK init (rac_init may initialize GPU context)
-        "rac_init"
-        # Backend registration (may probe GPU capabilities)
-        "rac_backend_llamacpp_register"
-        "rac_backend_llamacpp_vlm_register"
-        # C++ lifecycle/model wrappers invoked directly from TypeScript.
-        "rac_model_lifecycle_load_proto"
-        "rac_model_lifecycle_unload_proto"
-        # LLM lifecycle (GPU memory allocation / inference / cleanup)
-        "rac_llm_component_create"
-        "rac_llm_component_load_model"
-        "rac_llm_component_generate"
-        "rac_llm_component_generate_stream"
-        "rac_llm_component_unload"
-        "rac_llm_generate_proto"
-        "rac_llm_generate_stream_proto"
-        # VLM lifecycle (GPU memory allocation / inference / cleanup)
-        "rac_vlm_component_create"
-        "rac_vlm_component_load_model"
-        "rac_vlm_component_process"
-        "rac_vlm_component_process_stream"
-        "rac_vlm_component_unload"
-        "rac_vlm_process_proto"
-        "rac_vlm_process_stream_proto"
-    )
-    string(JOIN "\",\"" RAC_JSPI_EXPORTS_STR ${RAC_JSPI_EXPORTS})
-
-    list(APPEND EMSCRIPTEN_LINK_FLAGS
-        "-sJSPI"                     # Enable JSPI for async WebGPU calls from sync C
-        # NOTE: Do NOT add -sASYNCIFY=0 here. -sJSPI internally sets ASYNCIFY=2;
-        # an explicit ASYNCIFY=0 would override and disable JSPI.
-        "-sJSPI_EXPORTS=[\"${RAC_JSPI_EXPORTS_STR}\"]"
-        # Only wrap WebGPU-async imports with WebAssembly.Suspending.
-        #
-        # Using ["*"] wraps ALL imports (including synchronous ones like
-        # fd_write for stderr logging).  During model loading, llama.cpp
-        # prints hundreds of log lines via fd_write between WebGPU buffer
-        # operations.  The mix of synchronous Suspending-wrapped imports
-        # and actual async suspensions causes V8 to report
-        # "trying to suspend JS frames" because the synchronous wrappers
-        # leave transient JS frames on the JSPI stack.
-        #
-        # By limiting JSPI_IMPORTS to only the WebGPU functions that
-        # actually return Promises (adapter/device request, buffer map,
-        # queue sync), fd_write and other synchronous imports remain
-        # plain JS calls with no JSPI overhead.
-        "-sJSPI_IMPORTS=[\"wgpuInstanceRequestAdapter\",\"wgpuAdapterRequestDevice\",\"wgpuBufferMapAsync\",\"wgpuDeviceCreateComputePipelineAsync\",\"wgpuDeviceCreateRenderPipelineAsync\",\"wgpuQueueOnSubmittedWorkDone\",\"wgpuInstanceProcessEvents\"]"
-        "-fwasm-exceptions"          # WASM-native exceptions (required by JSPI)
-    )
-    message(STATUS "WebGPU + JSPI ENABLED (requires Chrome 113+ / Edge 113+)")
-endif()
-
-# Debug mode
-if(RAC_WASM_DEBUG)
-    list(APPEND EMSCRIPTEN_LINK_FLAGS
-        "-sASSERTIONS=2"
-        "-sSAFE_HEAP=1"
-        "-sSTACK_OVERFLOW_CHECK=2"
-        "-g3"
-    )
-    message(STATUS "Debug mode ENABLED")
-else()
-    list(APPEND EMSCRIPTEN_LINK_FLAGS
-        "-sASSERTIONS=0"
-        "-O3"
-    )
-    # Keep Emscripten runtime object member names stable. The Web SDK's
-    # platform adapter and VLM worker bridge call FS.readFile/writeFile/
-    # analyzePath directly to mirror native filesystem callbacks.
-    message(STATUS "Release mode (optimized)")
-endif()
-
-# Join flags
-string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
-
-# Determine output file name (racommons or racommons-webgpu)
-if(NOT DEFINED WASM_OUTPUT_NAME)
-    set(WASM_OUTPUT_NAME "racommons-llamacpp")
-endif()
-
-set_target_properties(runanywhere_wasm PROPERTIES
-    LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
-    OUTPUT_NAME "${WASM_OUTPUT_NAME}"
-    SUFFIX ".js"
+set(RAC_EXPORTED_FUNCTIONS_SHERPA
+    "_rac_backend_sherpa_register"
+    "_rac_backend_sherpa_unregister"
 )
 
 # =============================================================================
-# POST-BUILD: Copy outputs to packages/core/wasm/
+# WebGPU/JSPI suspending-import list (shared by webgpu llamacpp variant)
 # =============================================================================
+# WASM export names do NOT have the leading underscore that
+# -sEXPORTED_FUNCTIONS uses. The JSPI regex in the glue JS matches against
+# the raw export names, so we must omit the underscore here.
 
-set(WASM_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/llamacpp/wasm")
-
-add_custom_command(TARGET runanywhere_wasm POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${WASM_OUTPUT_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.js"
-        "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.js"
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.wasm"
-        "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.wasm"
-    COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
+set(RAC_JSPI_EXPORTS
+    # Module init (static constructors probe for WebGPU adapter)
+    "__wasm_call_ctors"
+    # SDK init (rac_init may initialize GPU context)
+    "rac_init"
+    # Backend registration (may probe GPU capabilities) — unified register
+    # covers both LLM and VLM modalities of the llama.cpp engine
+    "rac_backend_llamacpp_register"
+    # C++ lifecycle/model wrappers invoked directly from TypeScript.
+    "rac_model_lifecycle_load_proto"
+    "rac_model_lifecycle_unload_proto"
+    # LLM lifecycle (GPU memory allocation / inference / cleanup)
+    "rac_llm_component_create"
+    "rac_llm_component_load_model"
+    "rac_llm_component_generate"
+    "rac_llm_component_generate_stream"
+    "rac_llm_component_unload"
+    "rac_llm_generate_proto"
+    "rac_llm_generate_stream_proto"
+    # VLM lifecycle (GPU memory allocation / inference / cleanup)
+    "rac_vlm_component_create"
+    "rac_vlm_component_load_model"
+    "rac_vlm_component_process"
+    "rac_vlm_component_process_stream"
+    "rac_vlm_component_unload"
+    "rac_vlm_process_proto"
+    "rac_vlm_process_stream_proto"
 )
 
-# Pthread worker staging policy (single source of truth — mirrored by
-# wasm/scripts/build.sh:275-285):
-#   * Emscripten < 5.x : toolchain emits a separate `<output>.worker.js` next
-#     to the main glue. The companion MUST be present; missing it is a real
-#     bug (e.g. linker dropped pthread output) and we hard-fail the build.
-#   * Emscripten >= 5.x: toolchain bundles the pthread worker into the main
-#     .js file, so no companion file is produced. Tolerate its absence.
+# =============================================================================
+# HELPER: rac_wasm_add_target
+# =============================================================================
+# Add one Emscripten executable target with a uniform shape. Each call
+# produces a self-contained Emscripten module (.js + .wasm) staged into the
+# matching npm package directory.
 #
-# Emscripten's CMake toolchain file sets `CMAKE_C_COMPILER_VERSION` to the
-# emcc version, so we can gate the policy at configure time without an extra
-# subprocess call. Currently `VERSIONS:38` pins `EMSCRIPTEN_VERSION=3.1.51`,
-# so the strict path is the active one today.
-if(RAC_WASM_PTHREADS)
-    if(DEFINED CMAKE_C_COMPILER_VERSION
-       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "5.0")
-        set(_rac_pthread_worker_tolerant ON)
-    else()
-        set(_rac_pthread_worker_tolerant OFF)
-    endif()
-    message(STATUS "Pthread worker companion policy: "
-        "tolerant=${_rac_pthread_worker_tolerant} "
-        "(emcc=${CMAKE_C_COMPILER_VERSION})")
+# Single-value args:
+#   NAME              -- CMake target name (e.g. racommons_llamacpp_wasm)
+#   OUTPUT_NAME       -- Emscripten output base (e.g. racommons-llamacpp)
+#   OUTPUT_DIR        -- Final staging directory (post-build copy destination)
+#   EXPORT_NAME       -- -sEXPORT_NAME= module factory (e.g. createLlamaCppModule)
+#   ENABLE_WEBGPU     -- ON to add JSPI + WebGPU link flags (default OFF)
+# Multi-value args:
+#   LINK_LIBRARIES    -- CMake targets to PRIVATE link (rac_commons + backend archives)
+#   EXPORTED_FUNCTIONS -- Final list of _rac_* exports for this target
+#   COMPILE_DEFS      -- Extra target_compile_definitions (e.g. RAC_WASM_LLAMACPP=1)
+#   EXTRA_LINK_FLAGS  -- Optional extra emcc link flags appended verbatim
 
-    if(_rac_pthread_worker_tolerant)
-        add_custom_command(TARGET runanywhere_wasm POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E env bash -c "if [ -f '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' ]; then cp '${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js' '${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js'; echo 'Staged pthread worker companion'; else echo 'No separate .worker.js (Emscripten >=5.x bundles worker into main glue)'; fi"
-            COMMENT "Staging ${WASM_OUTPUT_NAME}.worker.js if present (Emscripten >=5.x bundles into main glue)"
-            VERBATIM
-        )
+function(rac_wasm_add_target)
+    set(_oneValueArgs NAME OUTPUT_NAME OUTPUT_DIR EXPORT_NAME ENABLE_WEBGPU)
+    set(_multiValueArgs LINK_LIBRARIES EXPORTED_FUNCTIONS COMPILE_DEFS EXTRA_LINK_FLAGS)
+    cmake_parse_arguments(RWT "" "${_oneValueArgs}" "${_multiValueArgs}" ${ARGN})
+
+    if(NOT RWT_NAME OR NOT RWT_OUTPUT_NAME OR NOT RWT_OUTPUT_DIR OR NOT RWT_EXPORT_NAME)
+        message(FATAL_ERROR "rac_wasm_add_target: NAME, OUTPUT_NAME, OUTPUT_DIR, EXPORT_NAME are required")
+    endif()
+    if(NOT RWT_ENABLE_WEBGPU)
+        set(RWT_ENABLE_WEBGPU OFF)
+    endif()
+
+    add_executable(${RWT_NAME}
+        ${WASM_EXPORT_SOURCES}
+        ${WASM_PLATFORM_SOURCES}
+    )
+
+    target_link_libraries(${RWT_NAME} PRIVATE ${RWT_LINK_LIBRARIES})
+
+    target_include_directories(${RWT_NAME} PRIVATE
+        ${RAC_COMMONS_DIR}/include
+        ${RAC_COMMONS_DIR}/src
+    )
+
+    target_compile_definitions(${RWT_NAME} PRIVATE
+        RAC_PLATFORM_WASM=1
+        RAC_PLATFORM_NAME="Emscripten"
+        # wasm_exports.cpp includes legacy internal event headers
+        # (rac_analytics_events.h, rac_events.h) to keep the analytics/telemetry
+        # bridge alive for in-process Web SDK shims. Marking the TU as internal
+        # avoids the public-API #warning these headers emit.
+        RAC_INTERNAL_TRANSLATION_UNIT=1
+    )
+
+    if(RWT_COMPILE_DEFS)
+        target_compile_definitions(${RWT_NAME} PRIVATE ${RWT_COMPILE_DEFS})
+    endif()
+
+    # Build the comma-separated -sEXPORTED_FUNCTIONS=[...] argument.
+    string(JOIN "," _exports_str ${RWT_EXPORTED_FUNCTIONS})
+
+    # Identical memory layout for every WASM produced here so the TS layer
+    # can host multiple modules side-by-side without per-package surprises.
+    set(_link_flags
+        # Output format
+        "-sWASM=1"
+        "-sMODULARIZE=1"
+        "-sEXPORT_ES6=1"
+        "-sEXPORT_NAME=${RWT_EXPORT_NAME}"
+        "-sENVIRONMENT=web,worker"
+
+        # Memory
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sINITIAL_MEMORY=33554432"    # 32 MB initial
+        "-sMAXIMUM_MEMORY=4294967296"  # 4 GB max (needed for large VLM models + mmproj)
+        "-sSTACK_SIZE=1048576"         # 1 MB stack
+
+        # Function exports
+        "-sEXPORTED_FUNCTIONS=[${_exports_str}]"
+        "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=\\$wasmTable"
+        "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAP32\",\"HEAPU32\",\"HEAPF32\",\"wasmMemory\"]"
+
+        # Allow JS function pointers (needed for platform adapter callbacks).
+        # Web downloads are scheduled on the main Emscripten runtime so JS callback
+        # pointers are invoked against the table that addFunction() mutates.
+        "-sALLOW_TABLE_GROWTH=1"
+
+        # Filesystem
+        "-sFORCE_FILESYSTEM=1"
+
+        # No auto-exit
+        "-sNO_EXIT_RUNTIME=1"
+
+        # Allow undefined symbols for stub builds (commons-only doesn't link
+        # backend archives, so engine-specific symbols stay null at runtime
+        # and the TS bridges already check for that).
+        "-sERROR_ON_UNDEFINED_SYMBOLS=0"
+        "-Wno-undefined"
+    )
+
+    # Exception model. WebGPU uses wasm-native exceptions (JSPI requirement);
+    # everything else uses the classic JS-based mechanism.
+    if(RWT_ENABLE_WEBGPU)
+        # nothing — -fwasm-exceptions added below via EXTRA_LINK_FLAGS
     else()
-        add_custom_command(TARGET runanywhere_wasm POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-                "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.worker.js"
-            COMMENT "Copying ${WASM_OUTPUT_NAME}.worker.js (Emscripten <5.x always emits a companion worker)"
+        list(APPEND _link_flags "-sDISABLE_EXCEPTION_CATCHING=0")
+    endif()
+
+    # Threading (optional)
+    if(RAC_WASM_PTHREADS)
+        list(APPEND _link_flags
+            "-pthread"
+            "-sPTHREAD_POOL_SIZE=4"
+            "-sPTHREAD_POOL_SIZE_STRICT=0"
+        )
+        target_compile_options(${RWT_NAME} PRIVATE "-pthread")
+    endif()
+
+    # WebGPU / JSPI (only for the llamacpp+webgpu variant)
+    if(RWT_ENABLE_WEBGPU)
+        string(JOIN "\",\"" _jspi_str ${RAC_JSPI_EXPORTS})
+        list(APPEND _link_flags
+            "-sJSPI"                     # Enable JSPI for async WebGPU calls from sync C
+            # NOTE: Do NOT add -sASYNCIFY=0 here. -sJSPI internally sets ASYNCIFY=2;
+            # an explicit ASYNCIFY=0 would override and disable JSPI.
+            "-sJSPI_EXPORTS=[\"${_jspi_str}\"]"
+            # Only wrap WebGPU-async imports with WebAssembly.Suspending so
+            # sync imports (e.g. fd_write log lines emitted during model
+            # loading) keep zero JSPI overhead.
+            "-sJSPI_IMPORTS=[\"wgpuInstanceRequestAdapter\",\"wgpuAdapterRequestDevice\",\"wgpuBufferMapAsync\",\"wgpuDeviceCreateComputePipelineAsync\",\"wgpuDeviceCreateRenderPipelineAsync\",\"wgpuQueueOnSubmittedWorkDone\",\"wgpuInstanceProcessEvents\"]"
+            "-fwasm-exceptions"          # WASM-native exceptions (required by JSPI)
         )
     endif()
+
+    # Debug vs release
+    if(RAC_WASM_DEBUG)
+        list(APPEND _link_flags
+            "-sASSERTIONS=2"
+            "-sSAFE_HEAP=1"
+            "-sSTACK_OVERFLOW_CHECK=2"
+            "-g3"
+        )
+    else()
+        list(APPEND _link_flags
+            "-sASSERTIONS=0"
+            "-O3"
+        )
+    endif()
+
+    # Caller-supplied extras (rare — webgpu already handled above).
+    if(RWT_EXTRA_LINK_FLAGS)
+        list(APPEND _link_flags ${RWT_EXTRA_LINK_FLAGS})
+    endif()
+
+    string(JOIN " " _link_flags_str ${_link_flags})
+
+    set_target_properties(${RWT_NAME} PROPERTIES
+        LINK_FLAGS "${_link_flags_str}"
+        OUTPUT_NAME "${RWT_OUTPUT_NAME}"
+        SUFFIX ".js"
+    )
+
+    # =============================================================================
+    # POST-BUILD: stage outputs into the matching npm package dir
+    # =============================================================================
+    add_custom_command(TARGET ${RWT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${RWT_OUTPUT_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "$<TARGET_FILE_DIR:${RWT_NAME}>/${RWT_OUTPUT_NAME}.js"
+            "${RWT_OUTPUT_DIR}/${RWT_OUTPUT_NAME}.js"
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "$<TARGET_FILE_DIR:${RWT_NAME}>/${RWT_OUTPUT_NAME}.wasm"
+            "${RWT_OUTPUT_DIR}/${RWT_OUTPUT_NAME}.wasm"
+        COMMENT "Copying ${RWT_OUTPUT_NAME} WASM outputs to ${RWT_OUTPUT_DIR}"
+    )
+
+    # Pthread worker staging policy (mirrored by wasm/scripts/build.sh):
+    #   * Emscripten <5.x : toolchain emits a separate `<output>.worker.js` next
+    #     to the main glue. The companion MUST be present; missing it is a real
+    #     bug (linker dropped pthread output) and we hard-fail the build.
+    #   * Emscripten >=5.x: toolchain bundles the pthread worker into the main
+    #     .js file, so no companion file is produced. Tolerate its absence.
+    if(RAC_WASM_PTHREADS)
+        if(DEFINED CMAKE_C_COMPILER_VERSION
+           AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "5.0")
+            add_custom_command(TARGET ${RWT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E env bash -c
+                    "if [ -f '$<TARGET_FILE_DIR:${RWT_NAME}>/${RWT_OUTPUT_NAME}.worker.js' ]; then \
+                       cp '$<TARGET_FILE_DIR:${RWT_NAME}>/${RWT_OUTPUT_NAME}.worker.js' '${RWT_OUTPUT_DIR}/${RWT_OUTPUT_NAME}.worker.js'; \
+                       echo 'Staged pthread worker companion'; \
+                     else \
+                       echo 'No separate .worker.js (Emscripten >=5.x bundles into main glue)'; \
+                     fi"
+                COMMENT "Staging ${RWT_OUTPUT_NAME}.worker.js if present (Emscripten >=5.x bundles into main glue)"
+                VERBATIM
+            )
+        else()
+            add_custom_command(TARGET ${RWT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy
+                    "$<TARGET_FILE_DIR:${RWT_NAME}>/${RWT_OUTPUT_NAME}.worker.js"
+                    "${RWT_OUTPUT_DIR}/${RWT_OUTPUT_NAME}.worker.js"
+                COMMENT "Copying ${RWT_OUTPUT_NAME}.worker.js (Emscripten <5.x always emits a companion worker)"
+            )
+        endif()
+    endif()
+endfunction()
+
+# =============================================================================
+# TARGET CONSTRUCTION
+# =============================================================================
+# One CMake target per Web SDK npm package WASM artifact + an optional WebGPU
+# variant of the llamacpp target.
+
+set(_CORE_OUTPUT_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/../packages/core/wasm")
+set(_LLAMACPP_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/llamacpp/wasm")
+set(_ONNX_OUTPUT_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/../packages/onnx/wasm")
+
+set(_targets_built "")
+
+# --- Core (commons-only) -----------------------------------------------------
+if(RAC_WASM_BUILD_CORE)
+    rac_wasm_add_target(
+        NAME racommons_core_wasm
+        OUTPUT_NAME racommons
+        OUTPUT_DIR "${_CORE_OUTPUT_DIR}"
+        EXPORT_NAME createRACommonsCoreModule
+        LINK_LIBRARIES rac_commons
+        EXPORTED_FUNCTIONS ${RAC_EXPORTED_FUNCTIONS_BASE}
+    )
+    list(APPEND _targets_built "racommons_core_wasm -> packages/core/wasm/racommons.{js,wasm}")
+endif()
+
+# --- llama.cpp (LLM + VLM) ---------------------------------------------------
+if(RAC_WASM_LLAMACPP)
+    set(_llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
+    list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_LLAMACPP})
+
+    if(NOT RAC_WASM_WEBGPU)
+        # CPU variant — keep EXPORT_NAME=createLlamaCppModule for backward
+        # compatibility with the existing TS bridge.
+        rac_wasm_add_target(
+            NAME racommons_llamacpp_wasm
+            OUTPUT_NAME racommons-llamacpp
+            OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
+            EXPORT_NAME createLlamaCppModule
+            LINK_LIBRARIES rac_commons rac_backend_llamacpp
+            EXPORTED_FUNCTIONS ${_llamacpp_exports}
+            COMPILE_DEFS RAC_WASM_LLAMACPP=1
+        )
+        list(APPEND _targets_built "racommons_llamacpp_wasm -> packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}")
+    else()
+        # WebGPU variant. Configures one build dir per variant; do not also
+        # build the CPU artifact in the same configure (build script handles
+        # that by re-invoking cmake without --webgpu).
+        rac_wasm_add_target(
+            NAME racommons_llamacpp_webgpu_wasm
+            OUTPUT_NAME racommons-llamacpp-webgpu
+            OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
+            EXPORT_NAME createLlamaCppWebGPUModule
+            LINK_LIBRARIES rac_commons rac_backend_llamacpp
+            EXPORTED_FUNCTIONS ${_llamacpp_exports}
+            COMPILE_DEFS RAC_WASM_LLAMACPP=1 RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1
+            ENABLE_WEBGPU ON
+        )
+        list(APPEND _targets_built "racommons_llamacpp_webgpu_wasm -> packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm}")
+    endif()
+endif()
+
+# --- ONNX + Sherpa (STT/TTS/VAD) ---------------------------------------------
+if(RAC_WASM_ONNX)
+    set(_onnx_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
+    list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_ONNX})
+
+    set(_onnx_libs rac_commons rac_backend_onnx)
+    if(TARGET rac_backend_sherpa)
+        list(APPEND _onnx_libs rac_backend_sherpa)
+        list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_SHERPA})
+    endif()
+
+    rac_wasm_add_target(
+        NAME racommons_onnx_wasm
+        OUTPUT_NAME racommons-onnx-sherpa
+        OUTPUT_DIR "${_ONNX_OUTPUT_DIR}"
+        EXPORT_NAME createRACommonsONNXModule
+        LINK_LIBRARIES ${_onnx_libs}
+        EXPORTED_FUNCTIONS ${_onnx_exports}
+        COMPILE_DEFS RAC_WASM_ONNX=1
+    )
+    list(APPEND _targets_built "racommons_onnx_wasm -> packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}")
+endif()
+
+# --- whisper.cpp (legacy STT) ------------------------------------------------
+# Kept for back-compat with any tooling still wired to --whispercpp. Stages
+# alongside llamacpp output since whisper.cpp shipped through that package
+# historically. New code should prefer the ONNX/Sherpa target.
+if(RAC_WASM_WHISPERCPP)
+    set(_whisper_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
+    list(APPEND _whisper_exports ${RAC_EXPORTED_FUNCTIONS_WHISPERCPP})
+    rac_wasm_add_target(
+        NAME racommons_whispercpp_wasm
+        OUTPUT_NAME racommons-whispercpp
+        OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
+        EXPORT_NAME createWhisperCppModule
+        LINK_LIBRARIES rac_commons rac_backend_whispercpp
+        EXPORTED_FUNCTIONS ${_whisper_exports}
+        COMPILE_DEFS RAC_WASM_WHISPERCPP=1
+    )
+    list(APPEND _targets_built "racommons_whispercpp_wasm -> packages/llamacpp/wasm/racommons-whispercpp.{js,wasm}")
+endif()
+
+if(NOT _targets_built)
+    message(FATAL_ERROR
+        "No WASM targets configured. Enable at least one of:\n"
+        "  -DRAC_WASM_BUILD_CORE=ON\n"
+        "  -DRAC_WASM_LLAMACPP=ON  (optionally with -DRAC_WASM_WEBGPU=ON)\n"
+        "  -DRAC_WASM_ONNX=ON\n"
+        "  -DRAC_WASM_WHISPERCPP=ON"
+    )
 endif()
 
 # =============================================================================
@@ -1277,13 +1345,14 @@ message(STATUS "====================================")
 message(STATUS "RACommons:    ${RAC_COMMONS_DIR}")
 message(STATUS "pthreads:     ${RAC_WASM_PTHREADS}")
 message(STATUS "Debug:        ${RAC_WASM_DEBUG}")
-message(STATUS "Target:       runanywhere_wasm")
+message(STATUS "Core target:  ${RAC_WASM_BUILD_CORE}")
 message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
 message(STATUS "WebGPU:       ${RAC_WASM_WEBGPU}")
-message(STATUS "VLM (mtmd):   ${RAC_VLM_USE_MTMD}")
 message(STATUS "whisper.cpp:  ${RAC_WASM_WHISPERCPP}")
 message(STATUS "sherpa-onnx:  ${RAC_WASM_ONNX}")
-message(STATUS "Output name:  ${WASM_OUTPUT_NAME}")
-message(STATUS "Output dir:   ${WASM_OUTPUT_DIR}")
+message(STATUS "Targets:")
+foreach(_t ${_targets_built})
+    message(STATUS "  ${_t}")
+endforeach()
 message(STATUS "====================================")
 message(STATUS "")

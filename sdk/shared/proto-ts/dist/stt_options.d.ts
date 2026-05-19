@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -331,110 +331,19 @@ export interface STTLanguageDetectionResult {
     confidence: number;
     alternatives: string[];
 }
-export declare const STTConfiguration: {
-    encode(message: STTConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTConfiguration;
-    fromJSON(object: any): STTConfiguration;
-    toJSON(message: STTConfiguration): unknown;
-    create<I extends Exact<DeepPartial<STTConfiguration>, I>>(base?: I): STTConfiguration;
-    fromPartial<I extends Exact<DeepPartial<STTConfiguration>, I>>(object: I): STTConfiguration;
-};
-export declare const STTOptions: {
-    encode(message: STTOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTOptions;
-    fromJSON(object: any): STTOptions;
-    toJSON(message: STTOptions): unknown;
-    create<I extends Exact<DeepPartial<STTOptions>, I>>(base?: I): STTOptions;
-    fromPartial<I extends Exact<DeepPartial<STTOptions>, I>>(object: I): STTOptions;
-};
-export declare const STTAudioSource: {
-    encode(message: STTAudioSource, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTAudioSource;
-    fromJSON(object: any): STTAudioSource;
-    toJSON(message: STTAudioSource): unknown;
-    create<I extends Exact<DeepPartial<STTAudioSource>, I>>(base?: I): STTAudioSource;
-    fromPartial<I extends Exact<DeepPartial<STTAudioSource>, I>>(object: I): STTAudioSource;
-};
-export declare const STTTranscriptionRequest: {
-    encode(message: STTTranscriptionRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTTranscriptionRequest;
-    fromJSON(object: any): STTTranscriptionRequest;
-    toJSON(message: STTTranscriptionRequest): unknown;
-    create<I extends Exact<DeepPartial<STTTranscriptionRequest>, I>>(base?: I): STTTranscriptionRequest;
-    fromPartial<I extends Exact<DeepPartial<STTTranscriptionRequest>, I>>(object: I): STTTranscriptionRequest;
-};
-export declare const STTTranscriptionRequest_MetadataEntry: {
-    encode(message: STTTranscriptionRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTTranscriptionRequest_MetadataEntry;
-    fromJSON(object: any): STTTranscriptionRequest_MetadataEntry;
-    toJSON(message: STTTranscriptionRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<STTTranscriptionRequest_MetadataEntry>, I>>(base?: I): STTTranscriptionRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<STTTranscriptionRequest_MetadataEntry>, I>>(object: I): STTTranscriptionRequest_MetadataEntry;
-};
-export declare const WordTimestamp: {
-    encode(message: WordTimestamp, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): WordTimestamp;
-    fromJSON(object: any): WordTimestamp;
-    toJSON(message: WordTimestamp): unknown;
-    create<I extends Exact<DeepPartial<WordTimestamp>, I>>(base?: I): WordTimestamp;
-    fromPartial<I extends Exact<DeepPartial<WordTimestamp>, I>>(object: I): WordTimestamp;
-};
-export declare const TranscriptionAlternative: {
-    encode(message: TranscriptionAlternative, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TranscriptionAlternative;
-    fromJSON(object: any): TranscriptionAlternative;
-    toJSON(message: TranscriptionAlternative): unknown;
-    create<I extends Exact<DeepPartial<TranscriptionAlternative>, I>>(base?: I): TranscriptionAlternative;
-    fromPartial<I extends Exact<DeepPartial<TranscriptionAlternative>, I>>(object: I): TranscriptionAlternative;
-};
-export declare const TranscriptionMetadata: {
-    encode(message: TranscriptionMetadata, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TranscriptionMetadata;
-    fromJSON(object: any): TranscriptionMetadata;
-    toJSON(message: TranscriptionMetadata): unknown;
-    create<I extends Exact<DeepPartial<TranscriptionMetadata>, I>>(base?: I): TranscriptionMetadata;
-    fromPartial<I extends Exact<DeepPartial<TranscriptionMetadata>, I>>(object: I): TranscriptionMetadata;
-};
-export declare const STTOutput: {
-    encode(message: STTOutput, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTOutput;
-    fromJSON(object: any): STTOutput;
-    toJSON(message: STTOutput): unknown;
-    create<I extends Exact<DeepPartial<STTOutput>, I>>(base?: I): STTOutput;
-    fromPartial<I extends Exact<DeepPartial<STTOutput>, I>>(object: I): STTOutput;
-};
-export declare const STTPartialResult: {
-    encode(message: STTPartialResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTPartialResult;
-    fromJSON(object: any): STTPartialResult;
-    toJSON(message: STTPartialResult): unknown;
-    create<I extends Exact<DeepPartial<STTPartialResult>, I>>(base?: I): STTPartialResult;
-    fromPartial<I extends Exact<DeepPartial<STTPartialResult>, I>>(object: I): STTPartialResult;
-};
-export declare const STTStreamEvent: {
-    encode(message: STTStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTStreamEvent;
-    fromJSON(object: any): STTStreamEvent;
-    toJSON(message: STTStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<STTStreamEvent>, I>>(base?: I): STTStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<STTStreamEvent>, I>>(object: I): STTStreamEvent;
-};
-export declare const STTServiceState: {
-    encode(message: STTServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTServiceState;
-    fromJSON(object: any): STTServiceState;
-    toJSON(message: STTServiceState): unknown;
-    create<I extends Exact<DeepPartial<STTServiceState>, I>>(base?: I): STTServiceState;
-    fromPartial<I extends Exact<DeepPartial<STTServiceState>, I>>(object: I): STTServiceState;
-};
-export declare const STTLanguageDetectionResult: {
-    encode(message: STTLanguageDetectionResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): STTLanguageDetectionResult;
-    fromJSON(object: any): STTLanguageDetectionResult;
-    toJSON(message: STTLanguageDetectionResult): unknown;
-    create<I extends Exact<DeepPartial<STTLanguageDetectionResult>, I>>(base?: I): STTLanguageDetectionResult;
-    fromPartial<I extends Exact<DeepPartial<STTLanguageDetectionResult>, I>>(object: I): STTLanguageDetectionResult;
-};
+export declare const STTConfiguration: MessageFns<STTConfiguration>;
+export declare const STTOptions: MessageFns<STTOptions>;
+export declare const STTAudioSource: MessageFns<STTAudioSource>;
+export declare const STTTranscriptionRequest: MessageFns<STTTranscriptionRequest>;
+export declare const STTTranscriptionRequest_MetadataEntry: MessageFns<STTTranscriptionRequest_MetadataEntry>;
+export declare const WordTimestamp: MessageFns<WordTimestamp>;
+export declare const TranscriptionAlternative: MessageFns<TranscriptionAlternative>;
+export declare const TranscriptionMetadata: MessageFns<TranscriptionMetadata>;
+export declare const STTOutput: MessageFns<STTOutput>;
+export declare const STTPartialResult: MessageFns<STTPartialResult>;
+export declare const STTStreamEvent: MessageFns<STTStreamEvent>;
+export declare const STTServiceState: MessageFns<STTServiceState>;
+export declare const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -445,4 +354,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

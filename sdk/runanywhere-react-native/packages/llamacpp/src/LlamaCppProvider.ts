@@ -12,13 +12,13 @@ import { SDKLogger } from '@runanywhere/core/internal';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('LLM.LlamaCppProvider');
-const vlmLog = new SDKLogger('VLM.LlamaCppProvider');
 
 /**
  * Internal LlamaCPP provider implementation.
  *
- * Registers llama.cpp LLM and VLM providers. Core owns public model lifecycle
- * and inference surfaces.
+ * Registers the llama.cpp backend provider; the single C++ registration call
+ * covers both LLM and VLM modalities. Core owns public model lifecycle and
+ * inference surfaces.
  *
  * @internal
  */
@@ -28,13 +28,12 @@ export class LlamaCppProvider {
   static readonly version = '2.0.0';
 
   private static registered = false;
-  private static isVLMRegistered = false;
 
   /**
    * Register LlamaCPP backend with the C++ service registry.
    * Calls rac_backend_llamacpp_register() to register the
-   * LlamaCPP service provider with the C++ commons layer.
-   * Also registers the VLM backend provider; core owns VLM model lifecycle.
+   * LlamaCPP service provider with the C++ commons layer; the single call
+   * covers both LLM and VLM modalities.
    * Safe to call multiple times - subsequent calls are no-ops.
    * @returns Promise<boolean> true if registered successfully
    */
@@ -57,10 +56,7 @@ export class LlamaCppProvider {
       const success = await native.registerBackend();
       if (success) {
         this.registered = true;
-        log.info('LlamaCPP backend registered successfully');
-
-        // Register the VLM provider; core owns VLM lifecycle and proto calls.
-        await this.registerVLM();
+        log.info('LlamaCPP backend registered successfully (covers LLM and VLM)');
       }
       return success;
     } catch (error) {
@@ -71,38 +67,8 @@ export class LlamaCppProvider {
   }
 
   /**
-   * Register VLM (Vision Language Model) backend provider.
-   * Called automatically by register().
-   */
-  private static async registerVLM(): Promise<void> {
-    if (this.isVLMRegistered) {
-      return;
-    }
-
-    if (!isNativeLlamaModuleAvailable()) {
-      return;
-    }
-
-    vlmLog.info('Registering LlamaCPP VLM backend...');
-
-    try {
-      const native = requireNativeLlamaModule();
-      const success = await native.registerVLMBackend();
-      if (success) {
-        this.isVLMRegistered = true;
-        vlmLog.info('LlamaCPP VLM backend registered successfully');
-      } else {
-        vlmLog.warning('LlamaCPP VLM registration returned false (VLM features may not be available)');
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      vlmLog.warning(`LlamaCPP VLM registration failed: ${msg} (VLM features may not be available)`);
-    }
-  }
-
-  /**
    * Unregister the LlamaCPP backend from C++ registry.
-   * Also unregisters the VLM backend provider.
+   * The single unregistration call covers both LLM and VLM modalities.
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
@@ -110,23 +76,11 @@ export class LlamaCppProvider {
       return false;
     }
 
-    const native = requireNativeLlamaModule();
-
-    // Unregister VLM first. VLM model handles are lifecycle-owned by core;
-    // backend unregistration only removes the provider.
-    if (this.isVLMRegistered) {
-      try {
-        await native.unregisterVLMBackend();
-        this.isVLMRegistered = false;
-        vlmLog.info('LlamaCPP VLM backend unregistered');
-      } catch (error) {
-        vlmLog.error(`LlamaCPP VLM unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
     if (!this.registered) {
       return true;
     }
+
+    const native = requireNativeLlamaModule();
 
     try {
       const success = await native.unregisterBackend();

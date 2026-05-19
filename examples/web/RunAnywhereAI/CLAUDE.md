@@ -32,12 +32,16 @@ npm run dev -- --host 127.0.0.1
 
 ## Browser Requirements
 
-The Vite dev server sets COOP/COEP headers for SharedArrayBuffer. Runtime WASM assets are copied from the SDK workspace when present:
+The Vite dev server sets COOP/COEP headers for SharedArrayBuffer. Runtime WASM assets are copied from the SDK workspace when present — there are now **three independent WASM artifacts** across three packages:
 
-- `racommons-llamacpp.wasm`
-- `racommons-llamacpp-webgpu.wasm`
+| WASM artifact | Owning package | Loaded by | Used by views |
+| --- | --- | --- | --- |
+| `racommons.{js,wasm}` | `@runanywhere/web` (core) | `RunAnywhere.initialize()` | All views (commons facade state) |
+| `racommons-llamacpp.{js,wasm}` (CPU) | `@runanywhere/web-llamacpp` | `LlamaCPP.register()` | Chat, Vision, Documents (RAG embeddings) |
+| `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU) | `@runanywhere/web-llamacpp` | `LlamaCPP.register({ acceleration: 'webgpu' })` — runtime capability check picks one | Chat, Vision (when WebGPU+JSPI available) |
+| `racommons-onnx-sherpa.{js,wasm}` | `@runanywhere/web-onnx` | `ONNX.register()` | Voice, Transcribe, Speak |
 
-The legacy standalone `packages/onnx/wasm/sherpa/sherpa-onnx.wasm` bundle is no longer used. STT/TTS/VAD require the unified RACommons WASM build with ONNX enabled.
+The legacy `packages/onnx/wasm/sherpa/sherpa-onnx.wasm` standalone bundle has been deleted. STT/TTS/VAD now run through the proto-byte adapters in `@runanywhere/web` core against the registered Sherpa vtable inside `racommons-onnx-sherpa.wasm` — there is no separate standalone speech provider path.
 
 ## Validation Standard
 

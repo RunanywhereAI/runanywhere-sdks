@@ -49,7 +49,9 @@ data class BenchmarkUiState(
  * Orchestrates benchmark execution, persistence, and export.
  * Matches iOS BenchmarkViewModel exactly.
  */
-class BenchmarkViewModel(application: Application) : AndroidViewModel(application) {
+class BenchmarkViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(BenchmarkUiState())
     val uiState: StateFlow<BenchmarkUiState> = _uiState.asStateFlow()
 
@@ -230,8 +232,8 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     // -- Helpers --
 
-    private fun makeDeviceInfo(): BenchmarkDeviceInfo {
-        return try {
+    private fun makeDeviceInfo(): BenchmarkDeviceInfo =
+        try {
             val info = AppDeviceInfo.current()
             BenchmarkDeviceInfo(
                 modelName = info.modelName,
@@ -249,5 +251,4 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
                 osVersion = "Android ${android.os.Build.VERSION.RELEASE}",
             )
         }
-    }
 }

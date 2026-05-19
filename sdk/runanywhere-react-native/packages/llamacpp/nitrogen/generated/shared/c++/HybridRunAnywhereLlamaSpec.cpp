@@ -17,9 +17,6 @@ namespace margelo::nitro::runanywhere::llama {
       prototype.registerHybridMethod("registerBackend", &HybridRunAnywhereLlamaSpec::registerBackend);
       prototype.registerHybridMethod("unregisterBackend", &HybridRunAnywhereLlamaSpec::unregisterBackend);
       prototype.registerHybridMethod("isBackendRegistered", &HybridRunAnywhereLlamaSpec::isBackendRegistered);
-      prototype.registerHybridMethod("registerVLMBackend", &HybridRunAnywhereLlamaSpec::registerVLMBackend);
-      prototype.registerHybridMethod("unregisterVLMBackend", &HybridRunAnywhereLlamaSpec::unregisterVLMBackend);
-      prototype.registerHybridMethod("isVLMBackendRegistered", &HybridRunAnywhereLlamaSpec::isVLMBackendRegistered);
     });
   }
 

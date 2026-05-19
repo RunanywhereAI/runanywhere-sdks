@@ -28,13 +28,12 @@ enum class DocumentType {
          * Determine document type from a display name or file extension.
          * Mirrors iOS `DocumentType.init(url:)`.
          */
-        fun from(fileName: String): DocumentType {
-            return when (fileName.substringAfterLast('.', "").lowercase()) {
+        fun from(fileName: String): DocumentType =
+            when (fileName.substringAfterLast('.', "").lowercase()) {
                 "pdf" -> PDF
                 "json" -> JSON
                 else -> UNSUPPORTED
             }
-        }
     }
 }
 
@@ -44,11 +43,15 @@ enum class DocumentType {
  * Errors thrown by DocumentService.
  * Mirrors iOS DocumentServiceError exactly.
  */
-sealed class DocumentServiceError(override val message: String) : Exception(message) {
+sealed class DocumentServiceError(
+    override val message: String,
+) : Exception(message) {
     /** The file format is not supported (only PDF and JSON). */
-    data class UnsupportedFormat(val ext: String) : DocumentServiceError(
-        "Unsupported document format: .$ext. Only PDF and JSON files are supported.",
-    )
+    data class UnsupportedFormat(
+        val ext: String,
+    ) : DocumentServiceError(
+            "Unsupported document format: .$ext. Only PDF and JSON files are supported.",
+        )
 
     /** The PDF could not be parsed (corrupted, image-only, etc.). */
     data object PdfExtractionFailed : DocumentServiceError(
@@ -56,14 +59,18 @@ sealed class DocumentServiceError(override val message: String) : Exception(mess
     )
 
     /** The JSON could not be parsed. */
-    data class JsonExtractionFailed(val reason: String) : DocumentServiceError(
-        "Failed to parse JSON file: $reason",
-    )
+    data class JsonExtractionFailed(
+        val reason: String,
+    ) : DocumentServiceError(
+            "Failed to parse JSON file: $reason",
+        )
 
     /** The file could not be read from the content URI. */
-    data class FileReadFailed(val reason: String) : DocumentServiceError(
-        "Failed to read file: $reason",
-    )
+    data class FileReadFailed(
+        val reason: String,
+    ) : DocumentServiceError(
+            "Failed to read file: $reason",
+        )
 }
 
 // MARK: - Document Service
@@ -215,20 +222,20 @@ object DocumentService {
     fun getFileName(
         context: Context,
         uri: Uri,
-    ): String? {
-        return context.contentResolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (nameIndex >= 0) cursor.getString(nameIndex) else null
-            } else {
-                null
+    ): String? =
+        context.contentResolver
+            .query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) cursor.getString(nameIndex) else null
+                } else {
+                    null
+                }
             }
-        }
-    }
 }

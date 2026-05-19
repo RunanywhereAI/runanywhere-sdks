@@ -124,7 +124,9 @@ class _RagDemoViewState extends State<RagDemoView> {
 
   Future<void> _pickDocument() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      // file_picker 11.x: removed `FilePicker.platform` getter; `pickFiles`
+      // is now a static method directly on `FilePicker`.
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'json'],
       );

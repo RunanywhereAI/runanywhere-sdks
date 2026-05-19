@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -319,102 +319,18 @@ export interface VLMLoadResolvedArtifactsResponse {
     resultCode: number;
     errorMessage?: string | undefined;
 }
-export declare const VLMChatTemplate: {
-    encode(message: VLMChatTemplate, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMChatTemplate;
-    fromJSON(object: any): VLMChatTemplate;
-    toJSON(message: VLMChatTemplate): unknown;
-    create<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(base?: I): VLMChatTemplate;
-    fromPartial<I extends Exact<DeepPartial<VLMChatTemplate>, I>>(object: I): VLMChatTemplate;
-};
-export declare const VLMImage: {
-    encode(message: VLMImage, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMImage;
-    fromJSON(object: any): VLMImage;
-    toJSON(message: VLMImage): unknown;
-    create<I extends Exact<DeepPartial<VLMImage>, I>>(base?: I): VLMImage;
-    fromPartial<I extends Exact<DeepPartial<VLMImage>, I>>(object: I): VLMImage;
-};
-export declare const VLMImage_MetadataEntry: {
-    encode(message: VLMImage_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMImage_MetadataEntry;
-    fromJSON(object: any): VLMImage_MetadataEntry;
-    toJSON(message: VLMImage_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(base?: I): VLMImage_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(object: I): VLMImage_MetadataEntry;
-};
-export declare const VLMConfiguration: {
-    encode(message: VLMConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMConfiguration;
-    fromJSON(object: any): VLMConfiguration;
-    toJSON(message: VLMConfiguration): unknown;
-    create<I extends Exact<DeepPartial<VLMConfiguration>, I>>(base?: I): VLMConfiguration;
-    fromPartial<I extends Exact<DeepPartial<VLMConfiguration>, I>>(object: I): VLMConfiguration;
-};
-export declare const VLMGenerationOptions: {
-    encode(message: VLMGenerationOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMGenerationOptions;
-    fromJSON(object: any): VLMGenerationOptions;
-    toJSON(message: VLMGenerationOptions): unknown;
-    create<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(base?: I): VLMGenerationOptions;
-    fromPartial<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(object: I): VLMGenerationOptions;
-};
-export declare const VLMGenerationRequest: {
-    encode(message: VLMGenerationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMGenerationRequest;
-    fromJSON(object: any): VLMGenerationRequest;
-    toJSON(message: VLMGenerationRequest): unknown;
-    create<I extends Exact<DeepPartial<VLMGenerationRequest>, I>>(base?: I): VLMGenerationRequest;
-    fromPartial<I extends Exact<DeepPartial<VLMGenerationRequest>, I>>(object: I): VLMGenerationRequest;
-};
-export declare const VLMGenerationRequest_MetadataEntry: {
-    encode(message: VLMGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMGenerationRequest_MetadataEntry;
-    fromJSON(object: any): VLMGenerationRequest_MetadataEntry;
-    toJSON(message: VLMGenerationRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(base?: I): VLMGenerationRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(object: I): VLMGenerationRequest_MetadataEntry;
-};
-export declare const VLMResult: {
-    encode(message: VLMResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMResult;
-    fromJSON(object: any): VLMResult;
-    toJSON(message: VLMResult): unknown;
-    create<I extends Exact<DeepPartial<VLMResult>, I>>(base?: I): VLMResult;
-    fromPartial<I extends Exact<DeepPartial<VLMResult>, I>>(object: I): VLMResult;
-};
-export declare const VLMStreamEvent: {
-    encode(message: VLMStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMStreamEvent;
-    fromJSON(object: any): VLMStreamEvent;
-    toJSON(message: VLMStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<VLMStreamEvent>, I>>(base?: I): VLMStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<VLMStreamEvent>, I>>(object: I): VLMStreamEvent;
-};
-export declare const VLMServiceState: {
-    encode(message: VLMServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMServiceState;
-    fromJSON(object: any): VLMServiceState;
-    toJSON(message: VLMServiceState): unknown;
-    create<I extends Exact<DeepPartial<VLMServiceState>, I>>(base?: I): VLMServiceState;
-    fromPartial<I extends Exact<DeepPartial<VLMServiceState>, I>>(object: I): VLMServiceState;
-};
-export declare const VLMLoadResolvedArtifactsRequest: {
-    encode(message: VLMLoadResolvedArtifactsRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsRequest;
-    fromJSON(object: any): VLMLoadResolvedArtifactsRequest;
-    toJSON(message: VLMLoadResolvedArtifactsRequest): unknown;
-    create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(base?: I): VLMLoadResolvedArtifactsRequest;
-    fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(object: I): VLMLoadResolvedArtifactsRequest;
-};
-export declare const VLMLoadResolvedArtifactsResponse: {
-    encode(message: VLMLoadResolvedArtifactsResponse, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsResponse;
-    fromJSON(object: any): VLMLoadResolvedArtifactsResponse;
-    toJSON(message: VLMLoadResolvedArtifactsResponse): unknown;
-    create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(base?: I): VLMLoadResolvedArtifactsResponse;
-    fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(object: I): VLMLoadResolvedArtifactsResponse;
-};
+export declare const VLMChatTemplate: MessageFns<VLMChatTemplate>;
+export declare const VLMImage: MessageFns<VLMImage>;
+export declare const VLMImage_MetadataEntry: MessageFns<VLMImage_MetadataEntry>;
+export declare const VLMConfiguration: MessageFns<VLMConfiguration>;
+export declare const VLMGenerationOptions: MessageFns<VLMGenerationOptions>;
+export declare const VLMGenerationRequest: MessageFns<VLMGenerationRequest>;
+export declare const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest_MetadataEntry>;
+export declare const VLMResult: MessageFns<VLMResult>;
+export declare const VLMStreamEvent: MessageFns<VLMStreamEvent>;
+export declare const VLMServiceState: MessageFns<VLMServiceState>;
+export declare const VLMLoadResolvedArtifactsRequest: MessageFns<VLMLoadResolvedArtifactsRequest>;
+export declare const VLMLoadResolvedArtifactsResponse: MessageFns<VLMLoadResolvedArtifactsResponse>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -425,4 +341,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

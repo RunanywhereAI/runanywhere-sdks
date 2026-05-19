@@ -252,8 +252,8 @@ fun AppNavigation() {
 /**
  * Maps current route to bottom nav tab, including nested/child routes.
  */
-private fun routeToBottomNavTab(route: String?): BottomNavTab {
-    return when {
+private fun routeToBottomNavTab(route: String?): BottomNavTab =
+    when {
         route == null -> BottomNavTab.Chat
         route == NavigationRoute.CHAT -> BottomNavTab.Chat
         route == NavigationRoute.VISION || route == NavigationRoute.VLM -> BottomNavTab.Vision
@@ -268,21 +268,20 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
                 NavigationRoute.BENCHMARKS,
                 NavigationRoute.LORA_MANAGER,
                 NavigationRoute.SOLUTIONS,
-            ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
+            ) ||
+            route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
         else -> BottomNavTab.Chat
     }
-}
 
-private fun bottomNavTabToRoute(tab: BottomNavTab): String {
-    return when (tab) {
+private fun bottomNavTabToRoute(tab: BottomNavTab): String =
+    when (tab) {
         BottomNavTab.Chat -> NavigationRoute.CHAT
         BottomNavTab.Vision -> NavigationRoute.VISION
         BottomNavTab.Voice -> NavigationRoute.VOICE
         BottomNavTab.More -> NavigationRoute.MORE
         BottomNavTab.Settings -> NavigationRoute.SETTINGS
     }
-}
 
 object NavigationRoute {
     const val CHAT = "chat"

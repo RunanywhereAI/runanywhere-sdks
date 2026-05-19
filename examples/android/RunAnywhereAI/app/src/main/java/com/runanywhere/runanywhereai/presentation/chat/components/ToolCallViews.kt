@@ -215,8 +215,7 @@ private fun CodeSection(
                     .background(
                         MaterialTheme.colorScheme.surfaceVariant,
                         RoundedCornerShape(8.dp),
-                    )
-                    .padding(12.dp)
+                    ).padding(12.dp)
                     .horizontalScroll(rememberScrollState()),
         ) {
             Text(
@@ -252,8 +251,7 @@ fun ToolCallingActiveIndicator(modifier: Modifier = Modifier) {
                 .background(
                     AppColors.primaryAccent.copy(alpha = 0.1f),
                     RoundedCornerShape(8.dp),
-                )
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                ).padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

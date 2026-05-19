@@ -274,9 +274,11 @@ rac_primitive_t primitive_for_component(SDKComponent component) {
 const char* framework_to_plugin_name(InferenceFramework framework, rac_primitive_t primitive) {
     switch (framework) {
         case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
-            if (primitive == RAC_PRIMITIVE_VLM) {
-                return "llamacpp_vlm";
-            }
+            // After the LLM/VLM plugin unification, llama.cpp publishes ONE
+            // vtable named "llamacpp" with both llm_ops and vlm_ops slots
+            // filled. Routing is by primitive on the same plugin entry, so
+            // both LLM and VLM resolve to the same plugin name.
+            (void)primitive;
             return "llamacpp";
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
             // Voice primitives on ONNX-format models are typically served by

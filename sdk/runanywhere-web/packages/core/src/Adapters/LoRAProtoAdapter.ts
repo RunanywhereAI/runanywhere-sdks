@@ -40,9 +40,8 @@ import {
 
 export class LoRAProtoAdapter {
   static tryDefault(): LoRAProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new LoRAProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.lora;
+    return mod ? new LoRAProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

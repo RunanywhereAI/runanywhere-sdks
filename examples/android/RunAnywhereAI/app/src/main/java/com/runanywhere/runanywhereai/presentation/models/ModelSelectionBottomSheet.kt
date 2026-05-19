@@ -190,8 +190,7 @@ fun ModelSelectionBottomSheet(
                                 } else {
                                     2
                                 }
-                            }
-                                .thenBy { it.name },
+                            }.thenBy { it.name },
                         )
                     sortedModels.forEachIndexed { index, model ->
                         val isBuiltIn =
@@ -603,8 +602,7 @@ private fun Badge(
             .background(backgroundColor)
             .then(
                 if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
-            )
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            ).padding(horizontal = 8.dp, vertical = 4.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier,

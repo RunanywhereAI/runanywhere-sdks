@@ -24,17 +24,18 @@ import java.util.*
  * ConversationStore for Android - Exact match with iOS ConversationStore
  * Handles conversation persistence, management, and search
  */
-class ConversationStore private constructor(context: Context) {
+class ConversationStore private constructor(
+    context: Context,
+) {
     companion object {
         @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: ConversationStore? = null
 
-        fun getInstance(context: Context): ConversationStore {
-            return instance ?: synchronized(this) {
+        fun getInstance(context: Context): ConversationStore =
+            instance ?: synchronized(this) {
                 instance ?: ConversationStore(context.applicationContext).also { instance = it }
             }
-        }
     }
 
     // Store application context to avoid memory leaks
@@ -164,7 +165,8 @@ class ConversationStore private constructor(context: Context) {
             )
 
         // Use first user input as conversation title (instead of "New Chat")
-        if (message.role == MessageRole.USER && message.content.isNotEmpty() &&
+        if (message.role == MessageRole.USER &&
+            message.content.isNotEmpty() &&
             (updated.title.isNullOrBlank() || updated.title == "New Chat")
         ) {
             updated = updated.copy(title = generateTitle(message.content))
@@ -271,9 +273,7 @@ class ConversationStore private constructor(context: Context) {
     /**
      * Get file URL for a conversation
      */
-    private fun conversationFileURL(id: String): File {
-        return File(conversationsDirectory, "$id.json")
-    }
+    private fun conversationFileURL(id: String): File = File(conversationsDirectory, "$id.json")
 
     /**
      * Generate title from message content

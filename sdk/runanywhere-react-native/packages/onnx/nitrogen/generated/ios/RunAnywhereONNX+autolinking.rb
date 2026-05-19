@@ -56,5 +56,7 @@ def add_nitrogen_files(spec)
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
     # Enables stricter modular headers
     "DEFINES_MODULE" => "YES",
+    # Disable auto-generated ObjC header for Swift (Static linkage on Xcode 26.4 breaks here)
+    "SWIFT_INSTALL_OBJC_HEADER" => "NO",
   })
 end

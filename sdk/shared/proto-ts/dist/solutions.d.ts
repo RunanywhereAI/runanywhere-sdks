@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -95,6 +95,15 @@ export interface VoiceAgentConfig {
     ttsModelId: string;
     /** e.g. "silero-v5" */
     vadModelId: string;
+    /**
+     * pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
+     * (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
+     * fall back to using tts_model_id as the voice id — correct for
+     * single-voice engines, wrong for multi-voice. Aligns the caller-facing
+     * VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
+     * (voice_agent_service.proto:214) which already exposes tts_voice_id.
+     */
+    ttsVoiceId: string;
     /** Audio configuration. */
     sampleRateHz: number;
     /** default 20 */
@@ -209,70 +218,14 @@ export interface TimeSeriesConfig {
     /** Optional explicit solution-kind tag. See `SolutionType`. */
     typeKind?: SolutionType | undefined;
 }
-export declare const SolutionConfig: {
-    encode(message: SolutionConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SolutionConfig;
-    fromJSON(object: any): SolutionConfig;
-    toJSON(message: SolutionConfig): unknown;
-    create<I extends Exact<DeepPartial<SolutionConfig>, I>>(base?: I): SolutionConfig;
-    fromPartial<I extends Exact<DeepPartial<SolutionConfig>, I>>(object: I): SolutionConfig;
-};
-export declare const SolutionHandle: {
-    encode(message: SolutionHandle, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SolutionHandle;
-    fromJSON(object: any): SolutionHandle;
-    toJSON(message: SolutionHandle): unknown;
-    create<I extends Exact<DeepPartial<SolutionHandle>, I>>(base?: I): SolutionHandle;
-    fromPartial<I extends Exact<DeepPartial<SolutionHandle>, I>>(object: I): SolutionHandle;
-};
-export declare const VoiceAgentConfig: {
-    encode(message: VoiceAgentConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentConfig;
-    fromJSON(object: any): VoiceAgentConfig;
-    toJSON(message: VoiceAgentConfig): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentConfig>, I>>(base?: I): VoiceAgentConfig;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentConfig>, I>>(object: I): VoiceAgentConfig;
-};
-export declare const RAGConfig: {
-    encode(message: RAGConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): RAGConfig;
-    fromJSON(object: any): RAGConfig;
-    toJSON(message: RAGConfig): unknown;
-    create<I extends Exact<DeepPartial<RAGConfig>, I>>(base?: I): RAGConfig;
-    fromPartial<I extends Exact<DeepPartial<RAGConfig>, I>>(object: I): RAGConfig;
-};
-export declare const WakeWordConfig: {
-    encode(message: WakeWordConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): WakeWordConfig;
-    fromJSON(object: any): WakeWordConfig;
-    toJSON(message: WakeWordConfig): unknown;
-    create<I extends Exact<DeepPartial<WakeWordConfig>, I>>(base?: I): WakeWordConfig;
-    fromPartial<I extends Exact<DeepPartial<WakeWordConfig>, I>>(object: I): WakeWordConfig;
-};
-export declare const AgentLoopConfig: {
-    encode(message: AgentLoopConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): AgentLoopConfig;
-    fromJSON(object: any): AgentLoopConfig;
-    toJSON(message: AgentLoopConfig): unknown;
-    create<I extends Exact<DeepPartial<AgentLoopConfig>, I>>(base?: I): AgentLoopConfig;
-    fromPartial<I extends Exact<DeepPartial<AgentLoopConfig>, I>>(object: I): AgentLoopConfig;
-};
-export declare const ToolSpec: {
-    encode(message: ToolSpec, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolSpec;
-    fromJSON(object: any): ToolSpec;
-    toJSON(message: ToolSpec): unknown;
-    create<I extends Exact<DeepPartial<ToolSpec>, I>>(base?: I): ToolSpec;
-    fromPartial<I extends Exact<DeepPartial<ToolSpec>, I>>(object: I): ToolSpec;
-};
-export declare const TimeSeriesConfig: {
-    encode(message: TimeSeriesConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TimeSeriesConfig;
-    fromJSON(object: any): TimeSeriesConfig;
-    toJSON(message: TimeSeriesConfig): unknown;
-    create<I extends Exact<DeepPartial<TimeSeriesConfig>, I>>(base?: I): TimeSeriesConfig;
-    fromPartial<I extends Exact<DeepPartial<TimeSeriesConfig>, I>>(object: I): TimeSeriesConfig;
-};
+export declare const SolutionConfig: MessageFns<SolutionConfig>;
+export declare const SolutionHandle: MessageFns<SolutionHandle>;
+export declare const VoiceAgentConfig: MessageFns<VoiceAgentConfig>;
+export declare const RAGConfig: MessageFns<RAGConfig>;
+export declare const WakeWordConfig: MessageFns<WakeWordConfig>;
+export declare const AgentLoopConfig: MessageFns<AgentLoopConfig>;
+export declare const ToolSpec: MessageFns<ToolSpec>;
+export declare const TimeSeriesConfig: MessageFns<TimeSeriesConfig>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -283,4 +236,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

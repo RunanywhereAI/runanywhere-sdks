@@ -15,9 +15,8 @@ import {
 
 export class EmbeddingsProtoAdapter {
   static tryDefault(): EmbeddingsProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new EmbeddingsProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.embedding;
+    return mod ? new EmbeddingsProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

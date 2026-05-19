@@ -105,7 +105,12 @@ class ModelSelectionViewModel(
 
                 // Call SDK to get available models via the proto-backed registry.
                 // `listModels()` replaced the removed `availableModels()` helper.
-                val allModels = RunAnywhere.listModels().models?.models.orEmpty()
+                val allModels =
+                    RunAnywhere
+                        .listModels()
+                        .models
+                        ?.models
+                        .orEmpty()
                 Timber.d("📦 Fetched ${allModels.size} total models from SDK")
 
                 // Filter models by context - matches iOS relevantCategories filtering
@@ -178,8 +183,8 @@ class ModelSelectionViewModel(
      * by file path at pipeline creation time and are not pre-loaded into memory.
      * This mirrors iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
-    private suspend fun getCurrentLoadedModelIdForContext(): String? {
-        return when (context) {
+    private suspend fun getCurrentLoadedModelIdForContext(): String? =
+        when (context) {
             ModelSelectionContext.LLM ->
                 RunAnywhere
                     .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE))
@@ -210,7 +215,6 @@ class ModelSelectionViewModel(
                     .model_id
                     .takeIf { it.isNotEmpty() }
         }
-    }
 
     /**
      * Check if a model category is relevant for the current selection context
@@ -218,8 +222,8 @@ class ModelSelectionViewModel(
     private fun isModelRelevantForContext(
         category: ModelCategory,
         ctx: ModelSelectionContext,
-    ): Boolean {
-        return when (ctx) {
+    ): Boolean =
+        when (ctx) {
             ModelSelectionContext.LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
             ModelSelectionContext.STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
             ModelSelectionContext.TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
@@ -239,7 +243,6 @@ class ModelSelectionViewModel(
                 category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
                     category == ModelCategory.MODEL_CATEGORY_VISION
         }
-    }
 
     /**
      * Toggle framework expansion
@@ -256,11 +259,10 @@ class ModelSelectionViewModel(
     /**
      * Get models for a specific framework
      */
-    fun getModelsForFramework(framework: InferenceFramework): List<RAModelInfo> {
-        return _uiState.value.models.filter { model ->
+    fun getModelsForFramework(framework: InferenceFramework): List<RAModelInfo> =
+        _uiState.value.models.filter { model ->
             model.framework == framework
         }
-    }
 
     /**
      * Download a model via the proto-canonical SDK API:
@@ -287,8 +289,13 @@ class ModelSelectionViewModel(
 
             val model =
                 try {
-                    RunAnywhere.listModels(ai.runanywhere.proto.v1.ModelListRequest())
-                        .models?.models?.firstOrNull { it.id == modelId }
+                    RunAnywhere
+                        .listModels(
+                            ai.runanywhere.proto.v1
+                                .ModelListRequest(),
+                        ).models
+                        ?.models
+                        ?.firstOrNull { it.id == modelId }
                 } catch (_: Throwable) {
                     null
                 }
@@ -455,7 +462,9 @@ class ModelSelectionViewModel(
     /**
      * Factory for creating ViewModel with context parameter
      */
-    class Factory(private val context: ModelSelectionContext) : ViewModelProvider.Factory {
+    class Factory(
+        private val context: ModelSelectionContext,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ModelSelectionViewModel::class.java)) {

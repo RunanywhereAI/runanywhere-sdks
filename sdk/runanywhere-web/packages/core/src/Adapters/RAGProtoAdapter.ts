@@ -21,9 +21,8 @@ import {
 
 export class RAGProtoAdapter {
   static tryDefault(): RAGProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new RAGProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.rag;
+    return mod ? new RAGProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

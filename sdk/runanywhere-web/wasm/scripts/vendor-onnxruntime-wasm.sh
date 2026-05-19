@@ -5,10 +5,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${WASM_DIR}/../../.." && pwd)"
 
-ONNX_RUNTIME_VERSION="${ONNX_RUNTIME_VERSION:-1.18.0}"
+# Source the canonical VERSIONS file so the WASM vendor matches the rest of the
+# matched set (iOS/Android/macOS/Linux all consume ORT/Sherpa from VERSIONS).
+# F3 (dep-bump 2026-05-19): WASM previously had its own hardcoded fallbacks
+# (1.18.0 / 1.12.23) that drifted from VERSIONS. The matched set now picks
+# ORT 1.24.4 + sherpa-onnx 1.13.2 across every platform.
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
+
+# Allow callers to override via env, otherwise read from VERSIONS. ORT WASM is
+# built from source so we use the Linux pin (which is what `cmake/FetchONNXRuntime.cmake`
+# uses for Linux/macOS/WASM and is kept in lockstep with sherpa-onnx).
+ONNX_RUNTIME_VERSION="${ONNX_RUNTIME_VERSION:-${ONNX_VERSION_LINUX}}"
 SRC_DIR="${ONNX_RUNTIME_SRC_DIR:-${WASM_DIR}/third_party/onnxruntime}"
-EIGEN_COMMIT="${EIGEN_COMMIT:-e7248b26a1ed53fa030c5c459f7ea095dfd276ac}"
-EIGEN_SRC_DIR="${EIGEN_SRC_DIR:-${WASM_DIR}/third_party/eigen}"
 DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
 BUILD_CONFIG="${ONNX_RUNTIME_BUILD_CONFIG:-Release}"
 ORT_BUILD_DIR="${SRC_DIR}/build/MacOS/${BUILD_CONFIG}"
@@ -37,15 +46,6 @@ if [ -f "${ORT_PATCH}" ]; then
   fi
 fi
 
-if [ ! -d "${EIGEN_SRC_DIR}/.git" ]; then
-  rm -rf "${EIGEN_SRC_DIR}"
-  mkdir -p "${EIGEN_SRC_DIR}"
-  git -C "${EIGEN_SRC_DIR}" init
-  git -C "${EIGEN_SRC_DIR}" remote add origin https://gitlab.com/libeigen/eigen.git
-  git -C "${EIGEN_SRC_DIR}" fetch --depth 1 origin "${EIGEN_COMMIT}"
-  git -C "${EIGEN_SRC_DIR}" checkout FETCH_HEAD
-fi
-
 cd "${SRC_DIR}"
 
 # Force regeneration of the bundled archive so that incremental rebuilds
@@ -54,6 +54,11 @@ cd "${SRC_DIR}"
 # satisfied by CMake and the stale archive ships unchanged.
 rm -f "${ORT_BUILD_DIR}/libonnxruntime_webassembly.a"
 
+# F3 (dep-bump 2026-05-19): ORT 1.24.x removed `--use_preinstalled_eigen` and
+# `--eigen_path` from build.py. Eigen is now fetched as part of the ORT build
+# via the bundled `cmake/external/eigen.cmake` FetchContent declaration, so
+# the previously vendored `third_party/eigen` checkout is no longer needed
+# (and supplying the legacy flags causes argparse to reject them outright).
 set +e
 ./build.sh \
   --config "${BUILD_CONFIG}" \
@@ -61,8 +66,6 @@ set +e
   --enable_wasm_simd \
   --skip_tests \
   --disable_rtti \
-  --use_preinstalled_eigen \
-  --eigen_path "${EIGEN_SRC_DIR}" \
   --cmake_extra_defines CMAKE_POLICY_VERSION_MINIMUM=3.5
 BUILD_RC=$?
 set -e

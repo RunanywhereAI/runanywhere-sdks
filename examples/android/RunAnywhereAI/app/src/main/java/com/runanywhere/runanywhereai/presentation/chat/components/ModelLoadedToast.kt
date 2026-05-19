@@ -100,17 +100,14 @@ private fun ToastContent(modelName: String) {
                     shape = shape,
                     ambientColor = AppColors.shadowMedium,
                     spotColor = AppColors.shadowMedium,
-                )
-                .background(
+                ).background(
                     color = MaterialTheme.colorScheme.surface,
                     shape = shape,
-                )
-                .border(
+                ).border(
                     width = 0.5.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                     shape = shape,
-                )
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                ).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {

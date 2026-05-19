@@ -10,7 +10,9 @@ const __dir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dir, '../../..');
 
 // SDK WASM directories (each backend ships its own WASM)
+const coreWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/wasm');
 const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
+const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm');
 const webCoreSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts');
 const webCoreInternalSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/internal.ts');
 const webCoreBrowserSrc = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/browser.ts');
@@ -27,16 +29,21 @@ const protoTsSrc = path.resolve(workspaceRoot, 'sdk/shared/proto-ts/src');
  * Emscripten JS glue files resolve `.wasm` via `new URL("x.wasm", import.meta.url)`,
  * so the binaries must sit alongside the bundled JS in `dist/assets/`.
  *
- * In V2, both the LLM and STT/TTS/VAD paths run through
- * `racommons-llamacpp.wasm` (the ONNX backend is built into the same module
- * via `RAC_WASM_ONNX=ON`). The standalone `sherpa-onnx.wasm` is no longer
- * loaded at runtime, so it is not copied — see `SherpaONNXBridge.ts`.
+ * Four WASM artifacts ship across three SDK packages:
+ *   - `racommons.wasm` (commons core, owned by `@runanywhere/web`)
+ *   - `racommons-llamacpp.wasm` (CPU LLM backend)
+ *   - `racommons-llamacpp-webgpu.wasm` (WebGPU LLM backend)
+ *   - `racommons-onnx-sherpa.wasm` (STT/TTS/VAD via Sherpa-ONNX)
  */
 function copyWasmPlugin(): Plugin {
   const wasmFiles = [
-    // LlamaCpp backend WASM (also exports ONNX vtable when built with RAC_WASM_ONNX)
+    // Commons core WASM (loaded by RunAnywhere.initialize())
+    { src: path.join(coreWasmDir, 'racommons.wasm'), dest: 'racommons.wasm' },
+    // LlamaCpp backend WASM (CPU + WebGPU variants)
     { src: path.join(llamacppWasmDir, 'racommons-llamacpp.wasm'), dest: 'racommons-llamacpp.wasm' },
     { src: path.join(llamacppWasmDir, 'racommons-llamacpp-webgpu.wasm'), dest: 'racommons-llamacpp-webgpu.wasm' },
+    // ONNX/Sherpa speech backend WASM (STT/TTS/VAD)
+    { src: path.join(onnxWasmDir, 'racommons-onnx-sherpa.wasm'), dest: 'racommons-onnx-sherpa.wasm' },
   ];
 
   return {

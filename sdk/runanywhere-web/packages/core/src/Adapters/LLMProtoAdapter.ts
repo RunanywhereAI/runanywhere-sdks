@@ -26,9 +26,8 @@ import {
 
 export class LLMProtoAdapter {
   static tryDefault(): LLMProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new LLMProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.llm;
+    return mod ? new LLMProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory } from "./component_types";
 import { ErrorSeverity } from "./errors";
 import { TTSOptions } from "./tts_options";
@@ -238,78 +238,15 @@ export interface VoiceAgentSynthesizeSpeechProtoRequest {
     sessionId: string;
     options?: TTSOptions | undefined;
 }
-export declare const VoiceAgentRequest: {
-    encode(message: VoiceAgentRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentRequest;
-    fromJSON(object: any): VoiceAgentRequest;
-    toJSON(message: VoiceAgentRequest): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(base?: I): VoiceAgentRequest;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(object: I): VoiceAgentRequest;
-};
-export declare const VoiceAgentResult: {
-    encode(message: VoiceAgentResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentResult;
-    fromJSON(object: any): VoiceAgentResult;
-    toJSON(message: VoiceAgentResult): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentResult>, I>>(base?: I): VoiceAgentResult;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentResult>, I>>(object: I): VoiceAgentResult;
-};
-export declare const VoiceAgentTurnRequest: {
-    encode(message: VoiceAgentTurnRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest;
-    fromJSON(object: any): VoiceAgentTurnRequest;
-    toJSON(message: VoiceAgentTurnRequest): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(base?: I): VoiceAgentTurnRequest;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(object: I): VoiceAgentTurnRequest;
-};
-export declare const VoiceAgentTurnRequest_MetadataEntry: {
-    encode(message: VoiceAgentTurnRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest_MetadataEntry;
-    fromJSON(object: any): VoiceAgentTurnRequest_MetadataEntry;
-    toJSON(message: VoiceAgentTurnRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(base?: I): VoiceAgentTurnRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(object: I): VoiceAgentTurnRequest_MetadataEntry;
-};
-export declare const VoiceSessionConfig: {
-    encode(message: VoiceSessionConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceSessionConfig;
-    fromJSON(object: any): VoiceSessionConfig;
-    toJSON(message: VoiceSessionConfig): unknown;
-    create<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(base?: I): VoiceSessionConfig;
-    fromPartial<I extends Exact<DeepPartial<VoiceSessionConfig>, I>>(object: I): VoiceSessionConfig;
-};
-export declare const AudioPipelineConfig: {
-    encode(message: AudioPipelineConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): AudioPipelineConfig;
-    fromJSON(object: any): AudioPipelineConfig;
-    toJSON(message: AudioPipelineConfig): unknown;
-    create<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(base?: I): AudioPipelineConfig;
-    fromPartial<I extends Exact<DeepPartial<AudioPipelineConfig>, I>>(object: I): AudioPipelineConfig;
-};
-export declare const VoiceAgentComposeConfig: {
-    encode(message: VoiceAgentComposeConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentComposeConfig;
-    fromJSON(object: any): VoiceAgentComposeConfig;
-    toJSON(message: VoiceAgentComposeConfig): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentComposeConfig>, I>>(base?: I): VoiceAgentComposeConfig;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentComposeConfig>, I>>(object: I): VoiceAgentComposeConfig;
-};
-export declare const VoiceAgentTranscribeProtoRequest: {
-    encode(message: VoiceAgentTranscribeProtoRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTranscribeProtoRequest;
-    fromJSON(object: any): VoiceAgentTranscribeProtoRequest;
-    toJSON(message: VoiceAgentTranscribeProtoRequest): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentTranscribeProtoRequest>, I>>(base?: I): VoiceAgentTranscribeProtoRequest;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentTranscribeProtoRequest>, I>>(object: I): VoiceAgentTranscribeProtoRequest;
-};
-export declare const VoiceAgentSynthesizeSpeechProtoRequest: {
-    encode(message: VoiceAgentSynthesizeSpeechProtoRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentSynthesizeSpeechProtoRequest;
-    fromJSON(object: any): VoiceAgentSynthesizeSpeechProtoRequest;
-    toJSON(message: VoiceAgentSynthesizeSpeechProtoRequest): unknown;
-    create<I extends Exact<DeepPartial<VoiceAgentSynthesizeSpeechProtoRequest>, I>>(base?: I): VoiceAgentSynthesizeSpeechProtoRequest;
-    fromPartial<I extends Exact<DeepPartial<VoiceAgentSynthesizeSpeechProtoRequest>, I>>(object: I): VoiceAgentSynthesizeSpeechProtoRequest;
-};
+export declare const VoiceAgentRequest: MessageFns<VoiceAgentRequest>;
+export declare const VoiceAgentResult: MessageFns<VoiceAgentResult>;
+export declare const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest>;
+export declare const VoiceAgentTurnRequest_MetadataEntry: MessageFns<VoiceAgentTurnRequest_MetadataEntry>;
+export declare const VoiceSessionConfig: MessageFns<VoiceSessionConfig>;
+export declare const AudioPipelineConfig: MessageFns<AudioPipelineConfig>;
+export declare const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig>;
+export declare const VoiceAgentTranscribeProtoRequest: MessageFns<VoiceAgentTranscribeProtoRequest>;
+export declare const VoiceAgentSynthesizeSpeechProtoRequest: MessageFns<VoiceAgentSynthesizeSpeechProtoRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -320,4 +257,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

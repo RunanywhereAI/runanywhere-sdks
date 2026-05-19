@@ -164,10 +164,9 @@ kotlin {
 
     // JVM target for IntelliJ plugins and general JVM usage
     jvm {
-        compilations.all {
-            compilerOptions.configure {
-                freeCompilerArgs.add("-Xsuppress-version-warnings")
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.add("-Xsuppress-version-warnings")
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -184,12 +183,10 @@ kotlin {
             artifactId = "runanywhere-sdk-android"
         }
 
-        compilations.all {
-            compilerOptions.configure {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-                freeCompilerArgs.add("-Xsuppress-version-warnings")
-                freeCompilerArgs.add("-Xno-param-assertions")
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.add("-Xsuppress-version-warnings")
+            freeCompilerArgs.add("-Xno-param-assertions")
         }
     }
 
@@ -351,12 +348,13 @@ tasks.register<Exec>("buildLocalJniLibs") {
             throw GradleException("Missing Android build script: ${buildCoreAndroidScript.absolutePath}")
         }
 
-        // Check if we have existing libs
-        // RAG pipeline is compiled into librac_commons.so; only the thin JNI bridge is separate
+        // Check if we have existing libs.
+        // Core SDK ships ONLY the commons artifacts: librac_commons.so (which embeds
+        // RAG and all in-core features) plus the JNI bridge and the libc++ / libomp
+        // sidecars. Backend plugins live in their own modules' jniLibs.
         val hasMainLibs =
             jniLibsDir.resolve("arm64-v8a/librac_commons.so").exists() &&
                 jniLibsDir.resolve("arm64-v8a/librunanywhere_jni.so").exists() &&
-                jniLibsDir.resolve("arm64-v8a/librac_backend_rag_jni.so").exists() &&
                 jniLibsDir.resolve("arm64-v8a/libc++_shared.so").exists() &&
                 jniLibsDir.resolve("arm64-v8a/libomp.so").exists()
         val hasLlamaCppLibs = llamaCppJniLibsDir.resolve("arm64-v8a/librac_backend_llamacpp_jni.so").exists()

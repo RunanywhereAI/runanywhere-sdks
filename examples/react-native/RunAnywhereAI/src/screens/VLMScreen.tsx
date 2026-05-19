@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
 
   // Model Required Overlay
   modelRequiredOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.overlayMedium,
     justifyContent: 'center',
     alignItems: 'center',

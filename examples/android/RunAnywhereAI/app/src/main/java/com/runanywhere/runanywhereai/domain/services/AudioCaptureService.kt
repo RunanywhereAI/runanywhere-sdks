@@ -41,6 +41,7 @@ class AudioCaptureService(
 
     private var audioRecord: AudioRecord? = null
 
+    @Suppress("ktlint:standard:backing-property-naming")
     private val _isRecording = MutableStateFlow(false)
 
     /**
@@ -58,12 +59,11 @@ class AudioCaptureService(
     /**
      * Check if we have microphone permission
      */
-    fun hasRecordPermission(): Boolean {
-        return ActivityCompat.checkSelfPermission(
+    fun hasRecordPermission(): Boolean =
+        ActivityCompat.checkSelfPermission(
             context,
             Manifest.permission.RECORD_AUDIO,
         ) == PackageManager.PERMISSION_GRANTED
-    }
 
     /**
      * Start capturing audio and emit audio chunks as a Flow
@@ -166,7 +166,8 @@ class AudioCaptureService(
         if (audioData.isEmpty()) return 0f
 
         val shorts =
-            ByteBuffer.wrap(audioData)
+            ByteBuffer
+                .wrap(audioData)
                 .order(ByteOrder.LITTLE_ENDIAN)
                 .asShortBuffer()
 

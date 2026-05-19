@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -339,102 +339,18 @@ export interface TTSServiceState {
     errorMessage?: string | undefined;
     errorCode: number;
 }
-export declare const TTSConfiguration: {
-    encode(message: TTSConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSConfiguration;
-    fromJSON(object: any): TTSConfiguration;
-    toJSON(message: TTSConfiguration): unknown;
-    create<I extends Exact<DeepPartial<TTSConfiguration>, I>>(base?: I): TTSConfiguration;
-    fromPartial<I extends Exact<DeepPartial<TTSConfiguration>, I>>(object: I): TTSConfiguration;
-};
-export declare const TTSOptions: {
-    encode(message: TTSOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSOptions;
-    fromJSON(object: any): TTSOptions;
-    toJSON(message: TTSOptions): unknown;
-    create<I extends Exact<DeepPartial<TTSOptions>, I>>(base?: I): TTSOptions;
-    fromPartial<I extends Exact<DeepPartial<TTSOptions>, I>>(object: I): TTSOptions;
-};
-export declare const TTSSynthesisRequest: {
-    encode(message: TTSSynthesisRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest;
-    fromJSON(object: any): TTSSynthesisRequest;
-    toJSON(message: TTSSynthesisRequest): unknown;
-    create<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(base?: I): TTSSynthesisRequest;
-    fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(object: I): TTSSynthesisRequest;
-};
-export declare const TTSSynthesisRequest_MetadataEntry: {
-    encode(message: TTSSynthesisRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest_MetadataEntry;
-    fromJSON(object: any): TTSSynthesisRequest_MetadataEntry;
-    toJSON(message: TTSSynthesisRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(base?: I): TTSSynthesisRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(object: I): TTSSynthesisRequest_MetadataEntry;
-};
-export declare const TTSPhonemeTimestamp: {
-    encode(message: TTSPhonemeTimestamp, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSPhonemeTimestamp;
-    fromJSON(object: any): TTSPhonemeTimestamp;
-    toJSON(message: TTSPhonemeTimestamp): unknown;
-    create<I extends Exact<DeepPartial<TTSPhonemeTimestamp>, I>>(base?: I): TTSPhonemeTimestamp;
-    fromPartial<I extends Exact<DeepPartial<TTSPhonemeTimestamp>, I>>(object: I): TTSPhonemeTimestamp;
-};
-export declare const TTSSynthesisMetadata: {
-    encode(message: TTSSynthesisMetadata, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisMetadata;
-    fromJSON(object: any): TTSSynthesisMetadata;
-    toJSON(message: TTSSynthesisMetadata): unknown;
-    create<I extends Exact<DeepPartial<TTSSynthesisMetadata>, I>>(base?: I): TTSSynthesisMetadata;
-    fromPartial<I extends Exact<DeepPartial<TTSSynthesisMetadata>, I>>(object: I): TTSSynthesisMetadata;
-};
-export declare const TTSOutput: {
-    encode(message: TTSOutput, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSOutput;
-    fromJSON(object: any): TTSOutput;
-    toJSON(message: TTSOutput): unknown;
-    create<I extends Exact<DeepPartial<TTSOutput>, I>>(base?: I): TTSOutput;
-    fromPartial<I extends Exact<DeepPartial<TTSOutput>, I>>(object: I): TTSOutput;
-};
-export declare const TTSSpeakResult: {
-    encode(message: TTSSpeakResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSpeakResult;
-    fromJSON(object: any): TTSSpeakResult;
-    toJSON(message: TTSSpeakResult): unknown;
-    create<I extends Exact<DeepPartial<TTSSpeakResult>, I>>(base?: I): TTSSpeakResult;
-    fromPartial<I extends Exact<DeepPartial<TTSSpeakResult>, I>>(object: I): TTSSpeakResult;
-};
-export declare const TTSVoiceInfo: {
-    encode(message: TTSVoiceInfo, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSVoiceInfo;
-    fromJSON(object: any): TTSVoiceInfo;
-    toJSON(message: TTSVoiceInfo): unknown;
-    create<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(base?: I): TTSVoiceInfo;
-    fromPartial<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(object: I): TTSVoiceInfo;
-};
-export declare const TTSVoiceList: {
-    encode(message: TTSVoiceList, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSVoiceList;
-    fromJSON(object: any): TTSVoiceList;
-    toJSON(message: TTSVoiceList): unknown;
-    create<I extends Exact<DeepPartial<TTSVoiceList>, I>>(base?: I): TTSVoiceList;
-    fromPartial<I extends Exact<DeepPartial<TTSVoiceList>, I>>(object: I): TTSVoiceList;
-};
-export declare const TTSStreamEvent: {
-    encode(message: TTSStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSStreamEvent;
-    fromJSON(object: any): TTSStreamEvent;
-    toJSON(message: TTSStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(base?: I): TTSStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(object: I): TTSStreamEvent;
-};
-export declare const TTSServiceState: {
-    encode(message: TTSServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TTSServiceState;
-    fromJSON(object: any): TTSServiceState;
-    toJSON(message: TTSServiceState): unknown;
-    create<I extends Exact<DeepPartial<TTSServiceState>, I>>(base?: I): TTSServiceState;
-    fromPartial<I extends Exact<DeepPartial<TTSServiceState>, I>>(object: I): TTSServiceState;
-};
+export declare const TTSConfiguration: MessageFns<TTSConfiguration>;
+export declare const TTSOptions: MessageFns<TTSOptions>;
+export declare const TTSSynthesisRequest: MessageFns<TTSSynthesisRequest>;
+export declare const TTSSynthesisRequest_MetadataEntry: MessageFns<TTSSynthesisRequest_MetadataEntry>;
+export declare const TTSPhonemeTimestamp: MessageFns<TTSPhonemeTimestamp>;
+export declare const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata>;
+export declare const TTSOutput: MessageFns<TTSOutput>;
+export declare const TTSSpeakResult: MessageFns<TTSSpeakResult>;
+export declare const TTSVoiceInfo: MessageFns<TTSVoiceInfo>;
+export declare const TTSVoiceList: MessageFns<TTSVoiceList>;
+export declare const TTSStreamEvent: MessageFns<TTSStreamEvent>;
+export declare const TTSServiceState: MessageFns<TTSServiceState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -445,4 +361,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

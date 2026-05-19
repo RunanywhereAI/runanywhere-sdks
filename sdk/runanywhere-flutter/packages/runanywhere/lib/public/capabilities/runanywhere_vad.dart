@@ -251,7 +251,7 @@ class RunAnywhereVAD {
         channels: 1,
       ),
       options: options,
-      metadata: {'model_id': modelId},
+      metadata: <String, String>{'model_id': modelId}.entries,
     );
     return DartBridgeVAD.shared.processLifecycleProto(request);
   }

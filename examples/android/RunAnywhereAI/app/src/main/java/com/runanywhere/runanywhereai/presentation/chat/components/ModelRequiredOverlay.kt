@@ -254,8 +254,8 @@ fun ModelRequiredOverlay(
     }
 }
 
-private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
-    return when (modality) {
+private fun getModalityIcon(modality: ModelSelectionContext): ImageVector =
+    when (modality) {
         ModelSelectionContext.LLM -> Icons.Default.AutoAwesome
         ModelSelectionContext.STT -> Icons.Default.GraphicEq
         ModelSelectionContext.TTS -> Icons.AutoMirrored.Filled.VolumeUp
@@ -266,10 +266,9 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
         -> Icons.Default.Description
         ModelSelectionContext.VLM -> Icons.Default.Visibility
     }
-}
 
-private fun getModalityColor(modality: ModelSelectionContext): Color {
-    return when (modality) {
+private fun getModalityColor(modality: ModelSelectionContext): Color =
+    when (modality) {
         ModelSelectionContext.LLM -> AppColors.primaryAccent
         ModelSelectionContext.STT -> AppColors.primaryGreen
         ModelSelectionContext.TTS -> AppColors.primaryPurple
@@ -280,10 +279,9 @@ private fun getModalityColor(modality: ModelSelectionContext): Color {
         -> Color(0xFF2196F3)
         ModelSelectionContext.VLM -> AppColors.primaryPurple
     }
-}
 
-private fun getModalityTitle(modality: ModelSelectionContext): String {
-    return when (modality) {
+private fun getModalityTitle(modality: ModelSelectionContext): String =
+    when (modality) {
         ModelSelectionContext.LLM -> "Welcome!"
         ModelSelectionContext.STT -> "Voice to Text"
         ModelSelectionContext.TTS -> "Read Aloud"
@@ -293,10 +291,9 @@ private fun getModalityTitle(modality: ModelSelectionContext): String {
         ModelSelectionContext.RAG_LLM -> "Document Chat"
         ModelSelectionContext.VLM -> "Vision Chat"
     }
-}
 
-private fun getModalityDescription(modality: ModelSelectionContext): String {
-    return when (modality) {
+private fun getModalityDescription(modality: ModelSelectionContext): String =
+    when (modality) {
         ModelSelectionContext.LLM ->
             "Choose your AI assistant and start chatting. Everything runs privately on your device."
         ModelSelectionContext.STT ->
@@ -314,4 +311,3 @@ private fun getModalityDescription(modality: ModelSelectionContext): String {
         ModelSelectionContext.VLM ->
             "Chat with images using your device's camera or photo library."
     }
-}

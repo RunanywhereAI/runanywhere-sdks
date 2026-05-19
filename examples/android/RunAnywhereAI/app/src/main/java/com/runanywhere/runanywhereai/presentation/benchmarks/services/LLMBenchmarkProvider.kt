@@ -64,7 +64,8 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
             val warmupOptions = RALLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
             // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
             withTimeoutOrNull(10_000L) {
-                RunAnywhere.generateStream("Hello", warmupOptions)
+                RunAnywhere
+                    .generateStream("Hello", warmupOptions)
                     .takeWhile { !it.is_final }
                     .collect { _ ->
                         // warmup only primes the model; no metrics needed
@@ -81,7 +82,8 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
             var firstTokenTimeNs: Long? = null
             // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
             withTimeoutOrNull(60_000L) {
-                RunAnywhere.generateStream(prompt, options)
+                RunAnywhere
+                    .generateStream(prompt, options)
                     .takeWhile { !it.is_final }
                     .collect { event ->
                         if (event.token.isNotEmpty()) {

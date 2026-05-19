@@ -746,8 +746,7 @@ fun ModelBadge(
                 .shadow(
                     elevation = Dimensions.shadowSmall,
                     shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
-                )
-                .border(
+                ).border(
                     width = Dimensions.strokeThin,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
@@ -789,7 +788,8 @@ private fun extractThinkingSummary(thinking: String): String {
     if (trimmed.isEmpty()) return "Show reasoning..."
 
     val sentences =
-        trimmed.split(Regex("[.!?]"))
+        trimmed
+            .split(Regex("[.!?]"))
             .map { it.trim() }
             .filter { it.length > 20 }
 
@@ -832,13 +832,11 @@ fun ThinkingProgressIndicator() {
                                     AppColors.primaryPurple.copy(alpha = 0.06f),
                                 ),
                         ),
-                )
-                .border(
+                ).border(
                     width = Dimensions.strokeThin,
                     color = AppColors.primaryPurple.copy(alpha = 0.3f),
                     shape = thinkingShape,
-                )
-                .padding(
+                ).padding(
                     horizontal = Dimensions.mediumLarge,
                     vertical = Dimensions.smallMedium,
                 ),
@@ -868,8 +866,7 @@ fun ThinkingProgressIndicator() {
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
-                            }
-                            .background(
+                            }.background(
                                 color = AppColors.primaryPurple,
                                 shape = CircleShape,
                             ),
@@ -1058,8 +1055,12 @@ fun TypingIndicatorView() {
                     baseColor.copy(alpha = 0.7f),
                     baseColor.copy(alpha = 0.3f),
                 ),
-            start = androidx.compose.ui.geometry.Offset(x = shimmerOffset * 300f, y = 0f),
-            end = androidx.compose.ui.geometry.Offset(x = (shimmerOffset + 0.5f) * 300f, y = 0f),
+            start =
+                androidx.compose.ui.geometry
+                    .Offset(x = shimmerOffset * 300f, y = 0f),
+            end =
+                androidx.compose.ui.geometry
+                    .Offset(x = (shimmerOffset + 0.5f) * 300f, y = 0f),
         )
 
     Row(
@@ -1139,7 +1140,9 @@ fun EmptyStateView(
         Spacer(modifier = Modifier.weight(1f))
 
         // Auto-scrolling prompt suggestions — stops when user touches
-        val promptListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val promptListState =
+            androidx.compose.foundation.lazy
+                .rememberLazyListState()
         var userHasScrolled by remember { mutableStateOf(false) }
 
         // Detect user-initiated scrolling
@@ -1226,8 +1229,7 @@ fun ToolCallingBadge(toolCount: Int) {
                     .background(
                         color = AppColors.primaryAccent.copy(alpha = 0.1f),
                         shape = RoundedCornerShape(6.dp),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ).padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -1557,7 +1559,10 @@ private fun ConversationRow(
                 // Last message preview
                 Text(
                     text =
-                        conversation.messages.lastOrNull()?.content?.take(100)
+                        conversation.messages
+                            .lastOrNull()
+                            ?.content
+                            ?.take(100)
                             ?: "Start a conversation",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

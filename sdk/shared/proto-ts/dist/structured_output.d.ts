@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -376,166 +376,26 @@ export interface SentimentResult {
 export interface NERResult {
     entities: NamedEntity[];
 }
-export declare const JSONSchemaProperty: {
-    encode(message: JSONSchemaProperty, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): JSONSchemaProperty;
-    fromJSON(object: any): JSONSchemaProperty;
-    toJSON(message: JSONSchemaProperty): unknown;
-    create<I extends Exact<DeepPartial<JSONSchemaProperty>, I>>(base?: I): JSONSchemaProperty;
-    fromPartial<I extends Exact<DeepPartial<JSONSchemaProperty>, I>>(object: I): JSONSchemaProperty;
-};
-export declare const JSONSchema: {
-    encode(message: JSONSchema, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): JSONSchema;
-    fromJSON(object: any): JSONSchema;
-    toJSON(message: JSONSchema): unknown;
-    create<I extends Exact<DeepPartial<JSONSchema>, I>>(base?: I): JSONSchema;
-    fromPartial<I extends Exact<DeepPartial<JSONSchema>, I>>(object: I): JSONSchema;
-};
-export declare const JSONSchema_PropertiesEntry: {
-    encode(message: JSONSchema_PropertiesEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): JSONSchema_PropertiesEntry;
-    fromJSON(object: any): JSONSchema_PropertiesEntry;
-    toJSON(message: JSONSchema_PropertiesEntry): unknown;
-    create<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(base?: I): JSONSchema_PropertiesEntry;
-    fromPartial<I extends Exact<DeepPartial<JSONSchema_PropertiesEntry>, I>>(object: I): JSONSchema_PropertiesEntry;
-};
-export declare const JSONSchema_DefinitionsEntry: {
-    encode(message: JSONSchema_DefinitionsEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): JSONSchema_DefinitionsEntry;
-    fromJSON(object: any): JSONSchema_DefinitionsEntry;
-    toJSON(message: JSONSchema_DefinitionsEntry): unknown;
-    create<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(base?: I): JSONSchema_DefinitionsEntry;
-    fromPartial<I extends Exact<DeepPartial<JSONSchema_DefinitionsEntry>, I>>(object: I): JSONSchema_DefinitionsEntry;
-};
-export declare const StructuredOutputOptions: {
-    encode(message: StructuredOutputOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputOptions;
-    fromJSON(object: any): StructuredOutputOptions;
-    toJSON(message: StructuredOutputOptions): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputOptions>, I>>(base?: I): StructuredOutputOptions;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputOptions>, I>>(object: I): StructuredOutputOptions;
-};
-export declare const StructuredOutputValidation: {
-    encode(message: StructuredOutputValidation, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputValidation;
-    fromJSON(object: any): StructuredOutputValidation;
-    toJSON(message: StructuredOutputValidation): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputValidation>, I>>(base?: I): StructuredOutputValidation;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputValidation>, I>>(object: I): StructuredOutputValidation;
-};
-export declare const StructuredOutputResult: {
-    encode(message: StructuredOutputResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputResult;
-    fromJSON(object: any): StructuredOutputResult;
-    toJSON(message: StructuredOutputResult): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputResult>, I>>(base?: I): StructuredOutputResult;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputResult>, I>>(object: I): StructuredOutputResult;
-};
-export declare const StructuredOutputParseRequest: {
-    encode(message: StructuredOutputParseRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest;
-    fromJSON(object: any): StructuredOutputParseRequest;
-    toJSON(message: StructuredOutputParseRequest): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(base?: I): StructuredOutputParseRequest;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(object: I): StructuredOutputParseRequest;
-};
-export declare const StructuredOutputParseRequest_MetadataEntry: {
-    encode(message: StructuredOutputParseRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest_MetadataEntry;
-    fromJSON(object: any): StructuredOutputParseRequest_MetadataEntry;
-    toJSON(message: StructuredOutputParseRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(base?: I): StructuredOutputParseRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(object: I): StructuredOutputParseRequest_MetadataEntry;
-};
-export declare const StructuredOutputValidationRequest: {
-    encode(message: StructuredOutputValidationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputValidationRequest;
-    fromJSON(object: any): StructuredOutputValidationRequest;
-    toJSON(message: StructuredOutputValidationRequest): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(base?: I): StructuredOutputValidationRequest;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(object: I): StructuredOutputValidationRequest;
-};
-export declare const StructuredOutputPromptResult: {
-    encode(message: StructuredOutputPromptResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputPromptResult;
-    fromJSON(object: any): StructuredOutputPromptResult;
-    toJSON(message: StructuredOutputPromptResult): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(base?: I): StructuredOutputPromptResult;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(object: I): StructuredOutputPromptResult;
-};
-export declare const StructuredOutputRequest: {
-    encode(message: StructuredOutputRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest;
-    fromJSON(object: any): StructuredOutputRequest;
-    toJSON(message: StructuredOutputRequest): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(base?: I): StructuredOutputRequest;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(object: I): StructuredOutputRequest;
-};
-export declare const StructuredOutputRequest_MetadataEntry: {
-    encode(message: StructuredOutputRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest_MetadataEntry;
-    fromJSON(object: any): StructuredOutputRequest_MetadataEntry;
-    toJSON(message: StructuredOutputRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(base?: I): StructuredOutputRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(object: I): StructuredOutputRequest_MetadataEntry;
-};
-export declare const StructuredOutputStreamEvent: {
-    encode(message: StructuredOutputStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputStreamEvent;
-    fromJSON(object: any): StructuredOutputStreamEvent;
-    toJSON(message: StructuredOutputStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(base?: I): StructuredOutputStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(object: I): StructuredOutputStreamEvent;
-};
-export declare const NamedEntity: {
-    encode(message: NamedEntity, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): NamedEntity;
-    fromJSON(object: any): NamedEntity;
-    toJSON(message: NamedEntity): unknown;
-    create<I extends Exact<DeepPartial<NamedEntity>, I>>(base?: I): NamedEntity;
-    fromPartial<I extends Exact<DeepPartial<NamedEntity>, I>>(object: I): NamedEntity;
-};
-export declare const EntityExtractionResult: {
-    encode(message: EntityExtractionResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EntityExtractionResult;
-    fromJSON(object: any): EntityExtractionResult;
-    toJSON(message: EntityExtractionResult): unknown;
-    create<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(base?: I): EntityExtractionResult;
-    fromPartial<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(object: I): EntityExtractionResult;
-};
-export declare const ClassificationCandidate: {
-    encode(message: ClassificationCandidate, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ClassificationCandidate;
-    fromJSON(object: any): ClassificationCandidate;
-    toJSON(message: ClassificationCandidate): unknown;
-    create<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(base?: I): ClassificationCandidate;
-    fromPartial<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(object: I): ClassificationCandidate;
-};
-export declare const ClassificationResult: {
-    encode(message: ClassificationResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ClassificationResult;
-    fromJSON(object: any): ClassificationResult;
-    toJSON(message: ClassificationResult): unknown;
-    create<I extends Exact<DeepPartial<ClassificationResult>, I>>(base?: I): ClassificationResult;
-    fromPartial<I extends Exact<DeepPartial<ClassificationResult>, I>>(object: I): ClassificationResult;
-};
-export declare const SentimentResult: {
-    encode(message: SentimentResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SentimentResult;
-    fromJSON(object: any): SentimentResult;
-    toJSON(message: SentimentResult): unknown;
-    create<I extends Exact<DeepPartial<SentimentResult>, I>>(base?: I): SentimentResult;
-    fromPartial<I extends Exact<DeepPartial<SentimentResult>, I>>(object: I): SentimentResult;
-};
-export declare const NERResult: {
-    encode(message: NERResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): NERResult;
-    fromJSON(object: any): NERResult;
-    toJSON(message: NERResult): unknown;
-    create<I extends Exact<DeepPartial<NERResult>, I>>(base?: I): NERResult;
-    fromPartial<I extends Exact<DeepPartial<NERResult>, I>>(object: I): NERResult;
-};
+export declare const JSONSchemaProperty: MessageFns<JSONSchemaProperty>;
+export declare const JSONSchema: MessageFns<JSONSchema>;
+export declare const JSONSchema_PropertiesEntry: MessageFns<JSONSchema_PropertiesEntry>;
+export declare const JSONSchema_DefinitionsEntry: MessageFns<JSONSchema_DefinitionsEntry>;
+export declare const StructuredOutputOptions: MessageFns<StructuredOutputOptions>;
+export declare const StructuredOutputValidation: MessageFns<StructuredOutputValidation>;
+export declare const StructuredOutputResult: MessageFns<StructuredOutputResult>;
+export declare const StructuredOutputParseRequest: MessageFns<StructuredOutputParseRequest>;
+export declare const StructuredOutputParseRequest_MetadataEntry: MessageFns<StructuredOutputParseRequest_MetadataEntry>;
+export declare const StructuredOutputValidationRequest: MessageFns<StructuredOutputValidationRequest>;
+export declare const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResult>;
+export declare const StructuredOutputRequest: MessageFns<StructuredOutputRequest>;
+export declare const StructuredOutputRequest_MetadataEntry: MessageFns<StructuredOutputRequest_MetadataEntry>;
+export declare const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent>;
+export declare const NamedEntity: MessageFns<NamedEntity>;
+export declare const EntityExtractionResult: MessageFns<EntityExtractionResult>;
+export declare const ClassificationCandidate: MessageFns<ClassificationCandidate>;
+export declare const ClassificationResult: MessageFns<ClassificationResult>;
+export declare const SentimentResult: MessageFns<SentimentResult>;
+export declare const NERResult: MessageFns<NERResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -546,4 +406,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

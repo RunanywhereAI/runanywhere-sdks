@@ -85,7 +85,7 @@ export function createRAGNativeProvider(
   if (!adapter) {
     throw SDKException.backendNotAvailable(
       'RAG.nativeProvider',
-      'No Web WASM module is active. Call setRunanywhereModule(...) before creating a native RAG provider.',
+      'No backend is registered for the RAG capability. Call LlamaCPP.register() (or another RAG-providing backend) before creating a native RAG provider.',
     );
   }
   if (!adapter.supportsProtoRAG()) {

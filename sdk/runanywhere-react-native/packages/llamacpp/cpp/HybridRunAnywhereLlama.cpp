@@ -13,7 +13,6 @@
 // Backend registration headers - always available
 extern "C" {
 #include "rac_llm_llamacpp.h"
-#include "rac_vlm_llamacpp.h"
 }
 
 #include "rac/core/rac_error.h"
@@ -26,7 +25,6 @@ extern "C" {
 
 // Log category for this module
 #define LOG_CATEGORY "LLM.LlamaCpp"
-#define VLM_LOG_CATEGORY "VLM.LlamaCpp"
 
 namespace margelo::nitro::runanywhere::llama {
 
@@ -97,54 +95,6 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::unregisterBackend() {
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::isBackendRegistered() {
   return Promise<bool>::async([this]() {
     return isRegistered_;
-  });
-}
-
-// ============================================================================
-// VLM Backend Registration
-// ============================================================================
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerVLMBackend() {
-  return Promise<bool>::async([this]() {
-    RAC_LOG_DEBUG(VLM_LOG_CATEGORY, "Registering LlamaCPP VLM backend with C++ registry");
-
-    // rac_backend_llamacpp_vlm_register() internally registers both the module
-    // and the VLM plugin entry — see
-    // engines/llamacpp/rac_backend_llamacpp_vlm_register.cpp:237-252, which
-    // mirrors the LLM-side dynamic-plugin fix. The RN host therefore does not
-    // need a separate rac_plugin_register() call; the in-engine registration
-    // matches the iOS source-of-truth pattern in LlamaCPPRuntime.
-    rac_result_t result = rac_backend_llamacpp_vlm_register();
-    if (!isRegistrationSuccess(result)) {
-      RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM registration failed with code: %d", result);
-      throw std::runtime_error("LlamaCPP VLM registration failed with error: " + std::to_string(result));
-    }
-
-    RAC_LOG_INFO(VLM_LOG_CATEGORY, "LlamaCPP VLM backend registered successfully");
-    isVLMRegistered_ = true;
-    return true;
-  });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::unregisterVLMBackend() {
-  return Promise<bool>::async([this]() {
-    RAC_LOG_DEBUG(VLM_LOG_CATEGORY, "Unregistering LlamaCPP VLM backend");
-
-    rac_result_t result = rac_backend_llamacpp_vlm_unregister();
-    isVLMRegistered_ = false;
-    if (result == RAC_SUCCESS) {
-      RAC_LOG_INFO(VLM_LOG_CATEGORY, "LlamaCPP VLM backend unregistered");
-      return true;
-    }
-
-    RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM unregistration failed with code: %d", result);
-    throw std::runtime_error("LlamaCPP VLM unregistration failed with error: " + std::to_string(result));
-  });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::isVLMBackendRegistered() {
-  return Promise<bool>::async([this]() {
-    return isVLMRegistered_;
   });
 }
 

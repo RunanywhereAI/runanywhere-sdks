@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -467,94 +467,17 @@ export interface DiffusionServiceState {
     errorMessage?: string | undefined;
     errorCode: number;
 }
-export declare const DiffusionTokenizerSource: {
-    encode(message: DiffusionTokenizerSource, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionTokenizerSource;
-    fromJSON(object: any): DiffusionTokenizerSource;
-    toJSON(message: DiffusionTokenizerSource): unknown;
-    create<I extends Exact<DeepPartial<DiffusionTokenizerSource>, I>>(base?: I): DiffusionTokenizerSource;
-    fromPartial<I extends Exact<DeepPartial<DiffusionTokenizerSource>, I>>(object: I): DiffusionTokenizerSource;
-};
-export declare const DiffusionConfiguration: {
-    encode(message: DiffusionConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionConfiguration;
-    fromJSON(object: any): DiffusionConfiguration;
-    toJSON(message: DiffusionConfiguration): unknown;
-    create<I extends Exact<DeepPartial<DiffusionConfiguration>, I>>(base?: I): DiffusionConfiguration;
-    fromPartial<I extends Exact<DeepPartial<DiffusionConfiguration>, I>>(object: I): DiffusionConfiguration;
-};
-export declare const DiffusionConfig: {
-    encode(message: DiffusionConfig, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionConfig;
-    fromJSON(object: any): DiffusionConfig;
-    toJSON(message: DiffusionConfig): unknown;
-    create<I extends Exact<DeepPartial<DiffusionConfig>, I>>(base?: I): DiffusionConfig;
-    fromPartial<I extends Exact<DeepPartial<DiffusionConfig>, I>>(object: I): DiffusionConfig;
-};
-export declare const DiffusionGenerationOptions: {
-    encode(message: DiffusionGenerationOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionGenerationOptions;
-    fromJSON(object: any): DiffusionGenerationOptions;
-    toJSON(message: DiffusionGenerationOptions): unknown;
-    create<I extends Exact<DeepPartial<DiffusionGenerationOptions>, I>>(base?: I): DiffusionGenerationOptions;
-    fromPartial<I extends Exact<DeepPartial<DiffusionGenerationOptions>, I>>(object: I): DiffusionGenerationOptions;
-};
-export declare const DiffusionGenerationRequest: {
-    encode(message: DiffusionGenerationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionGenerationRequest;
-    fromJSON(object: any): DiffusionGenerationRequest;
-    toJSON(message: DiffusionGenerationRequest): unknown;
-    create<I extends Exact<DeepPartial<DiffusionGenerationRequest>, I>>(base?: I): DiffusionGenerationRequest;
-    fromPartial<I extends Exact<DeepPartial<DiffusionGenerationRequest>, I>>(object: I): DiffusionGenerationRequest;
-};
-export declare const DiffusionGenerationRequest_MetadataEntry: {
-    encode(message: DiffusionGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionGenerationRequest_MetadataEntry;
-    fromJSON(object: any): DiffusionGenerationRequest_MetadataEntry;
-    toJSON(message: DiffusionGenerationRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<DiffusionGenerationRequest_MetadataEntry>, I>>(base?: I): DiffusionGenerationRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<DiffusionGenerationRequest_MetadataEntry>, I>>(object: I): DiffusionGenerationRequest_MetadataEntry;
-};
-export declare const DiffusionProgress: {
-    encode(message: DiffusionProgress, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionProgress;
-    fromJSON(object: any): DiffusionProgress;
-    toJSON(message: DiffusionProgress): unknown;
-    create<I extends Exact<DeepPartial<DiffusionProgress>, I>>(base?: I): DiffusionProgress;
-    fromPartial<I extends Exact<DeepPartial<DiffusionProgress>, I>>(object: I): DiffusionProgress;
-};
-export declare const DiffusionResult: {
-    encode(message: DiffusionResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionResult;
-    fromJSON(object: any): DiffusionResult;
-    toJSON(message: DiffusionResult): unknown;
-    create<I extends Exact<DeepPartial<DiffusionResult>, I>>(base?: I): DiffusionResult;
-    fromPartial<I extends Exact<DeepPartial<DiffusionResult>, I>>(object: I): DiffusionResult;
-};
-export declare const DiffusionCapabilities: {
-    encode(message: DiffusionCapabilities, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionCapabilities;
-    fromJSON(object: any): DiffusionCapabilities;
-    toJSON(message: DiffusionCapabilities): unknown;
-    create<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(base?: I): DiffusionCapabilities;
-    fromPartial<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(object: I): DiffusionCapabilities;
-};
-export declare const DiffusionStreamEvent: {
-    encode(message: DiffusionStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionStreamEvent;
-    fromJSON(object: any): DiffusionStreamEvent;
-    toJSON(message: DiffusionStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<DiffusionStreamEvent>, I>>(base?: I): DiffusionStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<DiffusionStreamEvent>, I>>(object: I): DiffusionStreamEvent;
-};
-export declare const DiffusionServiceState: {
-    encode(message: DiffusionServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionServiceState;
-    fromJSON(object: any): DiffusionServiceState;
-    toJSON(message: DiffusionServiceState): unknown;
-    create<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(base?: I): DiffusionServiceState;
-    fromPartial<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(object: I): DiffusionServiceState;
-};
+export declare const DiffusionTokenizerSource: MessageFns<DiffusionTokenizerSource>;
+export declare const DiffusionConfiguration: MessageFns<DiffusionConfiguration>;
+export declare const DiffusionConfig: MessageFns<DiffusionConfig>;
+export declare const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions>;
+export declare const DiffusionGenerationRequest: MessageFns<DiffusionGenerationRequest>;
+export declare const DiffusionGenerationRequest_MetadataEntry: MessageFns<DiffusionGenerationRequest_MetadataEntry>;
+export declare const DiffusionProgress: MessageFns<DiffusionProgress>;
+export declare const DiffusionResult: MessageFns<DiffusionResult>;
+export declare const DiffusionCapabilities: MessageFns<DiffusionCapabilities>;
+export declare const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent>;
+export declare const DiffusionServiceState: MessageFns<DiffusionServiceState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -565,4 +488,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

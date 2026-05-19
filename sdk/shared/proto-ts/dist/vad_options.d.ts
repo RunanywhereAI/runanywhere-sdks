@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -331,86 +331,16 @@ export interface VADServiceState {
     errorMessage?: string | undefined;
     errorCode: number;
 }
-export declare const VADConfiguration: {
-    encode(message: VADConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADConfiguration;
-    fromJSON(object: any): VADConfiguration;
-    toJSON(message: VADConfiguration): unknown;
-    create<I extends Exact<DeepPartial<VADConfiguration>, I>>(base?: I): VADConfiguration;
-    fromPartial<I extends Exact<DeepPartial<VADConfiguration>, I>>(object: I): VADConfiguration;
-};
-export declare const VADOptions: {
-    encode(message: VADOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADOptions;
-    fromJSON(object: any): VADOptions;
-    toJSON(message: VADOptions): unknown;
-    create<I extends Exact<DeepPartial<VADOptions>, I>>(base?: I): VADOptions;
-    fromPartial<I extends Exact<DeepPartial<VADOptions>, I>>(object: I): VADOptions;
-};
-export declare const VADAudioSource: {
-    encode(message: VADAudioSource, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADAudioSource;
-    fromJSON(object: any): VADAudioSource;
-    toJSON(message: VADAudioSource): unknown;
-    create<I extends Exact<DeepPartial<VADAudioSource>, I>>(base?: I): VADAudioSource;
-    fromPartial<I extends Exact<DeepPartial<VADAudioSource>, I>>(object: I): VADAudioSource;
-};
-export declare const VADProcessRequest: {
-    encode(message: VADProcessRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADProcessRequest;
-    fromJSON(object: any): VADProcessRequest;
-    toJSON(message: VADProcessRequest): unknown;
-    create<I extends Exact<DeepPartial<VADProcessRequest>, I>>(base?: I): VADProcessRequest;
-    fromPartial<I extends Exact<DeepPartial<VADProcessRequest>, I>>(object: I): VADProcessRequest;
-};
-export declare const VADProcessRequest_MetadataEntry: {
-    encode(message: VADProcessRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADProcessRequest_MetadataEntry;
-    fromJSON(object: any): VADProcessRequest_MetadataEntry;
-    toJSON(message: VADProcessRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<VADProcessRequest_MetadataEntry>, I>>(base?: I): VADProcessRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<VADProcessRequest_MetadataEntry>, I>>(object: I): VADProcessRequest_MetadataEntry;
-};
-export declare const VADResult: {
-    encode(message: VADResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADResult;
-    fromJSON(object: any): VADResult;
-    toJSON(message: VADResult): unknown;
-    create<I extends Exact<DeepPartial<VADResult>, I>>(base?: I): VADResult;
-    fromPartial<I extends Exact<DeepPartial<VADResult>, I>>(object: I): VADResult;
-};
-export declare const VADStatistics: {
-    encode(message: VADStatistics, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADStatistics;
-    fromJSON(object: any): VADStatistics;
-    toJSON(message: VADStatistics): unknown;
-    create<I extends Exact<DeepPartial<VADStatistics>, I>>(base?: I): VADStatistics;
-    fromPartial<I extends Exact<DeepPartial<VADStatistics>, I>>(object: I): VADStatistics;
-};
-export declare const SpeechActivityEvent: {
-    encode(message: SpeechActivityEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SpeechActivityEvent;
-    fromJSON(object: any): SpeechActivityEvent;
-    toJSON(message: SpeechActivityEvent): unknown;
-    create<I extends Exact<DeepPartial<SpeechActivityEvent>, I>>(base?: I): SpeechActivityEvent;
-    fromPartial<I extends Exact<DeepPartial<SpeechActivityEvent>, I>>(object: I): SpeechActivityEvent;
-};
-export declare const VADStreamEvent: {
-    encode(message: VADStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADStreamEvent;
-    fromJSON(object: any): VADStreamEvent;
-    toJSON(message: VADStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<VADStreamEvent>, I>>(base?: I): VADStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<VADStreamEvent>, I>>(object: I): VADStreamEvent;
-};
-export declare const VADServiceState: {
-    encode(message: VADServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VADServiceState;
-    fromJSON(object: any): VADServiceState;
-    toJSON(message: VADServiceState): unknown;
-    create<I extends Exact<DeepPartial<VADServiceState>, I>>(base?: I): VADServiceState;
-    fromPartial<I extends Exact<DeepPartial<VADServiceState>, I>>(object: I): VADServiceState;
-};
+export declare const VADConfiguration: MessageFns<VADConfiguration>;
+export declare const VADOptions: MessageFns<VADOptions>;
+export declare const VADAudioSource: MessageFns<VADAudioSource>;
+export declare const VADProcessRequest: MessageFns<VADProcessRequest>;
+export declare const VADProcessRequest_MetadataEntry: MessageFns<VADProcessRequest_MetadataEntry>;
+export declare const VADResult: MessageFns<VADResult>;
+export declare const VADStatistics: MessageFns<VADStatistics>;
+export declare const SpeechActivityEvent: MessageFns<SpeechActivityEvent>;
+export declare const VADStreamEvent: MessageFns<VADStreamEvent>;
+export declare const VADServiceState: MessageFns<VADServiceState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -421,4 +351,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

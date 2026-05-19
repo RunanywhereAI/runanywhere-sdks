@@ -29,12 +29,21 @@ int initialize(JavaVM* vm) {
   });
 }
 
+struct JHybridRunAnywhereDeviceInfoSpecImpl: public jni::JavaClass<JHybridRunAnywhereDeviceInfoSpecImpl, JHybridRunAnywhereDeviceInfoSpec::JavaPart> {
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo;";
+  static std::shared_ptr<JHybridRunAnywhereDeviceInfoSpec> create() {
+    static const auto constructorFn = javaClassStatic()->getConstructor<JHybridRunAnywhereDeviceInfoSpecImpl::javaobject()>();
+    jni::local_ref<JHybridRunAnywhereDeviceInfoSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
+    return javaPart->getJHybridRunAnywhereDeviceInfoSpec();
+  }
+};
+
 void registerAllNatives() {
   using namespace margelo::nitro;
   using namespace margelo::nitro::runanywhere;
 
   // Register native JNI methods
-  margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
+  margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::CxxPart::registerNatives();
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(
@@ -49,9 +58,7 @@ void registerAllNatives() {
   HybridObjectRegistry::registerHybridObjectConstructor(
     "RunAnywhereDeviceInfo",
     []() -> std::shared_ptr<HybridObject> {
-      static DefaultConstructableObject<JHybridRunAnywhereDeviceInfoSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo");
-      auto instance = object.create();
-      return instance->cthis()->shared();
+      return JHybridRunAnywhereDeviceInfoSpecImpl::create();
     }
   );
   HybridObjectRegistry::registerHybridObjectConstructor(

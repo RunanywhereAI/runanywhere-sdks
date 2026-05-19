@@ -22,9 +22,8 @@ import {
 
 export class VADProtoAdapter {
   static tryDefault(): VADProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new VADProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.vad;
+    return mod ? new VADProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

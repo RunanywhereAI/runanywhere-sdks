@@ -3,9 +3,9 @@
  *
  * Loads `racommons-llamacpp.wasm` (CPU) or `racommons-llamacpp-webgpu.wasm` (WebGPU)
  * as a fully independent Emscripten module, registers the platform adapter,
- * runs `rac_init`, registers the llama.cpp + llama.cpp-VLM backends, then
- * installs the loaded module on every core proto-byte adapter through
- * `setRunanywhereModule(...)`.
+ * runs `rac_init`, registers the unified llama.cpp backend (LLM + VLM in a
+ * single call), then installs the loaded module on every core proto-byte
+ * adapter through `setRunanywhereModule(...)`.
  *
  * This is intentionally MINIMAL — the heavy lifting (LLM/VLM/structured/tool
  * calling/embeddings/diffusion) flows through `@runanywhere/web` core's
@@ -16,15 +16,15 @@
 import {
   completeNativePhase1ForModule,
   HTTPAdapter,
-  ModelRegistryAdapter,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKErrorCode,
   SDKLogger,
-  clearRunanywhereModule,
-  setRunanywhereModule,
+  registerWasmModule,
+  unregisterWasmModule,
   type AccelerationMode,
   type EmscriptenRunanywhereModule,
+  type WasmCapability,
 } from '@runanywhere/web/internal';
 
 import { PlatformAdapter } from './PlatformAdapter';
@@ -58,9 +58,10 @@ export interface LlamaCppModule extends EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_config_platform_adapter?(): number;
   _rac_wasm_offsetof_config_log_level?(): number;
 
-  // Backend registration entry points
-  _rac_backend_llamacpp_register?(): number;
-  _rac_backend_llamacpp_vlm_register?(): number;
+  // Backend registration entry point — the unified llama.cpp backend
+  // (LLM + VLM) is the SOLE reason this artifact exists, so the export is
+  // required. The bridge fails fast if it is missing.
+  _rac_backend_llamacpp_register(): number;
 
   // Emscripten runtime helpers (loose-typed; not on the core proto module surface)
   setValue(ptr: number, value: number, type: string): void;
@@ -121,7 +122,6 @@ export class LlamaCppBridge {
   private _loading: Promise<void> | null = null;
   private _accelerationMode: AccelerationMode = 'cpu';
   private _platformAdapter: PlatformAdapter | null = null;
-  private _vlmRegistered = false;
 
   /** Override the default URL to the racommons-llamacpp.js glue file (CPU). */
   wasmUrl: string | null = null;
@@ -154,12 +154,13 @@ export class LlamaCppBridge {
   }
 
   /**
-   * Whether `rac_backend_llamacpp_vlm_register()` was successfully called for
-   * the currently-loaded module. Mirrors Swift's `isVLMRegistered` gate so
-   * VLM consumers can fail fast when the WASM artifact has no VLM backend.
+   * Whether the unified llama.cpp backend is registered. The C++ layer was
+   * unified so a single `rac_backend_llamacpp_register()` call wires both
+   * the LLM and VLM modalities — VLM is always available alongside LLM
+   * when the backend registration succeeds.
    */
   get isVLMRegistered(): boolean {
-    return this._vlmRegistered;
+    return this._loaded;
   }
 
   // -----------------------------------------------------------------------
@@ -212,14 +213,17 @@ export class LlamaCppBridge {
       try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
       this._platformAdapter = null;
     }
-    HTTPAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
-    clearRunanywhereModule();
+    // Drop this module from the capability registry — leaves the commons
+    // module (and any sibling backend, e.g. ONNX) untouched. Per-capability
+    // semantics: only capability slots that point at THIS module are
+    // released.
+    if (this._module) {
+      unregisterWasmModule(this._module);
+    }
     this._module = null;
     this._loaded = false;
     this._loading = null;
     this._accelerationMode = 'cpu';
-    this._vlmRegistered = false;
   }
 
   private async _doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
@@ -281,14 +285,35 @@ export class LlamaCppBridge {
       await this._initRACommons(this._platformAdapter.getAdapterPtr());
       completeNativePhase1ForModule(this._module);
 
-      // Register the llama.cpp backend (and the VLM variant if available).
+      // Register the unified llama.cpp backend (LLM + VLM in one call).
       await this._registerBackend();
 
-      // Install the module on every core adapter so proto-byte calls can find
-      // it without taking a hard dependency on this backend package.
-      setRunanywhereModule(this._module);
-      HTTPAdapter.setDefaultModule(this._module);
-      ModelRegistryAdapter.setDefaultModule(this._module);
+      // Register against the capabilities this artifact actually serves.
+      // The llama.cpp module also has the commons C++ code linked in (every
+      // backend WASM does), but the SDK facade routes commons-level calls
+      // (init, model registry, lifecycle, events) to the dedicated core
+      // WASM via `registerWasmModule(['commons'], …)` — so we deliberately
+      // do NOT claim 'commons' here. That keeps `RunAnywhere.initialize()`
+      // and sibling-backend lookups stable across LlamaCPP.register() +
+      // ONNX.register() in either order.
+      const capabilities: WasmCapability[] = [
+        'llm',
+        'vlm',
+        'embedding',
+        'rag',
+        'diffusion',
+        'structured-output',
+        'tool-calling',
+        'lora',
+      ];
+      registerWasmModule(capabilities, this._module);
+      // HTTP transport — commons-level adapter. Install if no other
+      // backend has bound it yet. ModelLifecycleAdapter + ModelRegistryAdapter
+      // are bound by `registerWasmModule` because model load requires the
+      // plugin registry that lives in this module (commons has no plugins).
+      if (!HTTPAdapter.tryDefault()) {
+        HTTPAdapter.setDefaultModule(this._module);
+      }
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
@@ -415,13 +440,13 @@ export class LlamaCppBridge {
   }
 
   /**
-   * Register the llama.cpp LLM backend (required) and the VLM backend
-   * (optional, tracked separately). Mirrors the Swift LlamaCPP runtime
-   * gate at sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPP.swift:
-   * a missing LLM export or a non-success / non-already-registered return
-   * code from `rac_backend_llamacpp_register()` aborts module installation
-   * so callers never see `LlamaCPP.isRegistered === true` against a stale
-   * or partially linked WASM artifact.
+   * Register the unified llama.cpp backend. The C++ layer was unified so a
+   * single `rac_backend_llamacpp_register()` call wires both the LLM and
+   * VLM modalities — VLM is always available alongside LLM once registration
+   * succeeds. A missing export or a non-success / non-already-registered
+   * return code aborts module installation so callers never see
+   * `LlamaCPP.isRegistered === true` against a stale or partially linked
+   * WASM artifact.
    */
   private async _registerBackend(): Promise<void> {
     const m = this._module!;
@@ -450,40 +475,9 @@ export class LlamaCppBridge {
     }
     logger.info(
       llmResult === RAC_ERROR_MODULE_ALREADY_REGISTERED
-        ? 'llama.cpp backend already registered (treated as success)'
-        : 'llama.cpp backend registered',
+        ? 'llama.cpp backend already registered (treated as success; LLM + VLM)'
+        : 'llama.cpp backend registered (LLM + VLM)',
     );
-
-    // VLM is optional. Track it on a separate flag so consumers can
-    // distinguish "LLM only" from "LLM + VLM" instead of silently exposing
-    // a VLM provider over a backend that never registered. Mirrors
-    // Swift's `isVLMRegistered` field.
-    this._vlmRegistered = false;
-    if (typeof m._rac_backend_llamacpp_vlm_register === 'function') {
-      const vlmResult = (await m.ccall(
-        'rac_backend_llamacpp_vlm_register',
-        'number',
-        [],
-        [],
-        { async: true },
-      )) as number;
-      if (vlmResult === 0 || vlmResult === RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        this._vlmRegistered = true;
-        logger.info(
-          vlmResult === RAC_ERROR_MODULE_ALREADY_REGISTERED
-            ? 'llama.cpp VLM backend already registered (treated as success)'
-            : 'llama.cpp VLM backend registered',
-        );
-      } else {
-        logger.warning(
-          `llama.cpp VLM backend registration returned ${vlmResult}; VLM features will not be available.`,
-        );
-      }
-    } else {
-      logger.info(
-        'WASM module does not export _rac_backend_llamacpp_vlm_register; VLM features disabled.',
-      );
-    }
   }
 
   // -----------------------------------------------------------------------

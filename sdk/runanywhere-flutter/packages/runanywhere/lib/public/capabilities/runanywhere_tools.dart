@@ -414,7 +414,7 @@ abstract final class ToolValues {
       ToolValue(arrayValue: ToolValueArray(values: values));
 
   static ToolValue object(Map<String, ToolValue> fields) =>
-      ToolValue(objectValue: ToolValueObject(fields: fields));
+      ToolValue(objectValue: ToolValueObject(fields: fields.entries));
 
   static String toJSONString(ToolValue value) =>
       DartBridgeToolCalling.shared.toolValueToJson(value);
@@ -430,7 +430,7 @@ abstract final class ToolValues {
   }
 
   static String jsonStringFromObject(Map<String, ToolValue> object) =>
-      toJSONString(ToolValue(objectValue: ToolValueObject(fields: object)));
+      toJSONString(ToolValue(objectValue: ToolValueObject(fields: object.entries)));
 }
 
 extension ToolValueAccessors on ToolValue {

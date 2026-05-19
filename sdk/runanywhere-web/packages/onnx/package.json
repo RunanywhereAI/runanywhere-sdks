@@ -26,7 +26,7 @@
     "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/sherpa/sherpa-onnx-glue.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-glue.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx.wasm || (echo 'ERROR: wasm/sherpa/sherpa-onnx.wasm missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-asr.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-asr.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-tts.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-tts.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1); test -f wasm/sherpa/sherpa-onnx-vad.js || (echo 'ERROR: wasm/sherpa/sherpa-onnx-vad.js missing. Run ./wasm/scripts/build-sherpa-onnx.sh from sdk/runanywhere-web.' && exit 1)"
+    "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/racommons-onnx-sherpa.js || (echo 'ERROR: wasm/racommons-onnx-sherpa.js missing. Run npm run build:wasm -- --onnx from sdk/runanywhere-web.' && exit 1); test -f wasm/racommons-onnx-sherpa.wasm || (echo 'ERROR: wasm/racommons-onnx-sherpa.wasm missing. Run npm run build:wasm -- --onnx from sdk/runanywhere-web.' && exit 1)"
   },
   "keywords": [
     "runanywhere",
@@ -59,18 +59,12 @@
     "node": ">=18.0.0"
   },
   "peerDependencies": {
-    "@runanywhere/web": ">=0.19.13 <1",
-    "@runanywhere/web-llamacpp": ">=0.19.13 <1"
-  },
-  "peerDependenciesMeta": {
-    "@runanywhere/web-llamacpp": {
-      "optional": true
-    }
+    "@runanywhere/web": ">=0.19.13 <1"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
     "eslint": "^9.39.4",
-    "@eslint/js": "^9.0.0",
-    "typescript-eslint": "^8.59.3"
+    "@eslint/js": "^9.39.4",
+    "typescript-eslint": "^8.59.4"
   }
 }

@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
@@ -939,318 +939,45 @@ export interface RegisterModelFromUrlRequest {
     /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
     source?: ModelSource | undefined;
 }
-export declare const ModelInfoMetadata: {
-    encode(message: ModelInfoMetadata, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMetadata;
-    fromJSON(object: any): ModelInfoMetadata;
-    toJSON(message: ModelInfoMetadata): unknown;
-    create<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(base?: I): ModelInfoMetadata;
-    fromPartial<I extends Exact<DeepPartial<ModelInfoMetadata>, I>>(object: I): ModelInfoMetadata;
-};
-export declare const ModelRuntimeCompatibility: {
-    encode(message: ModelRuntimeCompatibility, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRuntimeCompatibility;
-    fromJSON(object: any): ModelRuntimeCompatibility;
-    toJSON(message: ModelRuntimeCompatibility): unknown;
-    create<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(base?: I): ModelRuntimeCompatibility;
-    fromPartial<I extends Exact<DeepPartial<ModelRuntimeCompatibility>, I>>(object: I): ModelRuntimeCompatibility;
-};
-export declare const ModelInfo: {
-    encode(message: ModelInfo, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfo;
-    fromJSON(object: any): ModelInfo;
-    toJSON(message: ModelInfo): unknown;
-    create<I extends Exact<DeepPartial<ModelInfo>, I>>(base?: I): ModelInfo;
-    fromPartial<I extends Exact<DeepPartial<ModelInfo>, I>>(object: I): ModelInfo;
-};
-export declare const ModelInfoList: {
-    encode(message: ModelInfoList, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoList;
-    fromJSON(object: any): ModelInfoList;
-    toJSON(message: ModelInfoList): unknown;
-    create<I extends Exact<DeepPartial<ModelInfoList>, I>>(base?: I): ModelInfoList;
-    fromPartial<I extends Exact<DeepPartial<ModelInfoList>, I>>(object: I): ModelInfoList;
-};
-export declare const SingleFileArtifact: {
-    encode(message: SingleFileArtifact, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SingleFileArtifact;
-    fromJSON(object: any): SingleFileArtifact;
-    toJSON(message: SingleFileArtifact): unknown;
-    create<I extends Exact<DeepPartial<SingleFileArtifact>, I>>(base?: I): SingleFileArtifact;
-    fromPartial<I extends Exact<DeepPartial<SingleFileArtifact>, I>>(object: I): SingleFileArtifact;
-};
-export declare const ArchiveArtifact: {
-    encode(message: ArchiveArtifact, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ArchiveArtifact;
-    fromJSON(object: any): ArchiveArtifact;
-    toJSON(message: ArchiveArtifact): unknown;
-    create<I extends Exact<DeepPartial<ArchiveArtifact>, I>>(base?: I): ArchiveArtifact;
-    fromPartial<I extends Exact<DeepPartial<ArchiveArtifact>, I>>(object: I): ArchiveArtifact;
-};
-export declare const ModelFileDescriptor: {
-    encode(message: ModelFileDescriptor, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelFileDescriptor;
-    fromJSON(object: any): ModelFileDescriptor;
-    toJSON(message: ModelFileDescriptor): unknown;
-    create<I extends Exact<DeepPartial<ModelFileDescriptor>, I>>(base?: I): ModelFileDescriptor;
-    fromPartial<I extends Exact<DeepPartial<ModelFileDescriptor>, I>>(object: I): ModelFileDescriptor;
-};
-export declare const MultiFileArtifact: {
-    encode(message: MultiFileArtifact, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): MultiFileArtifact;
-    fromJSON(object: any): MultiFileArtifact;
-    toJSON(message: MultiFileArtifact): unknown;
-    create<I extends Exact<DeepPartial<MultiFileArtifact>, I>>(base?: I): MultiFileArtifact;
-    fromPartial<I extends Exact<DeepPartial<MultiFileArtifact>, I>>(object: I): MultiFileArtifact;
-};
-export declare const ExpectedModelFiles: {
-    encode(message: ExpectedModelFiles, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ExpectedModelFiles;
-    fromJSON(object: any): ExpectedModelFiles;
-    toJSON(message: ExpectedModelFiles): unknown;
-    create<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(base?: I): ExpectedModelFiles;
-    fromPartial<I extends Exact<DeepPartial<ExpectedModelFiles>, I>>(object: I): ExpectedModelFiles;
-};
-export declare const ModelQuery: {
-    encode(message: ModelQuery, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelQuery;
-    fromJSON(object: any): ModelQuery;
-    toJSON(message: ModelQuery): unknown;
-    create<I extends Exact<DeepPartial<ModelQuery>, I>>(base?: I): ModelQuery;
-    fromPartial<I extends Exact<DeepPartial<ModelQuery>, I>>(object: I): ModelQuery;
-};
-export declare const ModelRegistryRefreshRequest: {
-    encode(message: ModelRegistryRefreshRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshRequest;
-    fromJSON(object: any): ModelRegistryRefreshRequest;
-    toJSON(message: ModelRegistryRefreshRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(base?: I): ModelRegistryRefreshRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshRequest>, I>>(object: I): ModelRegistryRefreshRequest;
-};
-export declare const ModelRegistryRefreshResult: {
-    encode(message: ModelRegistryRefreshResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryRefreshResult;
-    fromJSON(object: any): ModelRegistryRefreshResult;
-    toJSON(message: ModelRegistryRefreshResult): unknown;
-    create<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(base?: I): ModelRegistryRefreshResult;
-    fromPartial<I extends Exact<DeepPartial<ModelRegistryRefreshResult>, I>>(object: I): ModelRegistryRefreshResult;
-};
-export declare const ModelListRequest: {
-    encode(message: ModelListRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelListRequest;
-    fromJSON(object: any): ModelListRequest;
-    toJSON(message: ModelListRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelListRequest>, I>>(base?: I): ModelListRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelListRequest>, I>>(object: I): ModelListRequest;
-};
-export declare const ModelListResult: {
-    encode(message: ModelListResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelListResult;
-    fromJSON(object: any): ModelListResult;
-    toJSON(message: ModelListResult): unknown;
-    create<I extends Exact<DeepPartial<ModelListResult>, I>>(base?: I): ModelListResult;
-    fromPartial<I extends Exact<DeepPartial<ModelListResult>, I>>(object: I): ModelListResult;
-};
-export declare const ModelGetRequest: {
-    encode(message: ModelGetRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetRequest;
-    fromJSON(object: any): ModelGetRequest;
-    toJSON(message: ModelGetRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelGetRequest>, I>>(base?: I): ModelGetRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelGetRequest>, I>>(object: I): ModelGetRequest;
-};
-export declare const ModelGetResult: {
-    encode(message: ModelGetResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelGetResult;
-    fromJSON(object: any): ModelGetResult;
-    toJSON(message: ModelGetResult): unknown;
-    create<I extends Exact<DeepPartial<ModelGetResult>, I>>(base?: I): ModelGetResult;
-    fromPartial<I extends Exact<DeepPartial<ModelGetResult>, I>>(object: I): ModelGetResult;
-};
-export declare const ModelImportRequest: {
-    encode(message: ModelImportRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportRequest;
-    fromJSON(object: any): ModelImportRequest;
-    toJSON(message: ModelImportRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelImportRequest>, I>>(base?: I): ModelImportRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelImportRequest>, I>>(object: I): ModelImportRequest;
-};
-export declare const ModelImportResult: {
-    encode(message: ModelImportResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelImportResult;
-    fromJSON(object: any): ModelImportResult;
-    toJSON(message: ModelImportResult): unknown;
-    create<I extends Exact<DeepPartial<ModelImportResult>, I>>(base?: I): ModelImportResult;
-    fromPartial<I extends Exact<DeepPartial<ModelImportResult>, I>>(object: I): ModelImportResult;
-};
-export declare const ModelDiscoveryRequest: {
-    encode(message: ModelDiscoveryRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryRequest;
-    fromJSON(object: any): ModelDiscoveryRequest;
-    toJSON(message: ModelDiscoveryRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(base?: I): ModelDiscoveryRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelDiscoveryRequest>, I>>(object: I): ModelDiscoveryRequest;
-};
-export declare const DiscoveredModel: {
-    encode(message: DiscoveredModel, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DiscoveredModel;
-    fromJSON(object: any): DiscoveredModel;
-    toJSON(message: DiscoveredModel): unknown;
-    create<I extends Exact<DeepPartial<DiscoveredModel>, I>>(base?: I): DiscoveredModel;
-    fromPartial<I extends Exact<DeepPartial<DiscoveredModel>, I>>(object: I): DiscoveredModel;
-};
-export declare const ModelDiscoveryResult: {
-    encode(message: ModelDiscoveryResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDiscoveryResult;
-    fromJSON(object: any): ModelDiscoveryResult;
-    toJSON(message: ModelDiscoveryResult): unknown;
-    create<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(base?: I): ModelDiscoveryResult;
-    fromPartial<I extends Exact<DeepPartial<ModelDiscoveryResult>, I>>(object: I): ModelDiscoveryResult;
-};
-export declare const ModelLoadRequest: {
-    encode(message: ModelLoadRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadRequest;
-    fromJSON(object: any): ModelLoadRequest;
-    toJSON(message: ModelLoadRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(base?: I): ModelLoadRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelLoadRequest>, I>>(object: I): ModelLoadRequest;
-};
-export declare const ModelLoadResult: {
-    encode(message: ModelLoadResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelLoadResult;
-    fromJSON(object: any): ModelLoadResult;
-    toJSON(message: ModelLoadResult): unknown;
-    create<I extends Exact<DeepPartial<ModelLoadResult>, I>>(base?: I): ModelLoadResult;
-    fromPartial<I extends Exact<DeepPartial<ModelLoadResult>, I>>(object: I): ModelLoadResult;
-};
-export declare const ModelUnloadRequest: {
-    encode(message: ModelUnloadRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadRequest;
-    fromJSON(object: any): ModelUnloadRequest;
-    toJSON(message: ModelUnloadRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(base?: I): ModelUnloadRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelUnloadRequest>, I>>(object: I): ModelUnloadRequest;
-};
-export declare const ModelUnloadResult: {
-    encode(message: ModelUnloadResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelUnloadResult;
-    fromJSON(object: any): ModelUnloadResult;
-    toJSON(message: ModelUnloadResult): unknown;
-    create<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(base?: I): ModelUnloadResult;
-    fromPartial<I extends Exact<DeepPartial<ModelUnloadResult>, I>>(object: I): ModelUnloadResult;
-};
-export declare const CurrentModelRequest: {
-    encode(message: CurrentModelRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelRequest;
-    fromJSON(object: any): CurrentModelRequest;
-    toJSON(message: CurrentModelRequest): unknown;
-    create<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(base?: I): CurrentModelRequest;
-    fromPartial<I extends Exact<DeepPartial<CurrentModelRequest>, I>>(object: I): CurrentModelRequest;
-};
-export declare const CurrentModelResult: {
-    encode(message: CurrentModelResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): CurrentModelResult;
-    fromJSON(object: any): CurrentModelResult;
-    toJSON(message: CurrentModelResult): unknown;
-    create<I extends Exact<DeepPartial<CurrentModelResult>, I>>(base?: I): CurrentModelResult;
-    fromPartial<I extends Exact<DeepPartial<CurrentModelResult>, I>>(object: I): CurrentModelResult;
-};
-export declare const ModelDeleteRequest: {
-    encode(message: ModelDeleteRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteRequest;
-    fromJSON(object: any): ModelDeleteRequest;
-    toJSON(message: ModelDeleteRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(base?: I): ModelDeleteRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelDeleteRequest>, I>>(object: I): ModelDeleteRequest;
-};
-export declare const ModelDeleteResult: {
-    encode(message: ModelDeleteResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelDeleteResult;
-    fromJSON(object: any): ModelDeleteResult;
-    toJSON(message: ModelDeleteResult): unknown;
-    create<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(base?: I): ModelDeleteResult;
-    fromPartial<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(object: I): ModelDeleteResult;
-};
-export declare const ModelCompatibilityRequest: {
-    encode(message: ModelCompatibilityRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityRequest;
-    fromJSON(object: any): ModelCompatibilityRequest;
-    toJSON(message: ModelCompatibilityRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(base?: I): ModelCompatibilityRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(object: I): ModelCompatibilityRequest;
-};
-export declare const ModelCompatibilityResult: {
-    encode(message: ModelCompatibilityResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityResult;
-    fromJSON(object: any): ModelCompatibilityResult;
-    toJSON(message: ModelCompatibilityResult): unknown;
-    create<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(base?: I): ModelCompatibilityResult;
-    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityResult>, I>>(object: I): ModelCompatibilityResult;
-};
-export declare const ModelFormatFromUrlRequest: {
-    encode(message: ModelFormatFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlRequest;
-    fromJSON(object: any): ModelFormatFromUrlRequest;
-    toJSON(message: ModelFormatFromUrlRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(base?: I): ModelFormatFromUrlRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(object: I): ModelFormatFromUrlRequest;
-};
-export declare const ModelFormatFromUrlResult: {
-    encode(message: ModelFormatFromUrlResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlResult;
-    fromJSON(object: any): ModelFormatFromUrlResult;
-    toJSON(message: ModelFormatFromUrlResult): unknown;
-    create<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(base?: I): ModelFormatFromUrlResult;
-    fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(object: I): ModelFormatFromUrlResult;
-};
-export declare const ArtifactInferFromUrlRequest: {
-    encode(message: ArtifactInferFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlRequest;
-    fromJSON(object: any): ArtifactInferFromUrlRequest;
-    toJSON(message: ArtifactInferFromUrlRequest): unknown;
-    create<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(base?: I): ArtifactInferFromUrlRequest;
-    fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(object: I): ArtifactInferFromUrlRequest;
-};
-export declare const ArtifactInferFromUrlResult: {
-    encode(message: ArtifactInferFromUrlResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlResult;
-    fromJSON(object: any): ArtifactInferFromUrlResult;
-    toJSON(message: ArtifactInferFromUrlResult): unknown;
-    create<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(base?: I): ArtifactInferFromUrlResult;
-    fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(object: I): ArtifactInferFromUrlResult;
-};
-export declare const ModelRegistryFetchAssignmentsRequest: {
-    encode(message: ModelRegistryFetchAssignmentsRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsRequest;
-    fromJSON(object: any): ModelRegistryFetchAssignmentsRequest;
-    toJSON(message: ModelRegistryFetchAssignmentsRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(base?: I): ModelRegistryFetchAssignmentsRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(object: I): ModelRegistryFetchAssignmentsRequest;
-};
-export declare const ModelRegistryFetchAssignmentsResult: {
-    encode(message: ModelRegistryFetchAssignmentsResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsResult;
-    fromJSON(object: any): ModelRegistryFetchAssignmentsResult;
-    toJSON(message: ModelRegistryFetchAssignmentsResult): unknown;
-    create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(base?: I): ModelRegistryFetchAssignmentsResult;
-    fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(object: I): ModelRegistryFetchAssignmentsResult;
-};
-export declare const ModelInfoMakeRequest: {
-    encode(message: ModelInfoMakeRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMakeRequest;
-    fromJSON(object: any): ModelInfoMakeRequest;
-    toJSON(message: ModelInfoMakeRequest): unknown;
-    create<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(base?: I): ModelInfoMakeRequest;
-    fromPartial<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(object: I): ModelInfoMakeRequest;
-};
-export declare const RegisterModelFromUrlRequest: {
-    encode(message: RegisterModelFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): RegisterModelFromUrlRequest;
-    fromJSON(object: any): RegisterModelFromUrlRequest;
-    toJSON(message: RegisterModelFromUrlRequest): unknown;
-    create<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(base?: I): RegisterModelFromUrlRequest;
-    fromPartial<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(object: I): RegisterModelFromUrlRequest;
-};
+export declare const ModelInfoMetadata: MessageFns<ModelInfoMetadata>;
+export declare const ModelRuntimeCompatibility: MessageFns<ModelRuntimeCompatibility>;
+export declare const ModelInfo: MessageFns<ModelInfo>;
+export declare const ModelInfoList: MessageFns<ModelInfoList>;
+export declare const SingleFileArtifact: MessageFns<SingleFileArtifact>;
+export declare const ArchiveArtifact: MessageFns<ArchiveArtifact>;
+export declare const ModelFileDescriptor: MessageFns<ModelFileDescriptor>;
+export declare const MultiFileArtifact: MessageFns<MultiFileArtifact>;
+export declare const ExpectedModelFiles: MessageFns<ExpectedModelFiles>;
+export declare const ModelQuery: MessageFns<ModelQuery>;
+export declare const ModelRegistryRefreshRequest: MessageFns<ModelRegistryRefreshRequest>;
+export declare const ModelRegistryRefreshResult: MessageFns<ModelRegistryRefreshResult>;
+export declare const ModelListRequest: MessageFns<ModelListRequest>;
+export declare const ModelListResult: MessageFns<ModelListResult>;
+export declare const ModelGetRequest: MessageFns<ModelGetRequest>;
+export declare const ModelGetResult: MessageFns<ModelGetResult>;
+export declare const ModelImportRequest: MessageFns<ModelImportRequest>;
+export declare const ModelImportResult: MessageFns<ModelImportResult>;
+export declare const ModelDiscoveryRequest: MessageFns<ModelDiscoveryRequest>;
+export declare const DiscoveredModel: MessageFns<DiscoveredModel>;
+export declare const ModelDiscoveryResult: MessageFns<ModelDiscoveryResult>;
+export declare const ModelLoadRequest: MessageFns<ModelLoadRequest>;
+export declare const ModelLoadResult: MessageFns<ModelLoadResult>;
+export declare const ModelUnloadRequest: MessageFns<ModelUnloadRequest>;
+export declare const ModelUnloadResult: MessageFns<ModelUnloadResult>;
+export declare const CurrentModelRequest: MessageFns<CurrentModelRequest>;
+export declare const CurrentModelResult: MessageFns<CurrentModelResult>;
+export declare const ModelDeleteRequest: MessageFns<ModelDeleteRequest>;
+export declare const ModelDeleteResult: MessageFns<ModelDeleteResult>;
+export declare const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest>;
+export declare const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult>;
+export declare const ModelFormatFromUrlRequest: MessageFns<ModelFormatFromUrlRequest>;
+export declare const ModelFormatFromUrlResult: MessageFns<ModelFormatFromUrlResult>;
+export declare const ArtifactInferFromUrlRequest: MessageFns<ArtifactInferFromUrlRequest>;
+export declare const ArtifactInferFromUrlResult: MessageFns<ArtifactInferFromUrlResult>;
+export declare const ModelRegistryFetchAssignmentsRequest: MessageFns<ModelRegistryFetchAssignmentsRequest>;
+export declare const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchAssignmentsResult>;
+export declare const ModelInfoMakeRequest: MessageFns<ModelInfoMakeRequest>;
+export declare const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -1261,4 +988,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

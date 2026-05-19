@@ -68,6 +68,7 @@ import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule';
+import { CommonsModule } from '../runtime/CommonsModule';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
 import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge';
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry';
@@ -421,6 +422,22 @@ export const RunAnywhere = {
           await RunAnywhere.storage.restoreLocalStorage();
         } catch (err) {
           logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // Load the core commons WASM so the SDK facade (init, environment,
+        // auth, model registry, lifecycle, proto events) has its native
+        // backing. Failure is non-fatal — backend packages (LlamaCPP, ONNX)
+        // load their own WASM modules and install them via
+        // `setRunanywhereModule`, so apps that only need backend-specific
+        // operations can still proceed if the core artifact is missing.
+        try {
+          await CommonsModule.shared.ensureLoaded();
+        } catch (err) {
+          logger.warning(
+            `Failed to load core Commons WASM (non-fatal — backend packages can still install their own modules): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
         }
 
         _isInitialized = true;

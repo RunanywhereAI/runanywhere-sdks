@@ -19,9 +19,8 @@ import {
 
 export class VoiceAgentProtoAdapter {
   static tryDefault(): VoiceAgentProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new VoiceAgentProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots['voice-agent'];
+    return mod ? new VoiceAgentProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

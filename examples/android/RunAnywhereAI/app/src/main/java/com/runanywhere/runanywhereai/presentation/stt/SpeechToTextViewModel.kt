@@ -689,7 +689,12 @@ class SpeechToTextViewModel : ViewModel() {
                 val result = transcriptionOutput.text
 
                 val inferenceTimeMs = System.currentTimeMillis() - startTime
-                val wordCount = result.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                val wordCount =
+                    result
+                        .trim()
+                        .split("\\s+".toRegex())
+                        .filter { it.isNotEmpty() }
+                        .size
 
                 withContext(Dispatchers.Main) {
                     _uiState.update {

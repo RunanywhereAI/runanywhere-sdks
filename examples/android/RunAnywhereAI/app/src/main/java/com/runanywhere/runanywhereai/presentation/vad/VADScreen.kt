@@ -624,8 +624,7 @@ private fun ListenButton(
                             width = 2.dp,
                             color = AppColors.primaryGreen.copy(alpha = 0.3f),
                             shape = CircleShape,
-                        )
-                        .scale(pulseScale * 1.1f),
+                        ).scale(pulseScale * 1.1f),
             )
         }
 

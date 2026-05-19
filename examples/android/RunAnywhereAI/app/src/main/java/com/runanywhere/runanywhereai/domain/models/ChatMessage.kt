@@ -232,7 +232,8 @@ fun createPerformanceSummary(messages: List<ChatMessage>): PerformanceSummary {
             },
         successRate =
             if (analyticsMessages.isNotEmpty()) {
-                analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }
+                analyticsMessages
+                    .count { it.completionStatus == CompletionStatus.COMPLETE }
                     .toDouble() / analyticsMessages.size
             } else {
                 1.0

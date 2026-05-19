@@ -195,7 +195,7 @@ class RunAnywhereSTT {
               bitsPerSample: _bitsPerSample(sourceEncoding),
             ),
             options: opts,
-            metadata: {'model_id': modelId},
+            metadata: <String, String>{'model_id': modelId}.entries,
           );
 
           final fn =
@@ -325,7 +325,7 @@ class RunAnywhereSTT {
         bitsPerSample: bitsPerSample ?? _bitsPerSample(sourceEncoding),
       ),
       options: opts,
-      metadata: {'model_id': modelId},
+      metadata: <String, String>{'model_id': modelId}.entries,
     );
 
     return DartBridgeSTT.shared.transcribeLifecycleProto(request);

@@ -16,7 +16,9 @@ import java.util.UUID
 // -- Benchmark Category --
 
 @Serializable
-enum class BenchmarkCategory(val value: String) {
+enum class BenchmarkCategory(
+    val value: String,
+) {
     @SerialName("llm")
     LLM("llm"),
 
@@ -61,7 +63,9 @@ enum class BenchmarkCategory(val value: String) {
 // -- Benchmark Run Status --
 
 @Serializable
-enum class BenchmarkRunStatus(val value: String) {
+enum class BenchmarkRunStatus(
+    val value: String,
+) {
     @SerialName("running")
     RUNNING("running"),
 

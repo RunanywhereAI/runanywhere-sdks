@@ -118,7 +118,7 @@ class DartBridgeRAG {
     // IDL-13: `metadata_json` proto field was deleted. Best-effort parse of
     // the legacy JSON into the typed `metadata` map before ingestion.
     return ingestDocument(
-        RAGDocument(text: text, metadata: _parseMetadata(metadataJson)));
+        RAGDocument(text: text, metadata: _parseMetadata(metadataJson).entries));
   }
 
   Future<RAGStatistics> addDocumentsBatchAsync(
@@ -128,7 +128,7 @@ class DartBridgeRAG {
     for (final doc in documents) {
       stats = ingestDocument(RAGDocument(
         text: doc['text'] ?? '',
-        metadata: _parseMetadata(doc['metadataJson']),
+        metadata: _parseMetadata(doc['metadataJson']).entries,
       ));
     }
     return stats;

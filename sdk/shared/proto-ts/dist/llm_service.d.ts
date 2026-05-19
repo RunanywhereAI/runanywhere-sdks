@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ToolCall, ToolResult } from "./tool_calling";
 import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
@@ -15,6 +15,14 @@ export declare enum LLMStreamEventKind {
 }
 export declare function lLMStreamEventKindFromJSON(object: any): LLMStreamEventKind;
 export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string;
+/**
+ * pass3-syn-025: structured field gaps below are intentional and documented;
+ * the wire schema is consciously decoupled from llm_options.proto to avoid
+ * the sdk_events ↔ llm_options package cycle. The companion fix for
+ * VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
+ * proto carries tts_model_id but not tts_voice_id" issue) lives in
+ * idl/solutions.proto where VoiceAgentConfig is declared.
+ */
 export interface LLMGenerateRequest {
     prompt: string;
     maxTokens: number;
@@ -172,38 +180,10 @@ export interface LLMStreamEvent {
      */
     toolCall?: ToolCall | undefined;
 }
-export declare const LLMGenerateRequest: {
-    encode(message: LLMGenerateRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerateRequest;
-    fromJSON(object: any): LLMGenerateRequest;
-    toJSON(message: LLMGenerateRequest): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(base?: I): LLMGenerateRequest;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest;
-};
-export declare const LLMGenerateRequest_MetadataEntry: {
-    encode(message: LLMGenerateRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerateRequest_MetadataEntry;
-    fromJSON(object: any): LLMGenerateRequest_MetadataEntry;
-    toJSON(message: LLMGenerateRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(base?: I): LLMGenerateRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(object: I): LLMGenerateRequest_MetadataEntry;
-};
-export declare const LLMStreamFinalResult: {
-    encode(message: LLMStreamFinalResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMStreamFinalResult;
-    fromJSON(object: any): LLMStreamFinalResult;
-    toJSON(message: LLMStreamFinalResult): unknown;
-    create<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(base?: I): LLMStreamFinalResult;
-    fromPartial<I extends Exact<DeepPartial<LLMStreamFinalResult>, I>>(object: I): LLMStreamFinalResult;
-};
-export declare const LLMStreamEvent: {
-    encode(message: LLMStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMStreamEvent;
-    fromJSON(object: any): LLMStreamEvent;
-    toJSON(message: LLMStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(base?: I): LLMStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(object: I): LLMStreamEvent;
-};
+export declare const LLMGenerateRequest: MessageFns<LLMGenerateRequest>;
+export declare const LLMGenerateRequest_MetadataEntry: MessageFns<LLMGenerateRequest_MetadataEntry>;
+export declare const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult>;
+export declare const LLMStreamEvent: MessageFns<LLMStreamEvent>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -214,4 +194,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

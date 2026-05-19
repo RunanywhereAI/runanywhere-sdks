@@ -65,7 +65,7 @@ import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
-  tryRunanywhereModule,
+  getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
@@ -151,11 +151,12 @@ function requireToolCallingModule(
   feature: string,
   names: ToolCallingExport[],
 ): EmscriptenRunanywhereModule {
-  const module = tryRunanywhereModule();
+  const module = getModuleForCapability('tool-calling');
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'RunAnywhere WASM module is not initialized.',
+      'No backend that exports rac_tool_call_*_proto / rac_tool_calling_session_*_proto is registered. ' +
+      'Call LlamaCPP.register() (or another tool-calling-providing backend) first.',
     );
   }
 
@@ -357,7 +358,7 @@ function encodeStepRequest(
 
 export const ToolCalling = {
   supportsProtoToolCalling(): boolean {
-    const module = tryRunanywhereModule();
+    const module = getModuleForCapability('tool-calling');
     if (!module) return false;
     return missingToolCallingExports(module, [
       '_rac_tool_call_parse_proto',

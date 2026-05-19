@@ -29,11 +29,9 @@
 #include <vector>
 
 // llama.cpp multimodal support (mtmd)
-#ifdef RAC_VLM_USE_MTMD
 #include "clip.h"
 #include "mtmd-helper.h"
 #include "mtmd.h"
-#endif
 
 #include "rac/core/rac_logger.h"
 #include "rac/utils/rac_image_utils.h"
@@ -66,10 +64,8 @@ struct LlamaCppVLMBackend {
   llama_context *ctx = nullptr;
   llama_sampler *sampler = nullptr;
 
-#ifdef RAC_VLM_USE_MTMD
   // Multimodal context (vision projector)
   mtmd_context *mtmd_ctx = nullptr;
-#endif
 
   // Configuration
   rac_vlm_llamacpp_config_t config = RAC_VLM_LLAMACPP_CONFIG_DEFAULT;
@@ -434,17 +430,9 @@ manual_fallback:
 }
 
 /**
- * Get the image marker string.
- * When mtmd is available, uses the default marker from mtmd.
- * Otherwise falls back to a generic "<image>" marker.
+ * Get the image marker string. Uses the default marker from mtmd.
  */
-const char *get_image_marker() {
-#ifdef RAC_VLM_USE_MTMD
-  return mtmd_default_marker();
-#else
-  return "<image>";
-#endif
-}
+const char *get_image_marker() { return mtmd_default_marker(); }
 
 /**
  * Configure the sampler chain with the given generation parameters.
@@ -661,7 +649,6 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     }
   }
 
-#ifdef RAC_VLM_USE_MTMD
   mtmd_bitmap *bitmap = nullptr;
 
   if (image && backend->mtmd_ctx) {
@@ -747,9 +734,7 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     }
 
     backend->n_past = new_n_past;
-  } else
-#endif
-  {
+  } else {
     // Text-only mode - still apply chat template for consistent formatting
     full_prompt = format_vlm_prompt_with_template(
         backend->model, prompt, image_marker, false, system_prompt,
@@ -959,7 +944,6 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   backend->model_type = detect_vlm_model_type(backend->model);
   bool force_cpu = false;
 
-#ifdef RAC_VLM_USE_MTMD
   if (backend->model_type == VLMModelType::Qwen2VL && gpu_layers != 0) {
     RAC_LOG_WARNING(
         LOG_CAT,
@@ -978,7 +962,6 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
     force_cpu = true;
     gpu_layers = 0;
   }
-#endif
 
   // Determine context size
   int ctx_size = backend->config.context_size;
@@ -1012,7 +995,6 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   // respect user options
   configure_sampler(backend, nullptr);
 
-#ifdef RAC_VLM_USE_MTMD
   // VLM contract (rac_vlm_service.h:44-47): mmproj_path is REQUIRED for
   // llama.cpp. Silently falling back to text-only on a missing/failed vision
   // projector previously let lifecycle/get_info report VLM ready while
@@ -1064,7 +1046,6 @@ rac_vlm_llamacpp_load_model(rac_handle_t handle, const char *model_path,
   RAC_LOG_INFO(LOG_CAT, "Vision projector loaded successfully%s",
                force_cpu ? " (CPU mode for M-RoPE compat)" : "");
   backend->mmproj_path = mmproj_path;
-#endif
 
   backend->model_path = model_path;
   backend->model_loaded = true;
@@ -1086,12 +1067,10 @@ rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle) {
   auto *backend = static_cast<LlamaCppVLMBackend *>(handle);
   std::lock_guard<std::mutex> lock(backend->mutex);
 
-#ifdef RAC_VLM_USE_MTMD
   if (backend->mtmd_ctx) {
     mtmd_free(backend->mtmd_ctx);
     backend->mtmd_ctx = nullptr;
   }
-#endif
 
   if (backend->sampler) {
     llama_sampler_free(backend->sampler);
@@ -1490,12 +1469,7 @@ rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle,
   snprintf(buffer, sizeof(buffer),
            "{\"context_size\":%d,\"model_path\":\"%s\",\"has_vision\":%s}",
            backend->context_size, backend->model_path.c_str(),
-#ifdef RAC_VLM_USE_MTMD
-           backend->mtmd_ctx ? "true" : "false"
-#else
-           "false"
-#endif
-  );
+           backend->mtmd_ctx ? "true" : "false");
 
   *out_json = strdup(buffer);
   if (!*out_json) {

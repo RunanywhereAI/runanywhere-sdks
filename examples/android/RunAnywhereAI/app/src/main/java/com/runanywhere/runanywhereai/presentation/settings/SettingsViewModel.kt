@@ -71,13 +71,16 @@ data class SettingsUiState(
  * - Model management via RunAnywhere storage APIs
  * - API configuration (API key and base URL)
  */
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+class SettingsViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val encryptedPrefs by lazy {
         val masterKey =
-            MasterKey.Builder(application)
+            MasterKey
+                .Builder(application)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
         EncryptedSharedPreferences.create(
@@ -116,10 +119,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         /**
          * Get stored API key (for use at app launch)
          */
-        fun getStoredApiKey(context: Context): String? {
-            return try {
+        fun getStoredApiKey(context: Context): String? =
+            try {
                 val masterKey =
-                    MasterKey.Builder(context)
+                    MasterKey
+                        .Builder(context)
                         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                         .build()
                 val prefs =
@@ -136,7 +140,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Timber.e(e, "Failed to get stored API key")
                 null
             }
-        }
 
         /**
          * Get stored base URL (for use at app launch)
@@ -145,7 +148,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         fun getStoredBaseURL(context: Context): String? {
             return try {
                 val masterKey =
-                    MasterKey.Builder(context)
+                    MasterKey
+                        .Builder(context)
                         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                         .build()
                 val prefs =
@@ -175,9 +179,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         /**
          * Check if custom configuration is set
          */
-        fun hasCustomConfiguration(context: Context): Boolean {
-            return getStoredApiKey(context) != null && getStoredBaseURL(context) != null
-        }
+        fun hasCustomConfiguration(context: Context): Boolean = getStoredApiKey(context) != null && getStoredBaseURL(context) != null
 
         /**
          * Data class for generation settings
@@ -473,7 +475,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 val currentState = _uiState.value
-                generationPrefs.edit()
+                generationPrefs
+                    .edit()
                     .putFloat(KEY_TEMPERATURE, currentState.temperature)
                     .putInt(KEY_MAX_TOKENS, currentState.maxTokens)
                     .putString(KEY_SYSTEM_PROMPT, currentState.systemPrompt)
@@ -551,7 +554,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val apiKey = currentState.apiKey
                 val normalizedURL = normalizeBaseURL(currentState.baseURL)
 
-                encryptedPrefs.edit()
+                encryptedPrefs
+                    .edit()
                     .putString(KEY_API_KEY, apiKey)
                     .putString(KEY_BASE_URL, normalizedURL)
                     .apply()
@@ -582,7 +586,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun clearApiConfiguration() {
         viewModelScope.launch {
             try {
-                encryptedPrefs.edit()
+                encryptedPrefs
+                    .edit()
                     .remove(KEY_API_KEY)
                     .remove(KEY_BASE_URL)
                     .apply()
@@ -615,7 +620,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      */
     private fun clearDeviceRegistration() {
         val context = getApplication<Application>()
-        context.getSharedPreferences("runanywhere_sdk", Context.MODE_PRIVATE)
+        context
+            .getSharedPreferences("runanywhere_sdk", Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_DEVICE_REGISTERED)
             .apply()

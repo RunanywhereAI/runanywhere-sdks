@@ -72,7 +72,9 @@ data class VLMUiState(
  *
  * iOS Reference: examples/ios/RunAnywhereAI/.../Features/Vision/VLMViewModel.swift
  */
-class VLMViewModel(application: Application) : AndroidViewModel(application) {
+class VLMViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     companion object {
         private const val AUTO_STREAM_INTERVAL_MS = 2500L
     }
@@ -137,7 +139,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         val context = getApplication<Application>()
         val granted =
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.CAMERA,
+                context,
+                Manifest.permission.CAMERA,
             ) == PackageManager.PERMISSION_GRANTED
         _uiState.update { it.copy(isCameraAuthorized = granted) }
     }
@@ -344,7 +347,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
                     Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
-                    RunAnywhere.processImageStream(image, options)
+                    RunAnywhere
+                        .processImageStream(image, options)
                         .collect { event ->
                             _uiState.update {
                                 it.copy(currentDescription = applyVlmStreamEvent(it.currentDescription, event))

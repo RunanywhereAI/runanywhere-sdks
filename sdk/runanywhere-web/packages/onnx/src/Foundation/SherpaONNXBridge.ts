@@ -1,50 +1,47 @@
 /**
- * SherpaONNXBridge - V2 canonical ONNX backend bridge
+ * SherpaONNXBridge - V2 canonical ONNX backend bridge.
  *
- * In the V2 architecture, STT/TTS/VAD inference flows entirely through the
- * RACommons proto-byte C ABI:
- *   `_rac_stt_component_*_proto`, `_rac_tts_component_*_proto`,
- *   `_rac_vad_component_*_proto`.
- *
- * Those exports are produced by the RACommons WASM module
- * (`racommons-llamacpp.wasm`, exposed by the `@runanywhere/web-llamacpp`
- * package). This bridge does NOT load `sherpa-onnx.wasm` directly — that
- * file is a standalone Sherpa-ONNX library used only by the legacy
- * direct-sherpa-JS path which V2 deletes.
+ * STT/TTS/VAD inference flows entirely through the RACommons proto-byte
+ * C ABI (`_rac_stt_component_*_proto`, `_rac_tts_component_*_proto`,
+ * `_rac_vad_component_*_proto`) exported by the dedicated
+ * `racommons-onnx-sherpa.wasm` artifact this bridge owns.
  *
  * Responsibilities:
  *  1. Acquire the commons WASM module — either from a sibling backend that
  *     already called `setRunanywhereModule(...)` (preferred) or by loading
- *     `racommons-llamacpp.wasm` itself.
+ *     `racommons-onnx-sherpa.wasm` itself.
  *  2. If we loaded the module ourselves, call `rac_init()` and install it
  *     via `setRunanywhereModule(...)` so the proto-byte adapters in core
  *     can find it.
  *  3. Call `_rac_backend_onnx_register()` and
  *     `_rac_backend_sherpa_register()` to register the ONNX runtime and
  *     Sherpa speech vtables with the C++ plugin registry. After this, all
- *     proto-byte STT/TTS/VAD calls in core route through the registered backend.
+ *     proto-byte STT/TTS/VAD calls in core route through the registered
+ *     backend.
  *
  * Backend availability requirement:
- *   The RACommons WASM module MUST be built with ONNX Runtime WASM and
- *   Sherpa-ONNX WASM static archives linked, so `_rac_backend_onnx_register`
- *   and `_rac_backend_sherpa_register` are exported. Without both,
- *   `register()` reports a typed `BackendNotAvailable` error and STT/TTS/VAD
- *   calls stay unavailable.
+ *   The `racommons-onnx-sherpa.wasm` artifact MUST be built with ONNX
+ *   Runtime WASM and Sherpa-ONNX WASM static archives linked, so
+ *   `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` are
+ *   exported. Without both, `register()` reports a typed
+ *   `BackendNotAvailable` error and STT/TTS/VAD calls stay unavailable.
  */
 
 import {
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
   SDKLogger,
-  clearRunanywhereModule,
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
   missingSpeechBackendExports,
-  setRunanywhereModule,
+  registerWasmModule,
   speechBackendRequirementMessage,
-  tryRunanywhereModule,
+  unregisterWasmModule,
 } from '@runanywhere/web/internal';
-import type { EmscriptenRunanywhereModule } from '@runanywhere/web/internal';
+import type {
+  EmscriptenRunanywhereModule,
+  WasmCapability,
+} from '@runanywhere/web/internal';
 
 const logger = new SDKLogger('SherpaONNXBridge');
 
@@ -64,6 +61,8 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
   _rac_wasm_ping?(): number;
   _rac_wasm_sizeof_platform_adapter?(): number;
   _rac_wasm_sizeof_config?(): number;
+  /** Offset of `platform_adapter` within `rac_config_t`. Optional — see _initCommons. */
+  _rac_wasm_offsetof_config_platform_adapter?(): number;
   _rac_set_platform_adapter?(adapterPtr: number): number;
   _rac_init?(configPtr: number): number;
   _rac_shutdown?(): void;
@@ -74,15 +73,15 @@ interface CommonsModule extends EmscriptenRunanywhereModule {
 }
 
 /**
- * Module factory exposed by the `racommons-llamacpp.js` glue file. Emscripten
- * builds it with `MODULARIZE=1` so the default export is a factory that
- * returns a Promise of the module.
+ * Module factory exposed by the `racommons-onnx-sherpa.js` glue file.
+ * Emscripten builds it with `MODULARIZE=1` so the default export is a
+ * factory that returns a Promise of the module.
  */
 type CommonsModuleFactory = (overrides?: Record<string, unknown>) => Promise<CommonsModule>;
 
 export interface SherpaONNXBridgeLoadOptions {
   /**
-   * Override URL to the `racommons-llamacpp.js` glue file. When omitted,
+   * Override URL to the `racommons-onnx-sherpa.js` glue file. When omitted,
    * the bridge resolves it via `import.meta.url` so bundlers (Vite/webpack)
    * can rewrite the asset path correctly.
    */
@@ -103,6 +102,15 @@ export class SherpaONNXBridge {
   private _loaded = false;
   private _loading: Promise<void> | null = null;
   /**
+   * Pointer to the zero-initialised `rac_platform_adapter_t` stub that
+   * satisfies the non-null check in `rac_init`. Allocated in `_initCommons`,
+   * freed when this bridge tears down the module install (see
+   * `unregister()`). The pointer lifetime MUST outlive the WASM module's
+   * `s_platform_adapter` static (which `rac_init` stores), otherwise the
+   * C++ side dereferences freed memory on any post-init callback.
+   */
+  private _stubAdapterPtr = 0;
+  /**
    * `true` when this bridge owned the commons module install (i.e.
    * `_doLoad` had to load the WASM glue + call `_rac_init` + install via
    * `setRunanywhereModule` because `tryRunanywhereModule()` returned null).
@@ -112,7 +120,7 @@ export class SherpaONNXBridge {
    */
   private _bridgeOwnedInit = false;
 
-  /** Override URL to `racommons-llamacpp.js`. Set before `register()`. */
+  /** Override URL to `racommons-onnx-sherpa.js`. Set before `register()`. */
   wasmUrl: string | null = null;
 
   static get shared(): SherpaONNXBridge {
@@ -148,30 +156,28 @@ export class SherpaONNXBridge {
   /**
    * Unregister the ONNX/Sherpa backend vtables. Idempotent.
    *
-   * When this bridge owned the commons module install (no sibling backend
-   * had pre-installed it before `register()`), this also mirrors
-   * `LlamaCppBridge._teardown`'s symmetric clear path: calls `_rac_shutdown`
-   * (best-effort) and `clearRunanywhereModule()` so a subsequent
-   * `LlamaCPP.register()` is free to install a fresh module without
-   * silently piggy-backing on this bridge's now-stale WASM instance. When a
-   * sibling owns the install, only the ONNX/Sherpa vtables are unregistered;
-   * the module stays put.
+   * Mirrors LlamaCppBridge teardown: drops the module from the
+   * capability registry (releasing only the slots it owned —
+   * STT/TTS/VAD/voice-agent), leaving siblings (commons, llamacpp) intact.
+   * If this bridge held the module install, calls `_rac_shutdown` to
+   * unwind C++ state too.
    */
   unregister(): void {
     if (!this._module || (!this._onnxBackendRegistered && !this._sherpaBackendRegistered)) {
       this._loaded = false;
-      if (this._bridgeOwnedInit) {
-        // No backend vtables to unregister, but we still own the module
-        // install — clear it so the next register() (any backend) starts
-        // from a clean slate.
+      if (this._bridgeOwnedInit && this._module) {
         try {
-          this._module?._rac_shutdown?.();
+          this._module._rac_shutdown?.();
         } catch (err) {
           logger.warning(
             `rac_shutdown threw: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
-        clearRunanywhereModule();
+        if (this._stubAdapterPtr) {
+          this._module._free(this._stubAdapterPtr);
+          this._stubAdapterPtr = 0;
+        }
+        unregisterWasmModule(this._module);
         this._module = null;
         this._bridgeOwnedInit = false;
       }
@@ -206,8 +212,6 @@ export class SherpaONNXBridge {
     this._loaded = false;
 
     if (this._bridgeOwnedInit) {
-      // Mirror LlamaCppBridge._teardown semantics — this bridge owned the
-      // module install, so unwind it fully so siblings can install fresh.
       try {
         this._module._rac_shutdown?.();
       } catch (err) {
@@ -215,7 +219,11 @@ export class SherpaONNXBridge {
           `rac_shutdown threw: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      clearRunanywhereModule();
+      if (this._stubAdapterPtr) {
+        this._module._free(this._stubAdapterPtr);
+        this._stubAdapterPtr = 0;
+      }
+      unregisterWasmModule(this._module);
       this._module = null;
       this._bridgeOwnedInit = false;
     }
@@ -226,26 +234,32 @@ export class SherpaONNXBridge {
   // -------------------------------------------------------------------------
 
   private async _doLoad(options?: SherpaONNXBridgeLoadOptions): Promise<void> {
-    logger.info('Loading ONNX backend (proto-byte commons C ABI)...');
+    logger.info('Loading ONNX/Sherpa backend (dedicated racommons-onnx-sherpa WASM)...');
 
-    // Phase 1: Acquire the commons WASM module.
-    const installed = tryRunanywhereModule() as CommonsModule | null;
-    if (installed) {
-      logger.info('Using already-installed RACommons module from sibling backend');
-      this._module = installed;
-      this._bridgeOwnedInit = false;
-    } else {
-      this._module = await this._loadCommonsModule(options);
+    // Phase 1: Always load the dedicated ONNX+Sherpa WASM. Each per-package
+    // WASM is a self-contained Emscripten module — the llamacpp WASM
+    // (potentially already installed by a sibling LlamaCPP.register()) does
+    // not export `_rac_backend_onnx_register` or `_rac_backend_sherpa_register`,
+    // so we cannot reuse a sibling module. Each bridge owns its own module.
+    this._module = await this._loadCommonsModule(options);
 
-      // initialize commons + install the module in the singleton so the
-      // proto-byte adapters in core can reach it.
-      await this._initCommons(this._module);
-      completeNativePhase1ForModule(this._module);
-      setRunanywhereModule(this._module);
-      // Track ownership so `unregister()` can mirror LlamaCppBridge._teardown's
-      // symmetric `_rac_shutdown` + `clearRunanywhereModule()` clear path.
-      this._bridgeOwnedInit = true;
-    }
+    // Initialize the commons code linked into this artifact, then register
+    // for the speech capabilities ONLY (STT/TTS/VAD/voice-agent). The
+    // commons module — installed by `CommonsModule.shared.ensureLoaded()`
+    // during `RunAnywhere.initialize()` — owns the 'commons' capability;
+    // the per-capability registry keeps siblings (LLM via llamacpp) safe
+    // from being overwritten.
+    await this._initCommons(this._module);
+    completeNativePhase1ForModule(this._module);
+    // Claim only the speech capabilities — the dedicated
+    // racommons-onnx-sherpa artifact does NOT include the RAG/embeddings
+    // proto exports today, so claiming those would route RAG calls into a
+    // module that returns "missing exports". When the WASM build picks up
+    // ONNX embeddings + RAG (RAC_BACKEND_RAG=ON), add 'embedding' and 'rag'
+    // here.
+    const capabilities: WasmCapability[] = ['stt', 'tts', 'vad', 'voice-agent'];
+    registerWasmModule(capabilities, this._module);
+    this._bridgeOwnedInit = true;
 
     // Phase 2: Register the ONNX + Sherpa backend vtables. Generic speech
     // component/proto exports are not enough for real STT/TTS/VAD inference.
@@ -281,8 +295,9 @@ export class SherpaONNXBridge {
 
   /**
    * Build the ordered list of candidate URLs from which to import the
-   * `racommons-llamacpp.js` Emscripten glue. See `_loadCommonsModule()`
-   * for the resolution rules.
+   * `racommons-onnx-sherpa.js` Emscripten glue. The dedicated ONNX/Sherpa
+   * artifact lives in this package's own `wasm/` folder, so we do not
+   * need to probe sibling-package paths.
    */
   private _collectCommonsModuleCandidates(
     options?: SherpaONNXBridgeLoadOptions,
@@ -292,43 +307,14 @@ export class SherpaONNXBridge {
     if (explicit) candidates.push(explicit);
 
     if (candidates.length === 0) {
-      const resolveFn = (
-        import.meta as ImportMeta & {
-          resolve?: (specifier: string) => string;
-        }
-      ).resolve;
-      if (typeof resolveFn === 'function') {
-        try {
-          candidates.push(
-            resolveFn('@runanywhere/web-llamacpp/wasm/racommons-llamacpp.js'),
-          );
-        } catch {
-          // import.meta.resolve threw — fall through to URL probes.
-        }
-      }
-
-      // Published-install layout: `node_modules/@runanywhere/web-llamacpp/...`.
+      // Package-relative path — works in both monorepo dev (TS source
+      // import.meta.url) and published-package layout (compiled dist/).
       try {
         candidates.push(
-          new URL(
-            '../../../web-llamacpp/wasm/racommons-llamacpp.js',
-            import.meta.url,
-          ).href,
+          new URL('../../wasm/racommons-onnx-sherpa.js', import.meta.url).href,
         );
       } catch {
-        // import.meta.url not a base URL (rare) — skip this probe.
-      }
-
-      // Monorepo-source layout: `sdk/runanywhere-web/packages/llamacpp/...`.
-      try {
-        candidates.push(
-          new URL(
-            '../../../llamacpp/wasm/racommons-llamacpp.js',
-            import.meta.url,
-          ).href,
-        );
-      } catch {
-        // import.meta.url not a base URL (rare) — skip this probe.
+        // import.meta.url not a base URL (rare) — skip.
       }
     }
 
@@ -338,17 +324,6 @@ export class SherpaONNXBridge {
   private async _loadCommonsModule(
     options?: SherpaONNXBridgeLoadOptions,
   ): Promise<CommonsModule> {
-    // Build the candidate list in priority order:
-    //   1. Explicit `{ wasmUrl }` override (per-call or sticky on the bridge).
-    //   2. `import.meta.resolve('@runanywhere/web-llamacpp/wasm/...')` —
-    //      the published-package contract that works in both monorepo dev
-    //      (via bundler aliases) and any consumer who installed the peer
-    //      dependency `@runanywhere/web-llamacpp` (Node 20.6+/Vite/modern
-    //      browsers ship `import.meta.resolve`).
-    //   3. Relative-URL probes for runtimes without `import.meta.resolve`:
-    //      try the published package directory name (`web-llamacpp`) first,
-    //      then the monorepo source folder name (`llamacpp`) as a last
-    //      resort.
     const candidates = this._collectCommonsModuleCandidates(options);
 
     let moduleUrl: string | undefined;
@@ -365,7 +340,7 @@ export class SherpaONNXBridge {
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
         logger.debug(
-          `RACommons glue not resolvable at ${candidate}: ${lastError}`,
+          `RACommons ONNX glue not resolvable at ${candidate}: ${lastError}`,
         );
       }
     }
@@ -373,15 +348,15 @@ export class SherpaONNXBridge {
     if (!factory || !moduleUrl) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
-        'Failed to import RACommons glue from any default location. ' +
-        'Install `@runanywhere/web-llamacpp` alongside `@runanywhere/web-onnx` ' +
-        'so the published WASM artifact is reachable, or pass ' +
-        '`{ wasmUrl }` to `ONNX.register()`. Last error: ' + lastError,
+        'Failed to import racommons-onnx-sherpa glue. ' +
+        'Ensure `@runanywhere/web-onnx` is installed with its `wasm/` directory ' +
+        'staged (run `npm run build:wasm -- --onnx` from sdk/runanywhere-web), ' +
+        'or pass `{ wasmUrl }` to `ONNX.register()`. Last error: ' + lastError,
       );
     }
 
     this.wasmUrl = moduleUrl;
-    logger.info(`Loading RACommons WASM glue from ${moduleUrl}`);
+    logger.info(`Loading RACommons ONNX/Sherpa WASM glue from ${moduleUrl}`);
 
     const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
@@ -395,7 +370,7 @@ export class SherpaONNXBridge {
     } catch (err) {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
-        `Failed to instantiate RACommons WASM: ${
+        `Failed to instantiate racommons-onnx-sherpa WASM: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -406,7 +381,7 @@ export class SherpaONNXBridge {
       if (ping !== 42) {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
-          `RACommons WASM ping check failed (expected 42, got ${ping})`,
+          `racommons-onnx-sherpa WASM ping check failed (expected 42, got ${ping})`,
         );
       }
     }
@@ -415,30 +390,69 @@ export class SherpaONNXBridge {
   }
 
   /**
-   * Call `rac_init()` with a zero-initialised `rac_config_t`. We rely on the
-   * defaults — no platform adapter is registered from the ONNX package
-   * because those callbacks belong to whichever backend owns the module.
-   * Sibling backends (LlamaCPP) install richer adapters; until they re-land
-   * the ONNX-only path leaves all platform callbacks NULL, which the C++
-   * core handles gracefully (logging falls back to stderr, file ops fail
-   * with `RAC_ERROR_FEATURE_NOT_AVAILABLE`).
+   * Call `rac_init()` with a `rac_config_t` whose `platform_adapter` field
+   * points at a zero-initialised `rac_platform_adapter_t`. The C++ core's
+   * `rac_init` only checks that the adapter pointer is non-null — it does
+   * NOT dereference any callback during init, so a stub adapter with every
+   * callback field set to NULL is sufficient for the ONNX/Sherpa proto-byte
+   * surface (which never touches file/secure/log/now_ms callbacks during
+   * STT/TTS/VAD inference). LlamaCPP installs a fully populated adapter
+   * because its module-load path exercises FS operations; the ONNX path
+   * does not.
    */
   private async _initCommons(module: CommonsModule): Promise<void> {
     if (typeof module._rac_init !== 'function' || typeof module._malloc !== 'function') {
       throw SDKException.backendNotAvailable(
         'ONNX.register',
-        'RACommons WASM module is missing _rac_init or _malloc.',
+        'racommons-onnx-sherpa WASM module is missing _rac_init or _malloc.',
       );
     }
 
     const sizeofConfig = module._rac_wasm_sizeof_config?.() ?? 0;
-    const configPtr = sizeofConfig > 0 ? module._malloc(sizeofConfig) : 0;
+    if (sizeofConfig === 0) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'racommons-onnx-sherpa WASM module is missing _rac_wasm_sizeof_config.',
+      );
+    }
+    // Allocate the stub platform adapter so `config->platform_adapter` is
+    // non-null when `rac_init` reads it. The struct is intentionally
+    // zero-initialised — the C++ side null-checks every callback before
+    // calling it (`s_platform_adapter->log != nullptr`, etc.).
+    const adapterSize = module._rac_wasm_sizeof_platform_adapter?.() ?? 0;
+    if (adapterSize === 0) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'racommons-onnx-sherpa WASM module is missing _rac_wasm_sizeof_platform_adapter.',
+      );
+    }
+    const adapterPtr = module._malloc(adapterSize);
+    if (adapterPtr && module.HEAPU8) {
+      module.HEAPU8.fill(0, adapterPtr, adapterPtr + adapterSize);
+    }
+    this._stubAdapterPtr = adapterPtr;
+
+    const configPtr = module._malloc(sizeofConfig);
     try {
       if (configPtr && module.HEAPU8) {
         module.HEAPU8.fill(0, configPtr, configPtr + sizeofConfig);
       }
+      // Write platform_adapter pointer at the correct struct offset; if the
+      // helper is missing we fall back to offset 0 (the field is the first
+      // member of `rac_config_t` today and this struct is stable across
+      // builds — but the runtime helper is preferred and added unconditionally
+      // by the latest wasm/src/wasm_exports.cpp).
+      const adapterOffset = typeof module._rac_wasm_offsetof_config_platform_adapter === 'function'
+        ? module._rac_wasm_offsetof_config_platform_adapter()
+        : 0;
+      module.HEAPU32[(configPtr + adapterOffset) >>> 2] = adapterPtr;
       const rc = await this._callMaybeAsync(module, 'rac_init', ['number'], [configPtr]);
       if (!this._isRegistrationSuccess(rc)) {
+        // Free the stub adapter — rac_init didn't take ownership.
+        if (this._stubAdapterPtr) {
+          module._free(this._stubAdapterPtr);
+          this._stubAdapterPtr = 0;
+        }
         throw SDKException.backendNotAvailable(
           'ONNX.register',
           `rac_init returned ${rc}.`,
@@ -472,7 +486,7 @@ export class SherpaONNXBridge {
       if (typeof fn !== 'function') {
         throw SDKException.backendNotAvailable(
           'ONNX.register',
-          `RACommons WASM module is missing _${name}.`,
+          `racommons-onnx-sherpa WASM module is missing _${name}.`,
         );
       }
       return fn(...(args as number[])) ?? 0;

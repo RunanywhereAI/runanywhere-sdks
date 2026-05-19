@@ -21,9 +21,8 @@ import {
 
 export class TTSProtoAdapter {
   static tryDefault(): TTSProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new TTSProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.tts;
+    return mod ? new TTSProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

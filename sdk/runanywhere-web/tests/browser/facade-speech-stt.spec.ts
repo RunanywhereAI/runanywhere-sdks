@@ -1,5 +1,5 @@
 /**
- * Facade speech-via-standalone-Sherpa STT end-to-end test.
+ * Facade STT end-to-end test via the unified ONNX/Sherpa WASM.
  *
  * Drives `RunAnywhere.transcribe(samples)` against a real Whisper Tiny
  * (English) model:
@@ -8,13 +8,12 @@
  *   2. Download the `sherpa-onnx-whisper-tiny.en` tarball via the V2
  *      download orchestrator. Extracted into the RACommons MEMFS at
  *      `/opfs/RunAnywhere/Models/Sherpa/<id>/<id>/`.
- *   3. `ONNX.register({ skipProtoBytePlugins: true })` installs the
- *      standalone Sherpa speech provider.
+ *   3. `ONNX.register()` loads `racommons-onnx-sherpa.wasm` and
+ *      registers the ONNX + Sherpa vtables with the plugin registry.
  *   4. `RunAnywhere.transcribe(samples, { modelPath })` dispatches
- *      through the speech provider, which mirrors the encoder /
- *      decoder / tokens.txt into the standalone Sherpa MEMFS,
- *      constructs `_SherpaOnnxCreateOfflineRecognizer`, and returns
- *      the decoded text.
+ *      through the proto-byte STT adapter into the registered Sherpa
+ *      backend, which constructs `_SherpaOnnxCreateOfflineRecognizer`
+ *      and returns the decoded text.
  *   5. Assert the output `text` field is a string (Whisper on a 1 s
  *      silence buffer typically returns "" or "[BLANK_AUDIO]"; we do
  *      not assert specific words, only that the call completed
@@ -67,7 +66,7 @@ declare global {
   }
 }
 
-test.describe('RunAnywhere.transcribe via standalone Sherpa speech provider', () => {
+test.describe('RunAnywhere.transcribe via unified ONNX/Sherpa WASM', () => {
   test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1).');
   test.setTimeout(20 * 60 * 1000);
 
@@ -96,7 +95,7 @@ test.describe('RunAnywhere.transcribe via standalone Sherpa speech provider', ()
           throw new Error('Model catalog registration failed.');
         }
 
-        await onnx.ONNX.register({ skipProtoBytePlugins: true });
+        await onnx.ONNX.register();
 
         const sdk = window.__RUNANYWHERE_SDK__;
         if (!sdk) throw new Error('SDK singleton not exposed');

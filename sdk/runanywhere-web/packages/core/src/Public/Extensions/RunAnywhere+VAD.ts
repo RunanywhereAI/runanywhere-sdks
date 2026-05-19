@@ -26,7 +26,7 @@ import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
-  tryRunanywhereModule,
+  getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 import {
@@ -62,11 +62,11 @@ interface VADComponentModule extends EmscriptenRunanywhereModule {
 }
 
 function requireVADModule(feature: string): VADComponentModule {
-  const module = tryRunanywhereModule() as VADComponentModule | null;
+  const module = getModuleForCapability('vad') as VADComponentModule | null;
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+      'No VAD backend is registered. Call ONNX.register() (or another VAD-providing backend) first.',
     );
   }
   const missing = missingSpeechBackendExports(module);
@@ -189,7 +189,7 @@ export const VAD = {
    * exports AND the component lifecycle exports (create / destroy).
    */
   supportsProtoVAD(): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module) return false;
     if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_vad_component_create !== 'function') return false;
@@ -225,7 +225,7 @@ export const VAD = {
    * Initialize the VAD pipeline. Required after `configure`.
    */
   initialize(handle: number): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_initialize !== 'function') {
       throw SDKException.backendNotAvailable(
         'VAD.initialize',
@@ -238,7 +238,7 @@ export const VAD = {
 
   /** Whether the VAD component has finished initialization. */
   isInitialized(handle: number): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_is_initialized !== 'function') return false;
     return Boolean(module._rac_vad_component_is_initialized(handle));
   },
@@ -314,28 +314,28 @@ export const VAD = {
 
   /** Start the VAD pipeline. */
   start(handle: number): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_start !== 'function') return false;
     return module._rac_vad_component_start(handle) === 0;
   },
 
   /** Stop the VAD pipeline. */
   stop(handle: number): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_stop !== 'function') return false;
     return module._rac_vad_component_stop(handle) === 0;
   },
 
   /** Reset the VAD state (clears any speech-segment buffers). */
   reset(handle: number): boolean {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_reset !== 'function') return false;
     return module._rac_vad_component_reset(handle) === 0;
   },
 
   /** Destroy the component handle. Idempotent. */
   destroy(handle: number): void {
-    const module = tryRunanywhereModule() as VADComponentModule | null;
+    const module = getModuleForCapability('vad') as VADComponentModule | null;
     if (!module || typeof module._rac_vad_component_destroy !== 'function') return;
     module._rac_vad_component_destroy(handle);
   },

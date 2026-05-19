@@ -2,9 +2,9 @@
  * LlamaCPP — public facade for the `@runanywhere/web-llamacpp` backend.
  *
  * V2 canonical: this package is a SHELL. It only loads the WASM module,
- * registers the platform adapter, calls `rac_init`, registers the
- * llama.cpp + llama.cpp-VLM backends, then installs the module on every
- * core proto-byte adapter via `setRunanywhereModule(...)`.
+ * registers the platform adapter, calls `rac_init`, registers the unified
+ * llama.cpp backend (LLM + VLM in a single call), then installs the module
+ * on every core proto-byte adapter via `setRunanywhereModule(...)`.
  *
  * After `LlamaCPP.register()` resolves, `RunAnywhere.textGeneration.*`,
  * tool calling, structured output,
@@ -139,8 +139,8 @@ export const LlamaCPP = {
    * 2. Verifies via `_rac_wasm_ping()` smoke check.
    * 3. Registers the 11-callback `rac_platform_adapter_t` browser vtable.
    * 4. Calls `rac_init()` (async, may suspend through ASYNCIFY).
-   * 5. Calls `rac_backend_llamacpp_register()` and (when present)
-   *    `rac_backend_llamacpp_vlm_register()`.
+   * 5. Calls `rac_backend_llamacpp_register()` — the unified entry point
+   *    that wires both LLM and VLM modalities in a single call.
    * 6. Installs the module on `setRunanywhereModule()` so every core
    *    proto-byte adapter (LLM/VLM/embeddings/diffusion/structured/tool/
    *    model-registry/lifecycle/download/hardware/storage/SDKEvent/HTTP)
@@ -197,10 +197,12 @@ export const LlamaCPP = {
         // what the bridge actually picked (auto → webgpu/cpu resolution).
         setActiveAccelerationMode(bridge.accelerationMode);
 
-        // Only install the VLM provider when `rac_backend_llamacpp_vlm_register()`
-        // actually succeeded. Mirrors Swift's `isVLMRegistered` gate so a
-        // module without VLM exports doesn't expose a "ready" VLM provider
-        // that fails at first use.
+        // VLM is wired alongside LLM by the unified
+        // `rac_backend_llamacpp_register()` call, so once `ensureLoaded()`
+        // resolves successfully the VLM provider is always installable.
+        // The `bridge.isVLMRegistered` gate is retained for parity with
+        // Swift's `isVLMRegistered` field; under the unified C++ layer it
+        // simply reflects that the backend module is loaded.
         if (bridge.isVLMRegistered) {
           setVisionLanguageProvider(lifecycleVLMProvider);
         } else {

@@ -41,7 +41,9 @@ data class LoraUiState(
  * ViewModel for LoRA adapter management.
  * Handles listing, downloading, loading, and removing LoRA adapters.
  */
-class LoraViewModel(application: Application) : AndroidViewModel(application) {
+class LoraViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(LoraUiState())
     val uiState: StateFlow<LoraUiState> = _uiState.asStateFlow()
 
@@ -170,14 +172,10 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Get the local file path for a catalog entry, or null if not downloaded. */
-    fun localPath(entry: LoraAdapterCatalogEntry): String? {
-        return currentCatalogEntry(entry.id)?.localPathOrNull() ?: entry.localPathOrNull()
-    }
+    fun localPath(entry: LoraAdapterCatalogEntry): String? = currentCatalogEntry(entry.id)?.localPathOrNull() ?: entry.localPathOrNull()
 
     /** Check if a catalog entry is already downloaded (reads from cached state). */
-    fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean {
-        return currentCatalogEntry(entry.id)?.isDownloadedLocally() ?: entry.isDownloadedLocally()
-    }
+    fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean = currentCatalogEntry(entry.id)?.isDownloadedLocally() ?: entry.isDownloadedLocally()
 
     /** Check if a specific adapter is currently loaded. */
     fun isLoaded(entry: LoraAdapterCatalogEntry): Boolean {
@@ -331,15 +329,14 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         return result.entries
     }
 
-    private suspend fun loadCurrentState(): List<LoRAAdapterInfo> {
-        return try {
+    private suspend fun loadCurrentState(): List<LoRAAdapterInfo> =
+        try {
             val state = RunAnywhere.lora.list()
             if (state.error_message.isNullOrBlank()) state.loaded_adapters else emptyList()
         } catch (e: Exception) {
             Timber.w(e, "LoRA state unavailable")
             emptyList()
         }
-    }
 
     private fun currentCatalogEntry(adapterId: String): LoraAdapterCatalogEntry? =
         (_uiState.value.registeredAdapters + _uiState.value.compatibleAdapters)

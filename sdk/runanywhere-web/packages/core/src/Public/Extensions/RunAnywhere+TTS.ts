@@ -21,7 +21,7 @@ import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
-  tryRunanywhereModule,
+  getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 import {
@@ -59,11 +59,11 @@ interface TTSComponentModule extends EmscriptenRunanywhereModule {
 }
 
 function requireTTSModule(feature: string): TTSComponentModule {
-  const module = tryRunanywhereModule() as TTSComponentModule | null;
+  const module = getModuleForCapability('tts') as TTSComponentModule | null;
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+      'No TTS backend is registered. Call ONNX.register() (or another TTS-providing backend) first.',
     );
   }
   const missing = missingSpeechBackendExports(module);
@@ -175,7 +175,7 @@ export const TTS = {
    * destroy).
    */
   supportsProtoTTS(): boolean {
-    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
     if (!module) return false;
     if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_tts_component_create !== 'function') return false;
@@ -205,7 +205,7 @@ export const TTS = {
 
   /** Whether the component handle has a voice loaded. */
   isLoaded(handle: number): boolean {
-    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
     if (!module || typeof module._rac_tts_component_is_loaded !== 'function') return false;
     return Boolean(module._rac_tts_component_is_loaded(handle));
   },
@@ -263,7 +263,7 @@ export const TTS = {
 
   /** Stop in-flight synthesis (best-effort). */
   stop(handle: number): boolean {
-    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
     if (!module || typeof module._rac_tts_component_stop !== 'function') return false;
     const rc = module._rac_tts_component_stop(handle);
     return rc === 0;
@@ -271,7 +271,7 @@ export const TTS = {
 
   /** Unload the voice but keep the component handle alive. */
   unload(handle: number): boolean {
-    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
     if (!module || typeof module._rac_tts_component_unload !== 'function') return false;
     const rc = module._rac_tts_component_unload(handle);
     return rc === 0;
@@ -279,7 +279,7 @@ export const TTS = {
 
   /** Destroy the component handle. Idempotent. */
   destroy(handle: number): void {
-    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    const module = getModuleForCapability('tts') as TTSComponentModule | null;
     if (!module || typeof module._rac_tts_component_destroy !== 'function') return;
     module._rac_tts_component_destroy(handle);
   },

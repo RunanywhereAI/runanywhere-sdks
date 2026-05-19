@@ -46,6 +46,7 @@ public val AudioFormat.wireString: String
         AudioFormat.AUDIO_FORMAT_OGG -> "ogg"
         AudioFormat.AUDIO_FORMAT_M4A -> "m4a"
         AudioFormat.AUDIO_FORMAT_PCM_S16LE -> "pcm_s16le"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
@@ -77,6 +78,7 @@ public val ModelCategory.wireString: String
         ModelCategory.MODEL_CATEGORY_AUDIO -> "audio"
         ModelCategory.MODEL_CATEGORY_EMBEDDING -> "embedding"
         ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> "voice-activity-detection"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
@@ -102,6 +104,7 @@ public val SDKEnvironment.wireString: String
         SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "development"
         SDKEnvironment.SDK_ENVIRONMENT_STAGING -> "staging"
         SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "production"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
@@ -121,6 +124,7 @@ public val ModelSource.wireString: String
         ModelSource.MODEL_SOURCE_REMOTE -> "remote"
         ModelSource.MODEL_SOURCE_LOCAL -> "local"
         ModelSource.MODEL_SOURCE_BUILT_IN -> "built-in"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
@@ -141,6 +145,7 @@ public val ArchiveStructure.wireString: String
         ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED -> "directoryBased"
         ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY -> "nestedDirectory"
         ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN -> "unknown"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */

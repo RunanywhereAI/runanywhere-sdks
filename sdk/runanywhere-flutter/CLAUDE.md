@@ -287,6 +287,42 @@ Extends `package:flutter_lints/flutter.yaml` with:
 | `runanywhere_onnx` | `libonnxruntime.so`, `libsherpa-onnx-c-api.so`, `libsherpa-onnx-cxx-api.so`, `libsherpa-onnx-jni.so`, `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `librac_backend_sherpa.so`, `libc++_shared.so` |
 | `runanywhere_genie` | `libc++_shared.so` only (backend `.so` downloaded separately) |
 
+## Package Architecture Notes
+
+### `libc++_shared.so` Duplication Is Intentional
+
+Each Flutter plugin package (`runanywhere`, `runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_genie`) bundles its own `libc++_shared.so` in `android/src/main/jniLibs/{abi}/`. This duplication is **by design**, not a bug to dedup.
+
+| Concern | Resolution |
+|---|---|
+| Why each package ships its own copy | Each Flutter plugin must be a **self-contained AAR**. A consumer app may add only `runanywhere` + `runanywhere_llamacpp` without `runanywhere_onnx`; every transitive dependency closure must include `libc++_shared.so`. |
+| How merge conflicts are resolved at app build | Gradle `packagingOptions { pickFirsts += "**/libc++_shared.so" }` in the consumer app (and in each plugin's `build.gradle`) tells AGP to pick one copy at APK packaging time. |
+| Why not factor into a shared sub-package | Flutter plugin packages cannot transitively depend on another plugin's `jniLibs` — Gradle resolves AARs, not raw `.so` bundles. The self-contained AAR contract is what makes `flutter pub add runanywhere_llamacpp` work in isolation. |
+
+**Do not try to dedup at the package level.** Removing `libc++_shared.so` from any one package will break that package when consumed standalone.
+
+### LlamaCPP Is One Package; LLM + VLM Are Two Modalities of the Same Engine
+
+After the P2-P3 unification, `runanywhere_llamacpp` exposes a **single registration call** that registers a unified plugin vtable with both `llm_ops` and `vlm_ops` slots filled:
+
+```dart
+await LlamaCpp.register();   // Registers a single vtable: llm_ops + vlm_ops both populated
+// No separate registerVlm() exists.
+```
+
+The underlying FFI symbol(s) are encapsulated by `LlamaCpp.register()` — Dart consumers see one engine that supports two modalities, not two engines. Router scoring treats LLM and VLM requests against the same plugin entry.
+
+### ONNX + Sherpa Are Bundled in One Package (Two Engines, One Distribution)
+
+`runanywhere_onnx` vendors **both** `RABackendONNX.xcframework` and `RABackendSherpa.xcframework`, and ships **both** engines' native libraries in its `jniLibs/`. This is two engines in one distribution package, intentionally:
+
+| Engine | Native artifact (iOS) | Native artifact (Android) | Modalities |
+|---|---|---|---|
+| ONNX Runtime backend | `RABackendONNX.xcframework` | `librac_backend_onnx.so`, `librac_backend_onnx_jni.so`, `libonnxruntime.so` | Embeddings + generic ORT services |
+| Sherpa-ONNX backend | `RABackendSherpa.xcframework` | `librac_backend_sherpa.so`, `libsherpa-onnx-{c-api,cxx-api,jni}.so` | STT + TTS + VAD |
+
+Both engines share the **underlying ONNX Runtime** (`libonnxruntime.so` / equivalent inside the ORT xcframework) — splitting them would double-ship the ORT shared library. They are co-distributed as `runanywhere_onnx` for that reason. `await Onnx.register()` registers the ONNX engine; Sherpa auto-registers its STT/TTS/VAD ops via ELF constructor when the package's `.so` files are loaded.
+
 ## Versions
 
 | Package / Artifact | Version |

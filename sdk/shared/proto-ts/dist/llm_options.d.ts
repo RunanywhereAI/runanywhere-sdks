@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
@@ -307,78 +307,15 @@ export interface PerformanceMetrics {
     /** Completion (output) token count. */
     completionTokens: number;
 }
-export declare const LLMGenerationOptions: {
-    encode(message: LLMGenerationOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationOptions;
-    fromJSON(object: any): LLMGenerationOptions;
-    toJSON(message: LLMGenerationOptions): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerationOptions>, I>>(base?: I): LLMGenerationOptions;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerationOptions>, I>>(object: I): LLMGenerationOptions;
-};
-export declare const LLMGenerationResult: {
-    encode(message: LLMGenerationResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationResult;
-    fromJSON(object: any): LLMGenerationResult;
-    toJSON(message: LLMGenerationResult): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(base?: I): LLMGenerationResult;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(object: I): LLMGenerationResult;
-};
-export declare const LLMGenerationRequest: {
-    encode(message: LLMGenerationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest;
-    fromJSON(object: any): LLMGenerationRequest;
-    toJSON(message: LLMGenerationRequest): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(base?: I): LLMGenerationRequest;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(object: I): LLMGenerationRequest;
-};
-export declare const LLMGenerationRequest_MetadataEntry: {
-    encode(message: LLMGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest_MetadataEntry;
-    fromJSON(object: any): LLMGenerationRequest_MetadataEntry;
-    toJSON(message: LLMGenerationRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(base?: I): LLMGenerationRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(object: I): LLMGenerationRequest_MetadataEntry;
-};
-export declare const LLMGenerationStatus: {
-    encode(message: LLMGenerationStatus, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationStatus;
-    fromJSON(object: any): LLMGenerationStatus;
-    toJSON(message: LLMGenerationStatus): unknown;
-    create<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(base?: I): LLMGenerationStatus;
-    fromPartial<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(object: I): LLMGenerationStatus;
-};
-export declare const LLMConfiguration: {
-    encode(message: LLMConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): LLMConfiguration;
-    fromJSON(object: any): LLMConfiguration;
-    toJSON(message: LLMConfiguration): unknown;
-    create<I extends Exact<DeepPartial<LLMConfiguration>, I>>(base?: I): LLMConfiguration;
-    fromPartial<I extends Exact<DeepPartial<LLMConfiguration>, I>>(object: I): LLMConfiguration;
-};
-export declare const GenerationHints: {
-    encode(message: GenerationHints, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): GenerationHints;
-    fromJSON(object: any): GenerationHints;
-    toJSON(message: GenerationHints): unknown;
-    create<I extends Exact<DeepPartial<GenerationHints>, I>>(base?: I): GenerationHints;
-    fromPartial<I extends Exact<DeepPartial<GenerationHints>, I>>(object: I): GenerationHints;
-};
-export declare const StreamToken: {
-    encode(message: StreamToken, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StreamToken;
-    fromJSON(object: any): StreamToken;
-    toJSON(message: StreamToken): unknown;
-    create<I extends Exact<DeepPartial<StreamToken>, I>>(base?: I): StreamToken;
-    fromPartial<I extends Exact<DeepPartial<StreamToken>, I>>(object: I): StreamToken;
-};
-export declare const PerformanceMetrics: {
-    encode(message: PerformanceMetrics, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PerformanceMetrics;
-    fromJSON(object: any): PerformanceMetrics;
-    toJSON(message: PerformanceMetrics): unknown;
-    create<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(base?: I): PerformanceMetrics;
-    fromPartial<I extends Exact<DeepPartial<PerformanceMetrics>, I>>(object: I): PerformanceMetrics;
-};
+export declare const LLMGenerationOptions: MessageFns<LLMGenerationOptions>;
+export declare const LLMGenerationResult: MessageFns<LLMGenerationResult>;
+export declare const LLMGenerationRequest: MessageFns<LLMGenerationRequest>;
+export declare const LLMGenerationRequest_MetadataEntry: MessageFns<LLMGenerationRequest_MetadataEntry>;
+export declare const LLMGenerationStatus: MessageFns<LLMGenerationStatus>;
+export declare const LLMConfiguration: MessageFns<LLMConfiguration>;
+export declare const GenerationHints: MessageFns<GenerationHints>;
+export declare const StreamToken: MessageFns<StreamToken>;
+export declare const PerformanceMetrics: MessageFns<PerformanceMetrics>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -389,4 +326,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

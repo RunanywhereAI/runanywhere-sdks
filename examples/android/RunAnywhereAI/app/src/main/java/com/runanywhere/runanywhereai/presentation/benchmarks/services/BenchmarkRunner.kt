@@ -33,14 +33,20 @@ interface BenchmarkScenarioProvider {
 
 // -- Runner Errors --
 
-sealed class BenchmarkRunnerError(message: String) : Exception(message) {
-    class NoModelsAvailable(skippedCategories: List<BenchmarkCategory>) : BenchmarkRunnerError(
-        "No downloaded models found for: ${skippedCategories.joinToString { it.displayName }}. Download models first from the Models tab.",
-    )
+sealed class BenchmarkRunnerError(
+    message: String,
+) : Exception(message) {
+    class NoModelsAvailable(
+        skippedCategories: List<BenchmarkCategory>,
+    ) : BenchmarkRunnerError(
+            "No downloaded models found for: ${skippedCategories.joinToString { it.displayName }}. Download models first from the Models tab.",
+        )
 
-    class FetchModelsFailed(cause: Throwable) : BenchmarkRunnerError(
-        "Failed to fetch available models: ${cause.localizedMessage ?: cause.message ?: "Unknown error"}",
-    )
+    class FetchModelsFailed(
+        cause: Throwable,
+    ) : BenchmarkRunnerError(
+            "Failed to fetch available models: ${cause.localizedMessage ?: cause.message ?: "Unknown error"}",
+        )
 }
 
 // -- Preflight Result --
@@ -72,7 +78,11 @@ class BenchmarkRunner {
     suspend fun preflight(categories: Set<BenchmarkCategory>): BenchmarkPreflightResult {
         val allModels: List<RAModelInfo> =
             try {
-                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+                RunAnywhere
+                    .listModels(ModelListRequest())
+                    .models
+                    ?.models
+                    .orEmpty()
             } catch (e: Exception) {
                 throw BenchmarkRunnerError.FetchModelsFailed(e)
             }

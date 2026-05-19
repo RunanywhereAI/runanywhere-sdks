@@ -13,7 +13,9 @@ import java.util.Locale
 
 // -- Export Format --
 
-enum class BenchmarkExportFormat(val displayName: String) {
+enum class BenchmarkExportFormat(
+    val displayName: String,
+) {
     MARKDOWN("Markdown"),
     JSON("JSON"),
 }

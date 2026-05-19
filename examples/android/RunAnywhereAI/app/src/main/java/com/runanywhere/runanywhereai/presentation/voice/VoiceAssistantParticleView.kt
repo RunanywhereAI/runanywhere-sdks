@@ -367,8 +367,10 @@ private fun DrawScope.drawParticlesBatched(
         val projY = f.centerY - screenY * f.viewScale * f.aspectRatio
 
         // Skip off-screen particles
-        if (projX < -20f || projX > size.width + 20f ||
-            projY < -20f || projY > size.height + 20f
+        if (projX < -20f ||
+            projX > size.width + 20f ||
+            projY < -20f ||
+            projY > size.height + 20f
         ) {
             continue
         }

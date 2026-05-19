@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -221,126 +221,21 @@ export interface StorageDeleteResult {
     registryUpdated: boolean;
     filesDeleted: boolean;
 }
-export declare const DeviceStorageInfo: {
-    encode(message: DeviceStorageInfo, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DeviceStorageInfo;
-    fromJSON(object: any): DeviceStorageInfo;
-    toJSON(message: DeviceStorageInfo): unknown;
-    create<I extends Exact<DeepPartial<DeviceStorageInfo>, I>>(base?: I): DeviceStorageInfo;
-    fromPartial<I extends Exact<DeepPartial<DeviceStorageInfo>, I>>(object: I): DeviceStorageInfo;
-};
-export declare const AppStorageInfo: {
-    encode(message: AppStorageInfo, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): AppStorageInfo;
-    fromJSON(object: any): AppStorageInfo;
-    toJSON(message: AppStorageInfo): unknown;
-    create<I extends Exact<DeepPartial<AppStorageInfo>, I>>(base?: I): AppStorageInfo;
-    fromPartial<I extends Exact<DeepPartial<AppStorageInfo>, I>>(object: I): AppStorageInfo;
-};
-export declare const ModelStorageMetrics: {
-    encode(message: ModelStorageMetrics, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelStorageMetrics;
-    fromJSON(object: any): ModelStorageMetrics;
-    toJSON(message: ModelStorageMetrics): unknown;
-    create<I extends Exact<DeepPartial<ModelStorageMetrics>, I>>(base?: I): ModelStorageMetrics;
-    fromPartial<I extends Exact<DeepPartial<ModelStorageMetrics>, I>>(object: I): ModelStorageMetrics;
-};
-export declare const StorageInfo: {
-    encode(message: StorageInfo, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageInfo;
-    fromJSON(object: any): StorageInfo;
-    toJSON(message: StorageInfo): unknown;
-    create<I extends Exact<DeepPartial<StorageInfo>, I>>(base?: I): StorageInfo;
-    fromPartial<I extends Exact<DeepPartial<StorageInfo>, I>>(object: I): StorageInfo;
-};
-export declare const StorageAvailability: {
-    encode(message: StorageAvailability, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageAvailability;
-    fromJSON(object: any): StorageAvailability;
-    toJSON(message: StorageAvailability): unknown;
-    create<I extends Exact<DeepPartial<StorageAvailability>, I>>(base?: I): StorageAvailability;
-    fromPartial<I extends Exact<DeepPartial<StorageAvailability>, I>>(object: I): StorageAvailability;
-};
-export declare const StoredModel: {
-    encode(message: StoredModel, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StoredModel;
-    fromJSON(object: any): StoredModel;
-    toJSON(message: StoredModel): unknown;
-    create<I extends Exact<DeepPartial<StoredModel>, I>>(base?: I): StoredModel;
-    fromPartial<I extends Exact<DeepPartial<StoredModel>, I>>(object: I): StoredModel;
-};
-export declare const StorageInfoRequest: {
-    encode(message: StorageInfoRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageInfoRequest;
-    fromJSON(object: any): StorageInfoRequest;
-    toJSON(message: StorageInfoRequest): unknown;
-    create<I extends Exact<DeepPartial<StorageInfoRequest>, I>>(base?: I): StorageInfoRequest;
-    fromPartial<I extends Exact<DeepPartial<StorageInfoRequest>, I>>(object: I): StorageInfoRequest;
-};
-export declare const StorageInfoResult: {
-    encode(message: StorageInfoResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageInfoResult;
-    fromJSON(object: any): StorageInfoResult;
-    toJSON(message: StorageInfoResult): unknown;
-    create<I extends Exact<DeepPartial<StorageInfoResult>, I>>(base?: I): StorageInfoResult;
-    fromPartial<I extends Exact<DeepPartial<StorageInfoResult>, I>>(object: I): StorageInfoResult;
-};
-export declare const StorageAvailabilityRequest: {
-    encode(message: StorageAvailabilityRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageAvailabilityRequest;
-    fromJSON(object: any): StorageAvailabilityRequest;
-    toJSON(message: StorageAvailabilityRequest): unknown;
-    create<I extends Exact<DeepPartial<StorageAvailabilityRequest>, I>>(base?: I): StorageAvailabilityRequest;
-    fromPartial<I extends Exact<DeepPartial<StorageAvailabilityRequest>, I>>(object: I): StorageAvailabilityRequest;
-};
-export declare const StorageAvailabilityResult: {
-    encode(message: StorageAvailabilityResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageAvailabilityResult;
-    fromJSON(object: any): StorageAvailabilityResult;
-    toJSON(message: StorageAvailabilityResult): unknown;
-    create<I extends Exact<DeepPartial<StorageAvailabilityResult>, I>>(base?: I): StorageAvailabilityResult;
-    fromPartial<I extends Exact<DeepPartial<StorageAvailabilityResult>, I>>(object: I): StorageAvailabilityResult;
-};
-export declare const StorageDeletePlanRequest: {
-    encode(message: StorageDeletePlanRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageDeletePlanRequest;
-    fromJSON(object: any): StorageDeletePlanRequest;
-    toJSON(message: StorageDeletePlanRequest): unknown;
-    create<I extends Exact<DeepPartial<StorageDeletePlanRequest>, I>>(base?: I): StorageDeletePlanRequest;
-    fromPartial<I extends Exact<DeepPartial<StorageDeletePlanRequest>, I>>(object: I): StorageDeletePlanRequest;
-};
-export declare const StorageDeleteCandidate: {
-    encode(message: StorageDeleteCandidate, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageDeleteCandidate;
-    fromJSON(object: any): StorageDeleteCandidate;
-    toJSON(message: StorageDeleteCandidate): unknown;
-    create<I extends Exact<DeepPartial<StorageDeleteCandidate>, I>>(base?: I): StorageDeleteCandidate;
-    fromPartial<I extends Exact<DeepPartial<StorageDeleteCandidate>, I>>(object: I): StorageDeleteCandidate;
-};
-export declare const StorageDeletePlan: {
-    encode(message: StorageDeletePlan, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageDeletePlan;
-    fromJSON(object: any): StorageDeletePlan;
-    toJSON(message: StorageDeletePlan): unknown;
-    create<I extends Exact<DeepPartial<StorageDeletePlan>, I>>(base?: I): StorageDeletePlan;
-    fromPartial<I extends Exact<DeepPartial<StorageDeletePlan>, I>>(object: I): StorageDeletePlan;
-};
-export declare const StorageDeleteRequest: {
-    encode(message: StorageDeleteRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageDeleteRequest;
-    fromJSON(object: any): StorageDeleteRequest;
-    toJSON(message: StorageDeleteRequest): unknown;
-    create<I extends Exact<DeepPartial<StorageDeleteRequest>, I>>(base?: I): StorageDeleteRequest;
-    fromPartial<I extends Exact<DeepPartial<StorageDeleteRequest>, I>>(object: I): StorageDeleteRequest;
-};
-export declare const StorageDeleteResult: {
-    encode(message: StorageDeleteResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageDeleteResult;
-    fromJSON(object: any): StorageDeleteResult;
-    toJSON(message: StorageDeleteResult): unknown;
-    create<I extends Exact<DeepPartial<StorageDeleteResult>, I>>(base?: I): StorageDeleteResult;
-    fromPartial<I extends Exact<DeepPartial<StorageDeleteResult>, I>>(object: I): StorageDeleteResult;
-};
+export declare const DeviceStorageInfo: MessageFns<DeviceStorageInfo>;
+export declare const AppStorageInfo: MessageFns<AppStorageInfo>;
+export declare const ModelStorageMetrics: MessageFns<ModelStorageMetrics>;
+export declare const StorageInfo: MessageFns<StorageInfo>;
+export declare const StorageAvailability: MessageFns<StorageAvailability>;
+export declare const StoredModel: MessageFns<StoredModel>;
+export declare const StorageInfoRequest: MessageFns<StorageInfoRequest>;
+export declare const StorageInfoResult: MessageFns<StorageInfoResult>;
+export declare const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest>;
+export declare const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult>;
+export declare const StorageDeletePlanRequest: MessageFns<StorageDeletePlanRequest>;
+export declare const StorageDeleteCandidate: MessageFns<StorageDeleteCandidate>;
+export declare const StorageDeletePlan: MessageFns<StorageDeletePlan>;
+export declare const StorageDeleteRequest: MessageFns<StorageDeleteRequest>;
+export declare const StorageDeleteResult: MessageFns<StorageDeleteResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -351,4 +246,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

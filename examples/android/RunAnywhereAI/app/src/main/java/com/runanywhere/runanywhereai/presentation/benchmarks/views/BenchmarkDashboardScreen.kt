@@ -401,8 +401,7 @@ private fun SkippedWarning(message: String) {
                 .background(
                     AppColors.statusOrange.copy(alpha = 0.1f),
                     RoundedCornerShape(AppSpacing.cornerRadiusSmall),
-                )
-                .padding(AppSpacing.medium),
+                ).padding(AppSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Filled.Warning, contentDescription = null, tint = AppColors.statusOrange, modifier = Modifier.size(18.dp))

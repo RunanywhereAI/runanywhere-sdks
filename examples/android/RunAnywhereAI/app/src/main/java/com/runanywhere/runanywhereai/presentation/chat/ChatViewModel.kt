@@ -74,7 +74,9 @@ data class ChatUiState(
  * - Model lifecycle via EventBus with LLMEvent filtering
  * - Generation via RunAnywhere.generate() and RunAnywhere.generateStream()
  */
-class ChatViewModel(application: Application) : AndroidViewModel(application) {
+class ChatViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val app = application as RunAnywhereApplication
     private val conversationStore = ConversationStore.getInstance(application)
     private val tokensPerSecondHistory = java.util.concurrent.CopyOnWriteArrayList<Double>()
@@ -391,7 +393,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (raw.isBlank()) return raw
         return runCatching {
             val element = PRETTY_JSON.parseToJsonElement(raw)
-            PRETTY_JSON.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element)
+            PRETTY_JSON.encodeToString(
+                kotlinx.serialization.json.JsonElement
+                    .serializer(),
+                element,
+            )
         }.getOrDefault(raw)
     }
 
@@ -437,7 +443,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             // arrives — plain return@collect does NOT close the upstream flow,
             // leaving the collector suspended indefinitely.
             var streamError: String? = null
-            RunAnywhere.generateStream(prompt, getGenerationOptions())
+            RunAnywhere
+                .generateStream(prompt, getGenerationOptions())
                 .transformWhile { event ->
                     if (event.is_final) {
                         if (event.error_message.isNotEmpty()) streamError = event.error_message
@@ -446,8 +453,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         emit(event)
                         true // keep going
                     }
-                }
-                .collect { event ->
+                }.collect { event ->
                     val token = event.token
                     if (token.isEmpty()) return@collect
                     fullResponse += token
@@ -766,9 +772,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Simple token estimation (approximately 4 characters per token)
      */
-    private fun estimateTokenCount(text: String): Int {
-        return ceil(text.length / 4.0).toInt()
-    }
+    private fun estimateTokenCount(text: String): Int = ceil(text.length / 4.0).toInt()
 
     /**
      * Create MessageModelInfo for the current loaded model
@@ -888,10 +892,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Use SDK's model listing API to find chat models
                 // Prefer Genie (NPU) models over CPU models for testing
-                val allModels = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+                val allModels =
+                    RunAnywhere
+                        .listModels(ModelListRequest())
+                        .models
+                        ?.models
+                        .orEmpty()
                 val chatModel =
                     allModels.firstOrNull { model ->
-                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedOnDisk &&
+                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE &&
+                            model.isDownloadedOnDisk &&
                             model.framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE
                     } ?: allModels.firstOrNull { model ->
                         model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedOnDisk

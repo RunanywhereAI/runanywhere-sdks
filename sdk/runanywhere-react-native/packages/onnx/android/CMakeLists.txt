@@ -1,3 +1,21 @@
+# =============================================================================
+# COUPLING NOTE: This file references librac_commons.so + RAC headers from the
+# sibling @runanywhere/core npm package via a hard-coded relative path:
+#   ../../core/android/src/main/jniLibs/${ANDROID_ABI}/librac_commons.so
+#   ../../core/android/src/main/jniLibs/include/
+# (computed via RN_NODE_MODULES → @runanywhere/core/android/src/main/jniLibs/).
+#
+# This is a known fragility — if the package directory structure changes,
+# update the path here. Future improvement: migrate to Android Prefab module
+# consumption (build.gradle: `prefab { commons { ... } }`) so the dependency
+# is declared at the Gradle layer rather than the CMake layer.
+#
+# Prefab adoption was attempted but deferred because librac_commons.so is a
+# pre-built binary downloaded by core's Gradle task (not produced by core's
+# externalNativeBuild), so AGP's `prefabPublishing` publisher cannot
+# auto-export it without additional manifest wiring. The relative-path
+# coupling is therefore documented and intentionally preserved.
+# =============================================================================
 project(runanywhereonnx)
 # Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)

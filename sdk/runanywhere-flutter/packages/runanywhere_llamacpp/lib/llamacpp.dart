@@ -90,7 +90,6 @@ class LlamaCpp implements RunAnywhereModule {
   // ============================================================================
 
   static bool _isRegistered = false;
-  static bool _isVlmRegistered = false;
   static LlamaCppBindings? _bindings;
   static final _logger = SDKLogger('LlamaCpp');
 
@@ -139,59 +138,13 @@ class LlamaCpp implements RunAnywhereModule {
 
       _isRegistered = true;
       _logger.info('LlamaCpp LLM backend registered successfully');
-
-      // Register VLM backend (Vision Language Model)
-      _registerVlm();
     } catch (e) {
       _logger.error('LlamaCppBindings not available: $e');
     }
   }
 
-  /// Register VLM (Vision Language Model) backend.
-  ///
-  /// This is called automatically by register() - matches iOS pattern.
-  static void _registerVlm() {
-    if (_isVlmRegistered) {
-      _logger.debug('LlamaCpp VLM already registered');
-      return;
-    }
-
-    if (_bindings == null) {
-      _logger.warning('Cannot register VLM: bindings not available');
-      return;
-    }
-
-    _logger.info('Registering LlamaCpp VLM backend...');
-
-    try {
-      final vlmResult = _bindings!.registerVlm();
-      _logger.info(
-          'rac_backend_llamacpp_vlm_register() returned: $vlmResult (${RacResultCode.getMessage(vlmResult)})');
-
-      // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
-      if (vlmResult != RacResultCode.success &&
-          vlmResult != RacResultCode.errorModuleAlreadyRegistered) {
-        _logger.warning(
-            'C++ VLM backend registration failed with code: $vlmResult (VLM features may not be available)');
-        return;
-      }
-
-      _isVlmRegistered = true;
-      _logger.info('LlamaCpp VLM backend registered successfully');
-    } catch (e) {
-      _logger.warning(
-          'VLM registration failed: $e (VLM features may not be available)');
-    }
-  }
-
   /// Unregister the LlamaCPP backend from C++ registry.
   static void unregister() {
-    if (_isVlmRegistered) {
-      _bindings?.unregisterVlm();
-      _isVlmRegistered = false;
-      _logger.info('LlamaCpp VLM backend unregistered');
-    }
-
     if (_isRegistered) {
       _bindings?.unregister();
       _isRegistered = false;

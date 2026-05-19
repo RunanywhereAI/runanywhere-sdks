@@ -5,7 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${WASM_DIR}/../../.." && pwd)"
 
-SHERPA_ONNX_VERSION="${SHERPA_ONNX_VERSION:-1.12.23}"
+# Source the canonical VERSIONS file so the WASM sherpa-onnx vendor matches
+# the rest of the matched set. F3 (dep-bump 2026-05-19): WASM previously
+# pinned 1.12.23 as a hardcoded fallback; the matched set now requires 1.13.2
+# alongside ORT 1.24.4 (see vendor-onnxruntime-wasm.sh for context).
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/sdk/runanywhere-commons/scripts/load-versions.sh"
+
+SHERPA_ONNX_VERSION="${SHERPA_ONNX_VERSION:-${SHERPA_ONNX_VERSION_LINUX}}"
 SRC_DIR="${SHERPA_ONNX_SRC_DIR:-${WASM_DIR}/third_party/sherpa-onnx}"
 DEST_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm"
 ORT_DIR="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"

@@ -252,15 +252,76 @@ export interface ModalityProtoModule extends ProtoWasmModule {
 export type ProtoEventHandler<T> = (event: T) => void;
 
 // ---------------------------------------------------------------------------
-// Shared mutable state used by `ModalityProtoAdapter.setDefaultModule` and
+// Shared mutable state used by `ModalityProtoAdapter` and
 // `VADProtoAdapter.setActivityHandler`. Lives in one module so the per-
 // modality files don't drift out of sync.
+//
+// Per-modality slots replace the single `defaultModule` slot that the
+// pre-P4 monolithic-WASM era used. Each per-modality adapter looks up the
+// module that owns its capability, so backends that register narrower
+// capability sets (e.g. ONNX → STT/TTS/VAD) no longer overwrite the module
+// for unrelated modalities (e.g. LLM via llamacpp).
+//
+// Capability names mirror `WasmCapability` in EmscriptenModule.ts.
 // ---------------------------------------------------------------------------
 
+export interface ModalityCapabilitySlots {
+  llm: ModalityProtoModule | null;
+  vlm: ModalityProtoModule | null;
+  stt: ModalityProtoModule | null;
+  tts: ModalityProtoModule | null;
+  vad: ModalityProtoModule | null;
+  embedding: ModalityProtoModule | null;
+  rag: ModalityProtoModule | null;
+  diffusion: ModalityProtoModule | null;
+  'structured-output': ModalityProtoModule | null;
+  'tool-calling': ModalityProtoModule | null;
+  lora: ModalityProtoModule | null;
+  'voice-agent': ModalityProtoModule | null;
+}
+
+export type ModalityCapabilityName = keyof ModalityCapabilitySlots;
+
 export const adapterState = {
+  /**
+   * Legacy aggregate slot — kept so `ModalityProtoAdapter.tryDefault()`
+   * still returns a single module for callers that don't care which
+   * capability they're talking to. Populated by whichever module last
+   * registered the 'commons' capability, falling back to any module if no
+   * commons exists.
+   */
   defaultModule: null as ModalityProtoModule | null,
+  /**
+   * Per-modality module slots. A given module may occupy multiple slots
+   * (LLM + VLM share the llamacpp module; STT/TTS/VAD share the onnx
+   * module). Lookup is O(1).
+   */
+  modalitySlots: {
+    llm: null,
+    vlm: null,
+    stt: null,
+    tts: null,
+    vad: null,
+    embedding: null,
+    rag: null,
+    diffusion: null,
+    'structured-output': null,
+    'tool-calling': null,
+    lora: null,
+    'voice-agent': null,
+  } as ModalityCapabilitySlots,
   vadActivityCallbackPtrs: new Map<number, number>(),
 };
+
+/**
+ * Helper used by per-modality adapters: returns the module that owns the
+ * given capability, or null if no backend has registered for it.
+ */
+export function modalityModuleFor(
+  cap: ModalityCapabilityName,
+): ModalityProtoModule | null {
+  return adapterState.modalitySlots[cap];
+}
 
 export function emptyLoRAState(): ProtoLoRAState {
   return {

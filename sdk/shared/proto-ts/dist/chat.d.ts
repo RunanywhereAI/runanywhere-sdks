@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
@@ -166,86 +166,16 @@ export interface ChatConversationState_MetadataEntry {
     key: string;
     value: string;
 }
-export declare const ChatAttachment: {
-    encode(message: ChatAttachment, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatAttachment;
-    fromJSON(object: any): ChatAttachment;
-    toJSON(message: ChatAttachment): unknown;
-    create<I extends Exact<DeepPartial<ChatAttachment>, I>>(base?: I): ChatAttachment;
-    fromPartial<I extends Exact<DeepPartial<ChatAttachment>, I>>(object: I): ChatAttachment;
-};
-export declare const ChatAttachment_MetadataEntry: {
-    encode(message: ChatAttachment_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatAttachment_MetadataEntry;
-    fromJSON(object: any): ChatAttachment_MetadataEntry;
-    toJSON(message: ChatAttachment_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ChatAttachment_MetadataEntry>, I>>(base?: I): ChatAttachment_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ChatAttachment_MetadataEntry>, I>>(object: I): ChatAttachment_MetadataEntry;
-};
-export declare const ChatMessage: {
-    encode(message: ChatMessage, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatMessage;
-    fromJSON(object: any): ChatMessage;
-    toJSON(message: ChatMessage): unknown;
-    create<I extends Exact<DeepPartial<ChatMessage>, I>>(base?: I): ChatMessage;
-    fromPartial<I extends Exact<DeepPartial<ChatMessage>, I>>(object: I): ChatMessage;
-};
-export declare const ChatMessage_MetadataEntry: {
-    encode(message: ChatMessage_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatMessage_MetadataEntry;
-    fromJSON(object: any): ChatMessage_MetadataEntry;
-    toJSON(message: ChatMessage_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ChatMessage_MetadataEntry>, I>>(base?: I): ChatMessage_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ChatMessage_MetadataEntry>, I>>(object: I): ChatMessage_MetadataEntry;
-};
-export declare const ChatGenerationRequest: {
-    encode(message: ChatGenerationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationRequest;
-    fromJSON(object: any): ChatGenerationRequest;
-    toJSON(message: ChatGenerationRequest): unknown;
-    create<I extends Exact<DeepPartial<ChatGenerationRequest>, I>>(base?: I): ChatGenerationRequest;
-    fromPartial<I extends Exact<DeepPartial<ChatGenerationRequest>, I>>(object: I): ChatGenerationRequest;
-};
-export declare const ChatGenerationRequest_MetadataEntry: {
-    encode(message: ChatGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationRequest_MetadataEntry;
-    fromJSON(object: any): ChatGenerationRequest_MetadataEntry;
-    toJSON(message: ChatGenerationRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ChatGenerationRequest_MetadataEntry>, I>>(base?: I): ChatGenerationRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ChatGenerationRequest_MetadataEntry>, I>>(object: I): ChatGenerationRequest_MetadataEntry;
-};
-export declare const ChatGenerationResult: {
-    encode(message: ChatGenerationResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationResult;
-    fromJSON(object: any): ChatGenerationResult;
-    toJSON(message: ChatGenerationResult): unknown;
-    create<I extends Exact<DeepPartial<ChatGenerationResult>, I>>(base?: I): ChatGenerationResult;
-    fromPartial<I extends Exact<DeepPartial<ChatGenerationResult>, I>>(object: I): ChatGenerationResult;
-};
-export declare const ChatStreamEvent: {
-    encode(message: ChatStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatStreamEvent;
-    fromJSON(object: any): ChatStreamEvent;
-    toJSON(message: ChatStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<ChatStreamEvent>, I>>(base?: I): ChatStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<ChatStreamEvent>, I>>(object: I): ChatStreamEvent;
-};
-export declare const ChatConversationState: {
-    encode(message: ChatConversationState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatConversationState;
-    fromJSON(object: any): ChatConversationState;
-    toJSON(message: ChatConversationState): unknown;
-    create<I extends Exact<DeepPartial<ChatConversationState>, I>>(base?: I): ChatConversationState;
-    fromPartial<I extends Exact<DeepPartial<ChatConversationState>, I>>(object: I): ChatConversationState;
-};
-export declare const ChatConversationState_MetadataEntry: {
-    encode(message: ChatConversationState_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ChatConversationState_MetadataEntry;
-    fromJSON(object: any): ChatConversationState_MetadataEntry;
-    toJSON(message: ChatConversationState_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ChatConversationState_MetadataEntry>, I>>(base?: I): ChatConversationState_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ChatConversationState_MetadataEntry>, I>>(object: I): ChatConversationState_MetadataEntry;
-};
+export declare const ChatAttachment: MessageFns<ChatAttachment>;
+export declare const ChatAttachment_MetadataEntry: MessageFns<ChatAttachment_MetadataEntry>;
+export declare const ChatMessage: MessageFns<ChatMessage>;
+export declare const ChatMessage_MetadataEntry: MessageFns<ChatMessage_MetadataEntry>;
+export declare const ChatGenerationRequest: MessageFns<ChatGenerationRequest>;
+export declare const ChatGenerationRequest_MetadataEntry: MessageFns<ChatGenerationRequest_MetadataEntry>;
+export declare const ChatGenerationResult: MessageFns<ChatGenerationResult>;
+export declare const ChatStreamEvent: MessageFns<ChatStreamEvent>;
+export declare const ChatConversationState: MessageFns<ChatConversationState>;
+export declare const ChatConversationState_MetadataEntry: MessageFns<ChatConversationState_MetadataEntry>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -256,4 +186,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

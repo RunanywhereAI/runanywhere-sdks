@@ -9,7 +9,9 @@ import java.io.File
  * JSON persistence for benchmark runs in the app's internal storage.
  * Matches iOS BenchmarkStore exactly.
  */
-class BenchmarkStore(private val context: Context) {
+class BenchmarkStore(
+    private val context: Context,
+) {
     private val json =
         Json {
             prettyPrint = true

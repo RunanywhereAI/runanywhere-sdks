@@ -1,13 +1,14 @@
+// This is a generated file - do not edit.
 //
-//  Generated code. Do not modify.
-//  source: storage_types.proto
-//
-// @dart = 2.12
+// Generated from storage_types.proto.
+
+// @dart = 3.3
 
 // ignore_for_file: annotate_overrides, camel_case_types, comment_references
-// ignore_for_file: constant_identifier_names, library_prefixes
-// ignore_for_file: non_constant_identifier_names, prefer_final_fields
-// ignore_for_file: unnecessary_import, unnecessary_this, unused_import
+// ignore_for_file: constant_identifier_names
+// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
+// ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
 import 'dart:core' as $core;
 
@@ -21,16 +22,24 @@ import 'package:protobuf/protobuf.dart' as $pb;
 /// Canonical superset (this file): vendor-grouped, vendor-agnostic.
 /// ---------------------------------------------------------------------------
 class NPUChip extends $pb.ProtobufEnum {
-  static const NPUChip NPU_CHIP_UNSPECIFIED = NPUChip._(0, _omitEnumNames ? '' : 'NPU_CHIP_UNSPECIFIED');
-  static const NPUChip NPU_CHIP_NONE = NPUChip._(1, _omitEnumNames ? '' : 'NPU_CHIP_NONE');
-  static const NPUChip NPU_CHIP_APPLE_NEURAL_ENGINE = NPUChip._(2, _omitEnumNames ? '' : 'NPU_CHIP_APPLE_NEURAL_ENGINE');
-  static const NPUChip NPU_CHIP_QUALCOMM_HEXAGON = NPUChip._(3, _omitEnumNames ? '' : 'NPU_CHIP_QUALCOMM_HEXAGON');
-  static const NPUChip NPU_CHIP_MEDIATEK_APU = NPUChip._(4, _omitEnumNames ? '' : 'NPU_CHIP_MEDIATEK_APU');
-  static const NPUChip NPU_CHIP_GOOGLE_TPU = NPUChip._(5, _omitEnumNames ? '' : 'NPU_CHIP_GOOGLE_TPU');
-  static const NPUChip NPU_CHIP_INTEL_NPU = NPUChip._(6, _omitEnumNames ? '' : 'NPU_CHIP_INTEL_NPU');
-  static const NPUChip NPU_CHIP_OTHER = NPUChip._(99, _omitEnumNames ? '' : 'NPU_CHIP_OTHER');
+  static const NPUChip NPU_CHIP_UNSPECIFIED =
+      NPUChip._(0, _omitEnumNames ? '' : 'NPU_CHIP_UNSPECIFIED');
+  static const NPUChip NPU_CHIP_NONE =
+      NPUChip._(1, _omitEnumNames ? '' : 'NPU_CHIP_NONE');
+  static const NPUChip NPU_CHIP_APPLE_NEURAL_ENGINE =
+      NPUChip._(2, _omitEnumNames ? '' : 'NPU_CHIP_APPLE_NEURAL_ENGINE');
+  static const NPUChip NPU_CHIP_QUALCOMM_HEXAGON =
+      NPUChip._(3, _omitEnumNames ? '' : 'NPU_CHIP_QUALCOMM_HEXAGON');
+  static const NPUChip NPU_CHIP_MEDIATEK_APU =
+      NPUChip._(4, _omitEnumNames ? '' : 'NPU_CHIP_MEDIATEK_APU');
+  static const NPUChip NPU_CHIP_GOOGLE_TPU =
+      NPUChip._(5, _omitEnumNames ? '' : 'NPU_CHIP_GOOGLE_TPU');
+  static const NPUChip NPU_CHIP_INTEL_NPU =
+      NPUChip._(6, _omitEnumNames ? '' : 'NPU_CHIP_INTEL_NPU');
+  static const NPUChip NPU_CHIP_OTHER =
+      NPUChip._(99, _omitEnumNames ? '' : 'NPU_CHIP_OTHER');
 
-  static const $core.List<NPUChip> values = <NPUChip> [
+  static const $core.List<NPUChip> values = <NPUChip>[
     NPU_CHIP_UNSPECIFIED,
     NPU_CHIP_NONE,
     NPU_CHIP_APPLE_NEURAL_ENGINE,
@@ -41,11 +50,12 @@ class NPUChip extends $pb.ProtobufEnum {
     NPU_CHIP_OTHER,
   ];
 
-  static final $core.Map<$core.int, NPUChip> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static final $core.Map<$core.int, NPUChip> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
   static NPUChip? valueOf($core.int value) => _byValue[value];
 
-  const NPUChip._($core.int v, $core.String n) : super(v, n);
+  const NPUChip._(super.value, super.name);
 }
 
-
-const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');
+const $core.bool _omitEnumNames =
+    $core.bool.fromEnvironment('protobuf.omit_enum_names');

@@ -1,11 +1,13 @@
 /**
  * @file rac_plugin_entry_llamacpp.h
- * @brief Public declaration of the llama.cpp unified-ABI plugin entry points.
+ * @brief Public declaration of the llama.cpp unified-ABI plugin entry point.
  *
- * GAP 02 Phase 8 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
+ * llama.cpp is one engine that supports both text generation (LLM) and
+ * vision-language (VLM) modalities. A single plugin vtable fills both the
+ * `llm_ops` and `vlm_ops` slots; there is one entry point.
  *
  * Consumers that want to register llama.cpp via the unified plugin registry
- * include this header and call either entry point manually, or use
+ * include this header and call `rac_plugin_entry_llamacpp()` manually, or use
  * `RAC_STATIC_PLUGIN_REGISTER(llamacpp)` in their bootstrap TU.
  */
 
@@ -19,14 +21,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Returns the engine vtable for llama.cpp text generation (LLM).
+ * @brief Returns the engine vtable for llama.cpp (both LLM and VLM modalities).
  */
 RAC_PLUGIN_ENTRY_DECL(llamacpp);
-
-/**
- * @brief Returns the engine vtable for llama.cpp vision-language models (VLM).
- */
-RAC_PLUGIN_ENTRY_DECL(llamacpp_vlm);
 
 #ifdef __cplusplus
 }

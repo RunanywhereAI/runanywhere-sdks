@@ -248,10 +248,16 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_COMMONS_JNI}" "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     copy_if_exists "${LIB_RAG_JNI}"     "${KOTLIN_DEST}"
 
-    # Engine plugin entry-point libs (runanywhere_<engine>.so) — Kotlin loads
-    # them via the dlopen registry. Keep the original glob-based collection
-    # for Kotlin so every emitted plugin is packaged.
-    find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_*.so" -exec cp -v {} "${KOTLIN_DEST}/" \;
+    # Engine plugin entry-point libs (runanywhere_<engine>.so) — routed to
+    # the appropriate backend module's jniLibs, NOT to core. The core module
+    # only ships librac_commons.so + librunanywhere_jni.so + the libc++/libomp
+    # sidecars. Each backend's entry-point lib travels with its plugin module.
+    LIB_RUNANYWHERE_LLAMACPP="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_llamacpp.so"  -print -quit || true)"
+    LIB_RUNANYWHERE_ONNX="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_onnx.so"          -print -quit || true)"
+    LIB_RUNANYWHERE_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_sherpa.so"      -print -quit || true)"
+    copy_if_exists "${LIB_RUNANYWHERE_LLAMACPP}" "${KOTLIN_LLAMA_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_ONNX}"     "${KOTLIN_ONNX_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_SHERPA}"   "${KOTLIN_ONNX_DEST}"
 
     # Per-engine backend + JNI libs. Staged to both RN and Flutter plugin
     # packages so the same jniLibs layout is shipped from every SDK.
@@ -260,9 +266,9 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_ONNX}"      "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     copy_if_exists "${LIB_ONNX_JNI}"  "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
-    # it alongside the onnx plugin on every ONNX-enabled SDK package. Also
-    # stage into Kotlin so its dlopen registry picks up the plugin.
-    copy_if_exists "${LIB_SHERPA}"    "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}" "${KOTLIN_DEST}" "${KOTLIN_ONNX_DEST}"
+    # it alongside the onnx plugin on every ONNX-enabled SDK package. Routed
+    # to the Kotlin ONNX module (not core).
+    copy_if_exists "${LIB_SHERPA}"    "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}" "${KOTLIN_ONNX_DEST}"
 
     # Sherpa / ORT prebuilt runtime — only has arm64-v8a/armeabi-v7a/x86_64
     # sub-folders. Staged into Kotlin, RN, and Flutter ONNX plugins.
@@ -283,7 +289,7 @@ for ABI in "${ABIS[@]}"; do
         exit 1
     fi
     for dst in \
-        "${KOTLIN_DEST}" \
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"

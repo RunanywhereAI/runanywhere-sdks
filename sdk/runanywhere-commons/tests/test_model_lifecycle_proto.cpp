@@ -252,7 +252,11 @@ rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops, const uint
 rac_engine_vtable_t make_dummy_vlm_vtable(rac_vlm_service_ops_t* ops, const uint32_t* formats) {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    v.metadata.name = "llamacpp_vlm";
+    // After the LLM/VLM plugin unification, llama.cpp publishes ONE vtable
+    // named "llamacpp" with both llm_ops and vlm_ops slots filled. The
+    // model-lifecycle code pins to "llamacpp" for RAC_FRAMEWORK_LLAMACPP, so
+    // the test mock must register under the same name to be discoverable.
+    v.metadata.name = "llamacpp";
     v.metadata.display_name = "dummy llama.cpp VLM";
     v.metadata.engine_version = "0.0.0";
     v.metadata.priority = 100;
@@ -445,7 +449,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
 
     const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
     auto vtable = make_dummy_vlm_vtable(&ops, formats);
-    (void)rac_plugin_unregister("llamacpp_vlm");
+    (void)rac_plugin_unregister("llamacpp");
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "dummy VLM lifecycle plugin registers");
     CHECK(register_model(registry, build_vlm_model(root)), "VLM model registers");
 
@@ -512,7 +516,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
           "VLM unload calls cleanup and destroy");
     rac_proto_buffer_free(&out);
 
-    rac_plugin_unregister("llamacpp_vlm");
+    rac_plugin_unregister("llamacpp");
     rac_model_lifecycle_reset();
     std::filesystem::remove_all(root);
     return 0;

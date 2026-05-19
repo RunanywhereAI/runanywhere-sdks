@@ -148,7 +148,7 @@ class RunAnywhereTTS {
       text: opts.enableSsml ? null : text,
       ssml: opts.enableSsml ? text : null,
       options: opts,
-      metadata: {'voice_id': voiceId},
+      metadata: <String, String>{'voice_id': voiceId}.entries,
     );
     return DartBridgeTTS.shared.synthesizeLifecycleProto(request);
   }
@@ -167,7 +167,7 @@ class RunAnywhereTTS {
       text: opts.enableSsml ? null : text,
       ssml: opts.enableSsml ? text : null,
       options: opts,
-      metadata: {'voice_id': voiceId},
+      metadata: <String, String>{'voice_id': voiceId}.entries,
     );
     await for (final event
         in DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request)) {

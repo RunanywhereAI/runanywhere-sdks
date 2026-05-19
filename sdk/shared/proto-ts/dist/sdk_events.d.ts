@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ComponentLifecycleState, EventCategory } from "./component_types";
 import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadResumeResult, DownloadStartResult } from "./download_service";
 import { ErrorSeverity, SDKError } from "./errors";
@@ -1124,262 +1124,38 @@ export interface SDKEventSubscribeRequest {
      */
     replayQueuedEvents: boolean;
 }
-export declare const InitializationEvent: {
-    encode(message: InitializationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): InitializationEvent;
-    fromJSON(object: any): InitializationEvent;
-    toJSON(message: InitializationEvent): unknown;
-    create<I extends Exact<DeepPartial<InitializationEvent>, I>>(base?: I): InitializationEvent;
-    fromPartial<I extends Exact<DeepPartial<InitializationEvent>, I>>(object: I): InitializationEvent;
-};
-export declare const ConfigurationEvent: {
-    encode(message: ConfigurationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ConfigurationEvent;
-    fromJSON(object: any): ConfigurationEvent;
-    toJSON(message: ConfigurationEvent): unknown;
-    create<I extends Exact<DeepPartial<ConfigurationEvent>, I>>(base?: I): ConfigurationEvent;
-    fromPartial<I extends Exact<DeepPartial<ConfigurationEvent>, I>>(object: I): ConfigurationEvent;
-};
-export declare const GenerationEvent: {
-    encode(message: GenerationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): GenerationEvent;
-    fromJSON(object: any): GenerationEvent;
-    toJSON(message: GenerationEvent): unknown;
-    create<I extends Exact<DeepPartial<GenerationEvent>, I>>(base?: I): GenerationEvent;
-    fromPartial<I extends Exact<DeepPartial<GenerationEvent>, I>>(object: I): GenerationEvent;
-};
-export declare const ModelEvent: {
-    encode(message: ModelEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelEvent;
-    fromJSON(object: any): ModelEvent;
-    toJSON(message: ModelEvent): unknown;
-    create<I extends Exact<DeepPartial<ModelEvent>, I>>(base?: I): ModelEvent;
-    fromPartial<I extends Exact<DeepPartial<ModelEvent>, I>>(object: I): ModelEvent;
-};
-export declare const VoiceLifecycleEvent: {
-    encode(message: VoiceLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceLifecycleEvent;
-    fromJSON(object: any): VoiceLifecycleEvent;
-    toJSON(message: VoiceLifecycleEvent): unknown;
-    create<I extends Exact<DeepPartial<VoiceLifecycleEvent>, I>>(base?: I): VoiceLifecycleEvent;
-    fromPartial<I extends Exact<DeepPartial<VoiceLifecycleEvent>, I>>(object: I): VoiceLifecycleEvent;
-};
-export declare const PerformanceEvent: {
-    encode(message: PerformanceEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): PerformanceEvent;
-    fromJSON(object: any): PerformanceEvent;
-    toJSON(message: PerformanceEvent): unknown;
-    create<I extends Exact<DeepPartial<PerformanceEvent>, I>>(base?: I): PerformanceEvent;
-    fromPartial<I extends Exact<DeepPartial<PerformanceEvent>, I>>(object: I): PerformanceEvent;
-};
-export declare const NetworkEvent: {
-    encode(message: NetworkEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): NetworkEvent;
-    fromJSON(object: any): NetworkEvent;
-    toJSON(message: NetworkEvent): unknown;
-    create<I extends Exact<DeepPartial<NetworkEvent>, I>>(base?: I): NetworkEvent;
-    fromPartial<I extends Exact<DeepPartial<NetworkEvent>, I>>(object: I): NetworkEvent;
-};
-export declare const StorageEvent: {
-    encode(message: StorageEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageEvent;
-    fromJSON(object: any): StorageEvent;
-    toJSON(message: StorageEvent): unknown;
-    create<I extends Exact<DeepPartial<StorageEvent>, I>>(base?: I): StorageEvent;
-    fromPartial<I extends Exact<DeepPartial<StorageEvent>, I>>(object: I): StorageEvent;
-};
-export declare const FrameworkEvent: {
-    encode(message: FrameworkEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): FrameworkEvent;
-    fromJSON(object: any): FrameworkEvent;
-    toJSON(message: FrameworkEvent): unknown;
-    create<I extends Exact<DeepPartial<FrameworkEvent>, I>>(base?: I): FrameworkEvent;
-    fromPartial<I extends Exact<DeepPartial<FrameworkEvent>, I>>(object: I): FrameworkEvent;
-};
-export declare const DeviceEvent: {
-    encode(message: DeviceEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DeviceEvent;
-    fromJSON(object: any): DeviceEvent;
-    toJSON(message: DeviceEvent): unknown;
-    create<I extends Exact<DeepPartial<DeviceEvent>, I>>(base?: I): DeviceEvent;
-    fromPartial<I extends Exact<DeepPartial<DeviceEvent>, I>>(object: I): DeviceEvent;
-};
-export declare const ComponentInitializationEvent: {
-    encode(message: ComponentInitializationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentInitializationEvent;
-    fromJSON(object: any): ComponentInitializationEvent;
-    toJSON(message: ComponentInitializationEvent): unknown;
-    create<I extends Exact<DeepPartial<ComponentInitializationEvent>, I>>(base?: I): ComponentInitializationEvent;
-    fromPartial<I extends Exact<DeepPartial<ComponentInitializationEvent>, I>>(object: I): ComponentInitializationEvent;
-};
-export declare const ComponentLifecycleSnapshot: {
-    encode(message: ComponentLifecycleSnapshot, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleSnapshot;
-    fromJSON(object: any): ComponentLifecycleSnapshot;
-    toJSON(message: ComponentLifecycleSnapshot): unknown;
-    create<I extends Exact<DeepPartial<ComponentLifecycleSnapshot>, I>>(base?: I): ComponentLifecycleSnapshot;
-    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleSnapshot>, I>>(object: I): ComponentLifecycleSnapshot;
-};
-export declare const ComponentLifecycleSnapshotRequest: {
-    encode(message: ComponentLifecycleSnapshotRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleSnapshotRequest;
-    fromJSON(object: any): ComponentLifecycleSnapshotRequest;
-    toJSON(message: ComponentLifecycleSnapshotRequest): unknown;
-    create<I extends Exact<DeepPartial<ComponentLifecycleSnapshotRequest>, I>>(base?: I): ComponentLifecycleSnapshotRequest;
-    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleSnapshotRequest>, I>>(object: I): ComponentLifecycleSnapshotRequest;
-};
-export declare const ComponentLifecycleSnapshotResult: {
-    encode(message: ComponentLifecycleSnapshotResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleSnapshotResult;
-    fromJSON(object: any): ComponentLifecycleSnapshotResult;
-    toJSON(message: ComponentLifecycleSnapshotResult): unknown;
-    create<I extends Exact<DeepPartial<ComponentLifecycleSnapshotResult>, I>>(base?: I): ComponentLifecycleSnapshotResult;
-    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleSnapshotResult>, I>>(object: I): ComponentLifecycleSnapshotResult;
-};
-export declare const ComponentLifecycleEvent: {
-    encode(message: ComponentLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentLifecycleEvent;
-    fromJSON(object: any): ComponentLifecycleEvent;
-    toJSON(message: ComponentLifecycleEvent): unknown;
-    create<I extends Exact<DeepPartial<ComponentLifecycleEvent>, I>>(base?: I): ComponentLifecycleEvent;
-    fromPartial<I extends Exact<DeepPartial<ComponentLifecycleEvent>, I>>(object: I): ComponentLifecycleEvent;
-};
-export declare const SessionEvent: {
-    encode(message: SessionEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SessionEvent;
-    fromJSON(object: any): SessionEvent;
-    toJSON(message: SessionEvent): unknown;
-    create<I extends Exact<DeepPartial<SessionEvent>, I>>(base?: I): SessionEvent;
-    fromPartial<I extends Exact<DeepPartial<SessionEvent>, I>>(object: I): SessionEvent;
-};
-export declare const AuthEvent: {
-    encode(message: AuthEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): AuthEvent;
-    fromJSON(object: any): AuthEvent;
-    toJSON(message: AuthEvent): unknown;
-    create<I extends Exact<DeepPartial<AuthEvent>, I>>(base?: I): AuthEvent;
-    fromPartial<I extends Exact<DeepPartial<AuthEvent>, I>>(object: I): AuthEvent;
-};
-export declare const ModelRegistryEvent: {
-    encode(message: ModelRegistryEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryEvent;
-    fromJSON(object: any): ModelRegistryEvent;
-    toJSON(message: ModelRegistryEvent): unknown;
-    create<I extends Exact<DeepPartial<ModelRegistryEvent>, I>>(base?: I): ModelRegistryEvent;
-    fromPartial<I extends Exact<DeepPartial<ModelRegistryEvent>, I>>(object: I): ModelRegistryEvent;
-};
-export declare const DownloadEvent: {
-    encode(message: DownloadEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadEvent;
-    fromJSON(object: any): DownloadEvent;
-    toJSON(message: DownloadEvent): unknown;
-    create<I extends Exact<DeepPartial<DownloadEvent>, I>>(base?: I): DownloadEvent;
-    fromPartial<I extends Exact<DeepPartial<DownloadEvent>, I>>(object: I): DownloadEvent;
-};
-export declare const StorageLifecycleEvent: {
-    encode(message: StorageLifecycleEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): StorageLifecycleEvent;
-    fromJSON(object: any): StorageLifecycleEvent;
-    toJSON(message: StorageLifecycleEvent): unknown;
-    create<I extends Exact<DeepPartial<StorageLifecycleEvent>, I>>(base?: I): StorageLifecycleEvent;
-    fromPartial<I extends Exact<DeepPartial<StorageLifecycleEvent>, I>>(object: I): StorageLifecycleEvent;
-};
-export declare const HardwareRoutingEvent: {
-    encode(message: HardwareRoutingEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareRoutingEvent;
-    fromJSON(object: any): HardwareRoutingEvent;
-    toJSON(message: HardwareRoutingEvent): unknown;
-    create<I extends Exact<DeepPartial<HardwareRoutingEvent>, I>>(base?: I): HardwareRoutingEvent;
-    fromPartial<I extends Exact<DeepPartial<HardwareRoutingEvent>, I>>(object: I): HardwareRoutingEvent;
-};
-export declare const CapabilityOperationEvent: {
-    encode(message: CapabilityOperationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): CapabilityOperationEvent;
-    fromJSON(object: any): CapabilityOperationEvent;
-    toJSON(message: CapabilityOperationEvent): unknown;
-    create<I extends Exact<DeepPartial<CapabilityOperationEvent>, I>>(base?: I): CapabilityOperationEvent;
-    fromPartial<I extends Exact<DeepPartial<CapabilityOperationEvent>, I>>(object: I): CapabilityOperationEvent;
-};
-export declare const TelemetryEvent: {
-    encode(message: TelemetryEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TelemetryEvent;
-    fromJSON(object: any): TelemetryEvent;
-    toJSON(message: TelemetryEvent): unknown;
-    create<I extends Exact<DeepPartial<TelemetryEvent>, I>>(base?: I): TelemetryEvent;
-    fromPartial<I extends Exact<DeepPartial<TelemetryEvent>, I>>(object: I): TelemetryEvent;
-};
-export declare const TelemetryEvent_AttributesEntry: {
-    encode(message: TelemetryEvent_AttributesEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): TelemetryEvent_AttributesEntry;
-    fromJSON(object: any): TelemetryEvent_AttributesEntry;
-    toJSON(message: TelemetryEvent_AttributesEntry): unknown;
-    create<I extends Exact<DeepPartial<TelemetryEvent_AttributesEntry>, I>>(base?: I): TelemetryEvent_AttributesEntry;
-    fromPartial<I extends Exact<DeepPartial<TelemetryEvent_AttributesEntry>, I>>(object: I): TelemetryEvent_AttributesEntry;
-};
-export declare const CancellationEvent: {
-    encode(message: CancellationEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): CancellationEvent;
-    fromJSON(object: any): CancellationEvent;
-    toJSON(message: CancellationEvent): unknown;
-    create<I extends Exact<DeepPartial<CancellationEvent>, I>>(base?: I): CancellationEvent;
-    fromPartial<I extends Exact<DeepPartial<CancellationEvent>, I>>(object: I): CancellationEvent;
-};
-export declare const FailureEvent: {
-    encode(message: FailureEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): FailureEvent;
-    fromJSON(object: any): FailureEvent;
-    toJSON(message: FailureEvent): unknown;
-    create<I extends Exact<DeepPartial<FailureEvent>, I>>(base?: I): FailureEvent;
-    fromPartial<I extends Exact<DeepPartial<FailureEvent>, I>>(object: I): FailureEvent;
-};
-export declare const SDKEvent: {
-    encode(message: SDKEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEvent;
-    fromJSON(object: any): SDKEvent;
-    toJSON(message: SDKEvent): unknown;
-    create<I extends Exact<DeepPartial<SDKEvent>, I>>(base?: I): SDKEvent;
-    fromPartial<I extends Exact<DeepPartial<SDKEvent>, I>>(object: I): SDKEvent;
-};
-export declare const SDKEvent_PropertiesEntry: {
-    encode(message: SDKEvent_PropertiesEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEvent_PropertiesEntry;
-    fromJSON(object: any): SDKEvent_PropertiesEntry;
-    toJSON(message: SDKEvent_PropertiesEntry): unknown;
-    create<I extends Exact<DeepPartial<SDKEvent_PropertiesEntry>, I>>(base?: I): SDKEvent_PropertiesEntry;
-    fromPartial<I extends Exact<DeepPartial<SDKEvent_PropertiesEntry>, I>>(object: I): SDKEvent_PropertiesEntry;
-};
-export declare const SDKEventFilter: {
-    encode(message: SDKEventFilter, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEventFilter;
-    fromJSON(object: any): SDKEventFilter;
-    toJSON(message: SDKEventFilter): unknown;
-    create<I extends Exact<DeepPartial<SDKEventFilter>, I>>(base?: I): SDKEventFilter;
-    fromPartial<I extends Exact<DeepPartial<SDKEventFilter>, I>>(object: I): SDKEventFilter;
-};
-export declare const SDKEventPublishRequest: {
-    encode(message: SDKEventPublishRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEventPublishRequest;
-    fromJSON(object: any): SDKEventPublishRequest;
-    toJSON(message: SDKEventPublishRequest): unknown;
-    create<I extends Exact<DeepPartial<SDKEventPublishRequest>, I>>(base?: I): SDKEventPublishRequest;
-    fromPartial<I extends Exact<DeepPartial<SDKEventPublishRequest>, I>>(object: I): SDKEventPublishRequest;
-};
-export declare const SDKEventPublishResult: {
-    encode(message: SDKEventPublishResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEventPublishResult;
-    fromJSON(object: any): SDKEventPublishResult;
-    toJSON(message: SDKEventPublishResult): unknown;
-    create<I extends Exact<DeepPartial<SDKEventPublishResult>, I>>(base?: I): SDKEventPublishResult;
-    fromPartial<I extends Exact<DeepPartial<SDKEventPublishResult>, I>>(object: I): SDKEventPublishResult;
-};
-export declare const SDKEventSubscribeRequest: {
-    encode(message: SDKEventSubscribeRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKEventSubscribeRequest;
-    fromJSON(object: any): SDKEventSubscribeRequest;
-    toJSON(message: SDKEventSubscribeRequest): unknown;
-    create<I extends Exact<DeepPartial<SDKEventSubscribeRequest>, I>>(base?: I): SDKEventSubscribeRequest;
-    fromPartial<I extends Exact<DeepPartial<SDKEventSubscribeRequest>, I>>(object: I): SDKEventSubscribeRequest;
-};
+export declare const InitializationEvent: MessageFns<InitializationEvent>;
+export declare const ConfigurationEvent: MessageFns<ConfigurationEvent>;
+export declare const GenerationEvent: MessageFns<GenerationEvent>;
+export declare const ModelEvent: MessageFns<ModelEvent>;
+export declare const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent>;
+export declare const PerformanceEvent: MessageFns<PerformanceEvent>;
+export declare const NetworkEvent: MessageFns<NetworkEvent>;
+export declare const StorageEvent: MessageFns<StorageEvent>;
+export declare const FrameworkEvent: MessageFns<FrameworkEvent>;
+export declare const DeviceEvent: MessageFns<DeviceEvent>;
+export declare const ComponentInitializationEvent: MessageFns<ComponentInitializationEvent>;
+export declare const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot>;
+export declare const ComponentLifecycleSnapshotRequest: MessageFns<ComponentLifecycleSnapshotRequest>;
+export declare const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnapshotResult>;
+export declare const ComponentLifecycleEvent: MessageFns<ComponentLifecycleEvent>;
+export declare const SessionEvent: MessageFns<SessionEvent>;
+export declare const AuthEvent: MessageFns<AuthEvent>;
+export declare const ModelRegistryEvent: MessageFns<ModelRegistryEvent>;
+export declare const DownloadEvent: MessageFns<DownloadEvent>;
+export declare const StorageLifecycleEvent: MessageFns<StorageLifecycleEvent>;
+export declare const HardwareRoutingEvent: MessageFns<HardwareRoutingEvent>;
+export declare const CapabilityOperationEvent: MessageFns<CapabilityOperationEvent>;
+export declare const TelemetryEvent: MessageFns<TelemetryEvent>;
+export declare const TelemetryEvent_AttributesEntry: MessageFns<TelemetryEvent_AttributesEntry>;
+export declare const CancellationEvent: MessageFns<CancellationEvent>;
+export declare const FailureEvent: MessageFns<FailureEvent>;
+export declare const SDKEvent: MessageFns<SDKEvent>;
+export declare const SDKEvent_PropertiesEntry: MessageFns<SDKEvent_PropertiesEntry>;
+export declare const SDKEventFilter: MessageFns<SDKEventFilter>;
+export declare const SDKEventPublishRequest: MessageFns<SDKEventPublishRequest>;
+export declare const SDKEventPublishResult: MessageFns<SDKEventPublishResult>;
+export declare const SDKEventSubscribeRequest: MessageFns<SDKEventSubscribeRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -1390,4 +1166,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

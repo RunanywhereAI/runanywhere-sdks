@@ -7,8 +7,8 @@ import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
-import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.generated.convenience.wireString
+import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,7 +32,9 @@ sealed class SDKInitializationState {
     data object Ready : SDKInitializationState()
 
     /** SDK initialization failed */
-    data class Error(val error: Throwable) : SDKInitializationState()
+    data class Error(
+        val error: Throwable,
+    ) : SDKInitializationState()
 }
 
 class RunAnywhereApplication : Application() {

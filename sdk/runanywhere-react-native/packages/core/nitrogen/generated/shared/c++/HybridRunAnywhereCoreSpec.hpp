@@ -19,7 +19,7 @@
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
-// #include <NitroModules/Null.hpp> // Removed - file does not exist in nitro-modules 0.31.3
+// #include <NitroModules/Null.hpp> // Removed - file does not ship in react-native-nitro-modules 0.33.9 (nitrogen 0.34.1 codegen emits it; runtime pin pair documented in dependencies/versions.json)
 #include <variant>
 #include <optional>
 

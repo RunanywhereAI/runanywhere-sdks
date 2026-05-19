@@ -227,6 +227,12 @@ tasks.register("downloadJniLibs") {
         setOf(
             "librac_backend_llamacpp.so",
             "librac_backend_llamacpp_jni.so",
+            // libc++_shared.so is the C++ runtime that the llamacpp backend
+            // links against. The local source-build path stages it into this
+            // module's jniLibs (see scripts/build-core-android.sh), so the
+            // remote download path must match for the two flows to be
+            // interchangeable.
+            "libc++_shared.so",
         )
 
     outputs.dir(outputDir)

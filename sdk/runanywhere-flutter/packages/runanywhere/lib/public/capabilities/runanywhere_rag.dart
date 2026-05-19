@@ -101,7 +101,7 @@ class RunAnywhereRAG {
   /// Ingest a single document into the pipeline (chunk → embed → index).
   Future<void> ingest(String text, {String? metadataJSON}) async {
     await ragIngest(
-      RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON)),
+      RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON).entries),
     );
   }
 
@@ -125,7 +125,7 @@ class RunAnywhereRAG {
       documents
           .map((doc) => RAGDocument(
                 text: doc['text'] ?? '',
-                metadata: _parseMetadataJSON(doc['metadataJson']),
+                metadata: _parseMetadataJSON(doc['metadataJson']).entries,
               ))
           .toList(),
     );
@@ -270,7 +270,7 @@ extension RAGConfigurationResolvedArtifacts on RAGConfiguration {
 
 extension RAGDocumentConvenience on RAGDocument {
   static RAGDocument fromText(String text, {String? metadataJSON}) {
-    return RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON));
+    return RAGDocument(text: text, metadata: _parseMetadataJSON(metadataJSON).entries);
   }
 }
 

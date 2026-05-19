@@ -2,7 +2,7 @@ name: runanywhere_flutter_workspace
 publish_to: none
 
 environment:
-  sdk: '>=3.6.0 <4.0.0'
+  sdk: '>=3.10.0 <4.0.0'
 
 workspace:
   - packages/runanywhere
@@ -11,7 +11,7 @@ workspace:
   - packages/runanywhere_genie
 
 dev_dependencies:
-  melos: 6.3.2
+  melos: ^7.7.0
 
 melos:
   command:

@@ -1039,8 +1039,7 @@ private fun RecordingButton(
                             // RED ring
                             color = AppColors.primaryRed.copy(alpha = 0.3f),
                             shape = CircleShape,
-                        )
-                        .scale(scale * 1.1f),
+                        ).scale(scale * 1.1f),
             )
         }
 

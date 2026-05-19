@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -406,206 +406,31 @@ export interface ToolCallingSessionStepWithResultRequest {
 export interface ToolCallingSessionDestroyRequest {
     sessionHandle: number;
 }
-export declare const ToolValue: {
-    encode(message: ToolValue, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValue;
-    fromJSON(object: any): ToolValue;
-    toJSON(message: ToolValue): unknown;
-    create<I extends Exact<DeepPartial<ToolValue>, I>>(base?: I): ToolValue;
-    fromPartial<I extends Exact<DeepPartial<ToolValue>, I>>(object: I): ToolValue;
-};
-export declare const ToolValueArray: {
-    encode(message: ToolValueArray, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueArray;
-    fromJSON(object: any): ToolValueArray;
-    toJSON(message: ToolValueArray): unknown;
-    create<I extends Exact<DeepPartial<ToolValueArray>, I>>(base?: I): ToolValueArray;
-    fromPartial<I extends Exact<DeepPartial<ToolValueArray>, I>>(object: I): ToolValueArray;
-};
-export declare const ToolValueObject: {
-    encode(message: ToolValueObject, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueObject;
-    fromJSON(object: any): ToolValueObject;
-    toJSON(message: ToolValueObject): unknown;
-    create<I extends Exact<DeepPartial<ToolValueObject>, I>>(base?: I): ToolValueObject;
-    fromPartial<I extends Exact<DeepPartial<ToolValueObject>, I>>(object: I): ToolValueObject;
-};
-export declare const ToolValueObject_FieldsEntry: {
-    encode(message: ToolValueObject_FieldsEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueObject_FieldsEntry;
-    fromJSON(object: any): ToolValueObject_FieldsEntry;
-    toJSON(message: ToolValueObject_FieldsEntry): unknown;
-    create<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(base?: I): ToolValueObject_FieldsEntry;
-    fromPartial<I extends Exact<DeepPartial<ToolValueObject_FieldsEntry>, I>>(object: I): ToolValueObject_FieldsEntry;
-};
-export declare const ToolValueJSON: {
-    encode(message: ToolValueJSON, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueJSON;
-    fromJSON(object: any): ToolValueJSON;
-    toJSON(message: ToolValueJSON): unknown;
-    create<I extends Exact<DeepPartial<ToolValueJSON>, I>>(base?: I): ToolValueJSON;
-    fromPartial<I extends Exact<DeepPartial<ToolValueJSON>, I>>(object: I): ToolValueJSON;
-};
-export declare const ToolParameter: {
-    encode(message: ToolParameter, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParameter;
-    fromJSON(object: any): ToolParameter;
-    toJSON(message: ToolParameter): unknown;
-    create<I extends Exact<DeepPartial<ToolParameter>, I>>(base?: I): ToolParameter;
-    fromPartial<I extends Exact<DeepPartial<ToolParameter>, I>>(object: I): ToolParameter;
-};
-export declare const ToolDefinition: {
-    encode(message: ToolDefinition, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolDefinition;
-    fromJSON(object: any): ToolDefinition;
-    toJSON(message: ToolDefinition): unknown;
-    create<I extends Exact<DeepPartial<ToolDefinition>, I>>(base?: I): ToolDefinition;
-    fromPartial<I extends Exact<DeepPartial<ToolDefinition>, I>>(object: I): ToolDefinition;
-};
-export declare const ToolDefinition_MetadataEntry: {
-    encode(message: ToolDefinition_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolDefinition_MetadataEntry;
-    fromJSON(object: any): ToolDefinition_MetadataEntry;
-    toJSON(message: ToolDefinition_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ToolDefinition_MetadataEntry>, I>>(base?: I): ToolDefinition_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ToolDefinition_MetadataEntry>, I>>(object: I): ToolDefinition_MetadataEntry;
-};
-export declare const ToolCall: {
-    encode(message: ToolCall, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall;
-    fromJSON(object: any): ToolCall;
-    toJSON(message: ToolCall): unknown;
-    create<I extends Exact<DeepPartial<ToolCall>, I>>(base?: I): ToolCall;
-    fromPartial<I extends Exact<DeepPartial<ToolCall>, I>>(object: I): ToolCall;
-};
-export declare const ToolResult: {
-    encode(message: ToolResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult;
-    fromJSON(object: any): ToolResult;
-    toJSON(message: ToolResult): unknown;
-    create<I extends Exact<DeepPartial<ToolResult>, I>>(base?: I): ToolResult;
-    fromPartial<I extends Exact<DeepPartial<ToolResult>, I>>(object: I): ToolResult;
-};
-export declare const ToolCallingOptions: {
-    encode(message: ToolCallingOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingOptions;
-    fromJSON(object: any): ToolCallingOptions;
-    toJSON(message: ToolCallingOptions): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(base?: I): ToolCallingOptions;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(object: I): ToolCallingOptions;
-};
-export declare const ToolCallingResult: {
-    encode(message: ToolCallingResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingResult;
-    fromJSON(object: any): ToolCallingResult;
-    toJSON(message: ToolCallingResult): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingResult>, I>>(base?: I): ToolCallingResult;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingResult>, I>>(object: I): ToolCallingResult;
-};
-export declare const ToolParseRequest: {
-    encode(message: ToolParseRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParseRequest;
-    fromJSON(object: any): ToolParseRequest;
-    toJSON(message: ToolParseRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolParseRequest>, I>>(base?: I): ToolParseRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolParseRequest>, I>>(object: I): ToolParseRequest;
-};
-export declare const ToolParseResult: {
-    encode(message: ToolParseResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParseResult;
-    fromJSON(object: any): ToolParseResult;
-    toJSON(message: ToolParseResult): unknown;
-    create<I extends Exact<DeepPartial<ToolParseResult>, I>>(base?: I): ToolParseResult;
-    fromPartial<I extends Exact<DeepPartial<ToolParseResult>, I>>(object: I): ToolParseResult;
-};
-export declare const ToolPromptFormatRequest: {
-    encode(message: ToolPromptFormatRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolPromptFormatRequest;
-    fromJSON(object: any): ToolPromptFormatRequest;
-    toJSON(message: ToolPromptFormatRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolPromptFormatRequest>, I>>(base?: I): ToolPromptFormatRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolPromptFormatRequest>, I>>(object: I): ToolPromptFormatRequest;
-};
-export declare const ToolPromptFormatResult: {
-    encode(message: ToolPromptFormatResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolPromptFormatResult;
-    fromJSON(object: any): ToolPromptFormatResult;
-    toJSON(message: ToolPromptFormatResult): unknown;
-    create<I extends Exact<DeepPartial<ToolPromptFormatResult>, I>>(base?: I): ToolPromptFormatResult;
-    fromPartial<I extends Exact<DeepPartial<ToolPromptFormatResult>, I>>(object: I): ToolPromptFormatResult;
-};
-export declare const ToolCallValidationRequest: {
-    encode(message: ToolCallValidationRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallValidationRequest;
-    fromJSON(object: any): ToolCallValidationRequest;
-    toJSON(message: ToolCallValidationRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolCallValidationRequest>, I>>(base?: I): ToolCallValidationRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolCallValidationRequest>, I>>(object: I): ToolCallValidationRequest;
-};
-export declare const ToolCallValidationResult: {
-    encode(message: ToolCallValidationResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallValidationResult;
-    fromJSON(object: any): ToolCallValidationResult;
-    toJSON(message: ToolCallValidationResult): unknown;
-    create<I extends Exact<DeepPartial<ToolCallValidationResult>, I>>(base?: I): ToolCallValidationResult;
-    fromPartial<I extends Exact<DeepPartial<ToolCallValidationResult>, I>>(object: I): ToolCallValidationResult;
-};
-export declare const ToolCallingStreamEvent: {
-    encode(message: ToolCallingStreamEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingStreamEvent;
-    fromJSON(object: any): ToolCallingStreamEvent;
-    toJSON(message: ToolCallingStreamEvent): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(base?: I): ToolCallingStreamEvent;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(object: I): ToolCallingStreamEvent;
-};
-export declare const ToolRegistrySnapshot: {
-    encode(message: ToolRegistrySnapshot, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolRegistrySnapshot;
-    fromJSON(object: any): ToolRegistrySnapshot;
-    toJSON(message: ToolRegistrySnapshot): unknown;
-    create<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(base?: I): ToolRegistrySnapshot;
-    fromPartial<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(object: I): ToolRegistrySnapshot;
-};
-export declare const ToolCallingSessionCreateRequest: {
-    encode(message: ToolCallingSessionCreateRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionCreateRequest;
-    fromJSON(object: any): ToolCallingSessionCreateRequest;
-    toJSON(message: ToolCallingSessionCreateRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(base?: I): ToolCallingSessionCreateRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(object: I): ToolCallingSessionCreateRequest;
-};
-export declare const ToolCallingSessionCreateResult: {
-    encode(message: ToolCallingSessionCreateResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionCreateResult;
-    fromJSON(object: any): ToolCallingSessionCreateResult;
-    toJSON(message: ToolCallingSessionCreateResult): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(object: I): ToolCallingSessionCreateResult;
-};
-export declare const ToolCallingSessionEvent: {
-    encode(message: ToolCallingSessionEvent, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionEvent;
-    fromJSON(object: any): ToolCallingSessionEvent;
-    toJSON(message: ToolCallingSessionEvent): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(base?: I): ToolCallingSessionEvent;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(object: I): ToolCallingSessionEvent;
-};
-export declare const ToolCallingSessionStepWithResultRequest: {
-    encode(message: ToolCallingSessionStepWithResultRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionStepWithResultRequest;
-    fromJSON(object: any): ToolCallingSessionStepWithResultRequest;
-    toJSON(message: ToolCallingSessionStepWithResultRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(base?: I): ToolCallingSessionStepWithResultRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(object: I): ToolCallingSessionStepWithResultRequest;
-};
-export declare const ToolCallingSessionDestroyRequest: {
-    encode(message: ToolCallingSessionDestroyRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest;
-    fromJSON(object: any): ToolCallingSessionDestroyRequest;
-    toJSON(message: ToolCallingSessionDestroyRequest): unknown;
-    create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(base?: I): ToolCallingSessionDestroyRequest;
-    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(object: I): ToolCallingSessionDestroyRequest;
-};
+export declare const ToolValue: MessageFns<ToolValue>;
+export declare const ToolValueArray: MessageFns<ToolValueArray>;
+export declare const ToolValueObject: MessageFns<ToolValueObject>;
+export declare const ToolValueObject_FieldsEntry: MessageFns<ToolValueObject_FieldsEntry>;
+export declare const ToolValueJSON: MessageFns<ToolValueJSON>;
+export declare const ToolParameter: MessageFns<ToolParameter>;
+export declare const ToolDefinition: MessageFns<ToolDefinition>;
+export declare const ToolDefinition_MetadataEntry: MessageFns<ToolDefinition_MetadataEntry>;
+export declare const ToolCall: MessageFns<ToolCall>;
+export declare const ToolResult: MessageFns<ToolResult>;
+export declare const ToolCallingOptions: MessageFns<ToolCallingOptions>;
+export declare const ToolCallingResult: MessageFns<ToolCallingResult>;
+export declare const ToolParseRequest: MessageFns<ToolParseRequest>;
+export declare const ToolParseResult: MessageFns<ToolParseResult>;
+export declare const ToolPromptFormatRequest: MessageFns<ToolPromptFormatRequest>;
+export declare const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult>;
+export declare const ToolCallValidationRequest: MessageFns<ToolCallValidationRequest>;
+export declare const ToolCallValidationResult: MessageFns<ToolCallValidationResult>;
+export declare const ToolCallingStreamEvent: MessageFns<ToolCallingStreamEvent>;
+export declare const ToolRegistrySnapshot: MessageFns<ToolRegistrySnapshot>;
+export declare const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest>;
+export declare const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult>;
+export declare const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent>;
+export declare const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest>;
+export declare const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -616,4 +441,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

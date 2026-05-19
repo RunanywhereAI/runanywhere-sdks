@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -484,30 +484,9 @@ export interface SDKError {
     remediationHint: string;
     correlationId: string;
 }
-export declare const ErrorContext: {
-    encode(message: ErrorContext, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ErrorContext;
-    fromJSON(object: any): ErrorContext;
-    toJSON(message: ErrorContext): unknown;
-    create<I extends Exact<DeepPartial<ErrorContext>, I>>(base?: I): ErrorContext;
-    fromPartial<I extends Exact<DeepPartial<ErrorContext>, I>>(object: I): ErrorContext;
-};
-export declare const ErrorContext_MetadataEntry: {
-    encode(message: ErrorContext_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ErrorContext_MetadataEntry;
-    fromJSON(object: any): ErrorContext_MetadataEntry;
-    toJSON(message: ErrorContext_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<ErrorContext_MetadataEntry>, I>>(base?: I): ErrorContext_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<ErrorContext_MetadataEntry>, I>>(object: I): ErrorContext_MetadataEntry;
-};
-export declare const SDKError: {
-    encode(message: SDKError, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SDKError;
-    fromJSON(object: any): SDKError;
-    toJSON(message: SDKError): unknown;
-    create<I extends Exact<DeepPartial<SDKError>, I>>(base?: I): SDKError;
-    fromPartial<I extends Exact<DeepPartial<SDKError>, I>>(object: I): SDKError;
-};
+export declare const ErrorContext: MessageFns<ErrorContext>;
+export declare const ErrorContext_MetadataEntry: MessageFns<ErrorContext_MetadataEntry>;
+export declare const SDKError: MessageFns<SDKError>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -518,4 +497,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

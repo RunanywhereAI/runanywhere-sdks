@@ -36,17 +36,18 @@ let package = Package(
     ],
     products: [
         // -------------------------------------------------------------------
-        // Core SDK — always needed. The `RunAnywhere` library vends the core
-        // target plus the two runtime backends so that a single product
-        // import pulls in the whole stack for local example apps.
+        // Core SDK — always needed. The `RunAnywhere` library vends only the
+        // core target. Consumers that need backend runtimes must import
+        // `RunAnywhereLlamaCPP` / `RunAnywhereONNX` separately so the linker
+        // can drop unused backend code. This matches the root Package.swift
+        // (see root Package.swift:80-83) which is the published SPM product
+        // surface — keeping the local and root manifests in sync ensures the
+        // local example apps exercise the same selective-linking shape that
+        // external consumers see.
         // -------------------------------------------------------------------
         .library(
             name: "RunAnywhere",
-            targets: [
-                "RunAnywhere",
-                "LlamaCPPRuntime",
-                "ONNXRuntime",
-            ]
+            targets: ["RunAnywhere"]
         ),
 
         // Individual backend products (used by the example apps that only

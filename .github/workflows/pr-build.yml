@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '22' }
       - name: TypeScript / Web / RN centralization (syncpack)
         run: bash scripts/validation/check_typescript_centralization.sh
       - name: Flutter dependency centralization
@@ -256,7 +256,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '22' }
       # Repo root and sdk/runanywhere-react-native pin `packageManager: yarn@3.6.1`
       # (Yarn Berry). The runner's global yarn is 1.x and refuses to run, so we
       # activate the pinned version through Corepack before any `yarn` call.
@@ -286,7 +286,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with: { node-version: '22' }
       # Install + typecheck from the workspace root so the in-tree
       # @runanywhere/proto-ts package (sdk/shared/proto-ts) is resolved as a
       # workspace member instead of being fetched from the npm registry. The

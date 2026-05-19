@@ -1,38 +1,42 @@
 /**
  * @file rac_plugin_entry_llamacpp.cpp
- * @brief Unified-ABI entry point for the llama.cpp LLM engine.
- *
- * GAP 02 Phase 8 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
+ * @brief Unified-ABI entry point for the llama.cpp engine.
  *
  * Exposes `rac_plugin_entry_llamacpp()` returning a `const
- * rac_engine_vtable_t*` filled with the existing `g_llamacpp_ops` (non-static
- * since Phase 8) as the LLM slot. All other primitive slots remain NULL.
+ * rac_engine_vtable_t*` with BOTH `llm_ops` and `vlm_ops` slots filled —
+ * llama.cpp is one engine that supports text generation (LLM) and
+ * vision-language (VLM) as two modalities of the same backend.
  *
- * v3.0.0: this is the SOLE llama.cpp registration path. The legacy
- * `rac_backend_llamacpp_register()` function now only does
- * `rac_module_register(...)`; it no longer calls
- * `rac_service_register_provider(...)` (removed in Phase B1). Plugin
- * registration flows through `RAC_STATIC_PLUGIN_REGISTER(llamacpp)`
+ * Per the v3 ABI principle ("each backend publishes a single
+ * `rac_engine_vtable_t`"), this is the SOLE llama.cpp plugin entry. The
+ * earlier split into `llamacpp` + `llamacpp_vlm` entries existed for
+ * compile-time gating of mtmd; that gating has been removed (mtmd always
+ * compiles in) and the two entries have been unified.
+ *
+ * Plugin registration flows through `RAC_STATIC_PLUGIN_REGISTER(llamacpp)`
  * (see `rac_static_register_llamacpp.cpp`) or through `dlopen` +
  * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 extern "C" {
 
-/* Defined in rac_backend_llamacpp_register.cpp (non-static since Phase 8). */
+/* Defined in rac_backend_llamacpp_register.cpp. */
 extern const rac_llm_service_ops_t g_llamacpp_ops;
+/* Defined in rac_llamacpp_vlm_ops.cpp. */
+extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
+
 rac_result_t rac_llamacpp_cpu_runtime_register(void);
 void rac_llamacpp_cpu_runtime_unregister(void);
 
-/* GAP 04 Phase 11: declare which runtimes + model formats this plugin serves
- * so the EngineRouter can score it against the caller's preferred_runtime
- * and model format. Apple-only entries are gated by __APPLE__ at the array
- * level so the table actually shrinks on non-Apple builds. */
+/* Declares which runtimes + model formats this plugin serves so the
+ * EngineRouter can score it against the caller's preferred_runtime and model
+ * format. Apple-only / desktop-only entries are gated at the array level. */
 static const rac_runtime_id_t k_llamacpp_runtimes[] = {
     RAC_RUNTIME_CPU,
 #if defined(__APPLE__)
@@ -45,16 +49,17 @@ static const rac_runtime_id_t k_llamacpp_runtimes[] = {
 #endif
 };
 
-/* Model formats use RAC_MODEL_FORMAT_ID_* values mirrored from
- * runanywhere.v1.ModelFormat. */
+/* GGUF for LLM/VLM weights, GGML for legacy LLM, BIN for VLM mmproj files. */
 static const uint32_t k_llamacpp_formats[] = {
     RAC_MODEL_FORMAT_ID_GGUF,
     RAC_MODEL_FORMAT_ID_GGML,
     RAC_MODEL_FORMAT_ID_BIN,
 };
 
+/* This single plugin serves both text generation and VLM primitives. */
 static const rac_primitive_t k_llamacpp_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT,
+    RAC_PRIMITIVE_VLM,
 };
 
 static const rac_engine_manifest_t k_llamacpp_manifest = {
@@ -92,7 +97,7 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
     /* rerank_ops       */ nullptr,
-    /* vlm_ops          */ nullptr,
+    /* vlm_ops          */ &g_llamacpp_vlm_ops,
     /* diffusion_ops    */ nullptr,
 
     /* reserved_slot_0..9 */

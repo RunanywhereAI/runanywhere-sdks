@@ -676,36 +676,205 @@ export interface EmscriptenRunanywhereModule {
   ) => unknown;
 }
 
-let _module: EmscriptenRunanywhereModule | null = null;
+// ---------------------------------------------------------------------------
+// Capability-aware module registry
+// ---------------------------------------------------------------------------
+// The Web SDK ships three independent WASM artifacts (commons / llamacpp /
+// onnx-sherpa). Each backend bridge registers its module against the
+// capabilities it serves. Operation-level facade dispatch then looks up the
+// correct module per capability — without colliding with the other modules.
+//
+// Capability ownership (typical layout):
+//   - racommons.wasm           → 'commons'
+//   - racommons-llamacpp.wasm  → 'llm', 'vlm', 'embedding', 'rag',
+//                                 'diffusion', 'structured-output',
+//                                 'tool-calling', 'lora'
+//   - racommons-onnx-sherpa.wasm → 'stt', 'tts', 'vad'
+//
+// The same module may register multiple capabilities; duplicate registration
+// of a capability replaces the previous owner (last-writer-wins per
+// capability, NOT per module).
 
 /**
- * Install the loaded Emscripten module so the rest of the SDK can
- * reach it. Call once during app init after your WASM loader resolves.
+ * Cross-cutting capability tag used by the Web SDK's facade to route each
+ * operation to the WASM module that actually exports the relevant proto
+ * symbols. See `getModuleForCapability` for the lookup contract.
  */
-export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
-  _module = mod;
-  DownloadAdapter.setDefaultModule(mod);
-  HardwareAdapter.setDefaultModule(mod);
-  ModelLifecycleAdapter.setDefaultModule(mod);
-  ModelRegistryAdapter.setDefaultModule(mod);
-  ModalityProtoAdapter.setDefaultModule(mod);
-  SDKEventStreamAdapter.setDefaultModule(mod);
+export type WasmCapability =
+  | 'commons'           // SDK init/lifecycle, model registry, events, etc.
+  | 'llm'               // LLM ops (text generation)
+  | 'vlm'               // VLM ops (vision-language); typically same module as 'llm'
+  | 'stt'               // Speech-to-text
+  | 'tts'               // Text-to-speech
+  | 'vad'               // Voice activity detection
+  | 'embedding'         // Embeddings
+  | 'rag'               // RAG pipeline (embeddings + retrieval)
+  | 'diffusion'         // Diffusion (image generation)
+  | 'structured-output' // Structured-output parse/validate/prepare-prompt
+  | 'tool-calling'      // Tool-calling session ABI
+  | 'lora'              // LoRA registry/apply/state
+  | 'voice-agent';      // Voice-agent component (lives in same module as STT/TTS/VAD)
+
+/**
+ * Complete set of capabilities — used as the default for the legacy
+ * `setRunanywhereModule()` alias, which registers a single module against
+ * everything (matches pre-P4 monolithic behavior).
+ */
+const ALL_CAPABILITIES: readonly WasmCapability[] = [
+  'commons',
+  'llm',
+  'vlm',
+  'stt',
+  'tts',
+  'vad',
+  'embedding',
+  'rag',
+  'diffusion',
+  'structured-output',
+  'tool-calling',
+  'lora',
+  'voice-agent',
+];
+
+/** Capability → module map. Backends register; facade looks up. */
+const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>();
+
+/**
+ * Register a module against one or more capabilities. Replaces any prior
+ * owner of those capabilities (last-writer-wins per capability). Also
+ * forwards the module to the legacy `setDefaultModule()` adapter slots,
+ * keyed by which capabilities are claimed — so e.g. an LLM-only bridge no
+ * longer overwrites the commons-installed `ModelRegistryAdapter`.
+ *
+ * The same module instance may be registered against any subset of
+ * capabilities — duplicate calls are idempotent for that capability.
+ */
+export function registerWasmModule(
+  capabilities: readonly WasmCapability[],
+  mod: EmscriptenRunanywhereModule,
+): void {
+  for (const cap of capabilities) {
+    _moduleByCapability.set(cap, mod);
+  }
+  // Commons-level adapters (model registry, downloads, hardware, events)
+  // follow the 'commons' capability — they target SDK-state surface exports
+  // that live in racommons.wasm. Routing them by capability prevents a
+  // later llamacpp/onnx bridge from clobbering the core's installed
+  // adapters when it registers its own narrower capabilities.
+  if (capabilities.includes('commons')) {
+    DownloadAdapter.setDefaultModule(mod);
+    HardwareAdapter.setDefaultModule(mod);
+    ModelRegistryAdapter.setDefaultModule(mod);
+    SDKEventStreamAdapter.setDefaultModule(mod);
+    // Pre-bind ModelLifecycleAdapter to commons too — backend bridges
+    // overwrite this when they register (see below), but a bare commons
+    // module still answers `currentModel` / `componentLifecycleSnapshot`
+    // for inspect-only use cases that don't require a plugin route.
+    ModelLifecycleAdapter.setDefaultModule(mod);
+  }
+  // Model lifecycle + model registry routing — special case. The C++
+  // `rac_plugin_route` call (driven by ModelLifecycleAdapter.load) lives
+  // inside whichever WASM module's `s_plugin_registry` was populated by
+  // the backend's `rac_backend_*_register()` call. The commons artifact
+  // has NO backend plugins linked in, so routing model loads through
+  // commons fails with "no backend route supports model". The model
+  // REGISTRY (catalog) is per-module too, so it must point at the SAME
+  // module as the lifecycle adapter or `loadModel` looks up the model in
+  // an empty registry. When any backend bridge (LlamaCPP, ONNX) registers,
+  // repoint BOTH adapters at THAT module. Last-writer-wins per
+  // registration.
+  const backendCapabilities: readonly WasmCapability[] = [
+    'llm', 'vlm', 'stt', 'tts', 'vad', 'embedding', 'rag', 'diffusion',
+  ];
+  if (backendCapabilities.some((cap) => capabilities.includes(cap))) {
+    ModelLifecycleAdapter.setDefaultModule(mod);
+    ModelRegistryAdapter.setDefaultModule(mod);
+  }
+  // The ModalityProtoAdapter's internal per-capability slot is the canonical
+  // dispatch table for the modality verbs (LLM/VLM/STT/TTS/VAD/embedding/
+  // diffusion/rag/lora/voice-agent/structured-output). Push the module into
+  // every claimed slot so per-modality `tryDefault()` calls find it.
+  ModalityProtoAdapter.registerModuleCapabilities(capabilities, mod);
 }
 
-/** Clear the singleton module during backend shutdown. */
+/**
+ * Drop a single module from the registry. All capability slots that
+ * point at this module are removed, and downstream adapters are cleared
+ * if they were tracking it. Use this on backend teardown / acceleration
+ * switch — it lets siblings keep their slots intact.
+ */
+export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
+  const releasedCapabilities: WasmCapability[] = [];
+  for (const [cap, current] of Array.from(_moduleByCapability.entries())) {
+    if (current === mod) {
+      _moduleByCapability.delete(cap);
+      releasedCapabilities.push(cap);
+    }
+  }
+  // If commons was released, clear the commons-level adapter slots that
+  // were pointing at this module. We can't easily check the adapter-side
+  // slot identity here, so we conservatively clear — re-registration by
+  // another module reinstalls them.
+  if (releasedCapabilities.includes('commons')) {
+    DownloadAdapter.clearDefaultModule();
+    HardwareAdapter.clearDefaultModule();
+    ModelLifecycleAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    SDKEventStreamAdapter.clearDefaultModule();
+  }
+  ModalityProtoAdapter.unregisterModuleCapabilities(releasedCapabilities, mod);
+}
+
+/**
+ * Look up the module that owns a given capability. Returns null when no
+ * backend has registered for that capability — facade verbs should throw
+ * a `SDKException.backendNotAvailable(...)` in that case to surface the
+ * missing backend clearly.
+ */
+export function getModuleForCapability(
+  cap: WasmCapability,
+): EmscriptenRunanywhereModule | null {
+  return _moduleByCapability.get(cap) ?? null;
+}
+
+/**
+ * @deprecated Prefer `registerWasmModule(capabilities, mod)` — calling
+ * `setRunanywhereModule` claims every capability for the supplied module,
+ * which collides with sibling backends that register their own narrower
+ * capability sets. Kept for backwards compatibility with external apps that
+ * used this API before the per-capability registry landed.
+ */
+export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
+  registerWasmModule(ALL_CAPABILITIES, mod);
+}
+
+/** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {
+  _moduleByCapability.clear();
   DownloadAdapter.clearDefaultModule();
   HardwareAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
   ModelRegistryAdapter.clearDefaultModule();
   ModalityProtoAdapter.clearDefaultModule();
   SDKEventStreamAdapter.clearDefaultModule();
-  _module = null;
 }
 
-/** Return the installed WASM module, if one has been registered. */
+/**
+ * Return the COMMONS module, if registered. This is the closest analog of
+ * the old monolithic singleton — facade reads that touch SDK-state surface
+ * (init, auth, model registry, lifecycle, events) route through this.
+ * Modality verbs should use `getModuleForCapability(...)` instead.
+ */
 export function tryRunanywhereModule(): EmscriptenRunanywhereModule | null {
-  return _module;
+  // Prefer the commons module; fall back to ANY registered module so the
+  // SDK-state APIs continue to work when only a backend (not commons) is
+  // loaded. This matches the pre-P4 behavior where the single installed
+  // module also satisfied commons reads.
+  const commons = _moduleByCapability.get('commons');
+  if (commons) return commons;
+  // Fall back to whatever was registered first.
+  const iter = _moduleByCapability.values().next();
+  return iter.done ? null : iter.value;
 }
 
 /**
@@ -724,17 +893,19 @@ export const runanywhereModule: EmscriptenRunanywhereModule = new Proxy(
   {} as EmscriptenRunanywhereModule,
   {
     get(_target, prop) {
-      if (_module == null) {
+      const mod = tryRunanywhereModule();
+      if (mod == null) {
         throw new Error(
           `RunAnywhere WASM module is not initialized. Call ` +
-            `setRunanywhereModule(mod) during app init before touching ` +
+            `registerWasmModule(capabilities, mod) (or the legacy ` +
+            `setRunanywhereModule(mod)) during app init before touching ` +
             `any RunAnywhere.* API that reaches into C++. Property accessed: ${String(prop)}`,
         );
       }
-      const value = (_module as unknown as Record<string | symbol, unknown>)[prop];
+      const value = (mod as unknown as Record<string | symbol, unknown>)[prop];
       // Bind methods so `this` is the real Emscripten module.
       return typeof value === 'function'
-        ? (value as (...args: unknown[]) => unknown).bind(_module)
+        ? (value as (...args: unknown[]) => unknown).bind(mod)
         : value;
     },
   },

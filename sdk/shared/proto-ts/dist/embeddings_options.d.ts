@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -237,86 +237,16 @@ export interface EmbeddingsCreateResult {
     errorCode: number;
     errorMessage: string;
 }
-export declare const EmbeddingsConfiguration: {
-    encode(message: EmbeddingsConfiguration, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsConfiguration;
-    fromJSON(object: any): EmbeddingsConfiguration;
-    toJSON(message: EmbeddingsConfiguration): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsConfiguration>, I>>(base?: I): EmbeddingsConfiguration;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsConfiguration>, I>>(object: I): EmbeddingsConfiguration;
-};
-export declare const EmbeddingsOptions: {
-    encode(message: EmbeddingsOptions, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsOptions;
-    fromJSON(object: any): EmbeddingsOptions;
-    toJSON(message: EmbeddingsOptions): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsOptions>, I>>(base?: I): EmbeddingsOptions;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsOptions>, I>>(object: I): EmbeddingsOptions;
-};
-export declare const EmbeddingVector: {
-    encode(message: EmbeddingVector, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingVector;
-    fromJSON(object: any): EmbeddingVector;
-    toJSON(message: EmbeddingVector): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingVector>, I>>(base?: I): EmbeddingVector;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingVector>, I>>(object: I): EmbeddingVector;
-};
-export declare const EmbeddingVector_MetadataEntry: {
-    encode(message: EmbeddingVector_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingVector_MetadataEntry;
-    fromJSON(object: any): EmbeddingVector_MetadataEntry;
-    toJSON(message: EmbeddingVector_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(base?: I): EmbeddingVector_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(object: I): EmbeddingVector_MetadataEntry;
-};
-export declare const EmbeddingsRequest: {
-    encode(message: EmbeddingsRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest;
-    fromJSON(object: any): EmbeddingsRequest;
-    toJSON(message: EmbeddingsRequest): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(base?: I): EmbeddingsRequest;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(object: I): EmbeddingsRequest;
-};
-export declare const EmbeddingsRequest_MetadataEntry: {
-    encode(message: EmbeddingsRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest_MetadataEntry;
-    fromJSON(object: any): EmbeddingsRequest_MetadataEntry;
-    toJSON(message: EmbeddingsRequest_MetadataEntry): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(base?: I): EmbeddingsRequest_MetadataEntry;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(object: I): EmbeddingsRequest_MetadataEntry;
-};
-export declare const EmbeddingsResult: {
-    encode(message: EmbeddingsResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsResult;
-    fromJSON(object: any): EmbeddingsResult;
-    toJSON(message: EmbeddingsResult): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsResult>, I>>(base?: I): EmbeddingsResult;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsResult>, I>>(object: I): EmbeddingsResult;
-};
-export declare const EmbeddingsServiceState: {
-    encode(message: EmbeddingsServiceState, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsServiceState;
-    fromJSON(object: any): EmbeddingsServiceState;
-    toJSON(message: EmbeddingsServiceState): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(base?: I): EmbeddingsServiceState;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(object: I): EmbeddingsServiceState;
-};
-export declare const EmbeddingsCreateRequest: {
-    encode(message: EmbeddingsCreateRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateRequest;
-    fromJSON(object: any): EmbeddingsCreateRequest;
-    toJSON(message: EmbeddingsCreateRequest): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(base?: I): EmbeddingsCreateRequest;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(object: I): EmbeddingsCreateRequest;
-};
-export declare const EmbeddingsCreateResult: {
-    encode(message: EmbeddingsCreateResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateResult;
-    fromJSON(object: any): EmbeddingsCreateResult;
-    toJSON(message: EmbeddingsCreateResult): unknown;
-    create<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(base?: I): EmbeddingsCreateResult;
-    fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(object: I): EmbeddingsCreateResult;
-};
+export declare const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration>;
+export declare const EmbeddingsOptions: MessageFns<EmbeddingsOptions>;
+export declare const EmbeddingVector: MessageFns<EmbeddingVector>;
+export declare const EmbeddingVector_MetadataEntry: MessageFns<EmbeddingVector_MetadataEntry>;
+export declare const EmbeddingsRequest: MessageFns<EmbeddingsRequest>;
+export declare const EmbeddingsRequest_MetadataEntry: MessageFns<EmbeddingsRequest_MetadataEntry>;
+export declare const EmbeddingsResult: MessageFns<EmbeddingsResult>;
+export declare const EmbeddingsServiceState: MessageFns<EmbeddingsServiceState>;
+export declare const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest>;
+export declare const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -327,4 +257,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

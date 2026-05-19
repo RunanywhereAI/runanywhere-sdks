@@ -64,7 +64,8 @@ class SDKException implements Exception {
       message: message,
     );
     if (fieldPath != null) {
-      err.context = pb.ErrorContext(metadata: {'field_path': fieldPath});
+      err.context =
+          pb.ErrorContext(metadata: <String, String>{'field_path': fieldPath}.entries);
     }
     return SDKException(
       err,

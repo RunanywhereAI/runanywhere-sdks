@@ -567,21 +567,22 @@ class TextToSpeechViewModel(
                     val bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
 
                     audioTrack =
-                        AudioTrack.Builder()
+                        AudioTrack
+                            .Builder()
                             .setAudioAttributes(
-                                AudioAttributes.Builder()
+                                AudioAttributes
+                                    .Builder()
                                     .setUsage(AudioAttributes.USAGE_MEDIA)
                                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                                     .build(),
-                            )
-                            .setAudioFormat(
-                                AudioFormat.Builder()
+                            ).setAudioFormat(
+                                AudioFormat
+                                    .Builder()
                                     .setEncoding(audioFormat)
                                     .setSampleRate(sampleRate)
                                     .setChannelMask(channelConfig)
                                     .build(),
-                            )
-                            .setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size))
+                            ).setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size))
                             .setTransferMode(AudioTrack.MODE_STATIC)
                             .build()
 

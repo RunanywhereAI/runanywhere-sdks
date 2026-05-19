@@ -463,7 +463,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
             title,
             style: AppTypography.headlineSemibold(context),
           ),
-          if (trailing != null) trailing,
+          ?trailing,
         ],
       ),
     );

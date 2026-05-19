@@ -20,9 +20,8 @@ import {
 
 export class STTProtoAdapter {
   static tryDefault(): STTProtoAdapter | null {
-    return adapterState.defaultModule
-      ? new STTProtoAdapter(adapterState.defaultModule)
-      : null;
+    const mod = adapterState.modalitySlots.stt;
+    return mod ? new STTProtoAdapter(mod) : null;
   }
 
   constructor(private readonly module: ModalityProtoModule) {}

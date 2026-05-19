@@ -464,9 +464,14 @@ int test_vlm_companion_resolution() {
     write_file(model_path, "GGUFmodel");
     write_file(mmproj_path, "GGUFmmproj");
 
+    // After the LLM/VLM plugin unification, llama.cpp publishes ONE vtable
+    // named "llamacpp" with both llm_ops and vlm_ops slots filled. The VLM
+    // service pins to "llamacpp" for RAC_FRAMEWORK_LLAMACPP, so the test
+    // mock must register under the same name to be discoverable by the
+    // pinned route.
     rac_vlm_service_ops_t vlm_ops = make_vlm_ops();
-    rac_engine_vtable_t vlm_vtable = make_vtable("llamacpp_vlm", nullptr, nullptr, &vlm_ops);
-    (void)rac_plugin_unregister("llamacpp_vlm");
+    rac_engine_vtable_t vlm_vtable = make_vtable("llamacpp", nullptr, nullptr, &vlm_ops);
+    (void)rac_plugin_unregister("llamacpp");
     CHECK(rac_plugin_register(&vlm_vtable) == RAC_SUCCESS, "VLM companion test plugin registers");
 
     rac_model_info_t model{};
@@ -489,7 +494,7 @@ int test_vlm_companion_resolution() {
     CHECK(g_last_vlm_create_config.find(mmproj_path.string()) != std::string::npos,
           "VLM create passes resolved mmproj_path in config_json");
     rac_vlm_destroy(handle);
-    (void)rac_plugin_unregister("llamacpp_vlm");
+    (void)rac_plugin_unregister("llamacpp");
     return 0;
 }
 

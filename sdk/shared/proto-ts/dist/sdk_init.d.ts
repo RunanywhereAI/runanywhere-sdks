@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -100,30 +100,9 @@ export interface SdkInitResult {
     /** Wall-clock duration for this phase. */
     durationMs: number;
 }
-export declare const SdkInitPhase1Request: {
-    encode(message: SdkInitPhase1Request, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SdkInitPhase1Request;
-    fromJSON(object: any): SdkInitPhase1Request;
-    toJSON(message: SdkInitPhase1Request): unknown;
-    create<I extends Exact<DeepPartial<SdkInitPhase1Request>, I>>(base?: I): SdkInitPhase1Request;
-    fromPartial<I extends Exact<DeepPartial<SdkInitPhase1Request>, I>>(object: I): SdkInitPhase1Request;
-};
-export declare const SdkInitPhase2Request: {
-    encode(_: SdkInitPhase2Request, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SdkInitPhase2Request;
-    fromJSON(_: any): SdkInitPhase2Request;
-    toJSON(_: SdkInitPhase2Request): unknown;
-    create<I extends Exact<DeepPartial<SdkInitPhase2Request>, I>>(base?: I): SdkInitPhase2Request;
-    fromPartial<I extends Exact<DeepPartial<SdkInitPhase2Request>, I>>(_: I): SdkInitPhase2Request;
-};
-export declare const SdkInitResult: {
-    encode(message: SdkInitResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): SdkInitResult;
-    fromJSON(object: any): SdkInitResult;
-    toJSON(message: SdkInitResult): unknown;
-    create<I extends Exact<DeepPartial<SdkInitResult>, I>>(base?: I): SdkInitResult;
-    fromPartial<I extends Exact<DeepPartial<SdkInitResult>, I>>(object: I): SdkInitResult;
-};
+export declare const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request>;
+export declare const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request>;
+export declare const SdkInitResult: MessageFns<SdkInitResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -134,4 +113,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

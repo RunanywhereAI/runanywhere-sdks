@@ -391,8 +391,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         .clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://docs.runanywhere.ai"))
                             context.startActivity(intent)
-                        }
-                        .padding(vertical = 8.dp),
+                        }.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -818,8 +817,7 @@ fun ToolSettingsSection() {
                     .fillMaxWidth()
                     .clickable {
                         toolViewModel.setToolCallingEnabled(!toolState.toolCallingEnabled)
-                    }
-                    .padding(vertical = 8.dp),
+                    }.padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

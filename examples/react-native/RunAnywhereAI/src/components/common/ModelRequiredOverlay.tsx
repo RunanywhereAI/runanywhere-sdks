@@ -138,7 +138,7 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.backgroundPrimary,
     justifyContent: 'center',
     alignItems: 'center',

@@ -23,7 +23,7 @@ import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
-  tryRunanywhereModule,
+  getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 import {
@@ -60,11 +60,11 @@ interface STTComponentModule extends EmscriptenRunanywhereModule {
 }
 
 function requireSTTModule(feature: string): STTComponentModule {
-  const module = tryRunanywhereModule() as STTComponentModule | null;
+  const module = getModuleForCapability('stt') as STTComponentModule | null;
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+      'No STT backend is registered. Call ONNX.register() (or another STT-providing backend) first.',
     );
   }
   const missing = missingSpeechBackendExports(module);
@@ -250,7 +250,7 @@ export const STT = {
    * already checks; this adds the lifecycle slot detection.
    */
   supportsProtoSTT(): boolean {
-    const module = tryRunanywhereModule() as STTComponentModule | null;
+    const module = getModuleForCapability('stt') as STTComponentModule | null;
     if (!module) return false;
     if (missingSpeechBackendExports(module).length > 0) return false;
     if (typeof module._rac_stt_component_create !== 'function') return false;
@@ -280,7 +280,7 @@ export const STT = {
 
   /** Whether the component handle has a model loaded. */
   isLoaded(handle: number): boolean {
-    const module = tryRunanywhereModule() as STTComponentModule | null;
+    const module = getModuleForCapability('stt') as STTComponentModule | null;
     if (!module || typeof module._rac_stt_component_is_loaded !== 'function') return false;
     return Boolean(module._rac_stt_component_is_loaded(handle));
   },
@@ -326,7 +326,7 @@ export const STT = {
 
   /** Unload the model but keep the component handle alive. */
   unload(handle: number): boolean {
-    const module = tryRunanywhereModule() as STTComponentModule | null;
+    const module = getModuleForCapability('stt') as STTComponentModule | null;
     if (!module || typeof module._rac_stt_component_unload !== 'function') return false;
     const rc = module._rac_stt_component_unload(handle);
     return rc === 0;
@@ -334,7 +334,7 @@ export const STT = {
 
   /** Destroy the component handle. Idempotent — safe to call multiple times. */
   destroy(handle: number): void {
-    const module = tryRunanywhereModule() as STTComponentModule | null;
+    const module = getModuleForCapability('stt') as STTComponentModule | null;
     if (!module || typeof module._rac_stt_component_destroy !== 'function') return;
     module._rac_stt_component_destroy(handle);
   },

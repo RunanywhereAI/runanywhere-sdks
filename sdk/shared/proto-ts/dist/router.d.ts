@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 import { SDKComponent } from "./sdk_events";
 export declare const protobufPackage = "runanywhere.v1";
@@ -24,22 +24,8 @@ export interface FrameworksForCapabilityRequest {
 export interface FrameworksForCapabilityResponse {
     frameworks: InferenceFramework[];
 }
-export declare const FrameworksForCapabilityRequest: {
-    encode(message: FrameworksForCapabilityRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): FrameworksForCapabilityRequest;
-    fromJSON(object: any): FrameworksForCapabilityRequest;
-    toJSON(message: FrameworksForCapabilityRequest): unknown;
-    create<I extends Exact<DeepPartial<FrameworksForCapabilityRequest>, I>>(base?: I): FrameworksForCapabilityRequest;
-    fromPartial<I extends Exact<DeepPartial<FrameworksForCapabilityRequest>, I>>(object: I): FrameworksForCapabilityRequest;
-};
-export declare const FrameworksForCapabilityResponse: {
-    encode(message: FrameworksForCapabilityResponse, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): FrameworksForCapabilityResponse;
-    fromJSON(object: any): FrameworksForCapabilityResponse;
-    toJSON(message: FrameworksForCapabilityResponse): unknown;
-    create<I extends Exact<DeepPartial<FrameworksForCapabilityResponse>, I>>(base?: I): FrameworksForCapabilityResponse;
-    fromPartial<I extends Exact<DeepPartial<FrameworksForCapabilityResponse>, I>>(object: I): FrameworksForCapabilityResponse;
-};
+export declare const FrameworksForCapabilityRequest: MessageFns<FrameworksForCapabilityRequest>;
+export declare const FrameworksForCapabilityResponse: MessageFns<FrameworksForCapabilityResponse>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -50,4 +36,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

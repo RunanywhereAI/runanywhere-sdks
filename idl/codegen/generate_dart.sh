@@ -4,7 +4,7 @@
 # Generate Dart bindings via dart-lang/protobuf (protoc_plugin).
 #
 # Requirements:
-#   dart pub global activate protoc_plugin 22.0.0
+#   dart pub global activate protoc_plugin ${PROTOC_GEN_DART_VERSION}
 #   export PATH="$PATH:$HOME/.pub-cache/bin"
 #
 # Output:
@@ -27,6 +27,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
 OUT_DIR="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/generated"
+
+# Load PROTOC_GEN_DART_VERSION from the centralized VERSIONS file so the
+# install hint below matches what setup-toolchain.sh actually installs.
+VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
+if [ -f "${VERSIONS_FILE}" ]; then
+    set -a
+    eval "$(grep -E '^[A-Z_][A-Z0-9_]*=' "${VERSIONS_FILE}")"
+    set +a
+fi
+PROTOC_GEN_DART_VERSION="${PROTOC_GEN_DART_VERSION:-25.0.0}"
 
 # IDL-16 / CPP-10: pin Dart + protoc_plugin versions so local + CI runs
 # produce byte-identical output. Older Dart / protoc_plugin combos emit
@@ -54,18 +64,19 @@ if ! command -v protoc >/dev/null 2>&1; then
 fi
 if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     echo "error: protoc-gen-dart not found." >&2
-    echo "       Install via: dart pub global activate protoc_plugin 22.0.0" >&2
+    echo "       Install via: dart pub global activate protoc_plugin ${PROTOC_GEN_DART_VERSION}" >&2
     echo "       and add \$HOME/.pub-cache/bin to your PATH." >&2
     exit 127
 fi
 
-# IDL-16 / CPP-10: verify protoc_plugin is pinned at 22.0.0. The plugin does
-# not expose --version in older releases; fall back to a best-effort check.
+# IDL-16 / CPP-10: verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
+# (loaded from VERSIONS). The plugin does not expose --version in older
+# releases; fall back to a best-effort check.
 if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
-    if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "22.0.0"; then
-        echo "warning: protoc_plugin version could not be verified as 22.0.0." >&2
+    if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "${PROTOC_GEN_DART_VERSION}"; then
+        echo "warning: protoc_plugin version could not be verified as ${PROTOC_GEN_DART_VERSION}." >&2
         echo "         Got: ${PLUGIN_VERSION_OUT}" >&2
-        echo "         Re-pin via: dart pub global activate protoc_plugin 22.0.0" >&2
+        echo "         Re-pin via: dart pub global activate protoc_plugin ${PROTOC_GEN_DART_VERSION}" >&2
     fi
 fi
 

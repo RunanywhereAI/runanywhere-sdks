@@ -127,7 +127,7 @@ class RunAnywhereDiffusion {
       DiffusionGenerationRequest(
         modelId: modelId,
         options: _effectiveOptions(prompt, options),
-        metadata: {'model_id': modelId},
+        metadata: <String, String>{'model_id': modelId}.entries,
       ),
     );
   }

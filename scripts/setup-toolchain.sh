@@ -10,11 +10,11 @@
 #   Ubuntu 22.04+ (apt + user-local pip/npm)
 #
 # Tools installed (all pins sourced from sdk/runanywhere-commons/VERSIONS):
-#   protoc                 25.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
+#   protoc                 34.x     (shared, all languages)        — PROTOC_VERSION_MAJOR
 #   protoc-gen-swift       1.38.x   (swift-protobuf)                — SWIFT_PROTOBUF_VERSION
-#   wire-compiler          5.3.x    (Kotlin via Square Wire)        — WIRE_VERSION
-#   protoc_plugin          22.0.0   (Dart — emits *.pb.dart)        — PROTOC_GEN_DART_VERSION
-#   ts-proto               1.181.x  (TypeScript message types)      — TS_PROTO_VERSION
+#   wire-compiler          5.5.x    (Kotlin via Square Wire)        — WIRE_VERSION
+#   protoc_plugin          25.0.0   (Dart — emits *.pb.dart)        — PROTOC_GEN_DART_VERSION
+#   ts-proto               2.11.x   (TypeScript message types)      — TS_PROTO_VERSION
 #   google-protobuf Python 4.25.x   (Python message types)
 #
 # GAP 09 streaming services (server-streaming gRPC client stubs):
@@ -58,11 +58,11 @@ if [ -f "${VERSIONS_FILE}" ]; then
     set +a
 fi
 
-PROTOC_EXPECTED_MAJOR="${PROTOC_VERSION_MAJOR:-25}"
+PROTOC_EXPECTED_MAJOR="${PROTOC_VERSION_MAJOR:-34}"
 SWIFT_PROTOBUF_EXPECTED="${SWIFT_PROTOBUF_VERSION:-1.38.0}"
-WIRE_EXPECTED="${WIRE_VERSION:-5.3.5}"
-PROTOC_PLUGIN_DART_EXPECTED="${PROTOC_GEN_DART_VERSION:-22.0.0}"
-TS_PROTO_EXPECTED="${TS_PROTO_VERSION:-1.181.1}"
+WIRE_EXPECTED="${WIRE_VERSION:-5.5.1}"
+PROTOC_PLUGIN_DART_EXPECTED="${PROTOC_GEN_DART_VERSION:-25.0.0}"
+TS_PROTO_EXPECTED="${TS_PROTO_VERSION:-2.11.8}"
 PYTHON_PROTOBUF_EXPECTED="4.25"
 # GAP 09 streaming additions:
 GRPC_SWIFT_EXPECTED="1.21"
@@ -126,9 +126,10 @@ install_wire() {
 
 install_dart_plugin() {
     # IDL-16 / CPP-10: Dart codegen requires Dart 3.0+ AND protoc_plugin
-    # pinned at 22.0.0. Older Dart / plugin combos emit subtly different
-    # code that trips idl-drift-check on unrelated PRs. `generate_dart.sh`
-    # enforces both at runtime; this installer documents the intent.
+    # pinned at PROTOC_PLUGIN_DART_EXPECTED (loaded from VERSIONS). Older
+    # Dart / plugin combos emit subtly different code that trips
+    # idl-drift-check on unrelated PRs. `generate_dart.sh` enforces both at
+    # runtime; this installer documents the intent.
     if have protoc-gen-dart; then
         echo "• protoc-gen-dart already present (required pin: ${PROTOC_PLUGIN_DART_EXPECTED})."
         return 0
@@ -141,7 +142,7 @@ install_dart_plugin() {
     DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     DART_MAJOR=$(echo "${DART_VERSION:-0.0.0}" | cut -d. -f1)
     if [ "${DART_MAJOR}" -lt 3 ]; then
-        echo "warning: Dart ${DART_VERSION} < 3.0 — protoc_plugin 22.0.0 requires Dart 3.0+." >&2
+        echo "warning: Dart ${DART_VERSION} < 3.0 — protoc_plugin ${PROTOC_PLUGIN_DART_EXPECTED} requires Dart 3.0+." >&2
         echo "         Upgrade Dart before running idl/codegen/generate_dart.sh." >&2
         return 0
     fi

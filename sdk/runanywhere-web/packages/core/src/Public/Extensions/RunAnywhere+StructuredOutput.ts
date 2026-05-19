@@ -24,7 +24,7 @@ import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
-  tryRunanywhereModule,
+  getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 import { generateStructuredStream } from './RunAnywhere+TextGeneration';
@@ -71,11 +71,12 @@ function requireStructuredOutputModule(
   feature: string,
   names: StructuredOutputExport[],
 ): EmscriptenRunanywhereModule {
-  const module = tryRunanywhereModule();
+  const module = getModuleForCapability('structured-output');
   if (!module) {
     throw SDKException.backendNotAvailable(
       feature,
-      'RunAnywhere WASM module is not initialized.',
+      'No backend that exports rac_structured_output_*_proto is registered. ' +
+      'Call LlamaCPP.register() (or another structured-output-providing backend) first.',
     );
   }
 
@@ -221,7 +222,7 @@ function validate(
 
 export const StructuredOutput = {
   supportsProtoStructuredOutput(): boolean {
-    const module = tryRunanywhereModule();
+    const module = getModuleForCapability('structured-output');
     if (!module) return false;
     return missingStructuredOutputExports(module, [
       '_rac_structured_output_prepare_prompt_proto',

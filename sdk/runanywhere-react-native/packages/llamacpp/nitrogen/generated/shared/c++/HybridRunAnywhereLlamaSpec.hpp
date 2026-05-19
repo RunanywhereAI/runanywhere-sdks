@@ -51,9 +51,6 @@ namespace margelo::nitro::runanywhere::llama {
       virtual std::shared_ptr<Promise<bool>> registerBackend() = 0;
       virtual std::shared_ptr<Promise<bool>> unregisterBackend() = 0;
       virtual std::shared_ptr<Promise<bool>> isBackendRegistered() = 0;
-      virtual std::shared_ptr<Promise<bool>> registerVLMBackend() = 0;
-      virtual std::shared_ptr<Promise<bool>> unregisterVLMBackend() = 0;
-      virtual std::shared_ptr<Promise<bool>> isVLMBackendRegistered() = 0;
 
     protected:
       // Hybrid Setup

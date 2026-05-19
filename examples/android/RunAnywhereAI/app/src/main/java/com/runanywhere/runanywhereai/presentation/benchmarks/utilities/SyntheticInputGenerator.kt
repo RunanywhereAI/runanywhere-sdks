@@ -29,7 +29,8 @@ object SyntheticInputGenerator {
     ): ByteArray {
         val sampleCount = (durationSeconds * sampleRate).toInt()
         val buffer =
-            ByteBuffer.allocate(sampleCount * Short.SIZE_BYTES)
+            ByteBuffer
+                .allocate(sampleCount * Short.SIZE_BYTES)
                 .order(ByteOrder.LITTLE_ENDIAN)
         for (i in 0 until sampleCount) {
             val t = i.toDouble() / sampleRate

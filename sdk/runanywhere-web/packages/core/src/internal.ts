@@ -7,10 +7,16 @@
 
 export {
   clearRunanywhereModule,
+  getModuleForCapability,
+  registerWasmModule,
   setRunanywhereModule,
   tryRunanywhereModule,
+  unregisterWasmModule,
 } from './runtime/EmscriptenModule';
-export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
+export type {
+  EmscriptenRunanywhereModule,
+  WasmCapability,
+} from './runtime/EmscriptenModule';
 
 export {
   hasSpeechBackendExports,

@@ -33,7 +33,7 @@ declare global {
 }
 
 test.describe('Web SDK backend readiness', () => {
-  test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1); needs the standalone Sherpa-ONNX WASM artifact.');
+  test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1); needs the racommons-onnx-sherpa.wasm artifact.');
   test('registers ONNX/Sherpa and exposes speech plus RAG native exports', async ({ page }) => {
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];

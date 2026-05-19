@@ -51,7 +51,13 @@ object ModelBootstrap {
      */
     private suspend fun existingRegistryIds(): Set<String> =
         try {
-            RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().map { it.id }.toSet()
+            RunAnywhere
+                .listModels(ModelListRequest())
+                .models
+                ?.models
+                .orEmpty()
+                .map { it.id }
+                .toSet()
         } catch (_: Throwable) {
             emptySet()
         }
@@ -226,8 +232,8 @@ object ModelBootstrap {
         Timber.i("🌱 LoRA adapter seed complete — registered=$registered, failed=$failed")
     }
 
-    private fun tryRegisterSingle(m: SingleFileModel): Boolean {
-        return try {
+    private fun tryRegisterSingle(m: SingleFileModel): Boolean =
+        try {
             val info =
                 ModelInfo(
                     id = m.id,
@@ -246,7 +252,6 @@ object ModelBootstrap {
             Timber.e(e, "tryRegisterSingle failed: ${m.id}")
             false
         }
-    }
 
     /**
      * Register an archive-based model (sherpa STT/TTS .tar.gz). Mirrors Swift's
@@ -255,8 +260,8 @@ object ModelBootstrap {
      * archive into a nested directory after download. Without this, the
      * .tar.gz lands on disk unextracted and the sherpa backend fails to load.
      */
-    private fun tryRegisterArchive(m: ArchiveModel): Boolean {
-        return try {
+    private fun tryRegisterArchive(m: ArchiveModel): Boolean =
+        try {
             val artifactType =
                 when (m.archiveType) {
                     ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
@@ -286,10 +291,9 @@ object ModelBootstrap {
             Timber.e(e, "tryRegisterArchive failed: ${m.id}")
             false
         }
-    }
 
-    private fun tryRegisterMultiFile(m: MultiFileModel): Boolean {
-        return try {
+    private fun tryRegisterMultiFile(m: MultiFileModel): Boolean =
+        try {
             val descriptors =
                 m.files.mapIndexed { idx, (url, filename) ->
                     ModelFileDescriptor(
@@ -318,7 +322,9 @@ object ModelBootstrap {
                     category = m.category,
                     memory_required_bytes = m.memoryBytes,
                     multi_file = MultiFileArtifact(files = descriptors),
-                    expected_files = ai.runanywhere.proto.v1.ExpectedModelFiles(files = descriptors),
+                    expected_files =
+                        ai.runanywhere.proto.v1
+                            .ExpectedModelFiles(files = descriptors),
                 )
             CppBridgeModelRegistry.save(info)
             true
@@ -326,7 +332,6 @@ object ModelBootstrap {
             Timber.e(e, "tryRegisterMultiFile failed: ${m.id}")
             false
         }
-    }
 
     // MARK: - Catalog data classes
 

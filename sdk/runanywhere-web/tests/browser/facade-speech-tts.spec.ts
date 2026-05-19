@@ -1,20 +1,19 @@
 /**
- * Facade speech-via-standalone-Sherpa TTS end-to-end test.
+ * Facade TTS end-to-end test via the unified ONNX/Sherpa WASM.
  *
  * Drives `RunAnywhere.synthesize(text)` against a real Piper VITS voice:
  *
  *   1. Register the example app's model catalog.
  *   2. Download the `vits-piper-en_US-lessac-medium` tarball via the V2
  *      download orchestrator (`RunAnywhere.downloadModel`). This goes
- *      through commons libcurl-backed HTTP transport + libarchive
- *      extraction into the RACommons MEMFS at
- *      `/opfs/RunAnywhere/Models/Sherpa/<id>/<id>/`.
- *   3. `ONNX.register({ skipProtoBytePlugins: true })` installs the
- *      standalone Sherpa speech provider.
+ *      through commons HTTP transport + libarchive extraction into the
+ *      RACommons MEMFS at `/opfs/RunAnywhere/Models/Sherpa/<id>/<id>/`.
+ *   3. `ONNX.register()` loads `racommons-onnx-sherpa.wasm` and
+ *      registers the ONNX + Sherpa vtables with the plugin registry.
  *   4. `RunAnywhere.synthesize(text, { voicePath })` dispatches through
- *      the speech provider, which mirrors the extracted directory
- *      tree into the standalone Sherpa MEMFS, constructs the VITS
- *      `_SherpaOnnxCreateOfflineTts` handle, and returns PCM audio.
+ *      the proto-byte TTS adapter into the registered Sherpa backend,
+ *      which constructs the VITS `_SherpaOnnxCreateOfflineTts` handle
+ *      and returns PCM audio.
  *   5. Assert the output has a sane sample rate, > 100 ms duration,
  *      and non-trivial RMS energy (i.e. real audio was synthesized).
  *
@@ -69,7 +68,7 @@ declare global {
   }
 }
 
-test.describe('RunAnywhere.synthesize via standalone Sherpa speech provider', () => {
+test.describe('RunAnywhere.synthesize via unified ONNX/Sherpa WASM', () => {
   test.skip(!shouldRun, 'Speech/RAG E2E is opt-in (set RA_RUN_SPEECH_E2E=1).');
   test.setTimeout(15 * 60 * 1000);
 
@@ -98,7 +97,7 @@ test.describe('RunAnywhere.synthesize via standalone Sherpa speech provider', ()
           throw new Error('Model catalog registration failed (no native registry available).');
         }
 
-        await onnx.ONNX.register({ skipProtoBytePlugins: true });
+        await onnx.ONNX.register();
 
         const sdk = window.__RUNANYWHERE_SDK__;
         if (!sdk) throw new Error('SDK singleton not exposed');

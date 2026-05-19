@@ -245,9 +245,17 @@ elseif(APPLE)
         message(STATUS "ONNX Runtime macOS library: ${ONNX_MACOS_DIR}/lib/libonnxruntime.dylib")
         message(STATUS "ONNX Runtime macOS headers: ${ONNX_MACOS_DIR}/include")
     else()
-        # Download ONNX Runtime if not present
+        # Download ONNX Runtime if not present.
+        # ORT v1.24+ ships per-arch tarballs only (no more osx-universal2).
+        # Select the right artifact based on the host architecture.
         message(STATUS "Local ONNX Runtime not found, downloading...")
-        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_MACOS_VERSION}/onnxruntime-osx-universal2-${ONNX_MACOS_VERSION}.tgz")
+        if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "aarch64")
+            set(ONNX_MACOS_ARCH "arm64")
+        else()
+            set(ONNX_MACOS_ARCH "x86_64")
+        endif()
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_MACOS_VERSION}/onnxruntime-osx-${ONNX_MACOS_ARCH}-${ONNX_MACOS_VERSION}.tgz")
+        message(STATUS "ONNX Runtime macOS URL: ${ONNX_URL}")
 
         FetchContent_Declare(
             onnxruntime

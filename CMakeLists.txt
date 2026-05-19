@@ -88,19 +88,22 @@ set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 # final values before their CMakeLists run. The wasm wrapper target itself
 # lives under sdk/runanywhere-web/wasm and is added after the engine targets.
 if(EMSCRIPTEN)
-    option(RAC_WASM_PTHREADS   "Enable pthreads in the WebAssembly target" OFF)
-    option(RAC_WASM_DEBUG      "Enable debug assertions/logging in the WebAssembly target" OFF)
-    option(RAC_WASM_LLAMACPP   "Build the WebAssembly target with llama.cpp" OFF)
-    option(RAC_WASM_VLM        "Enable llama.cpp mtmd VLM support in the WebAssembly target" OFF)
-    option(RAC_WASM_WHISPERCPP "Build the WebAssembly target with whisper.cpp" OFF)
-    option(RAC_WASM_ONNX       "Build the WebAssembly target with ONNX/sherpa support" OFF)
-    option(RAC_WASM_WEBGPU     "Enable WebGPU acceleration for the WebAssembly target" OFF)
+    option(RAC_WASM_PTHREADS    "Enable pthreads in the WebAssembly target" OFF)
+    option(RAC_WASM_DEBUG       "Enable debug assertions/logging in the WebAssembly target" OFF)
+    option(RAC_WASM_BUILD_CORE  "Build the commons-only Web SDK WASM target" OFF)
+    option(RAC_WASM_LLAMACPP    "Build the WebAssembly target with llama.cpp (LLM + VLM)" OFF)
+    option(RAC_WASM_WHISPERCPP  "Build the WebAssembly target with whisper.cpp" OFF)
+    option(RAC_WASM_ONNX        "Build the WebAssembly target with ONNX/sherpa support" OFF)
+    option(RAC_WASM_WEBGPU      "Enable WebGPU acceleration for the WebAssembly target" OFF)
 
     set(RAC_BUILD_JNI OFF CACHE BOOL "" FORCE)
     set(RAC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(RAC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
     set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
 
+    # Backends follow the union of requested WASM targets. The core-only target
+    # never links backend archives, but a configure that ONLY requests core
+    # still leaves backends off (commons compiles standalone).
     if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX)
         set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
     else()
@@ -110,15 +113,6 @@ if(EMSCRIPTEN)
     set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
     set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
     set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
-
-    if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
-        set(RAC_VLM_USE_MTMD ON CACHE BOOL "" FORCE)
-    else()
-        if(RAC_WASM_VLM AND NOT RAC_WASM_LLAMACPP)
-            message(WARNING "RAC_WASM_VLM requires RAC_WASM_LLAMACPP=ON; disabling VLM.")
-        endif()
-        set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
-    endif()
 
     if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP)
         set(GGML_METAL OFF CACHE BOOL "" FORCE)

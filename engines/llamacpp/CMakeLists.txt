@@ -146,68 +146,55 @@ set(LLAMACPP_BACKEND_SOURCES
     llamacpp_backend.cpp
     rac_llm_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
-    # GAP 02 Phase 8: unified engine plugin entry point. Coexists with the
-    # legacy rac_backend_llamacpp_register() bootstrap; both wrap the same
-    # ops-struct.
+    # Unified ABI plugin entry — fills both llm_ops and vlm_ops slots.
     rac_plugin_entry_llamacpp.cpp
+    # VLM Backend (vision-language as a modality of the same engine).
+    rac_vlm_llamacpp.cpp
+    # VLM ops vtable (the g_llamacpp_vlm_ops struct consumed by the unified
+    # plugin entry). Extracted from the (now-deleted) VLM register file when
+    # the two plugin entries were unified.
+    rac_llamacpp_vlm_ops.cpp
 )
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
 )
 
-# Option to enable VLM multimodal support (requires mtmd from llama.cpp)
-option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
-if(RAC_VLM_USE_MTMD)
-    message(STATUS "VLM multimodal support enabled")
-    # Add VLM Backend sources (Vision Language Model)
-    list(APPEND LLAMACPP_BACKEND_SOURCES
-        rac_vlm_llamacpp.cpp
-        rac_backend_llamacpp_vlm_register.cpp
-        # GAP 02 Phase 8: unified engine plugin entry point for VLM.
-        rac_plugin_entry_llamacpp_vlm.cpp
-    )
-    # Add mtmd sources from llama.cpp tools directory. mtmd-image.cpp
-    # carries the `mtmd_image_preprocessor_*` vtables that mtmd.cpp
-    # references during `mtmd_context::init_vision()`; without it ld.lld
-    # on Linux/Android complains:
-    #   ld.lld: error: undefined symbol: vtable for
-    #     mtmd_image_preprocessor_{llava_uhd,step3vl,idefics3,internvl}
-    list(APPEND LLAMACPP_BACKEND_SOURCES
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-image.cpp
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
-    )
-    # Glob every mtmd model implementation upstream ships. The previous
-    # hand-curated list drifts each llama.cpp bump (b9180 adds
-    # deepseekocr / dotsocr / gemma4a / gemma4v / granite-speech /
-    # hunyuanocr / mimovl / qwen3a / step3vl / yasa2 over what we
-    # listed). On Linux/Android the resulting clip_image_build_graph
-    # references unconditionally need every clip_graph_<name>::* vtable
-    # to be present at link time, otherwise ld.lld bails with
-    #   ld.lld: error: undefined symbol: vtable for clip_graph_<name>
-    # `CONFIGURE_DEPENDS` re-globs when the directory changes.
-    #
-    # pass2-syn-063: CONFIGURE_DEPENDS is best-effort on Visual Studio /
-    # Xcode generators (CMake docs: "a generator may not implement this
-    # feature"). All RAC CMakePresets that build this engine use Ninja
-    # (macos-debug, macos-release, linux-asan, android-arm64, ios-*),
-    # so re-glob fires reliably for our CI matrix. Developers who run an
-    # Xcode-driven CMake build of the C++ engine for direct on-device
-    # profiling MUST `cmake --reconfigure` after an upstream llama.cpp
-    # bump that adds a new tools/mtmd/models/*.cpp file; otherwise the
-    # build fails at link time with an undefined vtable for
-    # clip_graph_<new_model>. The STATUS message below prints the
-    # discovered count to make a silent drop loud during local builds.
-    file(GLOB _RAC_MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
-        "${llamacpp_SOURCE_DIR}/tools/mtmd/models/*.cpp"
-    )
-    list(LENGTH _RAC_MTMD_MODEL_SOURCES _RAC_MTMD_MODEL_COUNT)
-    message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${LLAMACPP_VERSION})")
-    list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
-endif()
+# VLM multimodal support is always compiled in — llama.cpp is one engine
+# that supports both LLM and VLM modalities. The two are exposed through
+# a single unified plugin vtable, not two separate plugins.
+#
+# Add mtmd sources from llama.cpp tools directory. mtmd-image.cpp carries
+# the `mtmd_image_preprocessor_*` vtables that mtmd.cpp references during
+# `mtmd_context::init_vision()`; without it ld.lld on Linux/Android complains:
+#   ld.lld: error: undefined symbol: vtable for
+#     mtmd_image_preprocessor_{llava_uhd,step3vl,idefics3,internvl}
+list(APPEND LLAMACPP_BACKEND_SOURCES
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-image.cpp
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
+)
+
+# Glob every mtmd model implementation upstream ships. The hand-curated list
+# drifts each llama.cpp bump (b9180 adds deepseekocr / dotsocr / gemma4a /
+# gemma4v / granite-speech / hunyuanocr / mimovl / qwen3a / step3vl / yasa2
+# etc.). On Linux/Android the resulting clip_image_build_graph references
+# unconditionally need every clip_graph_<name>::* vtable to be present at
+# link time, otherwise ld.lld bails with
+#   ld.lld: error: undefined symbol: vtable for clip_graph_<name>
+# `CONFIGURE_DEPENDS` re-globs when the directory changes; it is best-effort
+# on Visual Studio / Xcode generators but reliable on Ninja (which RAC's
+# CMakePresets use). Developers running an Xcode-driven CMake build for
+# on-device profiling MUST `cmake --reconfigure` after an upstream llama.cpp
+# bump that adds a new tools/mtmd/models/*.cpp file.
+file(GLOB _RAC_MTMD_MODEL_SOURCES CONFIGURE_DEPENDS
+    "${llamacpp_SOURCE_DIR}/tools/mtmd/models/*.cpp"
+)
+list(LENGTH _RAC_MTMD_MODEL_SOURCES _RAC_MTMD_MODEL_COUNT)
+message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${LLAMACPP_VERSION})")
+list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 
 # GAP 06 close-out (Phase 1 / B1): migrated to rac_add_engine_plugin().
 #
@@ -257,7 +244,7 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/ggml/include
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
-    PRIMITIVES          GENERATE_TEXT
+    PRIMITIVES          GENERATE_TEXT VLM
     RUNTIMES            CPU METAL CUDA
     FORMATS             GGUF GGML BIN
     AVAILABILITY        PUBLIC
@@ -265,16 +252,17 @@ rac_add_engine_plugin(llamacpp
     PACKAGE_NAME        runanywhere_llamacpp
 )
 
-# VLM multimodal mtmd includes/defs — engine-specific, applied after the macro.
-if(RAC_VLM_USE_MTMD)
-    target_include_directories(rac_backend_llamacpp PRIVATE
-        ${llamacpp_SOURCE_DIR}/tools/mtmd
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
-    )
-    target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_VLM_USE_MTMD=1)
-endif()
+# VLM multimodal mtmd includes — engine-specific, applied after the macro.
+# mtmd is always compiled in (one engine, two modalities).
+target_include_directories(rac_backend_llamacpp PRIVATE
+    ${llamacpp_SOURCE_DIR}/tools/mtmd
+    ${llamacpp_SOURCE_DIR}/tools/mtmd/models
+)
 
 # Self-registration carrier: thin shim that wraps RAC_STATIC_PLUGIN_REGISTER.
+# Since llama.cpp is one engine with both LLM and VLM modalities exposed by
+# the same plugin vtable, there is a single static-register shim and a single
+# SHARED carrier (no separate _vlm variants).
 if(RAC_STATIC_PLUGINS)
     # Static path: ctor lands inside rac_commons so it runs before main().
     # rac_commons PUBLIC-links rac_backend_llamacpp below so the entry
@@ -282,16 +270,6 @@ if(RAC_STATIC_PLUGINS)
     target_sources(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
     )
-    if(RAC_VLM_USE_MTMD)
-        # Swift-only E2E Phase 6e: VLM plugin needs its own static-register
-        # ctor to be routable via rac_plugin_route(framework=llamacpp,
-        # primitive=vlm). Without this, only the LLM plugin registers at
-        # process start and VLM loads fail with
-        # "no backend route for llamacpp_vlm".
-        target_sources(rac_commons PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp_vlm.cpp
-        )
-    endif()
     target_include_directories(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${RAC_COMMONS_ROOT_DIR}/include
@@ -313,33 +291,6 @@ else()
     )
     rac_apply_android_page_alignment(runanywhere_llamacpp)
     install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
-
-    if(RAC_VLM_USE_MTMD)
-        # Parallel SHARED carrier for the VLM vtable so dynamic-plugin hosts
-        # can route RAC_PRIMITIVE_VLM (name="llamacpp_vlm") via
-        # `rac_registry_load_plugin(librunanywhere_llamacpp_vlm.*)`. The
-        # dlopen loader derives the entry-symbol name from the library
-        # filename (see plugin_loader.cpp::entry_symbol_from_path), so the
-        # carrier's basename must match `runanywhere_llamacpp_vlm` to map to
-        # `rac_plugin_entry_llamacpp_vlm`. Without this, a host that does NOT
-        # call `rac_backend_llamacpp_vlm_register()` directly (the Swift /
-        # Kotlin / RN bridge path) cannot reach the VLM plugin even though
-        # the implementation is linked into rac_backend_llamacpp.
-        add_library(runanywhere_llamacpp_vlm SHARED
-            ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp_vlm.cpp
-        )
-        set_target_properties(runanywhere_llamacpp_vlm PROPERTIES
-            OUTPUT_NAME           runanywhere_llamacpp_vlm
-            C_VISIBILITY_PRESET   hidden
-            CXX_VISIBILITY_PRESET hidden
-        )
-        target_link_libraries(runanywhere_llamacpp_vlm PUBLIC
-            rac_backend_llamacpp
-            rac_commons
-        )
-        rac_apply_android_page_alignment(runanywhere_llamacpp_vlm)
-        install(TARGETS runanywhere_llamacpp_vlm LIBRARY DESTINATION lib)
-    endif()
 endif()
 
 # =============================================================================

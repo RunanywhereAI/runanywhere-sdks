@@ -303,8 +303,7 @@ private fun CameraPreviewSection(
                             .background(
                                 Color.Black.copy(alpha = 0.6f),
                                 shape = RoundedCornerShape(50),
-                            )
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            ).padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     CircularProgressIndicator(
                         color = Color.White,

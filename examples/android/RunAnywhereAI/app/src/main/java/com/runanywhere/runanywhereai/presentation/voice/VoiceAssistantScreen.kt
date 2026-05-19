@@ -994,8 +994,8 @@ private fun MicrophoneButton(
 /**
  * Get instruction text
  */
-private fun getInstructionText(pipelineState: PipelineState): String {
-    return when (pipelineState) {
+private fun getInstructionText(pipelineState: PipelineState): String =
+    when (pipelineState) {
         PipelineState.PIPELINE_STATE_LISTENING -> "Recording... Tap to send"
         PipelineState.PIPELINE_STATE_PROCESSING_SPEECH,
         PipelineState.PIPELINE_STATE_THINKING,
@@ -1007,4 +1007,3 @@ private fun getInstructionText(pipelineState: PipelineState): String {
         PipelineState.PIPELINE_STATE_IDLE -> "Preparing voice agent..."
         else -> "Tap to start conversation"
     }
-}

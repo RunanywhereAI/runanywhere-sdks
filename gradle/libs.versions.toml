@@ -2,37 +2,44 @@
 # ============================================================================
 # Build Tools & Language
 # ============================================================================
-agp = "8.13.0"
-kotlin = "2.1.21"
-# Bumping to Kotlin 2.2.x requires migrating the deprecated `kotlinOptions { jvmTarget = ... }`
-# DSL in sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts (lines 112, 124)
-# to the new `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` API. Tracked separately.
+# Bumped 2026-05-19 per comments/dep-bump-2026-05-19/matrix-final.json.
+# AGP held to 8.13.x (Gradle 8.x compat); AGP 9.x requires Gradle 9.4.1+.
+# Kotlin 2.2.20 is the minimum that satisfies kotlin-compose-compiler-plugin
+# alignment for Compose BOM 2026.05.01. The deprecated `kotlinOptions` DSL
+# was migrated to `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` in
+# every Kotlin SDK *.gradle.kts as part of P4.
+agp = "8.13.2"
+kotlin = "2.2.20"
 pdfbox = "2.0.27.0"
 
 # ============================================================================
 # AndroidX Core Libraries
 # ============================================================================
-coreKtx = "1.16.0"
+coreKtx = "1.18.0"
 appcompat = "1.7.1"
-material = "1.13.0"
-lifecycleRuntimeKtx = "2.9.0"
-lifecycleViewModelCompose = "2.9.0"
-activityCompose = "1.10.1"
+material = "1.14.0"
+lifecycleRuntimeKtx = "2.9.4"
+lifecycleViewModelCompose = "2.9.4"
+activityCompose = "1.11.0"
 
 # ============================================================================
 # Jetpack Compose
 # ============================================================================
-composeBom = "2025.08.01"
+composeBom = "2026.05.01"
 
 # ============================================================================
 # Kotlin Libraries
 # ============================================================================
+# coroutines stays on 1.10.2 — 1.11.0 is paired with Kotlin 2.3.x. Our Kotlin
+# pin (2.2.20) requires coroutines <= 1.10.x for ABI compat (matrix constraint
+# "kotlinx-coroutines 1.11.0 requires Kotlin 2.3.x runtime").
 coroutines = "1.10.2"
-datetime = "0.7.1"
-kotlinxSerialization = "1.9.0"
+datetime = "0.8.0"
+kotlinxSerialization = "1.11.0"
 # Square Wire — runtime types + code generator for idl/*.proto consumed by
 # sdk/runanywhere-kotlin (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).
-wire = "5.3.5"
+# Held within 5.x; Wire 6.x reshuffles the Kotlin proto runtime package.
+wire = "5.5.1"
 
 # ============================================================================
 # Testing
@@ -40,7 +47,7 @@ wire = "5.3.5"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-mockk = "1.13.17"
+mockk = "1.14.9"
 
 # ============================================================================
 # Logging
@@ -50,43 +57,52 @@ timber = "5.0.1"
 # ============================================================================
 # Error Tracking
 # ============================================================================
-sentry = "8.0.0"
+sentry = "8.41.0"
 
 # ============================================================================
 # Networking
 # ============================================================================
-okhttp = "5.1.0"
-retrofit = "2.11.0"
+okhttp = "5.3.2"
+# Retrofit stays on 2.x; 3.0.0 is OkHttp-5 compatible per matrix but is a
+# major bump (drops <API 21, OkHttp 5.x hard pin) — defer for coordinated
+# Retrofit/OkHttp migration.
+retrofit = "2.12.0"
+# Ktor stays on 3.0.3 — matrix-final.json listed 3.0.7 as the latest 3.0.x
+# patch but that version does not exist on Maven Central (last 3.0.x is 3.0.3;
+# 3.x then jumps to 3.1.x..3.5.0 minors). Keep 3.0.3 patch-line until a
+# coordinated 3.5.x bump. 6.x changes the HttpClient engine factory API.
 ktor = "3.0.3"
 
 # ============================================================================
 # JSON & Serialization
 # ============================================================================
-gson = "2.11.0"
-json = "20240303"
-junit-vintage = "5.10.2"
+gson = "2.14.0"
+json = "20251224"
+junit-vintage = "6.0.3"
 
 # ============================================================================
 # Navigation
 # ============================================================================
-navigationCompose = "2.9.0"
+navigationCompose = "2.9.8"
 
 # ============================================================================
 # Code Quality
 # ============================================================================
+# Detekt stays on 1.23.8 — 2.x relocates Maven coordinates from
+# `io.gitlab.arturbosch.detekt` to `dev.detekt` and is alpha.
 detekt = "1.23.8"
-ktlint = "12.1.2"
+ktlint = "14.2.0"
 
 # ============================================================================
 # Background Processing
 # ============================================================================
-workManager = "2.10.0"
+workManager = "2.11.2"
 
 # ============================================================================
 # File Management
 # ============================================================================
-commonsIo = "2.18.0"
-okio = "3.15.0"
+commonsIo = "2.22.0"
+okio = "3.17.0"
 
 # ============================================================================
 # AI/ML - Speech Recognition
@@ -106,17 +122,17 @@ prdownloader = "1.0.2"
 # ============================================================================
 # Database - Room
 # ============================================================================
-room = "2.6.1"
+room = "2.8.4"
 
 # ============================================================================
 # Security
 # ============================================================================
-securityCrypto = "1.1.0-alpha06"
+securityCrypto = "1.1.0"
 
 # ============================================================================
 # DataStore
 # ============================================================================
-datastore = "1.1.7"
+datastore = "1.2.1"
 
 # ============================================================================
 # Play Services (Updated for targetSdk 34+)
@@ -127,12 +143,12 @@ playAppUpdateKtx = "2.1.0"
 # ============================================================================
 # UI Components - Accompanist
 # ============================================================================
-accompanist = "0.36.0"
+accompanist = "0.37.3"
 
 # ============================================================================
 # CameraX
 # ============================================================================
-camerax = "1.4.2"
+camerax = "1.6.1"
 
 # ============================================================================
 # LIBRARIES

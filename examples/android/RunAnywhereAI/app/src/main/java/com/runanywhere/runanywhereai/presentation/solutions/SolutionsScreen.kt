@@ -38,14 +38,15 @@ import kotlinx.coroutines.launch
  * destroys the handle. Each lifecycle transition is appended to a simple
  * scrolling log so the demo stays readable without wiring up streaming
  * output yet.
+ *
+ * Use model IDs that ModelBootstrap.kt actually registers; the placeholder
+ * IDs from the canonical sdk/runanywhere-commons/examples/solutions YAML files (whisper-base,
+ * kokoro, silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3, qwen3-4b-q4_k_m)
+ * are not seeded in any example catalog, so handing them to
+ * RunAnywhere.solutions.run produces a "model not found in registry"
+ * failure as soon as the operators load. rerank_model_id is omitted because
+ * no example app seeds a reranker model.
  */
-// Use model IDs that ModelBootstrap.kt actually registers; the placeholder
-// IDs from sdk/runanywhere-commons/examples/solutions/*.yaml (whisper-base,
-// kokoro, silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3, qwen3-4b-q4_k_m)
-// are not seeded in any example catalog, so handing them to
-// RunAnywhere.solutions.run produces a "model not found in registry"
-// failure as soon as the operators load. rerank_model_id is omitted because
-// no example app seeds a reranker model.
 private val VOICE_AGENT_YAML =
     """
     voice_agent:

@@ -14,14 +14,15 @@
   "dependencyTypes": ["dev", "prod", "peer"],
   "versionGroups": [
     {
-      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges). NOTE: @runanywhere/proto-ts is a published npm package centralized in dependencies/versions.json, so it is NOT ignored here — see its own pin below.",
+      "label": "Local workspace packages: ignore (managed by workspaces protocol / peer ranges). @runanywhere/proto-ts lives in sdk/shared/proto-ts and is consumed via workspace:* by all TS SDK packages — it is not published to npm.",
       "dependencies": [
         "@runanywhere/core",
         "@runanywhere/llamacpp",
         "@runanywhere/onnx",
         "@runanywhere/web",
         "@runanywhere/web-llamacpp",
-        "@runanywhere/web-onnx"
+        "@runanywhere/web-onnx",
+        "@runanywhere/proto-ts"
       ],
       "isIgnored": true
     },
@@ -92,11 +93,6 @@
       "pinVersion": "^6.4.2"
     },
     {
-      "label": "Pinned: @runanywhere/proto-ts (centralized in dependencies/versions.json) — published npm package, schema-sensitive lockstep with all TS SDK packages",
-      "dependencies": ["@runanywhere/proto-ts"],
-      "pinVersion": "^0.21.0"
-    },
-    {
       "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version",
       "dependencies": ["react-native"],
       "pinVersion": "0.83.1"
@@ -139,7 +135,6 @@
         "prettier",
         "@playwright/test",
         "vite",
-        "@runanywhere/proto-ts",
         "@eslint/js",
         "tsd"
       ],

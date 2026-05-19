@@ -1,4 +1,4 @@
-import _m0 from "protobufjs/minimal";
+import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ModelFileDescriptor, ModelInfo } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum DownloadStage {
@@ -141,94 +141,17 @@ export interface DownloadResumeResult {
     errorMessage: string;
     resumeToken: string;
 }
-export declare const DownloadSubscribeRequest: {
-    encode(message: DownloadSubscribeRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadSubscribeRequest;
-    fromJSON(object: any): DownloadSubscribeRequest;
-    toJSON(message: DownloadSubscribeRequest): unknown;
-    create<I extends Exact<DeepPartial<DownloadSubscribeRequest>, I>>(base?: I): DownloadSubscribeRequest;
-    fromPartial<I extends Exact<DeepPartial<DownloadSubscribeRequest>, I>>(object: I): DownloadSubscribeRequest;
-};
-export declare const DownloadProgress: {
-    encode(message: DownloadProgress, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadProgress;
-    fromJSON(object: any): DownloadProgress;
-    toJSON(message: DownloadProgress): unknown;
-    create<I extends Exact<DeepPartial<DownloadProgress>, I>>(base?: I): DownloadProgress;
-    fromPartial<I extends Exact<DeepPartial<DownloadProgress>, I>>(object: I): DownloadProgress;
-};
-export declare const DownloadPlanRequest: {
-    encode(message: DownloadPlanRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadPlanRequest;
-    fromJSON(object: any): DownloadPlanRequest;
-    toJSON(message: DownloadPlanRequest): unknown;
-    create<I extends Exact<DeepPartial<DownloadPlanRequest>, I>>(base?: I): DownloadPlanRequest;
-    fromPartial<I extends Exact<DeepPartial<DownloadPlanRequest>, I>>(object: I): DownloadPlanRequest;
-};
-export declare const DownloadFilePlan: {
-    encode(message: DownloadFilePlan, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadFilePlan;
-    fromJSON(object: any): DownloadFilePlan;
-    toJSON(message: DownloadFilePlan): unknown;
-    create<I extends Exact<DeepPartial<DownloadFilePlan>, I>>(base?: I): DownloadFilePlan;
-    fromPartial<I extends Exact<DeepPartial<DownloadFilePlan>, I>>(object: I): DownloadFilePlan;
-};
-export declare const DownloadPlanResult: {
-    encode(message: DownloadPlanResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadPlanResult;
-    fromJSON(object: any): DownloadPlanResult;
-    toJSON(message: DownloadPlanResult): unknown;
-    create<I extends Exact<DeepPartial<DownloadPlanResult>, I>>(base?: I): DownloadPlanResult;
-    fromPartial<I extends Exact<DeepPartial<DownloadPlanResult>, I>>(object: I): DownloadPlanResult;
-};
-export declare const DownloadStartRequest: {
-    encode(message: DownloadStartRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadStartRequest;
-    fromJSON(object: any): DownloadStartRequest;
-    toJSON(message: DownloadStartRequest): unknown;
-    create<I extends Exact<DeepPartial<DownloadStartRequest>, I>>(base?: I): DownloadStartRequest;
-    fromPartial<I extends Exact<DeepPartial<DownloadStartRequest>, I>>(object: I): DownloadStartRequest;
-};
-export declare const DownloadStartResult: {
-    encode(message: DownloadStartResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadStartResult;
-    fromJSON(object: any): DownloadStartResult;
-    toJSON(message: DownloadStartResult): unknown;
-    create<I extends Exact<DeepPartial<DownloadStartResult>, I>>(base?: I): DownloadStartResult;
-    fromPartial<I extends Exact<DeepPartial<DownloadStartResult>, I>>(object: I): DownloadStartResult;
-};
-export declare const DownloadCancelRequest: {
-    encode(message: DownloadCancelRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadCancelRequest;
-    fromJSON(object: any): DownloadCancelRequest;
-    toJSON(message: DownloadCancelRequest): unknown;
-    create<I extends Exact<DeepPartial<DownloadCancelRequest>, I>>(base?: I): DownloadCancelRequest;
-    fromPartial<I extends Exact<DeepPartial<DownloadCancelRequest>, I>>(object: I): DownloadCancelRequest;
-};
-export declare const DownloadCancelResult: {
-    encode(message: DownloadCancelResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadCancelResult;
-    fromJSON(object: any): DownloadCancelResult;
-    toJSON(message: DownloadCancelResult): unknown;
-    create<I extends Exact<DeepPartial<DownloadCancelResult>, I>>(base?: I): DownloadCancelResult;
-    fromPartial<I extends Exact<DeepPartial<DownloadCancelResult>, I>>(object: I): DownloadCancelResult;
-};
-export declare const DownloadResumeRequest: {
-    encode(message: DownloadResumeRequest, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadResumeRequest;
-    fromJSON(object: any): DownloadResumeRequest;
-    toJSON(message: DownloadResumeRequest): unknown;
-    create<I extends Exact<DeepPartial<DownloadResumeRequest>, I>>(base?: I): DownloadResumeRequest;
-    fromPartial<I extends Exact<DeepPartial<DownloadResumeRequest>, I>>(object: I): DownloadResumeRequest;
-};
-export declare const DownloadResumeResult: {
-    encode(message: DownloadResumeResult, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): DownloadResumeResult;
-    fromJSON(object: any): DownloadResumeResult;
-    toJSON(message: DownloadResumeResult): unknown;
-    create<I extends Exact<DeepPartial<DownloadResumeResult>, I>>(base?: I): DownloadResumeResult;
-    fromPartial<I extends Exact<DeepPartial<DownloadResumeResult>, I>>(object: I): DownloadResumeResult;
-};
+export declare const DownloadSubscribeRequest: MessageFns<DownloadSubscribeRequest>;
+export declare const DownloadProgress: MessageFns<DownloadProgress>;
+export declare const DownloadPlanRequest: MessageFns<DownloadPlanRequest>;
+export declare const DownloadFilePlan: MessageFns<DownloadFilePlan>;
+export declare const DownloadPlanResult: MessageFns<DownloadPlanResult>;
+export declare const DownloadStartRequest: MessageFns<DownloadStartRequest>;
+export declare const DownloadStartResult: MessageFns<DownloadStartResult>;
+export declare const DownloadCancelRequest: MessageFns<DownloadCancelRequest>;
+export declare const DownloadCancelResult: MessageFns<DownloadCancelResult>;
+export declare const DownloadResumeRequest: MessageFns<DownloadResumeRequest>;
+export declare const DownloadResumeResult: MessageFns<DownloadResumeResult>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;
@@ -239,4 +162,12 @@ export type Exact<P, I extends P> = P extends Builtin ? P : P & {
 } & {
     [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
 };
+export interface MessageFns<T> {
+    encode(message: T, writer?: BinaryWriter): BinaryWriter;
+    decode(input: BinaryReader | Uint8Array, length?: number): T;
+    fromJSON(object: any): T;
+    toJSON(message: T): unknown;
+    create<I extends Exact<DeepPartial<T>, I>>(base?: I): T;
+    fromPartial<I extends Exact<DeepPartial<T>, I>>(object: I): T;
+}
 export {};

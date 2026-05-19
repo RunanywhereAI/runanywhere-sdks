@@ -38,7 +38,7 @@ void main() {
         adapterPath: '/models/style-a.gguf',
         scale: 0.75,
         targetModules: const ['q_proj'],
-        metadata: const {'rank': '8'},
+        metadata: <String, String>{'rank': '8'}.entries,
       );
       final request = LoRAApplyRequest(
         requestId: 'apply-1',
@@ -127,7 +127,7 @@ void main() {
         checksumSha256: 'abc123',
         license: 'Apache-2.0',
         tags: const ['style', 'demo'],
-        metadata: const {'rank': '8'},
+        metadata: <String, String>{'rank': '8'}.entries,
         localPath: '/models/lora/style-a.gguf',
         isDownloaded: true,
         downloadedAtUnixMs: fixnum.Int64(9999),

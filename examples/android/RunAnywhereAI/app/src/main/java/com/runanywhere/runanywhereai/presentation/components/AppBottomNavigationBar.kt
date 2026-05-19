@@ -131,8 +131,7 @@ private fun BottomNavItem(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = onClick,
-                )
-                .padding(vertical = 4.dp),
+                ).padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -174,42 +173,38 @@ private fun BottomNavItem(
     }
 }
 
-private fun getTabLabel(tab: BottomNavTab): String {
-    return when (tab) {
+private fun getTabLabel(tab: BottomNavTab): String =
+    when (tab) {
         BottomNavTab.Chat -> "Chat"
         BottomNavTab.Vision -> "Vision"
         BottomNavTab.Voice -> "Voice"
         BottomNavTab.More -> "More"
         BottomNavTab.Settings -> "Settings"
     }
-}
 
-private fun getTabIconFilled(tab: BottomNavTab): ImageVector {
-    return when (tab) {
+private fun getTabIconFilled(tab: BottomNavTab): ImageVector =
+    when (tab) {
         BottomNavTab.Chat -> Icons.Outlined.ChatBubbleOutline
         BottomNavTab.Vision -> Icons.Filled.Visibility
         BottomNavTab.Voice -> Icons.Filled.Mic
         BottomNavTab.More -> Icons.Filled.MoreHoriz
         BottomNavTab.Settings -> Icons.Filled.Settings
     }
-}
 
-private fun getTabIconOutlined(tab: BottomNavTab): ImageVector {
-    return when (tab) {
+private fun getTabIconOutlined(tab: BottomNavTab): ImageVector =
+    when (tab) {
         BottomNavTab.Chat -> Icons.Outlined.ChatBubbleOutline
         BottomNavTab.Vision -> Icons.Outlined.Visibility
         BottomNavTab.Voice -> Icons.Outlined.Mic
         BottomNavTab.More -> Icons.Outlined.MoreHoriz
         BottomNavTab.Settings -> Icons.Outlined.Settings
     }
-}
 
-private fun getTabAccentColor(tab: BottomNavTab): Color {
-    return when (tab) {
+private fun getTabAccentColor(tab: BottomNavTab): Color =
+    when (tab) {
         BottomNavTab.Chat -> AppColors.primaryAccent
         BottomNavTab.Vision -> AppColors.primaryAccent
         BottomNavTab.Voice -> AppColors.primaryAccent
         BottomNavTab.More -> AppColors.primaryAccent
         BottomNavTab.Settings -> AppColors.primaryAccent
     }
-}
