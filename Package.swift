@@ -5,7 +5,7 @@
 // closure-captured locals in AVAudioConverter / URLSession callbacks,
 // etc.) into hard build errors. Migrating those requires non-trivial
 // source changes (sendable globals, actor isolation) that are out of
-// scope for this dep-bump pass — see CLAUDE.md "no source edits" rule.
+// scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
 // Re-attempt once the Swift 6 strict-concurrency migration lands.
 import PackageDescription
 import Foundation

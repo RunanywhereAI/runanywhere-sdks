@@ -28,7 +28,7 @@ import SwiftProtobuf
 /// to the C ABI.
 public final class SolutionHandle: @unchecked Sendable {
 
-    // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
+    // Per AGENTS.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
     private let handle: OSAllocatedUnfairLock<rac_solution_handle_t?>
 
     // swiftlint:disable:next strict_fileprivate

@@ -27,7 +27,7 @@ extension CppBridge {
         /// In-process cache of the persistent device id resolved by commons.
         /// Commons also caches internally — this Swift cache avoids paying
         /// the C ABI round-trip on hot paths (telemetry, auth, device-info).
-        /// Per CLAUDE.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
+        /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
         private static let cachedPersistentId =
             OSAllocatedUnfairLock<String?>(initialState: nil)
 

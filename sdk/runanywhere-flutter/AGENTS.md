@@ -1,4 +1,4 @@
-# CLAUDE.md — RunAnywhere Flutter SDK
+# AGENTS.md — RunAnywhere Flutter SDK
 
 Verified state: 2026-05-12 against working tree on `feat/v2-architecture` (post Wave-G + Wave-H Phase-B parity + FIX-C revert).
 For exhaustive file-by-file inventory, see `gaps/gaps/file organization/flutter.md`.

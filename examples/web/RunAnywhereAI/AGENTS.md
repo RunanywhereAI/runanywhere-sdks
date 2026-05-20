@@ -1,4 +1,4 @@
-# RunAnywhere Web Example — CLAUDE.md
+# RunAnywhere Web Example — AGENTS.md
 
 ## Overview
 

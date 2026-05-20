@@ -61,7 +61,7 @@ class Genie implements RunAnywhereModule {
   /// Current version of the Genie Runtime Dart module.
   ///
   /// Matches the version convention used by `LlamaCpp.version` and
-  /// `Onnx.version` ('2.0.0' per CLAUDE.md Flutter SDK rules).
+  /// `Onnx.version` ('2.0.0' per AGENTS.md Flutter SDK rules).
   static const String version = '2.0.0';
 
   /// Qualcomm Genie native backend version (single source of truth).

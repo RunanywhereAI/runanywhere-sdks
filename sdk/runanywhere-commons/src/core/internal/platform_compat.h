@@ -11,7 +11,7 @@
  * never reaches SDK consumers' include paths. This prevents leaking unprefixed
  * POSIX shim symbols (`DIR`, `dirent`, `opendir`, `strcasecmp`, `S_IS*`, …)
  * into the public surface on Windows — which would violate the project's
- * "all public symbols must be `rac_` prefixed" rule (see commons CLAUDE.md).
+ * "all public symbols must be `rac_` prefixed" rule (see commons AGENTS.md).
  *
  * To use from a commons .cpp file, include relative to the private `src/`
  * include root:

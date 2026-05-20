@@ -546,7 +546,7 @@ private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKExcept
 // to the C++ caller.
 
 private final class PlatformDownloadCancelFlag {
-    // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+    // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.
     private let cancelled = OSAllocatedUnfairLock<Bool>(initialState: false)
 
     func cancel() {

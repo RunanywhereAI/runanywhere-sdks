@@ -147,7 +147,7 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     // callback that consults `isCancelled` must stop emitting events
     // and (where the C ABI allows) signal the native side to stop.
     // OSAllocatedUnfairLock matches the rest of the SDK's locking
-    // policy (CLAUDE.md forbids NSLock).
+    // policy (AGENTS.md forbids NSLock).
     private let cancellationState = OSAllocatedUnfairLock<Bool>(initialState: false)
 
     init(continuation: AsyncStream<Event>.Continuation, category: String) {

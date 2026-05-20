@@ -58,7 +58,7 @@ public enum CppBridge {
 
     /// Combined synchronously-readable bridge state, guarded by a single
     /// `OSAllocatedUnfairLock`. Replaces the prior NSLock + 3 vars layout
-    /// per CLAUDE.md "Do not use NSLock as it is outdated."
+    /// per AGENTS.md "Do not use NSLock as it is outdated."
     private struct CppBridgeSharedState {
         var environment: SDKEnvironment = .development
         var isInitialized: Bool = false

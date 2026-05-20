@@ -1,4 +1,4 @@
-# RunAnywhere Web SDK — CLAUDE.md
+# RunAnywhere Web SDK — AGENTS.md
 
 ## Overview
 

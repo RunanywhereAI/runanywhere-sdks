@@ -25,7 +25,7 @@
 //      forever until consumers detach.
 //
 //  Concurrency:
-//    * State is guarded by `OSAllocatedUnfairLock` (per CLAUDE.md
+//    * State is guarded by `OSAllocatedUnfairLock` (per AGENTS.md
 //      `NSLock` is forbidden).
 //    * The `@convention(c)` trampoline is a free closure with no
 //      captures; context is plumbed through `Unmanaged.passRetained`
@@ -82,7 +82,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     // MARK: - Per-handle fan-out
 
     private final class HandleFanOut: HandleStreamFanOutEntry {
-        // Per CLAUDE.md: NSLock is forbidden — use OSAllocatedUnfairLock.
+        // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.
         private let handle: Handle
         private let storeKey: HandleStreamStoreKey
         private let register: Register

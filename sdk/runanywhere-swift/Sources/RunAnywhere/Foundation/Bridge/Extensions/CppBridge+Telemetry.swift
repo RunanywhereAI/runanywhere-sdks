@@ -79,7 +79,7 @@ extension CppBridge {
     /// C++ handles JSON building, batching; Swift handles HTTP transport only
     public enum Telemetry {
 
-        // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
+        // Per AGENTS.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
         // The lock guards an opaque manager pointer wrapped in a Sendable shim;
         // `OpaquePointer` itself is not Sendable under Swift 6.
         private static let manager = OSAllocatedUnfairLock<ManagerHandle?>(initialState: nil)

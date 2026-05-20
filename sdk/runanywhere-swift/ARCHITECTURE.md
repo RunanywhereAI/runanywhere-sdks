@@ -89,7 +89,7 @@ sdk/runanywhere-swift/
 ├── Package.swift               ← local dev manifest (references Binaries/)
 ├── Package.resolved
 ├── VERSION                     ← 0.19.13
-├── CLAUDE.md
+├── AGENTS.md
 ├── README.md
 ├── ARCHITECTURE.md             ← this document
 ├── scripts/
@@ -2362,7 +2362,7 @@ Private actors for internal state: `ToolRegistry` actor in `RunAnywhere+ToolCall
 
 **`AsyncStream` for streaming events.** The fan-out pattern in `Adapters/HandleStreamAdapter.swift` delivers proto-deserialized events to multiple `AsyncStream` consumers.
 
-**`OSAllocatedUnfairLock<T>` (Swift 6) for non-actor synchronization.** Used in `URLSessionHttpTransport`, `Logging.shared` state, `CppBridge` shared state. The project enforces this — `NSLock` is forbidden per CLAUDE.md.
+**`OSAllocatedUnfairLock<T>` (Swift 6) for non-actor synchronization.** Used in `URLSessionHttpTransport`, `Logging.shared` state, `CppBridge` shared state. The project enforces this — `NSLock` is forbidden per AGENTS.md.
 
 **`withCheckedThrowingContinuation` for async/await over C callbacks.** Used in `SystemTTSService`, `AudioPlaybackManager`, `AudioCaptureManager`, `HTTPClientAdapter`, `RunAnywhere+ToolCalling`.
 

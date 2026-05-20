@@ -44,7 +44,7 @@ description = "Global allowlist"
 
 paths = [
     '''\.gitleaks\.toml$''',
-    '''CLAUDE\.md$''',
+    '''AGENTS\.md$''',
     '''\.cursor/plans/.*\.plan\.md$''',
     '''thoughts/.*\.md$''',
 ]
