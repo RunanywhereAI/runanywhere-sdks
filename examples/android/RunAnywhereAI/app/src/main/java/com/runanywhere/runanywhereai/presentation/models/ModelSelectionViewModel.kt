@@ -399,8 +399,21 @@ class ModelSelectionViewModel(
                     -> null
                 }
 
-            if (loadCategory == null) {
-                Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
+            val selectedModel = _uiState.value.models.find { it.id == modelId }
+            // Platform plugin is Apple-only; Android uses the example app's
+            // TextToSpeech API for system-tts (mirrors iOS SystemTTSRow bypass).
+            val skipCppLoad =
+                loadCategory == null ||
+                    modelId == "system-tts" ||
+                    selectedModel?.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+
+            if (skipCppLoad) {
+                val reason =
+                    when {
+                        loadCategory == null -> "RAG context"
+                        else -> "System TTS (platform API, no C++ backend on Android)"
+                    }
+                Timber.d("ℹ️ $reason: selecting model by reference only (no load): $modelId")
             } else {
                 val result =
                     RunAnywhere.loadModel(

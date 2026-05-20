@@ -490,6 +490,19 @@ rac_result_t rac_backend_llamacpp_register(void) {
     }
   }
 
+  const rac_engine_vtable_t *legacy_vlm_vt = rac_plugin_entry_llamacpp_vlm();
+  if (legacy_vlm_vt != nullptr) {
+    rac_result_t legacy_rc = rac_plugin_register(legacy_vlm_vt);
+    if (legacy_rc != RAC_SUCCESS &&
+        legacy_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed for llamacpp_vlm: %d",
+                      legacy_rc);
+    } else {
+      RAC_LOG_INFO(LOG_CAT,
+                  "rac_plugin_register succeeded for legacy alias 'llamacpp_vlm'");
+    }
+  }
+
   state.registered = true;
   RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module + plugin)");
   return RAC_SUCCESS;

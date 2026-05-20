@@ -30,7 +30,11 @@ import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
 } from '@runanywhere/proto-ts/download_service';
-import { getCatalog, registerModelCatalog } from '../services/model-catalog';
+import {
+  getCatalog,
+  registerModelCatalog,
+} from '../services/model-catalog';
+import { formatError } from '../services/format-error';
 import { showToast } from './dialogs';
 
 // ---------------------------------------------------------------------------
@@ -60,6 +64,18 @@ let getStartedOverlay: HTMLElement | null = null;
 let getStartedBtn: HTMLButtonElement | null = null;
 let catalogRegistered = false;
 const listeners: Array<() => void> = [];
+
+/**
+ * Sheet open options — used by tabs that want to restrict the visible catalog
+ * to a single modality (Vision → MULTIMODAL, Transcribe → SPEECH_RECOGNITION,
+ * Speak → SPEECH_SYNTHESIS). When omitted, the whole catalog is shown.
+ */
+export interface OpenSheetOptions {
+  filterCategories?: readonly ModelCategory[];
+  title?: string;
+}
+
+let activeSheetOptions: OpenSheetOptions = {};
 
 // ---------------------------------------------------------------------------
 // Public API — wiring into the chat view
@@ -147,9 +163,27 @@ export function onModelStateChange(listener: () => void): () => void {
   };
 }
 
+/**
+ * Find the loaded model for a specific category, or `null` if none. Used by
+ * the Transcribe/Speak tabs to surface a "Pick an STT/TTS model" toolbar pill
+ * matching the Chat tab's pattern.
+ */
+export function findLoadedModelForCategory(category: ModelCategory): ModelInfo | null {
+  try {
+    const current = RunAnywhere.currentModel();
+    if (!current?.modelId) return null;
+    const info = RunAnywhere.getModel(current.modelId);
+    if (info?.category === category) return info;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Open the model selection bottom sheet programmatically. */
-export function openSheet(): void {
+export function openSheet(options: OpenSheetOptions = {}): void {
   if (modalEl) return;
+  activeSheetOptions = options;
   ensureCatalogRegistered();
   renderSheet();
 }
@@ -159,13 +193,14 @@ export function openSheet(): void {
 // ---------------------------------------------------------------------------
 
 function renderSheet(): void {
+  const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
     <div class="modal-sheet" role="dialog" aria-modal="true">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h3 class="text-md font-semibold">Select Model</h3>
+        <h3 class="text-md font-semibold">${title}</h3>
         <button type="button" class="btn-ghost" id="model-sheet-close" aria-label="Close">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -193,13 +228,23 @@ function closeSheet(): void {
   if (!modalEl) return;
   modalEl.remove();
   modalEl = null;
+  activeSheetOptions = {};
 }
 
 function renderRows(): void {
   const host = document.getElementById('model-sheet-list');
   if (!host) return;
 
-  const entries = getCatalog();
+  const allEntries = getCatalog();
+  // Filter by category when the caller scoped the picker to a modality
+  // (e.g. Vision shows only VLM, Transcribe shows only STT). Without
+  // filtering, a user opening the picker from Vision could load an LLM
+  // and the modality call would then fail (BackendNotAvailable from the
+  // VLM provider).
+  const filterCats = activeSheetOptions.filterCategories;
+  const entries = filterCats && filterCats.length > 0
+    ? allEntries.filter((entry) => filterCats.includes(entry.category))
+    : allEntries;
   if (!entries.length) {
     host.innerHTML = '<p class="text-secondary">No models registered.</p>';
     return;
@@ -276,6 +321,7 @@ async function startDownload(modelId: string): Promise<void> {
     if (!model) {
       throw new Error(`Model ${modelId} not found in registry`);
     }
+
     const progress = await RunAnywhere.downloadModel({
       modelId,
       model,
@@ -292,7 +338,7 @@ async function startDownload(modelId: string): Promise<void> {
     });
     applyProgress(modelId, progress);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatError(err);
     setRow(modelId, { status: 'error', error: message });
     showToast(`Download failed: ${message}`, 'warning');
   }
@@ -313,7 +359,7 @@ async function loadModel(modelId: string): Promise<void> {
     showToast(`Loaded ${modelId}`, 'success');
     closeSheet();
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatError(err);
     setRow(modelId, { status: 'error', error: message });
     showToast(`Load failed: ${message}`, 'warning');
   }
@@ -331,7 +377,7 @@ async function unloadModel(modelId: string): Promise<void> {
     setRow(modelId, { status: 'downloaded' });
     showToast(`Unloaded ${modelId}`, 'info');
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = formatError(err);
     showToast(`Unload failed: ${message}`, 'warning');
   }
 }

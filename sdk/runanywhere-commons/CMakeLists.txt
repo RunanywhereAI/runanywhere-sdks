@@ -38,19 +38,18 @@ option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" 
 # Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 
-# Emscripten: default the RAG backend OFF. FetchONNXRuntime.cmake has no WASM
-# binary distribution (it expects headers under third_party/onnxruntime-wasm/
-# which are not vendored in this tree), so the RAG ONNX embedding TUs fail
-# to compile with `onnxruntime_c_api.h: file not found`. The ONNX WASM story
-# is delivered by `onnxruntime-web` (JavaScript package) from the frontend;
-# commons does not need an in-module ONNX runtime on WASM.
-#
-# We use `set(... CACHE ...)` (not `FORCE`) so callers of the WASM build
-# script (`sdk/runanywhere-web/wasm/scripts/build.sh`) can explicitly opt
-# in via `-DRAC_BACKEND_RAG=ON` once the onnxruntime-wasm third_party
-# package lands. See TODO(v0.21).
-if(EMSCRIPTEN)
-    set(RAC_BACKEND_RAG OFF CACHE BOOL "RAG disabled by default on Emscripten; opt-in via -DRAC_BACKEND_RAG=ON after vendoring onnxruntime-wasm")
+# Emscripten: RAG itself only depends on USearch + nlohmann_json (header-only)
+# and the rac_embeddings_service vtable — it does NOT directly include
+# onnxruntime headers. The ONNX embedding provider lives in engines/onnx/ and
+# is folded into rac_backend_onnx when that engine is enabled. On WASM the
+# matched-set ORT + Sherpa archives ship under third_party/onnxruntime-wasm/
+# and third_party/sherpa-onnx-wasm/ (via @runanywhere/web-onnx), so RAG can
+# safely default ON whenever the ONNX backend is requested for the same
+# build. If a caller asks for an ONNX-less WASM (commons-only / llamacpp-only)
+# we force RAG off so the proto-byte RAG calls fail loudly with
+# BackendNotAvailable instead of routing through a missing embeddings vtable.
+if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX)
+    set(RAC_BACKEND_RAG OFF CACHE BOOL "RAG requires ONNX embeddings on Emscripten; force off when RAC_BACKEND_ONNX is not enabled" FORCE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 

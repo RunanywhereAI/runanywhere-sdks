@@ -75,8 +75,22 @@ if [ "${BUILD_RC}" -ne 0 ]; then
     echo "ERROR: ONNX Runtime configure failed before producing ${ORT_BUILD_DIR}/CMakeCache.txt" >&2
     exit "${BUILD_RC}"
   fi
-  echo "ONNX Runtime build.py returned ${BUILD_RC}; falling back to direct CMake build."
-  cmake --build "${ORT_BUILD_DIR}" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-$(sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
+  # F3 (dep-bump 2026-05-19): ORT 1.24.x's build.py honors --skip_tests by
+  # disabling test target *execution* but still adds test sources to the
+  # `make all` graph; one test (onnxruntime_provider_test, e.g.
+  # gather_block_quantized_op_test.cc) fails to compile under WASM+Emscripten,
+  # making `make all` exit 2 even when every library target succeeds.
+  # `libonnxruntime_webassembly.a` is not exposed as a discrete cmake target
+  # in 1.24.x — it's produced by a custom command bundled into `make all`.
+  # Use `make -k` (keep going on error) so the failing test compile doesn't
+  # halt the build before the WASM static library is produced, then tolerate
+  # a non-zero exit since the `find` step below verifies the archive.
+  echo "ONNX Runtime build.py returned ${BUILD_RC}; falling back to direct make -k (keep-going) to skip the failing test compile."
+  set +e
+  cmake --build "${ORT_BUILD_DIR}" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-$(sysctl -n hw.ncpu 2>/dev/null || echo 4)}" -- -k
+  CMAKE_FALLBACK_RC=$?
+  set -e
+  echo "Fallback cmake --build exit: ${CMAKE_FALLBACK_RC} (non-zero is OK if libonnxruntime_webassembly.a was still produced)."
 fi
 
 ORT_ARCHIVE="$(
@@ -95,13 +109,20 @@ fi
 cp "${ORT_ARCHIVE}" "${DEST_DIR}/lib/libonnxruntime.a"
 
 HEADER_SRC="${SRC_DIR}/include/onnxruntime/core/session"
+# F3 (dep-bump 2026-05-19): ORT 1.24.x added onnxruntime_ep_c_api.h and
+# onnxruntime_ep_device_ep_metadata_keys.h to the EP plugin C ABI;
+# onnxruntime_c_api.h:8289 now `#include "onnxruntime_ep_c_api.h"` so the
+# header must be vendored alongside the core C API or downstream consumers
+# (sherpa-onnx) fail at the very first include.
 for header in \
   onnxruntime_c_api.h \
   onnxruntime_cxx_api.h \
   onnxruntime_cxx_inline.h \
   onnxruntime_float16.h \
   onnxruntime_session_options_config_keys.h \
-  onnxruntime_run_options_config_keys.h
+  onnxruntime_run_options_config_keys.h \
+  onnxruntime_ep_c_api.h \
+  onnxruntime_ep_device_ep_metadata_keys.h
 do
   if [ ! -f "${HEADER_SRC}/${header}" ]; then
     echo "ERROR: missing ONNX Runtime header ${HEADER_SRC}/${header}" >&2

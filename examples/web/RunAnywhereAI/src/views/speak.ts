@@ -12,11 +12,23 @@
 
 import type { TabLifecycle } from '../app';
 import {
+  ModelCategory,
   RunAnywhere,
   isSDKException,
 } from '@runanywhere/web';
 import { AudioPlayback } from '@runanywhere/web/browser';
 import { ONNX } from '@runanywhere/web-onnx';
+import {
+  ensureCatalogRegistered,
+  findLoadedModelForCategory,
+  onModelStateChange,
+  openSheet,
+} from '../components/model-selection';
+import { formatError } from '../services/format-error';
+
+const TTS_PICKER_FILTER: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+];
 
 let container: HTMLElement;
 let unmounted = false;
@@ -24,6 +36,7 @@ let playback: AudioPlayback | null = null;
 let isSynthesizing = false;
 let lastError: string | null = null;
 let lastDurationMs: number | null = null;
+let unsubscribeState: (() => void) | null = null;
 
 const DEFAULT_TEXT =
   'Hello — this synthesis was generated entirely on-device through the ' +
@@ -32,7 +45,11 @@ const DEFAULT_TEXT =
 export function initSpeakTab(el: HTMLElement): TabLifecycle {
   container = el;
   unmounted = false;
+  ensureCatalogRegistered();
   renderSpeak();
+  unsubscribeState = onModelStateChange(() => {
+    if (!unmounted) renderSpeak();
+  });
   return {
     // app.ts fires onDeactivate on every tab switch (not only on panel
     // teardown). Treat the flag as a "currently inactive" guard for
@@ -41,12 +58,17 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
     // post-ONNX-register re-renders.
     onActivate: () => {
       unmounted = false;
+      ensureCatalogRegistered();
       renderSpeak();
     },
     onDeactivate: () => {
       unmounted = true;
       playback?.dispose();
       playback = null;
+      if (!container.isConnected && unsubscribeState) {
+        unsubscribeState();
+        unsubscribeState = null;
+      }
     },
   };
 }
@@ -65,11 +87,17 @@ function inspectStatus(): SpeakStatus {
 function renderSpeak(): void {
   const status = inspectStatus();
   const showLive = status.registered && status.supportsProto;
+  const loadedModel = findLoadedModelForCategory(
+    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  );
+  const modelLabel = loadedModel?.name ?? 'Select TTS Model';
+  const canRunInference = showLive && Boolean(loadedModel);
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Speak</div>
       <div class="toolbar-actions">
+        <button class="btn btn-secondary" id="speak-model-btn">${escape(modelLabel)}</button>
         <button class="btn btn-secondary" id="onnx-register-btn">${
           status.registered ? 'Re-register ONNX' : 'Register ONNX backend'
         }</button>
@@ -85,6 +113,7 @@ function renderSpeak(): void {
           <li><code>RunAnywhere.tts.supportsProtoTTS()</code>: <strong>${
             status.supportsProto ? 'yes' : 'no'
           }</strong></li>
+          <li><code>TTS model loaded</code>: <strong>${loadedModel ? escape(loadedModel.id) : 'no'}</strong></li>
         </ul>
         <div id="onnx-register-status" class="docs-status"></div>
       </div>
@@ -99,16 +128,18 @@ function renderSpeak(): void {
             }>${escape(DEFAULT_TEXT)}</textarea>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="speak-btn" ${
-                isSynthesizing ? 'disabled' : ''
+                isSynthesizing || !canRunInference ? 'disabled' : ''
               }>${isSynthesizing ? 'Synthesizing...' : 'Speak'}</button>
               <button class="btn btn-secondary" id="stop-btn" ${
                 isSynthesizing ? '' : 'disabled'
               }>Stop</button>
             </div>
             <div id="speak-status" class="docs-status">${
+              !canRunInference ? 'Load a TTS model first.' : ''
+            }${
               lastError ? `Error: ${escape(lastError)}` : ''
             }${
-              lastDurationMs != null && !lastError
+              lastDurationMs != null && !lastError && canRunInference
                 ? `Last synthesis: ${(lastDurationMs / 1000).toFixed(2)}s of audio.`
                 : ''
             }</div>
@@ -134,6 +165,13 @@ function renderSpeak(): void {
   container
     .querySelector('#onnx-register-btn')!
     .addEventListener('click', () => void registerOnnx());
+
+  container.querySelector('#speak-model-btn')?.addEventListener('click', () => {
+    openSheet({
+      title: 'Select TTS Model',
+      filterCategories: TTS_PICKER_FILTER,
+    });
+  });
 
   if (showLive) {
     container.querySelector('#speak-btn')?.addEventListener('click', () => {
@@ -196,8 +234,7 @@ function pcmBytesToFloat32(bytes: Uint8Array): Float32Array {
 
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
-  if (err instanceof Error) return err.message;
-  return String(err);
+  return formatError(err);
 }
 
 function escape(value: string): string {

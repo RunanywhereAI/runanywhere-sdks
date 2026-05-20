@@ -112,6 +112,14 @@ export interface ModelRegistryModule {
 let defaultModule: ModelRegistryModule | null = null;
 const defaultModuleListeners: DefaultModuleListener[] = [];
 const protoAvailabilityByModule = new WeakMap<ModelRegistryModule, ModelRegistryAvailability>();
+// Every WASM module that has ever been installed as a registry target — even
+// after `setDefaultModule` reassigns the "primary" to a sibling backend.
+// `register`/`update`/`remove` operations are broadcast across every module
+// in this set so the per-module C++ `s_model_registry` singletons stay in
+// sync. Without this, the catalog ends up populated in (say) LlamaCpp's
+// registry while the commons WASM — which runs the C++ download orchestrator
+// — sees an empty registry and can't self-heal post-download state.
+const knownModules = new Set<ModelRegistryModule>();
 
 export interface RefreshOptions {
   includeRemoteCatalog?: boolean;
@@ -123,9 +131,42 @@ export class ModelRegistryAdapter {
   /**
    * Install the default Emscripten module (called by backend packages on
    * load). Mirrors the pattern used by `HTTPAdapter.setDefaultModule`.
+   *
+   * Each call ALSO adds the module to the broadcast set. Read operations
+   * (`get`/`list`/`query`) continue to target the "default" module (the
+   * last writer wins so the backend that owns the plugin route also owns
+   * read lookups), while writes (`register`/`update`/`remove`) fan out to
+   * every module in the set. That keeps commons + every backend WASM's
+   * per-module `s_model_registry` consistent — the C++ download
+   * orchestrator runs in whichever module owns the `DownloadAdapter`, and
+   * its `rac_get_model(...)` lookup must succeed regardless of which
+   * backend bridge happens to own the `ModelRegistryAdapter` primary slot.
    */
   static setDefaultModule(module: ModelRegistryModule): void {
+    const isNewModule = !knownModules.has(module);
     defaultModule = module;
+    knownModules.add(module);
+
+    // When a new backend WASM joins (e.g. ONNX after LlamaCPP), replay the
+    // full model catalog from any existing module to the newcomer. Without
+    // this, models registered before this module arrived are invisible to
+    // its s_model_registry — causing RAC_ERROR_MODEL_NOT_FOUND when the new
+    // WASM tries to resolve model paths (e.g. RAG session creation needs the
+    // embedding model entry in the ONNX WASM's registry).
+    if (isNewModule && knownModules.size > 1) {
+      for (const existing of knownModules) {
+        if (existing === module) continue;
+        const sourceAdapter = new ModelRegistryAdapter(existing);
+        const list = sourceAdapter.list();
+        if (!list?.models?.length) continue;
+        const targetAdapter = new ModelRegistryAdapter(module);
+        for (const m of list.models) {
+          targetAdapter.registerDirect(m);
+        }
+        break; // one source is sufficient
+      }
+    }
+
     const adapter = new ModelRegistryAdapter(module);
     for (const listener of defaultModuleListeners) {
       try {
@@ -140,8 +181,17 @@ export class ModelRegistryAdapter {
     }
   }
 
+  /** Drop a single module from the broadcast set (e.g. on backend teardown). */
+  static unregisterModule(module: ModelRegistryModule): void {
+    knownModules.delete(module);
+    if (defaultModule === module) {
+      defaultModule = null;
+    }
+  }
+
   static clearDefaultModule(): void {
     defaultModule = null;
+    knownModules.clear();
   }
 
   static onDefaultModuleReady(listener: DefaultModuleListener): () => void {
@@ -223,29 +273,28 @@ export class ModelRegistryAdapter {
   }
 
   register(model: ProtoModelInfo): boolean {
-    const mod = this.module;
-    if (!this.ensureProtoExports('register')) return false;
-    const handle = this.getRegistryHandle('register');
-    if (!handle) return false;
-
+    // Broadcast registration to every known module so the per-module C++
+    // `s_model_registry` singletons stay aligned. Returns success if the
+    // primary module accepted the registration — sibling failures are logged
+    // but do not fail the call, because (a) some sibling modules may not
+    // export the proto registry symbols at all, and (b) the user-visible
+    // "did register?" answer is determined by the primary module that holds
+    // the plugin route.
     const bytes = ProtoModelInfoCodec.encode(model).finish();
-    return this.withHeapBytes(bytes, (bytesPtr, bytesLen) => {
-      const rc = mod._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen);
-      return this.handleResult('rac_model_registry_register_proto', rc);
-    });
+    return this.broadcastWrite('rac_model_registry_register_proto', (mod, handle) => (
+      this.withHeapBytesOnModule(mod, bytes, (bytesPtr, bytesLen) => (
+        mod._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
+      ))
+    ));
   }
 
   update(model: ProtoModelInfo): boolean {
-    const mod = this.module;
-    if (!this.ensureProtoExports('update')) return false;
-    const handle = this.getRegistryHandle('update');
-    if (!handle) return false;
-
     const bytes = ProtoModelInfoCodec.encode(model).finish();
-    return this.withHeapBytes(bytes, (bytesPtr, bytesLen) => {
-      const rc = mod._rac_model_registry_update_proto!(handle, bytesPtr, bytesLen);
-      return this.handleResult('rac_model_registry_update_proto', rc);
-    });
+    return this.broadcastWrite('rac_model_registry_update_proto', (mod, handle) => (
+      this.withHeapBytesOnModule(mod, bytes, (bytesPtr, bytesLen) => (
+        mod._rac_model_registry_update_proto!(handle, bytesPtr, bytesLen)
+      ))
+    ));
   }
 
   get(modelId: string): ProtoModelInfo | null {
@@ -313,19 +362,38 @@ export class ModelRegistryAdapter {
   }
 
   remove(modelId: string): boolean {
-    const mod = this.module;
-    if (!this.ensureProtoExports('remove')) return false;
-    const handle = this.getRegistryHandle('remove');
-    if (!handle) return false;
+    // Broadcast removal so the primary registry and every sibling stay in
+    // sync. Sibling failures (e.g. not-found because that module never saw
+    // the matching `register`) are tolerated — the user-visible result still
+    // comes from the primary module.
+    return this.broadcastWrite('rac_model_registry_remove_proto', (mod, handle) => {
+      const idPtr = this.allocUtf8OnModule(mod, modelId);
+      if (!idPtr) return -1;
+      try {
+        return mod._rac_model_registry_remove_proto!(handle, idPtr);
+      } finally {
+        mod._free?.(idPtr);
+      }
+    });
+  }
 
-    const idPtr = this.allocUtf8(modelId);
-    if (!idPtr) return false;
-
+  /**
+   * Register a model directly on this adapter's module WITHOUT broadcasting
+   * to other known modules. Used during catalog replay when a new WASM joins.
+   */
+  private registerDirect(model: ProtoModelInfo): void {
+    if (!this.ensureProtoExports('registerDirect')) return;
+    const handle = this.getRegistryHandle('registerDirect');
+    if (!handle) return;
+    const bytes = ProtoModelInfoCodec.encode(model).finish();
     try {
-      const rc = mod._rac_model_registry_remove_proto!(handle, idPtr);
-      return this.handleResult('rac_model_registry_remove_proto', rc);
-    } finally {
-      this.module._free?.(idPtr);
+      this.withHeapBytesOnModule(this.module, bytes, (bytesPtr, bytesLen) => (
+        this.module._rac_model_registry_register_proto!(handle, bytesPtr, bytesLen)
+      ));
+    } catch (error) {
+      logger.debug(
+        `registerDirect(${model.id}) failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -377,7 +445,14 @@ export class ModelRegistryAdapter {
   }
 
   private withHeapBytes<T>(bytes: Uint8Array, fn: (bytesPtr: number, bytesLen: number) => T): T {
-    const mod = this.module;
+    return this.withHeapBytesOnModule(this.module, bytes, fn);
+  }
+
+  private withHeapBytesOnModule<T>(
+    mod: ModelRegistryModule,
+    bytes: Uint8Array,
+    fn: (bytesPtr: number, bytesLen: number) => T,
+  ): T {
     const ptr = mod._malloc!(Math.max(bytes.byteLength, 1));
     try {
       mod.HEAPU8!.set(bytes, ptr);
@@ -388,7 +463,10 @@ export class ModelRegistryAdapter {
   }
 
   private allocUtf8(value: string): number {
-    const mod = this.module;
+    return this.allocUtf8OnModule(this.module, value);
+  }
+
+  private allocUtf8OnModule(mod: ModelRegistryModule, value: string): number {
     if (!mod._malloc || !mod._free || !mod.lengthBytesUTF8 || !mod.stringToUTF8) {
       logger.warning('module missing UTF-8 allocation helpers');
       return 0;
@@ -401,6 +479,76 @@ export class ModelRegistryAdapter {
     }
     mod.stringToUTF8(value, ptr, size);
     return ptr;
+  }
+
+  /**
+   * Run a write op against every known WASM module (commons + every backend
+   * that registered against `ModelRegistryAdapter`). The return value is the
+   * result of the call against the PRIMARY module — sibling failures are
+   * logged at debug level but do not poison the user-visible result.
+   *
+   * Modules that don't expose proto-byte registry exports are skipped without
+   * a warning (e.g. a minimal WASM build that compiled out the proto path).
+   * Modules that DO expose them but return RAC_ERROR_FEATURE_NOT_AVAILABLE
+   * are flagged via `markProtoRegistryUnsupported` so subsequent calls skip
+   * them immediately.
+   *
+   * Used by `register`, `update`, and `remove` to keep the catalog in sync
+   * across modules. Without this fan-out, the C++ download orchestrator
+   * (which runs in whichever module owns `DownloadAdapter`) cannot find the
+   * model when its own `s_model_registry` is empty even though a sibling
+   * module's registry is fully populated.
+   */
+  private broadcastWrite(
+    functionName: string,
+    invoke: (mod: ModelRegistryModule, handle: number) => number,
+  ): boolean {
+    const primary = this.module;
+    let primaryResult: boolean | null = null;
+    let anySuccess = false;
+
+    // Snapshot the set so re-entrant register/listener pairs don't mutate
+    // the iteration target. The primary module is guaranteed to be present
+    // because `setDefaultModule(mod)` adds it to `knownModules` before
+    // assigning the primary slot.
+    const targets = new Set<ModelRegistryModule>(knownModules);
+    if (!targets.has(primary)) targets.add(primary);
+
+    for (const mod of targets) {
+      const isPrimary = mod === primary;
+      const tempAdapter = isPrimary ? this : new ModelRegistryAdapter(mod);
+      if (!tempAdapter.ensureProtoExports(functionName)) {
+        if (isPrimary) primaryResult = false;
+        continue;
+      }
+      const handle = tempAdapter.getRegistryHandle(functionName);
+      if (!handle) {
+        if (isPrimary) primaryResult = false;
+        continue;
+      }
+      let rc: number;
+      try {
+        rc = invoke(mod, handle);
+      } catch (error) {
+        logger.warning(
+          `${functionName} threw on sibling module: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        if (isPrimary) primaryResult = false;
+        continue;
+      }
+      const ok = tempAdapter.handleResult(functionName, rc);
+      if (ok) anySuccess = true;
+      if (isPrimary) primaryResult = ok;
+    }
+
+    // If the primary module never reported a result (e.g. it lacked exports
+    // or its handle was null) treat the broadcast as successful when AT
+    // LEAST ONE sibling accepted the write. That keeps the catalog usable
+    // when commons happens to be the primary but only the backend WASM has
+    // the proto registry exports.
+    return primaryResult ?? anySuccess;
   }
 
   private readOwnedProtoResult(

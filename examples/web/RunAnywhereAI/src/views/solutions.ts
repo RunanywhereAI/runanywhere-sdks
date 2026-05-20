@@ -9,6 +9,7 @@
  */
 import { RunAnywhere } from '@runanywhere/web';
 import type { TabLifecycle } from '../app';
+import { formatError } from '../services/format-error';
 
 // Use model IDs that are actually registered by services/model-catalog.ts;
 // the placeholder IDs from sdk/runanywhere-commons/examples/solutions/*.yaml
@@ -124,7 +125,7 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
           );
           availability = RunAnywhere.rag.availability();
         } catch (err) {
-          append(`N/A RAG: bootstrap failed: ${(err as Error).message}`);
+          append(`N/A RAG: bootstrap failed: ${formatError(err)}`);
           return;
         }
       }
@@ -149,7 +150,7 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
       handle.destroy();
       append(`OK ${name}: destroyed.`);
     } catch (err) {
-      append(`ERR ${name}: ${(err as Error).message}`);
+      append(`ERR ${name}: ${formatError(err)}`);
     } finally {
       running = false;
       voiceBtn.disabled = false;

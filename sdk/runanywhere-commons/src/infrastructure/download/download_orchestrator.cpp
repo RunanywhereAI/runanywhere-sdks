@@ -360,6 +360,9 @@ std::string join_path(const std::string& lhs, const std::string& rhs) {
 //   - is_absolute_path(path)     → absolute paths are policy decisions, not
 //                                  data; the C++ writer must not be steered
 //                                  by descriptor data into arbitrary roots.
+//                                  EXCEPTION: platform-trusted mount roots
+//                                  (see is_platform_trusted_absolute_prefix)
+//                                  are sandboxed by the platform itself.
 //
 // `is_safe_model_id_component` is the strictest of the three because the
 // model_id is concatenated into the per-model folder root and then used as
@@ -371,11 +374,53 @@ bool is_safe_path_segment(const std::string& component) {
     return component.find('/') == std::string::npos && component.find('\\') == std::string::npos;
 }
 
+// Whitelist platform-trusted absolute path prefixes that the C++ writer is
+// allowed to honor verbatim from descriptor metadata.
+//
+// `/opfs/` — Emscripten OPFS mount root on Web. The browser-owned Origin
+// Private File System is sandboxed: every path under `/opfs/` is rooted in
+// the origin's private storage and cannot reach files outside that root.
+// Path-traversal segments (`..`) are still validated separately by
+// `path_has_unsafe_components` / per-segment `is_safe_path_segment` so a
+// malicious `/opfs/../etc/passwd` is still rejected — the prefix check only
+// gates which absolute roots are admissible at all.
+bool is_platform_trusted_absolute_prefix(const std::string& path) {
+#if defined(__EMSCRIPTEN__)
+    return path.rfind("/opfs/", 0) == 0;
+#else
+    (void)path;
+    return false;
+#endif
+}
+
 bool is_safe_relative_descriptor_path(const std::string& path) {
     if (path.empty())
         return false;
-    if (is_absolute_path(path))
-        return false;
+    if (is_absolute_path(path)) {
+        // Absolute paths are normally a policy decision the C++ writer must
+        // not be steered into. The single exception is a platform-trusted
+        // mount root (e.g. Emscripten OPFS) where the platform itself
+        // sandboxes everything below the prefix. We still verify that no
+        // component is empty / "." / ".." so traversal segments embedded in
+        // a trusted-prefix path are caught.
+        if (!is_platform_trusted_absolute_prefix(path))
+            return false;
+        size_t start = 1;  // skip the leading '/'
+        while (start <= path.size()) {
+            size_t end = path.find_first_of("/\\", start);
+            if (end == std::string::npos)
+                end = path.size();
+            if (end > start) {
+                std::string component = path.substr(start, end - start);
+                if (!is_safe_path_segment(component))
+                    return false;
+            }
+            if (end == path.size())
+                break;
+            start = end + 1;
+        }
+        return true;
+    }
 
     size_t start = 0;
     while (start <= path.size()) {
@@ -398,9 +443,24 @@ bool is_safe_relative_descriptor_path(const std::string& path) {
 // when the result escapes the root or the inputs fail the safety checks.
 // `model_folder` is trusted (built from rac_model_paths_get_*); only
 // `relative_path` is treated as untrusted.
+//
+// EXCEPTION: when `relative_path` is a platform-trusted absolute path
+// (e.g. Emscripten `/opfs/...`), the path is returned verbatim — the
+// model_folder containment check does not apply because the platform mount
+// root IS the trusted root. Per-segment validation has already rejected
+// traversal segments inside the absolute path.
 std::optional<std::string> safe_descriptor_path_under(const std::string& model_folder,
                                                       const std::string& relative_path) {
-    if (model_folder.empty() || !is_safe_relative_descriptor_path(relative_path))
+    if (!is_safe_relative_descriptor_path(relative_path))
+        return std::nullopt;
+
+    // Platform-trusted absolute paths are not joined with model_folder —
+    // the platform mount root (e.g. /opfs/) is itself a sandbox boundary.
+    if (is_absolute_path(relative_path) && is_platform_trusted_absolute_prefix(relative_path)) {
+        return fs::path(relative_path).lexically_normal().string();
+    }
+
+    if (model_folder.empty())
         return std::nullopt;
 
     fs::path root = fs::path(model_folder).lexically_normal();
@@ -936,9 +996,17 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     // a single file — typically the mmproj — and the VLM load failed with
     // "primary model not found".
     std::string completion_local_path = final_path;
-    if (task->files.size() > 1 && !task->model_folder_path.empty() &&
-        task->model_folder_path != ".") {
-        completion_local_path = task->model_folder_path;
+    if (!task->model_folder_path.empty() && task->model_folder_path != ".") {
+        // Multi-file plans (VLM primary + mmproj, MiniLM onnx + vocab) always
+        // register the per-model folder. Single-file archive extracts (SmolVLM
+        // tarball, Sherpa STT/TTS) must do the same — otherwise self-heal can
+        // record the last discovered file (often mmproj) and VLM load fails.
+        const bool multi_file_plan = task->files.size() > 1;
+        const bool archive_extracted =
+            task->files.size() == 1 && !task->files.empty() && task->files[0].requires_extraction;
+        if (multi_file_plan || archive_extracted) {
+            completion_local_path = task->model_folder_path;
+        }
     }
     set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
                       completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
@@ -1150,6 +1218,12 @@ bool is_traversal_safe_destination(const std::string& path, const std::string& m
                                    const std::string& downloads_dir) {
     if (path_has_unsafe_components(path))
         return false;
+    // Platform-trusted absolute mount roots (e.g. Emscripten /opfs/) are
+    // sandboxed by the platform itself — accept verbatim once unsafe
+    // components have been ruled out above. This is the bypass-planner
+    // analog of the planner-side exception in safe_descriptor_path_under.
+    if (is_platform_trusted_absolute_prefix(path))
+        return true;
     // Require lexical containment under at least one known-safe root:
     // either the per-model folder (direct-write destinations) or the
     // shared archive-staging downloads dir (extraction-bearing files).
@@ -2528,7 +2602,16 @@ rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
             return RAC_SUCCESS;
         }
 
-        case RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED:
+        case RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED: {
+            // Directory-based archives (SmolVLM tarball, multi-file ONNX bundles)
+            // contain several artifacts at the extraction root. Register the
+            // folder so `rac_model_paths_resolve_artifact` can assign primary
+            // vs mmproj roles. Picking the first .gguf here often selects
+            // mmproj and breaks VLM load ("primary model not found").
+            snprintf(out_path, path_size, "%s", extracted_dir);
+            return RAC_SUCCESS;
+        }
+
         case RAC_ARCHIVE_STRUCTURE_UNKNOWN:
         default: {
             // Try to find a model file first

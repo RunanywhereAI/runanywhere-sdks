@@ -25,6 +25,7 @@ import {
   ModelFormat,
   ModelSource,
 } from '@runanywhere/proto-ts/model_types';
+import { formatError } from './format-error';
 
 /**
  * A flat, app-local description of a catalog entry that gets promoted to a
@@ -287,7 +288,7 @@ export function registerModelCatalog(): number {
     } catch (err) {
       console.warn(
         `[model-catalog] register(${entry.id}) threw:`,
-        err instanceof Error ? err.message : err,
+        formatError(err),
       );
     }
   }
@@ -303,11 +304,6 @@ export function registerModelCatalog(): number {
 /** Get the declarative catalog. Safe to call before SDK initialization. */
 export function getCatalog(): readonly CatalogEntry[] {
   return CATALOG;
-}
-
-/** Look up a catalog entry by id. */
-export function getCatalogEntry(id: string): CatalogEntry | undefined {
-  return CATALOG.find((entry) => entry.id === id);
 }
 
 // ---------------------------------------------------------------------------

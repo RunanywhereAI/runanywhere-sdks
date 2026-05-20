@@ -740,6 +740,20 @@ const ALL_CAPABILITIES: readonly WasmCapability[] = [
 const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>();
 
 /**
+ * Framework → module map. Each backend WASM owns its own static
+ * `s_plugin_registry`; `rac_plugin_route` only finds the framework's plugin
+ * inside the WASM that ran the backend's `rac_backend_*_register()` call.
+ * Web-only: native SDKs share a single process-wide plugin registry.
+ */
+const _moduleByFramework = new Map<string, EmscriptenRunanywhereModule>();
+
+/** Look up which WASM owns the registered plugin for a model framework. */
+export function getModuleForFramework(framework: string): EmscriptenRunanywhereModule | null {
+  if (!framework) return null;
+  return _moduleByFramework.get(framework.toLowerCase()) ?? null;
+}
+
+/**
  * Register a module against one or more capabilities. Replaces any prior
  * owner of those capabilities (last-writer-wins per capability). Also
  * forwards the module to the legacy `setDefaultModule()` adapter slots,
@@ -752,9 +766,13 @@ const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>
 export function registerWasmModule(
   capabilities: readonly WasmCapability[],
   mod: EmscriptenRunanywhereModule,
+  frameworks: readonly string[] = [],
 ): void {
   for (const cap of capabilities) {
     _moduleByCapability.set(cap, mod);
+  }
+  for (const fw of frameworks) {
+    if (fw) _moduleByFramework.set(fw.toLowerCase(), mod);
   }
   // Commons-level adapters (model registry, downloads, hardware, events)
   // follow the 'commons' capability — they target SDK-state surface exports
@@ -804,6 +822,9 @@ export function registerWasmModule(
  * switch — it lets siblings keep their slots intact.
  */
 export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
+  for (const [fw, current] of Array.from(_moduleByFramework.entries())) {
+    if (current === mod) _moduleByFramework.delete(fw);
+  }
   const releasedCapabilities: WasmCapability[] = [];
   for (const [cap, current] of Array.from(_moduleByCapability.entries())) {
     if (current === mod) {
@@ -811,15 +832,17 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
       releasedCapabilities.push(cap);
     }
   }
-  // If commons was released, clear the commons-level adapter slots that
-  // were pointing at this module. We can't easily check the adapter-side
-  // slot identity here, so we conservatively clear — re-registration by
-  // another module reinstalls them.
+  // Drop THIS module from the ModelRegistryAdapter broadcast set
+  // regardless of which capability it owned — the broadcast list mirrors
+  // every WASM that has ever called `setDefaultModule`. If commons was
+  // released we also clear the other commons-level adapters (Download,
+  // Hardware, ModelLifecycle, SDKEventStream) because they still track a
+  // single primary slot. Re-registration by another module reinstalls them.
+  ModelRegistryAdapter.unregisterModule(mod);
   if (releasedCapabilities.includes('commons')) {
     DownloadAdapter.clearDefaultModule();
     HardwareAdapter.clearDefaultModule();
     ModelLifecycleAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
     SDKEventStreamAdapter.clearDefaultModule();
   }
   ModalityProtoAdapter.unregisterModuleCapabilities(releasedCapabilities, mod);
@@ -835,6 +858,24 @@ export function getModuleForCapability(
   cap: WasmCapability,
 ): EmscriptenRunanywhereModule | null {
   return _moduleByCapability.get(cap) ?? null;
+}
+
+/**
+ * Enumerate every distinct WASM module currently registered. Useful when
+ * a caller needs to fan an operation out across every backend (e.g. OPFS
+ * MEMFS restore — see `OPFSBridge.restoreToMemfsAll`), because each
+ * Emscripten WASM owns a private MEMFS and writing into one is invisible
+ * to another.
+ *
+ * Returns an empty array when no backend has registered. Order is not
+ * guaranteed; callers should treat the list as a set.
+ */
+export function getAllRegisteredModules(): EmscriptenRunanywhereModule[] {
+  const unique = new Set<EmscriptenRunanywhereModule>();
+  for (const mod of _moduleByCapability.values()) {
+    unique.add(mod);
+  }
+  return Array.from(unique);
 }
 
 /**

@@ -40,11 +40,21 @@ fi
 PATCH_DIR="${WASM_DIR}/patches"
 SHERPA_PATCH="${PATCH_DIR}/sherpa-onnx-c-api-try-catch.patch"
 if [ -f "${SHERPA_PATCH}" ]; then
-  if ! git -C "${SRC_DIR}" apply --reverse --check "${SHERPA_PATCH}" >/dev/null 2>&1; then
+  if git -C "${SRC_DIR}" apply --reverse --check "${SHERPA_PATCH}" >/dev/null 2>&1; then
+    echo "Sherpa patch already applied: ${SHERPA_PATCH}"
+  elif git -C "${SRC_DIR}" apply --check "${SHERPA_PATCH}" >/dev/null 2>&1; then
     echo "Applying Sherpa patch: ${SHERPA_PATCH}"
     git -C "${SRC_DIR}" apply "${SHERPA_PATCH}"
   else
-    echo "Sherpa patch already applied: ${SHERPA_PATCH}"
+    # F3 (dep-bump 2026-05-19): Sherpa 1.13.2 reorganized c-api.cc + session.cc
+    # so the old line offsets in this patch no longer match. The session.cc
+    # WASM inter-op fix is already in upstream 1.13.2 (see csrc/session.cc
+    # `#if SHERPA_ONNX_ENABLE_WASM` block); the c-api.cc try/catch hardening
+    # remains uncovered but is robustness-only (existing builds without it
+    # still work; bad input just surfaces a CppException instead of a logged
+    # nullptr). Skip the patch with a warning rather than fail the vendor.
+    echo "WARNING: Sherpa patch ${SHERPA_PATCH} does not apply cleanly to v${SHERPA_ONNX_VERSION}; continuing without it." >&2
+    echo "         Upstream 1.13.2+ already includes the session.cc WASM inter-op fix; the c-api.cc try/catch hardening is robustness-only." >&2
   fi
 fi
 

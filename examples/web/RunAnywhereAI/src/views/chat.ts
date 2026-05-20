@@ -23,6 +23,7 @@ import {
   ensureCatalogRegistered,
   onModelStateChange,
 } from '../components/model-selection';
+import { formatError } from '../services/format-error';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -76,7 +77,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 
   const refreshSendButton = () => {
     const hasInput = inputEl.value.trim().length > 0;
-    sendBtn.disabled = isGenerating || !hasInput;
+    const modelLoaded = isModelLoaded();
+    sendBtn.disabled = isGenerating || !hasInput || !modelLoaded;
+    // Tooltip clarifies why the button is disabled. The textbox stays
+    // enabled so users may compose while a model is loading.
+    if (!modelLoaded) {
+      sendBtn.title = 'Load a model first';
+    } else if (!hasInput) {
+      sendBtn.title = 'Type a message to send';
+    } else if (isGenerating) {
+      sendBtn.title = 'Generation in progress';
+    } else {
+      sendBtn.title = 'Send';
+    }
   };
 
   inputEl.addEventListener('input', refreshSendButton);
@@ -96,6 +109,10 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   });
 
   renderMessages(messagesEl);
+
+  // Apply the initial disabled / tooltip state so the Send button reflects
+  // "Load a model first" before any user interaction.
+  refreshSendButton();
 
   // Re-render when the model state changes so disabled/enabled states stay
   // consistent with what the toolbar reports.
@@ -187,6 +204,19 @@ function isLLMBackendAvailable(): boolean {
   }
 }
 
+/**
+ * True when the C++ lifecycle reports a model loaded. Used to gate the chat
+ * Send button so users can't click into a silent no-op before loading a
+ * model from the toolbar picker.
+ */
+function isModelLoaded(): boolean {
+  try {
+    return Boolean(RunAnywhere.currentModel()?.modelId);
+  } catch {
+    return false;
+  }
+}
+
 function renderMessages(host: HTMLElement): void {
   if (messages.length === 0) {
     host.innerHTML = `
@@ -232,10 +262,7 @@ function formatChatError(error: unknown): string {
   if (isSDKException(error)) {
     return `Error: ${error.message}`;
   }
-  if (error instanceof Error) {
-    return `Error: ${error.message}`;
-  }
-  return `Error: ${String(error)}`;
+  return `Error: ${formatError(error)}`;
 }
 
 function buildClearButton(): HTMLButtonElement {

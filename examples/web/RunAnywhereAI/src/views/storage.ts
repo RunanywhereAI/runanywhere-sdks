@@ -23,6 +23,7 @@ import {
   openSheet as openModelSheet,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
+import { formatError } from '../services/format-error';
 
 let container: HTMLElement;
 let unsubscribeState: (() => void) | null = null;
@@ -69,7 +70,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
         showToast('Folder selection cancelled or unsupported', 'info');
       }
     } catch (err) {
-      showToast(err instanceof Error ? err.message : String(err), 'warning');
+      showToast(formatError(err), 'warning');
     }
     updateStorageLocationUI();
   });

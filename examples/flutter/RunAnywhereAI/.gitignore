@@ -65,3 +65,6 @@ android/settings.gradle.kts
 
 # Generated plugin registrant files
 **/GeneratedPluginRegistrant.*
+
+# FVM Version Cache
+.fvm/

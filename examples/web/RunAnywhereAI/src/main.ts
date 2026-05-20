@@ -11,6 +11,7 @@ import './styles/components.css';
 import { buildAppShell } from './app';
 import { RunAnywhere } from '@runanywhere/web';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import { formatError } from './services/format-error';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
 type SDKReadinessState = 'initializing' | 'ready' | 'unavailable';
@@ -273,9 +274,13 @@ async function main(): Promise<void> {
     publishReadiness('building-shell');
     buildAppShell();
     await waitForInteractiveShell();
+    // Hydrate OPFS model state now that the catalog has been registered during shell build.
+    void RunAnywhere.hydrateModelRegistry().then((n) => {
+      if (n > 0) console.log(`[RunAnywhere] hydrated ${n} model(s) from OPFS`);
+    });
   } catch (error) {
     // Show error view with retry
-    const message = error instanceof Error ? error.message : String(error);
+    const message = formatError(error);
     showErrorView(message);
     publishReadiness('error', message);
   }
@@ -320,7 +325,7 @@ async function initializeSDK(): Promise<void> {
       console.log('[RunAnywhere] llamacpp backend registered:', activeAcceleration);
     } catch (err) {
       backendReadinessState = 'unavailable';
-      backendRegistrationError = err instanceof Error ? err.message : String(err);
+      backendRegistrationError = formatError(err);
       console.warn(
         '[RunAnywhere] llamacpp backend failed to register; chat will show feature-unavailable:',
         backendRegistrationError,
@@ -337,7 +342,7 @@ async function initializeSDK(): Promise<void> {
     sdkInitializationError = undefined;
   } catch (err) {
     sdkReadinessState = 'unavailable';
-    sdkInitializationError = err instanceof Error ? err.message : String(err);
+    sdkInitializationError = formatError(err);
     console.warn(
       '[RunAnywhere] SDK unavailable; app shell continuing without model inference providers:',
       err,

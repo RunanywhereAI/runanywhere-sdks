@@ -1384,10 +1384,6 @@ object RunAnywhereBridge {
     // commons VAD lifecycle to the currently-loaded VAD service. Mirrors
     // Swift `VADGeneratedProtoABI.configureLifecycle/startLifecycle/...`.
     //
-    // PENDING — needs Java_* export in librunanywhere_jni.so. The C ABI
-    // symbols (`rac_vad_configure_lifecycle_proto`, `rac_vad_start_lifecycle_proto`,
-    // `rac_vad_stop_lifecycle_proto`, `rac_vad_reset_lifecycle_proto`) exist
-    // in `rac_vad_service.h:256-279` but are not yet exposed through JNI.
     // ========================================================================
 
     /**
@@ -1413,6 +1409,12 @@ object RunAnywhereBridge {
      * Returns serialized VADServiceState proto bytes, or null on failure.
      */
     @JvmStatic external fun racVadResetLifecycleProto(): ByteArray?
+
+    /**
+     * Process one VAD frame on the lifecycle-loaded model (handle-less).
+     * Takes serialized [VADProcessRequest], returns serialized [VADResult].
+     */
+    @JvmStatic external fun racVadProcessLifecycleProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // VLM COMPONENT METADATA (Swift-alignment Phase 1 — Group A)

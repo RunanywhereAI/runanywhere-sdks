@@ -162,8 +162,12 @@ export class CommonsModule {
       this._stubAdapterPtr = 0;
     }
     HTTPAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
     if (this._module) {
+      // Drop ONLY this module from the registry adapter — siblings that
+      // still hold the catalog stay untouched. `unregisterWasmModule`
+      // below also performs this drop, so the explicit call here is just
+      // defensive against an out-of-order shutdown sequence.
+      ModelRegistryAdapter.unregisterModule(this._module);
       unregisterWasmModule(this._module);
     }
     this._module = null;

@@ -20,6 +20,8 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
+  InferenceFramework,
+  ModelFileRole,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -38,6 +40,7 @@ import type { SDKInitOptions } from '../types/models';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
+import { OPFSBridge } from '../Infrastructure/OPFSBridge';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
@@ -65,6 +68,8 @@ import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { SDK_VERSION } from '../Foundation/Version';
 import {
   clearRunanywhereModule,
+  getAllRegisteredModules,
+  getModuleForCapability,
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule';
@@ -267,6 +272,162 @@ function readNullableCString(fn?: () => number): string | null {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ---------------------------------------------------------------------------
+// Multi-file Download Helpers (Web / OPFS platform layer)
+// ---------------------------------------------------------------------------
+
+// Mirrors C++ rac_framework_raw_value — directory names under
+// /opfs/RunAnywhere/Models/<dir>/<modelId>/<filename>.
+const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
+  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
+  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
+  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
+  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
+  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
+};
+
+function frameworkOPFSDir(framework: InferenceFramework): string | null {
+  return FRAMEWORK_OPFS_DIR[framework] ?? null;
+}
+
+function primaryFilenameFromModel(model: ModelInfo): string | null {
+  const primary = model.multiFile?.files?.find(
+    (f) => f.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+  ) ?? model.multiFile?.files?.[0];
+  if (primary?.filename) return primary.filename;
+  const url = model.downloadUrl ?? '';
+  const trailing = url.split('?')[0].split('/').pop() ?? '';
+  return trailing.length > 0 ? trailing : null;
+}
+
+async function fetchFileBytes(
+  url: string,
+  onProgress?: (loaded: number) => void,
+): Promise<Uint8Array> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`fetch(${url}) returned HTTP ${response.status}`);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const buf = new Uint8Array(await response.arrayBuffer());
+    onProgress?.(buf.byteLength);
+    return buf;
+  }
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      chunks.push(value);
+      received += value.byteLength;
+      onProgress?.(received);
+    }
+  }
+  const out = new Uint8Array(received);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return out;
+}
+
+async function downloadMultiFileModel(
+  request: DownloadModelOptions,
+  model: ModelInfo,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<DownloadProgress> {
+  const files = model.multiFile?.files ?? [];
+  const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
+  if (!frameworkDir) {
+    throw new Error(`Multi-file download: unsupported framework ${model.framework}`);
+  }
+
+  const folderSegments = ['RunAnywhere', 'Models', frameworkDir, request.modelId];
+  const opfsFolder = `/opfs/${folderSegments.join('/')}`;
+  const totalBytes = files.reduce((s, f) => s + (f.sizeBytes || 0), 0);
+  let downloadedBytes = 0;
+
+  const allModules = getAllRegisteredModules();
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file.url || !file.filename) continue;
+
+    const bytes = await fetchFileBytes(file.url, (loaded) => {
+      const overall = totalBytes > 0 ? (downloadedBytes + loaded) / totalBytes : 0;
+      onProgress?.({
+        modelId: request.modelId,
+        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
+        overallProgress: Math.min(1, overall),
+        bytesDownloaded: downloadedBytes + loaded,
+        totalBytes,
+        stageProgress: overall,
+        overallSpeedBps: 0,
+        etaSeconds: -1,
+        retryAttempt: 0,
+        errorMessage: '',
+        taskId: '',
+        stage: i,
+        currentFileIndex: i,
+        totalFiles: files.length,
+        storageKey: '',
+        localPath: '',
+        startedAtUnixMs: 0,
+        updatedAtUnixMs: Date.now(),
+        currentFileName: file.filename,
+        resumeToken: '',
+      });
+    });
+
+    downloadedBytes += bytes.byteLength;
+
+    // Persist to OPFS
+    await OPFSBridge.writeFileToOPFS([...folderSegments, file.filename], bytes);
+
+    // Mirror into every backend MEMFS so immediate loadModel works
+    const filePath = `${opfsFolder}/${file.filename}`;
+    if (allModules.length > 0) {
+      await OPFSBridge.restoreToMemfsAll(allModules, filePath);
+    }
+  }
+
+  // Update registry with folder path
+  try {
+    ModelRegistryCapability.updateModel({
+      ...model,
+      localPath: opfsFolder,
+      isDownloaded: true,
+    });
+  } catch (err) {
+    logger.warning(`Multi-file registry update failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const completed: DownloadProgress = {
+    modelId: request.modelId,
+    state: DownloadState.DOWNLOAD_STATE_COMPLETED,
+    overallProgress: 1,
+    bytesDownloaded: downloadedBytes,
+    totalBytes,
+    stageProgress: 1,
+    overallSpeedBps: 0,
+    etaSeconds: 0,
+    retryAttempt: 0,
+    errorMessage: '',
+    taskId: '',
+    stage: 0,
+    currentFileIndex: files.length,
+    totalFiles: files.length,
+    storageKey: '',
+    localPath: opfsFolder,
+    startedAtUnixMs: 0,
+    updatedAtUnixMs: Date.now(),
+    currentFileName: '',
+    resumeToken: '',
+  };
+  onProgress?.(completed);
+  return completed;
 }
 
 // ---------------------------------------------------------------------------
@@ -709,6 +870,16 @@ export const RunAnywhere = {
         `Model metadata for '${request.modelId}' is not registered.`,
       );
     }
+
+    // Multi-file models (VLM = primary GGUF + mmproj sidecar, embeddings =
+    // model.onnx + vocab.txt) cannot use the C++ download orchestrator on
+    // Web because that path writes to MEMFS and reports the folder as
+    // `localPath`; OPFSBridge.flushFromMemfs treats that as a single file
+    // and silently no-ops. Use the browser-side fetch path instead.
+    if ((model.multiFile?.files?.length ?? 0) > 1) {
+      return downloadMultiFileModel(request, model, request.onProgress);
+    }
+
     await prepareModelLoad({
       request: {
         modelId: request.modelId,
@@ -776,7 +947,112 @@ export const RunAnywhere = {
         lastProgress.errorMessage || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
       );
     }
+
+    // BUG-WEB-002 / OPFS persistence: the C++ download orchestrator wrote
+    // bytes via `std::ofstream` which on Emscripten lands on MEMFS — an
+    // in-memory filesystem invisible to `navigator.storage.estimate()` and
+    // destroyed on tab reload. Flush the freshly-written file into the
+    // Origin Private File System so the download actually persists.
+    //
+    // Architectural note: on iOS / Android / desktop the SDKs do nothing
+    // here because libc maps `std::ofstream` to the real filesystem.
+    // Web's responsibility — per the platform-adapter IoC contract — is to
+    // back the synthetic `/opfs/` prefix with a real persistent
+    // filesystem. We do that here at the TS layer (no WASM rebuild) by
+    // mirroring MEMFS → OPFS once the download completes.
+    if (lastProgress.localPath) {
+      try {
+        // Flush from whichever module owns the download orchestrator.
+        // The download runs inside the WASM that has the DownloadAdapter
+        // installed (commons when registered, else the first backend),
+        // so flush from there into OPFS.
+        const downloaderModule = getModuleForCapability('commons')
+          ?? tryRunanywhereModule();
+        if (downloaderModule) {
+          await OPFSBridge.flushFromMemfs(downloaderModule, lastProgress.localPath);
+        }
+        // Mirror the freshly-written file into every backend module's
+        // private MEMFS so the upcoming `loadModel` call can `fopen` it
+        // immediately — without forcing a round-trip back through OPFS.
+        // Web/Emscripten only: each WASM artifact has its own MEMFS and
+        // the C++ engine `fopen` executes inside the backend module that
+        // owns the plugin route. See OPFSBridge.restoreToMemfsAll for
+        // background.
+        const allModules = getAllRegisteredModules();
+        if (allModules.length > 0) {
+          await OPFSBridge.restoreToMemfsAll(allModules, lastProgress.localPath);
+        }
+      } catch (err) {
+        logger.warning(
+          `OPFS flush failed for '${lastProgress.localPath}': ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    // CPP-02 self-heal happens inside the C++ download orchestrator, but it
+    // only updates THAT module's `s_model_registry` (whichever WASM owns the
+    // DownloadAdapter — typically commons). Mirror the local_path into the
+    // user-visible registry adapter (which broadcasts to every known module)
+    // so subsequent `getModel(...)` and `downloadedModels()` calls reflect
+    // the new on-disk state regardless of which module they route through.
+    if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
+      try {
+        ModelRegistryCapability.updateModel({
+          ...model,
+          localPath: lastProgress.localPath,
+        });
+      } catch (err) {
+        logger.debug(
+          `post-download registry update failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     return lastProgress;
+  },
+
+  /**
+   * Scan the Origin Private File System for models that were downloaded in a
+   * previous session and update the C++ registry's `localPath` for any
+   * that are found on disk but not yet reflected in the in-memory registry.
+   *
+   * Call this once after backends register and the model catalog is
+   * populated, to restore the "Downloaded" status across tab reloads.
+   *
+   * Returns the number of registry entries patched.
+   */
+  async hydrateModelRegistry(): Promise<number> {
+    const list = ModelRegistryCapability.listModels();
+    if (!list?.models?.length) return 0;
+
+    let patched = 0;
+    for (const model of list.models) {
+      const existing = ModelRegistryCapability.getModel(model.id);
+      if (!existing) continue;
+      if (existing.localPath && existing.isDownloaded) continue;
+
+      const dir = frameworkOPFSDir(existing.framework as InferenceFramework);
+      if (!dir) continue;
+
+      const filename = primaryFilenameFromModel(existing);
+      if (!filename) continue;
+
+      const opfsPath = `/opfs/RunAnywhere/Models/${dir}/${existing.id}/${filename}`;
+      const exists = await OPFSBridge.exists(opfsPath);
+      if (!exists) continue;
+
+      const isMultiFile = (existing.multiFile?.files?.length ?? 0) > 1;
+      const localPath = isMultiFile
+        ? `/opfs/RunAnywhere/Models/${dir}/${existing.id}`
+        : opfsPath;
+
+      try {
+        ModelRegistryCapability.updateModel({ ...existing, localPath, isDownloaded: true });
+        patched++;
+      } catch { /* ignore */ }
+    }
+    return patched;
   },
 
   getStorageInfo(

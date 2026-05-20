@@ -165,11 +165,68 @@ endif()
 # When WebGPU is enabled, -fwasm-exceptions is required (JSPI is
 # incompatible with the older JS-based exception mechanism).
 # Otherwise, the classic -fexceptions flag works with DISABLE_EXCEPTION_CATCHING=0.
+#
+# CRITICAL BUG FIX (WASM-EXC-01): `add_compile_options()` only applies to
+# targets created AFTER it runs. The root CMakeLists.txt adds this WASM
+# subdirectory AFTER `sdk/runanywhere-commons` and `engines/llamacpp` have
+# already configured their targets (and llama.cpp's FetchContent has built
+# `llama`, `ggml*`, `llama-common*` targets). Without an explicit
+# `target_compile_options()` on each pre-existing target, llama.cpp's
+# translation units compiled WITHOUT exception support, so a throw from
+# inside `llama_decode` / `llama_sampler_sample` would invoke `__cxa_throw`
+# against an unwind table that has no catch frames — surfacing in JS as
+# `WebAssembly.Exception` instead of being caught by the `catch (...)`
+# block in `rac_llm_llamacpp_generate_stream`.
+#
+# Fix: explicitly propagate the exception flag to every existing C++ target
+# that participates in the decode call chain. Subsequently-created targets
+# (e.g. the WASM executables added below) still pick up the flag via
+# `add_compile_options()`, so we keep that for forward-coverage.
 if(RAC_WASM_WEBGPU)
-    add_compile_options("-fwasm-exceptions")
+    set(_RAC_WASM_EXC_FLAG "-fwasm-exceptions")
 else()
-    add_compile_options("-fexceptions")
+    set(_RAC_WASM_EXC_FLAG "-fexceptions")
 endif()
+
+add_compile_options("${_RAC_WASM_EXC_FLAG}")
+
+# Apply to pre-existing targets that were configured before this
+# subdirectory was added. Each must be tested with `if(TARGET ...)` because
+# the set of available targets depends on which backends were enabled at
+# the root configure step.
+set(_RAC_WASM_EXC_TARGETS
+    # Commons core — contains the proto service layer that catches throws
+    # from the engine and converts them into error events.
+    rac_commons
+    # llama.cpp engine — Emscripten-only catch sites in rac_llm_llamacpp.cpp
+    # rely on this archive being compiled with matching exception support.
+    rac_backend_llamacpp
+    # llama.cpp FetchContent targets — the actual throw sites
+    # (llama_decode, llama_sampler_sample, gguf parsing).
+    llama
+    llama-common
+    llama-common-base
+    # ggml backends — tensor ops can throw on bad logits / OOM.
+    ggml
+    ggml-base
+    ggml-cpu
+    # ONNX / Sherpa engine — only relevant for the onnx WASM target but
+    # listed defensively so the speech path is consistent.
+    rac_backend_onnx
+    rac_backend_sherpa
+)
+
+foreach(_tgt ${_RAC_WASM_EXC_TARGETS})
+    if(TARGET ${_tgt})
+        target_compile_options(${_tgt} PRIVATE "${_RAC_WASM_EXC_FLAG}")
+        # Static archives don't need link flags, but interface link options
+        # ensure any future SHARED variant correctly links the unwinder.
+        get_target_property(_tgt_type ${_tgt} TYPE)
+        if(_tgt_type STREQUAL "SHARED_LIBRARY" OR _tgt_type STREQUAL "EXECUTABLE")
+            target_link_options(${_tgt} PRIVATE "${_RAC_WASM_EXC_FLAG}")
+        endif()
+    endif()
+endforeach()
 
 # This target is wired from the repo-root CMakeLists after rac_commons and the
 # selected engine plugins have already been configured. Keep it in that build
@@ -774,13 +831,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_embeddings_component_get_metrics"
     "_rac_embeddings_component_destroy"
 
-    # RAG generated-proto pipeline
-    "_rac_rag_session_create_proto"
-    "_rac_rag_session_destroy_proto"
-    "_rac_rag_ingest_proto"
-    "_rac_rag_query_proto"
-    "_rac_rag_clear_proto"
-    "_rac_rag_stats_proto"
+    # RAG generated-proto pipeline exports are appended conditionally on
+    # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
+    # library folds into rac_commons) and only become live when ONNX is also
+    # linked (RAG routes embeddings through the rac_embeddings_service vtable
+    # at runtime). See sdk/runanywhere-commons/CMakeLists.txt:
+    # `if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX) RAC_BACKEND_RAG OFF`.
 
     # LoRA generated-proto service
     "_rac_get_lora_registry"
@@ -977,6 +1033,21 @@ set(RAC_EXPORTED_FUNCTIONS_ONNX
 set(RAC_EXPORTED_FUNCTIONS_SHERPA
     "_rac_backend_sherpa_register"
     "_rac_backend_sherpa_unregister"
+)
+
+# RAG generated-proto pipeline. The RAG OBJECT library folds into
+# librac_commons whenever RAC_BACKEND_RAG=ON (default ON, gated to ONNX
+# availability on Emscripten — see sdk/runanywhere-commons/CMakeLists.txt).
+# RAG routes embeddings through the rac_embeddings_service vtable at runtime,
+# so these exports are only meaningful on the ONNX-sherpa WASM target where
+# the ONNX embedding provider is also linked. Appended to that target only.
+set(RAC_EXPORTED_FUNCTIONS_RAG
+    "_rac_rag_session_create_proto"
+    "_rac_rag_session_destroy_proto"
+    "_rac_rag_ingest_proto"
+    "_rac_rag_query_proto"
+    "_rac_rag_clear_proto"
+    "_rac_rag_stats_proto"
 )
 
 # =============================================================================
@@ -1291,6 +1362,14 @@ if(RAC_WASM_ONNX)
     if(TARGET rac_backend_sherpa)
         list(APPEND _onnx_libs rac_backend_sherpa)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_SHERPA})
+    endif()
+
+    # RAG proto-byte exports: only meaningful here (ONNX provides embeddings).
+    # The RAG OBJECT library has already been folded into librac_commons by
+    # sdk/runanywhere-commons/CMakeLists.txt — we just need to make the
+    # 6 rac_rag_*_proto symbols visible in the emitted JS glue.
+    if(RAC_BACKEND_RAG)
+        list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
     endif()
 
     rac_wasm_add_target(

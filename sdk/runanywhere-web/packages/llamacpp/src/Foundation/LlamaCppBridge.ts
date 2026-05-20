@@ -306,7 +306,7 @@ export class LlamaCppBridge {
         'tool-calling',
         'lora',
       ];
-      registerWasmModule(capabilities, this._module);
+      registerWasmModule(capabilities, this._module, ['llamacpp']);
       // HTTP transport — commons-level adapter. Install if no other
       // backend has bound it yet. ModelLifecycleAdapter + ModelRegistryAdapter
       // are bound by `registerWasmModule` because model load requires the

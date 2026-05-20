@@ -703,8 +703,23 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();
 
-    rc = ref.ops->generate_stream(ref.impl, request.prompt().c_str(), &options,
-                                  stream_token_callback, &ctx);
+    // Defensive: catch any C++ exception that escapes the engine vtable.
+    // Each backend (llamacpp, onnx, etc.) already wraps its inference call in
+    // try/catch, but we wrap here too so a misbehaving engine (or a future
+    // backend that forgets) can never propagate `__cxa_throw` across the
+    // extern "C" boundary into the platform SDK. On WASM this would surface
+    // as an opaque `WebAssembly.Exception` (no `.message`) in JS; on native
+    // SDKs it would be undefined behaviour through a C ABI return.
+    try {
+        rc = ref.ops->generate_stream(ref.impl, request.prompt().c_str(), &options,
+                                      stream_token_callback, &ctx);
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        rc = RAC_ERROR_INFERENCE_FAILED;
+    } catch (...) {
+        rac_error_set_details("Unknown C++ exception escaped LLM engine generate_stream");
+        rc = RAC_ERROR_INFERENCE_FAILED;
+    }
 
     const bool cancelled = rac::llm::lifecycle_llm_cancel_requested(&ref) ||
                            rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;

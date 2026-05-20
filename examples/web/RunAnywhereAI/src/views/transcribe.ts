@@ -15,6 +15,7 @@
 
 import type { TabLifecycle } from '../app';
 import {
+  ModelCategory,
   RunAnywhere,
   isSDKException,
   type STTOutput,
@@ -24,6 +25,17 @@ import {
   AudioFileLoader,
 } from '@runanywhere/web/browser';
 import { ONNX } from '@runanywhere/web-onnx';
+import {
+  ensureCatalogRegistered,
+  findLoadedModelForCategory,
+  onModelStateChange,
+  openSheet,
+} from '../components/model-selection';
+import { formatError } from '../services/format-error';
+
+const STT_PICKER_FILTER: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+];
 
 let container: HTMLElement;
 let unmounted = false;
@@ -31,11 +43,16 @@ let audioCapture: AudioCapture | null = null;
 let isCapturing = false;
 let isProcessing = false;
 let lastResult: STTOutput | null = null;
+let unsubscribeState: (() => void) | null = null;
 
 export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   container = el;
   unmounted = false;
+  ensureCatalogRegistered();
   renderTranscribe();
+  unsubscribeState = onModelStateChange(() => {
+    if (!unmounted) renderTranscribe();
+  });
   return {
     // app.ts fires onDeactivate on every tab switch (not only on panel
     // teardown). Treat the flag as a "currently inactive" guard for
@@ -44,6 +61,7 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
     // post-ONNX-register re-renders.
     onActivate: () => {
       unmounted = false;
+      ensureCatalogRegistered();
       renderTranscribe();
     },
     onDeactivate: () => {
@@ -51,6 +69,10 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
       audioCapture?.stop();
       audioCapture = null;
       isCapturing = false;
+      if (!container.isConnected && unsubscribeState) {
+        unsubscribeState();
+        unsubscribeState = null;
+      }
     },
   };
 }
@@ -70,11 +92,17 @@ function renderTranscribe(): void {
   const status = inspectStatus();
   const transcript = lastResult?.text ?? '';
   const showLive = status.registered && status.supportsProto;
+  const loadedModel = findLoadedModelForCategory(
+    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  );
+  const modelLabel = loadedModel?.name ?? 'Select STT Model';
+  const canRunInference = showLive && Boolean(loadedModel);
 
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Transcribe</div>
       <div class="toolbar-actions">
+        <button class="btn btn-secondary" id="transcribe-model-btn">${escape(modelLabel)}</button>
         <button class="btn btn-secondary" id="onnx-register-btn">${
           status.registered ? 'Re-register ONNX' : 'Register ONNX backend'
         }</button>
@@ -90,6 +118,7 @@ function renderTranscribe(): void {
           <li><code>RunAnywhere.stt.supportsProtoSTT()</code>: <strong>${
             status.supportsProto ? 'yes' : 'no'
           }</strong></li>
+          <li><code>STT model loaded</code>: <strong>${loadedModel ? escape(loadedModel.id) : 'no'}</strong></li>
         </ul>
         <div id="onnx-register-status" class="docs-status"></div>
       </div>
@@ -100,16 +129,17 @@ function renderTranscribe(): void {
             <h3>Microphone</h3>
             <p class="text-secondary">Capture audio from your microphone, then transcribe it through <code>RunAnywhere.transcribe(...)</code>.</p>
             <div class="toolbar-actions">
-              <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing ? 'disabled' : ''}>
+              <button class="btn btn-primary" id="mic-toggle-btn" ${isProcessing || !canRunInference ? 'disabled' : ''}>
                 ${isCapturing ? 'Stop & transcribe' : 'Start recording'}
               </button>
               <button class="btn btn-secondary" id="clear-btn" ${isProcessing ? 'disabled' : ''}>Clear</button>
             </div>
+            ${canRunInference ? '' : '<div class="docs-status">Load an STT model first.</div>'}
           </div>
           <div class="docs-section">
             <h3>From file</h3>
             <p class="text-secondary">Upload an audio file (wav, mp3, m4a, ogg, flac, etc.) — decoded via <code>AudioFileLoader</code>.</p>
-            <input type="file" id="file-input" accept="audio/*" ${isProcessing ? 'disabled' : ''} />
+            <input type="file" id="file-input" accept="audio/*" ${isProcessing || !canRunInference ? 'disabled' : ''} />
           </div>
           <div class="docs-section">
             <h3>Result</h3>
@@ -135,6 +165,13 @@ function renderTranscribe(): void {
   container
     .querySelector('#onnx-register-btn')!
     .addEventListener('click', () => void registerOnnx());
+
+  container.querySelector('#transcribe-model-btn')?.addEventListener('click', () => {
+    openSheet({
+      title: 'Select Transcription Model',
+      filterCategories: STT_PICKER_FILTER,
+    });
+  });
 
   if (showLive) {
     container.querySelector('#mic-toggle-btn')?.addEventListener('click', () => {
@@ -234,8 +271,7 @@ function setStatus(text: string): void {
 
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
-  if (err instanceof Error) return err.message;
-  return String(err);
+  return formatError(err);
 }
 
 function escape(value: string): string {

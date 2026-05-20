@@ -1,4 +1,4 @@
-# CLAUDE.md — iOS RunAnywhereAI Example App
+# AGENTS.md — iOS RunAnywhereAI Example App
 
 This file documents the iOS example application for the RunAnywhere on-device AI SDK. It serves as a detailed reference for every module, feature, architecture pattern, data flow, and build/run instruction.
 

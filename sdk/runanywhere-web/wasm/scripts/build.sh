@@ -80,6 +80,11 @@ while [[ $# -gt 0 ]]; do
         --onnx)
             ONNX="ON"
             ONNX_REQUESTED="ON"
+            # ONNX target ships the ORT + Sherpa matched set, so RAG can ride
+            # along without an extra opt-in flag. RAG routes embeddings through
+            # the ONNX embedding provider's rac_embeddings_service vtable at
+            # runtime — when ONNX is on, every prerequisite is met.
+            RAG="ON"
             shift
             ;;
         --rag)

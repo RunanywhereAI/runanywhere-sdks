@@ -3475,6 +3475,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadResetLifecyclePro
     return makeProtoCallResult(env, rc, &result, "racVadResetLifecycleProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadProcessLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_vad_process_lifecycle_proto(req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVadProcessLifecycleProto");
+}
+
 // END R7.A
 // =============================================================================
 

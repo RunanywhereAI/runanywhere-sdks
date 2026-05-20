@@ -1,0 +1,424 @@
+/**
+ * OPFSBridge - persists Emscripten MEMFS files to the Origin Private
+ * File System (OPFS) so model downloads survive tab reloads.
+ *
+ * Background
+ * ----------
+ * The C++ download orchestrator writes bytes via `std::ofstream` (see
+ * `sdk/runanywhere-commons/src/infrastructure/http/rac_http_download.cpp`).
+ * On native SDKs (iOS / Android / desktop) this lands on the real
+ * filesystem because libc maps to it. Inside an Emscripten WASM module,
+ * `std::ofstream` lands on MEMFS — an in-memory filesystem that is
+ * destroyed on tab reload and invisible to `navigator.storage.estimate()`.
+ *
+ * The path prefix `/opfs/` (set on `g_base_dir` via
+ * `rac_model_paths_set_base_dir` during `_initRACommons`) is therefore
+ * misleading: bytes do NOT persist to the browser's Origin Private File
+ * System until something explicitly copies them there.
+ *
+ * OPFSBridge is that something. After a successful download the SDK
+ * facade calls `OPFSBridge.flushFromMemfs(module, '/opfs/<path>')` to
+ * read the bytes out of MEMFS and persist them in OPFS at the
+ * matching relative path. Before a model load, the SDK calls
+ * `OPFSBridge.restoreToMemfs(module, '/opfs/<path>')` so the C++ engine
+ * loader (which uses `fopen`/`mmap` against the MEMFS-visible path)
+ * sees the bytes again.
+ *
+ * Architectural alignment
+ * -----------------------
+ * The C++ core treats `std::ofstream` as a platform abstraction. Each
+ * SDK is responsible for backing that abstraction with a real
+ * filesystem. iOS and Android get one from libc; Web is supplied here
+ * via OPFS. The C++ download/extract logic stays untouched.
+ *
+ * Scope / limits
+ * --------------
+ * - Bridges the full file through a `Uint8Array` between MEMFS and
+ *   OPFS, so the file must fit in WASM heap during the flush/restore
+ *   step (currently bounded by `MAXIMUM_MEMORY=4 GB` — see
+ *   `sdk/runanywhere-web/wasm/CMakeLists.txt`).
+ * - Uses `FileSystemFileHandle.createWritable()` when available
+ *   (main thread) and falls back to `createSyncAccessHandle()` for
+ *   worker contexts.
+ * - All paths are absolute under the synthetic `/opfs/` prefix; the
+ *   leading `/opfs/` is stripped before being used as the OPFS-relative
+ *   path so OPFS sees `RunAnywhere/Models/...` directly.
+ */
+
+import { SDKLogger } from '../Foundation/SDKLogger';
+
+const logger = new SDKLogger('OPFSBridge');
+
+/** Synthetic prefix shared with C++ (see `rac_model_paths_set_base_dir`). */
+const OPFS_PREFIX = '/opfs';
+
+/** Minimal Emscripten FS surface OPFSBridge needs at runtime. */
+interface EmscriptenFS {
+  readFile(path: string, opts?: { encoding?: string }): Uint8Array;
+  writeFile(path: string, data: Uint8Array): void;
+  mkdir(path: string, mode?: number): void;
+  unlink(path: string): void;
+  stat(path: string): { size: number; mode: number };
+  analyzePath?(path: string): { exists: boolean };
+}
+
+/**
+ * Loose module shape — `FS` is added by Emscripten when the WASM target
+ * is built with `-sFORCE_FILESYSTEM=1` (see
+ * `sdk/runanywhere-web/wasm/CMakeLists.txt`) and exported via the
+ * `-sEXPORTED_RUNTIME_METHODS=[..., "FS", ...]` list. We accept any
+ * object and narrow at the call site so the bridge stays usable from any
+ * Emscripten module type (commons, llamacpp, onnx-sherpa) without
+ * depending on a specific module typing.
+ */
+export type ModuleLike = object;
+
+function getFS(module: ModuleLike): EmscriptenFS | null {
+  const candidate = (module as { FS?: unknown }).FS;
+  if (candidate && typeof candidate === 'object') {
+    const fs = candidate as Partial<EmscriptenFS>;
+    if (typeof fs.readFile === 'function' && typeof fs.writeFile === 'function'
+      && typeof fs.mkdir === 'function' && typeof fs.stat === 'function') {
+      return fs as EmscriptenFS;
+    }
+  }
+  return null;
+}
+
+/**
+ * Copy `src` into a fresh `ArrayBuffer` and return the buffer directly.
+ * The OPFS write APIs accept `ArrayBuffer` and reject views backed by
+ * `SharedArrayBuffer`; bytes returned from Emscripten's `FS.readFile`
+ * can be backed by `SharedArrayBuffer` when the build is
+ * `-pthread`-enabled, so the copy is unavoidable.
+ */
+function toOwnedArrayBuffer(src: Uint8Array): ArrayBuffer {
+  const owned = new ArrayBuffer(src.byteLength);
+  new Uint8Array(owned).set(src);
+  return owned;
+}
+
+/** True when the browser supports the Origin Private File System. */
+function isOPFSSupported(): boolean {
+  return typeof navigator !== 'undefined'
+    && 'storage' in navigator
+    && typeof navigator.storage?.getDirectory === 'function';
+}
+
+/**
+ * Strip the synthetic `/opfs/` prefix and return the OPFS-relative path
+ * components. `/opfs/RunAnywhere/Models/foo/bar.gguf` →
+ * ['RunAnywhere', 'Models', 'foo', 'bar.gguf'].
+ *
+ * Returns null when `path` does not live under the `/opfs/` prefix —
+ * caller should skip the OPFS step (the file was not written through
+ * the synthetic-prefix path so OPFS would not be the right home for it).
+ */
+function pathToOPFSSegments(path: string): string[] | null {
+  if (!path.startsWith(`${OPFS_PREFIX}/`)) return null;
+  const relative = path.slice(OPFS_PREFIX.length + 1);
+  if (relative.length === 0) return null;
+  return relative.split('/').filter((segment) => segment.length > 0);
+}
+
+/**
+ * Walk the OPFS tree from the root to the directory that should hold
+ * `fileName`. Creates intermediate directories when `create` is true.
+ */
+async function resolveOPFSDirectory(
+  segments: string[],
+  create: boolean,
+): Promise<FileSystemDirectoryHandle | null> {
+  if (!isOPFSSupported()) {
+    return null;
+  }
+  let dir = await navigator.storage.getDirectory();
+  for (const segment of segments) {
+    dir = await dir.getDirectoryHandle(segment, { create });
+  }
+  return dir;
+}
+
+/** Recursively ensure `path` exists in MEMFS as a directory. */
+function ensureMemfsDirectory(fs: EmscriptenFS, path: string): void {
+  if (path === '' || path === '/' || path === '.') return;
+  if (fs.analyzePath?.(path)?.exists) return;
+  const lastSlash = path.lastIndexOf('/');
+  if (lastSlash > 0) {
+    ensureMemfsDirectory(fs, path.slice(0, lastSlash));
+  }
+  try {
+    fs.mkdir(path);
+  } catch (err) {
+    // mkdir throws if the path already exists — race-safe ignore.
+    const message = err instanceof Error ? err.message : String(err);
+    if (!message.includes('EEXIST') && !message.includes('exists')) {
+      throw err;
+    }
+  }
+}
+
+/** Write `bytes` to the OPFS file handle. Prefers `createWritable` (main
+ *  thread); falls back to `createSyncAccessHandle` (worker contexts /
+ *  Safari where the writable stream is gated behind a permission). */
+async function writeBytesToOPFSFile(
+  handle: FileSystemFileHandle,
+  bytes: Uint8Array,
+): Promise<void> {
+  // createWritable is the easy path. It is async, but it does not
+  // require a sync-access handle (i.e. no main-thread restrictions on
+  // Chrome / Firefox).
+  if (typeof (handle as { createWritable?: unknown }).createWritable === 'function') {
+    try {
+      const writable = await handle.createWritable({ keepExistingData: false });
+      await writable.write(toOwnedArrayBuffer(bytes));
+      await writable.close();
+      return;
+    } catch (err) {
+      logger.debug(
+        `OPFS createWritable failed, falling back to sync-access handle: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  // Sync-access handle path. Requires the call site to run in a Worker
+  // on Safari; on Chrome it works on the main thread too. We use it as
+  // a fallback so the OPFS persistence still works when `createWritable`
+  // is unavailable or fails. The cast goes through `unknown` because the
+  // standard `FileSystemFileHandle` lib type does not yet declare
+  // `createSyncAccessHandle` in every tsconfig target.
+  const syncCapable = handle as unknown as {
+    createSyncAccessHandle?: () => Promise<{
+      write(data: ArrayBufferView | ArrayBuffer, opts?: { at?: number }): number;
+      truncate(size: number): void;
+      flush(): void;
+      close(): void;
+    }>;
+  };
+  if (typeof syncCapable.createSyncAccessHandle !== 'function') {
+    throw new Error('OPFS: neither createWritable nor createSyncAccessHandle is available on this FileSystemFileHandle');
+  }
+  const sync = await syncCapable.createSyncAccessHandle();
+  try {
+    sync.truncate(0);
+    sync.write(toOwnedArrayBuffer(bytes), { at: 0 });
+    sync.flush();
+  } finally {
+    sync.close();
+  }
+}
+
+/** Read all bytes from the OPFS file handle. */
+async function readBytesFromOPFSFile(handle: FileSystemFileHandle): Promise<Uint8Array> {
+  // FileSystemFileHandle.getFile() returns a regular Blob, so this works
+  // both on the main thread and inside Workers.
+  const file = await handle.getFile();
+  const buffer = await file.arrayBuffer();
+  return new Uint8Array(buffer);
+}
+
+export class OPFSBridge {
+  /** Whether the browser supports the OPFS APIs OPFSBridge needs. */
+  static get isSupported(): boolean {
+    return isOPFSSupported();
+  }
+
+  /**
+   * Flush a file from Emscripten MEMFS into the Origin Private File
+   * System so the bytes persist across tab reloads.
+   *
+   * Returns the number of bytes persisted on success, or 0 when the
+   * path is not under `/opfs/` (no-op) or the browser does not support
+   * OPFS. Throws on actual I/O failures so the caller can surface them.
+   */
+  static async flushFromMemfs(module: ModuleLike, path: string): Promise<number> {
+    const fs = getFS(module);
+    if (!fs) {
+      logger.debug(`flushFromMemfs: module has no FS surface (path=${path}); skipping`);
+      return 0;
+    }
+    const segments = pathToOPFSSegments(path);
+    if (!segments) {
+      logger.debug(`flushFromMemfs: path '${path}' is not under '${OPFS_PREFIX}/'; skipping`);
+      return 0;
+    }
+    if (!isOPFSSupported()) {
+      logger.warning(`flushFromMemfs: OPFS not supported in this browser; '${path}' will not persist`);
+      return 0;
+    }
+
+    let bytes: Uint8Array;
+    try {
+      bytes = fs.readFile(path);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warning(`flushFromMemfs: FS.readFile('${path}') failed: ${message}`);
+      return 0;
+    }
+
+    const fileName = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+    const dir = await resolveOPFSDirectory(dirSegments, true);
+    if (!dir) {
+      return 0;
+    }
+    const fileHandle = await dir.getFileHandle(fileName, { create: true });
+    await writeBytesToOPFSFile(fileHandle, bytes);
+    logger.info(`OPFS persisted ${bytes.length} bytes for '${path}'`);
+    return bytes.length;
+  }
+
+  /**
+   * Restore a file from OPFS into Emscripten MEMFS at `path` so the
+   * C++ engine loader (which opens `fopen`/`mmap` against MEMFS-visible
+   * paths) can find it after a tab reload.
+   *
+   * No-op when the file already exists in MEMFS, when the browser does
+   * not support OPFS, or when no matching file is found in OPFS.
+   * Returns the number of bytes restored, or 0 in any of those cases.
+   */
+  static async restoreToMemfs(module: ModuleLike, path: string): Promise<number> {
+    const fs = getFS(module);
+    if (!fs) return 0;
+
+    // Already present in MEMFS — nothing to do.
+    if (fs.analyzePath?.(path)?.exists) {
+      try {
+        const size = fs.stat(path).size;
+        logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
+        return 0;
+      } catch {
+        // stat failed — fall through and rebuild from OPFS.
+      }
+    }
+
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return 0;
+
+    const fileName = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+
+    let fileHandle: FileSystemFileHandle;
+    try {
+      const dir = await resolveOPFSDirectory(dirSegments, false);
+      if (!dir) return 0;
+      fileHandle = await dir.getFileHandle(fileName, { create: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.debug(`restoreToMemfs: OPFS lookup failed for '${path}': ${message}`);
+      return 0;
+    }
+
+    const bytes = await readBytesFromOPFSFile(fileHandle);
+    const dirPath = path.slice(0, path.lastIndexOf('/'));
+    ensureMemfsDirectory(fs, dirPath);
+    fs.writeFile(path, bytes);
+    logger.info(`OPFS restored ${bytes.length} bytes to '${path}'`);
+    return bytes.length;
+  }
+
+  /**
+   * Fan out a single OPFS restore across a list of modules.
+   *
+   * Each Emscripten WASM artifact (commons, llamacpp, onnx-sherpa)
+   * owns a private MEMFS — writing into one is invisible to another.
+   * The model-load path in C++ runs inside the backend WASM that owns
+   * the engine vtable (e.g. llamacpp), so restoring into the commons
+   * module alone leaves the backend's `fopen` returning ENOENT. To
+   * match the per-WASM isolation, mirror the file into every backend
+   * module the SDK has installed.
+   *
+   * Reads the file from OPFS exactly once and reuses the bytes across
+   * every MEMFS write so we do not pay N x OPFS-read cost.
+   *
+   * Returns the number of bytes restored to each module (max across
+   * all modules) — 0 means OPFS lookup failed or no module had an FS
+   * surface.
+   */
+  static async restoreToMemfsAll(modules: ModuleLike[], path: string): Promise<number> {
+    if (modules.length === 0) return 0;
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return 0;
+
+    const fileName = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+
+    let fileHandle: FileSystemFileHandle;
+    try {
+      const dir = await resolveOPFSDirectory(dirSegments, false);
+      if (!dir) return 0;
+      fileHandle = await dir.getFileHandle(fileName, { create: false });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.debug(`restoreToMemfsAll: OPFS lookup failed for '${path}': ${message}`);
+      return 0;
+    }
+
+    const bytes = await readBytesFromOPFSFile(fileHandle);
+    const dirPath = path.slice(0, path.lastIndexOf('/'));
+    let maxWritten = 0;
+    for (const module of modules) {
+      const fs = getFS(module);
+      if (!fs) continue;
+      if (fs.analyzePath?.(path)?.exists) {
+        try {
+          const size = fs.stat(path).size;
+          logger.debug(`restoreToMemfsAll: '${path}' already in MEMFS (${size} bytes); skipping module`);
+          if (size > maxWritten) maxWritten = size;
+          continue;
+        } catch {
+          // stat failed — fall through and rewrite from OPFS bytes.
+        }
+      }
+      try {
+        ensureMemfsDirectory(fs, dirPath);
+        fs.writeFile(path, bytes);
+        if (bytes.length > maxWritten) maxWritten = bytes.length;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.warning(`restoreToMemfsAll: MEMFS write failed for '${path}' on a module: ${message}`);
+      }
+    }
+    if (maxWritten > 0) {
+      logger.info(`OPFS restored ${maxWritten} bytes to '${path}' across ${modules.length} module(s)`);
+    }
+    return maxWritten;
+  }
+
+  /**
+   * Check whether a path is currently present in OPFS. Useful when the
+   * caller wants to decide between download and load-from-cache without
+   * paying the cost of reading bytes back.
+   */
+  static async exists(path: string): Promise<boolean> {
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return false;
+    const fileName = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+    try {
+      const dir = await resolveOPFSDirectory(dirSegments, false);
+      if (!dir) return false;
+      await dir.getFileHandle(fileName, { create: false });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Write `bytes` directly to an OPFS file at the given path segments.
+   * Creates intermediate directories as needed.
+   * Used by the SDK's multi-file download path to persist each file
+   * individually without going through Emscripten MEMFS.
+   */
+  static async writeFileToOPFS(segments: string[], bytes: Uint8Array): Promise<void> {
+    if (!isOPFSSupported()) return;
+    const dir = await resolveOPFSDirectory(segments.slice(0, -1), true);
+    if (!dir) return;
+    const fileName = segments[segments.length - 1];
+    const handle = await dir.getFileHandle(fileName, { create: true });
+    await writeBytesToOPFSFile(handle, bytes);
+  }
+}

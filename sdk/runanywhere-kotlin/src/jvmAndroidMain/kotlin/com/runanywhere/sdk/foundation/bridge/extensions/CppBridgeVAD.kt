@@ -20,6 +20,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.SpeechActivityEvent
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
+import ai.runanywhere.proto.v1.VADProcessRequest
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADServiceState
 import ai.runanywhere.proto.v1.VADStatistics
@@ -173,7 +174,20 @@ object CppBridgeVAD {
         checkRc(rc, "racVadComponentConfigureProto")
     }
 
-    /** Run a single VAD detection pass on the supplied audio samples. */
+    /**
+     * Run a single VAD detection pass via the lifecycle-loaded model.
+     * Mirrors Swift `CppBridge.VAD.processLifecycle(request:)`.
+     */
+    suspend fun processLifecycle(request: VADProcessRequest): RAVADResult =
+        decodeOrThrow(
+            VADResult.ADAPTER,
+            RunAnywhereBridge.racVadProcessLifecycleProto(
+                VADProcessRequest.ADAPTER.encode(request),
+            ),
+            "racVadProcessLifecycleProto",
+        )
+
+    /** Handle-based path; prefer [processLifecycle] after lifecycle model load. */
     suspend fun process(samples: FloatArray, options: RAVADOptions = RAVADOptions()): RAVADResult {
         val handle = actor.getHandle()
         return decodeOrThrow(
@@ -240,13 +254,8 @@ object CppBridgeVAD {
     // VAD service (no handle threaded) and returns the canonical
     // [VADServiceState] reflecting the post-call state.
     //
-    // PENDING — needs Java_* export in librunanywhere_jni.so. The
-    // underlying C symbols exist in `rac_vad_service.h:256-279`
-    // (`rac_vad_configure_lifecycle_proto`, `rac_vad_start_lifecycle_proto`,
-    // `rac_vad_stop_lifecycle_proto`, `rac_vad_reset_lifecycle_proto`) but
-    // the JNI thunks declared in [RunAnywhereBridge] are not yet wired up
-    // on the commons side. Calls will throw `UnsatisfiedLinkError` until
-    // the JNI implementation lands.
+    // Lifecycle configure/start/stop/reset/process JNI thunks are wired in
+    // librunanywhere_jni.so. Public VAD inference uses [processLifecycle].
 
     /**
      * Initialize VAD — binds to the commons lifecycle VAD service.

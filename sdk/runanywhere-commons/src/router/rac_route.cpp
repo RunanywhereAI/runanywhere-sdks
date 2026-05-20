@@ -8,6 +8,7 @@
 
 #include "rac/router/rac_route.h"
 
+#include <cstring>
 #include <string>
 
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -24,6 +25,16 @@ constexpr const char* kRuntimeUnavailableMarker = "no registered runtime satisfi
 
 bool is_runtime_unavailable(const std::string& reason) {
     return reason.find(kRuntimeUnavailableMarker) != std::string::npos;
+}
+
+/* Pre-unification commons pinned VLM loads to "llamacpp_vlm"; the unified
+ * llama.cpp plugin registers as "llamacpp". Normalize so routing succeeds on
+ * both old and new binaries. */
+const char* normalize_legacy_engine_pin(const char* pinned_engine) {
+    if (pinned_engine != nullptr && std::strcmp(pinned_engine, "llamacpp_vlm") == 0) {
+        return "llamacpp";
+    }
+    return pinned_engine;
 }
 
 }  // namespace
@@ -45,7 +56,7 @@ rac_result_t rac_plugin_route(rac_primitive_t primitive, uint32_t format,
         req.preferred_runtime = hints->preferred_runtime;
         req.no_fallback = (hints->no_fallback != 0);
         if (hints->preferred_engine_name != nullptr) {
-            req.pinned_engine = hints->preferred_engine_name;
+            req.pinned_engine = normalize_legacy_engine_pin(hints->preferred_engine_name);
         }
     }
 

@@ -780,7 +780,11 @@ private:
 
   bool load_model(const std::string &model_path) {
     runanywhere::runtime::onnxrt::SessionOptions options{};
+#if defined(__EMSCRIPTEN__)
+    options.intra_op_threads = 1;
+#else
     options.intra_op_threads = 4;
+#endif
     options.enable_all_optimizations = true;
     options.log_id = "RAGEmbedding";
     std::string error;

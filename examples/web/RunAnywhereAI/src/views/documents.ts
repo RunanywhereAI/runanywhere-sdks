@@ -11,6 +11,9 @@ import {
   type RAGDocumentSummary,
   type RAGSearchResult,
 } from '@runanywhere/web';
+import { ONNX } from '@runanywhere/web-onnx';
+import { ensureCatalogRegistered } from '../components/model-selection';
+import { formatError } from '../services/format-error';
 
 const TOP_K = 3;
 
@@ -23,6 +26,11 @@ let isBusy = false;
 
 export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   container = el;
+  // RAG requires the embedding + LLM models to be registered in the catalog
+  // (so ensureRAGReady can resolve their download URLs). Other tabs trigger
+  // this implicitly via their toolbar pickers; Docs has its own UI, so we
+  // call it explicitly on mount.
+  ensureCatalogRegistered();
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Documents</div>
@@ -89,7 +97,7 @@ async function onFilePicked(e: Event): Promise<void> {
     }
     await renderDocList();
   } catch (err) {
-    setStatus(`Indexing failed: ${err instanceof Error ? err.message : String(err)}`);
+    setStatus(`Indexing failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
     target.value = '';
@@ -102,28 +110,16 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  try {
-    await RunAnywhere.ragIngest(text, JSON.stringify({
-      docId,
-      docName: file.name,
-      sourceUri: `web-file:${file.name}`,
-      mediaType: file.type || 'text/plain',
-      sizeBytes: String(file.size),
-    }));
-  } catch (err) {
-    // The RAG bootstrap creates an in-memory session but does NOT
-    // pre-download / load the embedding or LLM models. If the user lands
-    // on Documents without having loaded those models elsewhere (Chat /
-    // Storage), the native session will surface a low-context "backend
-    // not available" / "no model loaded" error. Re-throw with a clearer
-    // hint so the user knows which models to load.
-    const raw = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `${raw} — Load the embedding model (${RAG_EMBEDDING_MODEL_ID}) ` +
-      `and the LLM (${RAG_LLM_MODEL_ID}) from the Storage or Chat tab ` +
-      `before ingesting documents.`,
-    );
-  }
+  // ensureRAGReady() pre-downloads the embedding + LLM models so the
+  // native ingest path has resolved local paths. A failure here is a
+  // genuine ingest-time problem (vector store, embedding inference, etc).
+  await RunAnywhere.ragIngest(text, JSON.stringify({
+    docId,
+    docName: file.name,
+    sourceUri: `web-file:${file.name}`,
+    mediaType: file.type || 'text/plain',
+    sizeBytes: String(file.size),
+  }));
 
   const stats = await RunAnywhere.ragGetStatistics();
   setStatus(`Indexed ${file.name}. ${stats.indexedChunks} chunks total.`);
@@ -138,7 +134,7 @@ async function clearAllDocs(): Promise<void> {
     await renderDocList();
     setStatus('All documents cleared.');
   } catch (err) {
-    setStatus(`Clear failed: ${err instanceof Error ? err.message : String(err)}`);
+    setStatus(`Clear failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -153,7 +149,7 @@ async function removeDocument(id: string): Promise<void> {
     await renderDocList();
     setStatus('Document removed.');
   } catch (err) {
-    setStatus(`Remove failed: ${err instanceof Error ? err.message : String(err)}`);
+    setStatus(`Remove failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -174,7 +170,7 @@ async function askQuestion(): Promise<void> {
   try {
     documentCount = await RunAnywhere.ragGetDocumentCount();
   } catch (err) {
-    setAnswer(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    setAnswer(`Failed: ${formatError(err)}`);
     return;
   }
   if (documentCount === 0) {
@@ -203,7 +199,7 @@ async function askQuestion(): Promise<void> {
 
     setAnswer(formatAnswer(result.answer, result.retrievedChunks));
   } catch (err) {
-    setAnswer(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    setAnswer(`Failed: ${formatError(err)}`);
   } finally {
     isBusy = false;
   }
@@ -237,7 +233,7 @@ async function renderDocList(): Promise<void> {
     documents = await RunAnywhere.rag.listDocuments();
   } catch (err) {
     listEl.innerHTML = '<li class="docs-empty">No documents indexed yet</li>';
-    setStatus(`Unable to list documents: ${err instanceof Error ? err.message : String(err)}`);
+    setStatus(`Unable to list documents: ${formatError(err)}`);
     return;
   }
 
@@ -277,23 +273,20 @@ function setAnswer(msg: string): void {
   el.innerHTML = msg;
 }
 
-// Embedding / LLM IDs that the example seeds via services/model-catalog.ts.
-// The native RAG ABI is in-memory and the bootstrap call is idempotent: once
-// the pipeline exists, RAG.availability() flips to source='wasm-session' and
-// future ensureRAGReady() calls become no-ops.
 const RAG_EMBEDDING_MODEL_ID = 'all-minilm-l6-v2';
 const RAG_LLM_MODEL_ID = 'smollm2-360m-q8_0';
 
 async function ensureRAGReady(): Promise<boolean> {
-  const availability = RunAnywhere.rag.availability();
-  if (availability.available) {
-    return true;
+  try {
+    await ONNX.register();
+  } catch (err) {
+    setStatus(`ONNX register failed: ${formatError(err)}`);
+    return false;
   }
 
-  // `wasm-exports` means the native RAG proto exports are present but no
-  // provider/session has been created yet. The example owns that bootstrap
-  // — without it, RAG availability stays `false` forever and every ingest /
-  // query / clear path short-circuits even though the WASM is healthy.
+  const availability = RunAnywhere.rag.availability();
+  if (availability.available) return true;
+
   if (availability.source === 'wasm-exports') {
     try {
       setStatus('Initializing RAG pipeline...');
@@ -306,7 +299,7 @@ async function ensureRAGReady(): Promise<boolean> {
       setStatus('RAG ready.');
       return true;
     } catch (err) {
-      setStatus(`RAG bootstrap failed: ${err instanceof Error ? err.message : String(err)}`);
+      setStatus(`RAG init failed: ${formatError(err)}. Download the embedding model (all-minilm-l6-v2) and an LLM (smollm2-360m-q8_0) from the Storage tab first.`);
       return false;
     }
   }

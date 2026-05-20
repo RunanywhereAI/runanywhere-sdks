@@ -972,6 +972,15 @@ rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info
         return RAC_ERROR_FILE_NOT_FOUND;
     }
 
+    // Self-heal legacy registry entries that stored the mmproj .gguf as
+    // local_path instead of the model folder (pre-fix archive extraction).
+    if (fs::is_regular_file(input_root, ec)) {
+        const std::string leaf = to_lower(filename_of(input_root));
+        if (leaf.find("mmproj") != std::string::npos && has_extension(input_root, "gguf")) {
+            input_root = input_root.parent_path();
+        }
+    }
+
     out_resolution->is_directory_based =
         rac_framework_uses_directory_based_models(model_info->framework);
 

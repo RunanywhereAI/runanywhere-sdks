@@ -25,6 +25,9 @@ extern "C" {
  */
 RAC_PLUGIN_ENTRY_DECL(llamacpp);
 
+/** Legacy alias for pre-unification VLM routing (pins to "llamacpp_vlm"). */
+RAC_PLUGIN_ENTRY_DECL(llamacpp_vlm);
+
 #ifdef __cplusplus
 }
 #endif

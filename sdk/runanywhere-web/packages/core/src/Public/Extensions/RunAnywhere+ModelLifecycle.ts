@@ -14,6 +14,11 @@ import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
 import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
+import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import { getAllRegisteredModules } from '../../runtime/EmscriptenModule';
+import { SDKLogger } from '../../Foundation/SDKLogger';
+
+const lifecycleLogger = new SDKLogger('ModelLifecycle');
 
 export type {
   CurrentModelRequest,
@@ -30,8 +35,10 @@ export type {
 } from '@runanywhere/proto-ts/sdk_events';
 export { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 
-function requireAdapter(): ModelLifecycleAdapter {
-  const adapter = ModelLifecycleAdapter.tryDefault();
+function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
+  const adapter = (framework !== undefined && framework !== null)
+    ? ModelLifecycleAdapter.tryDefaultForFramework(framework as never)
+    : ModelLifecycleAdapter.tryDefault();
   if (!adapter) {
     throw new Error('RunAnywhere model lifecycle proto adapter is not installed');
   }
@@ -44,7 +51,8 @@ export const ModelLifecycle = {
   },
 
   loadModel(request: ModelLoadRequest): ModelLoadResult | null {
-    return requireAdapter().load(request);
+    const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
+    return requireAdapter(snapshot?.framework).load(request);
   },
 
   async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
@@ -53,15 +61,63 @@ export const ModelLifecycle = {
     if (modelSnapshot) {
       ModelRegistry.registerModel(modelSnapshot);
     }
+
+    // BUG-WEB-002 / OPFS persistence: model files were persisted to OPFS
+    // after download (see RunAnywhere.downloadModel). On a fresh tab the
+    // Emscripten MEMFS is empty, so the C++ engine loader's `fopen` /
+    // `mmap` against the canonical /opfs/... path would fail. Restore
+    // the bytes from OPFS into MEMFS before invoking the backend loader.
+    //
+    // Multi-WASM caveat: each Emscripten WASM artifact (commons, llamacpp,
+    // onnx-sherpa) has its OWN private MEMFS. The C++ engine `fopen`
+    // executes inside whichever backend WASM owns the plugin route — NOT
+    // necessarily commons. Restoring into commons alone leaves the
+    // backend's `fopen` returning ENOENT (see post-OPFS E2E report, Bug A:
+    // "gguf_init_from_file ... No such file or directory"). Fan the
+    // restore out to every registered backend module so the file is
+    // reachable from whichever vtable claims the load. This is unique to
+    // Web/Emscripten — iOS/Android/Flutter/RN share one libc filesystem
+    // and have no equivalent isolation.
+    if (modelSnapshot?.localPath) {
+      try {
+        const modules = getAllRegisteredModules();
+        if (modules.length > 0) {
+          // Multi-file models (VLM = primary GGUF + mmproj sidecar,
+          // embeddings = model.onnx + vocab.txt) store every file inside the
+          // model folder; `localPath` is the folder. OPFS `getFileHandle` on
+          // a directory throws DOMException, so restoring the path as a
+          // single file silently produces zero bytes — the C++ engine then
+          // fails with "No such file or directory" (e.g. SmolVLM2 load).
+          // Iterate each file under the folder and restore individually.
+          const files = modelSnapshot.multiFile?.files ?? [];
+          if (files.length > 1) {
+            for (const file of files) {
+              if (!file.filename) continue;
+              const filePath = `${modelSnapshot.localPath}/${file.filename}`;
+              await OPFSBridge.restoreToMemfsAll(modules, filePath);
+            }
+          } else {
+            await OPFSBridge.restoreToMemfsAll(modules, modelSnapshot.localPath);
+          }
+        }
+      } catch (err) {
+        lifecycleLogger.warning(
+          `OPFS restore failed for '${modelSnapshot.localPath}': ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
     try {
-      return await requireAdapter().loadAsync(request);
+      return await requireAdapter(modelSnapshot?.framework).loadAsync(request);
     } catch (error) {
       const recovered = await recoverModelLoadFailure({ request, error });
       if (!recovered) throw error;
       if (modelSnapshot) {
         ModelRegistry.registerModel(modelSnapshot);
       }
-      return requireAdapter().loadAsync(request);
+      return requireAdapter(modelSnapshot?.framework).loadAsync(request);
     }
   },
 
@@ -80,20 +136,50 @@ export const ModelLifecycle = {
   currentModel(
     request: CurrentModelRequest = { includeModelMetadata: false },
   ): CurrentModelResult | null {
-    return requireAdapter().currentModel(request);
+    // Aggregate across all registered WASM modules: LlamaCPP holds LLM/VLM
+    // state in its g_loaded map; ONNX holds STT/TTS/VAD/Embedding state in
+    // its own map. The default adapter only sees one — return the first
+    // module that reports a non-empty current model.
+    const modules = getAllRegisteredModules();
+    if (modules.length === 0) return requireAdapter().currentModel(request);
+    let fallback: CurrentModelResult | null = null;
+    for (const mod of modules) {
+      const result = ModelLifecycleAdapter.fromModule(
+        mod as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+      ).currentModel(request);
+      if (result?.modelId) return result;
+      if (!fallback && result) fallback = result;
+    }
+    return fallback ?? requireAdapter().currentModel(request);
   },
 
   isLoaded(request: CurrentModelRequest = { includeModelMetadata: false }): boolean {
-    const current = requireAdapter().currentModel(request);
+    const current = ModelLifecycle.currentModel(request);
     return Boolean(current?.modelId);
   },
 
   componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot | null {
-    return requireAdapter().componentSnapshot(component);
+    // Each WASM module has its own static `g_loaded` map — a model loaded
+    // against the LlamaCPP WASM is invisible to ONNX's snapshot and vice
+    // versa. Walk every registered module and prefer any READY result over
+    // NOT_LOADED so the Voice tab can correctly see LLM (loaded in
+    // LlamaCPP) + STT/TTS (loaded in ONNX) simultaneously.
+    const modules = getAllRegisteredModules();
+    if (modules.length === 0) return requireAdapter().componentSnapshot(component);
+    let best: ComponentLifecycleSnapshot | null = null;
+    for (const mod of modules) {
+      const snap = ModelLifecycleAdapter.fromModule(
+        mod as unknown as Parameters<typeof ModelLifecycleAdapter.fromModule>[0],
+      ).componentSnapshot(component);
+      if (!snap) continue;
+      if (snap.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY) return snap;
+      if (!best) best = snap;
+    }
+    return best;
   },
 
   isComponentReady(component: SDKComponent): boolean {
-    return requireAdapter().componentSnapshot(component)?.state ===
+    return ModelLifecycle.componentLifecycleSnapshot(component)?.state ===
       ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
   },
 

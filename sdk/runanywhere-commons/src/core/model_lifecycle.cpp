@@ -870,7 +870,16 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
     if (out.resolved_path.empty()) {
         return out;
     }
-    const std::string artifact_root = out.resolved_path;
+    // Registry local_path may point at a single file (legacy self-heal picked
+    // mmproj first). Scan the containing folder so primary + companions resolve.
+    std::string artifact_root = out.resolved_path;
+    if (path_has_extension(artifact_root, "gguf") || path_has_extension(artifact_root, "onnx") ||
+        path_has_extension(artifact_root, "bin") || path_has_extension(artifact_root, "ort")) {
+        const size_t sep = artifact_root.find_last_of("/\\");
+        if (sep != std::string::npos) {
+            artifact_root = artifact_root.substr(0, sep);
+        }
+    }
 
     ProtoModelPathBridge bridge(model);
     rac_model_path_resolution_t resolution = {};
@@ -878,7 +887,7 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
                                ? model.checksum_sha256().c_str()
                                : nullptr;
     const rac_result_t rc = rac_model_paths_resolve_artifact(
-        &bridge.model, out.resolved_path.c_str(), checksum, &resolution);
+        &bridge.model, artifact_root.c_str(), checksum, &resolution);
     if ((rc == RAC_SUCCESS || resolution.primary_model_path || resolution.file_count > 0) &&
         resolution.primary_model_path) {
         out.resolved_path = resolution.primary_model_path;

@@ -19,6 +19,27 @@ import {
 } from '@runanywhere/proto-ts/sdk_events';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import { getModuleForFramework } from '../runtime/EmscriptenModule';
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+
+function frameworkToBridgeName(framework: InferenceFramework | string): string | null {
+  if (typeof framework === 'string') return framework.toLowerCase() || null;
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP: return 'llamacpp';
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX: return 'onnx';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA: return 'sherpa';
+    case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS: return 'sherpa';
+    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER: return 'sherpa';
+    default: return null;
+  }
+}
+
+function lookupFrameworkModule(framework: InferenceFramework | string): ModelLifecycleModule | null {
+  const name = frameworkToBridgeName(framework);
+  if (!name) return null;
+  const mod = getModuleForFramework(name);
+  return mod ? (mod as unknown as ModelLifecycleModule) : null;
+}
 
 const logger = new SDKLogger('ModelLifecycleAdapter');
 
@@ -94,6 +115,31 @@ export class ModelLifecycleAdapter {
 
   static tryDefault(): ModelLifecycleAdapter | null {
     return defaultModule ? new ModelLifecycleAdapter(defaultModule) : null;
+  }
+
+  /**
+   * Wrap a specific module in an adapter. Web-multi-WASM only: each WASM
+   * artifact (commons, llamacpp, onnx-sherpa) owns its own static lifecycle
+   * map (`g_loaded`), so cross-module aggregation (e.g. "is the LLM
+   * component ready in any backend?") must walk every module individually.
+   */
+  static fromModule(module: ModelLifecycleModule): ModelLifecycleAdapter {
+    return new ModelLifecycleAdapter(module);
+  }
+
+  /**
+   * Return an adapter bound to the WASM that owns the framework's plugin
+   * registry, falling back to the default. Web-multi-WASM only: native SDKs
+   * share one process-wide plugin registry and don't need this dispatch.
+   */
+  static tryDefaultForFramework(
+    framework: InferenceFramework | string | undefined | null,
+  ): ModelLifecycleAdapter | null {
+    if (framework !== undefined && framework !== null && framework !== '') {
+      const mod = lookupFrameworkModule(framework as InferenceFramework | string);
+      if (mod) return new ModelLifecycleAdapter(mod);
+    }
+    return ModelLifecycleAdapter.tryDefault();
   }
 
   private constructor(private readonly module: ModelLifecycleModule) {}

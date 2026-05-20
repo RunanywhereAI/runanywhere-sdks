@@ -18,6 +18,7 @@
 
 import type { TabLifecycle } from '../app';
 import {
+  ModelCategory,
   RunAnywhere,
   SDKErrorCode,
   VLMImageFormat,
@@ -33,6 +34,12 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { formatError } from '../services/format-error';
+
+const VLM_PICKER_FILTER: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+  ModelCategory.MODEL_CATEGORY_VISION,
+];
 
 const VLM_MODEL_ID = 'smolvlm2-256m-video-instruct-q8_0';
 const DEFAULT_PROMPT = 'Describe what you see in this image.';
@@ -175,7 +182,12 @@ function renderView(): void {
 
   container
     .querySelector('#vision-model-btn')!
-    .addEventListener('click', () => openSheet());
+    .addEventListener('click', () =>
+      openSheet({
+        title: 'Select Vision Model',
+        filterCategories: VLM_PICKER_FILTER,
+      }),
+    );
   container
     .querySelector('#vision-camera-btn')!
     .addEventListener('click', () => void toggleCamera());
@@ -359,8 +371,7 @@ function setStatus(text: string): void {
 
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
-  if (err instanceof Error) return err.message;
-  return String(err);
+  return formatError(err);
 }
 
 function escape(value: string): string {
