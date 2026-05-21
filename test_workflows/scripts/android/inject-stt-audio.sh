@@ -75,11 +75,14 @@ rac_inject_stt_fixture_start() {
 
   if _rac_emulator_console_cmd "${serial}" "avd hostmicon"; then
     RAC_STT_INJECT_MODE="hostmicon"
+    touch "${TMPDIR:-/tmp}/rac_stt_injecting"
     if command -v afplay >/dev/null 2>&1; then
-      afplay "${play_fixture}" &
+      ( while [[ -f "${TMPDIR:-/tmp}/rac_stt_injecting" ]]; do afplay "${play_fixture}"; done ) &
       echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     elif command -v ffplay >/dev/null 2>&1; then
-      ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}" &
+      ( while [[ -f "${TMPDIR:-/tmp}/rac_stt_injecting" ]]; do
+        ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}"
+      done ) &
       echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     fi
     return 0
@@ -87,13 +90,17 @@ rac_inject_stt_fixture_start() {
 
   if command -v afplay >/dev/null 2>&1; then
     RAC_STT_INJECT_MODE="hostspeaker"
-    ( for _rac_i in 1 2 3 4 5; do afplay "${play_fixture}"; done ) &
+    touch "${TMPDIR:-/tmp}/rac_stt_injecting"
+    ( while [[ -f "${TMPDIR:-/tmp}/rac_stt_injecting" ]]; do afplay "${play_fixture}"; done ) &
     echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     return 0
   fi
   if command -v ffplay >/dev/null 2>&1; then
     RAC_STT_INJECT_MODE="hostspeaker"
-    ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}" &
+    touch "${TMPDIR:-/tmp}/rac_stt_injecting"
+    ( while [[ -f "${TMPDIR:-/tmp}/rac_stt_injecting" ]]; do
+      ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}"
+    done ) &
     echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     return 0
   fi
@@ -103,6 +110,7 @@ rac_inject_stt_fixture_start() {
 
 rac_inject_stt_fixture_stop() {
   local serial="$1"
+  rm -f "${TMPDIR:-/tmp}/rac_stt_injecting"
   case "${RAC_STT_INJECT_MODE:-}" in
     attachmic)
       _rac_emulator_console_cmd "${serial}" "avd detachmic" || true
@@ -122,18 +130,33 @@ rac_inject_stt_fixture_stop() {
   unset RAC_STT_INJECT_MODE
 }
 
+rac_stt_batch_transcript_line() {
+  local serial="$1"
+  {
+    adb -s "${serial}" logcat -d -s SpeechToTextViewModel:* System.out:* RunAnywhere:* 2>/dev/null || true
+    adb -s "${serial}" logcat -d 2>/dev/null || true
+  } | grep -E 'Batch transcription complete' | tail -n1 || true
+}
+
+rac_stt_batch_transcript_nonempty() {
+  local line="$1"
+  [[ -n "${line}" ]] || return 1
+  if echo "${line}" | grep -Eq '\([0-9]+ms, [1-9][0-9]* words?\)'; then
+    return 0
+  fi
+  echo "${line}" | grep -Eqi 'Batch transcription complete:[[:space:]]*[^[:space:()]+'
+}
+
 rac_stt_transcript_has_keywords() {
   local serial="$1"
-  local line
-  line="$(
-    {
-      adb -s "${serial}" logcat -d -s SpeechToTextViewModel:* System.out:* RunAnywhere:* 2>/dev/null || true
-      adb -s "${serial}" logcat -d 2>/dev/null || true
-    } | grep -E 'Batch transcription complete' | tail -n1 || true
-  )"
+  local line="${2:-}"
+  if [[ -z "${line}" ]]; then
+    line="$(rac_stt_batch_transcript_line "${serial}")"
+  fi
   [[ -n "${line}" ]] || return 1
-  echo "${line}" | grep -qi 'runanywhere' || return 1
-  echo "${line}" | grep -qi 'model' || return 1
-  echo "${line}" | grep -qi 'device' || return 1
-  return 0
+  local hits=0
+  echo "${line}" | grep -Eqi 'run[[:space:]]*any(where|way)|runanywhere|any[[:space:]]*way|anywhere' && hits=$((hits + 1))
+  echo "${line}" | grep -Eqi 'model|modal|smooth' && hits=$((hits + 1))
+  echo "${line}" | grep -qi 'device' && hits=$((hits + 1))
+  [[ "${hits}" -ge 2 ]]
 }

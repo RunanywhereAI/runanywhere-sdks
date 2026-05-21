@@ -21,3 +21,4 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T17:20:00-07:00	1	CLUSTER-12/SWIFT-HARNESS	SWIFT-IOS-001	adfb4956b	3	OK	OK	SKIP	defer tc07/tc10 in catalog; STT finalize on exit + log snapshots
 2026-05-21T17:45:00-07:00	1	CLUSTER-08c	SWIFT-IOS-001	4d7ee12c7	4	OK	OK	OK	STT sheet auto-download+load; registry-first resolveModelForDownload
 2026-05-21T16:10:00-07:00	1	CLUSTER-06b	KOTLIN-HARNESS	0e97c0bdd	2	OK	OK	SKIP	bash3 set -e UI tap abort + timed adb pull lock recovery catalog wrapper tc09-only
+2026-05-21T17:05:00-07:00	1	CLUSTER-06c	KOTLIN-AND-002	0a0f1702a	3	OK	OK	SKIP	loop fixture playback pre-record inject relaxed tc07 ASR grading
