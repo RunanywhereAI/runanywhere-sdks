@@ -308,16 +308,21 @@ public extension RunAnywhere {
 }
 
 private extension RunAnywhere {
-    /// Prefer registry metadata when the caller passes a list-row snapshot that
-    /// may be missing download_url or archive layout fields.
+    /// Prefer the registry's canonical metadata when the caller passes a list-row
+    /// snapshot that may be missing download_url, archive layout, or checksum fields.
+    /// Mirrors Kotlin TC-07 which re-fetches `RAModelInfo` from `listModels()` before
+    /// `downloadModel(...)`.
     static func resolveModelForDownload(_ model: RAModelInfo) async -> RAModelInfo {
-        guard model.downloadURL.isEmpty else { return model }
-
         var request = RAModelGetRequest()
         request.modelID = model.id
         let result = await getModel(request)
         guard result.found else { return model }
-        return result.model
+
+        let registryModel = result.model
+        if registryModel.downloadURL.isEmpty, model.downloadURL.isEmpty {
+            return model
+        }
+        return registryModel
     }
 
     /// Plan a download and retry once after clearing oversize partial bytes.

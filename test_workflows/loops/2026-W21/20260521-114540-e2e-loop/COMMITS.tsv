@@ -19,4 +19,5 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T16:45:00-07:00	1	CLUSTER-08b	SWIFT-IOS-001	d85c21a54	5	OK	OK	OK	Always-on OSLog + example catalog markers for STT download/load grep
 2026-05-21T16:30:00-07:00	1	CLUSTER-05b	KOTLIN-AND-001	07fe10be0	2	OK	OK	OK	VLM lifecycle handle 0L + STREAM_COMPLETED emission for TC-09
 2026-05-21T17:20:00-07:00	1	CLUSTER-12/SWIFT-HARNESS	SWIFT-IOS-001	adfb4956b	3	OK	OK	SKIP	defer tc07/tc10 in catalog; STT finalize on exit + log snapshots
+2026-05-21T17:45:00-07:00	1	CLUSTER-08c	SWIFT-IOS-001	4d7ee12c7	4	OK	OK	OK	STT sheet auto-download+load; registry-first resolveModelForDownload
 2026-05-21T16:10:00-07:00	1	CLUSTER-06b	KOTLIN-HARNESS	0e97c0bdd	2	OK	OK	SKIP	bash3 set -e UI tap abort + timed adb pull lock recovery catalog wrapper tc09-only

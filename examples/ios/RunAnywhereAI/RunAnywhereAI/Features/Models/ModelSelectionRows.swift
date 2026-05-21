@@ -194,6 +194,15 @@ struct FlatModelRow: View {
         model.artifactType == .builtIn
     }
 
+    private var downloadAccessibilityLabel: String {
+        let size = model.downloadSizeBytes
+        if size > 0 {
+            let formatted = ByteCountFormatter.string(fromByteCount: size, countStyle: .memory)
+            return "Get \(formatted)"
+        }
+        return "Get"
+    }
+
     private var statusIcon: String {
         if availabilityReason != nil || downloadErrorMessage != nil {
             return "exclamationmark.triangle.fill"
@@ -378,6 +387,8 @@ struct FlatModelRow: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.primaryAccent)
                 .controlSize(.small)
+                .accessibilityIdentifier("model-download-\(model.id)")
+                .accessibilityLabel(downloadAccessibilityLabel)
                 .disabled(isLoading)
             }
         } else {
@@ -403,6 +414,7 @@ struct FlatModelRow: View {
         }
 
         logger.info("Starting download for \(model.id, privacy: .public)")
+        catalogLogger.info("Starting download for \(model.id, privacy: .public)")
 
         do {
             try await RunAnywhere.downloadModel(model) { progress in
@@ -413,9 +425,7 @@ struct FlatModelRow: View {
             }
 
             logger.info("Download completed for \(model.id, privacy: .public)")
-            catalogLogger.info(
-                "Download accepted for \(model.id, privacy: .public) (task=example)"
-            )
+            catalogLogger.info("Download completed for \(model.id, privacy: .public)")
 
             await MainActor.run {
                 self.downloadProgress = 1.0

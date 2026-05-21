@@ -82,6 +82,7 @@ struct ModelSelectionSheet: View {
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
     @State private var loadErrorMessage: String?
+    @State private var didAutoPrepareSTT = false
 
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
@@ -177,6 +178,9 @@ struct ModelSelectionSheet: View {
     private func loadInitialData() async {
         await viewModel.loadModels()
         await loadAvailableFrameworks()
+        if context == .stt {
+            await prepareDefaultSTTModelIfNeeded()
+        }
     }
 
     private func loadAvailableFrameworks() async {
@@ -276,6 +280,61 @@ extension ModelSelectionSheet {
 // MARK: - Model Loading Actions
 
 extension ModelSelectionSheet {
+    /// When the STT picker opens, download and load the default Sherpa model so
+    /// the Transcribe tab reaches a ready state without relying on brittle Get
+    /// coordinate taps in simulator automation (SWIFT-IOS-001).
+    private func prepareDefaultSTTModelIfNeeded() async {
+        guard !didAutoPrepareSTT else { return }
+        didAutoPrepareSTT = true
+
+        let downloadable = availableModels.first { model in
+            unavailableReason(for: model) == nil &&
+            !model.isBuiltIn &&
+            model.localPathURL == nil
+        }
+        let readyOnDisk = availableModels.first { model in
+            unavailableReason(for: model) == nil &&
+            !model.isBuiltIn &&
+            model.localPathURL != nil
+        }
+
+        if let readyOnDisk {
+            await selectAndLoadModel(readyOnDisk)
+            return
+        }
+
+        guard let downloadable else { return }
+
+        await MainActor.run {
+            isLoadingModel = true
+            loadingProgress = "Downloading \(downloadable.name)..."
+            selectedModel = downloadable
+        }
+
+        do {
+            try await RunAnywhere.downloadModel(downloadable) { progress in
+                await MainActor.run {
+                    loadingProgress =
+                        "\(progress.stage.displayName)… \(Int(Double(progress.overallProgress) * 100))%"
+                }
+            }
+            await viewModel.loadModels()
+            let refreshed =
+                viewModel.availableModels.first { $0.id == downloadable.id } ?? downloadable
+            await selectAndLoadModel(refreshed)
+        } catch {
+            let message = (error as? SDKException)?.message ?? error.localizedDescription
+            await MainActor.run {
+                isLoadingModel = false
+                loadingProgress = ""
+                selectedModel = nil
+                loadErrorMessage = message.isEmpty
+                    ? "Failed to download \(downloadable.name)."
+                    : "Failed to download \(downloadable.name): \(message)"
+            }
+        }
+    }
+
     private func selectAndLoadModel(_ model: RAModelInfo) async {
         if let reason = unavailableReason(for: model) {
             await MainActor.run {
