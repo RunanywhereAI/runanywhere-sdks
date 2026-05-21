@@ -1814,6 +1814,33 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         return serialize_proto_to_buffer(result, out_result);
     }
 
+    // CPP-02 idempotent start: if a non-terminal task already exists for this
+    // model_id, return the in-flight task instead of spawning a duplicate
+    // worker. Fixes SWIFT-IOS-001 (double-tap of Get cancelling the first
+    // download) at the commons layer so every SDK gets the same guarantee.
+    if (!request.resume()) {
+        std::lock_guard<std::mutex> lock(proto_state().mutex);
+        for (const auto& entry : proto_state().tasks) {
+            const auto& existing = entry.second;
+            if (!existing || existing->model_id != model_id) continue;
+            std::lock_guard<std::mutex> task_lock(existing->mutex);
+            const auto state = existing->progress.state();
+            const bool active =
+                state == rav1::DOWNLOAD_STATE_PENDING ||
+                state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
+                state == rav1::DOWNLOAD_STATE_EXTRACTING ||
+                state == rav1::DOWNLOAD_STATE_RESUMING ||
+                state == rav1::DOWNLOAD_STATE_RETRYING;
+            if (active) {
+                result.set_accepted(true);
+                result.set_task_id(existing->task_id);
+                result.set_resume_token(existing->resume_token);
+                *result.mutable_initial_progress() = existing->progress;
+                return serialize_proto_to_buffer(result, out_result);
+            }
+        }
+    }
+
     auto task = std::make_shared<proto_download_task>();
     task->model_id = model_id;
 

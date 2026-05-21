@@ -1030,7 +1030,6 @@ export const RunAnywhere = {
     for (const model of list.models) {
       const existing = ModelRegistryCapability.getModel(model.id);
       if (!existing) continue;
-      if (existing.localPath && existing.isDownloaded) continue;
 
       const dir = frameworkOPFSDir(existing.framework as InferenceFramework);
       if (!dir) continue;
@@ -1040,7 +1039,22 @@ export const RunAnywhere = {
 
       const opfsPath = `/opfs/RunAnywhere/Models/${dir}/${existing.id}/${filename}`;
       const exists = await OPFSBridge.exists(opfsPath);
-      if (!exists) continue;
+
+      // WEB-REDOWNLOAD-WAIT-001: clearSiteStorage (or manual OPFS purge)
+      // wipes bytes but the registry can still report isDownloaded=true from
+      // a prior session. Reconcile: if the canonical OPFS path is gone, clear
+      // the flag so the next downloadModel() re-fetches instead of no-oping.
+      if (!exists) {
+        if (existing.localPath || existing.isDownloaded) {
+          try {
+            ModelRegistryCapability.updateModel({ ...existing, localPath: '', isDownloaded: false });
+            patched++;
+          } catch { /* ignore */ }
+        }
+        continue;
+      }
+
+      if (existing.localPath && existing.isDownloaded) continue;
 
       const isMultiFile = (existing.multiFile?.files?.length ?? 0) > 1;
       const localPath = isMultiFile
@@ -1051,6 +1065,16 @@ export const RunAnywhere = {
         ModelRegistryCapability.updateModel({ ...existing, localPath, isDownloaded: true });
         patched++;
       } catch { /* ignore */ }
+    }
+    if (patched > 0) {
+      // WEB-OPFS-HYDRATE-UI-001: notify UI subscribers (Storage tab, model
+      // sheet) so they re-query the registry and render Downloaded/Load
+      // instead of Download after a fresh page load.
+      EventBus.shared.emit(
+        'models.hydrated',
+        EventCategory.EVENT_CATEGORY_STORAGE,
+        { count: patched },
+      );
     }
     return patched;
   },

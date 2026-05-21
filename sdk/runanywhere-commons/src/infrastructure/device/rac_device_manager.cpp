@@ -103,7 +103,10 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     std::lock_guard<std::mutex> lock(state.mutex);
 
     if (!state.callbacks_set) {
-        RAC_LOG_ERROR(LOG_CAT, "Device manager callbacks not set");
+        // Benign during early init: the platform adapter may bind callbacks
+        // after the first register-attempt (Web SDK ordering). Caller surfaces
+        // a typed RAC_ERROR_NOT_INITIALIZED for retry logic.
+        RAC_LOG_DEBUG(LOG_CAT, "Device manager callbacks not set yet — deferring registration");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
