@@ -62,7 +62,7 @@ rac_inject_stt_fixture_start() {
   [[ -f "${fixture}" ]] || return 1
 
   export RAC_STT_INJECT_MODE=""
-  if _rac_emulator_console_cmd "${serial}" "avd attachmic ${fixture}"; then
+  if _rac_emulator_console_cmd "${serial}" "avd attachmic "${fixture}""; then
     RAC_STT_INJECT_MODE="attachmic"
     return 0
   fi
@@ -79,24 +79,20 @@ rac_inject_stt_fixture_start() {
     return 0
   fi
 
-  # Physical device: push fixture and play through speaker during capture.
+  if command -v afplay >/dev/null 2>&1; then
+    RAC_STT_INJECT_MODE="hostspeaker"
+    ( for _rac_i in 1 2 3 4 5; do afplay "${fixture}"; done ) &
+    echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
+    return 0
+  fi
+  if command -v ffplay >/dev/null 2>&1; then
+    RAC_STT_INJECT_MODE="hostspeaker"
+    ffplay -nodisp -autoexit -loglevel quiet "${fixture}" &
+    echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
+    return 0
+  fi
   adb -s "${serial}" push "${fixture}" /sdcard/Download/stt-phrase.wav >/dev/null 2>&1 || true
-  adb -s "${serial}" shell am start -a android.intent.action.VIEW \
-    -d "file:///sdcard/Download/stt-phrase.wav" -t audio/wav >/dev/null 2>&1 &
-  echo $! > "${TMPDIR:-/tmp}/rac_stt_play.pid"
-  RAC_STT_INJECT_MODE="speaker"
-  # Speaker playback launches an external player and steals foreground — refocus the test app.
-  local pkg="${PACKAGE_ID:-${RAC_STT_PACKAGE:-}}"
-  local activity="${MAIN_ACTIVITY:-${RAC_STT_MAIN_ACTIVITY:-}}"
-  if [[ -n "${pkg}" ]] && [[ -z "${activity}" ]]; then
-    activity="${pkg}/com.runanywhere.runanywhereai.MainActivity"
-  fi
-  if [[ -n "${activity}" ]]; then
-    sleep 1
-    adb -s "${serial}" shell am start -W -S -n "${activity}" \
-      -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
-      >/dev/null 2>&1 || true
-  fi
+  RAC_STT_INJECT_MODE="speaker_push_only"
 }
 
 rac_inject_stt_fixture_stop() {
@@ -105,18 +101,16 @@ rac_inject_stt_fixture_stop() {
     attachmic)
       _rac_emulator_console_cmd "${serial}" "avd detachmic" || true
       ;;
-    hostmicon)
+    hostmicon|hostspeaker)
       if [[ -f "${TMPDIR:-/tmp}/rac_stt_afplay.pid" ]]; then
         kill "$(cat "${TMPDIR:-/tmp}/rac_stt_afplay.pid")" 2>/dev/null || true
         rm -f "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
       fi
-      _rac_emulator_console_cmd "${serial}" "avd hostmicoff" || true
-      ;;
-    speaker)
-      if [[ -f "${TMPDIR:-/tmp}/rac_stt_play.pid" ]]; then
-        kill "$(cat "${TMPDIR:-/tmp}/rac_stt_play.pid")" 2>/dev/null || true
-        rm -f "${TMPDIR:-/tmp}/rac_stt_play.pid"
+      if [[ "${RAC_STT_INJECT_MODE:-}" == "hostmicon" ]]; then
+        _rac_emulator_console_cmd "${serial}" "avd hostmicoff" || true
       fi
+      ;;
+    speaker_push_only)
       ;;
   esac
   unset RAC_STT_INJECT_MODE
@@ -129,7 +123,7 @@ rac_stt_transcript_has_keywords() {
     {
       adb -s "${serial}" logcat -d -s SpeechToTextViewModel:* System.out:* RunAnywhere:* 2>/dev/null || true
       adb -s "${serial}" logcat -d 2>/dev/null || true
-    } | grep -F 'Batch transcription complete' | tail -n1 || true
+    } | grep -E 'Batch transcription complete' | tail -n1 || true
   )"
   [[ -n "${line}" ]] || return 1
   echo "${line}" | grep -qi 'runanywhere' || return 1

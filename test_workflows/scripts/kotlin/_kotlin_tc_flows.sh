@@ -95,7 +95,7 @@ _kotlin_wait_grep() {
 }
 
 _kotlin_logcat_stt() {
-  adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s SpeechToTextViewModel:* 2>/dev/null || true
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null | grep -F "SpeechToTextViewModel" || true
 }
 
 _kotlin_wait_stt_model_ready() {
