@@ -212,7 +212,6 @@ public final class Logging: @unchecked Sendable {
         let (config, currentDestinations) = lock.withLock { ($0.configuration, $0.destinations) }
 
         guard level >= config.minLogLevel else { return }
-        guard config.enableLocalLogging || config.enableSentryLogging else { return }
 
         let entry = LogEntry(
             level: level,
@@ -222,12 +221,12 @@ public final class Logging: @unchecked Sendable {
             deviceInfo: config.includeDeviceMetadata ? DeviceInfo.current : nil
         )
 
-        // Write to console if local logging enabled
+        // Console print is optional; unified logging (OSLog) is always on for
+        // simulator/device log capture used by E2E catalog grep markers.
         if config.enableLocalLogging {
             printToConsole(entry)
         }
 
-        // Write to all registered destinations
         for destination in currentDestinations where destination.isAvailable {
             destination.write(entry)
         }
@@ -257,18 +256,12 @@ public final class Logging: @unchecked Sendable {
 
     // MARK: - Private Helpers
 
-    private func syncOSLogDestination(for config: LoggingConfiguration) {
-        if config.enableLocalLogging {
-            let hasOSLog = lock.withLock { state in
-                state.destinations.contains { $0.identifier == OSLogDestination.destinationID }
-            }
-            if !hasOSLog {
-                addDestination(OSLogDestination())
-            }
-        } else {
-            lock.withLock { state in
-                state.destinations.removeAll { $0.identifier == OSLogDestination.destinationID }
-            }
+    private func syncOSLogDestination(for _: LoggingConfiguration) {
+        let hasOSLog = lock.withLock { state in
+            state.destinations.contains { $0.identifier == OSLogDestination.destinationID }
+        }
+        if !hasOSLog {
+            addDestination(OSLogDestination())
         }
     }
 

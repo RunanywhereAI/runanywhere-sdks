@@ -119,6 +119,12 @@ class STTViewModel: ObservableObject {
             selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
+            Logger(subsystem: "com.runanywhere", category: "Models").info(
+                "Model load succeeded for \(model.id, privacy: .public)"
+            )
+            Logger(subsystem: "com.runanywhere", category: "STT").info(
+                "STT model loaded successfully: \(model.name, privacy: .public)"
+            )
         } else {
             logger.error("Failed to load STT model: \(result.errorMessage)")
             errorMessage = "Failed to load model: \(result.errorMessage)"

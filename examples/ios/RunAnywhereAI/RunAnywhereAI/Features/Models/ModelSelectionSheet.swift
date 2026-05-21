@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import os
 
 // MARK: - Model Selection Context
 
@@ -366,6 +367,15 @@ extension ModelSelectionSheet {
         let result = await RunAnywhere.loadModel(request)
         if !result.success {
             throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
+        }
+        let resolvedID = result.modelID.isEmpty ? modelID : result.modelID
+        Logger(subsystem: "com.runanywhere", category: "Models").info(
+            "Model load succeeded for \(resolvedID, privacy: .public)"
+        )
+        if context == .stt {
+            Logger(subsystem: "com.runanywhere", category: "STT").info(
+                "STT model loaded successfully: \(resolvedID, privacy: .public)"
+            )
         }
     }
 

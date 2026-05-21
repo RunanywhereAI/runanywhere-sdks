@@ -145,6 +145,10 @@ struct FlatModelRow: View {
         subsystem: "com.runanywhere.RunAnywhereAI",
         category: "ModelDownload"
     )
+    private let catalogLogger = Logger(
+        subsystem: "com.runanywhere",
+        category: "Download"
+    )
 
     let model: RAModelInfo
     let availabilityReason: String?
@@ -409,6 +413,9 @@ struct FlatModelRow: View {
             }
 
             logger.info("Download completed for \(model.id, privacy: .public)")
+            catalogLogger.info(
+                "Download accepted for \(model.id, privacy: .public) (task=example)"
+            )
 
             await MainActor.run {
                 self.downloadProgress = 1.0
