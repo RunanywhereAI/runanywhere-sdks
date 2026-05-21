@@ -41,6 +41,10 @@ export RAC_MCP_TAP_CMD='_swift_tap'
 export RAC_MCP_TYPE_CMD='_swift_type'
 export RAC_MCP_GREP_CMD='_swift_grep'
 
+# TC-07/10 need the dedicated STT download flow; catalog must not stamp LIMITED early.
+export RAC_TC_DEFER="tc07,tc10"
+export RAC_TC_DEFER_NOTE="dedicated STT flow"
+
 _swift_shot() {
   local out="$1"
   xcrun simctl io "${RAC_IOS_SIM_UDID}" screenshot "${out}" >/dev/null 2>&1 || true
@@ -75,7 +79,21 @@ _swift_capture_stop() {
   _swift_capture stop
 }
 
-trap _swift_capture_stop EXIT
+_swift_finalize_ran=0
+_swift_stt_flow_started=0
+_swift_finalize_once() {
+  [[ "${_swift_finalize_ran}" -eq 1 ]] && return 0
+  [[ "${_swift_stt_flow_started}" -eq 1 ]] || return 0
+  _swift_finalize_ran=1
+  _swift_finalize_tc07_tc10
+}
+
+_swift_on_exit() {
+  _swift_finalize_once
+  _swift_capture_stop
+}
+
+trap _swift_on_exit EXIT
 _swift_capture start
 
 rac_tc_init_lane
@@ -92,8 +110,8 @@ fi
 
 rac_tc_drive_catalog
 _swift_drive_stt_download
-_swift_capture snapshot post_catalog
-_swift_finalize_tc07_tc10
+_swift_capture snapshot post_stt
+_swift_finalize_once
 _swift_drive_tc19_benchmarks
 _swift_capture snapshot post_tc19 2>/dev/null || true
 echo "Swift iOS executor: catalog drive complete"

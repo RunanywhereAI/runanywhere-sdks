@@ -140,6 +140,13 @@ rac_tc_screenshot_path() {
   printf 'screenshots/%03d_%s.png' "${idx}" "${label}"
 }
 
+# Comma-separated TC ids in RAC_TC_DEFER skip catalog drive and stamp N/A (Swift STT flow).
+_rac_tc_is_deferred() {
+  local tc="$1"
+  [[ -n "${RAC_TC_DEFER:-}" ]] || return 1
+  [[ ",${RAC_TC_DEFER}," == *",${tc},"* ]]
+}
+
 rac_tc_run_modality() {
   local tc="$1"
   local label="$2"
@@ -149,6 +156,11 @@ rac_tc_run_modality() {
   local lane_root="${RAC_SESSION_ROOT:?}"
   local tab="${!tab_var:-}"
   local marker="${!marker_var:-}"
+
+  if _rac_tc_is_deferred "${tc}"; then
+    rac_tc_done "${tc}" "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    return 0
+  fi
 
   if [[ -z "${tab}" ]]; then
     rac_tc_done "${tc}" "N/A" "no ${label} surface for this lane"
@@ -193,4 +205,11 @@ rac_tc_drive_catalog() {
   for skip in tc06 tc17 tc18 tc21; do
     rac_tc_done "${skip}" "N/A" "not exposed in this app or DEFERRED per catalog"
   done
+
+  # TCs deferred for a dedicated lane flow (e.g. Swift tc10 STT UX) not driven in catalog.
+  if _rac_tc_is_deferred tc10; then
+    if ! awk -F'\t' '$1=="tc10"{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv"; then
+      rac_tc_done tc10 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    fi
+  fi
 }

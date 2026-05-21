@@ -47,8 +47,10 @@ _swift_tap_stt_get_button() {
 
 _swift_drive_stt_download() {
   local lane_root="${RAC_SESSION_ROOT:?}"
-  local wait_s="${RAC_STT_DOWNLOAD_WAIT_S:-180}"
+  local wait_s="${RAC_STT_DOWNLOAD_WAIT_S:-120}"
   local elapsed=0
+
+  _swift_stt_flow_started=1
 
   _swift_dismiss_chat_onboarding
   _swift_open_transcribe
@@ -57,6 +59,7 @@ _swift_drive_stt_download() {
   _swift_tap_raw "Get Started"
   sleep 1
   rac_mcp_shot "${lane_root}/screenshots/013b_stt_model_sheet.png"
+  _swift_capture snapshot tc07_stt_sheet 2>/dev/null || true
 
   _swift_tap_raw "Sherpa Whisper Tiny" || _swift_tap_raw "Whisper" || true
   sleep 0.5
@@ -68,6 +71,7 @@ _swift_drive_stt_download() {
     fi
     sleep 5
     elapsed=$((elapsed + 5))
+    _swift_capture snapshot "tc07_stt_wait_${elapsed}" 2>/dev/null || true
     if [[ $((elapsed % 30)) -eq 0 ]]; then
       _swift_tap_stt_get_button
     fi
@@ -76,16 +80,26 @@ _swift_drive_stt_download() {
   _swift_tap_raw "Use" || true
   sleep 2
   rac_mcp_shot "${lane_root}/screenshots/013c_stt_after_download.png"
-  _swift_capture snapshot tc07_stt 2>/dev/null || true
+  _swift_capture snapshot tc07_stt_done 2>/dev/null || true
 }
 
 _swift_finalize_tc07_tc10() {
-  local evidence status notes tc10_status tc10_notes
+  local evidence status notes tc10_status tc10_notes shot_tc10
+
+  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013c_stt_after_download.png" ]]; then
+    shot_tc10="screenshots/013c_stt_after_download.png"
+  elif [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
+    shot_tc10="screenshots/013b_stt_model_sheet.png"
+  else
+    shot_tc10="screenshots/013_transcribe.png"
+  fi
+
   if ! evidence="$(_swift_tc07_evidence)"; then
     rac_tc_done tc07 BLOCKED "never reached Transcribe / no STT evidence" "screenshots/013_transcribe.png"
-    rac_tc_done tc10 BLOCKED "TC-07 STT flow incomplete" "screenshots/013_transcribe.png"
+    rac_tc_done tc10 BLOCKED "TC-07 STT flow incomplete" "${shot_tc10}"
     return 0
   fi
+
   _swift_tc07_status_from_evidence "${evidence}" | {
     IFS=$'\t' read -r status notes
     rac_tc_done tc07 "${status}" "${notes}" "screenshots/013_transcribe.png"
@@ -94,8 +108,11 @@ _swift_finalize_tc07_tc10() {
     if [[ "${evidence}" == limited:download_error_surfaced ]] || [[ "${evidence}" == *download_error* ]]; then
       tc10_status="BLOCKED"
       tc10_notes="download error surfaced in logs (CLUSTER-08)"
+    elif [[ "${evidence}" == limited:stt_sheet_reached_no_logs ]]; then
+      tc10_status="BLOCKED"
+      tc10_notes="reached STT model sheet; no download/load markers (SWIFT-IOS-001)"
     fi
-    rac_tc_done tc10 "${tc10_status}" "${tc10_notes}" "screenshots/013c_stt_after_download.png"
+    rac_tc_done tc10 "${tc10_status}" "${tc10_notes}" "${shot_tc10}"
   }
 }
 
