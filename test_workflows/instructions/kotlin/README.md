@@ -40,7 +40,17 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell pm grant "$ANDROID_PACKAGE" android.permission.RECORD_AUDIO
 adb shell pm grant "$ANDROID_PACKAGE" android.permission.CAMERA
 test_workflows/scripts/kotlin/capture-kotlin-logs.sh snapshot "$RUN_ID" tc01_init
+```
 
+**STT fixture (TC-07 / catalog §2):** The executor injects `test_workflows/fixtures/stt-phrase.wav` (16 kHz mono, phrase *RunAnywhere runs models on device.*) via `test_workflows/scripts/android/inject-stt-audio.sh` — emulator `avd attachmic`, host-mic + `afplay`, or device speaker fallback — before batch record.
+
+```bash
+# Optional: regenerate fixture locally
+say -v Samantha -r 160 -o /tmp/stt.aiff "RunAnywhere runs models on device."
+ffmpeg -y -i /tmp/stt.aiff -ar 16000 -ac 1 -sample_fmt s16 test_workflows/fixtures/stt-phrase.wav
+```
+
+```bash
 test_workflows/scripts/kotlin/capture-kotlin-logs.sh stop "$RUN_ID"
 # Analyzer → test_workflows/logs/runs/$RUN_ID/lanes/01_kotlin_android/modality_report.md
 ```

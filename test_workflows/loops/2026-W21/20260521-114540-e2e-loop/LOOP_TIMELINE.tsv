@@ -73,6 +73,7 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T15:12:00-07:00	1	phase8_fix	orchestrator	COMMIT	OK	904b52909	CLUSTER-07/KOTLIN-HARNESS-001
 2026-05-21T12:50:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_SPAWN	OK	CLUSTER-06	KOTLIN-AND-002 STT catalog audio fixture injection
 2026-05-21T12:51:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_DONE	OK	KOTLIN-AND-002	inject-stt-audio.sh + tc07 keyword grading
+2026-05-21T12:56:00-07:00	1	phase8_fix	orchestrator	COMMIT	OK	4b0316a7d	CLUSTER-06/KOTLIN-AND-002 STT fixture injection
 2026-05-21T12:52:30-07:00	1	phase8_fix	fix-agent-cluster-01	AGENT_DONE	OK	9940abf31	OPFS flush gate downloadModel+loadModelAsync WEB-001/002/003
 2026-05-21T12:52:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	9940abf31	CLUSTER-01/WEB-001 OPFS flush before load
 2026-05-21T12:54:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_SPAWN	OK	CLUSTER-08	SWIFT-IOS-001 STT download error surface + SDK plan retry
