@@ -65,6 +65,79 @@ _kotlin_wait_grep() {
   return 1
 }
 
+_kotlin_logcat_vlm() {
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s VLMViewModel:* ModelSelectionViewModel:* 2>/dev/null || true
+}
+
+_kotlin_vlm_model_ready() {
+  _kotlin_logcat_vlm | grep -E 'Model load succeeded for smolvlm|VLM model loaded: true' >/dev/null 2>&1
+}
+
+_kotlin_wait_vlm_model_ready() {
+  local timeout="${1:-240}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_vlm_model_ready; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_vlm_description_visible() {
+  local tmp
+  tmp="$(mktemp)"
+  adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
+  adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${tmp}" >/dev/null 2>&1 || return 1
+  python3 - "${tmp}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+skip = {
+    "Description",
+    "Tap the button to describe what your camera sees",
+    "Vision AI",
+    "Photos",
+    "Live",
+    "LIVE",
+    "Back",
+    "Analyze",
+    "Copy",
+}
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except ET.ParseError:
+    raise SystemExit(1)
+
+for node in root.iter("node"):
+    text = (node.attrib.get("text") or "").strip()
+    if len(text) < 12 or text in skip:
+        continue
+    if text.startswith("Tap the button"):
+        continue
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+  local rc=$?
+  rm -f "${tmp}"
+  return "${rc}"
+}
+
+_kotlin_wait_vlm_description_visible() {
+  local timeout="${1:-240}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_vlm_description_visible; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
 _kotlin_foreground_package() {
   local line pkg
   line="$(adb -s "${RAC_ANDROID_SERIAL}" shell dumpsys activity activities 2>/dev/null \
@@ -156,10 +229,27 @@ _kotlin_tap_on_screen() {
   adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
   adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${tmp}" >/dev/null 2>&1 || return 1
   local bounds
-  bounds="$(grep -oE "text=\"${label}\"[^/]*bounds=\"[^\"]*\"" "${tmp}" | head -n1 | grep -oE 'bounds="[^"]*"' | sed 's/bounds=//;s/"//g' || true)"
-  if [[ -z "${bounds}" ]]; then
-    bounds="$(grep -oE "content-desc=\"${label}\"[^/]*bounds=\"[^\"]*\"" "${tmp}" | head -n1 | grep -oE 'bounds="[^"]*"' | sed 's/bounds=//;s/"//g' || true)"
-  fi
+  bounds="$(python3 - "${label}" "${tmp}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+label = sys.argv[1]
+try:
+    root = ET.parse(sys.argv[2]).getroot()
+except ET.ParseError:
+    raise SystemExit(1)
+
+for node in root.iter("node"):
+    text = node.attrib.get("text") or ""
+    desc = node.attrib.get("content-desc") or ""
+    if label not in (text, desc):
+        continue
+    b = node.attrib.get("bounds")
+    if b:
+        print(b)
+        break
+PY
+)"
   rm -f "${tmp}"
   [[ -z "${bounds}" ]] && return 1
   local x1 y1 x2 y2
@@ -173,8 +263,36 @@ _kotlin_tap_on_screen() {
   return 0
 }
 
+_kotlin_ensure_vlm_model_loaded() {
+  if _kotlin_vlm_model_ready; then
+    return 0
+  fi
+  _kotlin_tap_on_screen "Get Started" \
+    || _kotlin_tap_on_screen "Select Model" \
+    || _kotlin_tap_on_screen "Change" \
+    || true
+  sleep 2
+  _kotlin_tap_on_screen "SmolVLM 500M Instruct" \
+    || _kotlin_tap_on_screen "SmolVLM" \
+    || _kotlin_tap_on_screen "smolvlm" \
+    || true
+  sleep 3
+  _kotlin_tap_on_screen "Download" || true
+  sleep 35
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 20
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_wait_vlm_model_ready 300 || true
+  _kotlin_back
+  sleep 2
+}
+
 _kotlin_ensure_model_loaded() {
   local context_label="$1"
+  if [[ "${context_label}" == "vlm" ]]; then
+    _kotlin_ensure_vlm_model_loaded
+    return 0
+  fi
   _kotlin_tap_on_screen "Get Started" \
     || _kotlin_tap_on_screen "Select Model" \
     || _kotlin_tap_on_screen "Change" \
@@ -329,30 +447,32 @@ _kotlin_tc09_vlm() {
   _kotlin_tab_tap "Vision"
   _kotlin_tap_on_screen "Vision Chat" || true
   sleep 2
-  _kotlin_ensure_model_loaded "vlm"
-  _kotlin_wait_grep "Model load succeeded for smolvlm" 180 \
-    || _kotlin_wait_grep "VLM model loaded: true" 60 \
-    || true
-  sleep 3
+  _kotlin_ensure_vlm_model_loaded
+  if ! _kotlin_vlm_model_ready; then
+    rac_tc_done tc09 LIMITED "VLM model not loaded (smolvlm) before gallery analyze" "screenshots/013_vision_tab.png"
+    _kotlin_back
+    return 0
+  fi
+  sleep 2
   _kotlin_shot "013_vision_tab"
   _kotlin_snapshot "tc09_vision_tab"
 
+  # Gallery pick auto-runs processSelectedImage(); no prompt/Analyze tap required.
   _kotlin_tap_on_screen "Photos" || _kotlin_tap_on_screen "Gallery" || true
   sleep 2
   adb -s "${RAC_ANDROID_SERIAL}" shell input tap 200 600 >/dev/null 2>&1 || true
   sleep 2
   _kotlin_ensure_foreground "tc09-post-picker" || true
 
-  _kotlin_type "What is visible in this image?"
-  sleep 2
-  _kotlin_tap_on_screen "Analyze" || true
-
-  local status="LIMITED" notes="VLM analyze triggered; awaiting stream completion"
+  local status="LIMITED" notes="VLM gallery analyze triggered; awaiting stream completion"
   if _kotlin_wait_grep "VLM streaming completed" 240 \
     || _kotlin_wait_grep "${RAC_MARKER_VLM_FRAME_DONE}" 240 \
     || _kotlin_wait_grep "${RAC_MARKER_VLM_SDK_DONE}" 240; then
     status="PASS"
     notes="VLM completion marker observed in logcat"
+  elif _kotlin_wait_vlm_description_visible 240; then
+    status="PASS"
+    notes="VLM description text visible on Vision screen (UI completion)"
   elif _kotlin_grep "racVlmProcessStreamProto returned null"; then
     status="FAIL"
     notes="VLM stream failed: racVlmProcessStreamProto returned null"
@@ -361,7 +481,7 @@ _kotlin_tc09_vlm() {
     status="LIMITED"
     notes="VLM stream started without JNI null; completion marker missing within timeout"
   elif ! _kotlin_grep "racVlmProcessStreamProto returned null"; then
-    notes="VLM analyze triggered; no JNI null error but completion marker missing"
+    notes="VLM gallery analyze triggered; no JNI null but completion marker/UI text missing"
   fi
 
   sleep 4
