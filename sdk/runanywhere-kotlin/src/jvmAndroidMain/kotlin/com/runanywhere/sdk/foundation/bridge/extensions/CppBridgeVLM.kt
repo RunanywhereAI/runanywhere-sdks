@@ -15,10 +15,8 @@
  * inference helpers route through the lifecycle whenever it is loaded
  * (Phase 6j / Wave 7 / T23). The vtable's `createFn` returns 0L by
  * design (see `ComponentVTable.jvmAndroid.kt`), so `getHandle()` on the
- * actor is intentionally non-functional; consumers acquire the inference
- * handle via [loadResolvedArtifacts] until the Kotlin commons JNI
- * exposes the parameterless lifecycle process/stream variants (W3-5
- * follow-up).
+ * actor is intentionally non-functional; callers pass handle `0L` into
+ * the proto ABI and commons acquires the lifecycle-owned VLM service.
  *
  * VLM-specific surfaces kept here (mirrors Swift's slim post-Wave-7
  * CppBridge+VLM.swift):
@@ -26,7 +24,8 @@
  *     handle threaded), with a handle-based fallback for the transition
  *     window while the commons JNI symbol is being wired up.
  *   - [process] / [processStream] — proto-canonical inference helpers
- *     that thread the load-time handle into the proto ABI.
+ *     that thread the actor handle (0L) into the C ABI for signature
+ *     parity with Swift.
  *
  * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+VLM.swift`.
  */
@@ -36,8 +35,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
-import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsRequest
-import ai.runanywhere.proto.v1.VLMLoadResolvedArtifactsResponse
 import ai.runanywhere.proto.v1.VLMResult
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
@@ -57,11 +54,12 @@ private fun <M : Message<M, *>> decodeOrThrow(
     bytes: ByteArray?,
     operation: String,
 ): M {
-    val payload = bytes ?: throw SDKException.operation("$operation returned null")
+    val payload =
+        bytes ?: throw SDKException.operation("$operation returned null (no native error detail)")
     return try {
         adapter.decode(payload)
     } catch (e: Exception) {
-        throw SDKException.operation("Failed to decode $operation result: ${e.message}")
+        throw SDKException.operation("Failed to decode $operation result: ${e.message}", e)
     }
 }
 
@@ -79,56 +77,12 @@ object CppBridgeVLM {
 
     private val logger = SDKLogger("CppBridge.VLM")
 
-    /**
-     * Load-time handle returned by `racVlmComponentLoadResolvedArtifactsProto`.
-     * Owned by the lifecycle-orchestrated load path until [destroy]; the
-     * proto inference helpers thread it into the C ABI to satisfy the
-     * `rac_handle_t` parameter. Mirrors Swift's level-3 handle slot in
-     * shape, even though Kotlin still drives the handle through the
-     * load proto until the commons JNI exposes the parameterless
-     * lifecycle process variants.
-     */
-    @Volatile private var handle: Long = 0L
+    /** Mirrors Swift `CppBridge.VLM.shared.getHandle()` — satisfies the proto ABI signature. */
+    suspend fun getHandle(): Long = actor.getHandle()
 
-    @Synchronized
-    fun loadResolvedArtifacts(
-        modelId: String,
-        primaryModelPath: String,
-        visionProjectorPath: String,
-    ): Int {
-        destroy()
-        val request =
-            VLMLoadResolvedArtifactsRequest(
-                model_id = modelId,
-                primary_model_path = primaryModelPath,
-                mmproj_path = visionProjectorPath.takeIf { it.isNotBlank() },
-            )
-        val response =
-            decodeOrThrow(
-                VLMLoadResolvedArtifactsResponse.ADAPTER,
-                RunAnywhereBridge.racVlmComponentLoadResolvedArtifactsProto(
-                    VLMLoadResolvedArtifactsRequest.ADAPTER.encode(request),
-                ),
-                "racVlmComponentLoadResolvedArtifactsProto",
-            )
-        if (response.result_code != RunAnywhereBridge.RAC_SUCCESS || response.handle == 0L) {
-            return if (response.result_code != RunAnywhereBridge.RAC_SUCCESS) {
-                response.result_code
-            } else {
-                RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
-            }
-        }
-        handle = response.handle
-        return RunAnywhereBridge.RAC_SUCCESS
+    suspend fun destroy() {
+        actor.destroy()
     }
-
-    @Synchronized
-    fun destroy() {
-        if (handle != 0L) RunAnywhereBridge.racVlmDestroy(handle)
-        handle = 0L
-    }
-
-    fun isLoaded(): Boolean = handle != 0L
 
     /**
      * Cancel ongoing generation via the lifecycle cancel proto.
@@ -138,11 +92,6 @@ object CppBridgeVLM {
      * VLM service internally, dispatches `cancel` on its vtable, and
      * emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
      * the cancel path consistent with LLM cancellation semantics.
-     *
-     * When the commons JNI binding for `rac_vlm_cancel_lifecycle_proto`
-     * is not yet present, falls back to the handle-based
-     * `rac_vlm_cancel_proto` path so cancel keeps working through the
-     * transition window.
      */
     fun cancel() {
         try {
@@ -154,9 +103,7 @@ object CppBridgeVLM {
                 logger.warning("VLM cancel skipped: no lifecycle VLM loaded")
             }
         } catch (_: UnsatisfiedLinkError) {
-            // Commons JNI binding pending. Fall back to handle-based cancel.
-            val h = handle
-            if (h != 0L) RunAnywhereBridge.racVlmCancelProto(h)
+            logger.warning("VLM cancel skipped: lifecycle cancel JNI unavailable")
         } catch (e: Exception) {
             logger.warning("VLM cancel skipped: ${e.message}")
         }
@@ -167,13 +114,10 @@ object CppBridgeVLM {
      *
      * Mirrors Swift `CppBridge.VLM.supportsStreaming` — exposes the
      * `rac_vlm_component_supports_streaming` introspection helper through
-     * the JNI thunk. Throws [SDKException.invalidState] if no component
-     * handle is currently loaded (parity with the sibling modality
-     * accessors).
+     * the JNI thunk. Returns false when no component handle exists.
      */
     suspend fun supportsStreaming(): Boolean {
-        val h = handle
-        if (h == 0L) throw SDKException.invalidState("VLM service not loaded")
+        val h = actor.existingHandle() ?: return false
         return RunAnywhereBridge.racVlmComponentSupportsStreaming(h)
     }
 
@@ -182,32 +126,41 @@ object CppBridgeVLM {
      *
      * Mirrors Swift `CppBridge.VLM.state` — exposes the
      * `rac_vlm_component_get_state` introspection helper through the JNI
-     * thunk. Return value is a `rac_lifecycle_state_t` int. Throws
-     * [SDKException.invalidState] if no component handle is currently
-     * loaded (parity with the sibling modality accessors).
+     * thunk. Return value is a `rac_lifecycle_state_t` int.
      */
     suspend fun state(): Int {
-        val h = handle
-        if (h == 0L) throw SDKException.invalidState("VLM service not loaded")
+        val h = actor.existingHandle() ?: return RunAnywhereBridge.RAC_LIFECYCLE_IDLE
         return RunAnywhereBridge.racVlmComponentGetState(h)
     }
 
-    fun process(image: RAVLMImage, options: RAVLMGenerationOptions): RAVLMResult =
+    suspend fun process(
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
+    ): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessProto(
-                handle,
+                getHandle(),
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
             ),
             "racVlmProcessProto",
         )
 
-    fun processStream(
+    /**
+     * Stream VLM output as canonical [RASDKEvent] envelopes.
+     *
+     * Mirrors Swift `CppBridge.VLM.processStream` — the native call delivers
+     * token events through the callback; the aggregate [VLMResult] returned
+     * by the C ABI is validated but not forwarded to callers (public API is
+     * event-driven via [RunAnywhere.processImageStream]).
+     */
+    suspend fun processStream(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
         onEvent: (RASDKEvent) -> Boolean,
-    ): RAVLMResult =
+    ) {
+        val handle = getHandle()
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessStreamProto(
@@ -215,9 +168,15 @@ object CppBridgeVLM {
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
-                    onEvent(SDKEvent.ADAPTER.decode(bytes))
+                    try {
+                        onEvent(SDKEvent.ADAPTER.decode(bytes))
+                    } catch (e: Exception) {
+                        logger.warning("Failed to decode VLM stream event: ${e.message}")
+                        true
+                    }
                 },
             ),
             "racVlmProcessStreamProto",
         )
+    }
 }

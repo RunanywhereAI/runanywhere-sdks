@@ -256,6 +256,23 @@ static jbyteArray makeModelRegistryProtoByteArray(JNIEnv* env, uint8_t* bytes, s
     return env->ExceptionCheck() ? nullptr : result;
 }
 
+static void throwNativeProtoFailure(JNIEnv* env, const char* operation, rac_result_t status,
+                                    const char* message) {
+    if (env == nullptr || env->ExceptionCheck()) {
+        return;
+    }
+    const char* detail =
+        (message != nullptr && message[0] != '\0') ? message : "native proto API failed";
+    char formatted[512];
+    std::snprintf(formatted, sizeof(formatted), "%s failed with code %d: %s", operation, status,
+                  detail);
+    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    if (exClass != nullptr) {
+        env->ThrowNew(exClass, formatted);
+        env->DeleteLocalRef(exClass);
+    }
+}
+
 static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buffer,
                                            const char* operation) {
     if (buffer == nullptr) {
@@ -264,7 +281,10 @@ static jbyteArray makeProtoBufferByteArray(JNIEnv* env, rac_proto_buffer_t* buff
     if (RAC_FAILED(buffer->status)) {
         LOGe("%s: native proto API failed with code %d (%s)", operation, buffer->status,
              buffer->error_message ? buffer->error_message : "");
+        const rac_result_t status = buffer->status;
+        const char* message = buffer->error_message;
         rac_proto_buffer_free(buffer);
+        throwNativeProtoFailure(env, operation, status, message);
         return nullptr;
     }
     if (buffer->size > 0 && buffer->data == nullptr) {
