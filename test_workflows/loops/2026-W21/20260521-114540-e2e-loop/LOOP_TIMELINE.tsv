@@ -62,8 +62,8 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:46:00-07:00	1	phase7_plan	plan-writer-iter01	AGENT_DONE	OK	iter-01-remediation.md	issues=20 clusters=12 APPROVED-BY-LOOP sha=ea78337ac
 2026-05-21T12:44:35-07:00	AGENT_SPAWN	orchestrator	phase8: plan-writer + CLUSTER-01,02,03,05,06,07,08,09
 2026-05-21T12:45:07-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_SPAWN	OK	CLUSTER-09	SWIFT-IOS-002 benchmark preflight disk discovery
-2026-05-21T12:52:12-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_DONE	OK	3a790b275	BenchmarkRunner isDownloadedOnDisk + zero-work-item errors
-2026-05-21T12:52:12-07:00	1	phase8_fix	orchestrator	COMMIT	OK	3a790b275	CLUSTER-09/SWIFT-IOS-002
+2026-05-21T12:52:42-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_DONE	OK	37b3c5016	BenchmarkRunner isDownloadedOnDisk + zero-work-item errors
+2026-05-21T12:52:42-07:00	1	phase8_fix	orchestrator	COMMIT	OK	37b3c5016	CLUSTER-09/SWIFT-IOS-002
 2026-05-21T12:46:00-07:00	1	phase8_fix	fix-agent-cluster-01	AGENT_SPAWN	OK	CLUSTER-01	WEB-001/002/003 OPFS flush gate
 2026-05-21T12:47:00-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_SPAWN	OK	CLUSTER-03	WEB-HARNESS-002 post-hydrate UI assertions
 2026-05-21T12:47:30-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_DONE	OK	WEB-HARNESS-002	waitForOpfsHydration + registry-first tc03a/tc_storage_opfs
@@ -75,3 +75,5 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:51:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_DONE	OK	KOTLIN-AND-002	inject-stt-audio.sh + tc07 keyword grading
 2026-05-21T12:52:30-07:00	1	phase8_fix	fix-agent-cluster-01	AGENT_DONE	OK	9940abf31	OPFS flush gate downloadModel+loadModelAsync WEB-001/002/003
 2026-05-21T12:52:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	9940abf31	CLUSTER-01/WEB-001 OPFS flush before load
+2026-05-21T12:54:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_SPAWN	OK	CLUSTER-08	SWIFT-IOS-001 STT download error surface + SDK plan retry
+2026-05-21T12:55:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_DONE	OK	CLUSTER-08	FlatModelRow errors + RunAnywhere+Storage plan retry/logging

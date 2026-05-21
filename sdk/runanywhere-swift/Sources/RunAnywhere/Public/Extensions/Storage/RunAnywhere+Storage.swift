@@ -183,24 +183,29 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
+        let resolvedModel = await resolveModelForDownload(model)
+        SDKLogger.download.info("Planning download for \(resolvedModel.id)")
+
         var planRequest = RADownloadPlanRequest()
-        planRequest.modelID = model.id
-        planRequest.model = model
+        planRequest.modelID = resolvedModel.id
+        planRequest.model = resolvedModel
         planRequest.resumeExisting = true
         planRequest.validateExistingBytes = true
-        planRequest.verifyChecksums = !model.checksumSha256.isEmpty
+        planRequest.verifyChecksums = !resolvedModel.checksumSha256.isEmpty
 
-        let plan = await CppBridge.Download.shared.plan(planRequest)
+        let plan = await planDownload(planRequest)
         guard plan.canStart else {
+            let message = plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage
+            SDKLogger.download.error("Download plan rejected for \(resolvedModel.id): \(message)")
             throw SDKException(
                 code: .downloadFailed,
-                message: plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage,
+                message: message,
                 category: .network
             )
         }
 
         var startRequest = RADownloadStartRequest()
-        startRequest.modelID = model.id
+        startRequest.modelID = resolvedModel.id
         startRequest.plan = plan
         startRequest.resume = plan.canResume
         startRequest.resumeToken = plan.resumeToken
@@ -211,22 +216,30 @@ public extension RunAnywhere {
 
         let startResult = await CppBridge.Download.shared.start(startRequest)
         guard startResult.accepted else {
+            let message = startResult.errorMessage.isEmpty
+                ? "The download could not be started"
+                : startResult.errorMessage
+            SDKLogger.download.error("Download start rejected for \(resolvedModel.id): \(message)")
             throw SDKException(
                 code: .downloadFailed,
-                message: startResult.errorMessage.isEmpty ? "The download could not be started" : startResult.errorMessage,
+                message: message,
                 category: .network
             )
         }
 
+        SDKLogger.download.info(
+            "Download accepted for \(resolvedModel.id) (task=\(startResult.taskID))"
+        )
+
         if startResult.hasInitialProgress {
             let progress = startResult.initialProgress
             if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                return try await persistDownloadCompletion(model: model, progress: progress)
+                return try await persistDownloadCompletion(model: resolvedModel, progress: progress)
             }
         }
 
         var subscribeRequest = RADownloadSubscribeRequest()
-        subscribeRequest.modelID = startResult.modelID.isEmpty ? model.id : startResult.modelID
+        subscribeRequest.modelID = startResult.modelID.isEmpty ? resolvedModel.id : startResult.modelID
         subscribeRequest.taskID = startResult.taskID
 
         // Swift owns the polling/import loop, so a Swift task cancellation
@@ -240,7 +253,7 @@ public extension RunAnywhere {
 
                 let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
                 if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                    return try await persistDownloadCompletion(model: model, progress: progress)
+                    return try await persistDownloadCompletion(model: resolvedModel, progress: progress)
                 }
             }
         } catch is CancellationError {
@@ -295,6 +308,39 @@ public extension RunAnywhere {
 }
 
 private extension RunAnywhere {
+    /// Prefer registry metadata when the caller passes a list-row snapshot that
+    /// may be missing download_url or archive layout fields.
+    static func resolveModelForDownload(_ model: RAModelInfo) async -> RAModelInfo {
+        guard model.downloadURL.isEmpty else { return model }
+
+        var request = RAModelGetRequest()
+        request.modelID = model.id
+        let result = await getModel(request)
+        guard result.found else { return model }
+        return result.model
+    }
+
+    /// Plan a download and retry once after clearing oversize partial bytes.
+    static func planDownload(_ request: RADownloadPlanRequest) async -> RADownloadPlanResult {
+        var plan = await CppBridge.Download.shared.plan(request)
+        guard !plan.canStart,
+              plan.errorMessage.contains("existing partial bytes exceed") else {
+            return plan
+        }
+
+        for file in plan.files where !file.destinationPath.isEmpty {
+            let partialURL = URL(fileURLWithPath: file.destinationPath)
+            if FileManager.default.fileExists(atPath: partialURL.path) {
+                try? FileManager.default.removeItem(at: partialURL)
+                SDKLogger.download.warning(
+                    "Removed oversize partial download at \(file.destinationPath) for \(request.modelID)"
+                )
+            }
+        }
+
+        return await CppBridge.Download.shared.plan(request)
+    }
+
     /// Single-call URL → saved ModelInfo via `rac_register_model_from_url_proto`.
     static func registerModelFromUrl(_ request: RARegisterModelFromUrlRequest) throws -> RAModelInfo {
         var outBuffer = rac_proto_buffer_t()

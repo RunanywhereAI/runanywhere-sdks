@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import os
 
 // MARK: - System TTS Row
 
@@ -140,6 +141,11 @@ struct LoadingDeviceRow: View {
 
 /// A model row designed for flat list display with prominent framework badge
 struct FlatModelRow: View {
+    private let logger = Logger(
+        subsystem: "com.runanywhere.RunAnywhereAI",
+        category: "ModelDownload"
+    )
+
     let model: RAModelInfo
     let availabilityReason: String?
     let isSelected: Bool
@@ -151,6 +157,7 @@ struct FlatModelRow: View {
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
     @State private var downloadStage: RADownloadStage = .downloading
+    @State private var downloadErrorMessage: String?
 
     private var frameworkColor: Color {
         switch model.framework {
@@ -184,7 +191,7 @@ struct FlatModelRow: View {
     }
 
     private var statusIcon: String {
-        if availabilityReason != nil {
+        if availabilityReason != nil || downloadErrorMessage != nil {
             return "exclamationmark.triangle.fill"
         } else if isBuiltIn {
             return "checkmark.circle.fill"
@@ -196,7 +203,7 @@ struct FlatModelRow: View {
     }
 
     private var statusColor: Color {
-        if availabilityReason != nil {
+        if availabilityReason != nil || downloadErrorMessage != nil {
             return AppColors.statusOrange
         } else if isBuiltIn || model.localPathURL != nil {
             return AppColors.statusGreen
@@ -208,6 +215,8 @@ struct FlatModelRow: View {
     private var statusText: String {
         if let availabilityReason {
             return availabilityReason
+        } else if let downloadErrorMessage {
+            return downloadErrorMessage
         } else if isBuiltIn {
             return "Built-in"
         } else if model.localPathURL != nil {
@@ -386,7 +395,10 @@ struct FlatModelRow: View {
             isDownloading = true
             downloadProgress = 0.0
             downloadStage = .downloading
+            downloadErrorMessage = nil
         }
+
+        logger.info("Starting download for \(model.id, privacy: .public)")
 
         do {
             try await RunAnywhere.downloadModel(model) { progress in
@@ -396,17 +408,26 @@ struct FlatModelRow: View {
                 }
             }
 
+            logger.info("Download completed for \(model.id, privacy: .public)")
+
             await MainActor.run {
                 self.downloadProgress = 1.0
                 self.isDownloading = false
                 self.downloadStage = .downloading
+                self.downloadErrorMessage = nil
                 onDownloadCompleted()
             }
         } catch {
+            let message = (error as? SDKException)?.message ?? error.localizedDescription
+            logger.error(
+                "Download failed for \(model.id, privacy: .public): \(message, privacy: .public)"
+            )
+
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
                 downloadStage = .downloading
+                downloadErrorMessage = message.isEmpty ? "Download failed" : message
             }
         }
     }
