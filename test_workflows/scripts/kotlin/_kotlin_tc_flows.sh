@@ -173,8 +173,7 @@ _kotlin_logcat_vlm() {
 }
 
 _kotlin_vlm_model_ready() {
-  _kotlin_logcat_vlm | grep -Ei 'Model load succeeded for smolvlm|VLM model loaded: true|smolvlm-500m-instruct' >/dev/null 2>&1 \
-    || _kotlin_logcat_snapshot | grep -Ei 'Model load succeeded for smolvlm|VLM processing complete' >/dev/null 2>&1
+  _kotlin_logcat_vlm | grep -Ei 'Model load succeeded for smolvlm|VLM model loaded: true' >/dev/null 2>&1
 }
 
 _kotlin_wait_vlm_model_ready() {
@@ -212,6 +211,8 @@ skip = {
     "Back",
     "Analyze",
     "Copy",
+    "How can I help you?",
+    "How can I assist you?",
 }
 try:
     root = ET.parse(sys.argv[1]).getroot()
