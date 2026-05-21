@@ -77,3 +77,4 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:52:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	9940abf31	CLUSTER-01/WEB-001 OPFS flush before load
 2026-05-21T12:54:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_SPAWN	OK	CLUSTER-08	SWIFT-IOS-001 STT download error surface + SDK plan retry
 2026-05-21T12:55:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_DONE	OK	CLUSTER-08	FlatModelRow errors + RunAnywhere+Storage plan retry/logging
+2026-05-21T12:55:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	9cc28e502	CLUSTER-08/SWIFT-IOS-001 STT download error surface

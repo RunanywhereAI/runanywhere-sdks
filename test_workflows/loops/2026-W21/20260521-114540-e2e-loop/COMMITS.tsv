@@ -7,4 +7,4 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T15:10:00-07:00	1	CLUSTER-07	KOTLIN-HARNESS-001	904b52909	6	OK	OK	SKIP	keyframes 007-014 modality executor + sub-prompt
 2026-05-21T12:51:00-07:00	1	CLUSTER-06	KOTLIN-AND-002	PENDING	3	OK	OK	SKIP	stt-phrase.wav inject-stt-audio tc07 keyword check
 2026-05-21T12:52:30-07:00	1	CLUSTER-01	WEB-001,WEB-002,WEB-003	9940abf31	3	OK	OK	OK	ensureDownloadPersisted defer COMPLETED onProgress zero-byte MEMFS skip fix
-2026-05-21T12:55:00-07:00	1	CLUSTER-08	SWIFT-IOS-001	PENDING	4	OK	OK	OK	FlatModelRow download errors + SDK plan retry/logging
+2026-05-21T12:55:00-07:00	1	CLUSTER-08	SWIFT-IOS-001	9cc28e502	4	OK	OK	OK	FlatModelRow download errors + SDK plan retry/logging
