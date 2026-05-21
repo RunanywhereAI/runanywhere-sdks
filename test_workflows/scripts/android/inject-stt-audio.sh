@@ -61,8 +61,14 @@ rac_inject_stt_fixture_start() {
   fixture="$(cd "$(dirname "${fixture}")" && pwd)/$(basename "${fixture}")"
   [[ -f "${fixture}" ]] || return 1
 
+  local play_fixture="${fixture}"
+  if command -v ffmpeg >/dev/null 2>&1; then
+    play_fixture="${TMPDIR:-/tmp}/rac_stt_phrase_boost.wav"
+    ffmpeg -y -loglevel error -i "${fixture}" -af volume=8.0 "${play_fixture}" 2>/dev/null || play_fixture="${fixture}"
+  fi
+
   export RAC_STT_INJECT_MODE=""
-  if _rac_emulator_console_cmd "${serial}" "avd attachmic "${fixture}""; then
+  if _rac_emulator_console_cmd "${serial}" "avd attachmic "${play_fixture}""; then
     RAC_STT_INJECT_MODE="attachmic"
     return 0
   fi
@@ -70,10 +76,10 @@ rac_inject_stt_fixture_start() {
   if _rac_emulator_console_cmd "${serial}" "avd hostmicon"; then
     RAC_STT_INJECT_MODE="hostmicon"
     if command -v afplay >/dev/null 2>&1; then
-      afplay "${fixture}" &
+      afplay "${play_fixture}" &
       echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     elif command -v ffplay >/dev/null 2>&1; then
-      ffplay -nodisp -autoexit -loglevel quiet "${fixture}" &
+      ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}" &
       echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     fi
     return 0
@@ -81,13 +87,13 @@ rac_inject_stt_fixture_start() {
 
   if command -v afplay >/dev/null 2>&1; then
     RAC_STT_INJECT_MODE="hostspeaker"
-    ( for _rac_i in 1 2 3 4 5; do afplay "${fixture}"; done ) &
+    ( for _rac_i in 1 2 3 4 5; do afplay "${play_fixture}"; done ) &
     echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     return 0
   fi
   if command -v ffplay >/dev/null 2>&1; then
     RAC_STT_INJECT_MODE="hostspeaker"
-    ffplay -nodisp -autoexit -loglevel quiet "${fixture}" &
+    ffplay -nodisp -autoexit -loglevel quiet "${play_fixture}" &
     echo $! > "${TMPDIR:-/tmp}/rac_stt_afplay.pid"
     return 0
   fi
