@@ -154,7 +154,7 @@ _swift_tc07_status_from_evidence() {
       printf '%s\t%s\n' "PASS" "transcribe surface (executor/actions)" ;;
     pass:*) printf '%s\t%s\n' "PASS" "${evidence#pass:}" ;;
     limited:download_error_surfaced)
-      printf '%s\t%s\n' "LIMITED" "download error surfaced in logs (CLUSTER-08 evidence)"
+      printf '%s\t%s\n' "BLOCKED" "download error surfaced in logs (CLUSTER-08 evidence)"
       ;;
     limited:*)
       printf '%s\t%s\n' "LIMITED" "transcribe UI evidence (${evidence#limited:}); log marker missing"

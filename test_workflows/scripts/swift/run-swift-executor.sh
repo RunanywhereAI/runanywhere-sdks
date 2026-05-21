@@ -10,6 +10,10 @@ CAPTURE_SCRIPT="${SWIFT_SCRIPT_DIR}/capture-swift-logs.sh"
 source "${SWIFT_SCRIPT_DIR}/../_tc_helper.sh"
 # shellcheck source=_swift_log_lib.sh
 source "${SWIFT_SCRIPT_DIR}/_swift_log_lib.sh"
+# shellcheck source=_swift_tap_lib.sh
+source "${SWIFT_SCRIPT_DIR}/_swift_tap_lib.sh"
+# shellcheck source=_swift_tc_flows.sh
+source "${SWIFT_SCRIPT_DIR}/_swift_tc_flows.sh"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 export RAC_LANE_SLUG="02_swift_ios"
@@ -42,15 +46,6 @@ _swift_shot() {
   xcrun simctl io "${RAC_IOS_SIM_UDID}" screenshot "${out}" >/dev/null 2>&1 || true
 }
 
-_swift_tap_raw() {
-  local label="$1"
-  if [[ -n "${RAC_MCP_TAP_HTTP:-}" ]]; then
-    curl -fsS -X POST "${RAC_MCP_TAP_HTTP}" --data-urlencode "label=${label}" >/dev/null 2>&1 || true
-    return 0
-  fi
-  xcrun simctl ui "${RAC_IOS_SIM_UDID}" tap --label "${label}" >/dev/null 2>&1 || true
-}
-
 _swift_tap() {
   local label="$1"
   if [[ " ${RAC_SWIFT_MORE_HUB_LABELS} " == *" ${label} "* ]]; then
@@ -80,22 +75,12 @@ _swift_capture_stop() {
   _swift_capture stop
 }
 
-_swift_regrade_tc07() {
-  local evidence status notes
-  if ! evidence="$(_swift_tc07_evidence)"; then
-    return 0
-  fi
-  _swift_tc07_status_from_evidence "${evidence}" | {
-    IFS=$'\t' read -r status notes
-    rac_tc_done tc07 "${status}" "${notes}" "screenshots/013_transcribe.png"
-  }
-}
-
 trap _swift_capture_stop EXIT
 _swift_capture start
 
 rac_tc_init_lane
 sleep 5
+_swift_dismiss_chat_onboarding
 rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/000_after_launch.png"
 _swift_capture snapshot tc01_init
 if _swift_tc01_ready; then
@@ -105,6 +90,7 @@ else
 fi
 
 rac_tc_drive_catalog
+_swift_drive_stt_download
 _swift_capture snapshot post_catalog
-_swift_regrade_tc07
+_swift_finalize_tc07_tc10
 echo "Swift iOS executor: catalog drive complete"
