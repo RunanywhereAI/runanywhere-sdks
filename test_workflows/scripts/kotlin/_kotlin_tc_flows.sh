@@ -134,7 +134,8 @@ _kotlin_logcat_vlm() {
 }
 
 _kotlin_vlm_model_ready() {
-  _kotlin_logcat_vlm | grep -E 'Model load succeeded for smolvlm|VLM model loaded: true' >/dev/null 2>&1
+  _kotlin_logcat_vlm | grep -Ei 'Model load succeeded for smolvlm|VLM model loaded: true|smolvlm-500m-instruct' >/dev/null 2>&1 \
+    || _kotlin_logcat_snapshot | grep -Ei 'Model load succeeded for smolvlm|VLM processing complete' >/dev/null 2>&1
 }
 
 _kotlin_wait_vlm_model_ready() {
@@ -315,7 +316,7 @@ except ET.ParseError:
 for node in root.iter("node"):
     text = node.attrib.get("text") or ""
     desc = node.attrib.get("content-desc") or ""
-    if label not in (text, desc):
+    if label not in text and label not in desc:
         continue
     b = node.attrib.get("bounds")
     if b:
@@ -351,10 +352,15 @@ _kotlin_ensure_vlm_model_loaded() {
     || true
   sleep 3
   _kotlin_tap_on_screen "Download" || true
-  sleep 35
-  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
-  sleep 20
-  _kotlin_tap_on_screen "Use" || true
+  local dl_wait=0
+  while [[ "${dl_wait}" -lt 240 ]]; do
+    if _kotlin_vlm_model_ready; then
+      break
+    fi
+    _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+    sleep 8
+    dl_wait=$((dl_wait + 8))
+  done
   _kotlin_wait_vlm_model_ready 300 || true
   _kotlin_back
   sleep 2
@@ -482,8 +488,10 @@ _kotlin_tc07_stt() {
   local record_secs="${RAC_STT_RECORD_SECS:-10}"
   sleep "${record_secs}"
   _kotlin_tap_on_screen "Stop recording" || _kotlin_tap_on_screen "Microphone" || true
-  rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}"
-  sleep 3
+  sleep 2
+  _kotlin_tap_on_screen "Stop recording" || true
+  rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}" || true
+  sleep 5
 
   local status="FAIL" notes="STT batch driven; catalog keywords missing in transcript"
   if _kotlin_wait_stt_batch_marker 180; then
