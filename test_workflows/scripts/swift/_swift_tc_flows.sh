@@ -135,7 +135,8 @@ _swift_open_benchmarks() {
   sleep 1
   _swift_scroll_settings_down
   _swift_tap_raw "Benchmarks"
-  sleep 2
+  # Allow BenchmarkDashboardView .task refresh + registry rescan before Run All.
+  sleep 5
 }
 
 _swift_drive_tc19_benchmarks() {
@@ -146,12 +147,15 @@ _swift_drive_tc19_benchmarks() {
   local elapsed=0
   local status notes
 
-  _swift_ensure_llm_on_disk || true
+  if ! _swift_ensure_llm_on_disk; then
+    rac_tc_done tc19 BLOCKED "no LLM artifact on disk after prefetch" "${shot_pre}"
+    return 0
+  fi
   _swift_open_benchmarks
   rac_mcp_shot "${lane_root}/${shot_pre}"
 
   _swift_tap_raw "All" || true
-  sleep 0.5
+  sleep 1
   _swift_tap_raw "Run All Benchmarks"
   sleep 2
   _swift_capture snapshot tc19_start 2>/dev/null || true
@@ -176,4 +180,3 @@ _swift_drive_tc19_benchmarks() {
   fi
   rac_tc_done tc19 "${status}" "${notes}" "${shot_run}"
 }
-

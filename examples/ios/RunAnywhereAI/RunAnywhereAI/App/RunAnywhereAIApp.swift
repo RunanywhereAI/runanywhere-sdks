@@ -217,6 +217,8 @@ struct RunAnywhereAIApp: App {
     private func refreshSDKCatalogs() async {
         logger.info("Refreshing SDK model registry...")
 
+        await RunAnywhere.refreshModelRegistry()
+
         let listResult = await RunAnywhere.listModels()
         if listResult.success {
             let models = listResult.models.models

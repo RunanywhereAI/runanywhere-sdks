@@ -40,4 +40,26 @@ public extension RunAnywhere {
         query.downloadedOnly = true
         return await queryModels(query)
     }
+
+    /// Rescan managed model directories and reconcile downloaded state in the registry.
+    /// Mirrors Flutter `RunAnywhere.refreshModelRegistry()` / Kotlin `refreshModelRegistry()`.
+    static func refreshModelRegistry(
+        rescanLocal: Bool = true,
+        includeRemoteCatalog: Bool = false,
+        pruneOrphans: Bool = false
+    ) async {
+        guard isInitialized else { return }
+        try? await ensureServicesReady()
+
+        if rescanLocal {
+            _ = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+        }
+
+        var request = RAModelRegistryRefreshRequest()
+        request.rescanLocal = rescanLocal
+        request.includeRemoteCatalog = includeRemoteCatalog
+        request.pruneOrphans = pruneOrphans
+        request.includeDownloadedState = true
+        _ = await CppBridge.ModelRegistry.shared.refresh(request)
+    }
 }

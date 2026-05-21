@@ -36,7 +36,10 @@ enum BenchmarkRunnerError: LocalizedError {
                 return "No benchmarks to run. Select at least one downloaded model and try again."
             }
             let names = skipped.map(\.displayName).joined(separator: ", ")
-            return "No benchmarks to run. Missing on-disk models for: \(names). Download models first from the Models tab."
+            return """
+            No benchmarks to run. Missing on-disk models for: \(names). \
+            Download models first from the Models tab.
+            """
         case .fetchModelsFailed(let error):
             return "Failed to fetch available models: \(error.localizedDescription)"
         }
@@ -84,6 +87,8 @@ final class BenchmarkRunner {
     /// Checks which categories have downloaded models before running. This lets the UI
     /// inform the user which categories will be skipped.
     func preflight(categories: Set<BenchmarkCategory>) async throws -> BenchmarkPreflightResult {
+        await RunAnywhere.refreshModelRegistry()
+
         let allModels: [RAModelInfo]
         let listResult = await RunAnywhere.listModels()
         guard listResult.success else {
