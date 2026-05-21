@@ -12,3 +12,8 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T13:03:05-07:00	1	CLUSTER-01	WEB-001	e6bf2b64f	3	OK	OK	SKIP	OPFS persist verification helpers ensureDownloadPersisted ensureModelPathReadyForLoad
 2026-05-21T13:42:00-07:00	1	CLUSTER-01b	WEB-001	ee8663e0e	1	OK	OK	OK	registerModel mirror isDownloaded+localPath after ensureDownloadPersisted
 2026-05-21T13:36:20-07:00	1	CLUSTER-07b	KOTLIN-HARNESS	d178da3e4	3	OK	OK	SKIP	Keep app foreground and fix logcat markers for modality TCs
+2026-05-21T15:33:42-07:00	1	CLUSTER-06b	KOTLIN-AND-002	ab0761cac	2	OK	OK	SKIP	stt logcat grep inject-stt-audio stability
+2026-05-21T16:05:00-07:00	1	CLUSTER-08b	SWIFT-IOS-001	f3fc21c66	3	OK	OK	OK	OSLog destination + Model load succeeded log for simulator grep
+2026-05-21T16:20:00-07:00	1	CLUSTER-09b	SWIFT-IOS-002	PENDING	6	OK	OK	SKIP	refreshModelRegistry preflight + TC-19 harness dwell
+2026-05-21T15:47:00-07:00	1	CLUSTER-05b	KOTLIN-AND-001	542509a88	3	OK	OK	OK	VLMStreamEvent decode mapper + gallery completion log
+2026-05-21T15:47:00-07:00	1	CLUSTER-05b	KOTLIN-AND-001	542509a88	3	OK	OK	OK	VLMStreamEvent decode mapper + gallery completion log
