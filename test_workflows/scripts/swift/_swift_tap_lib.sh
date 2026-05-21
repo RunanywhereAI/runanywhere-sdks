@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # iOS Simulator tap helpers — simctl ui tap --label is unavailable on Xcode 16+;
 # use Simulator window geometry (402×874 pt) or optional RAC_MCP_TAP_HTTP / mobile-mcp.
-set -euo pipefail
 
 _swift_sim_udid() {
   printf '%s' "${RAC_IOS_SIM_UDID:-booted}"
@@ -72,10 +71,54 @@ _swift_label_coords() {
     Get|"71.5 MB"|"Get 71.5 MB") printf '%s %s\n' 340 300 ;;
     Use) printf '%s %s\n' 340 300 ;;
     "Sherpa Whisper Tiny"|"sherpa-onnx-whisper-tiny.en"|Whisper) printf '%s %s\n' 200 300 ;;
+    SmolLM2|SmolLM|"SmolLM2 360M") printf '%s %s\n' 200 260 ;;
+    Benchmarks) printf '%s %s\n' 200 620 ;;
+    "Run All Benchmarks") printf '%s %s\n' 201 340 ;;
+    All) printf '%s %s\n' 360 480 ;;
+    Allow|OK) printf '%s %s\n' 280 520 ;;
     Batch) printf '%s %s\n' 100 200 ;;
     Microphone) printf '%s %s\n' 201 650 ;;
     *) return 1 ;;
   esac
+}
+
+
+
+_swift_scroll_settings_down() {
+  local i
+  for i in 1 2 3; do
+    _swift_tap_xy_logical 201 650 || true
+    _swift_tap_xy_logical 201 350 || true
+    sleep 0.4
+  done
+}
+
+_swift_tap_ax_name() {
+  local name="$1"
+  local esc="${name//\/\\}"
+  esc="${esc//"/\"}"
+  osascript >/dev/null 2>&1 <<APPLESCRIPT || return 1
+tell application "Simulator" to activate
+delay 0.15
+tell application "System Events"
+  tell process "Simulator"
+    set frontmost to true
+    set w to front window
+    try
+      click (first UI element of w whose name is "${esc}")
+      return
+    end try
+    try
+      click (first button of w whose name is "${esc}")
+      return
+    end try
+    try
+      click (first static text of w whose value is "${esc}")
+    end try
+  end tell
+end tell
+APPLESCRIPT
+  sleep 0.35
 }
 
 _swift_tap_raw() {
@@ -88,6 +131,9 @@ _swift_tap_raw() {
   if coords="$(_swift_label_coords "${label}" 2>/dev/null)"; then
     read -r lx ly <<< "${coords}"
     _swift_tap_xy_logical "${lx}" "${ly}" && return 0
+  fi
+  if _swift_tap_ax_name "${label}"; then
+    return 0
   fi
   # Last resort: center tap (better than silent no-op)
   _swift_tap_xy_logical 201 437 || true

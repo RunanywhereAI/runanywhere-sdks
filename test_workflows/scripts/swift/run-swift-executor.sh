@@ -79,6 +79,7 @@ trap _swift_capture_stop EXIT
 _swift_capture start
 
 rac_tc_init_lane
+_swift_sim_privacy_grants
 sleep 5
 _swift_dismiss_chat_onboarding
 rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/000_after_launch.png"
@@ -93,4 +94,6 @@ rac_tc_drive_catalog
 _swift_drive_stt_download
 _swift_capture snapshot post_catalog
 _swift_finalize_tc07_tc10
+_swift_drive_tc19_benchmarks
+_swift_capture snapshot post_tc19 2>/dev/null || true
 echo "Swift iOS executor: catalog drive complete"
