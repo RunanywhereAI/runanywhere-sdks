@@ -44,14 +44,12 @@ _kotlin_type() {
 }
 
 _kotlin_logcat_snapshot() {
-  {
-    adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s RunAnywhere:* VLM:* System.out:* 2>/dev/null || true
-    adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s \
-      SpeechToTextViewModel:* TextToSpeechViewModel:* VLMViewModel:* \
-      ModelSelectionViewModel:* RunAnywhereApplication:* VoiceAssistantViewModel:* \
-      RAGViewModel:* 2>/dev/null || true
-    adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null || true
-  }
+  local tail_lines="${1:-2500}"
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d -t "${tail_lines}" -s \
+    RunAnywhere:* VLM:* System.out:* \
+    SpeechToTextViewModel:* TextToSpeechViewModel:* VLMViewModel:* \
+    ModelSelectionViewModel:* RunAnywhereApplication:* VoiceAssistantViewModel:* \
+    RAGViewModel:* CppBridgeVLM:* 2>/dev/null || true
 }
 
 _kotlin_grep() {

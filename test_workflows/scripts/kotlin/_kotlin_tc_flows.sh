@@ -38,6 +38,23 @@ RAC_MARKER_RAG_QUERY='Querying RAG pipeline'
 RAC_MARKER_TOOL_DEMO='Demo tools registered'
 RAC_MARKER_LORA_APPLY='LoRA adapter applied'
 
+_kotlin_ui_lock_file() {
+  local safe_serial
+  safe_serial="${RAC_ANDROID_SERIAL//[^a-zA-Z0-9]/_}"
+  printf '/tmp/rac_kotlin_uiautomator_%s.lock' "${safe_serial}"
+}
+
+_kotlin_pull_ui_xml() {
+  local dest="$1"
+  local lock_file
+  lock_file="$(_kotlin_ui_lock_file)"
+  (
+    flock -w 45 9 || exit 1
+    adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || exit 1
+    adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${dest}" >/dev/null 2>&1 || exit 1
+  ) 9>"${lock_file}"
+}
+
 _kotlin_shot() {
   local keyframe="$1"
   rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/${keyframe}.png"
@@ -86,11 +103,13 @@ _kotlin_wait_vlm_model_ready() {
   return 1
 }
 
-_kotlin_vlm_description_visible() {
+_kotlin_vlm_description_text() {
   local tmp
   tmp="$(mktemp)"
-  adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
-  adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${tmp}" >/dev/null 2>&1 || return 1
+  if ! _kotlin_pull_ui_xml "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
   python3 - "${tmp}" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
@@ -117,12 +136,17 @@ for node in root.iter("node"):
         continue
     if text.startswith("Tap the button"):
         continue
+    print(text[:240])
     raise SystemExit(0)
 raise SystemExit(1)
 PY
   local rc=$?
   rm -f "${tmp}"
   return "${rc}"
+}
+
+_kotlin_vlm_description_visible() {
+  _kotlin_vlm_description_text >/dev/null 2>&1
 }
 
 _kotlin_wait_vlm_description_visible() {
@@ -226,8 +250,10 @@ _kotlin_tap_on_screen() {
   local label="$1"
   local tmp
   tmp="$(mktemp)"
-  adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
-  adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${tmp}" >/dev/null 2>&1 || return 1
+  if ! _kotlin_pull_ui_xml "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
   local bounds
   bounds="$(python3 - "${label}" "${tmp}" <<'PY'
 import sys
@@ -472,7 +498,12 @@ _kotlin_tc09_vlm() {
     notes="VLM completion marker observed in logcat"
   elif _kotlin_wait_vlm_description_visible 240; then
     status="PASS"
+    local vlm_ui_text
+    vlm_ui_text="$(_kotlin_vlm_description_text 2>/dev/null || true)"
     notes="VLM description text visible on Vision screen (UI completion)"
+    if [[ -n "${vlm_ui_text}" ]]; then
+      notes="${notes}: ${vlm_ui_text}"
+    fi
   elif _kotlin_grep "racVlmProcessStreamProto returned null"; then
     status="FAIL"
     notes="VLM stream failed: racVlmProcessStreamProto returned null"
