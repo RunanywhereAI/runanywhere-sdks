@@ -181,7 +181,7 @@ _swift_app_data_container() {
 _swift_llm_artifact_on_disk() {
   local container
   container="$(_swift_app_data_container)" || return 1
-  find "${container}" -type f \( -name '*.gguf' -o -name '*.bin' -o -name 'model.safetensors' \) 2>/dev/null | grep -q .
+  find "${container}" -type f \( -path '*/RunAnywhere/Models/*' -o -name '*.gguf' -o -name '*.bin' -o -name 'model.safetensors' \) 2>/dev/null | grep -q .
 }
 
 _swift_benchmarks_json_path() {

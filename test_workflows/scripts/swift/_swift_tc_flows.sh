@@ -106,8 +106,9 @@ _swift_ensure_llm_on_disk() {
   local wait_s="${RAC_LLM_DOWNLOAD_WAIT_S:-600}"
   local elapsed=0
 
-  _swift_dismiss_chat_onboarding
-  _swift_tap_raw "Select Model" || _swift_tap_raw "Change" || true
+  _swift_tap_raw "${RAC_TAB_CHAT:-Chat}"
+  sleep 1
+  _swift_tap_raw "Get Started" || _swift_tap_raw "Select Model" || _swift_tap_raw "Change" || true
   sleep 1
   _swift_tap_raw "SmolLM2" || _swift_tap_raw "SmolLM" || true
   sleep 0.5
