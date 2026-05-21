@@ -337,8 +337,13 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    // The adapter's Stream onCancel deregisters the C-side callback —
-    // cancelling _eventSubscription above is sufficient cleanup.
+    // Release native voice-agent + VAD handles (Kotlin/Android parity:
+    // RunAnywhere.cleanupVoiceAgent() on session end).
+    try {
+      sdk.RunAnywhere.voice.cleanup();
+    } catch (e) {
+      debugPrint('Voice cleanup: $e');
+    }
 
     if (!mounted) return;
     setState(() {

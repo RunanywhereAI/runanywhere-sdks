@@ -19,6 +19,7 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import { bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 
 function ensureNative() {
@@ -142,15 +143,18 @@ async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
     return new SolutionHandle(h);
   }
 
-  const bytes =
-    args.configBytes ?? SolutionConfig.encode(args.config!).finish();
-  if (bytes.length === 0) {
+  const configBuffer = args.configBytes
+    ? bytesToArrayBuffer(args.configBytes)
+    : args.config
+      ? encodeProtoMessage(args.config, SolutionConfig)
+      : new ArrayBuffer(0);
+  if (configBuffer.byteLength === 0) {
     throw SDKException.invalidInput(
       'Solution config bytes are empty — refusing to call rac_solution_create_from_proto'
     );
   }
 
-  const h = await native.solutionCreateFromProto(bytesToArrayBuffer(bytes));
+  const h = await native.solutionCreateFromProto(configBuffer);
   if (!h) {
     throw SDKException.generationFailedWith(
       'rac_solution_create_from_proto failed'

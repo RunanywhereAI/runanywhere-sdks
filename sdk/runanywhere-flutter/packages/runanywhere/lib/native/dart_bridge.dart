@@ -163,6 +163,13 @@ class DartBridge {
     DartBridgeFileManager.register();
     _logger.debug('File manager callbacks registered');
 
+    // Step 9: Wire global model registry before any registerModel() calls.
+    // Swift's CppBridge.ModelRegistry.shared resolves rac_get_model_registry()
+    // lazily; Flutter apps register catalog models immediately after
+    // initialize() returns (Phase 1 only).
+    DartBridgeModelRegistry.instance.ensureInitialized();
+    _logger.debug('Model registry handle wired (Phase 1)');
+
     _isInitialized = true;
     _logger.info('Phase 1 initialization complete');
   }

@@ -31,10 +31,8 @@ import {
   STTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 let requestCounter = 0;
@@ -126,7 +124,7 @@ function buildSTTRequestBytes(
     options: buildSTTOptions(options),
     metadata: {},
   });
-  return bytesToArrayBuffer(STTTranscriptionRequest.encode(request).finish());
+  return encodeProtoMessage(request, STTTranscriptionRequest);
 }
 
 /**

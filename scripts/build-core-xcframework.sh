@@ -255,6 +255,7 @@ merge_llamacpp_backend_slice() {
         "${build_root}/engines/llamacpp/${slice_dir}/librac_backend_llamacpp.a"
         "${build_root}/_deps/llamacpp-build/src/${slice_dir}/libllama.a"
         "${build_root}/_deps/llamacpp-build/common/${slice_dir}/libllama-common.a"
+        "${build_root}/_deps/llamacpp-build/common/${slice_dir}/libllama-common-base.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-base.a"
         "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-cpu.a"
@@ -397,12 +398,17 @@ cmake_extra=(
     "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
 )
+ios_cmake_extra=(
+    "-DRAC_BACKEND_WHISPERKIT_COREML=OFF"
+    "-DRAC_BACKEND_DIFFUSION_COREML=OFF"
+    "-DRAC_BACKEND_METALRT=OFF"
+)
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
     cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
 fi
 
 echo "▶ Configure ios-device"
-run cmake --preset ios-device "${cmake_extra[@]}"
+run cmake --preset ios-device "${cmake_extra[@]}" "${ios_cmake_extra[@]}"
 echo "▶ Build ios-device (Release)"
 ios_build_targets=(rac_commons rac_backend_llamacpp)
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
@@ -414,7 +420,7 @@ fi
 run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}"
 
 echo "▶ Configure ios-simulator"
-run cmake --preset ios-simulator "${cmake_extra[@]}"
+run cmake --preset ios-simulator "${cmake_extra[@]}" "${ios_cmake_extra[@]}"
 echo "▶ Build ios-simulator (Release)"
 run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}"
 

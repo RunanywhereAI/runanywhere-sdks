@@ -20,7 +20,8 @@ import type {
   StorageDeleteResult,
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.Storage');
 
@@ -35,9 +36,9 @@ export type {
 
 function encode<T>(
   message: T,
-  codec: { encode(value: T): { finish(): Uint8Array } }
+  codec: { encode(value: T, writer?: { finish(): Uint8Array }): { finish(): Uint8Array } }
 ): ArrayBuffer {
-  return bytesToArrayBuffer(codec.encode(message).finish());
+  return encodeProtoMessage(message, codec);
 }
 
 function decode<T>(

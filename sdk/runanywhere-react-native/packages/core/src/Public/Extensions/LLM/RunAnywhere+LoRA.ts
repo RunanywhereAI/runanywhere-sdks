@@ -48,10 +48,8 @@ import {
   LoraAdapterDownloadCompletedResult as LoraAdapterDownloadCompletedResultMessage,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.LoRA');
 
@@ -75,78 +73,71 @@ function decodeRequired<T>(
 }
 
 function encodeConfig(config: LoRAAdapterConfig): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoRAAdapterConfigMessage.encode(
-      LoRAAdapterConfigMessage.create(config)
-    ).finish()
+  return encodeProtoMessage(
+    LoRAAdapterConfigMessage.create(config),
+    LoRAAdapterConfigMessage
   );
 }
 
 function encodeApplyRequest(request: LoRAApplyRequest): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoRAApplyRequestMessage.encode(
-      LoRAApplyRequestMessage.create(request)
-    ).finish()
+  return encodeProtoMessage(
+    LoRAApplyRequestMessage.create(request),
+    LoRAApplyRequestMessage
   );
 }
 
 function encodeRemoveRequest(request: LoRARemoveRequest): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoRARemoveRequestMessage.encode(
-      LoRARemoveRequestMessage.create(request)
-    ).finish()
+  return encodeProtoMessage(
+    LoRARemoveRequestMessage.create(request),
+    LoRARemoveRequestMessage
   );
 }
 
 function encodeStateRequest(request?: LoRAState): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoRAStateMessage.encode(LoRAStateMessage.create(request ?? {})).finish()
+  return encodeProtoMessage(
+    LoRAStateMessage.create(request ?? {}),
+    LoRAStateMessage
   );
 }
 
 function encodeCatalogEntry(entry: LoraAdapterCatalogEntry): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoraAdapterCatalogEntryMessage.encode(
-      LoraAdapterCatalogEntryMessage.create(entry)
-    ).finish()
+  return encodeProtoMessage(
+    LoraAdapterCatalogEntryMessage.create(entry),
+    LoraAdapterCatalogEntryMessage
   );
 }
 
 function encodeCatalogListRequest(
   request?: LoraAdapterCatalogListRequest
 ): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoraAdapterCatalogListRequestMessage.encode(
-      LoraAdapterCatalogListRequestMessage.create(request ?? {})
-    ).finish()
+  return encodeProtoMessage(
+    LoraAdapterCatalogListRequestMessage.create(request ?? {}),
+    LoraAdapterCatalogListRequestMessage
   );
 }
 
 function encodeCatalogQuery(query: LoraAdapterCatalogQuery): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoraAdapterCatalogQueryMessage.encode(
-      LoraAdapterCatalogQueryMessage.create(query)
-    ).finish()
+  return encodeProtoMessage(
+    LoraAdapterCatalogQueryMessage.create(query),
+    LoraAdapterCatalogQueryMessage
   );
 }
 
 function encodeCatalogGetRequest(
   request: LoraAdapterCatalogGetRequest
 ): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoraAdapterCatalogGetRequestMessage.encode(
-      LoraAdapterCatalogGetRequestMessage.create(request)
-    ).finish()
+  return encodeProtoMessage(
+    LoraAdapterCatalogGetRequestMessage.create(request),
+    LoraAdapterCatalogGetRequestMessage
   );
 }
 
 function encodeDownloadCompletedRequest(
   request: LoraAdapterDownloadCompletedRequest
 ): ArrayBuffer {
-  return bytesToArrayBuffer(
-    LoraAdapterDownloadCompletedRequestMessage.encode(
-      LoraAdapterDownloadCompletedRequestMessage.create(request)
-    ).finish()
+  return encodeProtoMessage(
+    LoraAdapterDownloadCompletedRequestMessage.create(request),
+    LoraAdapterDownloadCompletedRequestMessage
   );
 }
 

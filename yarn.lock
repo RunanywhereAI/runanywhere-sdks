@@ -6555,10 +6555,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react@npm:19.2.6":
-  version: 19.2.6
-  resolution: "react@npm:19.2.6"
-  checksum: e250029064bff3f3308ee61e52c44bc9a0c938f6ef11a3f39c31db487ca173eb9b4b0cd3261e32613d3498df0da5586f3c582bc83cef54ad99bc5643772c4535
+"react@npm:19.2.3":
+  version: 19.2.3
+  resolution: "react@npm:19.2.3"
+  checksum: 506e369ae13cb46b7f303c0201aadf856642f482cdf5b1c3730c3a6d1762fd5a3ae1dd31196a4686bfbbe56456dcd0c48a4656c75cbcb45620e3028c54789ae9
   languageName: node
   linkType: hard
 
@@ -6771,6 +6771,7 @@ __metadata:
   dependencies:
     "@babel/core": ^7.25.2
     "@babel/runtime": ^7.28.6
+    "@bufbuild/protobuf": ^2.12.0
     "@react-native-async-storage/async-storage": ^2.2.0
     "@react-native-clipboard/clipboard": ^1.16.3
     "@react-native-community/cli": ^20.1.1
@@ -6802,7 +6803,7 @@ __metadata:
     knip: ^5.76.0
     patch-package: ^8.0.1
     prettier: ^3.8.3
-    react: 19.2.6
+    react: 19.2.3
     react-native: 0.85.3
     react-native-fs: ^2.20.0
     react-native-image-picker: ^8.2.1

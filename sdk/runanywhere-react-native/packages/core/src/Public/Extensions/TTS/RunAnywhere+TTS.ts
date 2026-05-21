@@ -27,10 +27,8 @@ import {
   TTSStreamEventKind,
 } from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.TTS');
 let requestCounter = 0;
@@ -83,7 +81,7 @@ function encodeTTSSynthesisRequest(
     options: buildTTSOptions(options),
     metadata: {},
   });
-  return bytesToArrayBuffer(TTSSynthesisRequest.encode(request).finish());
+  return encodeProtoMessage(request, TTSSynthesisRequest);
 }
 
 function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {

@@ -24,10 +24,8 @@ import {
   VADProcessRequest,
   VADResult as VADResultMessage,
 } from '@runanywhere/proto-ts/vad_options';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.VAD');
 let requestCounter = 0;
@@ -85,7 +83,7 @@ function buildVADRequestBytes(
     options: buildVADOptions(options),
     metadata: {},
   });
-  return bytesToArrayBuffer(VADProcessRequest.encode(request).finish());
+  return encodeProtoMessage(request, VADProcessRequest);
 }
 
 /**

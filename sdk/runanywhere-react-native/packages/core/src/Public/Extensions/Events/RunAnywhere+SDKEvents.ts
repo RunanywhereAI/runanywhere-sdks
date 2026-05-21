@@ -8,13 +8,14 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import type { SDKEvent as SDKEventMessage } from '@runanywhere/proto-ts/sdk_events';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 
 export type { SDKEvent as ProtoSDKEvent } from '@runanywhere/proto-ts/sdk_events';
 
 function encodeEvent(event: SDKEventMessage): ArrayBuffer {
-  return bytesToArrayBuffer(SDKEvent.encode(event).finish());
+  return encodeProtoMessage(event, SDKEvent);
 }
 
 function decodeEvent(buffer: ArrayBuffer): SDKEventMessage | null {

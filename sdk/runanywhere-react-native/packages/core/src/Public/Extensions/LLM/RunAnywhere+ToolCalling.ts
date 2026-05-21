@@ -21,10 +21,8 @@ import {
   type ToolDefinition,
   type ToolParameter,
 } from '@runanywhere/proto-ts/tool_calling';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
@@ -228,13 +226,11 @@ export async function generateWithTools(
     `[ToolCalling] Delegating native run loop: format=${formatHint}, tools=${tools.length}`
   );
 
-  const encodedRequest = bytesToArrayBuffer(
-    ToolCallingSessionCreateRequest.encode(request).finish()
-  );
+  const encodedRequest = encodeProtoMessage(request, ToolCallingSessionCreateRequest);
   const onExecute = async (toolCallBytes: ArrayBuffer) => {
     const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
     const result = await executeTool(toolCall);
-    return bytesToArrayBuffer(ToolResult.encode(result).finish());
+    return encodeProtoMessage(result, ToolResult);
   };
 
   const signal = extra?.signal;

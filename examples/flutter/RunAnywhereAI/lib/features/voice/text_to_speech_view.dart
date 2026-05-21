@@ -188,13 +188,35 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
+      final options = sdk.TTSOptions(
+        speakingRate: _speechRate,
+        pitch: 1.0,
+        volume: 1.0,
+      );
+
+      // System TTS uses platform playback (iOS/Android parity: RunAnywhere.speak).
+      if (_isSystemTTS) {
+        final result = await sdk.RunAnywhere.speak(
+          _textController.text,
+          options,
+        );
+        debugPrint(
+            '✅ System TTS speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
+        setState(() {
+          _isGenerating = false;
+          _duration = result.durationMs.toInt() / 1000.0;
+          _metadata = TTSMetadata(
+            durationMs: result.durationMs.toDouble(),
+            audioSize: 0,
+            sampleRate: result.sampleRate,
+          );
+        });
+        return;
+      }
+
       final result = await sdk.RunAnywhere.tts.synthesize(
         _textController.text,
-        sdk.TTSOptions(
-          speakingRate: _speechRate,
-          pitch: 1.0,
-          volume: 1.0,
-        ),
+        options,
       );
 
       // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).

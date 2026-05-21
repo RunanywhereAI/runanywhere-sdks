@@ -31,10 +31,8 @@ import {
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
 import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
@@ -75,7 +73,7 @@ function buildLLMGenerateRequest(
 }
 
 function encodeLLMGenerateRequest(request: LLMGenerateRequest): ArrayBuffer {
-  return bytesToArrayBuffer(LLMGenerateRequest.encode(request).finish());
+  return encodeProtoMessage(request, LLMGenerateRequest);
 }
 
 function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {

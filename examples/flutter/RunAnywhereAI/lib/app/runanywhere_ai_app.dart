@@ -61,11 +61,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
+        await RunAnywhere.completeServicesInitialization();
       } else {
         await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
       }
 
+      // Model paths + registry must be ready before catalog registration.
+      await RunAnywhere.completeServicesInitialization();
       await _registerModulesAndModels();
 
       stopwatch.stop();

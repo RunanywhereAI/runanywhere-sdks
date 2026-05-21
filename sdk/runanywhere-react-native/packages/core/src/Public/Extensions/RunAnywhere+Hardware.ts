@@ -20,7 +20,8 @@ import {
 import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 import { isNativeModuleAvailable, requireNativeModule } from '../../native';
 import { SDKException } from '../../Foundation/Errors/SDKException';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../services/ProtoWire';
 
 export type {
   AcceleratorInfo,
@@ -187,11 +188,8 @@ export async function setAcceleratorPreference(
   if (typeof native.setAcceleratorPreferenceProto !== 'function') return false;
 
   try {
-    const requestBytes = HardwareAcceleratorPreferenceRequest.encode({
-      preference,
-    }).finish();
     const responseBuffer = await native.setAcceleratorPreferenceProto(
-      bytesToArrayBuffer(requestBytes)
+      encodeProtoMessage({ preference }, HardwareAcceleratorPreferenceRequest)
     );
     if (responseBuffer.byteLength === 0) return false;
     const result = HardwareAcceleratorPreferenceResult.decode(

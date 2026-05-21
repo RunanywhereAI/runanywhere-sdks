@@ -31,10 +31,8 @@ import {
   StructuredOutputStreamEvent,
   StructuredOutputStreamEventKind,
 } from '@runanywhere/proto-ts/structured_output';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { generate as generateText } from './RunAnywhere+TextGeneration';
 
 // ============================================================================
@@ -134,16 +132,13 @@ function encodeStructuredOutputRequest(
   schema: JSONSchema,
   options?: StructuredOutputOptions
 ): ArrayBuffer {
-  return bytesToArrayBuffer(
-    StructuredOutputRequest.encode(
-      StructuredOutputRequest.fromPartial({
-        requestId: nextStructuredOutputRequestId(),
-        prompt,
-        options: structuredOutputOptionsForSchema(schema, options),
-        metadata: {},
-      })
-    ).finish()
-  );
+  const request = StructuredOutputRequest.fromPartial({
+    requestId: nextStructuredOutputRequestId(),
+    prompt,
+    options: structuredOutputOptionsForSchema(schema, options),
+    metadata: {},
+  });
+  return encodeProtoMessage(request, StructuredOutputRequest);
 }
 
 /**
@@ -333,7 +328,7 @@ export async function extractStructuredOutput(
   });
   const responseBytes = await callNativeProto(
     'structuredOutputParseProto',
-    bytesToArrayBuffer(StructuredOutputParseRequest.encode(request).finish()),
+    encodeProtoMessage(request, StructuredOutputParseRequest),
     'structuredOutputParse'
   );
   return StructuredOutputResult.decode(responseBytes);
@@ -349,7 +344,7 @@ async function prepareStructuredOutputPrompt(
   });
   const responseBytes = await callNativeProto(
     'structuredOutputPreparePromptProto',
-    bytesToArrayBuffer(StructuredOutputRequest.encode(request).finish()),
+    encodeProtoMessage(request, StructuredOutputRequest),
     'structuredOutputPreparePrompt'
   );
   const result = StructuredOutputPromptResult.decode(responseBytes);

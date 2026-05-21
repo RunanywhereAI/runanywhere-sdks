@@ -50,7 +50,8 @@ import {
   ErrorCategory,
   ErrorCode,
 } from '@runanywhere/proto-ts/errors';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 // ---------------------------------------------------------------------------
 // Public types — match the Swift signatures.
@@ -106,11 +107,13 @@ export async function registerModel(input: RegisterModelInput): Promise<boolean>
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl: input.url,
-    memoryRequiredBytes: input.memoryRequirement ?? 0,
+    ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
+      ? { memoryRequiredBytes: input.memoryRequirement }
+      : {}),
     supportsThinking: input.supportsThinking ?? false,
     artifactType: input.artifactType,
   });
-  const bytes = bytesToArrayBuffer(ModelInfoCodec.encode(message).finish());
+  const bytes = encodeProtoMessage(message, ModelInfoCodec);
   return native.registerModelProto(bytes);
 }
 
@@ -130,7 +133,9 @@ export async function registerMultiFileModel(
     framework: input.framework,
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_GGUF,
-    memoryRequiredBytes: input.memoryRequirement ?? 0,
+    ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
+      ? { memoryRequiredBytes: input.memoryRequirement }
+      : {}),
     multiFile: {
       files: input.files.map((file, idx) => ({
         role:
@@ -144,7 +149,7 @@ export async function registerMultiFileModel(
       })),
     },
   });
-  const bytes = bytesToArrayBuffer(ModelInfoCodec.encode(message).finish());
+  const bytes = encodeProtoMessage(message, ModelInfoCodec);
   return native.registerModelProto(bytes);
 }
 
@@ -190,7 +195,7 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
   }
   const native = requireNativeModule();
   const buffer = await native.queryModelsProto(
-    bytesToArrayBuffer(ModelQuery.encode(query).finish())
+    encodeProtoMessage(query, ModelQuery)
   );
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
@@ -265,7 +270,7 @@ export async function importModel(
 
   const native = requireNativeModule();
   const buffer = await native.importModelProto(
-    bytesToArrayBuffer(ModelImportRequest.encode(request).finish())
+    encodeProtoMessage(request, ModelImportRequest)
   );
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
@@ -537,7 +542,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             model,
           });
           const planBytes = await native.downloadPlanProto(
-            bytesToArrayBuffer(DownloadPlanRequest.encode(planRequest).finish())
+            encodeProtoMessage(planRequest, DownloadPlanRequest)
           );
           const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
           if (!plan.canStart) {
@@ -554,9 +559,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             updateRegistryOnCompletion: false,
           });
           const startBytes = await native.downloadStartProto(
-            bytesToArrayBuffer(
-              DownloadStartRequest.encode(startRequest).finish()
-            )
+            encodeProtoMessage(startRequest, DownloadStartRequest)
           );
           const startResult = DownloadStartResult.decode(
             arrayBufferToBytes(startBytes)
@@ -631,9 +634,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             });
             try {
               await native.downloadCancelProto(
-                bytesToArrayBuffer(
-                  DownloadCancelRequest.encode(cancelRequest).finish()
-                )
+                encodeProtoMessage(cancelRequest, DownloadCancelRequest)
               );
             } catch {
               /* noop */

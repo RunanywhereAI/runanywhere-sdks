@@ -16,10 +16,8 @@ import {
   requireNativeModule,
   isNativeModuleAvailable,
 } from '../../../native';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 import {
   VLMGenerationOptions as VLMGenerationOptionsMessage,
   VLMGenerationRequest,
@@ -92,9 +90,7 @@ function encodeVLMRequest(
     options: buildVLMOptions(prompt, options, streamingEnabled),
     metadata: {},
   });
-  return bytesToArrayBuffer(
-    VLMGenerationRequest.encode(request).finish()
-  );
+  return encodeProtoMessage(request, VLMGenerationRequest);
 }
 
 function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {

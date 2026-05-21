@@ -9,6 +9,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { initializeNitroModulesGlobally } from '../native/NitroModulesGlobalInit';
+import { ensureProtoTextEncoding } from '../services/ProtoWire';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants/SDKConstants';
@@ -152,6 +153,7 @@ export const RunAnywhere = {
 
     publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
     logger.info('SDK initialization starting...');
+    ensureProtoTextEncoding();
 
     try {
       await initializeNitroModulesGlobally();

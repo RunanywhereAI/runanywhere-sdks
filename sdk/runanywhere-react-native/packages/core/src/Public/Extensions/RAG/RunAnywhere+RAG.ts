@@ -24,10 +24,8 @@ import {
   RAGResult as RAGResultMessage,
   RAGStatistics as RAGStatisticsMessage,
 } from '@runanywhere/proto-ts/rag';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.RAG');
 
@@ -69,7 +67,7 @@ export async function ragCreatePipeline(
     maxContextTokens: config.maxContextTokens ?? 0,
   });
   const success = await native.ragCreatePipelineProto(
-    bytesToArrayBuffer(RAGConfigurationMessage.encode(configWithDefaults).finish())
+    encodeProtoMessage(configWithDefaults, RAGConfigurationMessage)
   );
   if (!success) {
     throw SDKException.generationFailedWith('Failed to create RAG pipeline');
@@ -98,7 +96,7 @@ export async function ragIngest(
     text,
     metadata,
   });
-  await native.ragIngestProto(bytesToArrayBuffer(RAGDocument.encode(document).finish()));
+  await native.ragIngestProto(encodeProtoMessage(document, RAGDocument));
 }
 
 function parseMetadata(json?: string): Record<string, string> {
@@ -145,7 +143,7 @@ export async function ragQuery(
     topK: options?.topK ?? 0,
   });
   const resultBytes = await native.ragQueryProto(
-    bytesToArrayBuffer(RAGQueryOptionsMessage.encode(queryOptions).finish())
+    encodeProtoMessage(queryOptions, RAGQueryOptionsMessage)
   );
   return decodeRequired(resultBytes, RAGResultMessage.decode, 'ragQueryProto');
 }

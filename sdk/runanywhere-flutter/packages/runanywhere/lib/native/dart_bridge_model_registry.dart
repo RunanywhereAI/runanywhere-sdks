@@ -33,6 +33,9 @@ class DartBridgeModelRegistry {
   static Pointer<Void>? _registryHandle;
   static bool _isInitialized = false;
 
+  /// Models registered before the global registry handle is wired (Phase 1 race).
+  static final List<model_pb.ModelInfo> _pendingProtoModels = [];
+
   /// Native global registry handle for other proto-byte bridge surfaces.
   Pointer<Void>? get nativeHandle => _registryHandle;
 
@@ -40,13 +43,16 @@ class DartBridgeModelRegistry {
   // Lifecycle
   // ============================================================================
 
-  /// Initialize the model registry
+  /// Wire the global C++ model registry handle (sync, Phase 1 safe).
   ///
   /// IMPORTANT: Uses the GLOBAL C++ model registry via rac_get_model_registry(),
   /// NOT rac_model_registry_create() which would create a separate instance.
   /// This matches Swift's CppBridge+ModelRegistry.swift behavior.
-  Future<void> initialize() async {
-    if (_isInitialized) return;
+  void ensureInitialized() {
+    if (_registryHandle != null) {
+      _isInitialized = true;
+      return;
+    }
 
     try {
       final lib = PlatformLoader.loadCommons();
@@ -63,12 +69,38 @@ class DartBridgeModelRegistry {
         _registryHandle = globalRegistry;
         _isInitialized = true;
         _logger.debug('Using global C++ model registry');
+        _flushPendingProtoModels();
       } else {
         _logger.error('Failed to get global model registry');
       }
     } catch (e) {
       _logger.debug('Model registry init error: $e');
       _isInitialized = true; // Avoid retry loops
+    }
+  }
+
+  /// Initialize the model registry (async alias for Phase 2).
+  Future<void> initialize() async {
+    ensureInitialized();
+  }
+
+  void _flushPendingProtoModels() {
+    if (_pendingProtoModels.isEmpty || _registryHandle == null) return;
+
+    final pending = List<model_pb.ModelInfo>.from(_pendingProtoModels);
+    _pendingProtoModels.clear();
+    for (final model in pending) {
+      final saved = _writeProtoModel(
+        model,
+        RacNative.bindings.rac_model_registry_register_proto,
+        'rac_model_registry_register_proto',
+      );
+      if (saved != true) {
+        _logger.warning('Deferred model save failed: ${model.id}');
+      }
+    }
+    if (pending.isNotEmpty) {
+      _logger.debug('Flushed ${pending.length} deferred proto models');
     }
   }
 
@@ -91,7 +123,14 @@ class DartBridgeModelRegistry {
   /// Save a generated proto ModelInfo to the C++ registry.
   Future<bool> saveProtoModel(model_pb.ModelInfo model) async {
     if (_registryHandle == null) {
-      _logger.debug('Registry not initialized, cannot save proto model');
+      ensureInitialized();
+    }
+    if (_registryHandle == null) {
+      _pendingProtoModels.add(model);
+      _logger.debug(
+        'Registry not ready; queued proto model ${model.id} '
+        '(pending=${_pendingProtoModels.length})',
+      );
       return false;
     }
 

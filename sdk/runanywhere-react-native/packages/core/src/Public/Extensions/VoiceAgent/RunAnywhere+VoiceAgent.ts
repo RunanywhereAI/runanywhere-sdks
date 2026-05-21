@@ -25,10 +25,8 @@ import {
 } from '@runanywhere/proto-ts/voice_events';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
-import {
-  arrayBufferToBytes,
-  bytesToArrayBuffer,
-} from '../../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 
@@ -83,10 +81,9 @@ export async function initializeVoiceAgent(
   const native = ensureNative();
   try {
     logger.info('Initializing voice agent...');
+    const composeConfig = buildVoiceAgentComposeConfig(config);
     const bytes = await native.voiceAgentInitializeProto(
-      bytesToArrayBuffer(
-        VoiceAgentComposeConfig.encode(buildVoiceAgentComposeConfig(config)).finish()
-      )
+      encodeProtoMessage(composeConfig, VoiceAgentComposeConfig)
     );
     const result = arrayBufferToBytes(bytes).byteLength > 0;
     if (result) {

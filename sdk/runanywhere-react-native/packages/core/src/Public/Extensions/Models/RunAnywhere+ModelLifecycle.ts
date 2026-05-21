@@ -31,7 +31,8 @@ import {
 import type {
   ComponentLifecycleSnapshot as ComponentLifecycleSnapshotMessage,
 } from '@runanywhere/proto-ts/sdk_events';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 export type {
   CurrentModelRequest,
@@ -57,9 +58,9 @@ export interface VLMResolvedLifecycleArtifacts {
 
 function encode<T>(
   message: T,
-  codec: { encode(value: T): { finish(): Uint8Array } }
+  codec: { encode(value: T, writer?: { finish(): Uint8Array }): { finish(): Uint8Array } }
 ): ArrayBuffer {
-  return bytesToArrayBuffer(codec.encode(message).finish());
+  return encodeProtoMessage(message, codec);
 }
 
 function decode<T>(
