@@ -62,7 +62,9 @@
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#if defined(RAC_HAVE_RAG)
 #include "rac/features/rag/rac_rag.h"
+#endif
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
@@ -647,6 +649,7 @@ class RetrieveNode final : public OperatorNode {
             reinterpret_cast<rac_handle_t>(static_cast<std::uintptr_t>(session_handle_id_));
 
         ProtoBufferGuard buffer;
+#if defined(RAC_HAVE_RAG)
         rac_result_t rc = rac_rag_query_proto(session, bytes.data(), bytes.size(), buffer.raw());
         if (rc != RAC_SUCCESS) {
             const char* msg = buffer.raw()->error_message;
@@ -655,6 +658,13 @@ class RetrieveNode final : public OperatorNode {
             cancel_graph(this->cancel_token());
             return;
         }
+#else
+        (void)session;
+        set_error_detail(name(),
+                         "Solutions RetrieveNode requires RAG backend; rebuild with -DRAC_BACKEND_RAG=ON");
+        cancel_graph(this->cancel_token());
+        return;
+#endif
 
         runanywhere::v1::RAGResult result;
         if (!result.ParseFromArray(buffer.data(), static_cast<int>(buffer.size()))) {

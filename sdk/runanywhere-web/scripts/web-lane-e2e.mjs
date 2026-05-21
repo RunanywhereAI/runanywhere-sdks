@@ -201,12 +201,23 @@ async function loadModelInSheet(page, modelName, modelId, timeoutMs = 180_000) {
   await page.waitForTimeout(1000);
 }
 
-async function runTc(id, fn) {
+async function runTc(id, fn, pageHolder) {
   try {
+    if (pageHolder) {
+      pageHolder.page = await ensureLivePage(pageHolder);
+    }
     await fn();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[${id}] failed:`, msg);
+    if (pageHolder?.page?.isClosed?.()) {
+      try {
+        pageHolder.page = await ensureLivePage(pageHolder);
+      } catch (recoverErr) {
+        const recoverMsg = recoverErr instanceof Error ? recoverErr.message : String(recoverErr);
+        console.error(`[${id}] page recovery failed:`, recoverMsg);
+      }
+    }
     recordCommand(id, 'FAIL', 1, 'logs/browser_console.jsonl');
     recordAction({
       action: id,
@@ -220,6 +231,26 @@ async function runTc(id, fn) {
     return false;
   }
   return true;
+}
+
+async function ensureLivePage(pageHolder) {
+  if (pageHolder.page && !pageHolder.page.isClosed()) {
+    return pageHolder.page;
+  }
+  if (pageHolder.context) {
+    await pageHolder.context.close().catch(() => {});
+  }
+  pageHolder.context = await pageHolder.browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    permissions: ['microphone', 'camera'],
+  });
+  pageHolder.page = await pageHolder.context.newPage();
+  pageHolder.page.on('console', (msg) => {
+    consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() });
+  });
+  await gotoFresh(pageHolder.page);
+  await waitInteractive(pageHolder.page);
+  return pageHolder.page;
 }
 
 async function downloadAndLoad(page, modelName, modelId, timeoutMs = 1_800_000) {
@@ -342,11 +373,13 @@ async function runExecutor() {
 
     // TC-03a — tab close persistence
     await context.close();
-    const context2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['microphone', 'camera'] });
-    const page2 = await context2.newPage();
-    page2.on('console', (msg) => consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() }));
+    const page2Holder = { browser, context: null, page: null };
+    page2Holder.context = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['microphone', 'camera'] });
+    page2Holder.page = await page2Holder.context.newPage();
+    page2Holder.page.on('console', (msg) => consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() }));
 
     await runTc('tc03a', async () => {
+      const page2 = page2Holder.page;
       await page2.goto(BASE_URL);
       await waitInteractive(page2);
       await clickTab(page2, 'Chat');
@@ -355,23 +388,26 @@ async function runExecutor() {
         .locator('[data-action="load"]').isVisible().catch(() => false);
       await snapshotTc(page2, 'tc03a', 'tab_reopen', stillDl ? 'PASS' : 'FAIL', 'model persisted after new context');
       await closeModelSheet(page2);
-    });
+    }, page2Holder);
 
     await runTc('tc16', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Storage');
       const afterKill = await page2.locator('#storage-model-list').innerText();
       await snapshotTc(page2, 'tc16', 'after_tab_close', afterKill.includes('SmolLM') ? 'PASS' : 'LIMITED', afterKill.slice(0, 150));
-    });
+    }, page2Holder);
 
     await runTc('tc03d', async () => {
+      const page2 = page2Holder.page;
       await clearSiteStorage(page2);
       await gotoFresh(page2);
       await clickTab(page2, 'Storage');
       const cleared = await page2.locator('#storage-model-list').innerText();
       await snapshotTc(page2, 'tc03d', 'clear_site_data', !cleared.includes('Loaded') ? 'PASS' : 'FAIL', cleared.slice(0, 150));
-    });
+    }, page2Holder);
 
     await runTc('tc03c', async () => {
+      const page2 = page2Holder.page;
       await clearSiteStorage(page2);
       await gotoFresh(page2);
       await openModelSheet(page2);
@@ -379,37 +415,42 @@ async function runExecutor() {
         .locator('[data-action="download"]').isVisible().catch(() => false);
       await snapshotTc(page2, 'tc03c', 'fresh_origin', needDl ? 'PASS' : 'FAIL', 'models gone after clear');
       await closeModelSheet(page2);
-    });
+    }, page2Holder);
 
     await runTc('tc02_redownload', async () => {
+      const page2 = page2Holder.page;
       await downloadAndLoad(page2, LLM_MODEL, LLM_MODEL_ID, 900_000);
       llmLoaded = await page2.evaluate((id) => {
         try { return window.__RUNANYWHERE_SDK__?.currentModel?.()?.modelId === id; }
         catch { return false; }
       }, LLM_MODEL_ID);
-    });
+    }, page2Holder);
 
     // TC-07 / TC-10 — Transcribe
     await runTc('tc10', async () => {
+      const page2 = page2Holder.page;
       await registerOnnx(page2);
       await clickTab(page2, 'Transcribe');
       await snapshotTc(page2, 'tc10', 'transcribe_ui', 'PASS', 'transcribe tab rendered');
-    });
+    }, page2Holder);
     await runTc('tc07', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Transcribe');
       await page2.locator('#transcribe-model-btn').click();
       await downloadAndLoad(page2, STT_MODEL, STT_MODEL_ID, 600_000);
       await clickTab(page2, 'Transcribe');
       const sttReady = await page2.locator('#mic-toggle-btn').isEnabled().catch(() => false);
       await snapshotTc(page2, 'tc07', 'stt_ready', sttReady ? 'PASS' : 'BLOCKED', 'STT model loaded; mic path needs audio fixture');
-    });
+    }, page2Holder);
 
     // TC-08 / TC-11 — Speak
     await runTc('tc11', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Speak');
       await snapshotTc(page2, 'tc11', 'speak_ui', 'PASS', 'speak tab rendered');
-    });
+    }, page2Holder);
     await runTc('tc08', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Speak');
       await page2.locator('#speak-model-btn').click();
       await downloadAndLoad(page2, TTS_MODEL, TTS_MODEL_ID, 600_000);
@@ -426,10 +467,11 @@ async function runExecutor() {
       }
       const speakStatus = await page2.locator('#speak-status').innerText().catch(() => '');
       await snapshotTc(page2, 'tc08', 'tts', speakStatus.includes('Last synthesis') ? 'PASS' : 'LIMITED', speakStatus.slice(0, 120));
-    });
+    }, page2Holder);
 
     // TC-09 — VLM
     await runTc('tc09', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Vision');
       await page2.locator('#vision-model-btn').click();
       await downloadAndLoad(page2, VLM_MODEL, VLM_MODEL_ID, 900_000);
@@ -448,10 +490,11 @@ async function runExecutor() {
       ).catch(() => {});
       const vlmOut = await page2.locator('#vision-output').innerText().catch(() => '');
       await snapshotTc(page2, 'tc09', 'vlm', vlmOut.length > 20 ? 'PASS' : 'LIMITED', vlmOut.slice(0, 120));
-    });
+    }, page2Holder);
 
     // TC-13 — RAG
     await runTc('tc13', async () => {
+    const page2 = page2Holder.page;
     const ragFixture = path.join(REPO_ROOT, 'test_workflows/fixtures/rag-sample.txt');
     if (!fs.existsSync(ragFixture)) {
       fs.mkdirSync(path.dirname(ragFixture), { recursive: true });
@@ -470,33 +513,37 @@ async function runExecutor() {
     ).catch(() => {});
     const ragAns = await page2.locator('#docs-answer').innerText().catch(() => '');
     await snapshotTc(page2, 'tc13', 'rag', ragAns.toLowerCase().includes('c++') ? 'PASS' : 'LIMITED', ragAns.slice(0, 120));
-    });
+    }, page2Holder);
 
     await runTc('tc12', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Voice');
       const voiceText = await page2.locator('#tab-voice').innerText();
       await snapshotTc(page2, 'tc12', 'voice', 'LIMITED', voiceText.slice(0, 120));
-    });
+    }, page2Holder);
 
     await runTc('tc14', async () => {
+      const page2 = page2Holder.page;
       const tools = await page2.evaluate(() => {
         const sdk = window.__RUNANYWHERE_SDK__;
         if (!sdk?.toolCalling) return { ok: false };
         return { ok: sdk.toolCalling.supportsProtoToolCalling?.() ?? false };
       });
       await snapshotTc(page2, 'tc14', 'tool_api', tools.ok ? 'LIMITED' : 'N/A', 'SDK tool API probed; no Settings tool UI');
-    });
+    }, page2Holder);
 
     await runTc('tc17', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Solutions');
       await snapshotTc(page2, 'tc17', 'solutions', 'N/A', 'DEFERRED per catalog');
-    });
+    }, page2Holder);
 
     await runTc('tc20', async () => {
+      const page2 = page2Holder.page;
       await clickTab(page2, 'Settings');
       const settingsOk = await page2.locator('.settings-section-title').filter({ hasText: 'Generation' }).isVisible();
       await snapshotTc(page2, 'tc20', 'settings', settingsOk ? 'PASS' : 'FAIL', 'generation settings visible');
-    });
+    }, page2Holder);
 
     // TC-06, TC-18, TC-19, TC-21 N/A
     for (const [id, note] of [
@@ -519,7 +566,7 @@ async function runExecutor() {
     recordCommand('tc_load_oom', 'LIMITED', 0, 'logs/browser_console.jsonl');
     recordAction({ action: 'tc_load_oom', status: 'LIMITED', expected: 'OOM handling', actual: 'Not exercised on this host', phase: 'model_load', notes: 'LIMITED' });
 
-    await context2.close();
+    await page2Holder.context?.close().catch(() => {});
   } finally {
     fs.writeFileSync(CONSOLE_LOG, consoleEntries.map((e) => JSON.stringify(e)).join('\n'));
     fs.writeFileSync(NETWORK_LOG, networkEntries.map((e) => JSON.stringify(e)).join('\n'));

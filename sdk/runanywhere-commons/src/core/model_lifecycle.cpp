@@ -25,6 +25,7 @@
 #include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/rac_model_lifecycle.h"
+#include "rac/core/rac_logger.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -1730,6 +1731,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY, request.model_id(),
                             &result, nullptr, nullptr);
+    RAC_LOG_INFO("ModelLifecycle", "Model load succeeded for %s", request.model_id().c_str());
     return copy_proto(result, out_result);
 #endif
 }

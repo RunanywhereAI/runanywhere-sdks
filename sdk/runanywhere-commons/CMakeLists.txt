@@ -977,6 +977,9 @@ if(EMSCRIPTEN)
     # the header is visible and the runtime function is exported.
     target_compile_options(rac_commons PUBLIC "-sFETCH=1")
     target_link_options(rac_commons PUBLIC "-sFETCH=1")
+    # libarchive gzip filter reads tar.gz without spawning `gzip -d` (unavailable in WASM).
+    target_compile_options(rac_commons PUBLIC "-sUSE_ZLIB=1")
+    target_link_options(rac_commons PUBLIC "-sUSE_ZLIB=1")
 endif()
 
 # =============================================================================
@@ -1272,6 +1275,11 @@ if(RAC_ENABLE_SOLUTIONS)
         message(FATAL_ERROR
             "RAC_ENABLE_SOLUTIONS=ON requires RAC_ENABLE_PROTOBUF=ON and a working protobuf runtime.")
     endif()
+    if(NOT RAC_BACKEND_RAG)
+        message(WARNING
+            "RAC_ENABLE_SOLUTIONS=ON with RAC_BACKEND_RAG=OFF: Solutions RetrieveNode RAG "
+            "operations return RAC_ERROR_FEATURE_NOT_AVAILABLE at runtime.")
+    endif()
     message(STATUS "RAC_ENABLE_SOLUTIONS=ON — building full Solutions API")
     target_sources(rac_commons PRIVATE
         src/solutions/operator_registry.cpp
@@ -1420,6 +1428,7 @@ if(RAC_BACKEND_RAG
     if(APPLE)
         target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
     endif()
+    target_compile_definitions(rac_commons PRIVATE RAC_HAVE_RAG=1)
 endif()
 
 # =============================================================================

@@ -1025,6 +1025,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
         if (update_rc == RAC_SUCCESS) {
             RAC_LOG_INFO(LOG_TAG, "Registry self-heal: marked '%s' downloaded with local_path '%s'",
                          task->model_id.c_str(), completion_local_path.c_str());
+            RAC_LOG_INFO(LOG_TAG, "Registered downloaded model %s", task->model_id.c_str());
         } else {
             RAC_LOG_WARNING(LOG_TAG,
                             "Registry self-heal failed for '%s' (rc=%d); SDK fallback may apply",

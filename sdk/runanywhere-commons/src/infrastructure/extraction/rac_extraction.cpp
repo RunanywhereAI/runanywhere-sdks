@@ -302,7 +302,15 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 
     // Enable all supported formats and filters for auto-detection
     archive_read_support_format_all(a);
+#ifdef __EMSCRIPTEN__
+    // Emscripten has no gzip subprocess; register built-in gzip filter explicitly.
+    archive_read_support_filter_none(a);
+    archive_read_support_filter_gzip(a);
+    archive_read_support_filter_bzip2(a);
+    archive_read_support_filter_xz(a);
+#else
     archive_read_support_filter_all(a);
+#endif
 
     // Open the archive file with 10KB block size (streaming)
     int r = archive_read_open_filename(a, archive_path, 10240);

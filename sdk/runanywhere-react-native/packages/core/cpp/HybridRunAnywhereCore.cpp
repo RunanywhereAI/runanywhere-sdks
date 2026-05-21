@@ -212,40 +212,56 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         {
             rac_assignment_callbacks_t callbacks = {};
 
-            // HTTP GET callback - uses HTTPBridge for network requests
-            callbacks.http_get = [](const char* endpoint, rac_bool_t requires_auth,
-                                    rac_assignment_http_response_t* out_response, void* user_data) -> rac_result_t {
+            // HTTP GET callback — routes through the registered native HTTP transport
+            callbacks.http_get = [baseURL, apiKey](const char* endpoint, rac_bool_t requires_auth,
+                                    rac_assignment_http_response_t* out_response, void* /*user_data*/) -> rac_result_t {
                 if (!out_response) return RAC_ERROR_NULL_POINTER;
 
                 try {
                     std::string endpointStr = endpoint ? endpoint : "";
                     LOGD("Model assignment HTTP GET: %s", endpointStr.c_str());
 
-                    // Use HTTPBridge::execute which calls the registered JS executor
-                    auto responseOpt = HTTPBridge::shared().execute("GET", endpointStr, "", requires_auth == RAC_TRUE);
-
-                    if (!responseOpt.has_value()) {
-                        LOGE("HTTP executor not registered");
-                        out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
-                        out_response->error_message = strdup("HTTP executor not registered");
-                        return RAC_ERROR_HTTP_REQUEST_FAILED;
-                    }
-
-                    const auto& response = responseOpt.value();
-                    if (response.success && !response.body.empty()) {
-                        out_response->result = RAC_SUCCESS;
-                        out_response->status_code = response.statusCode;
-                        out_response->response_body = strdup(response.body.c_str());
-                        out_response->response_length = response.body.length();
-                        return RAC_SUCCESS;
-                    } else {
-                        out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
-                        out_response->status_code = response.statusCode;
-                        if (!response.error.empty()) {
-                            out_response->error_message = strdup(response.error.c_str());
+                    std::string url = endpointStr;
+                    if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) {
+                        if (HTTPBridge::shared().isConfigured()) {
+                            url = HTTPBridge::shared().buildURL(endpointStr);
+                        } else if (!baseURL.empty()) {
+                            url = baseURL;
+                            if (!url.empty() && url.back() == '/') {
+                                url.pop_back();
+                            }
+                            if (!endpointStr.empty() && endpointStr.front() != '/') {
+                                url += '/';
+                            }
+                            url += endpointStr;
                         }
-                        return RAC_ERROR_HTTP_REQUEST_FAILED;
                     }
+
+                    std::vector<std::pair<std::string, std::string>> headers;
+                    if (requires_auth == RAC_TRUE) {
+                        if (auto token = HTTPBridge::shared().getAuthorizationToken()) {
+                            headers.emplace_back("Authorization", "Bearer " + *token);
+                        } else if (!apiKey.empty()) {
+                            headers.emplace_back("Authorization", "Bearer " + apiKey);
+                        }
+                    }
+
+                    const auto nativeResult = performNativeHttpRequest("GET", url, headers, "", 30000);
+                    if (nativeResult.status >= 200 && nativeResult.status < 300 && !nativeResult.body.empty()) {
+                        out_response->result = RAC_SUCCESS;
+                        out_response->status_code = nativeResult.status;
+                        out_response->response_body = strdup(nativeResult.body.c_str());
+                        out_response->response_length = nativeResult.body.length();
+                        return RAC_SUCCESS;
+                    }
+
+                    out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                    out_response->status_code = nativeResult.status;
+                    const std::string errorMsg = nativeResult.body.empty()
+                        ? "HTTP request failed"
+                        : ("HTTP " + std::to_string(nativeResult.status));
+                    out_response->error_message = strdup(errorMsg.c_str());
+                    return RAC_ERROR_HTTP_REQUEST_FAILED;
                 } catch (const std::exception& e) {
                     LOGE("Model assignment HTTP GET failed: %s", e.what());
                     out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;

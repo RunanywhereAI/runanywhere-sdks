@@ -58,6 +58,7 @@ sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RAG/RunAnywhere
 # ============================================================================
 sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts
 sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
+sdk/runanywhere-web/packages/core/tests/unit/Public/Extensions/RunAnywhere+ToolCalling.test.ts
 sdk/runanywhere-web/packages/onnx/src/Foundation/StandaloneSherpaStt.ts
 
 # Web SDK — hand-written TypeScript type files

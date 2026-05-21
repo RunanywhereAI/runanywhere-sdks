@@ -1,11 +1,13 @@
 import type {
   CurrentModelRequest,
   CurrentModelResult,
+  ModelInfo,
   ModelLoadRequest,
   ModelLoadResult,
   ModelUnloadRequest,
   ModelUnloadResult,
 } from '@runanywhere/proto-ts/model_types';
+import { InferenceFramework, ModelFileRole } from '@runanywhere/proto-ts/model_types';
 import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
@@ -45,6 +47,41 @@ function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
   return adapter;
 }
 
+const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
+  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
+  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
+  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
+  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
+  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
+};
+
+function primaryFilenameFromModel(model: ModelInfo): string | null {
+  const primary = model.multiFile?.files?.find(
+    (file) => file.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+  ) ?? model.multiFile?.files?.[0];
+  if (primary?.filename) return primary.filename;
+  const trailing = (model.downloadUrl ?? '').split('?')[0].split('/').pop() ?? '';
+  return trailing.length > 0 ? trailing : null;
+}
+
+async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null> {
+  if (model.localPath) return model.localPath;
+
+  const frameworkDir = FRAMEWORK_OPFS_DIR[model.framework as InferenceFramework];
+  if (!frameworkDir) return null;
+
+  const filename = primaryFilenameFromModel(model);
+  if (!filename) return null;
+
+  const opfsPath = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}/${filename}`;
+  if (!(await OPFSBridge.exists(opfsPath))) return null;
+
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  return isMultiFile
+    ? `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`
+    : opfsPath;
+}
+
 export const ModelLifecycle = {
   supportsNativeLifecycle(): boolean {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
@@ -56,7 +93,14 @@ export const ModelLifecycle = {
   },
 
   async loadModelAsync(request: ModelLoadRequest): Promise<ModelLoadResult | null> {
-    const modelSnapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
+    let modelSnapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
+    if (modelSnapshot && !modelSnapshot.localPath) {
+      const resolvedPath = await resolveLocalPathFromOpfs(modelSnapshot);
+      if (resolvedPath) {
+        modelSnapshot = { ...modelSnapshot, localPath: resolvedPath, isDownloaded: true };
+        ModelRegistry.registerModel(modelSnapshot);
+      }
+    }
     await prepareModelLoad({ request, model: modelSnapshot });
     if (modelSnapshot) {
       ModelRegistry.registerModel(modelSnapshot);
