@@ -44,26 +44,65 @@ _kotlin_ui_lock_file() {
   printf '/tmp/rac_kotlin_uiautomator_%s.lock' "${safe_serial}"
 }
 
-_kotlin_adb_shell() {
+_kotlin_timeout_cmd() {
+  local secs="$1"
+  shift
   if command -v timeout >/dev/null 2>&1; then
-    timeout 35 adb -s "${RAC_ANDROID_SERIAL}" shell "$@"
+    timeout "${secs}" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "${secs}" "$@"
   else
-    adb -s "${RAC_ANDROID_SERIAL}" shell "$@"
+    "$@"
   fi
+}
+
+_kotlin_adb() {
+  _kotlin_timeout_cmd 35 adb -s "${RAC_ANDROID_SERIAL}" "$@"
+}
+
+_kotlin_adb_shell() {
+  _kotlin_adb shell "$@"
+}
+
+_kotlin_release_ui_lock() {
+  local lock_dir="$1"
+  [[ -n "${lock_dir}" ]] && rmdir "${lock_dir}" 2>/dev/null || true
+}
+
+_kotlin_acquire_ui_lock() {
+  local lock_dir lock_wait=0 lock_mtime lock_age now
+  lock_dir="$(_kotlin_ui_lock_file).d"
+  if [[ -d "${lock_dir}" ]]; then
+    lock_mtime="$(stat -f '%m' "${lock_dir}" 2>/dev/null || echo 0)"
+    now="$(date +%s)"
+    lock_age=$((now - lock_mtime))
+    if [[ "${lock_age}" -gt 90 ]]; then
+      _kotlin_release_ui_lock "${lock_dir}"
+    fi
+  fi
+  while ! mkdir "${lock_dir}" 2>/dev/null; do
+    lock_wait=$((lock_wait + 1))
+    [[ "${lock_wait}" -ge 45 ]] && return 1
+    sleep 1
+  done
+  printf '%s' "${lock_dir}"
+  return 0
 }
 
 _kotlin_pull_ui_xml() {
   local dest="$1"
-  local lock_dir lock_wait=0
-  lock_dir="$(_kotlin_ui_lock_file).d"
-  while ! mkdir "${lock_dir}" 2>/dev/null; do
-    lock_wait=$((lock_wait + 1))
-    [[ "${lock_wait}" -ge 60 ]] && return 1
-    sleep 1
-  done
-  _kotlin_adb_shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1     && adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${dest}" >/dev/null 2>&1
-  local rc=$?
-  rmdir "${lock_dir}" 2>/dev/null || true
+  local lock_dir=""
+  lock_dir="$(_kotlin_acquire_ui_lock)" || return 1
+  trap '_kotlin_release_ui_lock "${lock_dir}"' RETURN
+  local rc=1
+  if _kotlin_adb_shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; then
+    if _kotlin_adb pull /sdcard/ui.xml "${dest}" >/dev/null 2>&1; then
+      rc=0
+    fi
+  fi
+  _kotlin_release_ui_lock "${lock_dir}"
+  lock_dir=""
+  trap - RETURN
   return "${rc}"
 }
 
@@ -158,7 +197,8 @@ _kotlin_vlm_description_text() {
     rm -f "${tmp}"
     return 1
   fi
-  python3 - "${tmp}" <<'PY'
+  local rc=1
+  python3 - "${tmp}" <<'PY' && rc=0 || rc=1
 import sys
 import xml.etree.ElementTree as ET
 
@@ -188,7 +228,6 @@ for node in root.iter("node"):
     raise SystemExit(0)
 raise SystemExit(1)
 PY
-  local rc=$?
   rm -f "${tmp}"
   return "${rc}"
 }
@@ -302,7 +341,7 @@ _kotlin_tap_on_screen() {
     rm -f "${tmp}"
     return 1
   fi
-  local bounds
+  local bounds=""
   bounds="$(python3 - "${label}" "${tmp}" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
@@ -322,8 +361,10 @@ for node in root.iter("node"):
     if b:
         print(b)
         break
+else:
+    raise SystemExit(1)
 PY
-)"
+)" || bounds=""
   rm -f "${tmp}"
   [[ -z "${bounds}" ]] && return 1
   local x1 y1 x2 y2
@@ -805,17 +846,39 @@ _kotlin_tc_deferred_na() {
 # ---------------------------------------------------------------------------
 # Entry: modality catalog after TC-01 (assumes LLM download/load may already exist)
 # ---------------------------------------------------------------------------
+_kotlin_modality_tc_recorded() {
+  local tc="$1"
+  awk -F'\t' -v tc="${tc}" 'NR > 1 && $1 == tc { found = 1 } END { exit(found ? 0 : 1) }' \
+    "${RAC_SESSION_ROOT}/modality_results.tsv" 2>/dev/null
+}
+
+_kotlin_run_catalog_tc() {
+  local tc="$1"
+  local fn="$2"
+  set +e
+  "${fn}"
+  local rc=$?
+  set -e
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "WARN: ${tc} flow exited ${rc}; recording harness abort" >&2
+    if ! _kotlin_modality_tc_recorded "${tc}"; then
+      rac_tc_done "${tc}" "FAIL" "executor aborted during ${tc} (exit ${rc})" ""
+    fi
+  fi
+  return 0
+}
+
 _kotlin_drive_modality_catalog() {
   echo "Kotlin modality catalog: TC-06..TC-21 (keyframes 007–014)"
-  _kotlin_tc06_vad
-  _kotlin_tc07_stt
-  _kotlin_tc08_tts
-  _kotlin_tc09_vlm
-  _kotlin_tc12_voice
-  _kotlin_tc13_rag
-  _kotlin_tc14_tools
-  _kotlin_tc20_settings
-  _kotlin_tc21_lora
-  _kotlin_tc_deferred_na
+  _kotlin_run_catalog_tc tc06 _kotlin_tc06_vad
+  _kotlin_run_catalog_tc tc07 _kotlin_tc07_stt
+  _kotlin_run_catalog_tc tc08 _kotlin_tc08_tts
+  _kotlin_run_catalog_tc tc09 _kotlin_tc09_vlm
+  _kotlin_run_catalog_tc tc12 _kotlin_tc12_voice
+  _kotlin_run_catalog_tc tc13 _kotlin_tc13_rag
+  _kotlin_run_catalog_tc tc14 _kotlin_tc14_tools
+  _kotlin_run_catalog_tc tc20 _kotlin_tc20_settings
+  _kotlin_run_catalog_tc tc21 _kotlin_tc21_lora
+  _kotlin_run_catalog_tc tc17 _kotlin_tc_deferred_na
   echo "Kotlin modality catalog: complete"
 }
