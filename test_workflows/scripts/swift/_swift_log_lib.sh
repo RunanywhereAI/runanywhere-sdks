@@ -144,6 +144,10 @@ _swift_tc07_evidence() {
     printf '%s\n' "limited:screenshot_only"
     return 0
   fi
+  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
+    printf '%s\n' "limited:stt_sheet_reached_no_logs"
+    return 0
+  fi
   return 1
 }
 
@@ -153,6 +157,8 @@ _swift_tc07_status_from_evidence() {
     pass:executor_pass)
       printf '%s\t%s\n' "PASS" "transcribe surface (executor/actions)" ;;
     pass:*) printf '%s\t%s\n' "PASS" "${evidence#pass:}" ;;
+    limited:stt_sheet_reached_no_logs)
+      printf '%s\t%s\n' "BLOCKED" "reached STT model sheet; no download/load markers (SWIFT-IOS-001)" ;;
     limited:download_error_surfaced)
       printf '%s\t%s\n' "BLOCKED" "download error surfaced in logs (CLUSTER-08 evidence)"
       ;;

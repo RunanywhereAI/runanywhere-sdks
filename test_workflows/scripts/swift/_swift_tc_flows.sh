@@ -35,6 +35,16 @@ _swift_stt_outcome_reached() {
     "Download failed for"
 }
 
+
+_swift_tap_stt_get_button() {
+  local y
+  for y in 220 260 300 340 380; do
+    _swift_tap_xy_logical 350 "${y}" || true
+    sleep 0.25
+  done
+  _swift_tap_raw "Get" || _swift_tap_raw "71.5 MB" || true
+}
+
 _swift_drive_stt_download() {
   local lane_root="${RAC_SESSION_ROOT:?}"
   local wait_s="${RAC_STT_DOWNLOAD_WAIT_S:-180}"
@@ -50,7 +60,7 @@ _swift_drive_stt_download() {
 
   _swift_tap_raw "Sherpa Whisper Tiny" || _swift_tap_raw "Whisper" || true
   sleep 0.5
-  _swift_tap_raw "Get" || _swift_tap_raw "71.5 MB" || true
+  _swift_tap_stt_get_button
 
   while [[ "${elapsed}" -lt "${wait_s}" ]]; do
     if _swift_stt_outcome_reached; then
@@ -59,7 +69,7 @@ _swift_drive_stt_download() {
     sleep 5
     elapsed=$((elapsed + 5))
     if (( elapsed % 30 == 0 )); then
-      _swift_tap_raw "Get" || _swift_tap_raw "71.5 MB" || true
+      _swift_tap_stt_get_button
     fi
   done
 
