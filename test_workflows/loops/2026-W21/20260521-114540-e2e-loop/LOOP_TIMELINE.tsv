@@ -92,4 +92,4 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T13:34:42-07:00	PHASE_START	orchestrator	phase8_fix_round2
 2026-05-21T13:40:00-07:00	1	phase8_fix_round2	fix-agent-cluster-01b	AGENT_SPAWN	OK	CLUSTER-01b	WEB-001 isDownloaded registry mirror post OPFS persist
 2026-05-21T13:42:00-07:00	1	phase8_fix_round2	fix-agent-cluster-01b	AGENT_DONE	OK	CLUSTER-01b	mirrorDownloadCompletionToRegistry registerModel broadcast isDownloaded
-2026-05-21T13:42:00-07:00	1	phase8_fix_round2	orchestrator	COMMIT	OK	2c43ac808	CLUSTER-01b/WEB-001	Mirror download completion into TS registry immediately
+2026-05-21T13:42:00-07:00	1	phase8_fix_round2	orchestrator	COMMIT	OK	ee8663e0e	CLUSTER-01b/WEB-001	Mirror download completion into TS registry immediately
