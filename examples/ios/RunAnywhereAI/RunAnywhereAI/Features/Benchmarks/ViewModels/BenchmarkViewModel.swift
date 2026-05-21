@@ -64,7 +64,7 @@ final class BenchmarkViewModel {
             var grouped: [BenchmarkCategory: [RAModelInfo]] = [:]
             for category in BenchmarkCategory.allCases {
                 let models = allModels.filter {
-                    $0.category == category.modelCategory && $0.isDownloaded && !$0.isBuiltIn
+                    $0.category == category.modelCategory && $0.isDownloadedOnDisk && !$0.isBuiltIn
                 }
                 if !models.isEmpty {
                     grouped[category] = models
@@ -111,9 +111,10 @@ final class BenchmarkViewModel {
             var run = BenchmarkRun(deviceInfo: deviceInfo)
 
             do {
+                let modelIds = selectedModelIds.isEmpty ? nil : selectedModelIds
                 let output = try await runner.runBenchmarks(
                     categories: selectedCategories,
-                    modelIds: selectedModelIds
+                    modelIds: modelIds
                 ) { [weak self] update in
                     Task { @MainActor in
                         self?.progress = update.progress

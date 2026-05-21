@@ -57,16 +57,17 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:28:00-07:00	1	phase5_synthesize	investigator-preflight	AGENT_SPAWN	OK	20260521-115414-matrix	iter=1 read-only §7.7
 2026-05-21T12:29:00-07:00	1	phase5_synthesize	investigator-preflight	AGENT_DONE	OK	20260521-115414-matrix	preflight_FAIL=0 issues=2 P2=2 baseline=TRUSTED FINDINGS.md written
 2026-05-21T14:50:00-07:00	1	phase7_fix	fix-agent-cluster-02	AGENT_SPAWN	OK	WEB-HARNESS-001	CLUSTER-02 web-lane-e2e browser recovery
-2026-05-21T14:55:00-07:00	1	phase7_fix	fix-agent-cluster-02	AGENT_DONE	OK	WEB-HARNESS-001	harness recovery + failureKind in actions.jsonl
+2026-05-21T14:55:00-07:00	1	phase7_fix	fix-agent-cluster-02	AGENT_DONE	OK	3c79158c5	harness recovery + failureKind (bundled w/ CLUSTER-03)
 2026-05-21T12:44:35-07:00	1	phase7_plan	plan-writer-iter01	AGENT_SPAWN	OK	20260521-115414-matrix	writing iter-01-remediation.md
 2026-05-21T12:46:00-07:00	1	phase7_plan	plan-writer-iter01	AGENT_DONE	OK	iter-01-remediation.md	issues=20 clusters=12 APPROVED-BY-LOOP sha=ea78337ac
 2026-05-21T12:44:35-07:00	AGENT_SPAWN	orchestrator	phase8: plan-writer + CLUSTER-01,02,03,05,06,07,08,09
 2026-05-21T12:45:07-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_SPAWN	OK	CLUSTER-09	SWIFT-IOS-002 benchmark preflight disk discovery
-2026-05-21T12:45:30-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_DONE	OK	df6fe78a4	BenchmarkRunner isDownloadedOnDisk + zero-work-item errors
-2026-05-21T12:45:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	df6fe78a4	CLUSTER-09/SWIFT-IOS-002
+2026-05-21T12:52:12-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_DONE	OK	3a790b275	BenchmarkRunner isDownloadedOnDisk + zero-work-item errors
+2026-05-21T12:52:12-07:00	1	phase8_fix	orchestrator	COMMIT	OK	3a790b275	CLUSTER-09/SWIFT-IOS-002
 2026-05-21T12:46:00-07:00	1	phase8_fix	fix-agent-cluster-01	AGENT_SPAWN	OK	CLUSTER-01	WEB-001/002/003 OPFS flush gate
 2026-05-21T12:47:00-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_SPAWN	OK	CLUSTER-03	WEB-HARNESS-002 post-hydrate UI assertions
 2026-05-21T12:47:30-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_DONE	OK	WEB-HARNESS-002	waitForOpfsHydration + registry-first tc03a/tc_storage_opfs
+2026-05-21T12:47:20-07:00	1	phase8_fix	orchestrator	COMMIT	OK	3c79158c5	CLUSTER-03/WEB-HARNESS-002 post-hydrate UI assertions
 2026-05-21T15:05:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_SPAWN	OK	CLUSTER-07	KOTLIN-HARNESS-001 modality executor flows
 2026-05-21T15:10:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_DONE	OK	KOTLIN-HARNESS-001	keyframes 007-014 TTS wait RAG/tools/LoRA/settings
 2026-05-21T12:50:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_SPAWN	OK	CLUSTER-06	KOTLIN-AND-002 STT catalog audio fixture injection

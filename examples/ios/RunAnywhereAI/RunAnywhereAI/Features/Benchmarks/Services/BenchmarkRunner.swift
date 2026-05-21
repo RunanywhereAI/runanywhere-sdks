@@ -23,6 +23,7 @@ protocol BenchmarkScenarioProvider: Sendable {
 
 enum BenchmarkRunnerError: LocalizedError {
     case noModelsAvailable(skippedCategories: [BenchmarkCategory])
+    case noWorkItems(skippedCategories: [BenchmarkCategory])
     case fetchModelsFailed(underlying: Error)
 
     var errorDescription: String? {
@@ -30,6 +31,12 @@ enum BenchmarkRunnerError: LocalizedError {
         case .noModelsAvailable(let skipped):
             let names = skipped.map(\.displayName).joined(separator: ", ")
             return "No downloaded models found for: \(names). Download models first from the Models tab."
+        case .noWorkItems(let skipped):
+            if skipped.isEmpty {
+                return "No benchmarks to run. Select at least one downloaded model and try again."
+            }
+            let names = skipped.map(\.displayName).joined(separator: ", ")
+            return "No benchmarks to run. Missing on-disk models for: \(names). Download models first from the Models tab."
         case .fetchModelsFailed(let error):
             return "Failed to fetch available models: \(error.localizedDescription)"
         }
@@ -98,9 +105,7 @@ final class BenchmarkRunner {
                 skipped.append(category)
                 continue
             }
-            let models = allModels.filter {
-                $0.category == category.modelCategory && $0.isDownloaded && !$0.isBuiltIn
-            }
+            let models = Self.downloadedModels(for: category, in: allModels)
             if models.isEmpty {
                 skipped.append(category)
             } else {
@@ -132,7 +137,7 @@ final class BenchmarkRunner {
         let preflight = try await preflight(categories: categories)
 
         // If nothing to run, throw a descriptive error
-        if preflight.availableCategories.isEmpty {
+        if preflight.availableCategories.isEmpty || preflight.totalWorkItems == 0 {
             throw BenchmarkRunnerError.noModelsAvailable(
                 skippedCategories: preflight.skippedCategories
             )
@@ -143,6 +148,12 @@ final class BenchmarkRunner {
             modelIds: modelIds,
             preflight: preflight
         )
+
+        guard !workItems.isEmpty else {
+            throw BenchmarkRunnerError.noWorkItems(
+                skippedCategories: preflight.skippedCategories
+            )
+        }
 
         let total = workItems.count
         var results: [BenchmarkResult] = []
@@ -206,7 +217,7 @@ final class BenchmarkRunner {
             guard let provider = providers[category],
                   let models = preflight.availableCategories[category] else { continue }
             let filteredModels: [RAModelInfo]
-            if let modelIds {
+            if let modelIds, !modelIds.isEmpty {
                 filteredModels = models.filter { modelIds.contains($0.id) }
             } else {
                 filteredModels = models
@@ -223,5 +234,15 @@ final class BenchmarkRunner {
             }
         }
         return workItems
+    }
+
+    /// Models whose artifacts exist on disk (registry `isDownloaded` may be stale).
+    private static func downloadedModels(
+        for category: BenchmarkCategory,
+        in allModels: [RAModelInfo]
+    ) -> [RAModelInfo] {
+        allModels.filter {
+            $0.category == category.modelCategory && $0.isDownloadedOnDisk && !$0.isBuiltIn
+        }
     }
 }

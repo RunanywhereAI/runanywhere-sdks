@@ -1,8 +1,8 @@
 iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_status	build_status	notes
 2026-05-21T11:52:00-07:00	0	preflight	PREFLIGHT-001	eb893722a	469	OK	OK	OK	pre-commit + flutter pubspec
 2026-05-21T11:54:00-07:00	0	preflight	PREFLIGHT-002	ea78337ac	1	OK	OK	OK	remove pubspec.bak
-2026-05-21T14:55:00-07:00	1	CLUSTER-02	WEB-HARNESS-001	PENDING	1	OK	OK	OK	web-lane-e2e browser recovery + failureKind
-2026-05-21T12:45:07-07:00	1	CLUSTER-09	SWIFT-IOS-002	df6fe78a4	4	OK	OK	SKIP	benchmark preflight isDownloadedOnDisk
-2026-05-21T12:47:30-07:00	1	CLUSTER-03	WEB-HARNESS-002	PENDING	1	OK	OK	OK	waitForOpfsHydration registry-first tc03a tc_storage_opfs
+2026-05-21T14:55:00-07:00	1	CLUSTER-02	WEB-HARNESS-001	3c79158c5	1	OK	OK	OK	browser recovery failureKind retry registry localPath
+2026-05-21T12:52:12-07:00	1	CLUSTER-09	SWIFT-IOS-002	3a790b275	4	OK	OK	SKIP	benchmark preflight isDownloadedOnDisk
+2026-05-21T12:47:30-07:00	1	CLUSTER-03	WEB-HARNESS-002	3c79158c5	1	OK	OK	OK	waitForOpfsHydration registry-first tc03a tc_storage_opfs
 2026-05-21T15:10:00-07:00	1	CLUSTER-07	KOTLIN-HARNESS-001	PENDING	4	OK	OK	SKIP	keyframes 007-014 modality executor + sub-prompt
 2026-05-21T12:51:00-07:00	1	CLUSTER-06	KOTLIN-AND-002	PENDING	3	OK	OK	SKIP	stt-phrase.wav inject-stt-audio tc07 keyword check
