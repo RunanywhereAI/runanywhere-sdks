@@ -121,6 +121,12 @@ _swift_tc07_evidence() {
     printf '%s\n' "limited:stt_ui_ready_log"
     return 0
   fi
+
+  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
+    printf '%s\n' "limited:stt_sheet_reached_no_logs"
+    return 0
+  fi
+
   local action_status action_notes
   if action_status="$(_swift_actions_tc_field tc07 status)"; then
     action_notes="$(_swift_actions_tc_field tc07 notes 2>/dev/null || _swift_actions_tc_field tc07 actual 2>/dev/null || true)"
@@ -134,10 +140,6 @@ _swift_tc07_evidence() {
     esac
   fi
 
-  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
-    printf '%s\n' "limited:stt_sheet_reached_no_logs"
-    return 0
-  fi
   local shot="${RAC_SESSION_ROOT:-}/screenshots/013_transcribe.png"
   if [[ -f "${shot}" ]]; then
     if xcrun simctl ui "$(_swift_sim_target)" describe 2>/dev/null \
