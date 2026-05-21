@@ -70,7 +70,34 @@ _swift_tc01_ready() {
     "${RAC_MARKER_SDK_INIT_DEV}" \
     "${RAC_MARKER_SDK_SERVICES}" \
     "${RAC_MARKER_APP_READY}" \
+    "${RAC_MARKER_AI_READY}" \
     "Phase 1 complete"
+}
+
+
+_swift_actions_tc_field() {
+  local tc="$1"
+  local field="$2"
+  local actions="${RAC_SESSION_ROOT:-}/actions.jsonl"
+  [[ -f "${actions}" ]] || return 1
+  python3 - "${tc}" "${field}" "${actions}" <<'PYJSON' 2>/dev/null || return 1
+import json, sys
+tc, field, path = sys.argv[1:4]
+for line in open(path):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if row.get("action") == tc:
+        val = row.get(field)
+        if val is not None and str(val).strip():
+            print(str(val).strip())
+            raise SystemExit(0)
+raise SystemExit(1)
+PYJSON
 }
 
 # TC-07: model load, surfaced download error (CLUSTER-08), or transcribe UI ready text.
@@ -94,6 +121,19 @@ _swift_tc07_evidence() {
     printf '%s\n' "limited:stt_ui_ready_log"
     return 0
   fi
+  local action_status action_notes
+  if action_status="$(_swift_actions_tc_field tc07 status)"; then
+    action_notes="$(_swift_actions_tc_field tc07 notes 2>/dev/null || _swift_actions_tc_field tc07 actual 2>/dev/null || true)"
+    case "${action_status}" in
+      PASS) printf '%s
+' "pass:executor_pass"; return 0 ;;
+      LIMITED) printf '%s
+' "limited:executor_${action_notes:-transcribe}"; return 0 ;;
+      BLOCKED) printf '%s
+' "limited:executor_blocked"; return 0 ;;
+    esac
+  fi
+
   local shot="${RAC_SESSION_ROOT:-}/screenshots/013_transcribe.png"
   if [[ -f "${shot}" ]]; then
     if xcrun simctl ui "$(_swift_sim_target)" describe 2>/dev/null \
@@ -110,6 +150,8 @@ _swift_tc07_evidence() {
 _swift_tc07_status_from_evidence() {
   local evidence="$1"
   case "${evidence}" in
+    pass:executor_pass)
+      printf '%s\t%s\n' "PASS" "transcribe surface (executor/actions)" ;;
     pass:*) printf '%s\t%s\n' "PASS" "${evidence#pass:}" ;;
     limited:download_error_surfaced)
       printf '%s\t%s\n' "LIMITED" "download error surfaced in logs (CLUSTER-08 evidence)"

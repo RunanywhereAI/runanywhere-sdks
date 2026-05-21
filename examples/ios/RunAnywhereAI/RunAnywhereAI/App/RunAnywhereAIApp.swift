@@ -62,6 +62,7 @@ struct RunAnywhereAIApp: App {
                         }
                         #endif
                         .onAppear {
+                            logger.info("__RUNANYWHERE_AI_READY__")
                             logger.info("🎉 App is ready to use!")
                         }
                 } else if let error = initializationError {

@@ -1,9 +1,9 @@
 # Kotlin Android — lane deltas
 
-**Lane:** `01_kotlin_android`  
-**Full TC steps:** [`../cross-platform-e2e-test-catalog.md` §4](../cross-platform-e2e-test-catalog.md#4-android-kotlin-lane-01_android_kotlin)  
-**Executor sub-prompt (modality keyframes 007–014):** [`executor-sub-prompt.md`](executor-sub-prompt.md)  
-**Automated driver:** `test_workflows/scripts/kotlin/run-kotlin-executor.sh`  
+**Lane:** `01_kotlin_android`
+**Full TC steps:** [`../cross-platform-e2e-test-catalog.md` §4](../cross-platform-e2e-test-catalog.md#4-android-kotlin-lane-01_android_kotlin)
+**Executor sub-prompt (modality keyframes 007–014):** [`executor-sub-prompt.md`](executor-sub-prompt.md)
+**Automated driver:** `test_workflows/scripts/kotlin/run-kotlin-executor.sh`
 **MCP runbook:** [`../mcp-agent-runbook.md`](../mcp-agent-runbook.md)
 
 ## Identifiers
