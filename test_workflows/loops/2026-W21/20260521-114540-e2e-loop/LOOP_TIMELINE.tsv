@@ -69,3 +69,5 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:47:30-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_DONE	OK	WEB-HARNESS-002	waitForOpfsHydration + registry-first tc03a/tc_storage_opfs
 2026-05-21T15:05:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_SPAWN	OK	CLUSTER-07	KOTLIN-HARNESS-001 modality executor flows
 2026-05-21T15:10:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_DONE	OK	KOTLIN-HARNESS-001	keyframes 007-014 TTS wait RAG/tools/LoRA/settings
+2026-05-21T12:50:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_SPAWN	OK	CLUSTER-06	KOTLIN-AND-002 STT catalog audio fixture injection
+2026-05-21T12:51:00-07:00	1	phase8_fix	fix-agent-cluster-06	AGENT_DONE	OK	KOTLIN-AND-002	inject-stt-audio.sh + tc07 keyword grading

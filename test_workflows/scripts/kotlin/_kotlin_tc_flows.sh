@@ -9,8 +9,13 @@ set -euo pipefail
 PACKAGE_ID="${PACKAGE_ID:-com.runanywhere.runanywhereai.debug}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 CAPTURE_SCRIPT="${REPO_ROOT}/test_workflows/scripts/kotlin/capture-kotlin-logs.sh"
+INJECT_STT_SCRIPT="${REPO_ROOT}/test_workflows/scripts/android/inject-stt-audio.sh"
+# shellcheck source=../android/inject-stt-audio.sh
+source "${INJECT_STT_SCRIPT}"
 
 # Catalog fixed inputs (common/modality_matrix.md)
+RAC_INPUT_STT='RunAnywhere runs models on device.'
+RAC_STT_FIXTURE_PATH="${REPO_ROOT}/test_workflows/fixtures/stt-phrase.wav"
 RAC_INPUT_LLM='In one sentence, explain what RunAnywhere does.'
 RAC_INPUT_TTS='RunAnywhere runs privately on your device.'
 RAC_INPUT_RAG_QUERY='Where should model lifecycle logic live?'
@@ -169,14 +174,29 @@ _kotlin_tc07_stt() {
 
   _kotlin_tap_on_screen "Batch" || true
   sleep 1
-  _kotlin_tap_on_screen "Microphone" || _kotlin_tap_on_screen "Start recording" || true
-  sleep 4
-  _kotlin_tap_on_screen "Stop recording" || _kotlin_tap_on_screen "Microphone" || true
 
-  local status="LIMITED" notes="STT batch flow driven; awaiting transcription"
+  # Catalog §2: inject/play fixed STT phrase before batch record (KOTLIN-AND-002)
+  rac_ensure_stt_fixture "${RAC_STT_FIXTURE_PATH}" "${REPO_ROOT}" || true
+  rac_inject_stt_fixture_start "${RAC_ANDROID_SERIAL}" "${RAC_STT_FIXTURE_PATH}" || true
+
+  _kotlin_tap_on_screen "Microphone" || _kotlin_tap_on_screen "Start recording" || true
+  local record_secs="${RAC_STT_RECORD_SECS:-5}"
+  sleep "${record_secs}"
+  _kotlin_tap_on_screen "Stop recording" || _kotlin_tap_on_screen "Microphone" || true
+  rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}"
+
+  local status="FAIL" notes="STT batch driven; catalog keywords missing in transcript"
   if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 120; then
-    status="PASS"
-    notes="Batch transcription complete marker in logcat"
+    if rac_stt_transcript_has_keywords "${RAC_ANDROID_SERIAL}"; then
+      status="PASS"
+      notes="Batch transcription complete with catalog keywords (RunAnywhere, models, device)"
+    else
+      status="FAIL"
+      notes="Batch transcription complete but transcript lacks catalog keywords"
+    fi
+  else
+    status="LIMITED"
+    notes="STT batch flow driven; batch marker not seen within timeout"
   fi
   sleep 2
   _kotlin_shot "008_stt_transcribed"
