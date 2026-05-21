@@ -1,0 +1,71 @@
+iso_ts	iter	phase	agent_id	event	status	ref	notes
+2026-05-21T11:45:40-07:00	0	init	orchestrator	LOOP_START	OK	20260521-114540-e2e-loop	branch=feat/v2-architecture sha=fd57aa9dd17d
+2026-05-21T11:45:40-07:00	1	phase0_preflight	preflight-agent	PHASE_START	OK		Phase 0 preflight + env fix
+2026-05-21T11:45:40-07:00	1	phase0_preflight	preflight-agent	AGENT_SPAWN	OK		preflight-agent
+2026-05-21T11:52:00-07:00	0	preflight	orchestrator	COMMIT	OK	eb893722a	PREFLIGHT-001 pre-commit + flutter pubspec
+2026-05-21T11:54:00-07:00	0	preflight	orchestrator	COMMIT	OK	ea78337ac	PREFLIGHT-002 remove pubspec.bak
+2026-05-21T11:54:14-07:00	1	phase0_preflight	preflight-agent	PHASE_END	OK		Phase 0 OK
+2026-05-21T11:54:14-07:00	1	phase1a_execute	orchestrator	PHASE_START	OK	20260521-115414-matrix	Wave 0 executors
+2026-05-21T11:55:00-07:00	1	phase1a_execute	executor-commons-cpp	AGENT_DONE	OK	08_commons_cpp	ctest 110/110 test_core 13/13
+2026-05-21T11:55:30-07:00	1	phase1a_execute	executor-kotlin-android	AGENT_SPAWN	OK	01_kotlin_android	background executor
+2026-05-21T11:55:30-07:00	1	phase1a_execute	executor-swift-ios	AGENT_SPAWN	OK	02_swift_ios	background executor
+2026-05-21T11:55:30-07:00	1	phase1a_execute	executor-web	AGENT_SPAWN	OK	07_web	background executor
+2026-05-21T11:55:30-07:00	1	phase1a_execute	orchestrator	LANE_START	OK	01_kotlin_android	APK installed app launched
+2026-05-21T12:30:00-07:00	1	phase1a_execute	executor-kotlin-android	AGENT_DONE	OK	01_kotlin_android	19 TCs executed
+2026-05-21T12:30:00-07:00	1	phase1a_execute	orchestrator	LANE_END	OK	01_kotlin_android	executor complete pending analyzer
+2026-05-21T12:45:00-07:00	1	phase1b_analyze	analyzer-kotlin-android	AGENT_DONE	OK	01_kotlin_android	verdict=FAIL
+2026-05-21T13:00:00-07:00	1	phase1a_execute	executor-swift-ios	AGENT_DONE	OK	02_swift_ios	21 TCs recorded
+2026-05-21T13:00:00-07:00	1	phase1a_execute	orchestrator	LANE_END	OK	02_swift_ios	executor complete
+2026-05-21T13:15:00-07:00	1	phase1b_analyze	analyzer-swift-ios	AGENT_DONE	OK	02_swift_ios	verdict=FAIL
+2026-05-21T11:55:53-07:00	1	phase1a_execute	executor-commons-cpp	AGENT_SPAWN	OK	20260521-115414-matrix	iteration=1 lane=08_commons_cpp
+2026-05-21T12:01:49-07:00	1	phase1a_execute	executor-commons-cpp	AGENT_DONE	OK	20260521-115414-matrix	ctest=0 test_core=0 parity=skipped
+2026-05-21T19:02:42	1	phase1a_execute	executor-kotlin-android	AGENT_SPAWN	OK	01_kotlin_android	iteration=1 RAC_RUN_ID=20260521-115414-matrix
+2026-05-21T12:02:53-07:00	1	phase1a_execute	executor-swift-ios	AGENT_SPAWN	OK	02_swift_ios	RAC_RUN_ID=20260521-115414-matrix iter=1
+2026-05-21T12:19:10-07-00	1	phase1a_execute	executor-kotlin-android	AGENT_DONE	OK	01_kotlin_android	19 TCs executed; TC-09 FAIL
+2026-05-21T12:30:00-07-00	1	phase1b_analyze	analyzer-kotlin-android	AGENT_SPAWN	OK	01_kotlin_android	RAC_RUN_ID=20260521-115414-matrix iter=1
+2026-05-21T12:32:00-07-00	1	phase1b_analyze	analyzer-kotlin-android	AGENT_DONE	OK	01_kotlin_android	verdict=FAIL pass=11 fail=2 limited=7
+2026-05-21T13:05:00-07:00	1	phase1b_analyze	analyzer-swift-ios	AGENT_SPAWN	OK	02_swift_ios	RAC_RUN_ID=20260521-115414-matrix iter=1
+2026-05-21T13:15:00-07:00	1	phase1b_analyze	analyzer-swift-ios	AGENT_DONE	OK	02_swift_ios	verdict=FAIL pass=8 fail=1 blocked=2 limited=9
+2026-05-21T13:30:00-07:00	1	phase1a_execute	executor-web	AGENT_DONE	PARTIAL	07_web	22 TCs partial Playwright crash
+2026-05-21T13:30:00-07:00	1	phase1b_analyze	analyzer-web	AGENT_SPAWN	OK	07_web	Wave 0 analyzers
+2026-05-21T13:35:00-07:00	1	phase1b_analyze	analyzer-web	AGENT_DONE	OK	07_web	verdict=FAIL pass=6 fail=6 blocked=9 limited=3
+2026-05-21T13:30:00-07:00	1	phase1b_analyze	analyzer-commons-cpp	AGENT_SPAWN	OK	08_commons_cpp	Wave 0 analyzers
+2026-05-21T13:45:00-07:00	1	phase1b_analyze	analyzer-commons-cpp	AGENT_DONE	OK	08_commons_cpp	verdict=PASS
+2026-05-21T13:50:00-07:00	1	phase1b_analyze	analyzer-web	AGENT_DONE	OK	07_web	verdict=FAIL
+2026-05-21T13:50:00-07:00	1	phase2_matrix	matrix-coordinator	PHASE_START	OK	20260521-115414-matrix	Wave 0 analyze complete
+2026-05-21T12:23:32-07:00	1	phase1b_analyze	analyzer-commons-cpp	AGENT_DONE	OK	08_commons_cpp	verdict=PASS pass=4 na=3 ctest=110/110 test_core=13/13
+2026-05-21T12:24:00-07:00	1	phase2_matrix	matrix-coordinator	AGENT_SPAWN	OK	20260521-115414-matrix	iter=1 Wave 0 lanes complete
+2026-05-21T12:24:29-07:00	1	phase2_matrix	matrix-coordinator	AGENT_DONE	OK	20260521-115414-matrix	matrix=RED lanes=4 pass=1 fail=3 cross_regressions=5
+2026-05-21T14:00:00-07:00	1	phase3_green_check	orchestrator	ITERATION_VERDICT	RED	20260521-115414-matrix	continue to phase4
+2026-05-21T14:15:00-07:00	1	phase4_triage	investigator-swift-ios	AGENT_SPAWN	OK	02_swift_ios	RAC_RUN_ID=20260521-115414-matrix iter=1
+2026-05-21T14:30:00-07:00	1	phase4_triage	investigator-swift-ios	AGENT_DONE	OK	02_swift_ios	issues=7 P0=2 FINDINGS.md written
+2026-05-21T14:05:00-07:00	1	phase4_triage	investigator-kotlin-android	AGENT_SPAWN	OK	01_kotlin_android	RAC_RUN_ID=20260521-115414-matrix iter=1
+2026-05-21T14:20:00-07:00	1	phase4_triage	investigator-kotlin-android	AGENT_DONE	OK	01_kotlin_android	issues=10 P0=1 FINDINGS.md written
+2026-05-21T14:25:00-07:00	1	phase4_triage	investigator-swift-ios	AGENT_DONE	OK	02_swift_ios	issues=7 P0=2 FINDINGS.md written
+2026-05-21T14:25:00-07:00	1	phase5_synthesize	orchestrator	PHASE_START	OK	20260521-115414-matrix	synthesizer + preflight investigator
+2026-05-21T14:35:00-07:00	1	phase5_synthesize	matrix-synthesizer	AGENT_DONE	OK	20260521-115414-matrix	issues=18 clusters=12
+2026-05-21T14:35:00-07:00	1	phase6_layering_audit	layering-auditor	PHASE_START	OK	20260521-115414-matrix	§7.9
+2026-05-21T14:45:00-07:00	1	phase6_layering_audit	layering-auditor	AGENT_DONE	OK	20260521-115414-matrix	ACCEPT=16 DEMOTE=2 ESCALATE=0
+2026-05-21T14:45:00-07:00	1	phase6_layering_audit	orchestrator	PHASE_END	OK	20260521-115414-matrix	approved for phase7
+2026-05-21T14:45:00-07:00	1	phase7_plan	orchestrator	PHASE_START	OK	20260521-115414-matrix	auto-plan writer
+2026-05-21T14:05:00-07:00	1	phase4_triage	investigator-web	AGENT_SPAWN	OK	07_web	read-only §7.6
+2026-05-21T14:10:00-07:00	1	phase4_triage	investigator-web	AGENT_DONE	OK	07_web	issues=14 P0=3 FINDINGS.md written
+2026-05-21T12:26:53-07:00	1	phase5_synthesize	matrix-synthesizer	AGENT_SPAWN	OK	20260521-115414-matrix	iter=1 read-only §7.8 lanes=01,02,07
+2026-05-21T12:27:00-07:00	1	phase5_synthesize	matrix-synthesizer	AGENT_DONE	OK	20260521-115414-matrix	issues=18 clusters=12 P0=5 registry+CROSS_LANE written
+2026-05-21T14:45:00-07:00	1	phase6_layering_audit	layering-auditor	AGENT_DONE	OK	20260521-115414-matrix	ACCEPT=16 DEMOTE=2 ESCALATE=0 LAYERING_AUDIT.md registry-rewrites=2
+2026-05-21T14:45:00-07:00	1	phase6_layering_audit	layering-auditor	PHASE_END	OK	20260521-115414-matrix	§7.9 approved-by-loop
+2026-05-21T12:28:00-07:00	1	phase5_synthesize	investigator-preflight	AGENT_SPAWN	OK	20260521-115414-matrix	iter=1 read-only §7.7
+2026-05-21T12:29:00-07:00	1	phase5_synthesize	investigator-preflight	AGENT_DONE	OK	20260521-115414-matrix	preflight_FAIL=0 issues=2 P2=2 baseline=TRUSTED FINDINGS.md written
+2026-05-21T14:50:00-07:00	1	phase7_fix	fix-agent-cluster-02	AGENT_SPAWN	OK	WEB-HARNESS-001	CLUSTER-02 web-lane-e2e browser recovery
+2026-05-21T14:55:00-07:00	1	phase7_fix	fix-agent-cluster-02	AGENT_DONE	OK	WEB-HARNESS-001	harness recovery + failureKind in actions.jsonl
+2026-05-21T12:44:35-07:00	1	phase7_plan	plan-writer-iter01	AGENT_SPAWN	OK	20260521-115414-matrix	writing iter-01-remediation.md
+2026-05-21T12:46:00-07:00	1	phase7_plan	plan-writer-iter01	AGENT_DONE	OK	iter-01-remediation.md	issues=20 clusters=12 APPROVED-BY-LOOP sha=ea78337ac
+2026-05-21T12:44:35-07:00	AGENT_SPAWN	orchestrator	phase8: plan-writer + CLUSTER-01,02,03,05,06,07,08,09
+2026-05-21T12:45:07-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_SPAWN	OK	CLUSTER-09	SWIFT-IOS-002 benchmark preflight disk discovery
+2026-05-21T12:45:30-07:00	1	phase8_fix	fix-agent-cluster-09	AGENT_DONE	OK	df6fe78a4	BenchmarkRunner isDownloadedOnDisk + zero-work-item errors
+2026-05-21T12:45:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	df6fe78a4	CLUSTER-09/SWIFT-IOS-002
+2026-05-21T12:46:00-07:00	1	phase8_fix	fix-agent-cluster-01	AGENT_SPAWN	OK	CLUSTER-01	WEB-001/002/003 OPFS flush gate
+2026-05-21T12:47:00-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_SPAWN	OK	CLUSTER-03	WEB-HARNESS-002 post-hydrate UI assertions
+2026-05-21T12:47:30-07:00	1	phase8_fix	fix-agent-cluster-03	AGENT_DONE	OK	WEB-HARNESS-002	waitForOpfsHydration + registry-first tc03a/tc_storage_opfs
+2026-05-21T15:05:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_SPAWN	OK	CLUSTER-07	KOTLIN-HARNESS-001 modality executor flows
+2026-05-21T15:10:00-07:00	1	phase8_fix	fix-agent-cluster-07	AGENT_DONE	OK	KOTLIN-HARNESS-001	keyframes 007-014 TTS wait RAG/tools/LoRA/settings

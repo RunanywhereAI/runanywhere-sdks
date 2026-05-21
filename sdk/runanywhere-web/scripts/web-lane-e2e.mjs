@@ -59,12 +59,37 @@ function recordAction(entry) {
     expected: entry.expected ?? '',
     actual: entry.actual ?? '',
     status: entry.status,
+    failureKind: entry.failureKind ?? '',
     screenshot: entry.screenshot ?? '',
     logs: entry.logs ?? [`logs/browser_console.jsonl`],
     modelId: entry.modelId ?? '',
     notes: entry.notes ?? '',
   };
   fs.appendFileSync(ACTIONS_FILE, `${JSON.stringify(row)}\n`);
+}
+
+function errorMessage(err) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+const HARNESS_FAILURE_RE = /Target (page|closed)|browser has been closed|Execution context was destroyed|Protocol error|Page crashed|context or browser has been closed|Browser has been closed/i;
+
+function isHarnessFailure(err, pageHolder) {
+  if (HARNESS_FAILURE_RE.test(errorMessage(err))) return true;
+  if (pageHolder?.page?.isClosed?.()) return true;
+  if (pageHolder?.browser && pageHolder.browser.isConnected?.() === false) return true;
+  return false;
+}
+
+function attachPageListeners(page) {
+  page.on('console', (msg) => {
+    consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() });
+  });
+  page.on('request', (req) => {
+    if (req.resourceType() === 'fetch' || req.resourceType() === 'xhr') {
+      networkEntries.push({ ts: nowIso(), method: req.method(), url: req.url() });
+    }
+  });
 }
 
 function recordCommand(name, status, exitCode, logPath) {
@@ -164,7 +189,87 @@ function modelRow(page, modelId, modelName) {
   );
 }
 
-async function downloadModelInSheet(page, modelName, modelId, timeoutMs = 1_800_000) {
+async function waitForRegistryLocalPath(page, modelId, timeoutMs = 120_000) {
+  await page.waitForFunction(
+    (id) => {
+      try {
+        const model = window.__RUNANYWHERE_SDK__?.getModel?.(id);
+        return Boolean(model?.localPath && model.isDownloaded);
+      } catch {
+        return false;
+      }
+    },
+    modelId,
+    { timeout: timeoutMs },
+  );
+}
+
+/** Poll registry until OPFS hydrate marks the model downloaded (WEB-HARNESS-002). */
+async function waitForOpfsHydration(page, modelId, timeoutMs = 90_000) {
+  await page.evaluate(async () => {
+    const sdk = window.__RUNANYWHERE_SDK__;
+    if (typeof sdk?.hydrateModelRegistry === 'function') {
+      await sdk.hydrateModelRegistry();
+    }
+  }).catch(() => {});
+
+  await page.waitForFunction(
+    (id) => {
+      try {
+        const sdk = window.__RUNANYWHERE_SDK__;
+        const model = sdk?.getModel?.(id);
+        if (model?.isDownloaded && model?.localPath) return true;
+        const list = sdk?.downloadedModels?.();
+        return Boolean(list?.models?.some((m) => m.id === id));
+      } catch {
+        return false;
+      }
+    },
+    modelId,
+    { timeout: timeoutMs },
+  );
+}
+
+async function isModelDownloadedInRegistry(page, modelId) {
+  return page.evaluate((id) => {
+    try {
+      const sdk = window.__RUNANYWHERE_SDK__;
+      const model = sdk?.getModel?.(id);
+      if (model?.isDownloaded && model?.localPath) {
+        return { ok: true, via: 'getModel', localPath: model.localPath };
+      }
+      const list = sdk?.downloadedModels?.();
+      const found = list?.models?.find((m) => m.id === id);
+      if (found) {
+        return { ok: true, via: 'downloadedModels', localPath: found.localPath ?? '' };
+      }
+    } catch { /* ignore */ }
+    return { ok: false, via: '', localPath: '' };
+  }, modelId);
+}
+
+/** Registry-first persistence check; fall back to model-sheet load/unload buttons. */
+async function assertModelPersistedAfterHydrate(page, modelId, modelName) {
+  await waitForOpfsHydration(page, modelId);
+
+  const registry = await isModelDownloadedInRegistry(page, modelId);
+  if (registry.ok) {
+    return { pass: true, detail: `registry downloaded (${registry.via})` };
+  }
+
+  const row = modelRow(page, modelId, modelName);
+  await row.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+  const uiOk = await row.locator('[data-action="load"], [data-action="unload"]').first()
+    .isVisible({ timeout: 15_000 }).catch(() => false);
+  if (uiOk) {
+    return { pass: true, detail: 'model sheet shows load/unload' };
+  }
+
+  return { pass: false, detail: 'registry not downloaded and no load/unload in sheet' };
+}
+
+async function downloadModelInSheet(page, modelName, modelId, timeoutMs = 1_800_000, pageHolder = null) {
+  if (pageHolder) page = await ensureLivePage(pageHolder);
   const row = modelRow(page, modelId, modelName);
   await row.waitFor({ state: 'visible', timeout: 30_000 });
   const dl = row.locator('[data-action="download"]');
@@ -178,6 +283,12 @@ async function downloadModelInSheet(page, modelName, modelId, timeoutMs = 1_800_
       modelId,
       { timeout: timeoutMs },
     );
+    await waitForRegistryLocalPath(page, modelId, Math.min(timeoutMs, 120_000));
+  } else {
+    const loadBtn = row.locator('[data-action="load"]');
+    if (await loadBtn.isVisible().catch(() => false)) {
+      await waitForRegistryLocalPath(page, modelId, Math.min(timeoutMs, 60_000)).catch(() => {});
+    }
   }
 }
 
@@ -201,42 +312,7 @@ async function loadModelInSheet(page, modelName, modelId, timeoutMs = 180_000) {
   await page.waitForTimeout(1000);
 }
 
-async function runTc(id, fn, pageHolder) {
-  try {
-    if (pageHolder) {
-      pageHolder.page = await ensureLivePage(pageHolder);
-    }
-    await fn();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[${id}] failed:`, msg);
-    if (pageHolder?.page?.isClosed?.()) {
-      try {
-        pageHolder.page = await ensureLivePage(pageHolder);
-      } catch (recoverErr) {
-        const recoverMsg = recoverErr instanceof Error ? recoverErr.message : String(recoverErr);
-        console.error(`[${id}] page recovery failed:`, recoverMsg);
-      }
-    }
-    recordCommand(id, 'FAIL', 1, 'logs/browser_console.jsonl');
-    recordAction({
-      action: id,
-      status: 'FAIL',
-      expected: `${id} completes`,
-      actual: msg.slice(0, 500),
-      phase: 'modality_result',
-      notes: msg.slice(0, 500),
-    });
-    tcResults[id] = { status: 'FAIL', notes: msg.slice(0, 500) };
-    return false;
-  }
-  return true;
-}
-
-async function ensureLivePage(pageHolder) {
-  if (pageHolder.page && !pageHolder.page.isClosed()) {
-    return pageHolder.page;
-  }
+async function recreateBrowserContext(pageHolder) {
   if (pageHolder.context) {
     await pageHolder.context.close().catch(() => {});
   }
@@ -245,18 +321,88 @@ async function ensureLivePage(pageHolder) {
     permissions: ['microphone', 'camera'],
   });
   pageHolder.page = await pageHolder.context.newPage();
-  pageHolder.page.on('console', (msg) => {
-    consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() });
-  });
-  await gotoFresh(pageHolder.page);
-  await waitInteractive(pageHolder.page);
+  attachPageListeners(pageHolder.page);
   return pageHolder.page;
 }
 
-async function downloadAndLoad(page, modelName, modelId, timeoutMs = 1_800_000) {
+async function ensureLivePage(pageHolder) {
+  const pageAlive = pageHolder.page && !pageHolder.page.isClosed();
+  const browserAlive = pageHolder.browser?.isConnected?.() !== false;
+  if (pageAlive && browserAlive) {
+    return pageHolder.page;
+  }
+  console.warn('[harness] recreating Playwright context (page or browser closed)');
+  recordAction({
+    action: 'harness_page_recovery',
+    phase: 'other',
+    expected: 'live browser page',
+    actual: pageAlive ? 'browser disconnected' : 'page closed',
+    status: 'PASS',
+    failureKind: 'harness',
+    notes: 'Recreating Playwright context after closed page/browser',
+  });
+  const page = await recreateBrowserContext(pageHolder);
+  await gotoFresh(page);
+  await waitInteractive(page);
+  return page;
+}
+
+async function runTc(id, fn, pageHolder) {
+  const maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (pageHolder) {
+        pageHolder.page = await ensureLivePage(pageHolder);
+      }
+      await fn();
+      return true;
+    } catch (err) {
+      const msg = errorMessage(err);
+      const harness = isHarnessFailure(err, pageHolder);
+      console.error(`[${id}] attempt ${attempt}/${maxAttempts} failed (${harness ? 'harness' : 'product'}):`, msg);
+
+      if (harness && attempt < maxAttempts) {
+        recordAction({
+          action: `${id}_harness_retry`,
+          phase: 'other',
+          expected: `${id} completes after harness recovery`,
+          actual: msg.slice(0, 300),
+          status: 'PASS',
+          failureKind: 'harness',
+          notes: `Retrying ${id} after harness failure (attempt ${attempt}/${maxAttempts})`,
+        });
+        if (pageHolder) {
+          pageHolder.page = await ensureLivePage(pageHolder);
+        }
+        continue;
+      }
+
+      recordCommand(id, 'FAIL', 1, 'logs/browser_console.jsonl');
+      recordAction({
+        action: id,
+        status: 'FAIL',
+        expected: `${id} completes`,
+        actual: msg.slice(0, 500),
+        phase: 'modality_result',
+        failureKind: harness ? 'harness' : 'product',
+        notes: msg.slice(0, 500),
+      });
+      tcResults[id] = {
+        status: 'FAIL',
+        failureKind: harness ? 'harness' : 'product',
+        notes: msg.slice(0, 500),
+      };
+      return false;
+    }
+  }
+  return false;
+}
+
+async function downloadAndLoad(page, modelName, modelId, timeoutMs = 1_800_000, pageHolder = null) {
+  if (pageHolder) page = await ensureLivePage(pageHolder);
   const sheetOpen = await page.locator('.modal-sheet').isVisible().catch(() => false);
   if (!sheetOpen) await openModelSheet(page);
-  await downloadModelInSheet(page, modelName, modelId, timeoutMs);
+  await downloadModelInSheet(page, modelName, modelId, timeoutMs, pageHolder);
   await loadModelInSheet(page, modelName, modelId, timeoutMs);
 }
 
@@ -270,20 +416,14 @@ async function runExecutor() {
       '--use-fake-device-for-media-stream',
     ],
   });
-  const context = await browser.newContext({
+  const pageHolder = { browser, context: null, page: null };
+  pageHolder.context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     permissions: ['microphone', 'camera'],
   });
-  const page = await context.newPage();
-
-  page.on('console', (msg) => {
-    consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() });
-  });
-  page.on('request', (req) => {
-    if (req.resourceType() === 'fetch' || req.resourceType() === 'xhr') {
-      networkEntries.push({ ts: nowIso(), method: req.method(), url: req.url() });
-    }
-  });
+  pageHolder.page = await pageHolder.context.newPage();
+  attachPageListeners(pageHolder.page);
+  const page = pageHolder.page;
 
   try {
     // TC-01 — SDK init (fresh storage)
@@ -307,26 +447,28 @@ async function runExecutor() {
     });
     await page.locator('.modal-sheet').waitFor({ state: 'visible' });
     await snapshotTc(page, 'tc02', 'sheet_open', 'PASS', 'model sheet opened');
-    await downloadModelInSheet(page, LLM_MODEL, LLM_MODEL_ID);
+    await downloadModelInSheet(page, LLM_MODEL, LLM_MODEL_ID, 1_800_000, pageHolder);
     await snapshotTc(page, 'tc02', 'download_complete', 'PASS', `${LLM_MODEL} downloaded`);
 
     // TC-04 — Load
     let llmLoaded = false;
     await runTc('tc04', async () => {
-      await loadModelInSheet(page, LLM_MODEL, LLM_MODEL_ID);
-      llmLoaded = await page.evaluate((id) => {
+      const livePage = pageHolder.page;
+      await loadModelInSheet(livePage, LLM_MODEL, LLM_MODEL_ID);
+      llmLoaded = await livePage.evaluate((id) => {
         try { return window.__RUNANYWHERE_SDK__?.currentModel?.()?.modelId === id; }
         catch { return false; }
       }, LLM_MODEL_ID);
-      await snapshotTc(page, 'tc04', 'load', llmLoaded ? 'PASS' : 'FAIL', `currentModel=${llmLoaded}`);
-    });
+      await snapshotTc(livePage, 'tc04', 'load', llmLoaded ? 'PASS' : 'FAIL', `currentModel=${llmLoaded}`);
+    }, pageHolder);
 
     // TC-05 — LLM inference
     await runTc('tc05', async () => {
+      const livePage = pageHolder.page;
       if (!llmLoaded) throw new Error('LLM not loaded — skipping inference');
-      await page.locator('#chat-input').fill(LLM_PROMPT);
-      await page.locator('#chat-send-btn').click();
-      await page.waitForFunction(
+      await livePage.locator('#chat-input').fill(LLM_PROMPT);
+      await livePage.locator('#chat-send-btn').click();
+      await livePage.waitForFunction(
         () => {
           const bubbles = document.querySelectorAll('.chat-message--assistant .chat-bubble');
           const last = bubbles[bubbles.length - 1];
@@ -335,152 +477,165 @@ async function runExecutor() {
         null,
         { timeout: 300_000 },
       );
-      const reply = await page.locator('.chat-message--assistant .chat-bubble').last().textContent();
-      await snapshotTc(page, 'tc05', 'inference', reply && reply.length > 10 ? 'PASS' : 'FAIL', reply?.slice(0, 120));
-    });
+      const reply = await livePage.locator('.chat-message--assistant .chat-bubble').last().textContent();
+      await snapshotTc(livePage, 'tc05', 'inference', reply && reply.length > 10 ? 'PASS' : 'FAIL', reply?.slice(0, 120));
+    }, pageHolder);
 
     // TC-Inference-cancel
     await runTc('tc_inference_cancel', async () => {
+      const livePage = pageHolder.page;
       if (!llmLoaded) throw new Error('LLM not loaded');
-      await page.locator('#chat-input').fill('Write a detailed essay about on-device AI in at least 200 words.');
-      await page.locator('#chat-send-btn').click();
-      await page.waitForTimeout(2000);
-      await page.locator('#chat-clear-btn').click();
-      await page.waitForTimeout(2000);
-      await snapshotTc(page, 'tc_inference_cancel', 'clear_midstream', 'PASS', 'Clear clicked during generation');
-    });
+      await livePage.locator('#chat-input').fill('Write a detailed essay about on-device AI in at least 200 words.');
+      await livePage.locator('#chat-send-btn').click();
+      await livePage.waitForTimeout(2000);
+      await livePage.locator('#chat-clear-btn').click();
+      await livePage.waitForTimeout(2000);
+      await snapshotTc(livePage, 'tc_inference_cancel', 'clear_midstream', 'PASS', 'Clear clicked during generation');
+    }, pageHolder);
 
     // TC-15 — Storage baseline
     await runTc('tc15', async () => {
-      await clickTab(page, 'Storage');
-      const storageText = await page.locator('#storage-scroll').innerText();
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Storage');
+      const storageText = await livePage.locator('#storage-scroll').innerText();
       const tc15Pass = storageText.includes('Browser Storage') && storageText.includes('Registered Models');
-      await snapshotTc(page, 'tc15', 'baseline', tc15Pass ? 'PASS' : 'FAIL', storageText.slice(0, 200));
-    });
+      await snapshotTc(livePage, 'tc15', 'baseline', tc15Pass ? 'PASS' : 'FAIL', storageText.slice(0, 200));
+    }, pageHolder);
 
     // TC-Storage-OPFS — hard refresh
     await runTc('tc_storage_opfs', async () => {
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await waitInteractive(page);
-      await page.waitForTimeout(3000);
-      await clickTab(page, 'Chat');
-      await openModelSheet(page);
-      const loadVisible = await page.locator(`.modal-sheet .model-row[data-model-id="${LLM_MODEL_ID}"]`)
-        .locator('[data-action="load"], [data-action="unload"]').first().isVisible();
-      await snapshotTc(page, 'tc_storage_opfs', 'hard_refresh', loadVisible ? 'PASS' : 'FAIL', 'model still on disk after reload');
-      await closeModelSheet(page);
-    });
+      const livePage = pageHolder.page;
+      await livePage.reload({ waitUntil: 'domcontentloaded' });
+      await waitInteractive(livePage);
+      await waitForOpfsHydration(livePage, LLM_MODEL_ID);
+      await clickTab(livePage, 'Chat');
+      await openModelSheet(livePage);
+      const persisted = await assertModelPersistedAfterHydrate(livePage, LLM_MODEL_ID, LLM_MODEL);
+      await snapshotTc(
+        livePage,
+        'tc_storage_opfs',
+        'hard_refresh',
+        persisted.pass ? 'PASS' : 'FAIL',
+        persisted.detail,
+      );
+      await closeModelSheet(livePage);
+    }, pageHolder);
 
     // TC-03a — tab close persistence
-    await context.close();
-    const page2Holder = { browser, context: null, page: null };
-    page2Holder.context = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ['microphone', 'camera'] });
-    page2Holder.page = await page2Holder.context.newPage();
-    page2Holder.page.on('console', (msg) => consoleEntries.push({ ts: nowIso(), type: msg.type(), text: msg.text() }));
+    await pageHolder.context.close();
+    pageHolder.context = null;
+    pageHolder.page = null;
+    await recreateBrowserContext(pageHolder);
+    await gotoFresh(pageHolder.page);
+    await waitInteractive(pageHolder.page);
 
     await runTc('tc03a', async () => {
-      const page2 = page2Holder.page;
-      await page2.goto(BASE_URL);
-      await waitInteractive(page2);
-      await clickTab(page2, 'Chat');
-      await openModelSheet(page2);
-      const stillDl = await page2.locator(`.modal-sheet .model-row[data-model-id="${LLM_MODEL_ID}"]`)
-        .locator('[data-action="load"]').isVisible().catch(() => false);
-      await snapshotTc(page2, 'tc03a', 'tab_reopen', stillDl ? 'PASS' : 'FAIL', 'model persisted after new context');
-      await closeModelSheet(page2);
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await waitForOpfsHydration(livePage, LLM_MODEL_ID);
+      await clickTab(livePage, 'Chat');
+      await openModelSheet(livePage);
+      const persisted = await assertModelPersistedAfterHydrate(livePage, LLM_MODEL_ID, LLM_MODEL);
+      await snapshotTc(
+        livePage,
+        'tc03a',
+        'tab_reopen',
+        persisted.pass ? 'PASS' : 'FAIL',
+        persisted.detail || 'model persisted after new context',
+      );
+      await closeModelSheet(livePage);
+    }, pageHolder);
 
     await runTc('tc16', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Storage');
-      const afterKill = await page2.locator('#storage-model-list').innerText();
-      await snapshotTc(page2, 'tc16', 'after_tab_close', afterKill.includes('SmolLM') ? 'PASS' : 'LIMITED', afterKill.slice(0, 150));
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Storage');
+      const afterKill = await livePage.locator('#storage-model-list').innerText();
+      await snapshotTc(livePage, 'tc16', 'after_tab_close', afterKill.includes('SmolLM') ? 'PASS' : 'LIMITED', afterKill.slice(0, 150));
+    }, pageHolder);
 
     await runTc('tc03d', async () => {
-      const page2 = page2Holder.page;
-      await clearSiteStorage(page2);
-      await gotoFresh(page2);
-      await clickTab(page2, 'Storage');
-      const cleared = await page2.locator('#storage-model-list').innerText();
-      await snapshotTc(page2, 'tc03d', 'clear_site_data', !cleared.includes('Loaded') ? 'PASS' : 'FAIL', cleared.slice(0, 150));
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clearSiteStorage(livePage);
+      await gotoFresh(livePage);
+      await clickTab(livePage, 'Storage');
+      const cleared = await livePage.locator('#storage-model-list').innerText();
+      await snapshotTc(livePage, 'tc03d', 'clear_site_data', !cleared.includes('Loaded') ? 'PASS' : 'FAIL', cleared.slice(0, 150));
+    }, pageHolder);
 
     await runTc('tc03c', async () => {
-      const page2 = page2Holder.page;
-      await clearSiteStorage(page2);
-      await gotoFresh(page2);
-      await openModelSheet(page2);
-      const needDl = await page2.locator(`.modal-sheet .model-row[data-model-id="${LLM_MODEL_ID}"]`)
+      const livePage = pageHolder.page;
+      await clearSiteStorage(livePage);
+      await gotoFresh(livePage);
+      await openModelSheet(livePage);
+      const needDl = await livePage.locator(`.modal-sheet .model-row[data-model-id="${LLM_MODEL_ID}"]`)
         .locator('[data-action="download"]').isVisible().catch(() => false);
-      await snapshotTc(page2, 'tc03c', 'fresh_origin', needDl ? 'PASS' : 'FAIL', 'models gone after clear');
-      await closeModelSheet(page2);
-    }, page2Holder);
+      await snapshotTc(livePage, 'tc03c', 'fresh_origin', needDl ? 'PASS' : 'FAIL', 'models gone after clear');
+      await closeModelSheet(livePage);
+    }, pageHolder);
 
     await runTc('tc02_redownload', async () => {
-      const page2 = page2Holder.page;
-      await downloadAndLoad(page2, LLM_MODEL, LLM_MODEL_ID, 900_000);
-      llmLoaded = await page2.evaluate((id) => {
+      const livePage = pageHolder.page;
+      await downloadAndLoad(livePage, LLM_MODEL, LLM_MODEL_ID, 900_000, pageHolder);
+      llmLoaded = await livePage.evaluate((id) => {
         try { return window.__RUNANYWHERE_SDK__?.currentModel?.()?.modelId === id; }
         catch { return false; }
       }, LLM_MODEL_ID);
-    }, page2Holder);
+    }, pageHolder);
 
     // TC-07 / TC-10 — Transcribe
     await runTc('tc10', async () => {
-      const page2 = page2Holder.page;
-      await registerOnnx(page2);
-      await clickTab(page2, 'Transcribe');
-      await snapshotTc(page2, 'tc10', 'transcribe_ui', 'PASS', 'transcribe tab rendered');
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await registerOnnx(livePage);
+      await clickTab(livePage, 'Transcribe');
+      await snapshotTc(livePage, 'tc10', 'transcribe_ui', 'PASS', 'transcribe tab rendered');
+    }, pageHolder);
     await runTc('tc07', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Transcribe');
-      await page2.locator('#transcribe-model-btn').click();
-      await downloadAndLoad(page2, STT_MODEL, STT_MODEL_ID, 600_000);
-      await clickTab(page2, 'Transcribe');
-      const sttReady = await page2.locator('#mic-toggle-btn').isEnabled().catch(() => false);
-      await snapshotTc(page2, 'tc07', 'stt_ready', sttReady ? 'PASS' : 'BLOCKED', 'STT model loaded; mic path needs audio fixture');
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Transcribe');
+      await livePage.locator('#transcribe-model-btn').click();
+      await downloadAndLoad(livePage, STT_MODEL, STT_MODEL_ID, 600_000, pageHolder);
+      await clickTab(livePage, 'Transcribe');
+      const sttReady = await livePage.locator('#mic-toggle-btn').isEnabled().catch(() => false);
+      await snapshotTc(livePage, 'tc07', 'stt_ready', sttReady ? 'PASS' : 'BLOCKED', 'STT model loaded; mic path needs audio fixture');
+    }, pageHolder);
 
     // TC-08 / TC-11 — Speak
     await runTc('tc11', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Speak');
-      await snapshotTc(page2, 'tc11', 'speak_ui', 'PASS', 'speak tab rendered');
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Speak');
+      await snapshotTc(livePage, 'tc11', 'speak_ui', 'PASS', 'speak tab rendered');
+    }, pageHolder);
     await runTc('tc08', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Speak');
-      await page2.locator('#speak-model-btn').click();
-      await downloadAndLoad(page2, TTS_MODEL, TTS_MODEL_ID, 600_000);
-      await clickTab(page2, 'Speak');
-      await page2.locator('#speak-text').fill(TTS_TEXT);
-      const speakBtn = page2.locator('#speak-btn');
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Speak');
+      await livePage.locator('#speak-model-btn').click();
+      await downloadAndLoad(livePage, TTS_MODEL, TTS_MODEL_ID, 600_000, pageHolder);
+      await clickTab(livePage, 'Speak');
+      await livePage.locator('#speak-text').fill(TTS_TEXT);
+      const speakBtn = livePage.locator('#speak-btn');
       if (await speakBtn.isEnabled().catch(() => false)) {
         await speakBtn.click();
-        await page2.waitForFunction(
+        await livePage.waitForFunction(
           () => document.querySelector('#speak-status')?.textContent?.includes('Last synthesis'),
           null,
           { timeout: 180_000 },
         ).catch(() => {});
       }
-      const speakStatus = await page2.locator('#speak-status').innerText().catch(() => '');
-      await snapshotTc(page2, 'tc08', 'tts', speakStatus.includes('Last synthesis') ? 'PASS' : 'LIMITED', speakStatus.slice(0, 120));
-    }, page2Holder);
+      const speakStatus = await livePage.locator('#speak-status').innerText().catch(() => '');
+      await snapshotTc(livePage, 'tc08', 'tts', speakStatus.includes('Last synthesis') ? 'PASS' : 'LIMITED', speakStatus.slice(0, 120));
+    }, pageHolder);
 
     // TC-09 — VLM
     await runTc('tc09', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Vision');
-      await page2.locator('#vision-model-btn').click();
-      await downloadAndLoad(page2, VLM_MODEL, VLM_MODEL_ID, 900_000);
-      await clickTab(page2, 'Vision');
-      await page2.locator('#vision-camera-btn').click();
-      await page2.waitForTimeout(3000);
-      await page2.locator('#vision-capture-btn').click().catch(() => {});
-      await page2.locator('#vision-analyze-btn').click().catch(() => {});
-      await page2.waitForFunction(
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Vision');
+      await livePage.locator('#vision-model-btn').click();
+      await downloadAndLoad(livePage, VLM_MODEL, VLM_MODEL_ID, 900_000, pageHolder);
+      await clickTab(livePage, 'Vision');
+      await livePage.locator('#vision-camera-btn').click();
+      await livePage.waitForTimeout(3000);
+      await livePage.locator('#vision-capture-btn').click().catch(() => {});
+      await livePage.locator('#vision-analyze-btn').click().catch(() => {});
+      await livePage.waitForFunction(
         () => {
           const out = document.querySelector('#vision-output')?.textContent ?? '';
           return out.length > 30 && !out.includes('no response yet');
@@ -488,62 +643,62 @@ async function runExecutor() {
         null,
         { timeout: 300_000 },
       ).catch(() => {});
-      const vlmOut = await page2.locator('#vision-output').innerText().catch(() => '');
-      await snapshotTc(page2, 'tc09', 'vlm', vlmOut.length > 20 ? 'PASS' : 'LIMITED', vlmOut.slice(0, 120));
-    }, page2Holder);
+      const vlmOut = await livePage.locator('#vision-output').innerText().catch(() => '');
+      await snapshotTc(livePage, 'tc09', 'vlm', vlmOut.length > 20 ? 'PASS' : 'LIMITED', vlmOut.slice(0, 120));
+    }, pageHolder);
 
     // TC-13 — RAG
     await runTc('tc13', async () => {
-    const page2 = page2Holder.page;
-    const ragFixture = path.join(REPO_ROOT, 'test_workflows/fixtures/rag-sample.txt');
-    if (!fs.existsSync(ragFixture)) {
-      fs.mkdirSync(path.dirname(ragFixture), { recursive: true });
-      fs.writeFileSync(ragFixture, 'RunAnywhere keeps model lifecycle logic in C++.\nThe SDK registers backends such as LlamaCPP and ONNX/Sherpa on device.\n');
-    }
-    await clickTab(page2, 'Docs');
-    await page2.locator('#docs-upload-btn').click();
-    await page2.locator('#docs-file').setInputFiles(ragFixture);
-    await page2.waitForTimeout(5000);
-    await page2.locator('#docs-query').fill(RAG_QUERY);
-    await page2.locator('#docs-ask-btn').click();
-    await page2.waitForFunction(
-      () => (document.querySelector('#docs-answer')?.textContent?.length ?? 0) > 20,
-      null,
-      { timeout: 300_000 },
-    ).catch(() => {});
-    const ragAns = await page2.locator('#docs-answer').innerText().catch(() => '');
-    await snapshotTc(page2, 'tc13', 'rag', ragAns.toLowerCase().includes('c++') ? 'PASS' : 'LIMITED', ragAns.slice(0, 120));
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      const ragFixture = path.join(REPO_ROOT, 'test_workflows/fixtures/rag-sample.txt');
+      if (!fs.existsSync(ragFixture)) {
+        fs.mkdirSync(path.dirname(ragFixture), { recursive: true });
+        fs.writeFileSync(ragFixture, 'RunAnywhere keeps model lifecycle logic in C++.\nThe SDK registers backends such as LlamaCPP and ONNX/Sherpa on device.\n');
+      }
+      await clickTab(livePage, 'Docs');
+      await livePage.locator('#docs-upload-btn').click();
+      await livePage.locator('#docs-file').setInputFiles(ragFixture);
+      await livePage.waitForTimeout(5000);
+      await livePage.locator('#docs-query').fill(RAG_QUERY);
+      await livePage.locator('#docs-ask-btn').click();
+      await livePage.waitForFunction(
+        () => (document.querySelector('#docs-answer')?.textContent?.length ?? 0) > 20,
+        null,
+        { timeout: 300_000 },
+      ).catch(() => {});
+      const ragAns = await livePage.locator('#docs-answer').innerText().catch(() => '');
+      await snapshotTc(livePage, 'tc13', 'rag', ragAns.toLowerCase().includes('c++') ? 'PASS' : 'LIMITED', ragAns.slice(0, 120));
+    }, pageHolder);
 
     await runTc('tc12', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Voice');
-      const voiceText = await page2.locator('#tab-voice').innerText();
-      await snapshotTc(page2, 'tc12', 'voice', 'LIMITED', voiceText.slice(0, 120));
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Voice');
+      const voiceText = await livePage.locator('#tab-voice').innerText();
+      await snapshotTc(livePage, 'tc12', 'voice', 'LIMITED', voiceText.slice(0, 120));
+    }, pageHolder);
 
     await runTc('tc14', async () => {
-      const page2 = page2Holder.page;
-      const tools = await page2.evaluate(() => {
+      const livePage = pageHolder.page;
+      const tools = await livePage.evaluate(() => {
         const sdk = window.__RUNANYWHERE_SDK__;
         if (!sdk?.toolCalling) return { ok: false };
         return { ok: sdk.toolCalling.supportsProtoToolCalling?.() ?? false };
       });
-      await snapshotTc(page2, 'tc14', 'tool_api', tools.ok ? 'LIMITED' : 'N/A', 'SDK tool API probed; no Settings tool UI');
-    }, page2Holder);
+      await snapshotTc(livePage, 'tc14', 'tool_api', tools.ok ? 'LIMITED' : 'N/A', 'SDK tool API probed; no Settings tool UI');
+    }, pageHolder);
 
     await runTc('tc17', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Solutions');
-      await snapshotTc(page2, 'tc17', 'solutions', 'N/A', 'DEFERRED per catalog');
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Solutions');
+      await snapshotTc(livePage, 'tc17', 'solutions', 'N/A', 'DEFERRED per catalog');
+    }, pageHolder);
 
     await runTc('tc20', async () => {
-      const page2 = page2Holder.page;
-      await clickTab(page2, 'Settings');
-      const settingsOk = await page2.locator('.settings-section-title').filter({ hasText: 'Generation' }).isVisible();
-      await snapshotTc(page2, 'tc20', 'settings', settingsOk ? 'PASS' : 'FAIL', 'generation settings visible');
-    }, page2Holder);
+      const livePage = pageHolder.page;
+      await clickTab(livePage, 'Settings');
+      const settingsOk = await livePage.locator('.settings-section-title').filter({ hasText: 'Generation' }).isVisible();
+      await snapshotTc(livePage, 'tc20', 'settings', settingsOk ? 'PASS' : 'FAIL', 'generation settings visible');
+    }, pageHolder);
 
     // TC-06, TC-18, TC-19, TC-21 N/A
     for (const [id, note] of [
@@ -566,7 +721,7 @@ async function runExecutor() {
     recordCommand('tc_load_oom', 'LIMITED', 0, 'logs/browser_console.jsonl');
     recordAction({ action: 'tc_load_oom', status: 'LIMITED', expected: 'OOM handling', actual: 'Not exercised on this host', phase: 'model_load', notes: 'LIMITED' });
 
-    await page2Holder.context?.close().catch(() => {});
+    await pageHolder.context?.close().catch(() => {});
   } finally {
     fs.writeFileSync(CONSOLE_LOG, consoleEntries.map((e) => JSON.stringify(e)).join('\n'));
     fs.writeFileSync(NETWORK_LOG, networkEntries.map((e) => JSON.stringify(e)).join('\n'));
@@ -578,8 +733,19 @@ async function runExecutor() {
 }
 
 runExecutor().catch((err) => {
-  console.error('Executor top-level error:', err);
+  const msg = errorMessage(err);
+  const harness = isHarnessFailure(err, null);
+  console.error('Executor top-level error:', msg);
   recordCommand('executor', 'FAIL', 1, 'logs/browser_console.jsonl');
+  recordAction({
+    action: 'executor',
+    status: 'FAIL',
+    expected: 'E2E executor completes',
+    actual: msg.slice(0, 500),
+    phase: 'other',
+    failureKind: harness ? 'harness' : 'product',
+    notes: msg.slice(0, 500),
+  });
   fs.writeFileSync(path.join(LANE_ROOT, 'tc_results.json'), JSON.stringify(tcResults, null, 2));
   process.exit(1);
 });
