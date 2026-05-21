@@ -333,6 +333,26 @@ async function fetchFileBytes(
   return out;
 }
 
+/**
+ * Mirror a completed download into the user-visible model registry so
+ * `getModel()` / `downloadedModels()` reflect on-disk state immediately.
+ * Matches iOS `RunAnywhere+Storage.persistDownloadCompletion` → `importModel`.
+ *
+ * CPP-02 self-heal inside the C++ download orchestrator may update only the
+ * commons WASM's `s_model_registry`. `registerModel` broadcasts to every
+ * known module via `ModelRegistryAdapter`.
+ */
+function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string): void {
+  const importedModel: ModelInfo = {
+    ...model,
+    localPath,
+    isDownloaded: true,
+    isAvailable: true,
+    updatedAtUnixMs: Date.now(),
+  };
+  ModelRegistryCapability.registerModel(importedModel);
+}
+
 async function downloadMultiFileModel(
   request: DownloadModelOptions,
   model: ModelInfo,
@@ -400,15 +420,13 @@ async function downloadMultiFileModel(
     }
   }
 
-  // Update registry with folder path
+  // Mirror folder path into every WASM module's registry (WEB-001).
   try {
-    ModelRegistryCapability.updateModel({
-      ...model,
-      localPath: opfsFolder,
-      isDownloaded: true,
-    });
+    mirrorDownloadCompletionToRegistry(model, opfsFolder);
   } catch (err) {
-    logger.warning(`Multi-file registry update failed: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warning(
+      `Multi-file registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   const completed: DownloadProgress = {
@@ -995,21 +1013,14 @@ export const RunAnywhere = {
 
     request.onProgress?.(lastProgress);
 
-    // CPP-02 self-heal happens inside the C++ download orchestrator, but it
-    // only updates THAT module's `s_model_registry` (whichever WASM owns the
-    // DownloadAdapter — typically commons). Mirror the local_path into the
-    // user-visible registry adapter (which broadcasts to every known module)
-    // so subsequent `getModel(...)` and `downloadedModels()` calls reflect
-    // the new on-disk state regardless of which module they route through.
+    // CPP-02 self-heal may only update the commons WASM registry. Mirror
+    // localPath + isDownloaded into every module so harness/UI polls succeed.
     if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
       try {
-        ModelRegistryCapability.updateModel({
-          ...model,
-          localPath: lastProgress.localPath,
-        });
+        mirrorDownloadCompletionToRegistry(model, lastProgress.localPath);
       } catch (err) {
         logger.debug(
-          `post-download registry update failed: ${err instanceof Error ? err.message : String(err)}`,
+          `post-download registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
     }

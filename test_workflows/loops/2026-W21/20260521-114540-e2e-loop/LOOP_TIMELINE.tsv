@@ -82,3 +82,14 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T13:00:00-07:00	1	phase8_fix	fix-agent-cluster-05	AGENT_SPAWN	OK	CLUSTER-05	KOTLIN-AND-001 VLM stream null JNI bridge
 2026-05-21T13:02:00-07:00	1	phase8_fix	fix-agent-cluster-05	AGENT_DONE	OK	KOTLIN-AND-001	Wave7 VLM lifecycle bridge + JNI proto error throw
 2026-05-21T13:02:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	4bb5cef15	CLUSTER-05/KOTLIN-AND-001 VLM bridge lifecycle + JNI errors
+2026-05-21T13:01:44-07:00	PHASE_START	orchestrator	phase9_verify
+2026-05-21T13:02:30-07:00	1	phase9_verify	verify-coordinator	PHASE_START	OK		§7.12 lint/build matrix
+2026-05-21T13:04:30-07:00	1	phase8_verify	executor-swift-verify	AGENT_DONE	OK	20260521-130222-swift-verify-iter1	RAC_RUN_ID=20260521-130222-swift-verify-iter1 iter=1 post CLUSTER-08/09
+2026-05-21T13:06:29-07:00	1	phase9_verify	executor-web-verify	AGENT_DONE	FAIL	20260521-130317-web-verify-iter1	RAC_RUN_ID=20260521-130317-web-verify-iter1 post CLUSTER-01/02/03; tc04/tc05/tc07 NR; executor FAIL registry wait 120s at tc02 download
+2026-05-21T13:10:00-07:00	1	phase9_verify	matrix-coordinator-post-verify	AGENT_DONE	RED		matrix/MATRIX_REPORT.md	resolved=0 P0_remaining=5 kotlin_verify=NOT_RUN swift=BLOCKED web=FAIL §10=NOT_MET
+2026-05-21T13:09:38-07:00	1	phase9_verify	verify-coordinator	VERIFY_RUN	OK	20260521-130936-matrix-verify-iter1	matrix-verify-iter1 created (RAC_ALLOW_DIRTY=1)
+2026-05-21T13:32:11-07:00	1	phase9_verify	executor-kotlin-android	AGENT_DONE	LIMITED	01_kotlin_android	RAC_RUN_ID=20260521-130220-kotlin-verify-iter1 iter=1 post CLUSTER-05/06/07; pass=3 fail=0 limited=9 blocked=0; tc07=LIMITED tc09=LIMITED tc08=LIMITED tc11=LIMITED tc12=LIMITED tc13=LIMITED; rebuildCommons arm64 OK x86_64 onnx_jni copy fail; executor SCRIPT_DIR fix applied
+2026-05-21T13:34:42-07:00	PHASE_START	orchestrator	phase8_fix_round2
+2026-05-21T13:40:00-07:00	1	phase8_fix_round2	fix-agent-cluster-01b	AGENT_SPAWN	OK	CLUSTER-01b	WEB-001 isDownloaded registry mirror post OPFS persist
+2026-05-21T13:42:00-07:00	1	phase8_fix_round2	fix-agent-cluster-01b	AGENT_DONE	OK	CLUSTER-01b	mirrorDownloadCompletionToRegistry registerModel broadcast isDownloaded
+2026-05-21T13:42:00-07:00	1	phase8_fix_round2	orchestrator	COMMIT	OK	2c43ac808	CLUSTER-01b/WEB-001	Mirror download completion into TS registry immediately

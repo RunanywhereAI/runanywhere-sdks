@@ -10,3 +10,4 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T12:55:00-07:00	1	CLUSTER-08	SWIFT-IOS-001	9cc28e502	4	OK	OK	OK	FlatModelRow download errors + SDK plan retry/logging
 2026-05-21T13:02:30-07:00	1	CLUSTER-05	KOTLIN-AND-001	4bb5cef15	2	OK	OK	OK	Wave7 VLM lifecycle bridge + JNI proto error throw
 2026-05-21T13:03:05-07:00	1	CLUSTER-01	WEB-001	e6bf2b64f	3	OK	OK	SKIP	OPFS persist verification helpers ensureDownloadPersisted ensureModelPathReadyForLoad
+2026-05-21T13:42:00-07:00	1	CLUSTER-01b	WEB-001	2c43ac808	1	OK	OK	OK	registerModel mirror isDownloaded+localPath after ensureDownloadPersisted
