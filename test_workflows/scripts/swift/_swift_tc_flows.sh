@@ -154,14 +154,15 @@ _swift_drive_tc19_benchmarks() {
   _swift_open_benchmarks
   rac_mcp_shot "${lane_root}/${shot_pre}"
 
+  # BenchmarkViewModel auto-selects on-disk models; tap All only if the Models row is visible.
   _swift_tap_raw "All" || true
   sleep 1
   _swift_tap_raw "Run All Benchmarks"
-  sleep 2
+  sleep 5
   _swift_capture snapshot tc19_start 2>/dev/null || true
 
   while [[ "${elapsed}" -lt "${wait_s}" ]]; do
-    if _swift_tc19_history_ready; then
+    if _swift_tc19_history_ready || _swift_grep_any "${RAC_MARKER_BENCHMARK_SAVED}"; then
       break
     fi
     sleep 10

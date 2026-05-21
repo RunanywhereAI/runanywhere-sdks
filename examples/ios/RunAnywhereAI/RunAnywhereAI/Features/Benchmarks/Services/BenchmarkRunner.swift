@@ -246,8 +246,11 @@ final class BenchmarkRunner {
         for category: BenchmarkCategory,
         in allModels: [RAModelInfo]
     ) -> [RAModelInfo] {
-        allModels.filter {
-            $0.category == category.modelCategory && $0.isDownloadedOnDisk && !$0.isBuiltIn
+        allModels.filter { model in
+            guard model.category == category.modelCategory, !model.isBuiltIn else { return false }
+            if model.isDownloadedOnDisk { return true }
+            // Post-download registry may mark downloaded before artifact probe catches up.
+            return model.isDownloaded && !model.localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
 }

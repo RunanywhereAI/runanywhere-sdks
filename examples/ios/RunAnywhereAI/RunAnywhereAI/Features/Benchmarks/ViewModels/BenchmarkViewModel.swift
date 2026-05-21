@@ -7,6 +7,7 @@
 
 import Foundation
 import RunAnywhere
+import os
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -14,6 +15,8 @@ import UIKit
 @MainActor
 @Observable
 final class BenchmarkViewModel {
+    /// Grep marker for TC-19 harness (`test_workflows/scripts/_log_markers.sh`).
+    private static let historySavedLogMarker = "Benchmark history saved"
     // MARK: - State
 
     var isRunning = false
@@ -44,6 +47,7 @@ final class BenchmarkViewModel {
 
     private let runner = BenchmarkRunner()
     private let store = BenchmarkStore()
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Benchmarks")
     private var runTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
 
@@ -79,9 +83,21 @@ final class BenchmarkViewModel {
             }
         }
         availableModels = grouped
+        let availableIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
         if selectedModelIds.isEmpty {
-            selectedModelIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
+            selectedModelIds = availableIds
+        } else {
+            selectedModelIds = selectedModelIds.intersection(availableIds)
+            if selectedModelIds.isEmpty, !availableIds.isEmpty {
+                selectedModelIds = availableIds
+            }
         }
+    }
+
+    /// Categories that have on-disk models after the latest registry rescan.
+    private func categoriesReadyToRun() -> Set<BenchmarkCategory> {
+        let withModels = selectedCategories.filter { !(availableModels[$0]?.isEmpty ?? true) }
+        return withModels.isEmpty ? selectedCategories : withModels
     }
 
     func toggleModel(_ modelId: String) {
@@ -121,15 +137,19 @@ final class BenchmarkViewModel {
     private func executeBenchmarkRun() async {
         await reloadAvailableModels()
 
+        let availableIds = Set(availableModels.values.flatMap { $0 }.map { $0.id })
+        if !availableIds.isEmpty {
+            selectedModelIds = availableIds
+        }
+        let categoriesToRun = categoriesReadyToRun()
+
         let deviceInfo = makeDeviceInfo()
         var run = BenchmarkRun(deviceInfo: deviceInfo)
 
         do {
-            let availableIds = Set(availableModels.values.flatMap { $0 }.map { $0.id })
-            let effectiveSelection = selectedModelIds.intersection(availableIds)
-            let modelIds: Set<String>? = effectiveSelection.isEmpty ? nil : effectiveSelection
+            let modelIds: Set<String>? = availableIds.isEmpty ? nil : availableIds
             let output = try await runner.runBenchmarks(
-                categories: selectedCategories,
+                categories: categoriesToRun,
                 modelIds: modelIds
             ) { [weak self] update in
                 Task { @MainActor in
@@ -166,6 +186,12 @@ final class BenchmarkViewModel {
         // grading waits for a real benchmark history entry.
         if !run.results.isEmpty || run.status == .cancelled {
             store.save(run: run)
+            if !run.results.isEmpty {
+                let duration = run.duration ?? 0
+                logger.info(
+                    "\(Self.historySavedLogMarker, privacy: .public) results=\(run.results.count) duration=\(duration, privacy: .public)s"
+                )
+            }
         }
         loadPastRuns()
         isRunning = false
