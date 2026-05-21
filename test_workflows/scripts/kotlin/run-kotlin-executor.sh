@@ -3,8 +3,8 @@
 # Drives shared keyframes 007–014 and holds TTS/Voice/RAG until log markers appear.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+KOTLIN_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${KOTLIN_SCRIPT_DIR}/../../.." && pwd)"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 : "${RAC_ANDROID_SERIAL:?RAC_ANDROID_SERIAL required (set via session-manage.sh lane kotlin)}"
@@ -19,7 +19,7 @@ MAIN_ACTIVITY="${MAIN_ACTIVITY:-${PACKAGE_ID}/com.runanywhere.runanywhereai.Main
 export PACKAGE_ID MAIN_ACTIVITY
 
 # shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
+source "${KOTLIN_SCRIPT_DIR}/../_tc_helper.sh"
 
 # Kotlin bottom tabs (catalog §4) — More hub for STT/TTS/VAD/RAG/LoRA/Benchmarks
 export RAC_TAB_CHAT="Chat"
@@ -48,7 +48,8 @@ _kotlin_logcat_snapshot() {
     adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s RunAnywhere:* VLM:* System.out:* 2>/dev/null || true
     adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s \
       SpeechToTextViewModel:* TextToSpeechViewModel:* VLMViewModel:* \
-      RunAnywhereApplication:* VoiceAssistantViewModel:* RAGViewModel:* 2>/dev/null || true
+      ModelSelectionViewModel:* RunAnywhereApplication:* VoiceAssistantViewModel:* \
+      RAGViewModel:* 2>/dev/null || true
     adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null || true
   }
 }
@@ -59,10 +60,14 @@ _kotlin_grep() {
 }
 
 # shellcheck source=_kotlin_tc_flows.sh
-source "${SCRIPT_DIR}/_kotlin_tc_flows.sh"
+source "${KOTLIN_SCRIPT_DIR}/_kotlin_tc_flows.sh"
 
 rac_tc_init_lane
 _kotlin_launch_main
+adb -s "${RAC_ANDROID_SERIAL}" shell pm grant "${PACKAGE_ID}" android.permission.RECORD_AUDIO \
+  >/dev/null 2>&1 || true
+adb -s "${RAC_ANDROID_SERIAL}" shell pm grant "${PACKAGE_ID}" android.permission.CAMERA \
+  >/dev/null 2>&1 || true
 _kotlin_ensure_foreground "tc01-launch" || true
 sleep 5
 _kotlin_shot "000_app_launch"

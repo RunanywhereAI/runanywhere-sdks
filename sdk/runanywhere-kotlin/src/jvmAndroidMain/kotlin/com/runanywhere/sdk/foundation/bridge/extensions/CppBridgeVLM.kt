@@ -159,9 +159,9 @@ object CppBridgeVLM {
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
         onEvent: (RASDKEvent) -> Boolean,
-    ) {
+    ): RAVLMResult {
         val handle = getHandle()
-        decodeOrThrow(
+        return decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessStreamProto(
                 handle,

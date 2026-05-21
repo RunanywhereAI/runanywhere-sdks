@@ -101,10 +101,16 @@ actual fun RunAnywhere.processImageStream(
         val job =
             launch(Dispatchers.IO) {
                 try {
-                    CppBridgeVLM.processStream(image, options) { event ->
-                        trySend(event)
-                        true
-                    }
+                    val result =
+                        CppBridgeVLM.processStream(image, options) { event ->
+                            trySend(event)
+                            true
+                        }
+                    vlmLogger.info(
+                        "VLM processing complete: ${result.completion_tokens} tokens in " +
+                            "${result.processing_time_ms}ms " +
+                            "(${String.format(java.util.Locale.ROOT, "%.1f", result.tokens_per_second)} tok/s)",
+                    )
                     close()
                 } catch (e: Exception) {
                     close(e)

@@ -28,6 +28,8 @@ RAC_MARKER_TTS_SYNTHESIS='Synthesis complete'
 RAC_MARKER_STT_BATCH='Batch transcription complete'
 RAC_MARKER_VAD_LISTEN='Listening for speech'
 RAC_MARKER_VLM_STREAM='Starting VLM streaming'
+RAC_MARKER_VLM_FRAME_DONE='Frame description completed'
+RAC_MARKER_VLM_SDK_DONE='VLM processing complete'
 RAC_MARKER_VOICE_SYNC='Model states synced'
 RAC_MARKER_VOICE_SESSION='Voice session started'
 RAC_MARKER_RAG_INGEST='Ingesting document text'
@@ -173,10 +175,19 @@ _kotlin_tap_on_screen() {
 
 _kotlin_ensure_model_loaded() {
   local context_label="$1"
-  _kotlin_tap_on_screen "Select Model" || _kotlin_tap_on_screen "Change" || true
+  _kotlin_tap_on_screen "Get Started" \
+    || _kotlin_tap_on_screen "Select Model" \
+    || _kotlin_tap_on_screen "Change" \
+    || true
   sleep 2
-  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  _kotlin_tap_on_screen "SmolVLM" \
+    || _kotlin_tap_on_screen "smolvlm" \
+    || _kotlin_tap_on_screen "Use" \
+    || _kotlin_tap_on_screen "Download" \
+    || true
   sleep 4
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 10
   _kotlin_tap_on_screen "Use" || true
   sleep 6
   _kotlin_back
@@ -319,6 +330,10 @@ _kotlin_tc09_vlm() {
   _kotlin_tap_on_screen "Vision Chat" || true
   sleep 2
   _kotlin_ensure_model_loaded "vlm"
+  _kotlin_wait_grep "Model load succeeded for smolvlm" 180 \
+    || _kotlin_wait_grep "VLM model loaded: true" 60 \
+    || true
+  sleep 3
   _kotlin_shot "013_vision_tab"
   _kotlin_snapshot "tc09_vision_tab"
 
@@ -334,7 +349,8 @@ _kotlin_tc09_vlm() {
 
   local status="LIMITED" notes="VLM analyze triggered; awaiting stream completion"
   if _kotlin_wait_grep "VLM streaming completed" 240 \
-    || _kotlin_wait_grep "VLM processing complete" 30; then
+    || _kotlin_wait_grep "${RAC_MARKER_VLM_FRAME_DONE}" 240 \
+    || _kotlin_wait_grep "${RAC_MARKER_VLM_SDK_DONE}" 240; then
     status="PASS"
     notes="VLM completion marker observed in logcat"
   elif _kotlin_grep "racVlmProcessStreamProto returned null"; then
