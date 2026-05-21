@@ -68,7 +68,7 @@ _swift_drive_stt_download() {
     fi
     sleep 5
     elapsed=$((elapsed + 5))
-    if (( elapsed % 30 == 0 )); then
+    if [[ $((elapsed % 30)) -eq 0 ]]; then
       _swift_tap_stt_get_button
     fi
   done
@@ -119,7 +119,7 @@ _swift_ensure_llm_on_disk() {
     fi
     sleep 10
     elapsed=$((elapsed + 10))
-    if (( elapsed % 30 == 0 )); then
+    if [[ $((elapsed % 30)) -eq 0 ]]; then
       _swift_tap_raw "Get" || true
     fi
   done

@@ -134,6 +134,10 @@ _swift_tc07_evidence() {
     esac
   fi
 
+  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
+    printf '%s\n' "limited:stt_sheet_reached_no_logs"
+    return 0
+  fi
   local shot="${RAC_SESSION_ROOT:-}/screenshots/013_transcribe.png"
   if [[ -f "${shot}" ]]; then
     if xcrun simctl ui "$(_swift_sim_target)" describe 2>/dev/null \
@@ -142,10 +146,6 @@ _swift_tc07_evidence() {
       return 0
     fi
     printf '%s\n' "limited:screenshot_only"
-    return 0
-  fi
-  if [[ -f "${RAC_SESSION_ROOT:-}/screenshots/013b_stt_model_sheet.png" ]]; then
-    printf '%s\n' "limited:stt_sheet_reached_no_logs"
     return 0
   fi
   return 1
