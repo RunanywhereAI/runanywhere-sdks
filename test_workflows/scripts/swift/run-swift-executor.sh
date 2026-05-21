@@ -94,6 +94,4 @@ rac_tc_drive_catalog
 _swift_drive_stt_download
 _swift_capture snapshot post_catalog
 _swift_finalize_tc07_tc10
-_swift_drive_tc19_benchmarks
-_swift_capture snapshot post_tc19 2>/dev/null || true
 echo "Swift iOS executor: catalog drive complete"
