@@ -44,15 +44,27 @@ _kotlin_ui_lock_file() {
   printf '/tmp/rac_kotlin_uiautomator_%s.lock' "${safe_serial}"
 }
 
+_kotlin_adb_shell() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 35 adb -s "${RAC_ANDROID_SERIAL}" shell "$@"
+  else
+    adb -s "${RAC_ANDROID_SERIAL}" shell "$@"
+  fi
+}
+
 _kotlin_pull_ui_xml() {
   local dest="$1"
-  local lock_file
-  lock_file="$(_kotlin_ui_lock_file)"
-  (
-    flock -w 45 9 || exit 1
-    adb -s "${RAC_ANDROID_SERIAL}" shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || exit 1
-    adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${dest}" >/dev/null 2>&1 || exit 1
-  ) 9>"${lock_file}"
+  local lock_dir lock_wait=0
+  lock_dir="$(_kotlin_ui_lock_file).d"
+  while ! mkdir "${lock_dir}" 2>/dev/null; do
+    lock_wait=$((lock_wait + 1))
+    [[ "${lock_wait}" -ge 60 ]] && return 1
+    sleep 1
+  done
+  _kotlin_adb_shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1     && adb -s "${RAC_ANDROID_SERIAL}" pull /sdcard/ui.xml "${dest}" >/dev/null 2>&1
+  local rc=$?
+  rmdir "${lock_dir}" 2>/dev/null || true
+  return "${rc}"
 }
 
 _kotlin_shot() {
@@ -81,6 +93,41 @@ _kotlin_wait_grep() {
   done
   return 1
 }
+
+_kotlin_logcat_stt() {
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s SpeechToTextViewModel:* 2>/dev/null || true
+}
+
+_kotlin_wait_stt_model_ready() {
+  local timeout="${1:-180}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_logcat_stt | grep -F 'Model loaded notification' >/dev/null 2>&1       || _kotlin_logcat_stt | grep -F 'STT model download completed' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_stt_batch_marker_seen() {
+  _kotlin_logcat_stt | grep -E 'Batch transcription complete' >/dev/null 2>&1
+}
+
+_kotlin_wait_stt_batch_marker() {
+  local timeout="${1:-180}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_stt_batch_marker_seen; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
 
 _kotlin_logcat_vlm() {
   adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s VLMViewModel:* ModelSelectionViewModel:* 2>/dev/null || true
@@ -313,10 +360,38 @@ _kotlin_ensure_vlm_model_loaded() {
   sleep 2
 }
 
+_kotlin_ensure_stt_model_loaded() {
+  if _kotlin_logcat_stt | grep -F 'Model loaded notification' >/dev/null 2>&1; then
+    return 0
+  fi
+  _kotlin_tap_on_screen "Get Started" \
+    || _kotlin_tap_on_screen "Select Model" \
+    || _kotlin_tap_on_screen "Change" \
+    || true
+  sleep 2
+  _kotlin_tap_on_screen "Sherpa Whisper Tiny" \
+    || _kotlin_tap_on_screen "Whisper Tiny" \
+    || _kotlin_tap_on_screen "Whisper" \
+    || _kotlin_tap_on_screen "sherpa-onnx-whisper" \
+    || _kotlin_tap_on_screen "Use" \
+    || _kotlin_tap_on_screen "Download" \
+    || true
+  sleep 4
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 10
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_wait_stt_model_ready 180 || true
+  sleep 2
+}
+
 _kotlin_ensure_model_loaded() {
   local context_label="$1"
   if [[ "${context_label}" == "vlm" ]]; then
     _kotlin_ensure_vlm_model_loaded
+    return 0
+  fi
+  if [[ "${context_label}" == "stt" ]]; then
+    _kotlin_ensure_stt_model_loaded
     return 0
   fi
   _kotlin_tap_on_screen "Get Started" \
@@ -394,24 +469,24 @@ _kotlin_tc07_stt() {
   _kotlin_shot "007_stt_tab"
   _kotlin_snapshot "tc07_stt_tab"
 
-  _kotlin_tap_on_screen "Batch" || true
+  _kotlin_tap_on_screen "Batch" || _kotlin_tap_on_screen "Record then transcribe" || true
   sleep 2
 
-  # Catalog §2: inject/play fixed STT phrase before batch record (KOTLIN-AND-002)
   rac_ensure_stt_fixture "${RAC_STT_FIXTURE_PATH}" "${REPO_ROOT}" || true
   export PACKAGE_ID MAIN_ACTIVITY
-  rac_inject_stt_fixture_start "${RAC_ANDROID_SERIAL}" "${RAC_STT_FIXTURE_PATH}" || true
-  sleep 3
-  _kotlin_ensure_foreground "tc07-post-inject" || true
+  _kotlin_ensure_foreground "tc07-pre-record" || true
 
-  _kotlin_tap_on_screen "Microphone" || _kotlin_tap_on_screen "Start recording" || true
-  local record_secs="${RAC_STT_RECORD_SECS:-8}"
+  _kotlin_tap_on_screen "Start recording" || _kotlin_tap_on_screen "Microphone" || true
+  sleep 1
+  rac_inject_stt_fixture_start "${RAC_ANDROID_SERIAL}" "${RAC_STT_FIXTURE_PATH}" || true
+  local record_secs="${RAC_STT_RECORD_SECS:-10}"
   sleep "${record_secs}"
   _kotlin_tap_on_screen "Stop recording" || _kotlin_tap_on_screen "Microphone" || true
   rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}"
+  sleep 3
 
   local status="FAIL" notes="STT batch driven; catalog keywords missing in transcript"
-  if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 150; then
+  if _kotlin_wait_stt_batch_marker 180; then
     if rac_stt_transcript_has_keywords "${RAC_ANDROID_SERIAL}"; then
       status="PASS"
       notes="Batch transcription complete with catalog keywords (RunAnywhere, models, device)"
