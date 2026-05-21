@@ -18,3 +18,4 @@ iso_ts	iter	cluster	issue_ids	commit_sha	files_changed	lint_status	typecheck_sta
 2026-05-21T15:47:00-07:00	1	CLUSTER-05b	KOTLIN-AND-001	542509a88	3	OK	OK	OK	VLMStreamEvent decode mapper + gallery completion log
 2026-05-21T16:45:00-07:00	1	CLUSTER-08b	SWIFT-IOS-001	d85c21a54	5	OK	OK	OK	Always-on OSLog + example catalog markers for STT download/load grep
 2026-05-21T16:30:00-07:00	1	CLUSTER-05b	KOTLIN-AND-001	07fe10be0	2	OK	OK	OK	VLM lifecycle handle 0L + STREAM_COMPLETED emission for TC-09
+2026-05-21T16:10:00-07:00	1	CLUSTER-06b	KOTLIN-HARNESS	0e97c0bdd	2	OK	OK	SKIP	bash3 set -e UI tap abort + timed adb pull lock recovery catalog wrapper tc09-only
