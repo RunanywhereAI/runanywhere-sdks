@@ -77,8 +77,15 @@ object CppBridgeVLM {
 
     private val logger = SDKLogger("CppBridge.VLM")
 
-    /** Mirrors Swift `CppBridge.VLM.shared.getHandle()` — satisfies the proto ABI signature. */
-    suspend fun getHandle(): Long = actor.getHandle()
+    /**
+     * Proto ABI handle for VLM inference. Mirrors Swift's `getHandle()` surface
+     * but returns `0L` because Kotlin has no `rac_vlm_component_create` JNI
+     * binding yet — commons/JNI treat handle `0` as "use lifecycle-owned VLM"
+     * (see `rac_vlm_process_stream_proto` / `RunAnywhereBridge` comments).
+     * Do not route through [ComponentActor.getHandle]: the VLM vtable
+     * `createFn` returns `0L` by design and the actor rejects that as failure.
+     */
+    suspend fun getHandle(): Long = 0L
 
     suspend fun destroy() {
         actor.destroy()
