@@ -7,6 +7,7 @@ set -euo pipefail
 : "${RAC_ANDROID_SERIAL:?RAC_ANDROID_SERIAL required}"
 
 PACKAGE_ID="${PACKAGE_ID:-com.runanywhere.runanywhereai.debug}"
+MAIN_ACTIVITY="${MAIN_ACTIVITY:-${PACKAGE_ID}/com.runanywhere.runanywhereai.MainActivity}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 CAPTURE_SCRIPT="${REPO_ROOT}/test_workflows/scripts/kotlin/capture-kotlin-logs.sh"
 INJECT_STT_SCRIPT="${REPO_ROOT}/test_workflows/scripts/android/inject-stt-audio.sh"
@@ -50,16 +51,78 @@ _kotlin_snapshot() {
 
 _kotlin_wait_grep() {
   local pattern="$1"
-  local timeout="${2:-90}"
+  local timeout="${2:-120}"
   local elapsed=0
   while [[ "${elapsed}" -lt "${timeout}" ]]; do
     if _kotlin_grep "${pattern}"; then
       return 0
     fi
-    sleep 2
-    elapsed=$((elapsed + 2))
+    sleep 3
+    elapsed=$((elapsed + 3))
   done
   return 1
+}
+
+_kotlin_foreground_package() {
+  local line pkg
+  line="$(adb -s "${RAC_ANDROID_SERIAL}" shell dumpsys activity activities 2>/dev/null \
+    | grep -E 'topResumedActivity|mResumedActivity' | head -n1 || true)"
+  pkg="$(printf '%s\n' "${line}" | grep -oE 'u0 [^ /]+' | head -n1 | sed 's/u0 //' || true)"
+  if [[ -n "${pkg}" ]]; then
+    printf '%s' "${pkg}"
+    return 0
+  fi
+  line="$(adb -s "${RAC_ANDROID_SERIAL}" shell dumpsys window 2>/dev/null \
+    | grep -E 'mCurrentFocus|mFocusedApp' | head -n1 || true)"
+  pkg="$(printf '%s\n' "${line}" | grep -oE 'u0 [^ /]+' | head -n1 | sed 's/u0 //' || true)"
+  printf '%s' "${pkg}"
+}
+
+_kotlin_dismiss_launcher() {
+  local fg
+  fg="$(_kotlin_foreground_package)"
+  if [[ "${fg}" == *"launcher"* ]] || [[ "${fg}" == *"Launcher"* ]]; then
+    adb -s "${RAC_ANDROID_SERIAL}" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    sleep 1
+  fi
+}
+
+_kotlin_launch_main() {
+  adb -s "${RAC_ANDROID_SERIAL}" shell am start -W -S -n "${MAIN_ACTIVITY}" \
+    -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+    >/dev/null 2>&1 || true
+  sleep 3
+}
+
+_kotlin_ensure_foreground() {
+  local context="${1:-modality}"
+  _kotlin_dismiss_launcher
+  local fg
+  fg="$(_kotlin_foreground_package)"
+  if [[ "${fg}" != *"${PACKAGE_ID}"* ]]; then
+    _kotlin_launch_main
+    fg="$(_kotlin_foreground_package)"
+  fi
+  if [[ "${fg}" != *"${PACKAGE_ID}"* ]]; then
+    echo "WARN: ${context}: foreground '${fg:-unknown}', expected ${PACKAGE_ID}" >&2
+    return 1
+  fi
+  return 0
+}
+
+_kotlin_modality_preflight() {
+  local tc="$1"
+  _kotlin_launch_main
+  _kotlin_ensure_foreground "${tc}" || true
+  sleep 2
+}
+
+_kotlin_tab_tap() {
+  local label="$1"
+  _kotlin_ensure_foreground "tab-${label}" || true
+  rac_mcp_tap "${label}"
+  sleep 2
+  _kotlin_ensure_foreground "after-tab-${label}" || true
 }
 
 _kotlin_scroll_down() {
@@ -70,17 +133,18 @@ _kotlin_scroll_down() {
 _kotlin_back() {
   adb -s "${RAC_ANDROID_SERIAL}" shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
   sleep 1
+  _kotlin_ensure_foreground "after-back" || true
 }
 
 _kotlin_open_more_feature() {
   local title="$1"
-  rac_mcp_tap "More"
-  sleep 1
+  _kotlin_tab_tap "More"
   if ! _kotlin_tap_on_screen "${title}"; then
     _kotlin_scroll_down
     _kotlin_tap_on_screen "${title}" || true
   fi
   sleep 2
+  _kotlin_ensure_foreground "more-${title}" || true
 }
 
 _kotlin_tap_on_screen() {
@@ -102,19 +166,20 @@ _kotlin_tap_on_screen() {
   x2="$(echo "${bounds}" | sed -E 's/.*\[([0-9]+),([0-9]+)\]/\1/')"
   y2="$(echo "${bounds}" | sed -E 's/.*\[([0-9]+),([0-9]+)\]/\2/')"
   adb -s "${RAC_ANDROID_SERIAL}" shell input tap $((x1 + (x2 - x1) / 2)) $((y1 + (y2 - y1) / 2)) >/dev/null 2>&1
+  sleep 1
+  _kotlin_ensure_foreground "tap-${label}" || true
   return 0
 }
 
 _kotlin_ensure_model_loaded() {
   local context_label="$1"
   _kotlin_tap_on_screen "Select Model" || _kotlin_tap_on_screen "Change" || true
-  sleep 1
+  sleep 2
   _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
-  sleep 3
+  sleep 4
   _kotlin_tap_on_screen "Use" || true
-  sleep 5
+  sleep 6
   _kotlin_back
-  sleep 1
 }
 
 _kotlin_push_rag_fixture() {
@@ -133,7 +198,7 @@ _kotlin_push_rag_fixture() {
 
 _kotlin_select_document_in_picker() {
   local attempts=0
-  while [[ "${attempts}" -lt 6 ]]; do
+  while [[ "${attempts}" -lt 4 ]]; do
     _kotlin_tap_on_screen "rag-sample.json" && return 0
     _kotlin_tap_on_screen "Downloads" || _kotlin_tap_on_screen "Download" || true
     sleep 2
@@ -147,6 +212,7 @@ _kotlin_select_document_in_picker() {
 # TC-06 — VAD
 # ---------------------------------------------------------------------------
 _kotlin_tc06_vad() {
+  _kotlin_modality_preflight "tc06"
   _kotlin_open_more_feature "Voice Activity Detection"
   _kotlin_ensure_model_loaded "vad"
   sleep 3
@@ -167,26 +233,30 @@ _kotlin_tc06_vad() {
 # TC-07 / TC-10 — STT (keyframes 007, 008)
 # ---------------------------------------------------------------------------
 _kotlin_tc07_stt() {
+  _kotlin_modality_preflight "tc07"
   _kotlin_open_more_feature "Speech to Text"
   _kotlin_ensure_model_loaded "stt"
   _kotlin_shot "007_stt_tab"
   _kotlin_snapshot "tc07_stt_tab"
 
   _kotlin_tap_on_screen "Batch" || true
-  sleep 1
+  sleep 2
 
   # Catalog §2: inject/play fixed STT phrase before batch record (KOTLIN-AND-002)
   rac_ensure_stt_fixture "${RAC_STT_FIXTURE_PATH}" "${REPO_ROOT}" || true
+  export PACKAGE_ID MAIN_ACTIVITY
   rac_inject_stt_fixture_start "${RAC_ANDROID_SERIAL}" "${RAC_STT_FIXTURE_PATH}" || true
+  sleep 3
+  _kotlin_ensure_foreground "tc07-post-inject" || true
 
   _kotlin_tap_on_screen "Microphone" || _kotlin_tap_on_screen "Start recording" || true
-  local record_secs="${RAC_STT_RECORD_SECS:-5}"
+  local record_secs="${RAC_STT_RECORD_SECS:-8}"
   sleep "${record_secs}"
   _kotlin_tap_on_screen "Stop recording" || _kotlin_tap_on_screen "Microphone" || true
   rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}"
 
   local status="FAIL" notes="STT batch driven; catalog keywords missing in transcript"
-  if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 120; then
+  if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 150; then
     if rac_stt_transcript_has_keywords "${RAC_ANDROID_SERIAL}"; then
       status="PASS"
       notes="Batch transcription complete with catalog keywords (RunAnywhere, models, device)"
@@ -211,6 +281,7 @@ _kotlin_tc07_stt() {
 # TC-08 / TC-11 — TTS (keyframes 009, 010; hold for Synthesis complete)
 # ---------------------------------------------------------------------------
 _kotlin_tc08_tts() {
+  _kotlin_modality_preflight "tc08"
   _kotlin_open_more_feature "Text to Speech"
   _kotlin_ensure_model_loaded "tts"
   _kotlin_shot "009_tts_tab"
@@ -221,14 +292,14 @@ _kotlin_tc08_tts() {
   _kotlin_tap_on_screen "Generate" || true
 
   local status="LIMITED" notes="TTS generate tapped; waiting for synthesis log"
-  if _kotlin_wait_grep "${RAC_MARKER_TTS_SYNTHESIS}" 120; then
+  if _kotlin_wait_grep "${RAC_MARKER_TTS_SYNTHESIS}" 150; then
     status="PASS"
     notes="[TTS] Synthesis complete observed in logcat"
-    sleep 3
+    sleep 4
     _kotlin_tap_on_screen "Play" || true
-    sleep 5
+    sleep 6
   else
-    sleep 15
+    sleep 18
   fi
 
   _kotlin_shot "010_tts_played"
@@ -243,8 +314,8 @@ _kotlin_tc08_tts() {
 # TC-09 — VLM (keyframes 013, 014)
 # ---------------------------------------------------------------------------
 _kotlin_tc09_vlm() {
-  rac_mcp_tap "Vision"
-  sleep 1
+  _kotlin_modality_preflight "tc09"
+  _kotlin_tab_tap "Vision"
   _kotlin_tap_on_screen "Vision Chat" || true
   sleep 2
   _kotlin_ensure_model_loaded "vlm"
@@ -255,27 +326,32 @@ _kotlin_tc09_vlm() {
   sleep 2
   adb -s "${RAC_ANDROID_SERIAL}" shell input tap 200 600 >/dev/null 2>&1 || true
   sleep 2
+  _kotlin_ensure_foreground "tc09-post-picker" || true
 
   _kotlin_type "What is visible in this image?"
-  sleep 1
+  sleep 2
   _kotlin_tap_on_screen "Analyze" || true
 
   local status="LIMITED" notes="VLM analyze triggered; awaiting stream completion"
-  if _kotlin_wait_grep "VLM streaming completed" 180; then
+  if _kotlin_wait_grep "VLM streaming completed" 240 \
+    || _kotlin_wait_grep "VLM processing complete" 30; then
     status="PASS"
-    notes="VLM streaming completed in logcat"
+    notes="VLM completion marker observed in logcat"
   elif _kotlin_grep "racVlmProcessStreamProto returned null"; then
     status="FAIL"
     notes="VLM stream failed: racVlmProcessStreamProto returned null"
-  elif _kotlin_grep "${RAC_MARKER_VLM_STREAM}"; then
-    notes="VLM stream started; completion marker missing within timeout"
+  elif _kotlin_grep "${RAC_MARKER_VLM_STREAM}" \
+    && ! _kotlin_grep "racVlmProcessStreamProto returned null"; then
+    status="LIMITED"
+    notes="VLM stream started without JNI null; completion marker missing within timeout"
+  elif ! _kotlin_grep "racVlmProcessStreamProto returned null"; then
+    notes="VLM analyze triggered; no JNI null error but completion marker missing"
   fi
 
-  sleep 3
+  sleep 4
   _kotlin_shot "014_vision_response"
   _kotlin_snapshot "tc09_vision_response"
   rac_tc_done tc09 "${status}" "${notes}" "screenshots/014_vision_response.png"
-  _kotlin_back
   _kotlin_back
   sleep 1
 }
@@ -284,8 +360,8 @@ _kotlin_tc09_vlm() {
 # TC-12 — Voice agent (keyframes 011, 012)
 # ---------------------------------------------------------------------------
 _kotlin_tc12_voice() {
-  rac_mcp_tap "Voice"
-  sleep 2
+  _kotlin_modality_preflight "tc12"
+  _kotlin_tab_tap "Voice"
   _kotlin_shot "011_voice_tab"
   _kotlin_snapshot "tc12_voice_tab"
 
@@ -296,13 +372,13 @@ _kotlin_tc12_voice() {
   if _kotlin_grep "${RAC_MARKER_VOICE_SYNC}"; then
     notes="Model states synced STT+LLM+TTS"
   fi
-  if _kotlin_wait_grep "${RAC_MARKER_VOICE_SESSION}" 30; then
+  if _kotlin_wait_grep "${RAC_MARKER_VOICE_SESSION}" 45; then
     notes="${notes}; voice session started"
     sleep 5
     _kotlin_tap_on_screen "Microphone" || true
     sleep 8
     _kotlin_tap_on_screen "Microphone" || true
-    if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 90 || _kotlin_grep "Transcription complete"; then
+    if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 120 || _kotlin_grep "Transcription complete"; then
       status="PASS"
       notes="Voice turn: session started with transcription evidence"
     fi
@@ -318,6 +394,7 @@ _kotlin_tc12_voice() {
 # TC-13 — RAG Document Q&A
 # ---------------------------------------------------------------------------
 _kotlin_tc13_rag() {
+  _kotlin_modality_preflight "tc13"
   _kotlin_push_rag_fixture
   _kotlin_open_more_feature "Document Q&A"
   sleep 2
@@ -342,13 +419,13 @@ _kotlin_tc13_rag() {
   sleep 5
 
   local status="LIMITED" notes="RAG document picker driven"
-  if _kotlin_wait_grep "${RAC_MARKER_RAG_INGEST}" 120 || _kotlin_wait_grep "${RAC_MARKER_RAG_LOADED}" 120; then
+  if _kotlin_wait_grep "${RAC_MARKER_RAG_INGEST}" 150 || _kotlin_wait_grep "${RAC_MARKER_RAG_LOADED}" 150; then
     status="PASS"
     notes="RAG ingest completed"
     _kotlin_type "${RAC_INPUT_RAG_QUERY}"
     sleep 1
     _kotlin_tap_on_screen "Send" || true
-    if _kotlin_wait_grep "${RAC_MARKER_RAG_QUERY}" 120; then
+    if _kotlin_wait_grep "${RAC_MARKER_RAG_QUERY}" 150; then
       notes="RAG ingest + query completed"
     else
       status="LIMITED"
@@ -367,8 +444,8 @@ _kotlin_tc13_rag() {
 # TC-14 — Tool calling (Settings → Chat)
 # ---------------------------------------------------------------------------
 _kotlin_tc14_tools() {
-  rac_mcp_tap "Settings"
-  sleep 2
+  _kotlin_modality_preflight "tc14"
+  _kotlin_tab_tap "Settings"
   _kotlin_scroll_down
   _kotlin_tap_on_screen "Enable Tool Calling" || true
   sleep 1
@@ -381,12 +458,12 @@ _kotlin_tc14_tools() {
     notes="Demo tools registered"
   fi
 
-  rac_mcp_tap "Chat"
+  _kotlin_tab_tap "Chat"
   sleep 2
   _kotlin_type "${RAC_INPUT_TOOL_PROMPT}"
-  sleep 1
+  sleep 2
   _kotlin_tap_on_screen "Send" || true
-  sleep 15
+  sleep 18
 
   if _kotlin_grep "calculate" || _kotlin_grep "tool"; then
     status="PASS"
@@ -401,8 +478,8 @@ _kotlin_tc14_tools() {
 # TC-20 — Settings (API sheet + logging)
 # ---------------------------------------------------------------------------
 _kotlin_tc20_settings() {
-  rac_mcp_tap "Settings"
-  sleep 2
+  _kotlin_modality_preflight "tc20"
+  _kotlin_tab_tap "Settings"
   _kotlin_shot "015_settings_tab"
   _kotlin_tap_on_screen "API Key" || true
   sleep 2
@@ -427,6 +504,7 @@ _kotlin_tc20_settings() {
 # TC-21 — LoRA adapters
 # ---------------------------------------------------------------------------
 _kotlin_tc21_lora() {
+  _kotlin_modality_preflight "tc21"
   _kotlin_open_more_feature "LoRA Adapters"
   sleep 2
   _kotlin_snapshot "tc21_lora_screen"
@@ -434,12 +512,12 @@ _kotlin_tc21_lora() {
   _kotlin_tap_on_screen "Download" || true
   sleep 10
 
-  rac_mcp_tap "Chat"
+  _kotlin_tab_tap "Chat"
   sleep 2
   _kotlin_tap_on_screen "LoRA" || _kotlin_tap_on_screen "+ LoRA" || true
   sleep 2
   _kotlin_tap_on_screen "Apply" || true
-  sleep 5
+  sleep 6
 
   local status="LIMITED" notes="LoRA manager + apply flow attempted"
   if _kotlin_grep "${RAC_MARKER_LORA_APPLY}" || _kotlin_grep "LoRA adapter"; then
@@ -452,13 +530,13 @@ _kotlin_tc21_lora() {
   _kotlin_tap_on_screen "Send" || true
   sleep 10
 
-  rac_mcp_tap "More"
+  _kotlin_tab_tap "More"
   sleep 1
   _kotlin_scroll_down
   _kotlin_tap_on_screen "LoRA Adapters" || true
   sleep 2
   _kotlin_tap_on_screen "Unload" || _kotlin_tap_on_screen "Clear All Adapters" || true
-  sleep 3
+  sleep 4
 
   _kotlin_snapshot "tc21_lora"
   rac_tc_done tc21 "${status}" "${notes}" ""

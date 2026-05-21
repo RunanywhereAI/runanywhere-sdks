@@ -6,11 +6,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-# shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
-# shellcheck source=_kotlin_tc_flows.sh
-source "${SCRIPT_DIR}/_kotlin_tc_flows.sh"
-
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 : "${RAC_ANDROID_SERIAL:?RAC_ANDROID_SERIAL required (set via session-manage.sh lane kotlin)}"
 export RAC_LANE_SLUG="01_kotlin_android"
@@ -20,6 +15,11 @@ export REPO_ROOT="${REPO}"
 
 PACKAGE_ID="${PACKAGE_ID:-com.runanywhere.runanywhereai.debug}"
 ANDROID_PACKAGE="${ANDROID_PACKAGE:-${PACKAGE_ID}}"
+MAIN_ACTIVITY="${MAIN_ACTIVITY:-${PACKAGE_ID}/com.runanywhere.runanywhereai.MainActivity}"
+export PACKAGE_ID MAIN_ACTIVITY
+
+# shellcheck source=../_tc_helper.sh
+source "${SCRIPT_DIR}/../_tc_helper.sh"
 
 # Kotlin bottom tabs (catalog §4) — More hub for STT/TTS/VAD/RAG/LoRA/Benchmarks
 export RAC_TAB_CHAT="Chat"
@@ -43,12 +43,27 @@ _kotlin_type() {
   adb -s "${RAC_ANDROID_SERIAL}" shell input text "${text// /%s}" >/dev/null 2>&1 || true
 }
 
-_kotlin_grep() {
-  local pattern="$1"
-  adb -s "${RAC_ANDROID_SERIAL}" logcat -d | grep -F "${pattern}" >/dev/null 2>&1
+_kotlin_logcat_snapshot() {
+  {
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s RunAnywhere:* VLM:* System.out:* 2>/dev/null || true
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d -s \
+      SpeechToTextViewModel:* TextToSpeechViewModel:* VLMViewModel:* \
+      RunAnywhereApplication:* VoiceAssistantViewModel:* RAGViewModel:* 2>/dev/null || true
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null || true
+  }
 }
 
+_kotlin_grep() {
+  local pattern="$1"
+  _kotlin_logcat_snapshot | grep -F "${pattern}" >/dev/null 2>&1
+}
+
+# shellcheck source=_kotlin_tc_flows.sh
+source "${SCRIPT_DIR}/_kotlin_tc_flows.sh"
+
 rac_tc_init_lane
+_kotlin_launch_main
+_kotlin_ensure_foreground "tc01-launch" || true
 sleep 5
 _kotlin_shot "000_app_launch"
 if _kotlin_grep "SDK Phase 1 ready" || _kotlin_grep "${RAC_MARKER_SDK_INIT}"; then

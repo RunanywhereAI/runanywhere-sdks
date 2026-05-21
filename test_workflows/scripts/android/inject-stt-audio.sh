@@ -85,6 +85,18 @@ rac_inject_stt_fixture_start() {
     -d "file:///sdcard/Download/stt-phrase.wav" -t audio/wav >/dev/null 2>&1 &
   echo $! > "${TMPDIR:-/tmp}/rac_stt_play.pid"
   RAC_STT_INJECT_MODE="speaker"
+  # Speaker playback launches an external player and steals foreground — refocus the test app.
+  local pkg="${PACKAGE_ID:-${RAC_STT_PACKAGE:-}}"
+  local activity="${MAIN_ACTIVITY:-${RAC_STT_MAIN_ACTIVITY:-}}"
+  if [[ -n "${pkg}" ]] && [[ -z "${activity}" ]]; then
+    activity="${pkg}/com.runanywhere.runanywhereai.MainActivity"
+  fi
+  if [[ -n "${activity}" ]]; then
+    sleep 1
+    adb -s "${serial}" shell am start -W -S -n "${activity}" \
+      -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+      >/dev/null 2>&1 || true
+  fi
 }
 
 rac_inject_stt_fixture_stop() {
@@ -113,7 +125,12 @@ rac_inject_stt_fixture_stop() {
 rac_stt_transcript_has_keywords() {
   local serial="$1"
   local line
-  line="$(adb -s "${serial}" logcat -d 2>/dev/null | grep -F 'Batch transcription complete' | tail -n1 || true)"
+  line="$(
+    {
+      adb -s "${serial}" logcat -d -s SpeechToTextViewModel:* System.out:* RunAnywhere:* 2>/dev/null || true
+      adb -s "${serial}" logcat -d 2>/dev/null || true
+    } | grep -F 'Batch transcription complete' | tail -n1 || true
+  )"
   [[ -n "${line}" ]] || return 1
   echo "${line}" | grep -qi 'runanywhere' || return 1
   echo "${line}" | grep -qi 'model' || return 1
