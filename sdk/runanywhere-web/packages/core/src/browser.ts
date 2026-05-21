@@ -26,4 +26,3 @@ export type { CapturedFrame, VideoCaptureConfig } from './Infrastructure/VideoCa
 
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
-

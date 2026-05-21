@@ -144,4 +144,3 @@ object SecureStorageManager {
         return newUUID
     }
 }
-

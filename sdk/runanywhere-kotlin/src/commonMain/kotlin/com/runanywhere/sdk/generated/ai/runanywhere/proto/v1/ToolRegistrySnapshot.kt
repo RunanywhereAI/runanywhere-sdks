@@ -92,11 +92,11 @@ public class ToolRegistrySnapshot(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolRegistrySnapshot> = object :
         ProtoAdapter<ToolRegistrySnapshot>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ToolRegistrySnapshot::class, 
-      "type.googleapis.com/runanywhere.v1.ToolRegistrySnapshot", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ToolRegistrySnapshot::class,
+      "type.googleapis.com/runanywhere.v1.ToolRegistrySnapshot",
+      PROTO_3,
+      null,
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolRegistrySnapshot): Int {

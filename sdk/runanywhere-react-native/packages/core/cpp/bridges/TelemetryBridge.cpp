@@ -280,7 +280,7 @@ static void telemetryHttpCallback(
         // Production/Staging: Use configured Railway URL
         // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
         baseURL = config::trim(InitBridge::shared().getBaseURL());
-        
+
         // For production mode, prefer JWT access token (from authentication)
         // over raw API key. This matches Swift/Kotlin behavior.
         std::string accessToken = AuthBridge::shared().getAccessToken();
@@ -292,7 +292,7 @@ static void telemetryHttpCallback(
             apiKey = config::trim(InitBridge::shared().getApiKey());
             LOGD("Telemetry using API key (not authenticated)");
         }
-        
+
         if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
             LOGI("Skipping telemetry/device registration: no usable config");
             rac_telemetry_manager_http_complete(
@@ -303,7 +303,7 @@ static void telemetryHttpCallback(
             );
             return;
         }
-        
+
         LOGD("Telemetry using configured production/staging endpoint");
     }
 

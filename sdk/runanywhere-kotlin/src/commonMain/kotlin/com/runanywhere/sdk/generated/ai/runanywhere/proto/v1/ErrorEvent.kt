@@ -143,11 +143,11 @@ public class ErrorEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ErrorEvent> = object : ProtoAdapter<ErrorEvent>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ErrorEvent::class, 
-      "type.googleapis.com/runanywhere.v1.ErrorEvent", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ErrorEvent::class,
+      "type.googleapis.com/runanywhere.v1.ErrorEvent",
+      PROTO_3,
+      null,
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: ErrorEvent): Int {

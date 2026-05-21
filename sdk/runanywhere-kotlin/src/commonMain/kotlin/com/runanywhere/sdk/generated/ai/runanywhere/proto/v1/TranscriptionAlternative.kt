@@ -120,11 +120,11 @@ public class TranscriptionAlternative(
     @JvmField
     public val ADAPTER: ProtoAdapter<TranscriptionAlternative> = object :
         ProtoAdapter<TranscriptionAlternative>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      TranscriptionAlternative::class, 
-      "type.googleapis.com/runanywhere.v1.TranscriptionAlternative", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      TranscriptionAlternative::class,
+      "type.googleapis.com/runanywhere.v1.TranscriptionAlternative",
+      PROTO_3,
+      null,
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: TranscriptionAlternative): Int {

@@ -480,7 +480,7 @@ static NSString* getDeviceModelName(NSString* identifier) {
         @"x86_64": @"Simulator",
         @"arm64": @"Simulator",
     };
-    
+
     NSString* name = models[identifier];
     return name ?: identifier;
 }
@@ -511,7 +511,7 @@ static NSString* getChipNameForModel(NSString* identifier) {
         @"iPad14,1": @"M2",
         @"iPad14,2": @"M2",
     };
-    
+
     NSString* chip = chips[identifier];
     return chip ?: @"Apple Silicon";
 }
@@ -520,10 +520,10 @@ bool PlatformAdapter_getDeviceModel(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* identifier = getMachineIdentifier();
-            
+
             // Check for simulator
             #if TARGET_OS_SIMULATOR
             NSDictionary* env = [[NSProcessInfo processInfo] environment];
@@ -532,7 +532,7 @@ bool PlatformAdapter_getDeviceModel(char** outValue) {
                 identifier = simModelId;
             }
             #endif
-            
+
             NSString* modelName = getDeviceModelName(identifier);
             *outValue = strdup([modelName UTF8String]);
             return *outValue != NULL;
@@ -546,7 +546,7 @@ bool PlatformAdapter_getOSVersion(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* version = [[UIDevice currentDevice] systemVersion];
             *outValue = strdup([version UTF8String]);
@@ -561,10 +561,10 @@ bool PlatformAdapter_getChipName(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* identifier = getMachineIdentifier();
-            
+
             // Check for simulator
             #if TARGET_OS_SIMULATOR
             NSDictionary* env = [[NSProcessInfo processInfo] environment];
@@ -573,7 +573,7 @@ bool PlatformAdapter_getChipName(char** outValue) {
                 identifier = simModelId;
             }
             #endif
-            
+
             NSString* chipName = getChipNameForModel(identifier);
             *outValue = strdup([chipName UTF8String]);
             return *outValue != NULL;
@@ -595,11 +595,11 @@ uint64_t PlatformAdapter_getAvailableMemory(void) {
     if (result != KERN_SUCCESS) {
         return 0;
     }
-    
+
     uint64_t pageSize = vm_page_size;
     uint64_t freeMemory = vmStats.free_count * pageSize;
     uint64_t inactiveMemory = vmStats.inactive_count * pageSize;
-    
+
     return freeMemory + inactiveMemory;
 }
 
@@ -611,7 +611,7 @@ bool PlatformAdapter_getArchitecture(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             #if __arm64__
             *outValue = strdup("arm64");
@@ -631,7 +631,7 @@ bool PlatformAdapter_getGPUFamily(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             // All iOS/macOS devices use Apple's custom GPUs
             *outValue = strdup("apple");

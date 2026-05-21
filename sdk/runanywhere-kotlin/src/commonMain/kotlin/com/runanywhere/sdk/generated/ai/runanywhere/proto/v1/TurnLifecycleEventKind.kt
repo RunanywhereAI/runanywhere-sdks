@@ -32,8 +32,8 @@ public enum class TurnLifecycleEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<TurnLifecycleEventKind> = object :
         EnumAdapter<TurnLifecycleEventKind>(
-      TurnLifecycleEventKind::class, 
-      PROTO_3, 
+      TurnLifecycleEventKind::class,
+      PROTO_3,
       TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): TurnLifecycleEventKind? =

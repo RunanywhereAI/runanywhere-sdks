@@ -29,8 +29,8 @@ public enum class DeviceAffinity(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DeviceAffinity> = object : EnumAdapter<DeviceAffinity>(
-      DeviceAffinity::class, 
-      PROTO_3, 
+      DeviceAffinity::class,
+      PROTO_3,
       DeviceAffinity.DEVICE_AFFINITY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DeviceAffinity? = DeviceAffinity.fromValue(`value`)

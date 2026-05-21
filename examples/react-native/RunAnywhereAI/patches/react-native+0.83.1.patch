@@ -4,11 +4,11 @@ index ccc6510..0855104 100644
 +++ b/node_modules/react-native/ReactCommon/react/renderer/core/graphicsConversions.h
 @@ -8,6 +8,7 @@
  #pragma once
- 
+
  #include <array>
 +#include <sstream>
  #include <unordered_map>
- 
+
  #include <glog/logging.h>
 @@ -67,8 +68,11 @@ inline folly::dynamic toDynamic(const YGValue &dimension)
        return "stretch";
@@ -22,5 +22,5 @@ index ccc6510..0855104 100644
 +      return oss.str();
 +    }
    }
- 
+
    return nullptr;

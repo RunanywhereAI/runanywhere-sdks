@@ -42,8 +42,8 @@ public enum class DiffusionModelVariant(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionModelVariant> = object :
         EnumAdapter<DiffusionModelVariant>(
-      DiffusionModelVariant::class, 
-      PROTO_3, 
+      DiffusionModelVariant::class,
+      PROTO_3,
       DiffusionModelVariant.DIFFUSION_MODEL_VARIANT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionModelVariant? =

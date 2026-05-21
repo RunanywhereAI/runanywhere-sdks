@@ -13,7 +13,7 @@ def findNodeBinary() {
             return nodePath
         }
     }
-    
+
     // Check common node installation paths
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
@@ -29,7 +29,7 @@ def findNodeBinary() {
             return path
         }
     }
-    
+
     // Fallback to 'node' (works if PATH is set correctly in terminal builds)
     return "node"
 }

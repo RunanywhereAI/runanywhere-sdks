@@ -5,7 +5,7 @@ index 1958be8..72ac5ba 100644
 @@ -588,10 +588,21 @@ const SherpaOnnxOfflineRecognizer *SherpaOnnxCreateOfflineRecognizer(
      return nullptr;
    }
- 
+
 -  SherpaOnnxOfflineRecognizer *recognizer = new SherpaOnnxOfflineRecognizer;
 -
 -  recognizer->impl =
@@ -25,13 +25,13 @@ index 1958be8..72ac5ba 100644
 +    delete recognizer;
 +    return nullptr;
 +  }
- 
+
    return recognizer;
  }
 @@ -1131,9 +1142,23 @@ const SherpaOnnxVoiceActivityDetector *SherpaOnnxCreateVoiceActivityDetector(
      return nullptr;
    }
- 
+
 -  SherpaOnnxVoiceActivityDetector *p = new SherpaOnnxVoiceActivityDetector;
 -  p->impl = std::make_unique<sherpa_onnx::VoiceActivityDetector>(
 -      vad_config, buffer_size_in_seconds);
@@ -52,13 +52,13 @@ index 1958be8..72ac5ba 100644
 +    delete p;
 +    return nullptr;
 +  }
- 
+
    return p;
  }
 @@ -1318,9 +1343,20 @@ const SherpaOnnxOfflineTts *SherpaOnnxCreateOfflineTts(
      return nullptr;
    }
- 
+
 -  SherpaOnnxOfflineTts *tts = new SherpaOnnxOfflineTts;
 -
 -  tts->impl = std::make_unique<sherpa_onnx::OfflineTts>(tts_config);
@@ -76,7 +76,7 @@ index 1958be8..72ac5ba 100644
 +    delete tts;
 +    return nullptr;
 +  }
- 
+
    return tts;
  }
 diff --git a/sherpa-onnx/csrc/session.cc b/sherpa-onnx/csrc/session.cc
@@ -85,7 +85,7 @@ index 5e31165..c2c43d2 100755
 +++ b/sherpa-onnx/csrc/session.cc
 @@ -47,9 +47,25 @@ Ort::SessionOptions GetSessionOptionsImpl(
    Provider p = StringToProvider(provider_str);
- 
+
    Ort::SessionOptions sess_opts;
 +#ifdef __EMSCRIPTEN__
 +  // RACommons patch: the Web SDK ships a WASM build without
@@ -107,6 +107,6 @@ index 5e31165..c2c43d2 100755
 -
    sess_opts.SetInterOpNumThreads(num_threads);
 +#endif
- 
+
    std::vector<std::string> available_providers = Ort::GetAvailableProviders();
    std::ostringstream os;

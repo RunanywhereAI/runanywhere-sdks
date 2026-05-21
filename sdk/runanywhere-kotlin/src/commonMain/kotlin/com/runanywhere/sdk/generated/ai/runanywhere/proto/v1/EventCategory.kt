@@ -74,8 +74,8 @@ public enum class EventCategory(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<EventCategory> = object : EnumAdapter<EventCategory>(
-      EventCategory::class, 
-      PROTO_3, 
+      EventCategory::class,
+      PROTO_3,
       EventCategory.EVENT_CATEGORY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): EventCategory? = EventCategory.fromValue(`value`)

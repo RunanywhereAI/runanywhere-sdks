@@ -176,7 +176,7 @@ dependencies {
 
     // Manually link Nitro modules (excluded from autolinking)
     implementation project(':react-native-nitro-modules')
-    
+
     // Manually link @runanywhere packages (Nitro modules)
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')

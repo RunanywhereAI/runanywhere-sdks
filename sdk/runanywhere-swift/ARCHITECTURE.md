@@ -2705,4 +2705,3 @@ All files in `Generated/` are produced by `idl/codegen/generate_all.sh` and must
 | **Plugin static linking** | `-force_load` per `.binaryTarget` | `--whole-archive` via Gradle | `-all_load` via Flutter podspec | Manually linked in app target | Static linking forced (no `dlopen` in WASM) |
 
 ---
-

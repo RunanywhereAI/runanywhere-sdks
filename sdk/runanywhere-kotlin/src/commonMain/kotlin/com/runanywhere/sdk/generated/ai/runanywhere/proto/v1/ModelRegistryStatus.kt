@@ -40,8 +40,8 @@ public enum class ModelRegistryStatus(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelRegistryStatus> = object :
         EnumAdapter<ModelRegistryStatus>(
-      ModelRegistryStatus::class, 
-      PROTO_3, 
+      ModelRegistryStatus::class,
+      PROTO_3,
       ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelRegistryStatus? =

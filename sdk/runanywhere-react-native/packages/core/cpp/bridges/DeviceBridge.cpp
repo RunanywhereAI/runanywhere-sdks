@@ -250,9 +250,9 @@ DeviceInfo DeviceBridge::getDeviceInfo() const {
         LOGE("getDeviceInfo callback not available");
         return DeviceInfo{};
     }
-    
+
     DeviceInfo info = g_deviceCallbacks->getDeviceInfo();
-    LOGD("Device info retrieved: availableMemory=%lld bytes", 
+    LOGD("Device info retrieved: availableMemory=%lld bytes",
          static_cast<long long>(info.availableMemory));
     return info;
 }

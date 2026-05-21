@@ -19,5 +19,5 @@ index 0453a7e..1705abb 100644
    static constexpr bool DEFAULT_USE_PER_SESSION_THREADS = true;
 -#endif
    ExecutionMode execution_mode = ExecutionMode::ORT_SEQUENTIAL;
- 
+
    // set the execution order of the graph

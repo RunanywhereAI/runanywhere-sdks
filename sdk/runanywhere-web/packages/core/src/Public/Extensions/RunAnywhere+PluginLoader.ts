@@ -140,4 +140,3 @@ export const PluginLoader = {
 };
 
 export type PluginLoaderCapability = typeof PluginLoader;
-

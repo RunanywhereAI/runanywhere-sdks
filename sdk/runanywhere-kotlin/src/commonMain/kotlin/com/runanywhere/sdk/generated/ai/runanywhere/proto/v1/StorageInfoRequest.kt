@@ -124,11 +124,11 @@ public class StorageInfoRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageInfoRequest> = object :
         ProtoAdapter<StorageInfoRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      StorageInfoRequest::class, 
-      "type.googleapis.com/runanywhere.v1.StorageInfoRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      StorageInfoRequest::class,
+      "type.googleapis.com/runanywhere.v1.StorageInfoRequest",
+      PROTO_3,
+      null,
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: StorageInfoRequest): Int {

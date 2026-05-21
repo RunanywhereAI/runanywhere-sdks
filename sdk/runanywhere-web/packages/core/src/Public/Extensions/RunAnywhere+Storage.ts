@@ -113,4 +113,3 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
 }
 
 export type StorageNamespace = ReturnType<typeof createStorageNamespace>;
-

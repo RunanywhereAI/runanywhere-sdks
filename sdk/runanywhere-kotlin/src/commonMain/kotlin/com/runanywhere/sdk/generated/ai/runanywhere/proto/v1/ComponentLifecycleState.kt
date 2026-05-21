@@ -41,8 +41,8 @@ public enum class ComponentLifecycleState(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentLifecycleState> = object :
         EnumAdapter<ComponentLifecycleState>(
-      ComponentLifecycleState::class, 
-      PROTO_3, 
+      ComponentLifecycleState::class,
+      PROTO_3,
       ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ComponentLifecycleState? =

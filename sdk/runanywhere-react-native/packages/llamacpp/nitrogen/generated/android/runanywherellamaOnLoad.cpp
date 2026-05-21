@@ -32,7 +32,7 @@ void registerAllNatives() {
   using namespace margelo::nitro::runanywhere::llama;
 
   // Register native JNI methods
-  
+
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(

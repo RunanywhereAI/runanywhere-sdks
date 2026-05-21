@@ -52,8 +52,8 @@ public enum class DiffusionTokenizerSourceKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionTokenizerSourceKind> = object :
         EnumAdapter<DiffusionTokenizerSourceKind>(
-      DiffusionTokenizerSourceKind::class, 
-      PROTO_3, 
+      DiffusionTokenizerSourceKind::class,
+      PROTO_3,
       DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionTokenizerSourceKind? =

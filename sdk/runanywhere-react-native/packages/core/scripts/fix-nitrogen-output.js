@@ -11,7 +11,7 @@ const filePath = path.join(__dirname, '../nitrogen/generated/shared/c++/HybridRu
 
 if (fs.existsSync(filePath)) {
   let content = fs.readFileSync(filePath, 'utf8');
-  
+
   // Replace the Null.hpp include with a comment.
   // Pin pair (see dependencies/versions.json _notes): nitrogen ^0.34.1 (codegen)
   // / react-native-nitro-modules ^0.33.9 (runtime). The 0.34.x codegen emits
@@ -22,7 +22,7 @@ if (fs.existsSync(filePath)) {
     /#include <NitroModules\/Null\.hpp>/g,
     '// #include <NitroModules/Null.hpp> // Removed - file does not ship in react-native-nitro-modules 0.33.9 (nitrogen 0.34.1 codegen emits it; runtime pin pair documented in dependencies/versions.json)'
   );
-  
+
   fs.writeFileSync(filePath, content, 'utf8');
   console.log('✅ Fixed Null.hpp include in HybridRunAnywhereCoreSpec.hpp');
 } else {

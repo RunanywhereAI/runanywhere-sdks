@@ -100,10 +100,10 @@ static JNIEnv* getJNIEnv() {
         LOGE("JavaVM not initialized - cpp-adapter JNI_OnLoad may not have been called");
         return nullptr;
     }
-    
+
     JNIEnv* env = nullptr;
     int status = g_javaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    
+
     if (status == JNI_EDETACHED) {
         // Attach current thread
         if (g_javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
@@ -114,7 +114,7 @@ static JNIEnv* getJNIEnv() {
         LOGE("Failed to get JNI environment: %d", status);
         return nullptr;
     }
-    
+
     return env;
 }
 
@@ -124,102 +124,102 @@ namespace AndroidBridge {
     bool secureSet(const char* key, const char* value) {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
-        
+
         // Use cached references from JNI_OnLoad
         if (!g_platformAdapterBridgeClass || !g_secureSetMethod) {
             LOGE("PlatformAdapterBridge class or secureSet method not cached");
             return false;
         }
-        
+
         jstring jKey = env->NewStringUTF(key);
         jstring jValue = env->NewStringUTF(value);
         jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_secureSetMethod, jKey, jValue);
-        
+
         LOGD("secureSet (Android): key=%s, success=%d", key, result);
-        
+
         env->DeleteLocalRef(jKey);
         env->DeleteLocalRef(jValue);
-        
+
         return result;
     }
-    
+
     bool secureGet(const char* key, std::string& outValue) {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
-        
+
         // Use cached references from JNI_OnLoad
         if (!g_platformAdapterBridgeClass || !g_secureGetMethod) {
             LOGE("PlatformAdapterBridge class or secureGet method not cached");
             return false;
         }
-        
+
         jstring jKey = env->NewStringUTF(key);
         jstring jResult = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_secureGetMethod, jKey);
-        
+
         env->DeleteLocalRef(jKey);
-        
+
         if (jResult == nullptr) {
             LOGD("secureGet (Android): key=%s not found", key);
             return false;
         }
-        
+
         const char* resultStr = env->GetStringUTFChars(jResult, nullptr);
         if (resultStr) {
             outValue = resultStr;
             env->ReleaseStringUTFChars(jResult, resultStr);
         }
         env->DeleteLocalRef(jResult);
-        
+
         LOGD("secureGet (Android): key=%s found", key);
         return !outValue.empty();
     }
-    
+
     bool secureDelete(const char* key) {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
-        
+
         // Use cached references from JNI_OnLoad
         if (!g_platformAdapterBridgeClass || !g_secureDeleteMethod) {
             LOGE("PlatformAdapterBridge class or secureDelete method not cached");
             return false;
         }
-        
+
         jstring jKey = env->NewStringUTF(key);
         jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_secureDeleteMethod, jKey);
-        
+
         LOGD("secureDelete (Android): key=%s, success=%d", key, result);
-        
+
         env->DeleteLocalRef(jKey);
-        
+
         return result;
     }
-    
+
     bool secureExists(const char* key) {
         // For secureExists, we'll try secureGet and check if value is non-empty
         // since we don't have a cached method for it
         std::string value;
         return secureGet(key, value);
     }
-    
+
     std::string getPersistentDeviceUUID() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "";
-        
+
         // Use cached references from JNI_OnLoad
         if (!g_platformAdapterBridgeClass || !g_getPersistentDeviceUUIDMethod) {
             LOGE("PlatformAdapterBridge class or getPersistentDeviceUUID method not cached");
             return "";
         }
-        
+
         jstring jResult = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getPersistentDeviceUUIDMethod);
         if (!jResult) return "";
-        
+
         const char* resultStr = env->GetStringUTFChars(jResult, nullptr);
         std::string uuid = resultStr ? resultStr : "";
-        
+
         if (resultStr) env->ReleaseStringUTFChars(jResult, resultStr);
         env->DeleteLocalRef(jResult);
-        
+
         LOGD("getPersistentDeviceUUID (Android): %s", uuid.c_str());
         return uuid;
     }
@@ -259,22 +259,22 @@ namespace AndroidBridge {
     std::string getDeviceModel() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getDeviceModelMethod) {
             LOGE("PlatformAdapterBridge class or getDeviceModel method not cached");
             return "Unknown";
         }
-        
+
         jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getDeviceModelMethod);
-        
+
         if (!result) return "Unknown";
-        
+
         const char* str = env->GetStringUTFChars(result, nullptr);
         std::string modelName = str ? str : "Unknown";
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
-        
+
         LOGD("getDeviceModel (Android): %s", modelName.c_str());
         return modelName;
     }
@@ -282,146 +282,146 @@ namespace AndroidBridge {
     std::string getOSVersion() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getOSVersionMethod) {
             LOGE("PlatformAdapterBridge class or getOSVersion method not cached");
             return "Unknown";
         }
-        
+
         jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getOSVersionMethod);
-        
+
         if (!result) return "Unknown";
-        
+
         const char* str = env->GetStringUTFChars(result, nullptr);
         std::string version = str ? str : "Unknown";
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
-        
+
         return version;
     }
 
     std::string getChipName() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getChipNameMethod) {
             LOGE("PlatformAdapterBridge class or getChipName method not cached");
             return "Unknown";
         }
-        
+
         jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getChipNameMethod);
-        
+
         if (!result) return "Unknown";
-        
+
         const char* str = env->GetStringUTFChars(result, nullptr);
         std::string chipName = str ? str : "Unknown";
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
-        
+
         return chipName;
     }
 
     uint64_t getTotalMemory() {
         JNIEnv* env = getJNIEnv();
         if (!env) return 0;
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getTotalMemoryMethod) {
             LOGE("PlatformAdapterBridge class or getTotalMemory method not cached");
             return 0;
         }
-        
+
         jlong result = env->CallStaticLongMethod(g_platformAdapterBridgeClass, g_getTotalMemoryMethod);
-        
+
         return static_cast<uint64_t>(result);
     }
 
     uint64_t getAvailableMemory() {
         JNIEnv* env = getJNIEnv();
         if (!env) return 0;
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getAvailableMemoryMethod) {
             LOGE("PlatformAdapterBridge class or getAvailableMemory method not cached");
             return 0;
         }
-        
+
         jlong result = env->CallStaticLongMethod(g_platformAdapterBridgeClass, g_getAvailableMemoryMethod);
-        
+
         return static_cast<uint64_t>(result);
     }
 
     int getCoreCount() {
         JNIEnv* env = getJNIEnv();
         if (!env) return 1;
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getCoreCountMethod) {
             LOGE("PlatformAdapterBridge class or getCoreCount method not cached");
             return 1;
         }
-        
+
         jint result = env->CallStaticIntMethod(g_platformAdapterBridgeClass, g_getCoreCountMethod);
-        
+
         return static_cast<int>(result);
     }
 
     std::string getArchitecture() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "unknown";
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getArchitectureMethod) {
             LOGE("PlatformAdapterBridge class or getArchitecture method not cached");
             return "unknown";
         }
-        
+
         jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getArchitectureMethod);
-        
+
         if (!result) return "unknown";
-        
+
         const char* str = env->GetStringUTFChars(result, nullptr);
         std::string arch = str ? str : "unknown";
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
-        
+
         return arch;
     }
-    
+
     std::string getGPUFamily() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "unknown";
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_getGPUFamilyMethod) {
             LOGE("PlatformAdapterBridge class or getGPUFamily method not cached");
             return "unknown";
         }
-        
+
         jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getGPUFamilyMethod);
-        
+
         if (!result) return "unknown";
-        
+
         const char* str = env->GetStringUTFChars(result, nullptr);
         std::string gpuFamily = str ? str : "unknown";
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
-        
+
         return gpuFamily;
     }
 
     bool isTablet() {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
-        
+
         // Use cached references
         if (!g_platformAdapterBridgeClass || !g_isTabletMethod) {
             LOGE("PlatformAdapterBridge class or isTablet method not cached");
             return false;
         }
-        
+
         jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_isTabletMethod);
         return result == JNI_TRUE;
     }
@@ -491,12 +491,12 @@ extern "C" {
     bool PlatformAdapter_secureGet(const char* key, char** outValue);
     bool PlatformAdapter_secureDelete(const char* key);
     bool PlatformAdapter_secureExists(const char* key);
-    
+
     // Device type detection
     bool PlatformAdapter_isTablet(void);
     bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
     bool PlatformAdapter_getModelBaseDirectory(char** outValue);
-    
+
     // Device info (synchronous)
     bool PlatformAdapter_getDeviceModel(char** outValue);
     bool PlatformAdapter_getOSVersion(char** outValue);
@@ -506,7 +506,7 @@ extern "C" {
     int PlatformAdapter_getCoreCount(void);
     bool PlatformAdapter_getArchitecture(char** outValue);
     bool PlatformAdapter_getGPUFamily(char** outValue);
-    
+
     // Platform HTTP download fallback used by the RACommons platform adapter.
     // Public RN downloads enter commons through the rac_download_*_proto ABI.
     int PlatformAdapter_httpDownload(
@@ -1384,7 +1384,7 @@ rac_result_t InitBridge::initialize(
     static std::string s_deviceId;
     s_deviceId = deviceId_.empty() ? getPersistentDeviceUUID() : deviceId_;
     sdkConfig.device_id = s_deviceId.c_str();
-    
+
     rac_validation_result_t validResult = rac_sdk_init(&sdkConfig);
     if (validResult != RAC_VALIDATION_OK) {
         LOGW("SDK config validation warning: %d (non-fatal)", validResult);

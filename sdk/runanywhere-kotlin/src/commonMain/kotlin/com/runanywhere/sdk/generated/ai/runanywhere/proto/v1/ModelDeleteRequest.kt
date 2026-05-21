@@ -113,11 +113,11 @@ public class ModelDeleteRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelDeleteRequest> = object :
         ProtoAdapter<ModelDeleteRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ModelDeleteRequest::class, 
-      "type.googleapis.com/runanywhere.v1.ModelDeleteRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ModelDeleteRequest::class,
+      "type.googleapis.com/runanywhere.v1.ModelDeleteRequest",
+      PROTO_3,
+      null,
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelDeleteRequest): Int {

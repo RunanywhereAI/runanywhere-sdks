@@ -35,8 +35,8 @@ public enum class DiffusionMode(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionMode> = object : EnumAdapter<DiffusionMode>(
-      DiffusionMode::class, 
-      PROTO_3, 
+      DiffusionMode::class,
+      PROTO_3,
       DiffusionMode.DIFFUSION_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionMode? = DiffusionMode.fromValue(`value`)

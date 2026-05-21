@@ -343,7 +343,7 @@ object PlatformAdapterBridge {
                 Log.w(TAG, "getTotalMemory via ActivityManager failed: ${e.message}")
             }
         }
-        
+
         // Fallback: Read from /proc/meminfo (works without Context)
         try {
             val memInfoFile = java.io.File("/proc/meminfo")
@@ -362,7 +362,7 @@ object PlatformAdapterBridge {
         } catch (e: Exception) {
             Log.w(TAG, "getTotalMemory via /proc/meminfo failed: ${e.message}")
         }
-        
+
         // Last resort: Return a reasonable default for modern phones (4GB)
         return 4L * 1024 * 1024 * 1024
     }
@@ -386,7 +386,7 @@ object PlatformAdapterBridge {
                 Log.w(TAG, "getAvailableMemory via ActivityManager failed: ${e.message}")
             }
         }
-        
+
         // Fallback: Read from /proc/meminfo (works without Context)
         try {
             val memInfoFile = java.io.File("/proc/meminfo")
@@ -408,7 +408,7 @@ object PlatformAdapterBridge {
         } catch (e: Exception) {
             Log.w(TAG, "getAvailableMemory via /proc/meminfo failed: ${e.message}")
         }
-        
+
         // Last resort: Return half of total as estimate
         return getTotalMemory() / 2
     }
@@ -444,7 +444,7 @@ object PlatformAdapterBridge {
     fun getGPUFamily(): String {
         val chipName = getChipName().lowercase()
         val manufacturer = android.os.Build.MANUFACTURER.lowercase()
-        
+
         return when {
             // Google Pixel codenames (all use Mali GPUs from Samsung/Google Tensor)
             chipName == "bluejay" -> "mali"      // Pixel 6a (Tensor)
@@ -461,19 +461,19 @@ object PlatformAdapterBridge {
             chipName == "komodo" -> "mali"       // Pixel 9 Pro (Tensor G4)
             chipName == "comet" -> "mali"        // Pixel 9 Pro XL (Tensor G4)
             chipName == "tokay" -> "mali"        // Pixel 9 Pro Fold (Tensor G4)
-            
+
             // Google Tensor generic patterns
             chipName.contains("tensor") -> "mali"
             chipName.contains("gs1") -> "mali"   // GS101 (Tensor)
             chipName.contains("gs2") -> "mali"   // GS201 (Tensor G2)
             chipName.contains("zuma") -> "mali"  // Zuma (Tensor G3)
             manufacturer == "google" -> "mali"   // Default for Google devices
-            
+
             // Samsung Exynos uses Mali GPUs
             chipName.contains("exynos") -> "mali"
             chipName.startsWith("s5e") -> "mali" // Samsung internal naming (e.g., s5e8535)
             chipName.contains("samsung") -> "mali"
-            
+
             // Qualcomm Snapdragon uses Adreno GPUs
             chipName.contains("snapdragon") -> "adreno"
             chipName.contains("qualcomm") -> "adreno"
@@ -488,25 +488,25 @@ object PlatformAdapterBridge {
             chipName.contains("kalama") -> "adreno" // Snapdragon 8 Gen 2
             chipName.contains("pineapple") -> "adreno" // Snapdragon 8 Gen 3
             manufacturer == "qualcomm" -> "adreno"
-            
+
             // MediaTek uses Mali GPUs (mostly)
             chipName.contains("mediatek") -> "mali"
             chipName.contains("mt6") -> "mali"   // MT6xxx series
             chipName.contains("mt8") -> "mali"   // MT8xxx series
             chipName.contains("dimensity") -> "mali"
             chipName.contains("helio") -> "mali"
-            
+
             // HiSilicon Kirin uses Mali GPUs
             chipName.contains("kirin") -> "mali"
             chipName.contains("hisilicon") -> "mali"
-            
+
             // Intel/x86 GPUs
             chipName.contains("intel") -> "intel"
-            
+
             // NVIDIA (rare on mobile)
             chipName.contains("nvidia") -> "nvidia"
             chipName.contains("tegra") -> "nvidia"
-            
+
             else -> "unknown"
         }
     }
@@ -520,7 +520,7 @@ object PlatformAdapterBridge {
     fun isTablet(): Boolean {
         val context = SecureStorageManager.getContext()
         if (context != null) {
-            val screenLayout = context.resources.configuration.screenLayout and 
+            val screenLayout = context.resources.configuration.screenLayout and
                 android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK
             return screenLayout >= android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE
         }
