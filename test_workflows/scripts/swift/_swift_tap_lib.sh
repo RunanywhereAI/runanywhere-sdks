@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# iOS Simulator tap helpers — simctl ui tap --label is unavailable on Xcode 16+;
-# use Simulator window geometry (402×874 pt) or optional RAC_MCP_TAP_HTTP / mobile-mcp.
+# iOS Simulator tap helpers — simctl ui tap --label is unavailable on Xcode 16+.
 
 _swift_sim_udid() {
   printf '%s' "${RAC_IOS_SIM_UDID:-booted}"
 }
 
-# Screen-space origin of the embedded device view (logical points width=402 height=874).
 _swift_sim_device_origin() {
   local out
   out="$(osascript 2>/dev/null <<'APPLESCRIPT' || true
@@ -52,7 +50,6 @@ APPLESCRIPT
   sleep 0.35
 }
 
-# Catalog labels → logical (x y) on iPhone Pro class 402×874 layout.
 _swift_label_coords() {
   local label="$1"
   case "${label}" in
@@ -71,10 +68,6 @@ _swift_label_coords() {
     Get|"71.5 MB"|"Get 71.5 MB") printf '%s %s\n' 340 300 ;;
     Use) printf '%s %s\n' 340 300 ;;
     "Sherpa Whisper Tiny"|"sherpa-onnx-whisper-tiny.en"|Whisper) printf '%s %s\n' 200 300 ;;
-    SmolLM2|SmolLM|"SmolLM2 360M") printf '%s %s\n' 200 260 ;;
-    Benchmarks) printf '%s %s\n' 200 620 ;;
-    "Run All Benchmarks") printf '%s %s\n' 201 340 ;;
-    All) printf '%s %s\n' 360 480 ;;
     Allow|OK) printf '%s %s\n' 280 520 ;;
     Batch) printf '%s %s\n' 100 200 ;;
     Microphone) printf '%s %s\n' 201 650 ;;
@@ -82,21 +75,8 @@ _swift_label_coords() {
   esac
 }
 
-
-
-_swift_scroll_settings_down() {
-  local i
-  for i in 1 2 3; do
-    _swift_tap_xy_logical 201 650 || true
-    _swift_tap_xy_logical 201 350 || true
-    sleep 0.4
-  done
-}
-
 _swift_tap_ax_name() {
   local name="$1"
-  local esc="${name//\/\\}"
-  esc="${esc//"/\"}"
   osascript >/dev/null 2>&1 <<APPLESCRIPT || return 1
 tell application "Simulator" to activate
 delay 0.15
@@ -105,15 +85,11 @@ tell application "System Events"
     set frontmost to true
     set w to front window
     try
-      click (first UI element of w whose name is "${esc}")
-      return
-    end try
-    try
-      click (first button of w whose name is "${esc}")
-      return
-    end try
-    try
-      click (first static text of w whose value is "${esc}")
+      click (first button of w whose name is "$name")
+    on error
+      try
+        click (first UI element of w whose name is "$name")
+      end try
     end try
   end tell
 end tell
@@ -132,9 +108,7 @@ _swift_tap_raw() {
     read -r lx ly <<< "${coords}"
     _swift_tap_xy_logical "${lx}" "${ly}" && return 0
   fi
-  if _swift_tap_ax_name "${label}"; then
-    return 0
-  fi
-  # Last resort: center tap (better than silent no-op)
+  _swift_tap_ax_name "${label}" || true
   _swift_tap_xy_logical 201 437 || true
+  return 0
 }
