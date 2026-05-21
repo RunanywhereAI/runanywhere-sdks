@@ -362,6 +362,9 @@ class VLMViewModel(
                     _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
                 } finally {
                     tempFile?.delete()
+                    if (_uiState.value.error == null && _uiState.value.currentDescription.isNotBlank()) {
+                        Timber.i("VLM streaming completed")
+                    }
                     _uiState.update { it.copy(isProcessing = false) }
                 }
             }
