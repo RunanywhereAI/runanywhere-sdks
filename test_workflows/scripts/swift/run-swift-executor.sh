@@ -2,14 +2,14 @@
 # Swift iOS lane executor — drives TC-02..TC-21 via the shared mobile harness.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-CAPTURE_SCRIPT="${SCRIPT_DIR}/capture-swift-logs.sh"
+SWIFT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${SWIFT_SCRIPT_DIR}/../../.." && pwd)"
+CAPTURE_SCRIPT="${SWIFT_SCRIPT_DIR}/capture-swift-logs.sh"
 
 # shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
+source "${SWIFT_SCRIPT_DIR}/../_tc_helper.sh"
 # shellcheck source=_swift_log_lib.sh
-source "${SCRIPT_DIR}/_swift_log_lib.sh"
+source "${SWIFT_SCRIPT_DIR}/_swift_log_lib.sh"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 export RAC_LANE_SLUG="02_swift_ios"
