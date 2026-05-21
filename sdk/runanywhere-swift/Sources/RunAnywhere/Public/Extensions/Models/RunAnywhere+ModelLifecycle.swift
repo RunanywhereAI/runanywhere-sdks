@@ -32,7 +32,12 @@ public extension RunAnywhere {
             return result
         }
         try? await ensureServicesReady()
-        return await CppBridge.ModelLifecycle.load(request)
+        let result = await CppBridge.ModelLifecycle.load(request)
+        if result.success {
+            let modelID = result.modelID.isEmpty ? request.modelID : result.modelID
+            SDKLogger.models.info("Model load succeeded for \(modelID)")
+        }
+        return result
     }
 
     static func unloadModel(_ request: RAModelUnloadRequest) async -> RAModelUnloadResult {

@@ -158,6 +158,7 @@ public final class Logging: @unchecked Sendable {
 
     private init() {
         let config = lock.withLock { $0.configuration }
+        syncOSLogDestination(for: config)
         if config.enableSentryLogging {
             setupSentryLogging()
         }
@@ -171,6 +172,8 @@ public final class Logging: @unchecked Sendable {
             state.configuration = config
             return old
         }
+
+        syncOSLogDestination(for: config)
 
         // Handle Sentry state changes
         if config.enableSentryLogging && !oldConfig.enableSentryLogging {
@@ -253,6 +256,21 @@ public final class Logging: @unchecked Sendable {
     }
 
     // MARK: - Private Helpers
+
+    private func syncOSLogDestination(for config: LoggingConfiguration) {
+        if config.enableLocalLogging {
+            let hasOSLog = lock.withLock { state in
+                state.destinations.contains { $0.identifier == OSLogDestination.destinationID }
+            }
+            if !hasOSLog {
+                addDestination(OSLogDestination())
+            }
+        } else {
+            lock.withLock { state in
+                state.destinations.removeAll { $0.identifier == OSLogDestination.destinationID }
+            }
+        }
+    }
 
     private func setupSentryLogging() {
         let environment = RunAnywhere.currentEnvironment ?? .development
