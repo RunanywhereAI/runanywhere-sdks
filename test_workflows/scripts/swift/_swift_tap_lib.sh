@@ -69,10 +69,23 @@ _swift_label_coords() {
     Use) printf '%s %s\n' 340 300 ;;
     "Sherpa Whisper Tiny"|"sherpa-onnx-whisper-tiny.en"|Whisper) printf '%s %s\n' 200 300 ;;
     Allow|OK) printf '%s %s\n' 280 520 ;;
+    Benchmarks) printf '%s %s\n' 200 620 ;;
+    "Run All Benchmarks") printf '%s %s\n' 201 340 ;;
+    All) printf '%s %s\n' 360 480 ;;
+    SmolLM2|SmolLM|"SmolLM2 360M") printf '%s %s\n' 200 260 ;;
     Batch) printf '%s %s\n' 100 200 ;;
     Microphone) printf '%s %s\n' 201 650 ;;
     *) return 1 ;;
   esac
+}
+
+_swift_scroll_settings_down() {
+  local i
+  for i in 1 2 3; do
+    _swift_tap_xy_logical 201 650 || true
+    _swift_tap_xy_logical 201 350 || true
+    sleep 0.4
+  done
 }
 
 _swift_tap_ax_name() {

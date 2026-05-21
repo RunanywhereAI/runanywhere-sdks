@@ -111,7 +111,9 @@ final class BenchmarkViewModel {
             var run = BenchmarkRun(deviceInfo: deviceInfo)
 
             do {
-                let modelIds = selectedModelIds.isEmpty ? nil : selectedModelIds
+                let availableIds = Set(availableModels.values.flatMap { $0 }.map { $0.id })
+                let effectiveSelection = selectedModelIds.intersection(availableIds)
+                let modelIds: Set<String>? = effectiveSelection.isEmpty ? nil : effectiveSelection
                 let output = try await runner.runBenchmarks(
                     categories: selectedCategories,
                     modelIds: modelIds

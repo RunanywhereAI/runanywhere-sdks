@@ -162,3 +162,63 @@ _swift_tc07_status_from_evidence() {
     *) return 1 ;;
   esac
 }
+
+_swift_app_data_container() {
+  local udid bundle
+  udid="$(_swift_sim_target)"
+  bundle="${BUNDLE_ID:-com.runanywhere.RunAnywhere}"
+  xcrun simctl get_app_container "${udid}" "${bundle}" data 2>/dev/null
+}
+
+_swift_llm_artifact_on_disk() {
+  local container
+  container="$(_swift_app_data_container)" || return 1
+  find "${container}" -type f \( -name '*.gguf' -o -name '*.bin' -o -name 'model.safetensors' \) 2>/dev/null | grep -q .
+}
+
+_swift_benchmarks_json_path() {
+  local container
+  container="$(_swift_app_data_container)" || return 1
+  local json="${container}/Documents/benchmarks.json"
+  [[ -f "${json}" ]] || return 1
+  printf '%s' "${json}"
+}
+
+_swift_tc19_history_ready() {
+  local json
+  json="$(_swift_benchmarks_json_path)" || return 1
+  python3 - "${json}" <<'PY'
+import json, sys
+from datetime import datetime
+
+path = sys.argv[1]
+try:
+    runs = json.loads(open(path, encoding="utf-8").read())
+except Exception:
+    sys.exit(1)
+if not runs:
+    sys.exit(1)
+last = runs[-1]
+results = last.get("results") or []
+if not results:
+    sys.exit(1)
+started = last.get("startedAt")
+completed = last.get("completedAt")
+if not started or not completed:
+    sys.exit(1)
+
+def parse_iso(s):
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s)
+
+try:
+    dur = (parse_iso(completed) - parse_iso(started)).total_seconds()
+except Exception:
+    sys.exit(1)
+if dur <= 0.5:
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
