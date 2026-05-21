@@ -15,12 +15,10 @@ import type {
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
 import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig';
+import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
 import { getAllRegisteredModules } from '../../runtime/EmscriptenModule';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-
-const lifecycleLogger = new SDKLogger('ModelLifecycle');
 
 export type {
   CurrentModelRequest,
@@ -123,9 +121,9 @@ export const ModelLifecycle = {
     // Web/Emscripten — iOS/Android/Flutter/RN share one libc filesystem
     // and have no equivalent isolation.
     if (modelSnapshot?.localPath) {
-      try {
-        const modules = getAllRegisteredModules();
-        if (modules.length > 0) {
+      const modules = getAllRegisteredModules();
+      if (modules.length > 0) {
+        try {
           // Multi-file models (VLM = primary GGUF + mmproj sidecar,
           // embeddings = model.onnx + vocab.txt) store every file inside the
           // model folder; `localPath` is the folder. OPFS `getFileHandle` on
@@ -138,18 +136,18 @@ export const ModelLifecycle = {
             for (const file of files) {
               if (!file.filename) continue;
               const filePath = `${modelSnapshot.localPath}/${file.filename}`;
-              await OPFSBridge.restoreToMemfsAll(modules, filePath);
+              await OPFSBridge.ensureModelPathReadyForLoad(modules, filePath);
             }
           } else {
-            await OPFSBridge.restoreToMemfsAll(modules, modelSnapshot.localPath);
+            await OPFSBridge.ensureModelPathReadyForLoad(modules, modelSnapshot.localPath);
           }
+        } catch (err) {
+          throw SDKException.fromCode(
+            SDKErrorCode.ModelLoadFailed,
+            err instanceof Error ? err.message : String(err),
+            'loadModel',
+          );
         }
-      } catch (err) {
-        lifecycleLogger.warning(
-          `OPFS restore failed for '${modelSnapshot.localPath}': ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
       }
     }
 

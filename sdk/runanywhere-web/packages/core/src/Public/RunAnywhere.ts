@@ -390,6 +390,13 @@ async function downloadMultiFileModel(
     const filePath = `${opfsFolder}/${file.filename}`;
     if (allModules.length > 0) {
       await OPFSBridge.restoreToMemfsAll(allModules, filePath);
+      if (OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, filePath) === 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.StorageError,
+          `Multi-file persist failed: '${filePath}' has 0 bytes in MEMFS`,
+          'downloadModel',
+        );
+      }
     }
   }
 
@@ -938,7 +945,12 @@ export const RunAnywhere = {
       });
       if (!progress) continue;
       lastProgress = progress;
-      request.onProgress?.(progress);
+      // Defer COMPLETED to onProgress until OPFS flush finishes (WEB-001).
+      // UI/E2E often triggers loadModel on COMPLETED; firing it early races
+      // the async MEMFS→OPFS persist that follows the poll loop.
+      if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+        request.onProgress?.(progress);
+      }
     }
 
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -961,35 +973,27 @@ export const RunAnywhere = {
     // filesystem. We do that here at the TS layer (no WASM rebuild) by
     // mirroring MEMFS → OPFS once the download completes.
     if (lastProgress.localPath) {
-      try {
-        // Flush from whichever module owns the download orchestrator.
-        // The download runs inside the WASM that has the DownloadAdapter
-        // installed (commons when registered, else the first backend),
-        // so flush from there into OPFS.
-        const downloaderModule = getModuleForCapability('commons')
-          ?? tryRunanywhereModule();
-        if (downloaderModule) {
-          await OPFSBridge.flushFromMemfs(downloaderModule, lastProgress.localPath);
+      const downloaderModule = getModuleForCapability('commons')
+        ?? tryRunanywhereModule();
+      const allModules = getAllRegisteredModules();
+      if (downloaderModule) {
+        try {
+          await OPFSBridge.ensureDownloadPersisted(
+            lastProgress.localPath,
+            downloaderModule,
+            allModules,
+          );
+        } catch (err) {
+          throw SDKException.fromCode(
+            SDKErrorCode.StorageError,
+            err instanceof Error ? err.message : String(err),
+            'downloadModel',
+          );
         }
-        // Mirror the freshly-written file into every backend module's
-        // private MEMFS so the upcoming `loadModel` call can `fopen` it
-        // immediately — without forcing a round-trip back through OPFS.
-        // Web/Emscripten only: each WASM artifact has its own MEMFS and
-        // the C++ engine `fopen` executes inside the backend module that
-        // owns the plugin route. See OPFSBridge.restoreToMemfsAll for
-        // background.
-        const allModules = getAllRegisteredModules();
-        if (allModules.length > 0) {
-          await OPFSBridge.restoreToMemfsAll(allModules, lastProgress.localPath);
-        }
-      } catch (err) {
-        logger.warning(
-          `OPFS flush failed for '${lastProgress.localPath}': ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
       }
     }
+
+    request.onProgress?.(lastProgress);
 
     // CPP-02 self-heal happens inside the C++ download orchestrator, but it
     // only updates THAT module's `s_model_registry` (whichever WASM owns the

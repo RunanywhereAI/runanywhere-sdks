@@ -225,6 +225,105 @@ export class OPFSBridge {
     return isOPFSSupported();
   }
 
+  /** Byte length of `path` in a module's MEMFS, or 0 when missing/unreadable. */
+  static memfsFileSize(module: ModuleLike, path: string): number {
+    const fs = getFS(module);
+    if (!fs) return 0;
+    try {
+      if (fs.analyzePath && !fs.analyzePath(path)?.exists) return 0;
+      return fs.stat(path).size;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Largest MEMFS size for `path` across `modules`. */
+  static maxMemfsFileSizeAcrossModules(modules: ModuleLike[], path: string): number {
+    let max = 0;
+    for (const module of modules) {
+      const size = OPFSBridge.memfsFileSize(module, path);
+      if (size > max) max = size;
+    }
+    return max;
+  }
+
+  /**
+   * After a download completes, flush MEMFS → OPFS and mirror bytes into every
+   * backend module's MEMFS. Throws when persistence cannot be verified so
+   * callers cannot race `loadModel` against an in-flight OPFS write.
+   */
+  static async ensureDownloadPersisted(
+    localPath: string,
+    downloaderModule: ModuleLike,
+    allModules: ModuleLike[],
+  ): Promise<void> {
+    const opfsExpected = pathToOPFSSegments(localPath) !== null && isOPFSSupported();
+
+    if (opfsExpected) {
+      const flushed = await OPFSBridge.flushFromMemfs(downloaderModule, localPath);
+      const downloaderMemfs = OPFSBridge.memfsFileSize(downloaderModule, localPath);
+      if (flushed === 0 && downloaderMemfs === 0) {
+        const exists = await OPFSBridge.exists(localPath);
+        if (!exists) {
+          throw new Error(
+            `Download persist failed: '${localPath}' is absent from MEMFS and OPFS`,
+          );
+        }
+      }
+      if (!(await OPFSBridge.exists(localPath))) {
+        throw new Error(
+          `Download persist failed: '${localPath}' missing from OPFS after flush`,
+        );
+      }
+    }
+
+    if (allModules.length === 0) return;
+
+    await OPFSBridge.restoreToMemfsAll(allModules, localPath);
+    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
+    if (memfsMax > 0) return;
+
+    const downloaderOnly = OPFSBridge.memfsFileSize(downloaderModule, localPath);
+    if (downloaderOnly > 0 && opfsExpected) {
+      await OPFSBridge.flushFromMemfs(downloaderModule, localPath);
+      await OPFSBridge.restoreToMemfsAll(allModules, localPath);
+    }
+
+    const retryMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
+    if (retryMax === 0) {
+      throw new Error(
+        `Download persist failed: '${localPath}' has 0 bytes in MEMFS after OPFS restore`,
+      );
+    }
+  }
+
+  /**
+   * Before C++ `fopen`, ensure `path` is mirrored from OPFS into every module's
+   * MEMFS with non-zero size. No-op when the path is not under `/opfs/`.
+   */
+  static async ensureModelPathReadyForLoad(
+    modules: ModuleLike[],
+    path: string,
+  ): Promise<void> {
+    if (modules.length === 0) return;
+    if (!pathToOPFSSegments(path)) return;
+
+    let memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
+    if (memfsMax > 0) return;
+
+    if (isOPFSSupported() && !(await OPFSBridge.exists(path))) {
+      throw new Error(`Model load failed: '${path}' not found in OPFS`);
+    }
+
+    await OPFSBridge.restoreToMemfsAll(modules, path);
+    memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
+    if (memfsMax === 0) {
+      throw new Error(
+        `Model load failed: '${path}' has 0 bytes in MEMFS after OPFS restore`,
+      );
+    }
+  }
+
   /**
    * Flush a file from Emscripten MEMFS into the Origin Private File
    * System so the bytes persist across tab reloads.
@@ -283,12 +382,14 @@ export class OPFSBridge {
     const fs = getFS(module);
     if (!fs) return 0;
 
-    // Already present in MEMFS — nothing to do.
+    // Already present in MEMFS with real bytes — nothing to do.
     if (fs.analyzePath?.(path)?.exists) {
       try {
         const size = fs.stat(path).size;
-        logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
-        return 0;
+        if (size > 0) {
+          logger.debug(`restoreToMemfs: '${path}' already in MEMFS (${size} bytes)`);
+          return 0;
+        }
       } catch {
         // stat failed — fall through and rebuild from OPFS.
       }
@@ -365,9 +466,13 @@ export class OPFSBridge {
       if (fs.analyzePath?.(path)?.exists) {
         try {
           const size = fs.stat(path).size;
-          logger.debug(`restoreToMemfsAll: '${path}' already in MEMFS (${size} bytes); skipping module`);
-          if (size > maxWritten) maxWritten = size;
-          continue;
+          if (size > 0) {
+            logger.debug(
+              `restoreToMemfsAll: '${path}' already in MEMFS (${size} bytes); skipping module`,
+            );
+            if (size > maxWritten) maxWritten = size;
+            continue;
+          }
         } catch {
           // stat failed — fall through and rewrite from OPFS bytes.
         }

@@ -79,3 +79,6 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T12:54:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_SPAWN	OK	CLUSTER-08	SWIFT-IOS-001 STT download error surface + SDK plan retry
 2026-05-21T12:55:00-07:00	1	phase8_fix	fix-agent-cluster-08	AGENT_DONE	OK	CLUSTER-08	FlatModelRow errors + RunAnywhere+Storage plan retry/logging
 2026-05-21T12:55:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	9cc28e502	CLUSTER-08/SWIFT-IOS-001 STT download error surface
+2026-05-21T13:00:00-07:00	1	phase8_fix	fix-agent-cluster-05	AGENT_SPAWN	OK	CLUSTER-05	KOTLIN-AND-001 VLM stream null JNI bridge
+2026-05-21T13:02:00-07:00	1	phase8_fix	fix-agent-cluster-05	AGENT_DONE	OK	KOTLIN-AND-001	Wave7 VLM lifecycle bridge + JNI proto error throw
+2026-05-21T13:02:30-07:00	1	phase8_fix	orchestrator	COMMIT	OK	4bb5cef15	CLUSTER-05/KOTLIN-AND-001 VLM bridge lifecycle + JNI errors
