@@ -5,6 +5,15 @@ _swift_sim_udid() {
   printf '%s' "${RAC_IOS_SIM_UDID:-booted}"
 }
 
+_swift_launch_app() {
+  local bundle="${BUNDLE_ID:-com.runanywhere.RunAnywhere}"
+  xcrun simctl launch "$(_swift_sim_udid)" "${bundle}" >/dev/null 2>&1 || true
+  osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
+tell application "Simulator" to activate
+APPLESCRIPT
+  sleep 2
+}
+
 _swift_sim_device_origin() {
   local out
   out="$(osascript 2>/dev/null <<'APPLESCRIPT' || true

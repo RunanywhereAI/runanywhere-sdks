@@ -287,6 +287,10 @@ extension ModelSelectionSheet {
         guard !didAutoPrepareSTT else { return }
         didAutoPrepareSTT = true
 
+        Logger(subsystem: "com.runanywhere", category: "STT").info(
+            "STT sheet auto-prepare started (SWIFT-IOS-001)"
+        )
+
         let downloadable = availableModels.first { model in
             unavailableReason(for: model) == nil &&
             !model.isBuiltIn &&
@@ -303,7 +307,12 @@ extension ModelSelectionSheet {
             return
         }
 
-        guard let downloadable else { return }
+        guard let downloadable else {
+            Logger(subsystem: "com.runanywhere", category: "STT").error(
+                "STT sheet auto-prepare skipped: no downloadable model (count=\(availableModels.count, privacy: .public))"
+            )
+            return
+        }
 
         await MainActor.run {
             isLoadingModel = true

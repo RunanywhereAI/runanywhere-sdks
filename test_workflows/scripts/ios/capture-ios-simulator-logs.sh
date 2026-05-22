@@ -45,18 +45,31 @@ start_logs() {
   xcrun simctl spawn "${sim_target}" log stream --style compact --level debug --info --debug \
     --predicate "$(predicate "${proc_filter}")" > "${log_root}/ios_live.log" 2>&1 &
   echo $! > "${pid_file}"
+  # Host unified log mirrors Simulator os_log for grep during snapshots.
+  log stream --style compact --level debug --info --debug \
+    --predicate "$(predicate "${proc_filter}")" >> "${log_root}/ios_live.log" 2>&1 &
+  echo $! >> "${pid_file}"
 }
 
 snapshot_logs() {
   local snap="${label:-snapshot}"
   xcrun simctl spawn "${sim_target}" log show --last 15m --style compact --info --debug \
     --predicate "$(predicate "${proc_filter}")" > "${log_root}/ios_snapshot_${snap}.log" 2>&1 || true
+  log show --last 15m --style compact --info --debug \
+    --predicate "$(predicate "${proc_filter}")" >> "${log_root}/ios_snapshot_${snap}.log" 2>&1 || true
 }
 
 stop_logs() {
-  [[ -f "${pid_file}" ]] && kill "$(cat "${pid_file}")" 2>/dev/null || true && rm -f "${pid_file}"
+  if [[ -f "${pid_file}" ]]; then
+    while read -r pid; do
+      [[ -n "${pid}" ]] && kill "${pid}" 2>/dev/null || true
+    done < "${pid_file}"
+    rm -f "${pid_file}"
+  fi
   xcrun simctl spawn "${sim_target}" log show --last 15m --style compact --info --debug \
     --predicate "$(predicate "${proc_filter}")" > "${log_root}/ios_final.log" 2>&1 || true
+  log show --last 15m --style compact --info --debug \
+    --predicate "$(predicate "${proc_filter}")" >> "${log_root}/ios_final.log" 2>&1 || true
 }
 
 case "${cmd}" in

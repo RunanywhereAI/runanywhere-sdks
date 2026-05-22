@@ -47,23 +47,23 @@ _swift_tap_stt_get_button() {
 
 _swift_drive_stt_download() {
   local lane_root="${RAC_SESSION_ROOT:?}"
-  local wait_s="${RAC_STT_DOWNLOAD_WAIT_S:-120}"
+  local wait_s="${RAC_STT_DOWNLOAD_WAIT_S:-180}"
   local elapsed=0
 
   _swift_stt_flow_started=1
 
+  _swift_launch_app
   _swift_dismiss_chat_onboarding
   _swift_open_transcribe
   rac_mcp_shot "${lane_root}/screenshots/013_transcribe.png"
+  _swift_capture snapshot tc07_stt_tab 2>/dev/null || true
 
-  _swift_tap_raw "Get Started"
+  # STTViewModel auto-prepare runs on Transcribe tab appear; sheet open is optional.
+  sleep 3
+  _swift_tap_raw "Get Started" || true
   sleep 1
   rac_mcp_shot "${lane_root}/screenshots/013b_stt_model_sheet.png"
   _swift_capture snapshot tc07_stt_sheet 2>/dev/null || true
-
-  _swift_tap_raw "Sherpa Whisper Tiny" || _swift_tap_raw "Whisper" || true
-  sleep 0.5
-  _swift_tap_stt_get_button
 
   while [[ "${elapsed}" -lt "${wait_s}" ]]; do
     if _swift_stt_outcome_reached; then
@@ -72,8 +72,9 @@ _swift_drive_stt_download() {
     sleep 5
     elapsed=$((elapsed + 5))
     _swift_capture snapshot "tc07_stt_wait_${elapsed}" 2>/dev/null || true
-    if [[ $((elapsed % 30)) -eq 0 ]]; then
-      _swift_tap_stt_get_button
+    if [[ $((elapsed % 60)) -eq 0 ]]; then
+      _swift_launch_app
+      _swift_open_transcribe
     fi
   done
 

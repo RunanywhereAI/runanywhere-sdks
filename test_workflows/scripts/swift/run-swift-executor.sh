@@ -98,6 +98,7 @@ _swift_capture start
 
 rac_tc_init_lane
 _swift_sim_privacy_grants
+_swift_launch_app
 sleep 5
 _swift_dismiss_chat_onboarding
 rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/000_after_launch.png"

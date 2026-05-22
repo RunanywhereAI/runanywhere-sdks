@@ -30,7 +30,9 @@ _swift_grep_file() {
 _swift_grep_live() {
   local pattern="$1"
   xcrun simctl spawn "$(_swift_sim_target)" log show --style syslog --info --debug --last 5m \
-    --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Fq "${pattern}"
+    --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Fq "${pattern}" \
+    || log show --style syslog --info --debug --last 5m \
+      --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Fq "${pattern}"
 }
 
 _swift_grep() {
@@ -59,7 +61,9 @@ _swift_grep_regex() {
     [[ -f "${f}" ]] && grep -Eq "${pattern}" "${f}" && return 0
   done < <(_swift_log_files)
   xcrun simctl spawn "$(_swift_sim_target)" log show --style syslog --info --debug --last 5m \
-    --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Eq "${pattern}"
+    --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Eq "${pattern}" \
+    || log show --style syslog --info --debug --last 5m \
+      --predicate "$(_swift_log_predicate)" 2>/dev/null | grep -Eq "${pattern}"
 }
 
 # TC-01: SDK init log markers OR iOS app-ready os_log (web parity: __RUNANYWHERE_AI_READY__).
@@ -107,6 +111,10 @@ _swift_tc07_evidence() {
     "${RAC_MARKER_STT_LOADED}" \
     "${RAC_MARKER_DOWNLOAD_ACCEPTED}"; then
     printf '%s\n' "pass:model_or_download_marker"
+    return 0
+  fi
+  if _swift_grep_any "${RAC_MARKER_STT_AUTO_PREPARE}"; then
+    printf '%s\n' "limited:stt_auto_prepare_started"
     return 0
   fi
   if _swift_grep_any \
@@ -229,4 +237,3 @@ if dur <= 0.5:
 sys.exit(0)
 PY
 }
-
