@@ -7,9 +7,9 @@ SCRIPT_DIR="${RAC_RN_SCRIPT_DIR}"
 REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
+source "${RAC_RN_SCRIPT_DIR}/../_tc_helper.sh"
 # shellcheck source=_rn_tc_flows.sh
-source "${SCRIPT_DIR}/_rn_tc_flows.sh"
+source "${RAC_RN_SCRIPT_DIR}/_rn_tc_flows.sh"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 export RAC_LANE_SLUG="04_react_native_ios"
@@ -33,8 +33,8 @@ export RAC_TAB_SETTINGS="Settings"
 export RAC_TAB_VALIDATION="Validation"
 
 export RAC_TC13_DRIVE_CMD='_rn_drive_tc13_rag'
-export RAC_MCP_KILL_CMD='xcrun simctl terminate "${RAC_IOS_SIM_UDID}" "${BUNDLE_ID}"'
-export RAC_MCP_LAUNCH_CMD='xcrun simctl launch "${RAC_IOS_SIM_UDID}" "${BUNDLE_ID}"'
+export RAC_MCP_KILL_CMD='xcrun simctl terminate "${RAC_IOS_SIM_UDID}" "${BUNDLE_ID}" >/dev/null 2>&1 || true'
+export RAC_MCP_LAUNCH_CMD='xcrun simctl launch "${RAC_IOS_SIM_UDID}" "${BUNDLE_ID}" >/dev/null 2>&1 || true'
 
 export RAC_MCP_SHOT_CMD='xcrun simctl io "${RAC_IOS_SIM_UDID}" screenshot'
 export RAC_MCP_TAP_CMD='_rn_ios_tap'

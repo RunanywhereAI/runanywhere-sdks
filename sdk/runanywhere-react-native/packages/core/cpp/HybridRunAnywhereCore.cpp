@@ -212,8 +212,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         {
             rac_assignment_callbacks_t callbacks = {};
 
-            // HTTP GET callback — routes through the registered native HTTP transport
-            callbacks.http_get = [baseURL, apiKey](const char* endpoint, rac_bool_t requires_auth,
+            // HTTP GET callback — routes through the registered native HTTP transport.
+            // Must be a captureless lambda so it decays to a C function pointer; URL
+            // and credentials are read from HTTPBridge::shared() (configured above).
+            callbacks.http_get = [](const char* endpoint, rac_bool_t requires_auth,
                                     rac_assignment_http_response_t* out_response, void* /*user_data*/) -> rac_result_t {
                 if (!out_response) return RAC_ERROR_NULL_POINTER;
 
@@ -225,15 +227,11 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                     if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) {
                         if (HTTPBridge::shared().isConfigured()) {
                             url = HTTPBridge::shared().buildURL(endpointStr);
-                        } else if (!baseURL.empty()) {
-                            url = baseURL;
-                            if (!url.empty() && url.back() == '/') {
-                                url.pop_back();
-                            }
-                            if (!endpointStr.empty() && endpointStr.front() != '/') {
-                                url += '/';
-                            }
-                            url += endpointStr;
+                        } else {
+                            LOGE("Model assignment HTTP GET: HTTPBridge not configured");
+                            out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                            out_response->error_message = strdup("HTTPBridge not configured");
+                            return RAC_ERROR_HTTP_REQUEST_FAILED;
                         }
                     }
 
@@ -241,8 +239,6 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                     if (requires_auth == RAC_TRUE) {
                         if (auto token = HTTPBridge::shared().getAuthorizationToken()) {
                             headers.emplace_back("Authorization", "Bearer " + *token);
-                        } else if (!apiKey.empty()) {
-                            headers.emplace_back("Authorization", "Bearer " + apiKey);
                         }
                     }
 
