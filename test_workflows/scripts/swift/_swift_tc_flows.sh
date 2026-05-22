@@ -330,25 +330,24 @@ _swift_drive_tc08_tts() {
   rac_mcp_shot "${lane_root}/screenshots/009_tts_tab.png"
   _swift_capture snapshot tc08_tts_tab 2>/dev/null || true
 
-  while [[ "${elapsed}" -lt 420 ]]; do
+  _swift_ensure_tts_model_loaded
+
+  while [[ "${elapsed}" -lt 180 ]]; do
     if _swift_grep "${RAC_MARKER_TTS_DONE}"; then
       status="PASS"
       notes="TTS speech generation complete observed in logs"
       break
     fi
-    _swift_ensure_tts_model_loaded
     _swift_type "${RAC_INPUT_TTS}"
     sleep 1
     _swift_tap_raw "Speak"
-    sleep 8
-    if _swift_wait_grep "${RAC_MARKER_TTS_DONE}" 90; then
+    if _swift_wait_grep "${RAC_MARKER_TTS_DONE}" 120; then
       status="PASS"
       notes="TTS speech generation complete observed in logs"
       break
     fi
-    elapsed=$((elapsed + 30))
-    _swift_launch_app
-    _swift_open_speak
+    elapsed=$((elapsed + 15))
+    sleep 5
   done
 
   rac_mcp_shot "${lane_root}/screenshots/010_tts_played.png"
