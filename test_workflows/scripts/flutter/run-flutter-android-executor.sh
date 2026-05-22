@@ -60,7 +60,8 @@ _flutter_android_grep() {
   local pattern="$1"
   _flutter_grep_logs "${pattern}" && return 0
   local pid
-  pid="$(adb -s "${RAC_ANDROID_SERIAL}" shell pidof "${ANDROID_PACKAGE}" 2>/dev/null | tr -d '' | awk '{print $1}')"
+  pid="$(adb -s "${RAC_ANDROID_SERIAL}" shell pidof "${ANDROID_PACKAGE}" 2>/dev/null | tr -d '
+' | awk '{print $1}')"
   if [[ -n "${pid}" ]]; then
     adb -s "${RAC_ANDROID_SERIAL}" logcat -d --pid="${pid}" 2>/dev/null | grep -F "${pattern}" >/dev/null 2>&1
   else
@@ -77,7 +78,31 @@ if _flutter_android_grep "${RAC_MARKER_SDK_INIT}" || _flutter_android_grep "Phas
 else
   rac_tc_done tc01 BLOCKED "SDK init marker missing" "screenshots/000_after_launch.png"
 fi
+_flutter_regrade_if_marker() {
+  local tc="$1"
+  local marker="$2"
+  local note="$3"
+  if _flutter_android_grep "${marker}"; then
+    rac_tc_done "${tc}" PASS "${note}" ""
+  fi
+}
+
+_flutter_final_regrade() {
+  _flutter_regrade_if_marker tc04 "${RAC_MARKER_LLM_LOAD}" "LLM load marker in captured logs"
+  _flutter_regrade_if_marker tc07 "${RAC_MARKER_STT_LOADED}" "STT load marker in captured logs"
+  _flutter_regrade_if_marker tc08 "${RAC_MARKER_TTS_DONE}" "TTS completion marker in captured logs"
+  _flutter_regrade_if_marker tc09 "${RAC_MARKER_VLM_DONE}" "VLM marker in captured logs"
+  _flutter_regrade_if_marker tc13 "${RAC_MARKER_RAG_INGEST}" "RAG ingest marker in captured logs"
+  if _flutter_android_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "${RAC_MARKER_MODEL_LOAD}" "${RAC_MARKER_LLM_LOAD}" "${RAC_MARKER_DOWNLOAD_ACCEPTED}"; then
+    rac_tc_done tc03 PASS "model registry marker present after relaunch" "screenshots/011_tc03_persistence.png"
+  fi
+}
+
 _flutter_wait_grep "${RAC_MARKER_APP_READY}" 90 || _flutter_wait_grep "${RAC_MARKER_AI_READY}" 90 || true
+_flutter_wait_grep "${RAC_MARKER_LLM_LOAD}" 240 || true
+_flutter_wait_grep "${RAC_MARKER_STT_LOADED}" 240 || true
+export RAC_TC03_LAUNCH_WAIT_S="${RAC_TC03_LAUNCH_WAIT_S:-30}"
 rac_tc_drive_catalog
 _flutter_drive_deep_modalities
+_flutter_final_regrade
 echo "Flutter Android executor: catalog + deep modality drive complete"

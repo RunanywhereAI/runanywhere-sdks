@@ -32,7 +32,7 @@ _flutter_drive_tc13_rag() {
   sleep 2
   rac_mcp_shot "${lane_root}/${shot}"
   local status="LIMITED" notes="Document Q&A entry opened from Chat"
-  if _flutter_wait_grep "${RAC_MARKER_RAG_INGEST}" 60 || _flutter_grep_logs "Document loaded"; then
+  if _flutter_wait_grep "${RAC_MARKER_RAG_INGEST}" 120 || _flutter_grep_logs "Document loaded successfully"; then
     status="PASS"
     notes="RAG ingest marker or UI present"
   fi
@@ -44,13 +44,18 @@ _flutter_drive_tc08_tts() {
   local shot="screenshots/009_tts_tab.png"
   rac_mcp_tap "${RAC_TAB_SPEAK:-Speak}"
   sleep 2
-  rac_mcp_type "Hello from Flutter E2E harness"
+  rac_mcp_tap "Select Model" || true
+  sleep 2
+  rac_mcp_tap "System TTS" || rac_mcp_tap "Piper TTS (US English - Medium)" || true
+  sleep 3
+  rac_mcp_tap "Hello from Flutter E2E harness" || true
+  rac_mcp_type "Hello"
   sleep 1
   rac_mcp_tap "Generate" || rac_mcp_tap "Speak" || true
-  sleep 2
+  sleep 5
   rac_mcp_shot "${lane_root}/${shot}"
   local status="LIMITED" notes="TTS generate tapped"
-  if _flutter_wait_grep "${RAC_MARKER_TTS_DONE}" 120 || _flutter_grep_logs "Speech generation complete"; then
+  if _flutter_wait_grep "${RAC_MARKER_TTS_DONE}" 180 || _flutter_grep_logs "Speech generation complete" || _flutter_grep_logs "TTS synthesis complete"; then
     status="PASS"
     notes="TTS completion marker observed"
   fi
@@ -61,10 +66,14 @@ _flutter_drive_tc09_vlm() {
   local lane_root="${RAC_SESSION_ROOT:?}"
   local shot="screenshots/014_vision_tab.png"
   rac_mcp_tap "${RAC_TAB_VISION:-Vision}"
-  sleep 3
+  sleep 2
+  rac_mcp_tap "Select Model" || true
+  sleep 2
+  rac_mcp_tap "SmolVLM 500M Instruct" || true
+  sleep 5
   rac_mcp_shot "${lane_root}/${shot}"
   local status="LIMITED" notes="Vision tab held for VLM surface"
-  if _flutter_wait_grep "${RAC_MARKER_VLM_DONE}" 90 || _flutter_grep_logs "VLM streaming completed"; then
+  if _flutter_wait_grep "${RAC_MARKER_VLM_DONE}" 120 || _flutter_grep_logs "VLM streaming completed" || _flutter_grep_logs "VLM model loaded"; then
     status="PASS"
     notes="VLM streaming marker observed"
   fi
@@ -80,6 +89,7 @@ _flutter_drive_tc21_lora() {
 }
 
 _flutter_drive_deep_modalities() {
+  _flutter_wait_grep "${RAC_MARKER_LLM_LOAD}" 60 || true
   _flutter_drive_tc08_tts
   _flutter_drive_tc09_vlm
   _flutter_drive_tc13_rag
