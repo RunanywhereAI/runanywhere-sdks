@@ -1,6 +1,10 @@
 .vercel
 .env*.local
 
+# Yarn workspace state
+.yarn/cache/
+.yarn/install-state.gz
+
 # Emscripten test compile outputs
 a.out.js
 a.out.wasm
