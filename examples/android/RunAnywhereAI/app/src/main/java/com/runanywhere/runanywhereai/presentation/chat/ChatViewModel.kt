@@ -284,8 +284,11 @@ class ChatViewModel(
             // Generate with tools
             val result =
                 RunAnywhere.generateWithTools(
-                    prompt,
-                    RALLMGenerationOptions(tool_calling = toolOptions),
+                    prompt = prompt,
+                    options = RALLMGenerationOptions(tool_calling = toolOptions),
+                    toolOptions = null,
+                    toolChoice = null,
+                    forcedToolName = null,
                 )
             val endTime = System.currentTimeMillis()
 
