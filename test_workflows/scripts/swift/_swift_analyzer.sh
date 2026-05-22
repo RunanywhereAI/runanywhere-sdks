@@ -53,9 +53,10 @@ _swift_analyzer_regrade() {
 tc02	Download accepted for	PASS
 tc04	Model load succeeded for	PASS
 tc05	Phase 1 complete	PASS
-tc08	Model load succeeded for	LIMITED
-tc09	Model load succeeded for	LIMITED
-tc13	Model load succeeded for	LIMITED
+tc08	Speech generation complete	PASS
+tc09	VLM streaming completed	PASS
+tc13	Document loaded successfully	PASS
+tc13	Query complete	PASS
 MARKERS
 }
 

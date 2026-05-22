@@ -4,6 +4,7 @@ set -euo pipefail
 
 SWIFT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${SWIFT_SCRIPT_DIR}/../../.." && pwd)"
+export REPO
 CAPTURE_SCRIPT="${SWIFT_SCRIPT_DIR}/capture-swift-logs.sh"
 
 # shellcheck source=../_tc_helper.sh
@@ -42,8 +43,8 @@ export RAC_MCP_TYPE_CMD='_swift_type'
 export RAC_MCP_GREP_CMD='_swift_grep'
 
 # TC-07/10 need the dedicated STT download flow; catalog must not stamp LIMITED early.
-export RAC_TC_DEFER="tc07,tc10"
-export RAC_TC_DEFER_NOTE="dedicated STT flow"
+export RAC_TC_DEFER="tc07,tc10,tc08,tc09,tc13"
+export RAC_TC_DEFER_NOTE="dedicated modality flows"
 
 _swift_shot() {
   local out="$1"
@@ -112,6 +113,9 @@ fi
 rac_tc_drive_catalog
 _swift_drive_stt_download
 _swift_capture snapshot post_stt
+_swift_drive_tc08_tts
+_swift_drive_tc09_vlm
+_swift_drive_tc13_rag
 _swift_finalize_once
 _swift_drive_tc19_benchmarks
 _swift_capture snapshot post_tc19 2>/dev/null || true

@@ -54,6 +54,21 @@ _swift_grep_any() {
   return 1
 }
 
+_swift_wait_grep() {
+  local pattern="$1"
+  local timeout="${2:-120}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _swift_grep "${pattern}"; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+
 _swift_grep_regex() {
   local pattern="$1"
   local f

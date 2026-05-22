@@ -109,7 +109,8 @@ class TTSViewModel: ObservableObject {
             let result = try await RunAnywhere.speak(text, options: options)
             lastResult = result
 
-            logger.info("Speech completed: \(String(format: "%.2fs", result.duration))")
+            let durationMs = Int(result.duration * 1000)
+            logger.info("Speech generation complete: duration=\(durationMs)ms")
         } catch {
             logger.error("Speech failed: \(error.localizedDescription)")
             errorMessage = "Speech failed: \(error.localizedDescription)"

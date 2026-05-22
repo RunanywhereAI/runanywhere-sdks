@@ -155,6 +155,7 @@ final class VLMViewModel: NSObject {
             for await event in stream where !event.generation.token.isEmpty {
                 currentDescription += event.generation.token
             }
+            logger.info("VLM streaming completed")
         } catch {
             self.error = error
             logger.error("VLM error: \(error.localizedDescription)")
@@ -181,6 +182,7 @@ final class VLMViewModel: NSObject {
             for await event in stream where !event.generation.token.isEmpty {
                 currentDescription += event.generation.token
             }
+            logger.info("VLM streaming completed")
         } catch {
             self.error = error
         }
@@ -219,6 +221,7 @@ final class VLMViewModel: NSObject {
             for await event in stream where !event.generation.token.isEmpty {
                 currentDescription += event.generation.token
             }
+            logger.info("VLM streaming completed")
         } catch {
             self.error = error
         }
@@ -321,6 +324,7 @@ final class VLMViewModel: NSObject {
                 newDescription += event.generation.token
                 currentDescription = newDescription
             }
+            logger.info("VLM streaming completed")
         } catch {
             // Don't show errors during auto-stream, just log
             logger.error("Auto-stream VLM error: \(error.localizedDescription)")

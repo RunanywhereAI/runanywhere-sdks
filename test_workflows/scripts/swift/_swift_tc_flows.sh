@@ -221,3 +221,180 @@ _swift_drive_tc19_benchmarks() {
   fi
   rac_tc_done tc19 "${status}" "${notes}" "${shot_run}"
 }
+
+RAC_INPUT_TTS='RunAnywhere runs privately on your device.'
+RAC_INPUT_RAG_QUERY='Where should model lifecycle logic live?'
+
+_swift_back() {
+  _swift_tap_raw "Back" || _swift_tap_xy_logical 30 60 || true
+  sleep 1
+}
+
+_swift_open_speak() {
+  _swift_tap_raw "${RAC_TAB_MORE:-More}"
+  sleep 1
+  _swift_tap_raw "${RAC_TAB_SPEAK:-Speak}"
+  sleep 2
+}
+
+_swift_push_rag_fixture() {
+  local repo_root="${REPO:-${REPO_ROOT:-}}"
+  local fixture="${repo_root}/test_workflows/fixtures/rag-sample.txt"
+  local dest="${RAC_SESSION_ROOT}/fixtures"
+  mkdir -p "${dest}"
+  local json_out="${dest}/rag-sample.json"
+  {
+    printf '{"title":"RunAnywhere RAG fixture","body":'
+    python3 -c 'import json,sys; print(json.dumps(open(sys.argv[1]).read()))' "${fixture}" 2>/dev/null \
+      || printf '"RunAnywhere keeps model lifecycle logic in C++. The SDK registers backends such as LlamaCPP and ONNX/Sherpa on device."'
+    printf '}\n'
+  } > "${json_out}"
+  cp "${json_out}" "${TMPDIR:-/tmp}/rag-sample.json" 2>/dev/null || cp "${json_out}" /tmp/rag-sample.json
+}
+
+_swift_seed_vlm_photo() {
+  local img="${RAC_SESSION_ROOT}/fixtures/vlm-sample.jpg"
+  mkdir -p "$(dirname "${img}")"
+  if [[ ! -s "${img}" ]]; then
+    python3 - "${img}" <<'PY' 2>/dev/null || true
+import base64, sys
+open(sys.argv[1], "wb").write(base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDAQEGBgcGBj0jJz0jQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0P/wAARCAABAAEDAREAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGf/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQL/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/AX//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/AX//2Q=="
+))
+PY
+  fi
+  [[ -s "${img}" ]] && xcrun simctl addmedia "$(_swift_sim_udid)" "${img}" >/dev/null 2>&1 || true
+}
+
+_swift_ensure_tts_model_loaded() {
+  _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
+  sleep 2
+  _swift_tap_raw "Piper TTS (US English - Medium)" || _swift_tap_raw "Piper" || _swift_tap_raw "US English" || true
+  sleep 3
+  _swift_tap_raw "Get" || _swift_tap_raw "Download" || true
+  sleep 10
+  _swift_tap_raw "Use" || true
+  sleep 3
+}
+
+_swift_ensure_vlm_model_loaded() {
+  _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
+  sleep 2
+  _swift_tap_raw "SmolVLM 500M Instruct" || _swift_tap_raw "SmolVLM" || true
+  sleep 3
+  local dl_wait=0
+  while [[ "${dl_wait}" -lt 240 ]]; do
+    if _swift_grep_any "${RAC_MARKER_MODEL_LOAD}" "Model load succeeded"; then
+      break
+    fi
+    _swift_tap_raw "Get" || _swift_tap_raw "Use" || _swift_tap_raw "Download" || true
+    sleep 8
+    dl_wait=$((dl_wait + 8))
+  done
+  _swift_tap_raw "Use" || true
+  sleep 2
+}
+
+_swift_drive_tc08_tts() {
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local status="LIMITED" notes="TTS Speak tapped; waiting for completion log"
+
+  _swift_launch_app
+  _swift_open_speak
+  rac_mcp_shot "${lane_root}/screenshots/009_tts_tab.png"
+  _swift_capture snapshot tc08_tts_tab 2>/dev/null || true
+
+  _swift_ensure_tts_model_loaded
+  _swift_type "${RAC_INPUT_TTS}"
+  sleep 1
+  _swift_tap_raw "Speak"
+
+  if _swift_wait_grep "${RAC_MARKER_TTS_DONE}" 150; then
+    status="PASS"
+    notes="TTS speech generation complete observed in logs"
+  else
+    sleep 10
+  fi
+
+  rac_mcp_shot "${lane_root}/screenshots/010_tts_played.png"
+  _swift_capture snapshot tc08_tts_played 2>/dev/null || true
+  rac_tc_done tc08 "${status}" "${notes}" "screenshots/009_tts_tab.png"
+}
+
+_swift_drive_tc09_vlm() {
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local status="LIMITED" notes="VLM gallery analyze triggered; awaiting stream completion"
+
+  _swift_seed_vlm_photo
+  _swift_launch_app
+  _swift_tap_raw "${RAC_TAB_VISION:-Vision}"
+  sleep 2
+  _swift_tap_raw "Vision Chat" || true
+  sleep 2
+  _swift_ensure_vlm_model_loaded
+  rac_mcp_shot "${lane_root}/screenshots/013_vision_tab.png"
+  _swift_capture snapshot tc09_vision_tab 2>/dev/null || true
+
+  _swift_tap_raw "Photos" || true
+  sleep 3
+  _swift_tap_xy_logical 200 600 || true
+  sleep 3
+
+  if _swift_wait_grep "${RAC_MARKER_VLM_DONE}" 240; then
+    status="PASS"
+    notes="VLM streaming completed marker observed in logs"
+  fi
+
+  rac_mcp_shot "${lane_root}/screenshots/014_vision_response.png"
+  _swift_capture snapshot tc09_vision_response 2>/dev/null || true
+  rac_tc_done tc09 "${status}" "${notes}" "screenshots/014_vision_response.png"
+  _swift_back
+}
+
+_swift_drive_tc13_rag() {
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local status="LIMITED" notes="RAG document flow driven"
+
+  _swift_push_rag_fixture
+  _swift_launch_app
+  _swift_tap_raw "${RAC_TAB_MORE:-More}"
+  sleep 1
+  _swift_tap_raw "${RAC_TAB_DOCS:-Document Q&A}"
+  sleep 2
+
+  _swift_tap_raw "Embedding Model" || true
+  sleep 1
+  _swift_tap_raw "All MiniLM" || _swift_tap_raw "Use" || _swift_tap_raw "Get" || true
+  sleep 3
+  _swift_back
+
+  _swift_tap_raw "LLM Model" || true
+  sleep 1
+  _swift_tap_raw "SmolLM2" || _swift_tap_raw "SmolLM" || _swift_tap_raw "Use" || true
+  sleep 3
+  _swift_back
+
+  _swift_tap_raw "Select Document" || true
+  sleep 2
+  _swift_tap_raw "rag-sample.json" || true
+  sleep 5
+
+  if _swift_wait_grep "${RAC_MARKER_RAG_INGEST}" 150; then
+    status="PASS"
+    notes="RAG ingest completed"
+    _swift_type "${RAC_INPUT_RAG_QUERY}"
+    sleep 1
+    _swift_tap_raw "Send" || _swift_tap_xy_logical 370 780 || true
+    if _swift_wait_grep "${RAC_MARKER_RAG_QUERY}" 150; then
+      notes="RAG ingest + query completed"
+    else
+      status="LIMITED"
+      notes="RAG ingest OK; query marker missing"
+    fi
+    sleep 3
+  fi
+
+  _swift_capture snapshot tc13_rag 2>/dev/null || true
+  rac_tc_done tc13 "${status}" "${notes}" ""
+  _swift_back
+}

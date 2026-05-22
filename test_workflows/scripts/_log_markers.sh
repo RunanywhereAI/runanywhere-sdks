@@ -19,3 +19,8 @@ RAC_MARKER_STT_UI_READY='Ready to transcribe'
 RAC_MARKER_STT_AUTO_PREPARE='STT auto-prepare started'
 RAC_MARKER_OPFS_HYDRATED='hydrated'
 RAC_MARKER_BENCHMARK_SAVED='Benchmark history saved'
+
+export RAC_MARKER_TTS_DONE='Speech generation complete'
+export RAC_MARKER_VLM_DONE='VLM streaming completed'
+export RAC_MARKER_RAG_INGEST='Document loaded successfully'
+export RAC_MARKER_RAG_QUERY='Query complete'

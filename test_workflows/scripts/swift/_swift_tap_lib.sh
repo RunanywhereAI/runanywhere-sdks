@@ -112,6 +112,26 @@ _swift_label_coords() {
     All) printf '%s %s\n' 360 480 ;;
     RunAnywhere) printf '%s %s\n' 154 335 ;;
     SmolLM2|SmolLM|"SmolLM2 360M") printf '%s %s\n' 200 260 ;;
+    "Vision Chat") printf '%s %s
+' 200 220 ;;
+    Photos) printf '%s %s
+' 120 720 ;;
+    "SmolVLM 500M Instruct"|SmolVLM) printf '%s %s
+' 200 280 ;;
+    Piper|"Piper TTS (US English - Medium)"|"US English") printf '%s %s
+' 200 300 ;;
+    "Embedding Model") printf '%s %s
+' 200 200 ;;
+    "All MiniLM"|"All MiniLM L6 v2 (Embedding)") printf '%s %s
+' 200 300 ;;
+    "LLM Model") printf '%s %s
+' 200 260 ;;
+    "Select Document") printf '%s %s
+' 201 400 ;;
+    rag-sample.json) printf '%s %s
+' 200 350 ;;
+    Back) printf '%s %s
+' 30 60 ;;
     Batch) printf '%s %s\n' 100 200 ;;
     Microphone) printf '%s %s\n' 201 650 ;;
     *) return 1 ;;
