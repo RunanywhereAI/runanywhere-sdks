@@ -571,7 +571,7 @@ _kotlin_voice_transcript_log_nonempty() {
   if echo "${line}" | grep -Eqi 'Live transcription result:[[:space:]]*[^[:space:]+'; then
     return 0
   fi
-  echo "${line}" | grep -Eqi 'Transcription complete' 
+  echo "${line}" | grep -Eqi 'Transcription complete'
 }
 
 

@@ -375,4 +375,3 @@ rac_tc_drive_catalog() {
     fi
   fi
 }
-
