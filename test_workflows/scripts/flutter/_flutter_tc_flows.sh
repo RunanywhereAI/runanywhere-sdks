@@ -5,7 +5,7 @@ _flutter_grep_logs() {
   local pattern="$1"
   local root="${RAC_SESSION_ROOT:?}/logs"
   local name
-  for name in flutter_run_console.log flutter_logs.log ios_live.log executor.log; do
+  for name in flutter_run_console.log flutter_logs.log ios_live.log ios_final.log executor.log; do
     [[ -f "${root}/${name}" ]] && grep -qF "${pattern}" "${root}/${name}" && return 0
   done
   return 1
@@ -16,6 +16,9 @@ _flutter_wait_grep() {
   local wait_s="${2:-120}"
   local elapsed=0
   while [[ "${elapsed}" -lt "${wait_s}" ]]; do
+    if declare -f _flutter_android_grep >/dev/null 2>&1; then
+      _flutter_android_grep "${pattern}" && return 0
+    fi
     _flutter_grep_logs "${pattern}" && return 0
     sleep 5
     elapsed=$((elapsed + 5))
@@ -29,7 +32,7 @@ _flutter_drive_tc13_rag() {
   rac_mcp_tap "${RAC_TAB_CHAT:-Chat}"
   sleep 1
   rac_mcp_tap "Document Q&A" || rac_mcp_tap "Document Q&A" || true
-  sleep 2
+  sleep 5
   rac_mcp_shot "${lane_root}/${shot}"
   local status="LIMITED" notes="Document Q&A entry opened from Chat"
   if _flutter_wait_grep "${RAC_MARKER_RAG_INGEST}" 120 || _flutter_grep_logs "Document loaded successfully"; then
