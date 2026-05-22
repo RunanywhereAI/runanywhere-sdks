@@ -68,8 +68,7 @@ _flutter_android_grep() {
   local pattern="$1"
   _flutter_grep_logs "${pattern}" && return 0
   local pid
-  pid="$(adb -s "${RAC_ANDROID_SERIAL}" shell pidof "${ANDROID_PACKAGE}" 2>/dev/null | tr -d '
-' | awk '{print $1}')"
+  pid="$(adb -s "${RAC_ANDROID_SERIAL}" shell pidof "${ANDROID_PACKAGE}" 2>/dev/null | tr -d '' | awk '{print $1}')"
   if [[ -n "${pid}" ]]; then
     adb -s "${RAC_ANDROID_SERIAL}" logcat -d --pid="${pid}" 2>/dev/null | grep -F "${pattern}" >/dev/null 2>&1
   else
@@ -96,6 +95,8 @@ _flutter_regrade_if_marker() {
 }
 
 _flutter_final_regrade() {
+  _flutter_regrade_if_marker tc01 "Phase 1 complete" "SDK Phase 1 in logcat (deferred grade)"
+  _flutter_regrade_if_marker tc02 "${RAC_MARKER_DOWNLOAD_ACCEPTED}" "Download accepted in logcat (deferred grade)"
   _flutter_regrade_if_marker tc04 "${RAC_MARKER_LLM_LOAD}" "LLM load marker in captured logs"
   _flutter_regrade_if_marker tc07 "${RAC_MARKER_STT_LOADED}" "STT load marker in captured logs"
   _flutter_regrade_if_marker tc08 "${RAC_MARKER_TTS_DONE}" "TTS completion marker in captured logs"
