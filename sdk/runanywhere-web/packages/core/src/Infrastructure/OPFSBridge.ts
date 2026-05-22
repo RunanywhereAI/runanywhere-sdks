@@ -60,6 +60,31 @@ interface EmscriptenFS {
   unlink(path: string): void;
   stat(path: string): { size: number; mode: number };
   analyzePath?(path: string): { exists: boolean };
+  readdir?(path: string): string[];
+  isDir?(mode: number): boolean;
+}
+
+/** Emscripten POSIX-style file-mode bit for "is directory" (S_IFDIR). */
+const S_IFDIR = 0o040000;
+
+function isMemfsDirectory(fs: EmscriptenFS, path: string): boolean {
+  try {
+    if (fs.analyzePath && !fs.analyzePath(path)?.exists) return false;
+    const mode = fs.stat(path).mode;
+    if (typeof fs.isDir === 'function') return fs.isDir(mode);
+    return (mode & S_IFDIR) === S_IFDIR;
+  } catch {
+    return false;
+  }
+}
+
+function listMemfsDirectory(fs: EmscriptenFS, path: string): string[] {
+  if (typeof fs.readdir !== 'function') return [];
+  try {
+    return fs.readdir(path).filter((name) => name !== '.' && name !== '..');
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -258,26 +283,44 @@ export class OPFSBridge {
     allModules: ModuleLike[],
   ): Promise<void> {
     const opfsExpected = pathToOPFSSegments(localPath) !== null && isOPFSSupported();
+    const downloaderFs = getFS(downloaderModule);
+    const isDirectoryArtifact = downloaderFs ? isMemfsDirectory(downloaderFs, localPath) : false;
 
     if (opfsExpected) {
       const flushed = await OPFSBridge.flushFromMemfs(downloaderModule, localPath);
-      const downloaderMemfs = OPFSBridge.memfsFileSize(downloaderModule, localPath);
-      if (flushed === 0 && downloaderMemfs === 0) {
-        const exists = await OPFSBridge.exists(localPath);
-        if (!exists) {
+
+      if (isDirectoryArtifact) {
+        const segments = pathToOPFSSegments(localPath) ?? [];
+        const hasArtifacts = await OPFSBridge.directoryHasArtifacts(segments);
+        if (!hasArtifacts) {
           throw new Error(
-            `Download persist failed: '${localPath}' is absent from MEMFS and OPFS`,
+            `Download persist failed: directory '${localPath}' has no artifacts in OPFS after flush`,
           );
         }
-      }
-      if (!(await OPFSBridge.exists(localPath))) {
-        throw new Error(
-          `Download persist failed: '${localPath}' missing from OPFS after flush`,
-        );
+      } else {
+        const downloaderMemfs = OPFSBridge.memfsFileSize(downloaderModule, localPath);
+        if (flushed === 0 && downloaderMemfs === 0) {
+          const exists = await OPFSBridge.exists(localPath);
+          if (!exists) {
+            throw new Error(
+              `Download persist failed: '${localPath}' is absent from MEMFS and OPFS`,
+            );
+          }
+        }
+        if (!(await OPFSBridge.exists(localPath))) {
+          throw new Error(
+            `Download persist failed: '${localPath}' missing from OPFS after flush`,
+          );
+        }
       }
     }
 
     if (allModules.length === 0) return;
+
+    // Directory artifacts are mirrored back to MEMFS lazily on-demand via
+    // ensureModelPathReadyForLoad (per file); skip the file-shaped MEMFS-max
+    // check that does not apply to directories.
+    if (isDirectoryArtifact) return;
 
     await OPFSBridge.restoreToMemfsAll(allModules, localPath);
     const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
@@ -348,6 +391,13 @@ export class OPFSBridge {
       return 0;
     }
 
+    // tar.gz / multi-file model artifacts expand into a directory rather than a
+    // single file. Walk the directory in MEMFS and flush each contained file
+    // individually so OPFS mirrors the full extract.
+    if (isMemfsDirectory(fs, path)) {
+      return OPFSBridge.flushDirectoryFromMemfs(fs, path);
+    }
+
     let bytes: Uint8Array;
     try {
       bytes = fs.readFile(path);
@@ -367,6 +417,26 @@ export class OPFSBridge {
     await writeBytesToOPFSFile(fileHandle, bytes);
     logger.info(`OPFS persisted ${bytes.length} bytes for '${path}'`);
     return bytes.length;
+  }
+
+  /** Recursively flush every file under a MEMFS directory to its OPFS twin. */
+  private static async flushDirectoryFromMemfs(
+    fs: EmscriptenFS,
+    dirPath: string,
+  ): Promise<number> {
+    const names = listMemfsDirectory(fs, dirPath);
+    if (names.length === 0) {
+      logger.debug(`flushFromMemfs: directory '${dirPath}' is empty in MEMFS`);
+      return 0;
+    }
+    let total = 0;
+    for (const name of names) {
+      const childPath = `${dirPath}/${name}`;
+      const written = await OPFSBridge.flushFromMemfs({ FS: fs } as ModuleLike, childPath);
+      total += written;
+    }
+    logger.info(`OPFS persisted directory '${dirPath}' (${total} bytes across ${names.length} entries)`);
+    return total;
   }
 
   /**
