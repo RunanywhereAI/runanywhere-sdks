@@ -450,7 +450,7 @@ abstract final class RunAnywhere {
     // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
     // can flush against a still-initialized native side. Mirrors Swift's
     // `await CppBridge.shutdown()` ordering inside `RunAnywhere.reset()`.
-    DartBridge.shutdown();
+    unawaited(DartBridge.shutdown());
   }
 
   // --- Capability surfaces -------------------------------------------------

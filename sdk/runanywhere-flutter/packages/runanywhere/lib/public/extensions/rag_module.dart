@@ -25,7 +25,7 @@
 /// // Use DartBridgeRAG for pipeline operations
 /// DartBridgeRAG.shared.createPipeline(config: myConfig);
 /// ```
-library rag_module;
+library;
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';

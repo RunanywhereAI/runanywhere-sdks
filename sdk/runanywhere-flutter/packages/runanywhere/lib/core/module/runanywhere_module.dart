@@ -6,7 +6,7 @@
 ///
 /// Note: Registration is now handled by the C++ platform backend via FFI.
 /// Modules only need to provide metadata and call the C++ registration function.
-library runanywhere_module;
+library;
 
 import 'package:runanywhere/generated/model_types.pbenum.dart';
 import 'package:runanywhere/generated/sdk_events.pbenum.dart';

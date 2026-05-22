@@ -17,7 +17,7 @@
 // fields; `RacNative.bindings` is the shared singleton wrapping
 // `PlatformLoader.loadCommons()`.
 
-library rac_native;
+library;
 
 import 'dart:ffi' as ffi;
 

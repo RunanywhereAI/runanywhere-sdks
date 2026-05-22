@@ -7,7 +7,7 @@
 /// (proto integer ↔ C integer) delegate to commons' `rac_*_from_proto` /
 /// `rac_*_to_proto` ABIs (T15a + Wave 7A) so the conversion logic stays
 /// single-sourced in C++.
-library model_types_cpp_bridge;
+library;
 
 import 'dart:ffi';
 import 'dart:io';

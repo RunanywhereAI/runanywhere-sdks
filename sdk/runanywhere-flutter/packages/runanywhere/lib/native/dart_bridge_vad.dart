@@ -4,7 +4,7 @@
 /// commons model lifecycle, so this bridge only exposes the
 /// lifecycle-owned generated-proto one-shot processing entry point
 /// plus a minimal handle accessor used by state-query getters.
-library dart_bridge_vad;
+library;
 
 import 'dart:ffi';
 

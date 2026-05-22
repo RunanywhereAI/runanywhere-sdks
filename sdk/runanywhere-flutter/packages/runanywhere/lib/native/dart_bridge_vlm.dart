@@ -3,7 +3,7 @@
 /// Thin generated-proto VLM bridge. Commons lifecycle owns the loaded VLM
 /// service; Dart passes app-owned image request bytes and receives generated
 /// VLM result/stream protos.
-library dart_bridge_vlm;
+library;
 
 import 'dart:async';
 import 'dart:ffi' as ffi;

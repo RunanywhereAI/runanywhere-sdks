@@ -5,7 +5,7 @@
 ///
 /// This is a thin wrapper around C++ LLM component functions.
 /// All business logic is in C++ - Dart only manages the handle.
-library dart_bridge_llm;
+library;
 
 import 'dart:async';
 import 'dart:ffi';

@@ -2,7 +2,7 @@
 ///
 /// Centralized logging utility.
 /// Matches iOS SDKLogger from Foundation/Logging/SDKLogger.swift
-library sdk_logger;
+library;
 
 /// Log levels
 enum LogLevel {

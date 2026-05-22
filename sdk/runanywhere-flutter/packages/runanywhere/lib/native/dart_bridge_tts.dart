@@ -2,7 +2,7 @@
 ///
 /// TTS component bridge - manages C++ TTS component lifecycle.
 /// Mirrors Swift's CppBridge+TTS.swift pattern.
-library dart_bridge_tts;
+library;
 
 import 'dart:async';
 import 'dart:ffi';

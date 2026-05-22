@@ -27,7 +27,7 @@
 /// // Register models through RunAnywhere.models after register()
 /// // succeeds. The commons registry/router owns framework selection and routing.
 /// ```
-library runanywhere_genie;
+library;
 
 import 'dart:async';
 

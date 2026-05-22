@@ -5,7 +5,7 @@
 /// All [DynamicLibrary.lookupFunction] calls are performed once at first access
 /// via lazy static fields. Subsequent calls return the cached function pointer,
 /// avoiding repeated symbol-table searches (dlsym) on every invocation.
-library native_functions;
+library;
 
 import 'dart:ffi';
 

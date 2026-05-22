@@ -7,7 +7,6 @@
 import 'dart:async';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';

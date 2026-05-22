@@ -31,7 +31,6 @@ class DartBridgeModelRegistry {
 
   /// Registry handle
   static Pointer<Void>? _registryHandle;
-  static bool _isInitialized = false;
 
   /// Models registered before the global registry handle is wired (Phase 1 race).
   static final List<model_pb.ModelInfo> _pendingProtoModels = [];
@@ -50,7 +49,6 @@ class DartBridgeModelRegistry {
   /// This matches Swift's CppBridge+ModelRegistry.swift behavior.
   void ensureInitialized() {
     if (_registryHandle != null) {
-      _isInitialized = true;
       return;
     }
 
@@ -67,7 +65,6 @@ class DartBridgeModelRegistry {
 
       if (globalRegistry != nullptr) {
         _registryHandle = globalRegistry;
-        _isInitialized = true;
         _logger.debug('Using global C++ model registry');
         _flushPendingProtoModels();
       } else {
@@ -75,7 +72,6 @@ class DartBridgeModelRegistry {
       }
     } catch (e) {
       _logger.debug('Model registry init error: $e');
-      _isInitialized = true; // Avoid retry loops
     }
   }
 
@@ -112,7 +108,6 @@ class DartBridgeModelRegistry {
     // Don't destroy the global registry - it's managed by C++
     // The handle is just a reference to the singleton
     _registryHandle = null;
-    _isInitialized = false;
     _logger.debug('Model registry bridge shutdown (global registry preserved)');
   }
 

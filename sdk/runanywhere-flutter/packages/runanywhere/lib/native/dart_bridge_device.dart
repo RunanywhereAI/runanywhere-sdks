@@ -396,7 +396,7 @@ class DartBridgeDevice {
   /// - iOS: Keychain (survives app reinstalls)
   /// - Android: EncryptedSharedPreferences (survives app reinstalls)
   static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 

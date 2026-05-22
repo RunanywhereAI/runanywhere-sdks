@@ -181,7 +181,7 @@ typedef RacGetVendorIdCallbackNative = Int32 Function(
 // =============================================================================
 
 /// Platform adapter struct matching rac_platform_adapter_t
-/// Note: This is a complex struct - for simplicity we use Pointer<Void> in FFI calls
+/// Note: This is a complex struct - for simplicity we use `Pointer<Void>` in FFI calls
 /// and manage the struct manually in Dart
 base class RacPlatformAdapterStruct extends Struct {
   external Pointer<NativeFunction<RacFileExistsCallbackNative>> fileExists;

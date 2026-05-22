@@ -5,7 +5,6 @@
 
 import 'package:fixnum/fixnum.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
     show DownloadProgress;

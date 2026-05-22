@@ -2,7 +2,7 @@
 ///
 /// STT component bridge - manages C++ STT component lifecycle.
 /// Mirrors Swift's CppBridge+STT.swift pattern.
-library dart_bridge_stt;
+library;
 
 import 'dart:ffi';
 import 'dart:typed_data';

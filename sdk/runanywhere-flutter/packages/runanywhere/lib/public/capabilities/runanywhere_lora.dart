@@ -8,7 +8,6 @@
 //   register / listCatalog / queryCatalog / getCatalogEntry /
 //   markDownloadCompleted / adaptersForModel / allRegistered
 
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';

@@ -6,7 +6,7 @@
 // `rac_tool_calling_session_*_proto`). This file only carries bytes.
 //
 // Mirrors Swift's `CppBridge+ToolCalling.swift`.
-library dart_bridge_tool_calling;
+library;
 
 import 'dart:async';
 import 'dart:ffi' as ffi;

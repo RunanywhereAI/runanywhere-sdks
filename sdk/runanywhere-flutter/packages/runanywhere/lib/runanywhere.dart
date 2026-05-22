@@ -3,7 +3,7 @@
 /// The generated protobuf modules are the canonical data-contract surface.
 /// Hand-written exports below are limited to platform glue, capability facades,
 /// and Dart helpers that expose real SDK behavior.
-library runanywhere;
+library;
 
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'foundation/constants/sdk_constants.dart';

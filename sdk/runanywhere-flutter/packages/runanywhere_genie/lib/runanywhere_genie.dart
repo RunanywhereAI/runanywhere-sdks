@@ -39,6 +39,6 @@
 ///
 /// - **Android**: Snapdragon devices with Qualcomm Genie SDK-built native binaries
 /// - **iOS**: Not supported (Genie is Android/Snapdragon only)
-library runanywhere_genie;
+library;
 
 export 'genie.dart';

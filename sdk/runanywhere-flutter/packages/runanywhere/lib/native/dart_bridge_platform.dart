@@ -84,7 +84,7 @@ class DartBridgePlatform {
   /// Secure storage for keychain operations
   // ignore: unused_field
   static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
@@ -472,7 +472,7 @@ Future<void> loadSecureStorageCache() async {
 
   try {
     const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     final all = await storage.readAll();
@@ -541,7 +541,7 @@ int _platformSecureSetCallback(
 Future<void> _writeSecureStorage(String key, String value) async {
   try {
     const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     await storage.write(key: key, value: value);
@@ -578,7 +578,7 @@ int _platformSecureDeleteCallback(
 Future<void> _deleteSecureStorage(String key) async {
   try {
     const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     await storage.delete(key: key);

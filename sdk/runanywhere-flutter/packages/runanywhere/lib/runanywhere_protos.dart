@@ -6,7 +6,7 @@
 /// ```dart
 /// import 'package:runanywhere/runanywhere_protos.dart' as ra_proto;
 /// ```
-library runanywhere_protos;
+library;
 
 export 'generated/chat.pb.dart';
 export 'generated/chat.pbenum.dart';

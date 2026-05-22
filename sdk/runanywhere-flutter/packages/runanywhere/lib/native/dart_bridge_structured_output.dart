@@ -6,7 +6,7 @@
 // All orchestration (prompt preparation, generation, thinking-tag stripping,
 // JSON extraction, schema validation) lives in commons C++. This file only
 // packs the request proto bytes and unpacks the result proto bytes.
-library dart_bridge_structured_output;
+library;
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';

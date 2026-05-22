@@ -62,7 +62,7 @@ class DartBridgeTelemetry {
 
   /// Detect unfilled .env / dart-define template placeholders.
   /// Returns true for strings like "YOUR_SUPABASE_PROJECT_URL",
-  /// "<your-key>", "REPLACE_ME", etc. (B-FL-1-004 / B-WEB-9-001).
+  /// `<your-key>`, "REPLACE_ME", etc. (B-FL-1-004 / B-WEB-9-001).
   static bool _looksLikePlaceholder(String? value) {
     if (value == null) return false;
     return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
@@ -409,8 +409,8 @@ class DartBridgeTelemetry {
         'modelName': modelName,
         'modality': modality,
         'durationMs': durationMs,
-        if (tokensGenerated != null) 'tokensGenerated': tokensGenerated,
-        if (tokensPerSecond != null) 'tokensPerSecond': tokensPerSecond,
+        'tokensGenerated': ?tokensGenerated,
+        'tokensPerSecond': ?tokensPerSecond,
       },
     );
   }

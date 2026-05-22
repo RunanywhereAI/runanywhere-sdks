@@ -46,9 +46,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
-import 'package:runanywhere/generated/tts_options.pbenum.dart';
 import 'package:runanywhere/generated/vlm_options.pb.dart';
-import 'package:runanywhere/generated/vlm_options.pbenum.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 
 import 'helpers/fake_native_listener.dart';

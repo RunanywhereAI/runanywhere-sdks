@@ -12,7 +12,7 @@
 // `rac_voice_agent_component_create_proto` /
 // `rac_voice_agent_component_destroy_proto` so Dart no longer pins
 // individual LLM/STT/TTS/VAD handles.
-library dart_bridge_voice_agent;
+library;
 
 import 'dart:async';
 import 'dart:ffi';

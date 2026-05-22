@@ -220,7 +220,7 @@ class DartBridgeAuth {
         // Try secure storage directly
         try {
           const storage = FlutterSecureStorage(
-            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            aOptions: AndroidOptions(),
             iOptions:
                 IOSOptions(accessibility: KeychainAccessibility.first_unlock),
           );
@@ -575,7 +575,7 @@ class DartBridgeAuth {
     // Fallback: read directly from secure storage
     try {
       const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        aOptions: AndroidOptions(),
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
       );
       final token = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
@@ -692,7 +692,7 @@ class DartBridgeAuth {
   Future<void> _storeAuthTokens(AuthData authData) async {
     try {
       const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        aOptions: AndroidOptions(),
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
       );
 
@@ -762,7 +762,7 @@ class DartBridgeAuth {
     // Also pre-load tokens into cache from Flutter secure storage
     try {
       const storage = FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        aOptions: AndroidOptions(),
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
       );
 
@@ -918,7 +918,7 @@ int _secureDeleteCallback(Pointer<Utf8> key, Pointer<Void> context) {
 Future<void> _writeToSecureStorage(String key, String value) async {
   try {
     const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     await storage.write(key: key, value: value);
@@ -931,7 +931,7 @@ Future<void> _writeToSecureStorage(String key, String value) async {
 Future<void> _deleteFromSecureStorage(String key) async {
   try {
     const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      aOptions: AndroidOptions(),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     await storage.delete(key: key);

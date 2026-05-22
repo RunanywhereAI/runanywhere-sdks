@@ -7,7 +7,7 @@
 /// Two classes:
 /// - [DartBridgeLora] - Runtime LoRA operations (apply/remove/list/state)
 /// - [DartBridgeLoraRegistry] - Catalog registry (register/query adapters)
-library dart_bridge_lora;
+library;
 
 import 'dart:ffi';
 
