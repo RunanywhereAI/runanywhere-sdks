@@ -9,16 +9,15 @@
 #        sdk/runanywhere-kotlin/build.gradle.kts
 #
 # Output:
-#   sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/
+#   sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/
 #
-# Wire emits pure Kotlin data classes with no Java protobuf dependency, which
-# keeps KMP's commonMain source set portable.
+# Wire emits pure Kotlin data classes with no Java protobuf dependency.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated"
+OUT_DIR="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated"
 
 mkdir -p "${OUT_DIR}"
 
@@ -27,7 +26,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # definitions are passed too — Wire treats `service { rpc ... }` blocks
     # as informational and emits the message types only. The streaming
     # client wrapper is hand-written in
-    # sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/.../adapters/
+    # sdk/runanywhere-kotlin/src/main/kotlin/.../adapters/
     # using kotlinx.coroutines Flow + the Wire-generated message types.
     #
     # IDL-19c: canonical proto-file list from generate_all.sh, with fallback
@@ -77,13 +76,12 @@ if command -v wire-compiler >/dev/null 2>&1; then
         --kotlin_out="${OUT_DIR}" \
         "${KOTLIN_PROTO_BASENAMES[@]}"
 
-    # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
-    # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both
-    # depend on com.squareup.wire:wire-grpc-client which we don't carry in KMP
-    # commonMain (JVM-only grpc runtime). The hand-written
-    # VoiceAgentStreamAdapter / DownloadStreamAdapter under jvmAndroidMain
-    # consume the message types directly via rac_*_set_proto_callback, so the
-    # generated client stubs are dead weight. Strip them so regen stays green.
+    # Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`) AND their
+    # Grpc client implementations (`Grpc<Service>Client.kt`). Both depend on
+    # com.squareup.wire:wire-grpc-client which the SDK does not carry. The
+    # hand-written VoiceAgentStreamAdapter / DownloadStreamAdapter consume the
+    # message types directly via rac_*_set_proto_callback, so the generated
+    # client stubs are dead weight. Strip them so regen stays green.
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*Client.kt" -delete
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "Grpc*Client.kt" -delete
 
@@ -92,8 +90,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # Note: protoc-gen-grpckt (grpc-kotlin official plugin) emits
     # com.google.protobuf-style Java messages + Flow client stubs. We do
     # NOT use it here because it would force a Java protobuf runtime
-    # dependency in commonMain (breaks KMP). The hand-written ~150 LOC
-    # adapter (Wave C Phase 17) is the bridge.
+    # dependency. The hand-written ~150 LOC adapter is the bridge.
 else
     echo "warning: wire-compiler not on PATH." >&2
     echo "         The Gradle Wire plugin in sdk/runanywhere-kotlin/build.gradle.kts" >&2
