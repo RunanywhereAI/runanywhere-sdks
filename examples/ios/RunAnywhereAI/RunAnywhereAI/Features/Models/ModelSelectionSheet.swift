@@ -291,16 +291,20 @@ extension ModelSelectionSheet {
             "STT sheet auto-prepare started (SWIFT-IOS-001)"
         )
 
-        let downloadable = availableModels.first { model in
-            unavailableReason(for: model) == nil &&
-            !model.isBuiltIn &&
-            model.localPathURL == nil
-        }
-        let readyOnDisk = availableModels.first { model in
-            unavailableReason(for: model) == nil &&
-            !model.isBuiltIn &&
-            model.localPathURL != nil
-        }
+        let defaultSTTModelID = "sherpa-onnx-whisper-tiny.en"
+        let preferred = availableModels.first { $0.id == defaultSTTModelID }
+        let downloadable = preferred.flatMap { $0.localPathURL == nil ? $0 : nil }
+            ?? availableModels.first { model in
+                unavailableReason(for: model) == nil &&
+                !model.isBuiltIn &&
+                model.localPathURL == nil
+            }
+        let readyOnDisk = preferred.flatMap { $0.localPathURL != nil ? $0 : nil }
+            ?? availableModels.first { model in
+                unavailableReason(for: model) == nil &&
+                !model.isBuiltIn &&
+                model.localPathURL != nil
+            }
 
         if let readyOnDisk {
             await selectAndLoadModel(readyOnDisk)

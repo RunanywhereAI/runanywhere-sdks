@@ -315,14 +315,23 @@ private extension RunAnywhere {
     static func resolveModelForDownload(_ model: RAModelInfo) async -> RAModelInfo {
         var request = RAModelGetRequest()
         request.modelID = model.id
-        let result = await getModel(request)
-        guard result.found else { return model }
-
-        let registryModel = result.model
-        if registryModel.downloadURL.isEmpty, model.downloadURL.isEmpty {
+        let getResult = await getModel(request)
+        if getResult.found {
+            let registryModel = getResult.model
+            if !registryModel.downloadURL.isEmpty || model.downloadURL.isEmpty {
+                return registryModel
+            }
             return model
         }
-        return registryModel
+
+        let listResult = await listModels()
+        guard listResult.success else { return model }
+        if let listed = listResult.models.models.first(where: { $0.id == model.id }) {
+            if !listed.downloadURL.isEmpty || model.downloadURL.isEmpty {
+                return listed
+            }
+        }
+        return model
     }
 
     /// Plan a download and retry once after clearing oversize partial bytes.

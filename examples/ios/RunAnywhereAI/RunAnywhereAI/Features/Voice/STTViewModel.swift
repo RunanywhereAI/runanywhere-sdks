@@ -114,7 +114,6 @@ class STTViewModel: ObservableObject {
     private func prepareDefaultSTTModelIfNeeded() async {
         guard !didAutoPrepareSTT else { return }
         didAutoPrepareSTT = true
-        guard selectedModelId == nil else { return }
 
         logger.info("STT auto-prepare started (SWIFT-IOS-001)")
 
@@ -459,6 +458,7 @@ class STTViewModel: ObservableObject {
 
         // Reset initialization flags to allow re-initialization if needed
         isInitialized = false
+        didAutoPrepareSTT = false
         hasSubscribedToAudioLevel = false
         hasSubscribedToSDKEvents = false
     }
