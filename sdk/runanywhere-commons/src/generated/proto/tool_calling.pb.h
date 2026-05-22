@@ -6945,7 +6945,7 @@ inline ::runanywhere::v1::ToolValueArray* PROTOBUF_NONNULL ToolValue::_internal_
   if (kind_case() != kArrayValue) {
     clear_kind();
     set_has_array_value();
-    _impl_.kind_.array_value_ =
+    _impl_.kind_.array_value_ = 
         ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ToolValueArray>(GetArena());
   }
   return _impl_.kind_.array_value_;
@@ -7027,7 +7027,7 @@ inline ::runanywhere::v1::ToolValueObject* PROTOBUF_NONNULL ToolValue::_internal
   if (kind_case() != kObjectValue) {
     clear_kind();
     set_has_object_value();
-    _impl_.kind_.object_value_ =
+    _impl_.kind_.object_value_ = 
         ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ToolValueObject>(GetArena());
   }
   return _impl_.kind_.object_value_;
@@ -12848,7 +12848,7 @@ inline ::runanywhere::v1::ToolCall* PROTOBUF_NONNULL ToolCallingSessionEvent::_i
   if (kind_case() != kToolCall) {
     clear_kind();
     set_has_tool_call();
-    _impl_.kind_.tool_call_ =
+    _impl_.kind_.tool_call_ = 
         ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ToolCall>(GetArena());
   }
   return _impl_.kind_.tool_call_;
@@ -12930,7 +12930,7 @@ inline ::runanywhere::v1::ToolCallingResult* PROTOBUF_NONNULL ToolCallingSession
   if (kind_case() != kFinalResult) {
     clear_kind();
     set_has_final_result();
-    _impl_.kind_.final_result_ =
+    _impl_.kind_.final_result_ = 
         ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ToolCallingResult>(GetArena());
   }
   return _impl_.kind_.final_result_;
