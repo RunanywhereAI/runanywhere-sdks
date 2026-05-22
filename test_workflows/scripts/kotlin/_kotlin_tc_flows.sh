@@ -734,7 +734,7 @@ _kotlin_push_rag_fixture() {
 _kotlin_select_document_in_picker() {
   local attempts=0
   while [[ "${attempts}" -lt 4 ]]; do
-    _kotlin_tap_on_screen "rag-sample.json" && return 0
+    _kotlin_tap_on_screen "rag-sample.json" || _kotlin_tap_on_screen "rag-sample.txt" && return 0
     _kotlin_tap_on_screen "Downloads" || _kotlin_tap_on_screen "Download" || true
     sleep 2
     _kotlin_scroll_down
