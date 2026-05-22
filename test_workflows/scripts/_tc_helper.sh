@@ -122,8 +122,155 @@ rac_mcp_grep() {
     eval "${RAC_MCP_GREP_CMD} \"${pattern}\""
     return $?
   fi
-  rac_tc_grep_log "${pattern}"
+  rac_tc_grep_lane_logs "${pattern}" || rac_tc_grep_log "${pattern}"
 }
+
+rac_tc_each_lane_log() {
+  local lane_root="${RAC_SESSION_ROOT:?}/logs"
+  local name
+  for name in flutter_run_console.log flutter_logs.log ios_live.log metro.log android_logcat.log executor.log; do
+    [[ -f "${lane_root}/${name}" ]] && printf '%s\n' "${lane_root}/${name}"
+  done
+}
+
+rac_tc_grep_lane_logs() {
+  local pattern="$1"
+  local f
+  while IFS= read -r f; do
+    [[ -n "${f}" ]] && grep -qF "${pattern}" "${f}" && return 0
+  done < <(rac_tc_each_lane_log)
+  return 1
+}
+
+rac_mcp_grep_any() {
+  local pattern
+  for pattern in "$@"; do
+    rac_mcp_grep "${pattern}" && return 0
+  done
+  return 1
+}
+
+rac_tc_drive_tc03_persistence() {
+  if _rac_tc_is_deferred tc03; then
+    rac_tc_done tc03 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    return 0
+  fi
+  if [[ -z "${RAC_MCP_KILL_CMD:-}" || -z "${RAC_MCP_LAUNCH_CMD:-}" ]]; then
+    rac_tc_done tc03 "N/A" "persistence drive requires RAC_MCP_KILL_CMD + RAC_MCP_LAUNCH_CMD"
+    return 0
+  fi
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local shot="screenshots/011_tc03_persistence.png"
+  eval "${RAC_MCP_KILL_CMD}"
+  sleep 2
+  eval "${RAC_MCP_LAUNCH_CMD}"
+  sleep "${RAC_TC03_LAUNCH_WAIT_S:-8}"
+  rac_mcp_tap "${RAC_TAB_CHAT:-Chat}"
+  sleep 2
+  rac_mcp_shot "${lane_root}/${shot}"
+  local status="LIMITED" notes="relaunched after force-kill; persistence not confirmed"
+  local hint="${RAC_TC03_MODEL_UI_HINT:-SmolVLM}"
+  if [[ -n "${RAC_MCP_UI_SCAN_CMD:-}" ]] && eval "${RAC_MCP_UI_SCAN_CMD} \"${hint}\""; then
+    status="PASS"
+    notes="model hint ${hint} visible after relaunch"
+  elif rac_mcp_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "${RAC_MARKER_MODEL_LOAD}" "${RAC_MARKER_LLM_LOAD}"; then
+    status="PASS"
+    notes="model registry marker present after relaunch"
+  fi
+  rac_tc_done tc03 "${status}" "${notes}" "${shot}"
+}
+
+rac_tc_drive_tc10_transcribe_ui() {
+  if _rac_tc_is_deferred tc10; then
+    return 0
+  fi
+  local tab="${RAC_TAB_TRANSCRIBE:-}"
+  if [[ -z "${tab}" ]]; then
+    rac_tc_done tc10 "N/A" "no transcribe/STT tab for this lane"
+    return 0
+  fi
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local shot="screenshots/012_tc10_stt_ui.png"
+  rac_mcp_tap "${tab}"
+  sleep 2
+  rac_mcp_shot "${lane_root}/${shot}"
+  local status="PASS" notes="STT tab opened"
+  if [[ -n "${RAC_MCP_UI_PROBE_CMD:-}" ]]; then
+    if eval "${RAC_MCP_UI_PROBE_CMD} \"microphone\" \"Mic\" \"Start recording\""; then
+      notes="mic toggle / record control present on STT surface"
+    else
+      status="LIMITED"
+      notes="STT tab opened; mic control not confirmed"
+    fi
+  elif ! rac_mcp_grep_any "${RAC_MARKER_STT_UI_READY}" "${RAC_MARKER_STT_LOADED}" "${RAC_MARKER_STT_AUTO_PREPARE}"; then
+    status="LIMITED"
+    notes="STT tab opened; STT ready marker not in captured logs"
+  fi
+  rac_tc_done tc10 "${status}" "${notes}" "${shot}"
+}
+
+rac_tc_drive_tc14_tool_calling() {
+  if _rac_tc_is_deferred tc14; then
+    rac_tc_done tc14 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    return 0
+  fi
+  local tab="${RAC_TAB_SETTINGS:-Settings}"
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local shot="screenshots/014_tc14_tools.png"
+  rac_mcp_tap "${tab}"
+  sleep 2
+  rac_mcp_tap "Tool Calling" || rac_mcp_tap "Tools" || true
+  sleep 1
+  rac_mcp_tap "Enable Tool Calling" || rac_mcp_tap "Tool calling" || true
+  sleep 1
+  rac_mcp_shot "${lane_root}/${shot}"
+  rac_mcp_tap "${RAC_TAB_CHAT:-Chat}"
+  sleep 1
+  local status="LIMITED" notes="settings visited; tool toggle not confirmed in logs"
+  if rac_mcp_grep_any "ToolCalling" "Registered tool" "tool calling"; then
+    status="PASS"
+    notes="tool-calling markers present after settings visit"
+  fi
+  rac_tc_done tc14 "${status}" "${notes}" "${shot}"
+}
+
+rac_tc_drive_tc16_storage_after_lifecycle() {
+  if _rac_tc_is_deferred tc16; then
+    rac_tc_done tc16 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    return 0
+  fi
+  local tab="${RAC_TAB_STORAGE:-}"
+  [[ -z "${tab}" ]] && tab="${RAC_TAB_SETTINGS:-Settings}"
+  local lane_root="${RAC_SESSION_ROOT:?}"
+  local shot="screenshots/016_tc16_storage.png"
+  rac_mcp_tap "${tab}"
+  sleep 2
+  rac_mcp_shot "${lane_root}/${shot}"
+  local status="LIMITED" notes="storage/settings surface reopened after lifecycle"
+  local hint="${RAC_TC03_MODEL_UI_HINT:-SmolVLM}"
+  if [[ -n "${RAC_MCP_UI_SCAN_CMD:-}" ]] && eval "${RAC_MCP_UI_SCAN_CMD} \"${hint}\""; then
+    status="PASS"
+    notes="model row/hint ${hint} still listed after tc03 lifecycle"
+  elif rac_mcp_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "${RAC_MARKER_MODEL_LOAD}"; then
+    status="PASS"
+    notes="model registry markers still present after lifecycle"
+  fi
+  rac_tc_done tc16 "${status}" "${notes}" "${shot}"
+}
+
+rac_tc_drive_tc13_rag() {
+  if _rac_tc_is_deferred tc13; then
+    rac_tc_done tc13 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    return 0
+  fi
+  if [[ -n "${RAC_TC13_DRIVE_CMD:-}" ]]; then
+    eval "${RAC_TC13_DRIVE_CMD}"
+    return 0
+  fi
+  rac_tc_run_modality tc13 rag RAC_TAB_DOCS RAC_MARKER_RAG_INGEST "$((RAC_TC_INDEX_BASE:-10 + 8))"
+}
+
+
 
 # ---------------------------------------------------------------------------
 # Catalog modality drive (TC-02..TC-21)
@@ -195,25 +342,34 @@ rac_tc_drive_catalog() {
   local idx="${RAC_TC_INDEX_BASE:-10}"
 
   rac_tc_run_modality tc02 download RAC_TAB_CHAT RAC_MARKER_DOWNLOAD_ACCEPTED "$((idx+0))"
-  rac_tc_run_modality tc04 load RAC_TAB_CHAT RAC_MARKER_MODEL_LOAD "$((idx+1))"
-  rac_tc_run_modality tc05 chat RAC_TAB_CHAT RAC_MARKER_SDK_INIT "$((idx+2))"
-  rac_tc_run_modality tc07 transcribe RAC_TAB_TRANSCRIBE RAC_MARKER_MODEL_LOAD "$((idx+3))"
-  rac_tc_run_modality tc08 speak RAC_TAB_SPEAK RAC_MARKER_MODEL_LOAD "$((idx+4))"
-  rac_tc_run_modality tc09 vision RAC_TAB_VISION RAC_MARKER_MODEL_LOAD "$((idx+5))"
+  rac_tc_drive_tc03_persistence
+  rac_tc_run_modality tc04 load RAC_TAB_CHAT RAC_MARKER_LLM_LOAD "$((idx+1))"
+  rac_tc_run_modality tc05 chat RAC_TAB_CHAT RAC_MARKER_LLM_STREAM_DONE "$((idx+2))"
+  rac_tc_run_modality tc07 transcribe RAC_TAB_TRANSCRIBE RAC_MARKER_STT_LOADED "$((idx+3))"
+  rac_tc_drive_tc10_transcribe_ui
+  rac_tc_run_modality tc08 speak RAC_TAB_SPEAK RAC_MARKER_TTS_DONE "$((idx+4))"
+  rac_tc_run_modality tc09 vision RAC_TAB_VISION RAC_MARKER_VLM_DONE "$((idx+5))"
   rac_tc_run_modality tc11 speak_ui RAC_TAB_SPEAK '' "$((idx+6))"
   rac_tc_run_modality tc12 voice RAC_TAB_VOICE '' "$((idx+7))"
-  rac_tc_run_modality tc13 rag RAC_TAB_DOCS RAC_MARKER_MODEL_LOAD "$((idx+8))"
+  rac_tc_drive_tc13_rag
+  rac_tc_drive_tc14_tool_calling
   rac_tc_run_modality tc15 storage RAC_TAB_STORAGE '' "$((idx+9))"
+  rac_tc_drive_tc16_storage_after_lifecycle
   rac_tc_run_modality tc20 settings RAC_TAB_SETTINGS '' "$((idx+10))"
 
   for skip in tc06 tc17 tc18 tc21; do
-    rac_tc_done "${skip}" "N/A" "not exposed in this app or DEFERRED per catalog"
+    if _rac_tc_is_deferred "${skip}"; then
+      continue
+    fi
+    if ! awk -F'	' -v tc="${skip}" '$1==tc{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv" 2>/dev/null; then
+      rac_tc_done "${skip}" "N/A" "not exposed in this app or DEFERRED per catalog"
+    fi
   done
 
-  # TCs deferred for a dedicated lane flow (e.g. Swift tc10 STT UX) not driven in catalog.
   if _rac_tc_is_deferred tc10; then
-    if ! awk -F'\t' '$1=="tc10"{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv"; then
+    if ! awk -F'	' '$1=="tc10"{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv"; then
       rac_tc_done tc10 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
     fi
   fi
 }
+
