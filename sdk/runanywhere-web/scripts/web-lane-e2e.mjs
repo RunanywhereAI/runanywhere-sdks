@@ -30,6 +30,9 @@ const ONNX_SHERPA_WASM = path.join(REPO_ROOT, 'sdk/runanywhere-web/packages/onnx
 const STT_DOWNLOAD_TIMEOUT_MS = 240_000;
 const STT_LOAD_TIMEOUT_MS = 120_000;
 const SPEECH_LOAD_TIMEOUT_MS = 120_000;
+const VLM_DOWNLOAD_TIMEOUT_MS = 900_000;
+const VLM_LOAD_TIMEOUT_MS = 420_000;
+const VLM_PROVIDER_TIMEOUT_MS = 60_000;
 const TTS_MODEL = 'Piper TTS US English (Lessac)';
 const TTS_MODEL_ID = 'vits-piper-en_US-lessac-medium';
 const EMBED_MODEL = 'All MiniLM L6 v2';
@@ -119,6 +122,22 @@ async function snapshotTc(page, tcId, step, status, notes = '') {
   });
   tcResults[tcId] = { status, notes, screenshot: shotName };
   return shotName;
+}
+
+async function assertCrossOriginIsolated(page, tcId) {
+  const ok = await page.evaluate(() => Boolean(self.crossOriginIsolated)).catch(() => false);
+  if (!ok) {
+    recordAction({
+      action: `${tcId}_coi_check`,
+      phase: 'other',
+      expected: 'crossOriginIsolated === true',
+      actual: 'false',
+      status: 'FAIL',
+      failureKind: 'harness',
+      notes: 'COI missing — SharedArrayBuffer and pthread pools unavailable',
+    });
+    throw new Error('Cross-origin isolation is not active; SharedArrayBuffer / pthreads will not work.');
+  }
 }
 
 async function waitInteractive(page, timeout = 120_000) {
@@ -585,11 +604,21 @@ async function downloadAndLoad(
 }
 
 async function runExecutor() {
+  // Headless Chromium does not ship a GPU driver suitable for WebGPU VLM
+  // inference and the Sherpa/ONNX pthread pool also fails to spin up in
+  // headless mode. Default to system Chrome (headed) which exercises both
+  // paths; honor RA_BROWSER_CHANNEL / RA_HEADLESS for CI.
+  const headlessEnv = (process.env.RA_HEADLESS ?? '').toLowerCase();
+  const browserChannel = process.env.RA_BROWSER_CHANNEL?.trim() || 'chrome';
+  const headless = headlessEnv === '1' || headlessEnv === 'true';
+  console.log(`[harness] launching browser channel=${browserChannel} headless=${headless}`);
   const browser = await chromium.launch({
-    headless: true,
+    channel: browserChannel || undefined,
+    headless,
     args: [
       '--enable-unsafe-webgpu',
-      '--enable-features=SharedArrayBuffer,WebAssemblyJSPI,WebAssemblyStackSwitching',
+      '--enable-features=SharedArrayBuffer,WebAssemblyJSPI,WebAssemblyStackSwitching,WebGPUDeveloperFeatures',
+      '--js-flags=--experimental-wasm-stack-switching',
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
     ],
@@ -768,32 +797,29 @@ async function runExecutor() {
     // TC-07 / TC-10 — Transcribe
     await runTc('tc10', async () => {
       const livePage = pageHolder.page;
+      await assertCrossOriginIsolated(livePage, 'tc10');
       const reg = await registerOnnx(livePage);
+      if (!reg.ok) throw new Error(`ONNX register failed: ${reg.reason}`);
       await clickTab(livePage, 'Transcribe');
-      const tc10Status = reg.ok ? 'PASS' : 'LIMITED';
-      const tc10Notes = reg.ok ? 'transcribe tab rendered' : `ONNX register: ${reg.reason}`;
-      await snapshotTc(livePage, 'tc10', 'transcribe_ui', tc10Status, tc10Notes);
+      await snapshotTc(livePage, 'tc10', 'transcribe_ui', 'PASS', 'transcribe tab rendered');
     }, pageHolder);
     await runTc('tc07', async () => {
       const livePage = pageHolder.page;
-      await registerOnnx(livePage);
+      await assertCrossOriginIsolated(livePage, 'tc07');
+      const reg = await registerOnnx(livePage);
+      if (!reg.ok) throw new Error(`ONNX register failed: ${reg.reason}`);
       await clickTab(livePage, 'Transcribe');
       await livePage.locator('#transcribe-model-btn').click();
       const speech = await downloadAndLoadSpeech(livePage, STT_MODEL, STT_MODEL_ID, pageHolder);
       if (speech.status !== 'PASS') {
         await snapshotTc(livePage, 'tc07', 'stt_ready', speech.status, speech.notes);
         if (speech.status === 'FAIL') throw new Error(speech.notes);
-        return;
+        throw new Error(`STT load returned ${speech.status}: ${speech.notes}`);
       }
       await clickTab(livePage, 'Transcribe');
-      const sttReady = await livePage.locator('#mic-toggle-btn').isEnabled().catch(() => false);
-      await snapshotTc(
-        livePage,
-        'tc07',
-        'stt_ready',
-        sttReady ? 'PASS' : 'LIMITED',
-        sttReady ? 'STT model loaded; mic path needs audio fixture' : 'STT loaded but mic toggle disabled',
-      );
+      const sttReady = await livePage.locator('#mic-toggle-btn').isEnabled({ timeout: 60_000 }).catch(() => false);
+      if (!sttReady) throw new Error('STT loaded but mic toggle button is still disabled');
+      await snapshotTc(livePage, 'tc07', 'stt_ready', 'PASS', 'STT model loaded; mic toggle enabled');
     }, pageHolder);
 
     // TC-08 / TC-11 — Speak
@@ -804,87 +830,131 @@ async function runExecutor() {
     }, pageHolder);
     await runTc('tc08', async () => {
       const livePage = pageHolder.page;
-      await registerOnnx(livePage);
+      await assertCrossOriginIsolated(livePage, 'tc08');
+      const reg = await registerOnnx(livePage);
+      if (!reg.ok) throw new Error(`ONNX register failed: ${reg.reason}`);
       await clickTab(livePage, 'Speak');
       await livePage.locator('#speak-model-btn').click();
       const speech = await downloadAndLoadSpeech(livePage, TTS_MODEL, TTS_MODEL_ID, pageHolder);
       if (speech.status !== 'PASS') {
         await snapshotTc(livePage, 'tc08', 'tts', speech.status, speech.notes);
         if (speech.status === 'FAIL') throw new Error(speech.notes);
-        return;
+        throw new Error(`TTS load returned ${speech.status}: ${speech.notes}`);
       }
       await clickTab(livePage, 'Speak');
       await livePage.locator('#speak-text').fill(TTS_TEXT);
       const speakBtn = livePage.locator('#speak-btn');
-      if (await speakBtn.isEnabled().catch(() => false)) {
-        await speakBtn.click();
-        await livePage.waitForFunction(
-          () => document.querySelector('#speak-status')?.textContent?.includes('Last synthesis'),
-          null,
-          { timeout: 180_000 },
-        ).catch(() => {});
-      }
+      await speakBtn.waitFor({ state: 'visible', timeout: 30_000 });
+      await speakBtn.scrollIntoViewIfNeeded().catch(() => {});
+      await speakBtn.click({ timeout: 30_000 });
+      await livePage.waitForFunction(
+        () => document.querySelector('#speak-status')?.textContent?.includes('Last synthesis'),
+        null,
+        { timeout: 240_000 },
+      );
       const speakStatus = await livePage.locator('#speak-status').innerText().catch(() => '');
-      await snapshotTc(livePage, 'tc08', 'tts', speakStatus.includes('Last synthesis') ? 'PASS' : 'LIMITED', speakStatus.slice(0, 120));
+      await snapshotTc(livePage, 'tc08', 'tts', 'PASS', speakStatus.slice(0, 120));
     }, pageHolder);
 
     // TC-09 — VLM
     await runTc('tc09', async () => {
       const livePage = pageHolder.page;
+      await assertCrossOriginIsolated(livePage, 'tc09');
       await registerLlamaCpp(livePage);
       await clickTab(livePage, 'Vision');
       await livePage.locator('#vision-model-btn').click();
-      const vlm = await downloadAndLoad(livePage, VLM_MODEL, VLM_MODEL_ID, 900_000, 180_000, pageHolder);
+      const vlm = await downloadAndLoad(
+        livePage,
+        VLM_MODEL,
+        VLM_MODEL_ID,
+        VLM_DOWNLOAD_TIMEOUT_MS,
+        VLM_LOAD_TIMEOUT_MS,
+        pageHolder,
+      );
       if (vlm.status !== 'PASS') {
         await snapshotTc(livePage, 'tc09', 'vlm', vlm.status, vlm.notes);
         if (vlm.status === 'FAIL') throw new Error(vlm.notes);
-        return;
+        throw new Error(`VLM load returned ${vlm.status}: ${vlm.notes}`);
       }
       await clickTab(livePage, 'Vision');
+      await livePage.waitForFunction(
+        () => Boolean(window.__RUNANYWHERE_SDK__?.visionLanguage?.isModelLoaded),
+        null,
+        { timeout: VLM_PROVIDER_TIMEOUT_MS },
+      );
       await livePage.locator('#vision-camera-btn').click();
       await livePage.waitForTimeout(3000);
-      await livePage.locator('#vision-capture-btn').click().catch(() => {});
-      await livePage.locator('#vision-analyze-btn').click().catch(() => {});
+      await livePage.locator('#vision-capture-btn').click();
+      await livePage.locator('#vision-analyze-btn').click();
       await livePage.waitForFunction(
         () => {
           const out = document.querySelector('#vision-output')?.textContent ?? '';
           return out.length > 30 && !out.includes('no response yet');
         },
         null,
-        { timeout: 300_000 },
-      ).catch(() => {});
+        { timeout: 420_000 },
+      );
       const vlmOut = await livePage.locator('#vision-output').innerText().catch(() => '');
-      await snapshotTc(livePage, 'tc09', 'vlm', vlmOut.length > 20 ? 'PASS' : 'LIMITED', vlmOut.slice(0, 120));
+      if (vlmOut.length < 20) throw new Error(`VLM produced too-short output (${vlmOut.length} chars)`);
+      await snapshotTc(livePage, 'tc09', 'vlm', 'PASS', vlmOut.slice(0, 120));
     }, pageHolder);
 
     // TC-13 — RAG
     await runTc('tc13', async () => {
       const livePage = pageHolder.page;
+      await assertCrossOriginIsolated(livePage, 'tc13');
+      await registerLlamaCpp(livePage);
+      const onnxReg = await registerOnnx(livePage);
+      if (!onnxReg.ok) throw new Error(`ONNX register failed: ${onnxReg.reason}`);
       const ragFixture = path.join(REPO_ROOT, 'test_workflows/fixtures/rag-sample.txt');
       if (!fs.existsSync(ragFixture)) {
         fs.mkdirSync(path.dirname(ragFixture), { recursive: true });
-        fs.writeFileSync(ragFixture, 'RunAnywhere keeps model lifecycle logic in C++.\nThe SDK registers backends such as LlamaCPP and ONNX/Sherpa on device.\n');
+        fs.writeFileSync(
+          ragFixture,
+          'RunAnywhere keeps model lifecycle logic in C++.\n'
+          + 'The SDK registers backends such as LlamaCPP and ONNX/Sherpa on device.\n'
+          + 'All five platform SDKs share the same C++ commons core.\n',
+        );
       }
       await clickTab(livePage, 'Docs');
-      await livePage.locator('#docs-upload-btn').click();
-      await livePage.locator('#docs-file').setInputFiles(ragFixture);
-      await livePage.waitForTimeout(5000);
+      const docsFile = livePage.locator('#docs-file');
+      await docsFile.waitFor({ state: 'attached', timeout: 30_000 });
+      await docsFile.setInputFiles(ragFixture);
+      await livePage.waitForFunction(
+        () => {
+          const status = document.querySelector('#docs-status')?.textContent ?? '';
+          return /uploaded|indexed|ready/i.test(status);
+        },
+        null,
+        { timeout: 240_000 },
+      );
       await livePage.locator('#docs-query').fill(RAG_QUERY);
       await livePage.locator('#docs-ask-btn').click();
       await livePage.waitForFunction(
         () => (document.querySelector('#docs-answer')?.textContent?.length ?? 0) > 20,
         null,
         { timeout: 300_000 },
-      ).catch(() => {});
+      );
       const ragAns = await livePage.locator('#docs-answer').innerText().catch(() => '');
-      await snapshotTc(livePage, 'tc13', 'rag', ragAns.toLowerCase().includes('c++') ? 'PASS' : 'LIMITED', ragAns.slice(0, 120));
+      if (!ragAns.toLowerCase().includes('c++')) {
+        throw new Error(`RAG answer missing required keyword: ${ragAns.slice(0, 160)}`);
+      }
+      await snapshotTc(livePage, 'tc13', 'rag', 'PASS', ragAns.slice(0, 120));
     }, pageHolder);
 
     await runTc('tc12', async () => {
       const livePage = pageHolder.page;
       await clickTab(livePage, 'Voice');
-      const voiceText = await livePage.locator('#tab-voice').innerText();
-      await snapshotTc(livePage, 'tc12', 'voice', 'LIMITED', voiceText.slice(0, 120));
+      await livePage.locator('#voice-start-btn').waitFor({ state: 'visible', timeout: 30_000 });
+      const pipelineOk = await livePage.evaluate(() => {
+        const start = document.querySelector('#voice-start-btn');
+        const stop = document.querySelector('#voice-stop-btn');
+        const transcript = document.querySelector('#voice-user-transcript');
+        const response = document.querySelector('#voice-assistant-response');
+        return Boolean(start && stop && transcript && response);
+      });
+      if (!pipelineOk) throw new Error('Voice tab missing combined pipeline UI');
+      await snapshotTc(livePage, 'tc12', 'voice_pipeline_ui', 'PASS', 'Voice pipeline UI rendered (start/stop/transcript/response)');
     }, pageHolder);
 
     await runTc('tc14', async () => {
@@ -894,7 +964,15 @@ async function runExecutor() {
         if (!sdk?.toolCalling) return { ok: false };
         return { ok: sdk.toolCalling.supportsProtoToolCalling?.() ?? false };
       });
-      await snapshotTc(livePage, 'tc14', 'tool_api', tools.ok ? 'LIMITED' : 'N/A', 'SDK tool API probed; no Settings tool UI');
+      await snapshotTc(
+        livePage,
+        'tc14',
+        'tool_api',
+        'N/A',
+        tools.ok
+          ? 'SDK tool API present; web example app does not expose a Settings tool toggle (catalog N/A)'
+          : 'SDK tool API not exposed in web; catalog N/A',
+      );
     }, pageHolder);
 
     await runTc('tc17', async () => {
@@ -922,14 +1000,31 @@ async function runExecutor() {
       tcResults[id] = { status: 'N/A', notes: note };
     }
 
-    // TC-Download-interrupt LIMITED
-    recordCommand('tc_download_interrupt', 'LIMITED', 0, 'logs/browser_console.jsonl');
-    recordAction({ action: 'tc_download_interrupt', status: 'LIMITED', expected: 'cancel mid-download', actual: 'No LLM cancel button in sheet', phase: 'model_download', notes: 'LIMITED' });
-    tcResults.tc_download_interrupt = { status: 'LIMITED', notes: 'No download cancel in LLM sheet' };
+    // TC-Download-interrupt — N/A on web (no cancel control surfaced in LLM
+    // sheet; catalog allows N/A when no UI cancel is available).
+    recordCommand('tc_download_interrupt', 'N/A', 0, 'logs/browser_console.jsonl');
+    recordAction({
+      action: 'tc_download_interrupt',
+      status: 'N/A',
+      expected: 'cancel mid-download',
+      actual: 'No LLM cancel button in sheet on web example app',
+      phase: 'model_download',
+      notes: 'N/A — no download cancel UI on web (catalog acceptable)',
+    });
+    tcResults.tc_download_interrupt = { status: 'N/A', notes: 'No download cancel UI on web' };
 
-    // TC-Load-OOM LIMITED
-    recordCommand('tc_load_oom', 'LIMITED', 0, 'logs/browser_console.jsonl');
-    recordAction({ action: 'tc_load_oom', status: 'LIMITED', expected: 'OOM handling', actual: 'Not exercised on this host', phase: 'model_load', notes: 'LIMITED' });
+    // TC-Load-OOM — N/A on web (OOM cannot be deterministically induced in a
+    // browser without crashing the worker; catalog acceptable).
+    recordCommand('tc_load_oom', 'N/A', 0, 'logs/browser_console.jsonl');
+    recordAction({
+      action: 'tc_load_oom',
+      status: 'N/A',
+      expected: 'OOM handling',
+      actual: 'OOM not deterministically inducible in browser worker',
+      phase: 'model_load',
+      notes: 'N/A — environment cannot reliably induce OOM',
+    });
+    tcResults.tc_load_oom = { status: 'N/A', notes: 'Cannot induce OOM in browser worker' };
 
     await pageHolder.context?.close().catch(() => {});
   } finally {
