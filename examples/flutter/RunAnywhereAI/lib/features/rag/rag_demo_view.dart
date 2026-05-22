@@ -449,6 +449,7 @@ class _RagDemoViewState extends State<RagDemoView> {
     final String subtitle;
     if (_viewModel.isDocumentLoaded) {
       title = 'Document loaded';
+      debugPrint('Document loaded successfully');
       subtitle = 'Ask a question below to get started';
     } else if (!_areModelsReady) {
       title = 'Select models to get started';

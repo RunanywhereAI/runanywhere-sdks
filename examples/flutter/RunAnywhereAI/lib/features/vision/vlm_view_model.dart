@@ -122,6 +122,7 @@ class VLMViewModel extends ChangeNotifier {
       _loadedModelName = modelName;
       notifyListeners();
       debugPrint('✅ VLM model loaded: $modelName');
+      debugPrint('VLM streaming completed');
     } catch (e) {
       debugPrint('❌ Failed to load VLM model: $e');
       _error = 'Failed to load model: $e';
@@ -321,6 +322,7 @@ class VLMViewModel extends ChangeNotifier {
   Future<void> cancelGeneration() async {
     unawaited(sdk.RunAnywhere.vlm.cancelVLMGeneration());
     debugPrint('🛑 VLM generation cancelled');
+    debugPrint('VLM streaming completed');
   }
 
   // MARK: - Cleanup

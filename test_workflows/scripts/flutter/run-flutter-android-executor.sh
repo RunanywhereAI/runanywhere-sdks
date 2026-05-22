@@ -57,17 +57,27 @@ _flutter_type() {
 }
 
 _flutter_android_grep() {
-  adb -s "${RAC_ANDROID_SERIAL}" logcat -d | grep -F "$1" >/dev/null 2>&1
+  local pattern="$1"
+  _flutter_grep_logs "${pattern}" && return 0
+  local pid
+  pid="$(adb -s "${RAC_ANDROID_SERIAL}" shell pidof "${ANDROID_PACKAGE}" 2>/dev/null | tr -d '' | awk '{print $1}')"
+  if [[ -n "${pid}" ]]; then
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d --pid="${pid}" 2>/dev/null | grep -F "${pattern}" >/dev/null 2>&1
+  else
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null | grep -F "${pattern}" >/dev/null 2>&1
+  fi
 }
 
 rac_tc_init_lane
-sleep 5
+eval "${RAC_MCP_LAUNCH_CMD}" || true
+sleep "${RAC_FLUTTER_BOOT_WAIT_S:-25}"
 rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/000_after_launch.png"
 if _flutter_android_grep "${RAC_MARKER_SDK_INIT}" || _flutter_android_grep "Phase 1 complete"; then
   rac_tc_done tc01 PASS "Flutter SDK init in logcat" "screenshots/000_after_launch.png"
 else
   rac_tc_done tc01 BLOCKED "SDK init marker missing" "screenshots/000_after_launch.png"
 fi
+_flutter_wait_grep "${RAC_MARKER_APP_READY}" 90 || _flutter_wait_grep "${RAC_MARKER_AI_READY}" 90 || true
 rac_tc_drive_catalog
 _flutter_drive_deep_modalities
 echo "Flutter Android executor: catalog + deep modality drive complete"

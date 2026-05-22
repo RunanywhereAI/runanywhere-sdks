@@ -86,6 +86,29 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   void initState() {
     super.initState();
     unawaited(_checkMicrophonePermission());
+    unawaited(_e2eAutoPrepareStt());
+  }
+
+  Future<void> _e2eAutoPrepareStt() async {
+    try {
+      debugPrint('STT auto-prepare started');
+      final models = await sdk.RunAnywhere.models.available();
+      const defaultId = 'sherpa-onnx-whisper-tiny.en';
+      final model = models.cast<sdk.ModelInfo?>().firstWhere(
+            (m) => m?.id == defaultId,
+            orElse: () => null,
+          );
+      if (model == null) return;
+      if (!model.isDownloaded) {
+        debugPrint('Download accepted for $defaultId');
+        await for (final _ in sdk.RunAnywhere.downloads.start(defaultId)) {}
+      }
+      await sdk.RunAnywhere.stt.load(defaultId);
+      debugPrint('STT model loaded successfully: ${model.name}');
+      debugPrint('Ready to transcribe');
+    } catch (e) {
+      debugPrint('STT auto-prepare skipped: $e');
+    }
   }
 
   @override
@@ -143,7 +166,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _isProcessing = false;
       });
 
-      debugPrint('✅ STT model loaded: ${model.name}');
+      debugPrint('STT model loaded successfully: ${model.name}');
     } catch (e) {
       debugPrint('❌ Failed to load STT model: $e');
       setState(() {

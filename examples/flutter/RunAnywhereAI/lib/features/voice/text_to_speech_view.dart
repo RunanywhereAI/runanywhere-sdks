@@ -224,6 +224,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
           '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+      debugPrint('Speech generation complete');
 
       setState(() {
         _isGenerating = false;
