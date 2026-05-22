@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.core.onnx
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
@@ -117,14 +118,43 @@ object ONNX : RunAnywhereModule {
     }
 }
 
-/**
- * Platform-specific native registration.
- * Calls rac_backend_onnx_register() via JNI.
- */
-internal expect fun ONNX.registerNative(): Int
+
+
+private val logger = SDKLogger.onnx
 
 /**
- * Platform-specific native unregistration.
- * Calls rac_backend_onnx_unregister() via JNI.
+ * JVM/Android implementation of ONNX native registration.
+ *
+ * Uses the self-contained ONNXBridge to register the backend,
+ * mirroring the Swift ONNXBackend XCFramework architecture.
+ *
+ * The ONNX module has its own JNI library (librac_backend_onnx_jni.so)
+ * that provides backend registration, separate from the main commons JNI.
  */
-internal expect fun ONNX.unregisterNative(): Int
+internal fun ONNX.registerNative(): Int {
+    logger.debug("Ensuring commons JNI is loaded for service registry")
+    // Ensure commons JNI is loaded first (provides service registry)
+    RunAnywhereBridge.ensureNativeLibraryLoaded()
+
+    logger.debug("Loading ONNX JNI library")
+    // Load and use the dedicated ONNX JNI
+    if (!ONNXBridge.ensureNativeLibraryLoaded()) {
+        logger.error("Failed to load ONNX native library")
+        throw UnsatisfiedLinkError("Failed to load ONNX native library")
+    }
+
+    logger.debug("Calling native ONNX register")
+    val result = ONNXBridge.nativeRegister()
+    logger.debug("Native ONNX register returned: $result")
+    return result
+}
+
+/**
+ * JVM/Android implementation of ONNX native unregistration.
+ */
+internal fun ONNX.unregisterNative(): Int {
+    logger.debug("Calling native ONNX unregister")
+    val result = ONNXBridge.nativeUnregister()
+    logger.debug("Native ONNX unregister returned: $result")
+    return result
+}
