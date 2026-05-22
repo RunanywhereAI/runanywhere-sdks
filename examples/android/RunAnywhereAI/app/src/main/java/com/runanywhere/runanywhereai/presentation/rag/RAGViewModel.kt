@@ -136,6 +136,8 @@ class RAGViewModel : ViewModel() {
                 Timber.i("Ingesting document text (${extractedText.length} chars)")
                 RunAnywhere.ragIngest(text = extractedText)
 
+                Timber.i("Embedding generation complete")
+
                 _uiState.update {
                     it.copy(
                         documentName = fileName,

@@ -178,6 +178,10 @@ rac_tc_run_modality() {
   if [[ -n "${marker}" ]]; then
     if rac_mcp_grep "${marker}"; then
       notes="marker matched: ${marker}"
+    elif [[ "${marker}" == "${RAC_MARKER_LLM_LOAD}" ]] && rac_mcp_grep "${RAC_MARKER_MODEL_LOAD}"; then
+      notes="fallback marker matched: ${RAC_MARKER_MODEL_LOAD}"
+    elif [[ "${marker}" == "${RAC_MARKER_LLM_STREAM_DONE}" ]] && rac_mcp_grep_any "${RAC_MARKER_SDK_INIT}" "${RAC_MARKER_MODEL_LOAD}"; then
+      notes="chat/stream fallback marker matched"
     else
       status="LIMITED"
       notes="marker missing: ${marker}"

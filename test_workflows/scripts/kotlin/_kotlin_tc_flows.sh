@@ -34,9 +34,11 @@ RAC_MARKER_VOICE_SYNC='Model states synced'
 RAC_MARKER_VOICE_SESSION='Voice session started'
 RAC_MARKER_RAG_INGEST='Ingesting document text'
 RAC_MARKER_RAG_LOADED='Document loaded successfully'
+RAC_MARKER_RAG_EMBED='Embedding generation complete'
+RAC_MARKER_RAG_QUERY_DONE='Query complete'
 RAC_MARKER_RAG_QUERY='Querying RAG pipeline'
 RAC_MARKER_TOOL_DEMO='Demo tools registered'
-RAC_MARKER_LORA_APPLY='LoRA adapter applied'
+RAC_MARKER_LORA_APPLY='Loaded LoRA adapter'
 
 _kotlin_ui_lock_file() {
   local safe_serial
@@ -432,6 +434,253 @@ _kotlin_ensure_stt_model_loaded() {
   sleep 2
 }
 
+
+_kotlin_logcat_tts() {
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null | grep -F "TextToSpeechViewModel" || true
+}
+
+_kotlin_logcat_chat() {
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null | grep -F "ChatViewModel" || true
+}
+
+_kotlin_logcat_voice() {
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null | grep -F "VoiceAssistantViewModel" || true
+}
+
+_kotlin_wait_tts_model_ready() {
+  local timeout="${1:-180}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_logcat_tts | grep -F 'Model loaded notification' >/dev/null 2>&1       || _kotlin_logcat_tts | grep -F '✅ TTS model loaded' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_wait_chat_llm_ready() {
+  local timeout="${1:-240}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_logcat_chat | grep -F 'Found downloaded chat model' >/dev/null 2>&1       || _kotlin_logcat_voice | grep -F '✅ LLM model loaded' >/dev/null 2>&1       || _kotlin_grep 'Model load succeeded for smollm2-360m'; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_ensure_tts_model_loaded() {
+  if _kotlin_logcat_tts | grep -F 'Model loaded notification' >/dev/null 2>&1; then
+    return 0
+  fi
+  _kotlin_tap_on_screen "Get Started"     || _kotlin_tap_on_screen "Select Model"     || _kotlin_tap_on_screen "Change"     || true
+  sleep 2
+  _kotlin_tap_on_screen "Piper TTS"     || _kotlin_tap_on_screen "Piper"     || _kotlin_tap_on_screen "Lessac"     || _kotlin_tap_on_screen "Medium"     || true
+  sleep 3
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 8
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_wait_tts_model_ready 180 || true
+  _kotlin_back
+  sleep 2
+}
+
+_kotlin_ensure_chat_llm_loaded() {
+  if _kotlin_wait_chat_llm_ready 5; then
+    return 0
+  fi
+  _kotlin_tap_on_screen "Get Started"     || _kotlin_tap_on_screen "Select Model"     || _kotlin_tap_on_screen "Change"     || _kotlin_tap_on_screen "Models"     || true
+  sleep 2
+  _kotlin_tap_on_screen "SmolLM2 360M"     || _kotlin_tap_on_screen "SmolLM2"     || _kotlin_tap_on_screen "SmolLM"     || true
+  sleep 3
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 10
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_wait_chat_llm_ready 240 || true
+  sleep 2
+}
+
+_kotlin_ensure_voice_models_loaded() {
+  _kotlin_open_more_feature "Speech to Text"
+  _kotlin_ensure_stt_model_loaded
+  _kotlin_back
+  sleep 1
+
+  _kotlin_tab_tap "Chat"
+  _kotlin_ensure_chat_llm_loaded
+  sleep 1
+
+  _kotlin_open_more_feature "Text to Speech"
+  _kotlin_ensure_tts_model_loaded
+  _kotlin_back
+  sleep 1
+}
+
+_kotlin_ui_dump_contains() {
+  local needle="$1"
+  local tmp
+  tmp="$(mktemp)"
+  if ! _kotlin_pull_ui_xml "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  python3 - "${needle}" "${tmp}" <<'PYUI'
+import sys
+import xml.etree.ElementTree as ET
+
+needle = sys.argv[1]
+try:
+    root = ET.parse(sys.argv[2]).getroot()
+except ET.ParseError:
+    raise SystemExit(1)
+blob = []
+for node in root.iter("node"):
+    blob.append(node.attrib.get("text") or "")
+    blob.append(node.attrib.get("content-desc") or "")
+hay = "
+".join(blob)
+raise SystemExit(0 if needle in hay else 1)
+PYUI
+  local rc=$?
+  rm -f "${tmp}"
+  return "${rc}"
+}
+
+_kotlin_ui_contains_all() {
+  local label
+  for label in "$@"; do
+    if ! _kotlin_ui_dump_contains "${label}"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+_kotlin_voice_transcript_log_nonempty() {
+  local line
+  line="$(
+    adb -s "${RAC_ANDROID_SERIAL}" logcat -d 2>/dev/null       | grep -E 'Batch transcription complete|Live transcription result:|Transcription complete'       | tail -n1 || true
+  )"
+  [[ -n "${line}" ]] || return 1
+  if echo "${line}" | grep -Eqi 'Batch transcription complete:[[:space:]]*[^[:space:()]+'; then
+    return 0
+  fi
+  if echo "${line}" | grep -Eqi 'Live transcription result:[[:space:]]*[^[:space:]+'; then
+    return 0
+  fi
+  echo "${line}" | grep -Eqi 'Transcription complete' 
+}
+
+
+_kotlin_wait_voice_transcript_visible() {
+  local timeout="${1:-120}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_voice_transcript_visible; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_voice_transcript_visible() {
+  local tmp
+  tmp="$(mktemp)"
+  if ! _kotlin_pull_ui_xml "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  local rc=1
+  python3 - "${tmp}" <<'PYV' && rc=0 || rc=1
+import sys
+import xml.etree.ElementTree as ET
+
+skip = {
+    "Voice Assistant",
+    "Speech Recognition",
+    "Language Model",
+    "Text to Speech",
+    "Models",
+    "Show Info",
+    "Hide Info",
+    "Microphone",
+    "LLM",
+    "STT",
+    "TTS",
+    "Loaded",
+    "Configured",
+    "Select",
+    "Change",
+    "Start Voice Assistant",
+    "Tap to start conversation",
+    "Recording... Tap to send",
+    "Processing your message...",
+    "Speaking...",
+    "Preparing voice agent...",
+}
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except ET.ParseError:
+    raise SystemExit(1)
+
+for node in root.iter("node"):
+    text = (node.attrib.get("text") or "").strip()
+    desc = (node.attrib.get("content-desc") or "").strip()
+    for candidate in (text, desc):
+        if len(candidate) < 8 or candidate in skip:
+            continue
+        if candidate.startswith("Tap ") or candidate.endswith("..."):
+            continue
+        raise SystemExit(0)
+raise SystemExit(1)
+PYV
+  rm -f "${tmp}"
+  return "${rc}"
+}
+
+_kotlin_wait_rag_models_ready() {
+  local timeout="${1:-240}"
+  local elapsed=0
+  while [[ "${elapsed}" -lt "${timeout}" ]]; do
+    if _kotlin_ui_dump_contains "All MiniLM"       && { _kotlin_ui_dump_contains "SmolLM2" || _kotlin_ui_dump_contains "SmolLM"; }; then
+      return 0
+    fi
+    sleep 3
+    elapsed=$((elapsed + 3))
+  done
+  return 1
+}
+
+_kotlin_ensure_rag_models_loaded() {
+  _kotlin_tap_on_screen "Embedding Model" || true
+  sleep 1
+  _kotlin_tap_on_screen "All MiniLM"     || _kotlin_tap_on_screen "MiniLM-L6"     || _kotlin_tap_on_screen "MiniLM"     || true
+  sleep 2
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 8
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_back
+  sleep 1
+
+  _kotlin_tap_on_screen "LLM Model" || true
+  sleep 1
+  _kotlin_tap_on_screen "SmolLM2 360M"     || _kotlin_tap_on_screen "SmolLM2"     || _kotlin_tap_on_screen "SmolLM"     || true
+  sleep 2
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 10
+  _kotlin_tap_on_screen "Use" || true
+  _kotlin_back
+  sleep 2
+  _kotlin_wait_rag_models_ready 240 || true
+}
+
+
 _kotlin_ensure_model_loaded() {
   local context_label="$1"
   if [[ "${context_label}" == "vlm" ]]; then
@@ -440,6 +689,14 @@ _kotlin_ensure_model_loaded() {
   fi
   if [[ "${context_label}" == "stt" ]]; then
     _kotlin_ensure_stt_model_loaded
+    return 0
+  fi
+  if [[ "${context_label}" == "tts" ]]; then
+    _kotlin_ensure_tts_model_loaded
+    return 0
+  fi
+  if [[ "${context_label}" == "llm" ]] || [[ "${context_label}" == "chat" ]]; then
+    _kotlin_ensure_chat_llm_loaded
     return 0
   fi
   _kotlin_tap_on_screen "Get Started" \
@@ -656,26 +913,40 @@ _kotlin_tc09_vlm() {
 # ---------------------------------------------------------------------------
 _kotlin_tc12_voice() {
   _kotlin_modality_preflight "tc12"
+  _kotlin_ensure_voice_models_loaded
   _kotlin_tab_tap "Voice"
   _kotlin_shot "011_voice_tab"
   _kotlin_snapshot "tc12_voice_tab"
 
+  rac_ensure_stt_fixture "${RAC_STT_FIXTURE_PATH}" "${REPO_ROOT}" || true
   _kotlin_tap_on_screen "Start Voice Assistant" || _kotlin_tap_on_screen "Microphone" || true
+  sleep 2
+  rac_inject_stt_fixture_start "${RAC_ANDROID_SERIAL}" "${RAC_STT_FIXTURE_PATH}" || true
+  sleep 1
+  _kotlin_tap_on_screen "Microphone" || true
+  sleep "${RAC_STT_RECORD_SECS:-12}"
+  _kotlin_tap_on_screen "Microphone" || true
+  rac_inject_stt_fixture_stop "${RAC_ANDROID_SERIAL}" || true
   sleep 3
 
   local status="LIMITED" notes="Voice session start attempted"
   if _kotlin_grep "${RAC_MARKER_VOICE_SYNC}"; then
     notes="Model states synced STT+LLM+TTS"
   fi
-  if _kotlin_wait_grep "${RAC_MARKER_VOICE_SESSION}" 45; then
+  if _kotlin_wait_grep "${RAC_MARKER_VOICE_SESSION}" 90; then
     notes="${notes}; voice session started"
-    sleep 5
-    _kotlin_tap_on_screen "Microphone" || true
-    sleep 8
-    _kotlin_tap_on_screen "Microphone" || true
-    if _kotlin_wait_grep "${RAC_MARKER_STT_BATCH}" 120 || _kotlin_grep "Transcription complete"; then
+    local transcript_ok=0
+    if _kotlin_voice_transcript_log_nonempty; then
+      transcript_ok=1
+    fi
+    if _kotlin_wait_voice_transcript_visible 120; then
+      transcript_ok=1
+    fi
+    if [[ "${transcript_ok}" -eq 1 ]]; then
       status="PASS"
-      notes="Voice turn: session started with transcription evidence"
+      notes="Voice session started with non-empty transcript (logcat and/or UI)"
+    else
+      notes="${notes}; transcript not confirmed in logcat/UI"
     fi
   fi
 
@@ -694,19 +965,7 @@ _kotlin_tc13_rag() {
   _kotlin_open_more_feature "Document Q&A"
   sleep 2
 
-  _kotlin_tap_on_screen "Embedding Model" || true
-  sleep 1
-  _kotlin_tap_on_screen "All MiniLM" || _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
-  sleep 3
-  _kotlin_back
-  sleep 1
-
-  _kotlin_tap_on_screen "LLM Model" || true
-  sleep 1
-  _kotlin_tap_on_screen "SmolLM2" || _kotlin_tap_on_screen "Use" || true
-  sleep 2
-  _kotlin_back
-  sleep 1
+  _kotlin_ensure_rag_models_loaded
 
   _kotlin_tap_on_screen "Select Document" || true
   sleep 2
@@ -714,19 +973,33 @@ _kotlin_tc13_rag() {
   sleep 5
 
   local status="LIMITED" notes="RAG document picker driven"
-  if _kotlin_wait_grep "${RAC_MARKER_RAG_INGEST}" 150 || _kotlin_wait_grep "${RAC_MARKER_RAG_LOADED}" 150; then
-    status="PASS"
-    notes="RAG ingest completed"
+  local ingest_deadline=180
+  local ingest_elapsed=0
+  local loaded=0 embed=0
+  while [[ "${ingest_elapsed}" -lt "${ingest_deadline}" ]]; do
+    _kotlin_grep "${RAC_MARKER_RAG_LOADED}" && loaded=1
+    _kotlin_grep "${RAC_MARKER_RAG_EMBED}" && embed=1
+    if [[ "${loaded}" -eq 1 && "${embed}" -eq 1 ]]; then
+      break
+    fi
+    sleep 3
+    ingest_elapsed=$((ingest_elapsed + 3))
+  done
+
+  if [[ "${loaded}" -eq 1 && "${embed}" -eq 1 ]]; then
     _kotlin_type "${RAC_INPUT_RAG_QUERY}"
     sleep 1
     _kotlin_tap_on_screen "Send" || true
-    if _kotlin_wait_grep "${RAC_MARKER_RAG_QUERY}" 150; then
-      notes="RAG ingest + query completed"
+    if _kotlin_wait_grep "${RAC_MARKER_RAG_QUERY_DONE}" 240; then
+      status="PASS"
+      notes="RAG ingest + embedding + query complete (Timber markers)"
     else
       status="LIMITED"
-      notes="RAG ingest OK; query marker missing"
+      notes="RAG ingest markers OK; Query complete missing within timeout"
     fi
     sleep 5
+  else
+    notes="RAG ingest incomplete (need Document loaded successfully + Embedding generation complete)"
   fi
 
   _kotlin_snapshot "tc13_rag"
@@ -786,10 +1059,14 @@ _kotlin_tc20_settings() {
   fi
   sleep 1
 
+  _kotlin_scroll_down
+  sleep 1
   local status="PASS" notes="Settings tab + API Configuration sheet opened"
-  if ! _kotlin_grep "Logging Configuration"; then
+  if ! _kotlin_ui_contains_all "Generation" "Logging" "API"; then
     status="LIMITED"
-    notes="Settings visible; logging section not confirmed in logcat"
+    notes="Settings visible; Generation/Logging/API strings not all present in UI dump"
+  else
+    notes="Settings UI contains Generation, Logging, and API sections"
   fi
   _kotlin_snapshot "tc20_settings"
   rac_tc_done tc20 "${status}" "${notes}" "screenshots/015_settings_tab.png"
@@ -803,21 +1080,32 @@ _kotlin_tc21_lora() {
   _kotlin_open_more_feature "LoRA Adapters"
   sleep 2
   _kotlin_snapshot "tc21_lora_screen"
-
-  _kotlin_tap_on_screen "Download" || true
-  sleep 10
+  # Catalog is pre-seeded at startup (ModelBootstrap.seedLoRAAdapters); skip manager Download tap.
 
   _kotlin_tab_tap "Chat"
   sleep 2
-  _kotlin_tap_on_screen "LoRA" || _kotlin_tap_on_screen "+ LoRA" || true
+  _kotlin_tap_on_screen "Select Model" || _kotlin_tap_on_screen "Change" || _kotlin_tap_on_screen "Models" || true
+  sleep 1
+  _kotlin_tap_on_screen "Qwen 2.5 0.5B" || _kotlin_tap_on_screen "Qwen" || true
   sleep 2
-  _kotlin_tap_on_screen "Apply" || true
+  _kotlin_tap_on_screen "Use" || _kotlin_tap_on_screen "Download" || true
+  sleep 12
+  _kotlin_tap_on_screen "Use" || true
   sleep 6
 
-  local status="LIMITED" notes="LoRA manager + apply flow attempted"
-  if _kotlin_grep "${RAC_MARKER_LORA_APPLY}" || _kotlin_grep "LoRA adapter"; then
+  _kotlin_tap_on_screen "LoRA" || _kotlin_tap_on_screen "+ LoRA" || true
+  sleep 2
+  _kotlin_tap_on_screen "Abliterated" || _kotlin_tap_on_screen "abliterated" || true
+  sleep 2
+  _kotlin_tap_on_screen "Download" || true
+  sleep 25
+  _kotlin_tap_on_screen "Apply" || true
+  sleep 8
+
+  local status="LIMITED" notes="LoRA catalog + chat apply flow attempted"
+  if _kotlin_grep "${RAC_MARKER_LORA_APPLY}"; then
     status="PASS"
-    notes="LoRA apply attempted from Chat picker"
+    notes="Loaded LoRA adapter marker observed in logcat"
   fi
 
   _kotlin_type "Hello from LoRA test"
