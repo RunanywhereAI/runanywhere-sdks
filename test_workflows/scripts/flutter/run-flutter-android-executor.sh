@@ -2,12 +2,12 @@
 # Flutter Android lane executor — shared harness binding.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+FLUTTER_EXEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${FLUTTER_EXEC_DIR}/../../.." && pwd)"
 # shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
+source "${FLUTTER_EXEC_DIR}/../_tc_helper.sh"
 # shellcheck source=_flutter_tc_flows.sh
-source "${SCRIPT_DIR}/_flutter_tc_flows.sh"
+source "${FLUTTER_EXEC_DIR}/_flutter_tc_flows.sh"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 : "${RAC_ANDROID_SERIAL:?RAC_ANDROID_SERIAL required}"
