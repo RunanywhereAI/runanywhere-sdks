@@ -49,12 +49,15 @@ _kotlin_logcat_snapshot() {
     RunAnywhere:* VLM:* System.out:* \
     SpeechToTextViewModel:* TextToSpeechViewModel:* VLMViewModel:* \
     ModelSelectionViewModel:* RunAnywhereApplication:* VoiceAssistantViewModel:* \
-    RAGViewModel:* CppBridgeVLM:* 2>/dev/null || true
+    RAGViewModel:* LoraViewModel:* CppBridgeVLM:* 2>/dev/null || true
 }
 
 _kotlin_grep() {
   local pattern="$1"
-  _kotlin_logcat_snapshot | grep -F "${pattern}" >/dev/null 2>&1
+  if _kotlin_logcat_snapshot | grep -F "${pattern}" >/dev/null 2>&1; then
+    return 0
+  fi
+  adb -s "${RAC_ANDROID_SERIAL}" logcat -d -t 5000 2>/dev/null | grep -F "${pattern}" >/dev/null 2>&1
 }
 
 # shellcheck source=_kotlin_tc_flows.sh
