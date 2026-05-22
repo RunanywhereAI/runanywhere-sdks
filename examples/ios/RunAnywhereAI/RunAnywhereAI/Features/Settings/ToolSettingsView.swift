@@ -23,6 +23,7 @@ class ToolSettingsViewModel: ObservableObject {
             UserDefaults.standard.set(toolCallingEnabled, forKey: "toolCallingEnabled")
             if toolCallingEnabled {
                 logger.info("Registered tool calling enabled")
+                Task { await registerDemoTools() }
             }
         }
     }
@@ -152,6 +153,7 @@ class ToolSettingsViewModel: ObservableObject {
     func registerDemoTools() async {
         for tool in demoTools {
             await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
+            logger.info("Registered tool \(tool.definition.name)")
         }
         await refreshRegisteredTools()
     }

@@ -224,6 +224,8 @@ rac_tc_drive_tc14_tool_calling() {
   sleep 1
   rac_mcp_tap "Enable Tool Calling" || rac_mcp_tap "Tool calling" || true
   sleep 1
+  rac_mcp_tap "Add Demo Tools" || true
+  sleep 2
   rac_mcp_shot "${lane_root}/${shot}"
   rac_mcp_tap "${RAC_TAB_CHAT:-Chat}"
   sleep 1

@@ -128,6 +128,8 @@ _swift_label_coords() {
 ' 200 260 ;;
     "Select Document") printf '%s %s
 ' 201 400 ;;
+    Downloads) printf '%s %s
+' 200 320 ;;
     rag-sample.json) printf '%s %s
 ' 200 350 ;;
     Back) printf '%s %s

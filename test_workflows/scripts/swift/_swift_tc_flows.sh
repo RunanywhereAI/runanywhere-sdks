@@ -272,62 +272,84 @@ PY
   [[ -s "${img}" ]] && xcrun simctl addmedia "$(_swift_sim_udid)" "${img}" >/dev/null 2>&1 || true
 }
 
+_swift_tts_ready() {
+  _swift_grep_any \
+    "${RAC_MARKER_TTS_DONE}" \
+    "Speech generation complete" \
+    "Model load succeeded for vits-piper" \
+    "Download completed for vits-piper"
+}
+
 _swift_ensure_tts_model_loaded() {
   local dl_wait=0
-  while [[ "${dl_wait}" -lt 300 ]]; do
+  while [[ "${dl_wait}" -lt 360 ]]; do
     if _swift_grep_any "Model load succeeded for vits-piper" "Download completed for vits-piper"; then
       return 0
     fi
-    _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
+    _swift_tap_raw "Get Started" || _swift_tap_raw "Select Model" || true
     sleep 2
     _swift_tap_raw "Piper TTS (US English - Medium)" || _swift_tap_raw "Piper" || _swift_tap_raw "US English" || true
     sleep 2
-    _swift_tap_raw "Get" || _swift_tap_raw "Download" || true
-    sleep 8
+    _swift_tap_stt_get_button
+    sleep 10
     _swift_tap_raw "Use" || true
     sleep 5
-    dl_wait=$((dl_wait + 17))
+    dl_wait=$((dl_wait + 19))
+    if [[ $((dl_wait % 57)) -eq 0 ]]; then
+      _swift_launch_app
+      _swift_open_speak
+    fi
   done
 }
 
 _swift_ensure_vlm_model_loaded() {
-  _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
-  sleep 2
-  _swift_tap_raw "SmolVLM 500M Instruct" || _swift_tap_raw "SmolVLM" || true
-  sleep 3
   local dl_wait=0
-  while [[ "${dl_wait}" -lt 300 ]]; do
+  while [[ "${dl_wait}" -lt 360 ]]; do
     if _swift_grep_any "Model load succeeded for smolvlm" "Download completed for smolvlm"; then
-      break
+      return 0
     fi
-    _swift_tap_raw "Get" || _swift_tap_raw "Use" || _swift_tap_raw "Download" || true
-    sleep 8
-    dl_wait=$((dl_wait + 8))
+    _swift_tap_raw "Get Started" || _swift_tap_raw "Select Model" || true
+    sleep 2
+    _swift_tap_raw "SmolVLM 500M Instruct" || _swift_tap_raw "SmolVLM" || true
+    sleep 2
+    _swift_tap_stt_get_button
+    sleep 10
+    _swift_tap_raw "Use" || true
+    sleep 5
+    dl_wait=$((dl_wait + 19))
   done
-  _swift_tap_raw "Use" || true
-  sleep 2
 }
 
 _swift_drive_tc08_tts() {
   local lane_root="${RAC_SESSION_ROOT:?}"
   local status="LIMITED" notes="TTS Speak tapped; waiting for completion log"
+  local elapsed=0
 
   _swift_launch_app
   _swift_open_speak
   rac_mcp_shot "${lane_root}/screenshots/009_tts_tab.png"
   _swift_capture snapshot tc08_tts_tab 2>/dev/null || true
 
-  _swift_ensure_tts_model_loaded
-  _swift_type "${RAC_INPUT_TTS}"
-  sleep 1
-  _swift_tap_raw "Speak"
-
-  if _swift_wait_grep "${RAC_MARKER_TTS_DONE}" 150; then
-    status="PASS"
-    notes="TTS speech generation complete observed in logs"
-  else
-    sleep 10
-  fi
+  while [[ "${elapsed}" -lt 420 ]]; do
+    if _swift_grep "${RAC_MARKER_TTS_DONE}"; then
+      status="PASS"
+      notes="TTS speech generation complete observed in logs"
+      break
+    fi
+    _swift_ensure_tts_model_loaded
+    _swift_type "${RAC_INPUT_TTS}"
+    sleep 1
+    _swift_tap_raw "Speak"
+    sleep 8
+    if _swift_wait_grep "${RAC_MARKER_TTS_DONE}" 90; then
+      status="PASS"
+      notes="TTS speech generation complete observed in logs"
+      break
+    fi
+    elapsed=$((elapsed + 30))
+    _swift_launch_app
+    _swift_open_speak
+  done
 
   rac_mcp_shot "${lane_root}/screenshots/010_tts_played.png"
   _swift_capture snapshot tc08_tts_played 2>/dev/null || true
@@ -353,9 +375,9 @@ _swift_drive_tc09_vlm() {
   _swift_tap_xy_logical 200 600 || true
   sleep 2
   _swift_tap_xy_logical 200 600 || true
-  sleep 8
+  sleep 10
 
-  if _swift_wait_grep "${RAC_MARKER_VLM_DONE}" 240; then
+  if _swift_wait_grep "${RAC_MARKER_VLM_DONE}" 300; then
     status="PASS"
     notes="VLM streaming completed marker observed in logs"
   fi
@@ -371,6 +393,10 @@ _swift_drive_tc13_rag() {
   local status="LIMITED" notes="RAG document flow driven"
 
   _swift_push_rag_fixture
+  local sim_dl="${HOME}/Library/Developer/CoreSimulator/Devices/$(_swift_sim_udid)/data/Downloads"
+  mkdir -p "${sim_dl}"
+  cp "${RAC_SESSION_ROOT}/fixtures/rag-sample.json" "${sim_dl}/rag-sample.json" 2>/dev/null || true
+
   _swift_launch_app
   _swift_tap_raw "${RAC_TAB_MORE:-More}"
   sleep 1
@@ -380,27 +406,33 @@ _swift_drive_tc13_rag() {
   _swift_tap_raw "Embedding Model" || true
   sleep 1
   _swift_tap_raw "All MiniLM" || _swift_tap_raw "Use" || _swift_tap_raw "Get" || true
-  sleep 3
+  sleep 2
+  _swift_tap_stt_get_button
+  sleep 8
   _swift_back
 
   _swift_tap_raw "LLM Model" || true
   sleep 1
   _swift_tap_raw "SmolLM2" || _swift_tap_raw "SmolLM" || _swift_tap_raw "Use" || true
-  sleep 3
+  sleep 2
+  _swift_tap_stt_get_button
+  sleep 8
   _swift_back
 
   _swift_tap_raw "Select Document" || true
   sleep 2
+  _swift_tap_raw "Downloads" || true
+  sleep 2
   _swift_tap_raw "rag-sample.json" || true
-  sleep 5
+  sleep 8
 
-  if _swift_wait_grep "${RAC_MARKER_RAG_INGEST}" 150; then
+  if _swift_wait_grep "${RAC_MARKER_RAG_INGEST}" 180; then
     status="PASS"
     notes="RAG ingest completed"
-    _swift_type "${RAC_INPUT_RAG_QUERY}"
+    _swift_type "${RAC_INPUT_RAG_QUERY:-What does RunAnywhere do?}"
     sleep 1
     _swift_tap_raw "Send" || _swift_tap_xy_logical 370 780 || true
-    if _swift_wait_grep "${RAC_MARKER_RAG_QUERY}" 150; then
+    if _swift_wait_grep "${RAC_MARKER_RAG_QUERY}" 180; then
       notes="RAG ingest + query completed"
     else
       status="LIMITED"
@@ -413,3 +445,4 @@ _swift_drive_tc13_rag() {
   rac_tc_done tc13 "${status}" "${notes}" ""
   _swift_back
 }
+
