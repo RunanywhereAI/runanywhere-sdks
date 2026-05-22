@@ -362,7 +362,7 @@ cd examples/android/RunAnywhereAI/
 ./scripts/verify.sh            # Full build gate
 ```
 
-Uses local project references via `settings.gradle.kts` to SDK modules.
+Consumes the SDK as prebuilt AARs in `examples/android/RunAnywhereAI/libs/`. Stage them with `./scripts/stage-sdk-aars.sh [debug|release]` (from the example dir), which builds the SDK in `sdk/runanywhere-kotlin/` and copies the AARs over.
 
 ### Flutter Example
 
@@ -575,7 +575,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 
 | Component | Build | Test | Lint | Notes |
 |-----------|-------|------|------|-------|
-| Kotlin SDK (Android target) | `./gradlew :runanywhere-kotlin:compileDebugKotlinAndroid -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `./gradlew :runanywhere-kotlin:runKtlintCheckOverCommonMainSourceSet` | JVM target has a known issue: `RAGBridge.kt` in `jvmAndroidMain` imports `@Keep` from `androidx.annotation` which is unavailable for JVM compilation |
+| Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | JVM target has a known issue: `RAGBridge.kt` in `jvmAndroidMain` imports `@Keep` from `androidx.annotation` which is unavailable for JVM compilation |
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
 | Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |

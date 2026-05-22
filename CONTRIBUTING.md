@@ -143,7 +143,7 @@ docs: update README with new API examples
 - Follow [Kotlin coding conventions](https://kotlinlang.org/docs/coding-conventions.html)
 - Use 4 spaces for indentation
 - Maximum line length: 120 characters
-- Run `./gradlew ktlintFormat` to auto-format code
+- Run `./gradlew ktlintFormat` from within `sdk/runanywhere-kotlin/` to auto-format Kotlin code
 
 ### iOS (Swift)
 
