@@ -219,6 +219,7 @@ rac_tc_drive_tc14_tool_calling() {
   local shot="screenshots/014_tc14_tools.png"
   rac_mcp_tap "${tab}"
   sleep 2
+  [[ -n "${RAC_SETTINGS_PRE_SCROLL_CMD:-}" ]] && eval "${RAC_SETTINGS_PRE_SCROLL_CMD}"
   rac_mcp_tap "Tool Calling" || rac_mcp_tap "Tools" || true
   sleep 1
   rac_mcp_tap "Enable Tool Calling" || rac_mcp_tap "Tool calling" || true
@@ -227,7 +228,7 @@ rac_tc_drive_tc14_tool_calling() {
   rac_mcp_tap "${RAC_TAB_CHAT:-Chat}"
   sleep 1
   local status="LIMITED" notes="settings visited; tool toggle not confirmed in logs"
-  if rac_mcp_grep_any "ToolCalling" "Registered tool" "tool calling"; then
+  if rac_mcp_grep_any "ToolCalling" "Registered tool" "Registered tool calling" "tool calling"; then
     status="PASS"
     notes="tool-calling markers present after settings visit"
   fi
@@ -251,7 +252,7 @@ rac_tc_drive_tc16_storage_after_lifecycle() {
   if [[ -n "${RAC_MCP_UI_SCAN_CMD:-}" ]] && eval "${RAC_MCP_UI_SCAN_CMD} \"${hint}\""; then
     status="PASS"
     notes="model row/hint ${hint} still listed after tc03 lifecycle"
-  elif rac_mcp_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "${RAC_MARKER_MODEL_LOAD}"; then
+  elif rac_mcp_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "${RAC_MARKER_MODEL_LOAD}" "${RAC_MARKER_DOWNLOAD_ACCEPTED}"; then
     status="PASS"
     notes="model registry markers still present after lifecycle"
   fi

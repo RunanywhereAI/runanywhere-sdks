@@ -17,8 +17,8 @@ USAGE
 }
 
 platform="${1:?platform required}"
-target="${2:-}"
-shift 2 || true
+shift
+target=""
 run_id="${RAC_RUN_ID:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in

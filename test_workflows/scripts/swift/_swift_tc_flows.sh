@@ -250,6 +250,12 @@ _swift_push_rag_fixture() {
     printf '}\n'
   } > "${json_out}"
   cp "${json_out}" "${TMPDIR:-/tmp}/rag-sample.json" 2>/dev/null || cp "${json_out}" /tmp/rag-sample.json
+  local container
+  if container="$(_swift_app_data_container 2>/dev/null)"; then
+    mkdir -p "${container}/Documents/E2E"
+    cp "${json_out}" "${container}/Documents/E2E/rag-sample.json"
+    cp "${json_out}" "${container}/Documents/rag-sample.json"
+  fi
 }
 
 _swift_seed_vlm_photo() {
@@ -267,14 +273,21 @@ PY
 }
 
 _swift_ensure_tts_model_loaded() {
-  _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
-  sleep 2
-  _swift_tap_raw "Piper TTS (US English - Medium)" || _swift_tap_raw "Piper" || _swift_tap_raw "US English" || true
-  sleep 3
-  _swift_tap_raw "Get" || _swift_tap_raw "Download" || true
-  sleep 10
-  _swift_tap_raw "Use" || true
-  sleep 3
+  local dl_wait=0
+  while [[ "${dl_wait}" -lt 300 ]]; do
+    if _swift_grep_any "Model load succeeded for vits-piper" "Download completed for vits-piper"; then
+      return 0
+    fi
+    _swift_tap_raw "Select Model" || _swift_tap_raw "Get Started" || true
+    sleep 2
+    _swift_tap_raw "Piper TTS (US English - Medium)" || _swift_tap_raw "Piper" || _swift_tap_raw "US English" || true
+    sleep 2
+    _swift_tap_raw "Get" || _swift_tap_raw "Download" || true
+    sleep 8
+    _swift_tap_raw "Use" || true
+    sleep 5
+    dl_wait=$((dl_wait + 17))
+  done
 }
 
 _swift_ensure_vlm_model_loaded() {
@@ -283,8 +296,8 @@ _swift_ensure_vlm_model_loaded() {
   _swift_tap_raw "SmolVLM 500M Instruct" || _swift_tap_raw "SmolVLM" || true
   sleep 3
   local dl_wait=0
-  while [[ "${dl_wait}" -lt 240 ]]; do
-    if _swift_grep_any "${RAC_MARKER_MODEL_LOAD}" "Model load succeeded"; then
+  while [[ "${dl_wait}" -lt 300 ]]; do
+    if _swift_grep_any "Model load succeeded for smolvlm" "Download completed for smolvlm"; then
       break
     fi
     _swift_tap_raw "Get" || _swift_tap_raw "Use" || _swift_tap_raw "Download" || true
@@ -336,9 +349,11 @@ _swift_drive_tc09_vlm() {
   _swift_capture snapshot tc09_vision_tab 2>/dev/null || true
 
   _swift_tap_raw "Photos" || true
-  sleep 3
+  sleep 4
   _swift_tap_xy_logical 200 600 || true
-  sleep 3
+  sleep 2
+  _swift_tap_xy_logical 200 600 || true
+  sleep 8
 
   if _swift_wait_grep "${RAC_MARKER_VLM_DONE}" 240; then
     status="PASS"

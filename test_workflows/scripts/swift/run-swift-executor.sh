@@ -35,6 +35,7 @@ export RAC_TAB_DOCS="Document Q&A"
 export RAC_TAB_STORAGE="Storage"
 export RAC_TAB_SETTINGS="Settings"
 # More hub rows (catalog §5): tap More before these labels.
+export RAC_SETTINGS_PRE_SCROLL_CMD='_swift_scroll_settings_down'
 export RAC_SWIFT_MORE_HUB_LABELS="Transcribe Speak Document Q&A Storage Voice Detection"
 
 export RAC_MCP_SHOT_CMD='_swift_shot'

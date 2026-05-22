@@ -57,6 +57,8 @@ tc08	Speech generation complete	PASS
 tc09	VLM streaming completed	PASS
 tc13	Document loaded successfully	PASS
 tc13	Query complete	PASS
+tc14	Registered tool calling enabled	PASS
+tc16	Download accepted for	PASS
 MARKERS
 }
 

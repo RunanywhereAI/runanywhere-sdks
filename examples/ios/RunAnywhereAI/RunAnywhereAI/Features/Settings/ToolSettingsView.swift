@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import os
 
 // MARK: - Tool Settings View Model
 
@@ -14,10 +15,15 @@ import RunAnywhere
 class ToolSettingsViewModel: ObservableObject {
     static let shared = ToolSettingsViewModel()
 
+    private let logger = Logger(subsystem: "com.runanywhere", category: "ToolCalling")
+
     @Published var registeredTools: [RAToolDefinition] = []
     @Published var toolCallingEnabled: Bool = false {
         didSet {
             UserDefaults.standard.set(toolCallingEnabled, forKey: "toolCallingEnabled")
+            if toolCallingEnabled {
+                logger.info("Registered tool calling enabled")
+            }
         }
     }
 
