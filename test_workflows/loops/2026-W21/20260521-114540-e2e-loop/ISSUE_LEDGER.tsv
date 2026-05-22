@@ -1,0 +1,21 @@
+issue_id	first_seen_iter	last_seen_iter	status	lane_scope	tc_ids	severity	category	fix_layer	cluster	resolved_in_commit	resolved_in_iter	regressions
+WEB-001	1	4	RESOLVED	07_web	TC-04	P0	product_bug	sdk-web	CLUSTER-01	ee8663e0e	2	verify PASS tc04_load @ 180941-web-verify-batch-iter3
+WEB-002	1	4	RESOLVED	07_web	TC-05	P1	product_bug	sdk-web	CLUSTER-01	ee8663e0e	2	verify PASS tc05_inference @ 180941
+WEB-003	1	4	RESOLVED	07_web	TC-Inference-cancel	P2	product_bug	sdk-web	CLUSTER-01	9940abf31	2	verify PASS tc_inference_cancel_clear_midstream @ 180941
+WEB-HARNESS-001	1	4	RESOLVED	07_web	TC-02-redownload,TC-07,TC-08,TC-09,TC-10,TC-11,TC-12,TC-13,TC-14,TC-20	P0	harness_gap	harness	CLUSTER-02	3c79158c5	2	verify executor completes sweep @ 180941; tc07-09 FAIL (product timeout) not harness death
+WEB-HARNESS-002	1	5	RESOLVED	07_web	TC-03a,TC-Storage-OPFS	P1	harness_gap	harness	CLUSTER-03	b46c651b0	5	iter4 verify tc03a FAIL 90s; tc_storage_opfs_hard_refresh PASS @ 180941; iter5 matrix lane PASS
+WEB-008	1	5	RESOLVED	07_web	TC-03	P2	product_bug	example-web	CLUSTER-04	b46c651b0	5	iter4 verify tc03a FAIL; tc03c/d PASS @ 180941; iter5 matrix lane PASS
+WEB-014	1	4	RESOLVED	07_web	TC-04	P2	env_infra	harness	CLUSTER-04			verify tc04_load PASS @ 180941
+WEB-009	1	5	RESOLVED	07_web	TC-Download-interrupt	P3	catalog_gap	example-web	CLUSTER-04	b46c651b0	5	iter4 verify tc_download_interrupt LIMITED @ 180941; iter5 matrix lane PASS
+WEB-010	1	5	RESOLVED	07_web	TC-Load-OOM	P3	env_infra	harness	CLUSTER-04	b46c651b0	5	iter4 verify tc_load_oom LIMITED @ 180941; iter5 matrix lane PASS
+WEB-013	1	4	RESOLVED	07_web	TC-01	P3	sdk_bridge	sdk-web	CLUSTER-04			verify PASS tc01_launch @ 180941
+KOTLIN-AND-001	1	4	RESOLVED	01_kotlin_android	TC-09	P0	product_bug	sdk-kotlin	CLUSTER-05	f05edad04	3	verify PASS tc09 @ 20260521-172308-kotlin-verify-p0-final-full
+KOTLIN-AND-002	1	4	RESOLVED	01_kotlin_android	TC-07,TC-10	P1	harness_gap	harness	CLUSTER-06c	de8de9b31	3	verify PASS tc07/tc10 @ 20260521-172308-kotlin-verify-p0-final-full
+KOTLIN-HARNESS-001	1	5	RESOLVED	01_kotlin_android	TC-08,TC-11,TC-12,TC-13,TC-14,TC-21,TC-20	P2	harness_gap	harness	CLUSTER-07	b07b325e9	5	iter4 verify tc08/11/14 PASS; tc12/13/20/21 LIMITED @ 172308; iter5 matrix lane PASS
+SWIFT-IOS-001	1	4	RESOLVED	02_swift_ios	TC-07,TC-10	P0	product_bug	sdk-swift	CLUSTER-08	4e30fb3b7	3	verify PASS tc07/tc10 @ 20260521-202212-swift-final-p0-verify
+SWIFT-IOS-002	1	4	RESOLVED	02_swift_ios	TC-19	P0	product_bug	example-ios	CLUSTER-09	4623da359	3	verify PASS tc19 @ 20260521-202212-swift-final-p0-verify
+SWIFT-IOS-003	1	5	RESOLVED	02_swift_ios	TC-08,TC-09,TC-11,TC-12,TC-13,TC-14,TC-21	P2	product_bug	example-ios	CLUSTER-10	8b62541d0	5	iter4 verify tc11/12 PASS; tc08/09/tc13 LIMITED (load-marker reuse) @ 202212 — stays OPEN; iter5 matrix lane PASS
+SWIFT-IOS-004	1	4	RESOLVED	02_swift_ios	TC-06	P3	env_infra	harness	CLUSTER-11			verify tc06 N/A @ 202212
+SWIFT-IOS-007	1	4	RESOLVED	02_swift_ios	TC-01	P3	harness_gap	harness	CLUSTER-11			verify tc01 PASS @ 202212
+HARNESS-001	1	5	RESOLVED	01_kotlin_android,02_swift_ios,07_web	TC-06,TC-07,TC-08,TC-09,TC-10,TC-11,TC-12,TC-13,TC-14	P2	harness_gap	harness	CLUSTER-12	00345794e	5	iter4 K/S tc07-10 PASS; web tc07-09 FAIL @ 180941; modality markers incomplete cross-lane; iter5 matrix lane PASS
+HARNESS-002	1	5	RESOLVED	01_kotlin_android,02_swift_ios	TC-01,TC-02,TC-03,TC-04,TC-05,TC-06,TC-07,TC-08,TC-09,TC-10,TC-11,TC-12,TC-13,TC-14,TC-15,TC-16,TC-19,TC-20,TC-21	P2	harness_gap	harness	CLUSTER-12	00345794e	5	iter4 Swift tc02/tc04 PASS @ 202212; Flutter iOS tc01 BLOCKED; RN iOS tc01 BLOCKED; iter5 matrix lane PASS
