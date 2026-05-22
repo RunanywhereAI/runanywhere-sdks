@@ -628,7 +628,7 @@ surface — there are no longer hand-rolled value-types
 (`LLMGenerationOptions`, `LLMStreamingResult`, `LLMConfiguration`).
 
 ```kotlin
-// From sdk/runanywhere-kotlin/src/commonMain/.../types/SwiftAliases.kt
+// From sdk/runanywhere-kotlin/src/main/.../types/SwiftAliases.kt
 typealias RALLMGenerationOptions = ai.runanywhere.proto.v1.LLMGenerationOptions
 typealias RALLMGenerationResult  = ai.runanywhere.proto.v1.LLMGenerationResult
 typealias RALLMStreamEvent       = ai.runanywhere.proto.v1.LLMStreamEvent

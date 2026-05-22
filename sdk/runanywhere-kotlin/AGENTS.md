@@ -201,7 +201,7 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 
 Tests live in two source sets:
 
-- `src/commonTest/` — Kotlin-layer surface tests (generated proto adapters, extension surfaces) that run on any target. No JNI required.
+- `src/test/` — Kotlin-layer surface tests (generated proto adapters, extension surfaces) that run on any target. No JNI required.
 - `src/jvmTest/` — JVM-only tests that exercise code which only exists in `jvmAndroidMain`.
 
 Notable test: `VoiceAgentStreamAdapterFanOutTest` (`src/jvmTest/`) verifies `SharedFlow` fan-out for concurrent collectors on `VoiceAgentStreamAdapter`.

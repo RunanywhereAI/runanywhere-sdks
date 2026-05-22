@@ -479,7 +479,7 @@ The SDK has two modes controlled by `runanywhere.useLocalNatives` in `gradle.pro
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/androidMain/jniLibs/` (for development) |
+| **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/main/jniLibs/` (for development) |
 | **Remote** | `runanywhere.useLocalNatives=false` | Downloads JNI libs from GitHub releases (for end users) |
 
 When you run `--setup`, the script automatically sets `testLocal=true`.
@@ -535,10 +535,12 @@ cd sdk/runanywhere-kotlin
 ```
 sdk/runanywhere-kotlin/
 ├── src/
-│   ├── commonMain/          # Cross-platform Kotlin code
-│   ├── jvmAndroidMain/      # Shared JVM/Android (JNI bridges)
-│   ├── androidMain/         # Android-specific (jniLibs, platform code)
-│   └── jvmMain/             # Desktop JVM support
+│   ├── main/
+│   │   ├── kotlin/          # Kotlin source
+│   │   ├── jniLibs/         # Per-ABI native .so files
+│   │   └── AndroidManifest.xml
+│   └── test/
+│       └── kotlin/          # Unit tests
 ├── modules/
 │   ├── runanywhere-core-llamacpp/   # LLM backend module
 │   └── runanywhere-core-onnx/       # STT/TTS/VAD backend module
