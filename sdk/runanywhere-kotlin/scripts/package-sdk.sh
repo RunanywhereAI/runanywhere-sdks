@@ -16,7 +16,7 @@
 #   --mode local|ci      Build mode (default: auto-detect from $CI)
 #   --natives-from PATH  Directory containing per-ABI librac_*.so files
 #                        Expected: PATH/{arm64-v8a,x86_64,...}/librac_*.so OR zipped
-#                        Default: src/androidMain/jniLibs/ (in-place)
+#                        Default: src/main/jniLibs/ (in-place)
 #
 # OUTPUTS:
 #   dist/sdk-kotlin/*.aar    + .sha256
@@ -44,7 +44,7 @@ done
 
 echo ">> Kotlin SDK packaging (mode=${RAC_BUILD_MODE})"
 
-JNI_DIR="${KOTLIN_ROOT}/src/androidMain/jniLibs"
+JNI_DIR="${KOTLIN_ROOT}/src/main/jniLibs"
 
 if [ -n "$NATIVES_FROM" ]; then
     [ -d "$NATIVES_FROM" ] || { echo "ERROR: --natives-from not found: $NATIVES_FROM" >&2; exit 1; }
