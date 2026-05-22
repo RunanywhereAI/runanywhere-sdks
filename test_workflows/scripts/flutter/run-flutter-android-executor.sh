@@ -56,6 +56,14 @@ _flutter_type() {
   adb -s "${RAC_ANDROID_SERIAL}" shell input text "${1// /%s}" >/dev/null 2>&1 || true
 }
 
+_flutter_android_grep_any() {
+  local pattern
+  for pattern in "$@"; do
+    _flutter_android_grep "${pattern}" && return 0
+  done
+  return 1
+}
+
 _flutter_android_grep() {
   local pattern="$1"
   _flutter_grep_logs "${pattern}" && return 0
