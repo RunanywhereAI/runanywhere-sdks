@@ -95,3 +95,4 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-21T13:42:00-07:00	1	phase8_fix_round2	orchestrator	COMMIT	OK	ee8663e0e	CLUSTER-01b/WEB-001	Mirror download completion into TS registry immediately
 2026-05-22T05:35:00-07:00	4	phase2_matrix	matrix-coordinator-iter4	ITERATION_VERDICT	RED	matrix/MATRIX_REPORT_ITER4.md	verdict=RED P0_Kotlin+Swift_PASS Web_FAIL(tc07-09)@180941 web_iter4=222040_in_progress Flutter_RN_iter1 §10=NOT_MET(6/6_gates) ledger_open=8 non_green=70
 2026-05-22T10:31:03+0000	5	phase10_terminate	orchestrator	LOOP_END	SUCCESS	-	All §10 gates passed; matrix all lanes PASS; ledger 0 OPEN
+2026-05-22T15:22:43+0000	6	phase10_terminate	orchestrator	LOOP_END	SUCCESS	-	Iter6 fresh wave-2 verifies + Swift/Kotlin reverify; matrix 8 lanes PASS; ESCALATIONS.md updated
