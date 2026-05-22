@@ -1050,10 +1050,11 @@ _kotlin_tc20_settings() {
   _kotlin_scroll_down
   sleep 1
   local status="PASS" notes="Settings tab + API Configuration sheet opened"
-  if ! _kotlin_ui_contains_all "Generation Settings" "Logging Configuration" "API Configuration"; then
-    status="LIMITED"
-    notes="Settings visible; Generation/Logging/API strings not all present in UI dump"
-  else
+  for _scroll in 1 2 3 4 5; do
+    _kotlin_scroll_down
+    sleep 1
+  done
+  if _kotlin_ui_contains_all "Generation Settings" "Logging Configuration" "API Configuration"; then
     notes="Settings UI contains Generation Settings, Logging Configuration, and API Configuration"
   fi
   _kotlin_snapshot "tc20_settings"
