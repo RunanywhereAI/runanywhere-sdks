@@ -1,10 +1,24 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-Xjvm-default=all",
+        )
+    }
 }
 
 android {
@@ -168,27 +182,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-
-        // Kotlin compiler optimizations
-        freeCompilerArgs +=
-            listOf(
-                "-opt-in=kotlin.RequiresOptIn",
-                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-                "-Xjvm-default=all",
-            )
-    }
 
     buildFeatures {
         compose = true
         buildConfig = true
-
-        // Disable unused features for smaller APK
         aidl = false
-        renderScript = false
         resValues = false
         shaders = false
         viewBinding = false
@@ -211,23 +209,18 @@ android {
 }
 
 dependencies {
-    // SDK
-    implementation(project(":runanywhere-kotlin"))
+    implementation(files("../libs/runanywhere-sdk.aar"))
+    implementation(files("../libs/runanywhere-llamacpp.aar"))
+    implementation(files("../libs/runanywhere-onnx.aar"))
 
-    // Backend modules - each is SELF-CONTAINED with all native libs
-    // Pick the backends you need:
-    implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
-    implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
-    // RAG pipeline is now part of the core SDK (not a separate module)
-
-    // Genie (Qualcomm NPU / Snapdragon) excised from the example app per
-    // gaps/kotlin.md KOT-E2E-R2-001. The 0.2.1 AAR was compiled against a
-    // pre-proto Kotlin SDK surface (`com.runanywhere.sdk.core.types.*`)
-    // and crashed on startup with `NoClassDefFoundError: SDKComponent` on
-    // non-Snapdragon devices (and on Snapdragon devices when the AAR's
-    // native 4KB-aligned .so files failed to load under 16 KB page-size).
-    // Re-introduce once a 16KB-compatible AAR aligned with the current
-    // proto-based Kotlin SDK is published.
+    implementation(libs.wire.runtime)
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.okio)
+    implementation(libs.sentry)
+    implementation(libs.json)
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)
@@ -319,30 +312,6 @@ dependencies {
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-    // Kotlin version constraints
-    constraints {
-        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-reflect") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-    }
 }
 
 detekt {
