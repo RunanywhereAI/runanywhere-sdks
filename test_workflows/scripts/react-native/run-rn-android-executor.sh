@@ -2,13 +2,13 @@
 # React Native Android lane executor — drives TC-02..TC-21 via shared harness.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+RAC_RN_EXEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "${RAC_RN_EXEC_DIR}/../../.." && pwd)"
 
 # shellcheck source=../_tc_helper.sh
-source "${SCRIPT_DIR}/../_tc_helper.sh"
+source "${RAC_RN_EXEC_DIR}/../_tc_helper.sh"
 # shellcheck source=_rn_tc_flows.sh
-source "${SCRIPT_DIR}/_rn_tc_flows.sh"
+source "${RAC_RN_EXEC_DIR}/_rn_tc_flows.sh"
 
 : "${RAC_RUN_ID:?RAC_RUN_ID required}"
 : "${RAC_ANDROID_SERIAL:?RAC_ANDROID_SERIAL required}"
@@ -18,8 +18,8 @@ export RAC_SESSION_ROOT
 PACKAGE_ID="${PACKAGE_ID:-com.runanywhereaI}"
 
 mkdir -p "${RAC_SESSION_ROOT}/logs"
-"${SCRIPT_DIR}/ensure-metro.sh" "${RAC_SESSION_ROOT}/logs/metro.log"
-"${SCRIPT_DIR}/capture-react-native-logs.sh" start "${RAC_RUN_ID}" android
+"${RAC_RN_EXEC_DIR}/ensure-metro.sh" "${RAC_SESSION_ROOT}/logs/metro.log"
+"${RAC_RN_EXEC_DIR}/capture-react-native-logs.sh" start "${RAC_RUN_ID}" android
 
 export RAC_TAB_CHAT="Chat"
 export RAC_TAB_TRANSCRIBE="Transcribe"
