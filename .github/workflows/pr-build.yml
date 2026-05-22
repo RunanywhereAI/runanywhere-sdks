@@ -217,13 +217,12 @@ jobs:
       - name: Build Android JNI libs
         run: ./scripts/build-core-android.sh
       - name: gradle assembleDebug
-        run: ./gradlew :runanywhere-kotlin:assembleDebug
-      # pass3-syn-024: per-SDK lint lane — run ktlint + detekt on the kotlin
-      # multiplatform module. Soft (continue-on-error) until baseline is clean;
-      # flip to required gate once the backlog clears.
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew assembleDebug
       - name: ktlintCheck + detekt (lint lane)
         continue-on-error: true
-        run: ./gradlew :runanywhere-kotlin:ktlintCheck :runanywhere-kotlin:detekt --no-daemon
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew ktlintCheck detekt --no-daemon
 
   flutter-pubget:
     runs-on: ubuntu-22.04
