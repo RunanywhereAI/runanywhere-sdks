@@ -55,6 +55,7 @@ extension CppBridge {
             }
         }
 
+        // swiftlint:disable:next no_apple_logger
         private static let fallbackLogger = Logger(subsystem: "com.runanywhere", category: "CppBridge.Device")
 
         private static func resolvePersistentId() -> String {

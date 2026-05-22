@@ -13,7 +13,23 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-commons/src/generated/|
+            sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
+            sdk/runanywhere-web/packages/core/src/generated/|
+            idl/
+          )
       - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-commons/src/generated/|
+            sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
+            sdk/runanywhere-web/packages/core/src/generated/|
+            idl/
+          )
       - id: check-yaml
       - id: check-added-large-files
         args: ['--maxkb=1000']
