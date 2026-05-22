@@ -55,6 +55,8 @@ extension CppBridge {
             }
         }
 
+        private static let fallbackLogger = Logger(subsystem: "com.runanywhere", category: "CppBridge.Device")
+
         private static func resolvePersistentId() -> String {
             let bufferSize = Int(RAC_DEVICE_ID_BUFFER_MIN_SIZE)
             var buffer = [CChar](repeating: 0, count: bufferSize)
@@ -70,8 +72,8 @@ extension CppBridge {
             // Fallback: commons resolver unavailable (e.g. platform adapter
             // not yet registered). Synthesize a UUID so callers never see an
             // empty string. This is non-persistent for this run only.
-            let logger = SDKLogger(category: "CppBridge.Device")
-            logger.warning("rac_device_get_or_create_persistent_id failed (result=\(result)); using transient UUID")
+            // Use os.Logger directly — SDKLogger would recurse via DeviceInfo.current.
+            fallbackLogger.warning("rac_device_get_or_create_persistent_id failed (result=\(result)); using transient UUID")
             return UUID().uuidString
         }
 

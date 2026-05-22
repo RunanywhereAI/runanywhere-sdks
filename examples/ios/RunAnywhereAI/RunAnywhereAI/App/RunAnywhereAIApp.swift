@@ -40,6 +40,7 @@ struct RunAnywhereAIApp: App {
     #endif
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -80,6 +81,14 @@ struct RunAnywhereAIApp: App {
                 _ = SettingsViewModel.shared
                 logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active, !isSDKInitialized, initializationError == nil else { return }
+                Task {
+                    _ = SettingsViewModel.shared
+                    logger.info("🏁 App active, initializing SDK...")
+                    await initializeSDK()
+                }
             }
         }
         #if os(macOS)
@@ -126,6 +135,10 @@ struct RunAnywhereAIApp: App {
             // Mark as initialized
             await MainActor.run {
                 isSDKInitialized = true
+            }
+
+            Task { @MainActor in
+                await BenchmarkViewModel().prepareForBenchmarksIfNeeded()
             }
 
             logger.info("💡 Model registry refreshed, user can now download and select models")

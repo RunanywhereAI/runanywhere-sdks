@@ -242,7 +242,7 @@ final class BenchmarkRunner {
     }
 
     /// Models whose artifacts exist on disk (registry `isDownloaded` may be stale).
-    private static func downloadedModels(
+    static func downloadedModels(
         for category: BenchmarkCategory,
         in allModels: [RAModelInfo]
     ) -> [RAModelInfo] {

@@ -5,13 +5,33 @@ _swift_sim_udid() {
   printf '%s' "${RAC_IOS_SIM_UDID:-booted}"
 }
 
+_swift_sim_uuid() {
+  local udid="$(_swift_sim_udid)"
+  if [[ "${udid}" == "booted" ]]; then
+    udid="$(xcrun simctl list devices booted 2>/dev/null | rg -o '[0-9A-F-]{36}' | head -1)"
+  fi
+  [[ -n "${udid}" ]] || return 1
+  printf '%s' "${udid}"
+}
+
+_swift_dismiss_system_dialogs() {
+  _swift_tap_raw "Open" || _swift_tap_raw "Allow" || _swift_tap_raw "OK" || true
+  sleep 0.5
+}
+
 _swift_launch_app() {
   local bundle="${BUNDLE_ID:-com.runanywhere.RunAnywhere}"
-  xcrun simctl launch "$(_swift_sim_udid)" "${bundle}" >/dev/null 2>&1 || true
+  open -a Simulator >/dev/null 2>&1 || true
   osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
 tell application "Simulator" to activate
 APPLESCRIPT
+  xcrun simctl launch "$(_swift_sim_udid)" "${bundle}" >/dev/null 2>&1 || true
   sleep 2
+  _swift_dismiss_system_dialogs
+  _swift_tap_raw "RunAnywhere" || _swift_tap_xy_logical 154 335 || true
+  sleep 1
+  _swift_dismiss_system_dialogs
+  sleep 1
 }
 
 _swift_sim_device_origin() {
@@ -43,7 +63,16 @@ APPLESCRIPT
 
 _swift_tap_xy_logical() {
   local lx="$1" ly="$2"
-  local origin sx sy
+  local origin sx sy mobilecli="${RAC_MOBILECLI:-}"
+  if [[ -z "${mobilecli}" ]]; then
+    mobilecli="$(ls "${HOME}"/.npm/_npx/*/node_modules/mobilecli/bin/mobilecli-darwin-arm64 2>/dev/null | head -1 || true)"
+  fi
+  if [[ -x "${mobilecli}" ]]; then
+    "${mobilecli}" io tap --device "$(_swift_sim_uuid)" "${lx},${ly}" >/dev/null 2>&1 && {
+      sleep 0.35
+      return 0
+    }
+  fi
   origin="$(_swift_sim_device_origin)" || return 1
   sx="${origin%%,*}"
   sy="${origin#*,}"
@@ -77,10 +106,11 @@ _swift_label_coords() {
     Get|"71.5 MB"|"Get 71.5 MB") printf '%s %s\n' 340 300 ;;
     Use) printf '%s %s\n' 340 300 ;;
     "Sherpa Whisper Tiny"|"sherpa-onnx-whisper-tiny.en"|Whisper) printf '%s %s\n' 200 300 ;;
-    Allow|OK) printf '%s %s\n' 280 520 ;;
+    Open|Allow|OK) printf '%s %s\n' 275 474 ;;
     Benchmarks) printf '%s %s\n' 200 620 ;;
     "Run All Benchmarks") printf '%s %s\n' 201 340 ;;
     All) printf '%s %s\n' 360 480 ;;
+    RunAnywhere) printf '%s %s\n' 154 335 ;;
     SmolLM2|SmolLM|"SmolLM2 360M") printf '%s %s\n' 200 260 ;;
     Batch) printf '%s %s\n' 100 200 ;;
     Microphone) printf '%s %s\n' 201 650 ;;

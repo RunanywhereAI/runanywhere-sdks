@@ -161,14 +161,36 @@ _swift_drive_tc19_benchmarks() {
   local lane_root="${RAC_SESSION_ROOT:?}"
   local shot_pre="screenshots/030_tc19_benchmarks.png"
   local shot_run="screenshots/031_tc19_benchmarks_run.png"
+  local prefetch_wait="${RAC_LLM_DOWNLOAD_WAIT_S:-600}"
   local wait_s="${RAC_BENCHMARK_WAIT_S:-900}"
   local elapsed=0
   local status notes
 
-  if ! _swift_ensure_llm_on_disk; then
+  _swift_launch_app
+  local sdk_wait="${RAC_SDK_READY_WAIT_S:-180}"
+  elapsed=0
+  while [[ "${elapsed}" -lt "${sdk_wait}" ]]; do
+    if _swift_grep_any "${RAC_MARKER_AI_READY}" "${RAC_MARKER_SDK_INIT_ALT}" "SDK successfully initialized"; then
+      break
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+
+  elapsed=0
+  while [[ "${elapsed}" -lt "${prefetch_wait}" ]]; do
+    if _swift_llm_artifact_on_disk; then
+      break
+    fi
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+
+  if ! _swift_llm_artifact_on_disk; then
     rac_tc_done tc19 BLOCKED "no LLM artifact on disk after prefetch" "${shot_pre}"
     return 0
   fi
+
   _swift_open_benchmarks
   rac_mcp_shot "${lane_root}/${shot_pre}"
 
