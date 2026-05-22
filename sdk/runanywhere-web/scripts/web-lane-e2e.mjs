@@ -106,7 +106,14 @@ function recordCommand(name, status, exitCode, logPath) {
 async function snapshotTc(page, tcId, step, status, notes = '') {
   const shotName = `screenshots/${tcId}_${step}.png`;
   const shotPath = path.join(LANE_ROOT, shotName);
-  await page.screenshot({ path: shotPath, fullPage: true });
+  // Defensive screenshot: a frozen page (e.g. mid-VLM-load on WASM) can hang
+  // page.screenshot past Playwright's default. Cap aggressively and degrade
+  // to a screenshot-less record rather than failing the TC for evidence.
+  try {
+    await page.screenshot({ path: shotPath, fullPage: true, timeout: 15_000 });
+  } catch (err) {
+    console.warn(`[snapshotTc] screenshot for ${tcId}_${step} failed: ${errorMessage(err)}`);
+  }
   const logSlice = path.join(LOGS, `console_${tcId}_${step}.jsonl`);
   fs.writeFileSync(logSlice, consoleEntries.slice(-80).map((e) => JSON.stringify(e)).join('\n'));
   recordCommand(`tc_${tcId}_${step}`, status, status === 'PASS' ? 0 : 1, `logs/console_${tcId}_${step}.jsonl`);
