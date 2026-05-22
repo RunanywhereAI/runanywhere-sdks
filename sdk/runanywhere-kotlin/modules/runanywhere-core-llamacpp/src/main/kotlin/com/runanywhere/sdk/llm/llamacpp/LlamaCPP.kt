@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.llm.llamacpp
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
@@ -120,15 +121,43 @@ object LlamaCPP : RunAnywhereModule {
     }
 }
 
-/**
- * Platform-specific native registration.
- * Calls the unified `rac_backend_llamacpp_register()` via JNI, which registers
- * a vtable covering both the LLM and VLM modality slots.
- */
-internal expect fun LlamaCPP.registerNative(): Int
+
+
+private val logger = SDKLogger.llamacpp
 
 /**
- * Platform-specific native unregistration.
- * Calls rac_backend_llamacpp_unregister() via JNI.
+ * JVM/Android implementation of LlamaCPP native registration.
+ *
+ * Uses the self-contained LlamaCPPBridge to register the backend,
+ * mirroring the Swift LlamaCPPBackend XCFramework architecture.
+ *
+ * The LlamaCPP module has its own JNI library (librac_backend_llamacpp_jni.so)
+ * that provides backend registration, separate from the main commons JNI.
  */
-internal expect fun LlamaCPP.unregisterNative(): Int
+internal fun LlamaCPP.registerNative(): Int {
+    logger.debug("Ensuring commons JNI is loaded for service registry")
+    // Ensure commons JNI is loaded first (provides service registry)
+    RunAnywhereBridge.ensureNativeLibraryLoaded()
+
+    logger.debug("Loading dedicated LlamaCPP JNI library")
+    // Load and use the dedicated LlamaCPP JNI
+    if (!LlamaCPPBridge.ensureNativeLibraryLoaded()) {
+        logger.error("Failed to load LlamaCPP native library")
+        throw UnsatisfiedLinkError("Failed to load LlamaCPP native library")
+    }
+
+    logger.debug("Calling native register")
+    val result = LlamaCPPBridge.nativeRegister()
+    logger.debug("Native register returned: $result")
+    return result
+}
+
+/**
+ * JVM/Android implementation of LlamaCPP native unregistration.
+ */
+internal fun LlamaCPP.unregisterNative(): Int {
+    logger.debug("Calling native unregister")
+    val result = LlamaCPPBridge.nativeUnregister()
+    logger.debug("Native unregister returned: $result")
+    return result
+}
