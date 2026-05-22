@@ -1,0 +1,707 @@
+RunAnywhere SDK — work log
+==========================
+
+Purpose
+-------
+Single source of truth for what has been done on this branch
+(feat/v2-architecture) by Claude agents. Each agent writes its own
+section. Newest entries at top. Don't rewrite history.
+
+Format per entry:
+  - Date / session label
+  - One-line goal
+  - What changed (files / paths)
+  - Why (decision context)
+  - Open questions / handoff for next agent
+
+
+================================================================
+Session 2026-05-23 (this session, agent: Claude Opus 4.7 — SDK source flatten)
+================================================================
+
+Goal
+----
+Execute tasks #16–#30 from the previous session's queue: flatten the
+SDK from KMP-shaped layout (commonMain / jvmAndroidMain / androidMain
+/ commonTest / jvmMain / jvmTest) to pure Android (src/main + src/test).
+
+What changed
+------------
+
+A. Pre-flight audit (#16)
+   - 78 `expect` declarations in src/commonMain, 78 actuals (77 in
+     jvmAndroidMain, 1 in androidMain). 0 unmatched.
+   - jvmMain (5 desktop-only Jvm*Manager / Jvm*Module files) and
+     jvmTest (3 JUnit tests) inventoried. User decided: delete both.
+   - jniLibs are gitignored (untracked), so they need plain `mv` not
+     `git mv`.
+   - The "AndroidManifest.xml" under src/androidMain/ was a DIRECTORY
+     containing an AndroidManifest.xml file inside — quirky layout
+     that the AGP manifest.srcFile() call probably never resolved
+     cleanly. Flatten replaces it with a proper file at the AGP
+     default path.
+
+B. SDK source moves (#17–#23)
+   - Deleted src/jvmMain (5 files) and src/jvmTest (3 files).
+   - `git mv src/commonMain/kotlin → src/main/kotlin` (448 files,
+     proto subtree of 399 files preserved intact).
+   - jvmAndroidMain merged into src/main/kotlin file-by-file. One
+     collision: utils/TimeUtils.kt (expect in commonMain, actual in
+     jvmAndroidMain). jvmAndroidMain version won.
+   - androidMain merged: 5 unique files + 2 collisions resolved
+     (AudioCaptureManager, TtsAudioPlayback.android.kt → .kt — both
+     androidMain actuals overwriting commonMain expects).
+   - Stripped `expect ` / `actual ` keywords from src/main/kotlin via
+     a lookahead-safe Python pass (only strips when followed by a
+     Kotlin declaration token — won't touch "the actual content" in
+     KDoc). 52 files touched, 248 keywords removed.
+   - Merged the 22 `.jvmAndroid.kt` ↔ sibling `.kt` pairs via a
+     Python script that:
+       1. Reads the pre-flatten commonMain file from `git show HEAD:`
+          to find the declarations that were originally `expect`.
+       2. Deletes those (now-bodyless) declarations from the current
+          `.kt` file using a brace-aware parser.
+       3. Appends the `.jvmAndroid.kt` body (minus duplicate package +
+          imports) to the `.kt` file, deduping imports.
+       4. Deletes the `.jvmAndroid.kt` file.
+     The one orphan (ToolCallingOrchestrator.jvmAndroid.kt — no
+     commonMain sibling) was simple-renamed to drop the suffix.
+   - AndroidManifest.xml moved from the directory-quirk to the AGP
+     default path src/main/AndroidManifest.xml.
+   - jniLibs moved (plain mv, untracked) src/androidMain/jniLibs → src/main/jniLibs.
+   - commonTest moved to src/test/kotlin (10 files, no KMP keywords
+     present).
+
+C. Module flatten (#27, #28)
+   - runanywhere-core-llamacpp: same pattern; 1 expect/actual pair
+     merged (LlamaCPP), 1 standalone preserved (LlamaCPPBridge), 12
+     .so files moved.
+   - runanywhere-core-onnx: 1 expect/actual pair merged (ONNX), 2
+     standalones (ONNXAndroidInit, ONNXBridge), 30 .so files moved.
+
+D. Build config simplification (#24)
+   - SDK build.gradle.kts: replaced the 11-line sourceSets block with
+     a 6-line src/main/kotlin + src/test/kotlin pair. Detekt source
+     paths down to single `src/main/kotlin`. The lines added in the
+     previous session's step 17 (manifest.srcFile + jniLibs.srcDirs)
+     are gone — AGP defaults now pick up everything.
+   - Module build.gradle.kts files: same simplification.
+   - All `file("src/androidMain/jniLibs")` references rewritten to
+     `file("src/main/jniLibs")` across the SDK and both modules.
+
+E. Wire codegen repoint (#25)
+   - idl/codegen/generate_kotlin.sh OUT_DIR: commonMain/kotlin → main/kotlin.
+   - idl/codegen/generate_kotlin_convenience.py out_dir: same.
+   - idl/codegen/tests/test_convenience_generators.py: same fix on
+     the path-fingerprint test (would have failed on regen otherwise).
+
+F. .gitignore (#22 fallout)
+   - SDK + both module .gitignore lines: src/androidMain/jniLibs/ →
+     src/main/jniLibs/.
+
+G. gradle.properties (#26) — no-op. Audit confirmed zero
+   kotlin.mpp.* / kotlin.native.* / kotlin.multiplatform.* lines.
+
+H. Docs path sweep (#29)
+   - Bulk-replaced src/{commonMain,jvmAndroidMain,androidMain,commonTest}/
+     paths to src/main/ + src/test/ in README.md, AGENTS.md,
+     ARCHITECTURE.md, KOTLIN_MAVEN_CENTRAL_PUBLISHING.md,
+     Documentation.md.
+   - Rewrote the README "Project Structure" tree diagram to show
+     src/main + src/test instead of the four KMP source sets.
+   - Functional script scripts/package-sdk.sh: JNI_DIR + help-text
+     path updated.
+
+End-state mechanical checks (all pass)
+--------------------------------------
+   1. find ... -type d ( -name commonMain -o -name jvmAndroidMain
+      -o -name androidMain -o -name commonTest -o -name jvmMain
+      -o -name jvmTest -o -name androidUnitTest ) → 0 results
+   2. grep -rnE '\b(expect|actual)\s+(class|fun|val|...)' across
+      src/main + src/test + modules/*/src/main → 0 results
+   3. SDK jniLibs: 12 .so files. llamacpp: 12. onnx: 30. Total: 54.
+   4. src/main/AndroidManifest.xml exists as a file.
+   5. Proto subtree intact: 399 .kt files under generated/.
+   6. No KMP path references left in SDK build.gradle.kts, module
+      build files, or idl/codegen/ scripts.
+   7. File counts: SDK src/main/kotlin = 499 .kt, src/test/kotlin = 10.
+      llamacpp src/main = 2 .kt + 12 .so. onnx src/main = 3 .kt + 30 .so.
+
+Post-flatten build repair (user ran the build; this agent fixed fallout)
+------------------------------------------------------------------------
+
+User ran `./run sdk kotlin build` after the mechanical flatten and the
+SDK Kotlin compile surfaced THREE categories of errors that the
+mechanical verification could not detect:
+
+I. **Unresolved references to commonMain-only types** in files where
+   commonMain was overwritten by androidMain during collision
+   resolution (step A4 in section B). Specifically:
+   - src/main/kotlin/.../STT/Services/AudioCaptureManager.kt referenced
+     `AudioCaptureError` and `AudioCaptureConstants` — both were
+     `sealed class` / `internal object` definitions that lived ONLY
+     in the commonMain version (98-134 in the original). They were
+     not in the androidMain version (which only had the `actual class`
+     impl). When the androidMain version overwrote commonMain on
+     flatten, the shared types went with it.
+   - **Fix**: appended both definitions back to the current file from
+     `git show HEAD:src/commonMain/kotlin/.../AudioCaptureManager.kt`.
+     The two other overwritten files (TtsAudioPlayback.kt, TimeUtils.kt)
+     had no extra common-only types — git inventory confirmed.
+
+II. **Bodyless top-level functions across the SDK** where my Python
+    merger missed pairs because the actuals lived in DIFFERENTLY-NAMED
+    files. The merger only paired `Foo.kt` ↔ `Foo.jvmAndroid.kt`. Some
+    expects had their actuals in files with completely different names:
+      - src/main/kotlin/.../public/RunAnywhere.kt: 8 expect declarations
+        (initializePlatformBridge, initializePlatformBridgeServices,
+        shutdownPlatformBridge, platformGetUserId, platformGetOrgId,
+        platformIsAuthenticated, platformIsDeviceRegistered,
+        platformDeviceId). Actuals lived in PlatformBridge.kt (different
+        basename → never paired by merger).
+      - src/main/kotlin/.../public/events/EventBus.kt: 3 expects
+        (startNativeSubscription, stopNativeSubscription, publishToNative).
+        Actuals lived in EventBusBridge.kt.
+   - **Fix**: wrote /tmp/strip_bodyless.py — a global pass that walks
+     every .kt under src/main/kotlin (SDK + both modules), parses for
+     top-level `fun` declarations, and deletes any that have no body
+     (no `{...}` block, no `=` expression body). Bodyless top-level
+     fun is always a compile error after `expect` strip, so the pass
+     is safe. Removed 8 from RunAnywhere.kt, 3 from EventBus.kt, total
+     11.
+
+III. **Over-deleted non-expect overload + orphan body line** in
+     RunAnywhereVAD.kt. The merger's by-name deletion treated all
+     declarations named `streamVAD` as expect-derived because the
+     original commonMain file had `expect fun streamVAD(audioSamples,
+     options)`. But the file ALSO had a non-expect convenience
+     overload `fun streamVAD(audioSamples) = streamVAD(audioSamples,
+     RAVADOptions())` — the merger deleted that too. Worse: the
+     bounds parser stopped at the `=` newline and left the body line
+     orphaned at column 4 between two blank-line pads.
+   - **Fix**: deleted the orphan line, restored the convenience
+     overload directly before the bodied `streamVAD(audioSamples,
+     options)`. Build now goes green on the SDK side.
+
+Result: SDK builds, AARs staged:
+   examples/android/RunAnywhereAI/libs/runanywhere-sdk.aar       13M
+   examples/android/RunAnywhereAI/libs/runanywhere-llamacpp.aar  7.3M
+   examples/android/RunAnywhereAI/libs/runanywhere-onnx.aar      41M
+
+Example-app call-site drift (separate from flatten)
+---------------------------------------------------
+
+User then ran `./run example android install`. SDK compiled and the
+AARs landed cleanly; the example app's :app:compileDebugKotlin failed
+with 6 errors that are NOT flatten regressions — they're stale call
+sites against API signatures that evolved before this branch. Patched
+each one to match the current SDK surface:
+
+   app/.../chat/ChatViewModel.kt:288
+     generateWithTools(prompt, options)
+       → added toolOptions = null, toolChoice = null,
+              forcedToolName = null  (SDK takes 5 params)
+
+   app/.../models/ModelSelectionViewModel.kt:110
+     listModels()
+       → listModels(ModelListRequest())
+       + import ai.runanywhere.proto.v1.ModelListRequest
+
+   app/.../rag/RAGViewModel.kt:137
+     ragIngest(text = extractedText)
+       → ragIngest(text = ..., metadataJSON = null)
+
+   app/.../rag/RAGViewModel.kt:183
+     ragQuery(question = question)
+       → ragQuery(question = ..., options = null)
+
+If more app-side mismatches surface on the next install run, the
+pattern is the same: SDK API requires a new param → pass null/default.
+The fix never touches the SDK — it's pure consumer-side reconciliation.
+
+Open / handoff
+--------------
+
+1. **Run `./run example android install` again.** SDK is green; one
+   round of consumer patches has been applied. Any remaining
+   "no value passed for parameter X" or "no candidate matches"
+   errors are the same class of drift — just pass null or the
+   appropriate default. None of these require touching the SDK.
+
+2. **Deferred: deep KMP-prose rewrites in AGENTS.md +
+   docs/ARCHITECTURE.md.** Path-only sed handled the runnable parts.
+   The narrative descriptions ("commonMain / jvmAndroidMain /
+   androidMain source sets explain…") are now obsolete prose. AGENTS.md
+   still has a multi-page "Source set hierarchy" section and
+   ARCHITECTURE.md has a "Kotlin Multiplatform First" framing. These
+   are editorial rewrites — out of scope for the mechanical flatten,
+   but the next agent should rewrite them to describe the flat Android
+   layout if AGENTS.md / ARCHITECTURE.md are kept as authoritative
+   docs. (Both have a 2-line residual jvmTest reference that grep
+   surfaces but isn't broken — just historic.)
+
+3. **Merge artifacts to spot-check after first successful build.** The
+   22 auto-merged files (HTTPClientAdapter, ComponentVTable,
+   RunAnywhereHardware, etc.) may have subtle stylistic noise:
+   trailing blank lines where stripped declarations used to be,
+   imports re-sorted alphabetically (deliberate), and the merged
+   `// Private helpers` / `// Configuration` section comments from
+   .jvmAndroid.kt now appearing after the common-side `object`
+   declaration. Functionally correct; cosmetic polish is follow-up.
+
+
+
+
+What changed (chronological)
+----------------------------
+
+1. Audited the Gradle topology.
+   - Root build had: settings.gradle.kts, build.gradle.kts (300+ line dev
+     tasks file), gradle.properties, gradle/libs.versions.toml (341 lines),
+     gradle/wrapper (Gradle 9.4.1), gradlew, gradlew.bat.
+   - SDK already had its own settings.gradle.kts + build.gradle.kts +
+     wrapper (Gradle 8.13, incompatible with AGP 9.2.1) + gradle.properties.
+   - Example app at examples/android/RunAnywhereAI/ already had its own
+     settings + wrapper but read ../../../gradle/libs.versions.toml.
+
+2. Pruned the SDK catalog.
+   - Audited libs.* references in sdk/runanywhere-kotlin/build.gradle.kts
+     and the two module build files. 27 libraries + 4 plugins are in use
+     by the SDK side.
+   - Wrote sdk/runanywhere-kotlin/gradle/libs.versions.toml with only those
+     entries. Compose / Material / Room / CameraX / AppCompat / Lifecycle /
+     PDFbox / Navigation / Accompanist / play-app-update / Timber / Espresso
+     / kotlin-compose / android-application: stripped (example-only).
+
+3. Pointed SDK settings.gradle.kts at the local catalog.
+   - Was: from(files("../../gradle/libs.versions.toml"))
+   - First became: from(files("gradle/libs.versions.toml"))
+   - Then the entire versionCatalogs.create("libs") block was removed —
+     Gradle 9 auto-creates the `libs` catalog from gradle/libs.versions.toml
+     at the default location, so an explicit `from(...)` is a duplicate
+     and Gradle 9.4.1 rejects it.
+
+4. Aligned all Gradle wrappers.
+   - Set sdk/runanywhere-kotlin, examples/android/RunAnywhereAI, and
+     Playground/android-use-agent wrappers to gradle-9.4.1-bin.zip.
+   - Originally tried 9.2.1 per user preference, but AGP 9.2.1 (the pin in
+     the catalog) hard-requires Gradle >= 9.4.1. Surfaced the conflict and
+     user picked "use Gradle 9.4.1, keep AGP 9.2.1".
+
+5. Merged SDK-needed properties into SDK gradle.properties.
+   - racNdkVersion=27.0.12077973 + runanywhere.useLocalNatives=true +
+     runanywhere.testLocal=true + runanywhere.rebuildCommons=false +
+     runanywhere.nativeLibVersion=0.19.13.
+   - User later trimmed redundant lines (android.enableJetifier,
+     kotlin.mpp.applyDefaultHierarchyTemplate).
+
+6. Added SDK dev tasks to sdk/runanywhere-kotlin/build.gradle.kts.
+   - setup (writes local.properties, prints SDK + NDK paths)
+   - buildSdk / buildSdkRelease / publishSdkToMavenLocal aliases over
+     assembleDebug / assembleRelease / publishToMavenLocal.
+   - Existing native tasks kept: buildLocalJniLibs, downloadJniLibs,
+     syncAndroidRuntimeLibs, setupLocalDevelopment, rebuildCommons.
+
+7. Made modules resolve the SDK from either root context.
+   - modules/runanywhere-core-llamacpp/build.gradle.kts and
+     modules/runanywhere-core-onnx/build.gradle.kts: changed
+     api(project(":runanywhere-kotlin")) →
+     api(findProject(":runanywhere-kotlin") ?: project(":"))
+   - This way the modules work both when the example app includes them
+     as subprojects (path = :runanywhere-kotlin) and when the SDK builds
+     standalone (path = :).
+
+8. Decoupled the example app from the root catalog.
+   - Wrote examples/android/RunAnywhereAI/gradle/libs.versions.toml as a
+     full catalog (Compose, Material, Room, CameraX, AppCompat, Lifecycle,
+     PDFbox, Navigation, Accompanist, play-app-update, Timber, Espresso,
+     plus everything the SDK uses — example needs all of it).
+   - Removed the versionCatalogs.create("libs") block from
+     examples/android/RunAnywhereAI/settings.gradle.kts (same Gradle 9
+     auto-catalog reason as #3).
+
+9. Deleted the root Gradle system.
+   - rm: settings.gradle.kts, build.gradle.kts, gradlew, gradlew.bat,
+     gradle.properties, local.properties, gradle/wrapper/,
+     gradle/gradle-daemon-jvm.properties, gradle/libs.versions.toml,
+     .gradle/, build/reports/.
+   - Kept: CMakeLists.txt, CMakePresets.json, cmake/, scripts/, build/
+     android-arm64/ (CMake C++ build, unrelated to Gradle).
+
+10. Swept CI / docs for stale root-Gradle invocations.
+    - .github/workflows/pr-build.yml: rewrote `./gradlew :runanywhere-
+      kotlin:assembleDebug` and `:ktlintCheck :detekt` to use
+      `working-directory: sdk/runanywhere-kotlin`.
+    - AGENTS.md: updated Cursor Cloud build table entry to use
+      `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin ...`
+      instead of `:runanywhere-kotlin:*` paths.
+    - CONTRIBUTING.md: qualified the ktlintFormat hint with `from within
+      sdk/runanywhere-kotlin/`.
+    - release.yml and jitpack.yml already used `cd sdk/runanywhere-kotlin
+      && ./gradlew ...`, untouched.
+
+11. Switched the example app to consume the SDK as a prebuilt AAR.
+    - examples/android/RunAnywhereAI/settings.gradle.kts: removed the
+      three include(":runanywhere-kotlin"), include(":runanywhere-core-*")
+      blocks. Added flatDir { dirs("${rootDir}/libs") }.
+    - examples/android/RunAnywhereAI/app/build.gradle.kts: replaced
+      implementation(project(":runanywhere-*")) with
+      implementation(files("../libs/runanywhere-sdk.aar")),
+      implementation(files("../libs/runanywhere-llamacpp.aar")),
+      implementation(files("../libs/runanywhere-onnx.aar")).
+      Also added the SDK's transitive deps explicitly (the example would
+      otherwise miss them — flatDir AARs carry no metadata):
+      wire-runtime, ktor-client-core / content-negotiation / logging /
+      serialization-kotlinx-json, okio, sentry, json.
+    - Created examples/android/RunAnywhereAI/libs/.gitignore that ignores
+      *.aar so the dir is tracked but the artifacts aren't.
+
+12. Wrote examples/android/RunAnywhereAI/scripts/stage-sdk-aars.sh.
+    - Args: [debug|release], default release.
+    - cd sdk/runanywhere-kotlin && ./gradlew assembleRelease
+      :modules:runanywhere-core-llamacpp:assembleRelease
+      :modules:runanywhere-core-onnx:assembleRelease
+    - find the three -release.aar files, copy as runanywhere-sdk.aar,
+      runanywhere-llamacpp.aar, runanywhere-onnx.aar in the example's
+      libs/ directory.
+
+13. Built the DX entry point at the repo root.
+    - run (bash, 9.9 KB, executable). Single CLI dispatch with sectioned
+      gh-style help. Groups: doctor, setup, sdk {commons|kotlin|flutter|
+      rn|ios|web} <action>, example {android|flutter|ios|web} <action>,
+      utilities (clean, lint, format, codegen, sync-versions).
+    - run.bat (Windows shim that delegates to bash via Git Bash / WSL).
+    - Originally tried a Makefile with `/`-separated targets like
+      `make sdk/kotlin/build`. User wanted a real `./run sdk kotlin
+      build` UX, so the Makefile was deleted and replaced by ./run.
+
+14. Wrote scripts/doctor.sh and scripts/setup.sh.
+    - doctor.sh: detects OS (Linux/macOS/Windows), scans Android SDK +
+      NDK (uses racNdkVersion from gradle.properties), JDK 17+, CMake,
+      Ninja, Node 20+, Yarn, npm, Flutter, Dart, protoc, C compiler,
+      Xcode + Swift on macOS. Computes per-OS buildable matrix
+      (iOS targets show "—" on Linux, native Linux shows "—" on macOS,
+      etc.). Streams output (each row prints as the check completes,
+      not buffered). Uses `timeout` / `gtimeout` on slow tools
+      (flutter 8s, xcode 10s, dart 5s, java 5s, others 3s) with
+      </dev/null to prevent interactive prompts.
+    - setup.sh: ENV ONLY, NO BUILDS. Provisions local.properties for
+      android, runs yarn install / flutter pub get / swift package
+      resolve / pod install. Removed the original `native` target that
+      ran build-core-android.sh — that's a build, lives under
+      `./run sdk commons build-android` now.
+
+15. Fixed the "yarn.lock not found" workspace climb errors.
+    - Repo root has its own yarn 3 workspace (sdk/shared/proto-ts +
+      3 RN packages + RN example). sdk/runanywhere-web and
+      sdk/runanywhere-react-native are independent workspace roots.
+      examples/web/RunAnywhereAI is downstream of web. None of them had
+      yarn.lock, so yarn climbed up to the repo root and refused.
+    - touch'd empty yarn.lock in:
+        sdk/runanywhere-web/yarn.lock
+        sdk/runanywhere-react-native/yarn.lock
+        examples/web/RunAnywhereAI/yarn.lock
+    - Yarn will populate them on first install.
+
+16. Renamed `./run sdk commons build` → `./run sdk commons build-android`.
+    - The unqualified `build` was misleading (it only built Android, not
+      iOS / wasm / linux). build-android / build-ios / build-wasm /
+      build-linux now spell out the target.
+
+17. Fixed two compounding bugs that produced empty 1.7 KB AARs.
+    - sdk/runanywhere-kotlin/build.gradle.kts (and both module builds)
+      used `java.directories.add("src/commonMain/kotlin")` and similar
+      to register source dirs. `AndroidSourceDirectorySet.directories`
+      is a read-only FileCollection — .add(...) silently does nothing,
+      so 524 Kotlin files were never compiled. Changed all three files
+      to use `java.srcDirs(...)`.
+    - Same files never registered jniLibs paths. AGP default is
+      src/main/jniLibs (doesn't exist); actual location is
+      src/androidMain/jniLibs. Added jniLibs.srcDirs("src/androidMain/
+      jniLibs") to all three.
+    - SDK manifest is at src/androidMain/AndroidManifest.xml (default
+      is src/main/AndroidManifest.xml). Added
+      manifest.srcFile("src/androidMain/AndroidManifest.xml") on the
+      SDK only (modules don't have a source manifest).
+
+State at end of session
+-----------------------
+
+- Root has no Gradle build files. Only ./run, run.bat, CMake config.
+- sdk/runanywhere-kotlin/ builds standalone (wrapper 9.4.1, own catalog,
+  own settings, own dev tasks).
+- examples/android/RunAnywhereAI/ builds standalone, consumes the SDK
+  via libs/*.aar produced by scripts/stage-sdk-aars.sh.
+- DX surface: ./run doctor, ./run setup, ./run sdk kotlin build, etc.
+- The fix in step 17 means subsequent SDK builds actually compile the
+  Kotlin sources and pack the .so files. Before step 17, every AAR was
+  ~1.7 KB and the example app died with hundreds of "Unresolved
+  reference" errors.
+
+Pending — handed off as queued tasks (#16–#30)
+----------------------------------------------
+
+The SDK source tree is still in KMP-shaped layout (src/commonMain/
+kotlin/, src/jvmAndroidMain/kotlin/, src/androidMain/kotlin/) with ~25
+live `expect` declarations in commonMain paired with `actual`
+declarations in jvmAndroidMain. The build.gradle.kts uses only
+android.library + kotlin-android, no kotlin("multiplatform") plugin —
+so expect/actual are currently compile errors waiting to happen (they
+weren't surfaced before because source dirs weren't registered).
+
+User chose flatten-to-pure-Android (option A). Tasks queued:
+
+  #16  Audit expect/actual pairs and write resolution table
+  #17  Delete src/jvmMain (5 files), src/jvmTest (3), src/androidUnitTest
+  #18  Move src/commonMain/kotlin → src/main/kotlin
+  #19  Move src/jvmAndroidMain/kotlin → src/main/kotlin
+        (rename .jvmAndroid.kt → .kt)
+  #20  Move src/androidMain/kotlin → src/main/kotlin
+        (android wins on conflicts; rename .android.kt → .kt)
+  #21  Strip expect/actual keywords from src/main/kotlin
+  #22  Move src/{commonMain,jvmAndroidMain,androidMain}/resources →
+        src/main/resources; src/androidMain/jniLibs → src/main/jniLibs;
+        src/androidMain/AndroidManifest.xml → src/main/AndroidManifest.xml
+  #23  Move src/commonTest/kotlin → src/test/kotlin and strip KMP markers
+  #24  Delete the sourceSets {...} block from SDK build.gradle.kts (and
+        the manifest.srcFile + jniLibs.srcDirs lines added in step 17 —
+        not needed anymore once files are at AGP defaults). Update
+        detekt source.setFrom to src/main/kotlin.
+  #25  Repoint idl/codegen/generate_kotlin.sh +
+        generate_kotlin_convenience.py OUT_DIR from
+        src/commonMain/kotlin/.../generated → src/main/kotlin/.../generated
+  #26  Verify SDK gradle.properties has no kotlin.mpp.* residue
+  #27  Flatten modules/runanywhere-core-llamacpp the same way
+  #28  Flatten modules/runanywhere-core-onnx the same way
+  #29  Sweep repo for residual references to commonMain/jvmAndroidMain/
+        androidMain/jvmMain paths (docs, CI, scripts, validation)
+  #30  USER VERIFICATION — ./run sdk kotlin build, fix any compile errors
+        from expect/actual leftovers, then ./run example android build
+
+Notes for whoever picks this up
+-------------------------------
+
+- The two filename collisions to resolve in #16:
+    src/commonMain/kotlin/.../STT/Services/AudioCaptureManager.kt (expect)
+    src/jvmMain/kotlin/.../STT/Services/AudioCaptureManager.kt   (jvm actual — deletes in #17)
+    src/androidMain/kotlin/.../STT/Services/AudioCaptureManager.kt (android actual — keep)
+  Same pattern for TimeUtils.kt.
+
+- ~20 .jvmAndroid.kt files in jvmAndroidMain pair cleanly with `expect`
+  stubs in commonMain. Mechanical rename.
+
+- Don't run builds — user runs builds themselves.
+
+- Don't bump versions — AGP is pinned at 9.2.1, Gradle at 9.4.1,
+  Kotlin at 2.2.20. Only change on explicit ask.
+
+- Wire is a runtime dep, not a Gradle plugin. The proto-generated code
+  at src/commonMain/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/
+  proto/v1/** is committed source — moves as a unit in #18. Only the
+  codegen scripts in idl/codegen/ need their OUT_DIR repointed.
+
+
+================================================================
+Prior work (other Claude session(s), partial reconstruction)
+================================================================
+
+Some files in this branch were modified before this session began.
+git diff HEAD shows the following pre-existing changes that this
+agent did NOT make (left here so the next agent can fill in context
+if known):
+
+  - .idea/.name  (deleted)
+  - .idea/vcs.xml  (modified)
+  - Playground/android-use-agent/app/build.gradle.kts  (modified, ~13 lines)
+  - Playground/android-use-agent/build.gradle.kts  (modified, 1 line)
+  - examples/android/RunAnywhereAI/gradle.properties  (~4 lines trimmed)
+  - sdk/runanywhere-web/packages/llamacpp/package.json  (~4 lines)
+  - sdk/runanywhere-web/packages/onnx/package.json  (~4 lines)
+
+If you (next agent) recognize any of these as your work, add an entry
+above with the context.
+
+
+================================================================
+Session 2026-05-22 → 2026-05-23 (agent: Claude Opus 4.7 — AGP 9 migration + audit)
+================================================================
+
+Goal
+----
+Migrate the existing monorepo onto AGP 9.2.1 / Gradle 9.4.1 / Kotlin
+2.2.20, drop Kotlin Multiplatform from the SDK and the two backend
+modules (keep Android-only), and clean up every DSL deprecation the
+migration surfaced. Then read-only audit of what gets shipped per
+platform.
+
+What changed (chronological)
+----------------------------
+
+1. AGP 9 built-in Kotlin: removed the kotlin-android plugin.
+   - Example app (examples/android/RunAnywhereAI/app/build.gradle.kts):
+     dropped alias(libs.plugins.kotlin.android). AGP 9 brings its own
+     Kotlin pipeline; explicit plugin is now rejected.
+   - Playground/android-use-agent/app/build.gradle.kts: same.
+   - examples/android/RunAnywhereAI/build.gradle.kts: removed
+     `kotlin.android apply false` and `kotlin.multiplatform apply false`.
+   - Playground/android-use-agent/build.gradle.kts: removed
+     `kotlin.android apply false`.
+   - Repo-root build.gradle.kts: removed the kotlin.multiplatform and
+     kotlin.android `apply false` lines.
+
+2. Migrated `android { kotlinOptions { ... } }` → top-level
+   `kotlin { compilerOptions { ... } }` in:
+   - examples/android/RunAnywhereAI/app/build.gradle.kts
+     (carrying jvmTarget = JVM_17 + 5 freeCompilerArgs incl. opt-ins
+     and -Xjvm-default=all)
+   - Playground/android-use-agent/app/build.gradle.kts
+
+3. Removed kotlin-stdlib strict-version constraints block from the
+   example app. AGP 9 built-in Kotlin pins stdlib itself; the four
+   strictly(libs.versions.kotlin.get()) declarations caused
+   "Failed to resolve: org.jetbrains.kotlin:kotlin-stdlib".
+
+4. Removed deprecated DSL bits the migration surfaced.
+   - `renderScript = false` in app/build.gradle.kts (removed in AGP 10).
+   - `android.enableJetifier=true` in gradle.properties (default is now
+     false).
+
+5. Dropped Kotlin Multiplatform from the SDK + both backend modules.
+   User chose option 1 (drop JVM, Android-only) — JVM target / jvmJar
+   tasks deleted, jvm{} block removed, KMP source-set DSL replaced.
+   - sdk/runanywhere-kotlin/build.gradle.kts: rewrote with
+     com.android.library only. Mapped legacy KMP source dirs
+     (commonMain, jvmAndroidMain, androidMain, commonTest, jvmTest,
+     androidUnitTest) into android.sourceSets via
+     java.directories.add(...) and resources.directories.add(...).
+     Flattened dependencies into a single dependencies{} block
+     (api wire-runtime + okhttp; impl coroutines, serialization,
+     datetime, ktor x4, okio, whisper-jni, gson, commons-io, sentry,
+     json, androidx-core-ktx, coroutines-android, vad-webrtc,
+     prdownloader, work-runtime, security-crypto, retrofit x2).
+     Reworked publishing to android.publishing.singleVariant("release")
+     + afterEvaluate { register<MavenPublication>("release") { ... } }.
+     Kept all native-lib tasks (buildLocalJniLibs, setupLocalDevelopment,
+     rebuildCommons, downloadJniLibs, syncAndroidRuntimeLibs) and the
+     mergeJniLibFolders / preBuild hookups.
+   - sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/build.gradle.kts:
+     same conversion. Added api(project(":runanywhere-kotlin")).
+   - sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/build.gradle.kts:
+     same conversion.
+
+6. NOTE: my source-dir mapping used `java.directories.add("...")` per
+   the AGP-9 deprecation warning text ("Use directories mutable set
+   instead"). The next session discovered this is silently a no-op
+   (AndroidSourceDirectorySet.directories is read-only) — they
+   reverted to `java.srcDirs(...)`. See step 17 of the next entry above.
+
+7. Repo-root build.gradle.kts rewritten for Gradle 9.
+   - Gradle 9 removed Project.exec / Project.javaexec. Wrapped every
+     `exec { ... }` call inside `doLast { }` blocks via an injected
+     `InjectedExecOps` helper interface holding `@get:Inject val
+     execOps: ExecOperations`.
+   - Stripped all banner comments per project rule.
+   - Removed `:runanywhere-kotlin:jvmJar` from buildFullSdk / buildSdk
+     dependsOn (no JVM target anymore).
+
+8. Cleaned the version catalog and gradle.properties.
+   - gradle/libs.versions.toml: removed kotlin-android, kotlin-jvm,
+     kotlin-multiplatform plugin aliases (all unreferenced after
+     migration). Kotlin / Compose / serialization plugins kept.
+   - gradle.properties (root): removed android.builtInKotlin=false,
+     android.newDsl=false, android.r8.* tweaks, and the giant comment
+     header. Later also removed android.enableJetifier=true (step 4).
+   - examples/android/RunAnywhereAI/gradle.properties: removed
+     `kotlin.mpp.stability.nowarn=true` and
+     `kotlin.mpp.applyDefaultHierarchyTemplate=false` (inert after
+     KMP removal).
+
+9. Fixed srcDirs deprecation warnings (interim — see #6 above).
+   - First swap: java.srcDirs(...) → java.srcDir(...) per call.
+     IDE then warned that srcDir(singular) is ALSO deprecated.
+   - Second swap: → java.directories.add("...") per call across all
+     three SDK build files. Compiles, passes IDE inspection — but
+     silently fails to register sources (caught by next session).
+
+10. Read-only binary-shipping audit across all non-iOS platforms.
+    Dispatched 4 general-purpose agents in parallel (background) with
+    self-contained prompts: Android Kotlin, React Native, Flutter,
+    Web. All four reported back; none could execute Gradle/npm/yarn
+    inside the sandbox (Bash blocked), so reports are static + on-disk
+    analysis only.
+
+    Cross-platform finding (one root cause):
+      build/android-arm64/sdk/runanywhere-commons/librac_commons.so
+      = 108–114 MB, arm64-only, ELF reports
+      "with debug_info, not stripped". Comparable SDKs ship the same
+      lib at ~15–25 MB stripped. CMake preset uses Release but has
+      no -s / strip step. This drives the perceived bloat in the
+      inline app/build.gradle.kts comment (~45 MB llamacpp / ~30 MB
+      onnx).
+
+    Platform-specific findings:
+      - Android Kotlin: full ONNX Runtime ships (libonnxruntime.so
+        ≈25.8 MB arm64 / 18.4 MB armv7 / 31.3 MB x86_64 — ~75 MB just
+        for ORT across 3 ABIs). GGML_OPENMP=OFF in CMakeLists.txt but
+        libomp.so still copied into core jniLibs. llama.cpp's
+        GGML_LLAMAFILE / mtmd / llava / tests not explicitly OFF.
+      - React Native: .so files NOT shipped inside the npm tarballs;
+        Gradle's downloadNativeLibs fetches them at consumer build
+        time from GitHub releases (commons-v0.1.4). Tarballs are tiny
+        (core 1–1.4 MB gz, llamacpp/onnx ~80 KB each). Source-side
+        waste: 904 KB vendored nlohmann/json (also CMake-fetched),
+        1.7 MB / 154 RAC C headers shipped to npm AND re-extracted
+        at build time.
+      - Flutter: all 4 packages (runanywhere, llamacpp, onnx, genie)
+        have empty jniLibs at rest; same prebuilt zip flow as RN.
+        Ships all 3 ABIs (libonnxruntime.so × 3 ≈ 74 MB in onnx
+        package alone). libc++_shared.so duplicated across all 4
+        plugins (intentional per AGENTS.md — pickFirsts collapses at
+        APK merge).
+      - Web: @runanywhere/proto-ts is the only package built —
+        3.4 MB unminified ts-proto output (sdk_events.js 402 KB,
+        model_types.js 286 KB). @runanywhere/web-llamacpp ships BOTH
+        CPU and WebGPU wasm variants (~7 MB+ wasm) plus pthread
+        worker shims. Source maps and declaration maps ship because
+        `files: ["dist/"]` is unfiltered.
+
+State at end of session (before next Claude picked up)
+------------------------------------------------------
+
+- AGP 9.2.1 build configures cleanly across the SDK, both backend
+  modules, the example app, and the Playground app.
+- KMP gone from the three SDK gradle files; com.android.library only.
+- All deprecation warnings reported by the user during the session
+  were resolved (kotlinOptions, kotlin-android plugin, srcDirs,
+  renderScript, enableJetifier, kotlin-stdlib strict constraints).
+- BUT: the `java.directories.add(...)` source-set registration is
+  silently a no-op. AARs produced from here would contain no Kotlin
+  bytecode (~1.7 KB shell). This was the bug the next session
+  caught and fixed by reverting to java.srcDirs(...).
+
+Handoff (what user told me when I stopped)
+------------------------------------------
+
+- "Now do the gradle split" — user will run another Claude session
+  to delete the root Gradle build and stand up per-project gradles.
+  My migration changes carry over: SDK + module build.gradle.kts,
+  example app build.gradle.kts, libs.versions.toml entries. Root
+  build.gradle.kts and root settings.gradle.kts can be deleted.
+- "Strip the noise from .so files" deferred for after the gradle
+  split. Keep all platforms / all ABIs (no cuts). Targets:
+  (a) librac_commons.so stripped (~80% cut),
+  (b) libomp.so removed when GGML_OPENMP=OFF,
+  (c) llama.cpp GGML_LLAMAFILE / mtmd / llava / tests = OFF,
+  (d) RN: drop vendored nlohmann/json (CMake FetchContent already
+       provides it),
+  (e) RN: drop duplicate RAC header tree from npm tarball,
+  (f) Web: filter `files: ["dist/"]` to exclude *.map,
+  (g) Web: minify @runanywhere/proto-ts,
+  (h) Web: separate @runanywhere/web-llamacpp into CPU vs WebGPU
+       packages instead of shipping both wasms in one.
+
+================================================================
+Reserved — next agent
+================================================================
+
+(write your entry above this line, newest first)
