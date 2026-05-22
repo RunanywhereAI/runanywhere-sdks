@@ -421,10 +421,18 @@ async function downloadModelInSheet(page, modelName, modelId, timeoutMs = 1_800_
   const dl = row.locator('[data-action="download"]');
   if (await dl.isVisible().catch(() => false)) {
     await dl.click();
+    // Settle on either UI state — Load button appears — OR the registry has
+    // marked the model downloaded (multi-file archives can extract to a
+    // directory faster than the row re-renders).
     await page.waitForFunction(
       (id) => {
         const r = document.querySelector(`.modal-sheet .model-row[data-model-id="${id}"]`);
-        return r?.querySelector('[data-action="load"]') != null;
+        if (r?.querySelector('[data-action="load"]') != null) return true;
+        try {
+          const model = window.__RUNANYWHERE_SDK__?.getModel?.(id);
+          if (model?.isDownloaded && model?.localPath) return true;
+        } catch { /* ignore */ }
+        return false;
       },
       modelId,
       { timeout: timeoutMs },
@@ -441,7 +449,24 @@ async function downloadModelInSheet(page, modelName, modelId, timeoutMs = 1_800_
 async function loadModelInSheet(page, modelName, modelId, timeoutMs = 180_000) {
   const row = modelRow(page, modelId, modelName);
   const loadBtn = row.locator('[data-action="load"]');
-  await loadBtn.waitFor({ state: 'visible', timeout: 30_000 });
+  // Tolerate a missing load button when the SDK has already loaded the
+  // model (e.g. auto-load after download for multi-file archives).
+  const visible = await loadBtn.isVisible({ timeout: 30_000 }).catch(() => false);
+  if (!visible) {
+    const alreadyLoaded = await page.evaluate((id) => {
+      try {
+        const current = window.__RUNANYWHERE_SDK__?.currentModel?.();
+        return current?.modelId === id;
+      } catch {
+        return false;
+      }
+    }, modelId);
+    if (alreadyLoaded) {
+      await page.waitForTimeout(500);
+      return;
+    }
+    throw new Error(`load button missing for ${modelId} and SDK currentModel != ${modelId}`);
+  }
   await loadBtn.click();
   await page.waitForFunction(
     (id) => {
