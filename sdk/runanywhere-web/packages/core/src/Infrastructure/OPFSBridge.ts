@@ -582,22 +582,38 @@ export class OPFSBridge {
     }
   }
 
-  /** True when an OPFS model directory contains at least one file (post tar.gz extract). */
+  /**
+   * True when an OPFS model directory contains at least one file anywhere in
+   * its tree (post tar.gz extract). Some Sherpa archives wrap their contents
+   * in a nested directory of the same name, so a shallow file-only check is
+   * not sufficient; recurse into subdirectories.
+   */
   static async directoryHasArtifacts(dirSegments: string[]): Promise<boolean> {
     if (!isOPFSSupported()) return false;
     try {
       const dir = await resolveOPFSDirectory(dirSegments, false);
       if (!dir) return false;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const entries = (dir as any).values?.() ?? null;
-      if (!entries) return false;
-      for await (const handle of entries) {
-        if (handle?.kind === 'file') return true;
-      }
-      return false;
+      return await OPFSBridge.opfsDirectoryHasAnyFile(dir);
     } catch {
       return false;
     }
+  }
+
+  private static async opfsDirectoryHasAnyFile(
+    dir: FileSystemDirectoryHandle,
+  ): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries = (dir as any).values?.() ?? null;
+    if (!entries) return false;
+    for await (const handle of entries) {
+      if (!handle) continue;
+      if (handle.kind === 'file') return true;
+      if (handle.kind === 'directory') {
+        const child = handle as FileSystemDirectoryHandle;
+        if (await OPFSBridge.opfsDirectoryHasAnyFile(child)) return true;
+      }
+    }
+    return false;
   }
 
   /**
