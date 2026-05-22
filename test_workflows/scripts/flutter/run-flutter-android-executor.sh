@@ -79,7 +79,7 @@ _flutter_android_grep() {
 
 rac_tc_init_lane
 eval "${RAC_MCP_LAUNCH_CMD}" || true
-sleep "${RAC_FLUTTER_BOOT_WAIT_S:-25}"
+_flutter_wait_grep "Phase 1 complete" 90 || _flutter_wait_grep "${RAC_MARKER_SDK_INIT_DEV}" 90 || sleep "${RAC_FLUTTER_BOOT_WAIT_S:-25}"
 rac_mcp_shot "${RAC_SESSION_ROOT}/screenshots/000_after_launch.png"
 if _flutter_android_grep "${RAC_MARKER_SDK_INIT}" || _flutter_android_grep "Phase 1 complete"; then
   rac_tc_done tc01 PASS "Flutter SDK init in logcat" "screenshots/000_after_launch.png"
@@ -112,5 +112,7 @@ _flutter_wait_grep "${RAC_MARKER_STT_LOADED}" 240 || true
 export RAC_TC03_LAUNCH_WAIT_S="${RAC_TC03_LAUNCH_WAIT_S:-30}"
 rac_tc_drive_catalog
 _flutter_drive_deep_modalities
+_flutter_wait_grep "${RAC_MARKER_LLM_LOAD}" 120 || true
+_flutter_wait_grep "${RAC_MARKER_STT_LOADED}" 120 || true
 _flutter_final_regrade
 echo "Flutter Android executor: catalog + deep modality drive complete"
