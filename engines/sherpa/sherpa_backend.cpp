@@ -379,7 +379,18 @@ bool SherpaSTT::build_offline_recognizer_locked() {
   }
 
   recognizer_config.model_config.tokens = tokens_path_.c_str();
+#if defined(__EMSCRIPTEN__)
+  // ONNX Runtime tries to spawn an Eigen ThreadPool whenever
+  // num_threads > 1. The vendored sherpa-onnx-c-api WASM build links a
+  // single-threaded ONNX Runtime (the build script forces pthreads=OFF
+  // because the prebuilt .a was not compiled with pthread support). In a
+  // browser without a working pthread pool this aborts with
+  // "PosixThread: pthread_create failed". Run inference single-threaded
+  // on Web so the recognizer can come up without threading support.
+  recognizer_config.model_config.num_threads = 1;
+#else
   recognizer_config.model_config.num_threads = 2;
+#endif
   recognizer_config.model_config.debug = 1;
   recognizer_config.model_config.provider = "cpu";
 
