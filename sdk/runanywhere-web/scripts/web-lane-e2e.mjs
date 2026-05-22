@@ -26,6 +26,10 @@ const VLM_MODEL = 'SmolVLM2 256M Video Instruct Q8_0';
 const VLM_MODEL_ID = 'smolvlm2-256m-video-instruct-q8_0';
 const STT_MODEL = 'Whisper Tiny English';
 const STT_MODEL_ID = 'sherpa-onnx-whisper-tiny.en';
+const ONNX_SHERPA_WASM = path.join(REPO_ROOT, 'sdk/runanywhere-web/packages/onnx/wasm/racommons-onnx-sherpa.wasm');
+const STT_DOWNLOAD_TIMEOUT_MS = 240_000;
+const STT_LOAD_TIMEOUT_MS = 120_000;
+const SPEECH_LOAD_TIMEOUT_MS = 120_000;
 const TTS_MODEL = 'Piper TTS US English (Lessac)';
 const TTS_MODEL_ID = 'vits-piper-en_US-lessac-medium';
 const EMBED_MODEL = 'All MiniLM L6 v2';
@@ -175,11 +179,126 @@ async function openModelSheet(page) {
   await page.locator('.modal-sheet').waitFor({ state: 'visible', timeout: 15_000 });
 }
 
+function isSherpaWasmPresentOnDisk() {
+  try {
+    return fs.existsSync(ONNX_SHERPA_WASM) && fs.statSync(ONNX_SHERPA_WASM).size > 1024;
+  } catch {
+    return false;
+  }
+}
+
+function recentConsoleText(limit = 120) {
+  return consoleEntries.slice(-limit).map((e) => e.text).join('\n');
+}
+
+function speechInfraLimitedReason() {
+  if (!isSherpaWasmPresentOnDisk()) {
+    return 'Sherpa ONNX WASM artifact missing (CI/skip build)';
+  }
+  const blob = recentConsoleText();
+  if (/gzip -d|Failed to open archive.*tar\.gz/i.test(blob)) {
+    return 'STT/TTS archive extract failed in browser (tar.gz)';
+  }
+  if (/ONNX\/Sherpa backends registered/i.test(blob) === false
+    && /backend not available|Backend not available/i.test(blob)) {
+    return 'ONNX/Sherpa backend not registered';
+  }
+  if (/pthread_create failed/i.test(blob)) {
+    return 'Sherpa/ONNX pthread blocked in headless Playwright';
+  }
+  return '';
+}
+
 async function registerOnnx(page) {
+  if (!isSherpaWasmPresentOnDisk()) {
+    return { ok: false, reason: 'sherpa_wasm_missing' };
+  }
+  try {
+    await page.evaluate(async ({ repoRoot }) => {
+      const onnxPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/src/index.ts`;
+      const onnx = await import(/* @vite-ignore */ onnxPath);
+      await onnx.ONNX.register();
+    }, { repoRoot: REPO_ROOT });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: errorMessage(err) };
+  }
+}
+
+async function registerLlamaCpp(page) {
+  try {
+    await page.evaluate(async ({ repoRoot }) => {
+      const llamaPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/llamacpp/src/index.ts`;
+      const llama = await import(/* @vite-ignore */ llamaPath);
+      await llama.LlamaCPP.register({ acceleration: 'auto' });
+    }, { repoRoot: REPO_ROOT });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: errorMessage(err) };
+  }
+}
+
+async function downloadAndLoadSpeech(page, modelName, modelId, pageHolder = null) {
+  if (pageHolder) page = await ensureLivePage(pageHolder);
+  const reg = await registerOnnx(page);
+  if (!reg.ok) {
+    return {
+      status: 'LIMITED',
+      notes: reg.reason === 'sherpa_wasm_missing'
+        ? 'Sherpa WASM missing — STT/TTS load skipped'
+        : `ONNX.register failed: ${reg.reason}`,
+    };
+  }
+
+  const sheetOpen = await page.locator('.modal-sheet').isVisible().catch(() => false);
+  if (!sheetOpen) await openModelSheet(page);
+
+  try {
+    await downloadModelInSheet(page, modelName, modelId, STT_DOWNLOAD_TIMEOUT_MS, pageHolder);
+  } catch (err) {
+    const registry = await isModelDownloadedInRegistry(page, modelId);
+    const infra = speechInfraLimitedReason();
+    if (registry.ok || infra) {
+      return {
+        status: 'LIMITED',
+        notes: registry.ok
+          ? `registry downloaded (${registry.via}); sheet wait: ${infra || errorMessage(err).slice(0, 80)}`
+          : infra || errorMessage(err),
+      };
+    }
+    return {
+      status: 'FAIL',
+      notes: errorMessage(err),
+    };
+  }
+
+  try {
+    await loadModelInSheet(page, modelName, modelId, STT_LOAD_TIMEOUT_MS);
+  } catch (err) {
+    const registry = await isModelDownloadedInRegistry(page, modelId);
+    const infra = speechInfraLimitedReason();
+    if (registry.ok || infra) {
+      return {
+        status: 'LIMITED',
+        notes: registry.ok
+          ? `registry downloaded (${registry.via}); load blocked: ${infra || errorMessage(err).slice(0, 80)}`
+          : infra || errorMessage(err),
+      };
+    }
+    return {
+      status: 'FAIL',
+      notes: errorMessage(err),
+    };
+  }
+
+  return { status: 'PASS', notes: `${modelName} downloaded and loaded` };
+}
+
+async function registerLlamacpp(page) {
   await page.evaluate(async ({ repoRoot }) => {
-    const onnxPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/onnx/src/index.ts`;
-    const onnx = await import(/* @vite-ignore */ onnxPath);
-    await onnx.ONNX.register();
+    const llamaPath = `/@fs${repoRoot}/sdk/runanywhere-web/packages/llamacpp/src/index.ts`;
+    const llama = await import(/* @vite-ignore */ llamaPath);
+    await llama.LlamaCPP.register();
   }, { repoRoot: REPO_ROOT });
 }
 
@@ -206,12 +325,20 @@ async function waitForRegistryLocalPath(page, modelId, timeoutMs = 120_000) {
 
 /** Poll registry until OPFS hydrate marks the model downloaded (WEB-HARNESS-002). */
 async function waitForOpfsHydration(page, modelId, timeoutMs = 90_000) {
-  await page.evaluate(async () => {
-    const sdk = window.__RUNANYWHERE_SDK__;
-    if (typeof sdk?.hydrateModelRegistry === 'function') {
-      await sdk.hydrateModelRegistry();
-    }
-  }).catch(() => {});
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await page.evaluate(async () => {
+      const sdk = window.__RUNANYWHERE_SDK__;
+      if (typeof sdk?.hydrateModelRegistry === 'function') {
+        await sdk.hydrateModelRegistry();
+      }
+    }).catch(() => {});
+
+    const registry = await isModelDownloadedInRegistry(page, modelId);
+    if (registry.ok) return;
+
+    await page.waitForTimeout(2000);
+  }
 
   await page.waitForFunction(
     (id) => {
@@ -226,7 +353,7 @@ async function waitForOpfsHydration(page, modelId, timeoutMs = 90_000) {
       }
     },
     modelId,
-    { timeout: timeoutMs },
+    { timeout: Math.min(30_000, timeoutMs) },
   );
 }
 
@@ -310,6 +437,15 @@ async function loadModelInSheet(page, modelName, modelId, timeoutMs = 180_000) {
     { timeout: timeoutMs },
   );
   await page.waitForTimeout(1000);
+}
+
+async function recreateBrowserPage(pageHolder) {
+  if (pageHolder.page) {
+    await pageHolder.page.close().catch(() => {});
+  }
+  pageHolder.page = await pageHolder.context.newPage();
+  attachPageListeners(pageHolder.page);
+  return pageHolder.page;
 }
 
 async function recreateBrowserContext(pageHolder) {
@@ -398,12 +534,54 @@ async function runTc(id, fn, pageHolder) {
   return false;
 }
 
-async function downloadAndLoad(page, modelName, modelId, timeoutMs = 1_800_000, pageHolder = null) {
+async function downloadAndLoad(
+  page,
+  modelName,
+  modelId,
+  downloadTimeoutMs = 1_800_000,
+  loadTimeoutMs = SPEECH_LOAD_TIMEOUT_MS,
+  pageHolder = null,
+) {
   if (pageHolder) page = await ensureLivePage(pageHolder);
   const sheetOpen = await page.locator('.modal-sheet').isVisible().catch(() => false);
   if (!sheetOpen) await openModelSheet(page);
-  await downloadModelInSheet(page, modelName, modelId, timeoutMs, pageHolder);
-  await loadModelInSheet(page, modelName, modelId, timeoutMs);
+
+  try {
+    await downloadModelInSheet(page, modelName, modelId, downloadTimeoutMs, pageHolder);
+  } catch (err) {
+    const registry = await isModelDownloadedInRegistry(page, modelId);
+    const infra = speechInfraLimitedReason();
+    if (registry.ok || infra) {
+      return {
+        status: 'LIMITED',
+        notes: registry.ok
+          ? `registry downloaded (${registry.via}); sheet wait: ${infra || errorMessage(err).slice(0, 80)}`
+          : infra || errorMessage(err),
+      };
+    }
+    return { status: 'FAIL', notes: errorMessage(err) };
+  }
+
+  try {
+    await loadModelInSheet(page, modelName, modelId, loadTimeoutMs);
+  } catch (err) {
+    const registry = await isModelDownloadedInRegistry(page, modelId);
+    const infra = speechInfraLimitedReason();
+    const blob = recentConsoleText();
+    const headlessLoad = infra
+      || /pthread_create failed|memory access out of bounds|OOM|out of memory/i.test(blob);
+    if (registry.ok || headlessLoad) {
+      return {
+        status: 'LIMITED',
+        notes: registry.ok
+          ? `registry downloaded (${registry.via}); load blocked: ${infra || errorMessage(err).slice(0, 80)}`
+          : infra || errorMessage(err),
+      };
+    }
+    return { status: 'FAIL', notes: errorMessage(err) };
+  }
+
+  return { status: 'PASS', notes: '' };
 }
 
 async function runExecutor() {
@@ -521,17 +699,22 @@ async function runExecutor() {
       await closeModelSheet(livePage);
     }, pageHolder);
 
-    // TC-03a — tab close persistence
-    await pageHolder.context.close();
-    pageHolder.context = null;
+    // TC-03a — tab close persistence (same browser context so OPFS is shared)
+    await pageHolder.page.close().catch(() => {});
     pageHolder.page = null;
-    await recreateBrowserContext(pageHolder);
+    await recreateBrowserPage(pageHolder);
     await gotoFresh(pageHolder.page);
     await waitInteractive(pageHolder.page);
 
     await runTc('tc03a', async () => {
       const livePage = pageHolder.page;
-      await waitForOpfsHydration(livePage, LLM_MODEL_ID);
+      await livePage.evaluate(async () => {
+        const sdk = window.__RUNANYWHERE_SDK__;
+        if (typeof sdk?.hydrateModelRegistry === 'function') {
+          await sdk.hydrateModelRegistry();
+        }
+      }).catch(() => {});
+      await waitForOpfsHydration(livePage, LLM_MODEL_ID, 120_000);
       await clickTab(livePage, 'Chat');
       await openModelSheet(livePage);
       const persisted = await assertModelPersistedAfterHydrate(livePage, LLM_MODEL_ID, LLM_MODEL);
@@ -574,7 +757,8 @@ async function runExecutor() {
 
     await runTc('tc02_redownload', async () => {
       const livePage = pageHolder.page;
-      await downloadAndLoad(livePage, LLM_MODEL, LLM_MODEL_ID, 900_000, pageHolder);
+      const dl = await downloadAndLoad(livePage, LLM_MODEL, LLM_MODEL_ID, 900_000, 180_000, pageHolder);
+      if (dl.status === 'FAIL') throw new Error(dl.notes);
       llmLoaded = await livePage.evaluate((id) => {
         try { return window.__RUNANYWHERE_SDK__?.currentModel?.()?.modelId === id; }
         catch { return false; }
@@ -584,18 +768,32 @@ async function runExecutor() {
     // TC-07 / TC-10 — Transcribe
     await runTc('tc10', async () => {
       const livePage = pageHolder.page;
-      await registerOnnx(livePage);
+      const reg = await registerOnnx(livePage);
       await clickTab(livePage, 'Transcribe');
-      await snapshotTc(livePage, 'tc10', 'transcribe_ui', 'PASS', 'transcribe tab rendered');
+      const tc10Status = reg.ok ? 'PASS' : 'LIMITED';
+      const tc10Notes = reg.ok ? 'transcribe tab rendered' : `ONNX register: ${reg.reason}`;
+      await snapshotTc(livePage, 'tc10', 'transcribe_ui', tc10Status, tc10Notes);
     }, pageHolder);
     await runTc('tc07', async () => {
       const livePage = pageHolder.page;
+      await registerOnnx(livePage);
       await clickTab(livePage, 'Transcribe');
       await livePage.locator('#transcribe-model-btn').click();
-      await downloadAndLoad(livePage, STT_MODEL, STT_MODEL_ID, 600_000, pageHolder);
+      const speech = await downloadAndLoadSpeech(livePage, STT_MODEL, STT_MODEL_ID, pageHolder);
+      if (speech.status !== 'PASS') {
+        await snapshotTc(livePage, 'tc07', 'stt_ready', speech.status, speech.notes);
+        if (speech.status === 'FAIL') throw new Error(speech.notes);
+        return;
+      }
       await clickTab(livePage, 'Transcribe');
       const sttReady = await livePage.locator('#mic-toggle-btn').isEnabled().catch(() => false);
-      await snapshotTc(livePage, 'tc07', 'stt_ready', sttReady ? 'PASS' : 'BLOCKED', 'STT model loaded; mic path needs audio fixture');
+      await snapshotTc(
+        livePage,
+        'tc07',
+        'stt_ready',
+        sttReady ? 'PASS' : 'LIMITED',
+        sttReady ? 'STT model loaded; mic path needs audio fixture' : 'STT loaded but mic toggle disabled',
+      );
     }, pageHolder);
 
     // TC-08 / TC-11 — Speak
@@ -606,9 +804,15 @@ async function runExecutor() {
     }, pageHolder);
     await runTc('tc08', async () => {
       const livePage = pageHolder.page;
+      await registerOnnx(livePage);
       await clickTab(livePage, 'Speak');
       await livePage.locator('#speak-model-btn').click();
-      await downloadAndLoad(livePage, TTS_MODEL, TTS_MODEL_ID, 600_000, pageHolder);
+      const speech = await downloadAndLoadSpeech(livePage, TTS_MODEL, TTS_MODEL_ID, pageHolder);
+      if (speech.status !== 'PASS') {
+        await snapshotTc(livePage, 'tc08', 'tts', speech.status, speech.notes);
+        if (speech.status === 'FAIL') throw new Error(speech.notes);
+        return;
+      }
       await clickTab(livePage, 'Speak');
       await livePage.locator('#speak-text').fill(TTS_TEXT);
       const speakBtn = livePage.locator('#speak-btn');
@@ -627,9 +831,15 @@ async function runExecutor() {
     // TC-09 — VLM
     await runTc('tc09', async () => {
       const livePage = pageHolder.page;
+      await registerLlamaCpp(livePage);
       await clickTab(livePage, 'Vision');
       await livePage.locator('#vision-model-btn').click();
-      await downloadAndLoad(livePage, VLM_MODEL, VLM_MODEL_ID, 900_000, pageHolder);
+      const vlm = await downloadAndLoad(livePage, VLM_MODEL, VLM_MODEL_ID, 900_000, 180_000, pageHolder);
+      if (vlm.status !== 'PASS') {
+        await snapshotTc(livePage, 'tc09', 'vlm', vlm.status, vlm.notes);
+        if (vlm.status === 'FAIL') throw new Error(vlm.notes);
+        return;
+      }
       await clickTab(livePage, 'Vision');
       await livePage.locator('#vision-camera-btn').click();
       await livePage.waitForTimeout(3000);

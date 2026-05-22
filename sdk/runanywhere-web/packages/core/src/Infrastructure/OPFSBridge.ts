@@ -512,6 +512,24 @@ export class OPFSBridge {
     }
   }
 
+  /** True when an OPFS model directory contains at least one file (post tar.gz extract). */
+  static async directoryHasArtifacts(dirSegments: string[]): Promise<boolean> {
+    if (!isOPFSSupported()) return false;
+    try {
+      const dir = await resolveOPFSDirectory(dirSegments, false);
+      if (!dir) return false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const entries = (dir as any).values?.() ?? null;
+      if (!entries) return false;
+      for await (const handle of entries) {
+        if (handle?.kind === 'file') return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Write `bytes` directly to an OPFS file at the given path segments.
    * Creates intermediate directories as needed.

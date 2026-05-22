@@ -22,6 +22,7 @@ import {
   SDKEnvironment,
   InferenceFramework,
   ModelFileRole,
+  ModelArtifactType,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -300,6 +301,55 @@ function primaryFilenameFromModel(model: ModelInfo): string | null {
   const url = model.downloadUrl ?? '';
   const trailing = url.split('?')[0].split('/').pop() ?? '';
   return trailing.length > 0 ? trailing : null;
+}
+
+function isTarGzArchiveArtifact(model: ModelInfo): boolean {
+  return model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
+}
+
+function opfsModelDirectory(model: ModelInfo): string | null {
+  const dir = frameworkOPFSDir(model.framework as InferenceFramework);
+  if (!dir) return null;
+  return `/opfs/RunAnywhere/Models/${dir}/${model.id}`;
+}
+
+/** Registry path after download/extract — archives hydrate as model dirs, not .tar.gz files. */
+function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): string {
+  const modelDir = opfsModelDirectory(model);
+  if (modelDir && isTarGzArchiveArtifact(model)) {
+    return modelDir;
+  }
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  if (modelDir && isMultiFile) {
+    return modelDir;
+  }
+  return reportedPath;
+}
+
+async function resolveHydratedModelPath(
+  model: ModelInfo,
+  frameworkDir: string,
+): Promise<{ exists: boolean; localPath: string }> {
+  const modelDir = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`;
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  if (isMultiFile || isTarGzArchiveArtifact(model)) {
+    const hasDir = await OPFSBridge.directoryHasArtifacts([
+      'RunAnywhere',
+      'Models',
+      frameworkDir,
+      model.id,
+    ]);
+    if (hasDir) {
+      return { exists: true, localPath: modelDir };
+    }
+  }
+  const filename = primaryFilenameFromModel(model);
+  if (!filename) {
+    return { exists: false, localPath: modelDir };
+  }
+  const opfsPath = `${modelDir}/${filename}`;
+  const exists = await OPFSBridge.exists(opfsPath);
+  return { exists, localPath: exists ? opfsPath : modelDir };
 }
 
 async function fetchFileBytes(
@@ -1017,7 +1067,8 @@ export const RunAnywhere = {
     // localPath + isDownloaded into every module so harness/UI polls succeed.
     if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
       try {
-        mirrorDownloadCompletionToRegistry(model, lastProgress.localPath);
+        const registryPath = registryLocalPathForDownload(model, lastProgress.localPath);
+        mirrorDownloadCompletionToRegistry(model, registryPath);
       } catch (err) {
         logger.debug(
           `post-download registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -1049,11 +1100,7 @@ export const RunAnywhere = {
       const dir = frameworkOPFSDir(existing.framework as InferenceFramework);
       if (!dir) continue;
 
-      const filename = primaryFilenameFromModel(existing);
-      if (!filename) continue;
-
-      const opfsPath = `/opfs/RunAnywhere/Models/${dir}/${existing.id}/${filename}`;
-      const exists = await OPFSBridge.exists(opfsPath);
+      const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
 
       // WEB-REDOWNLOAD-WAIT-001: clearSiteStorage (or manual OPFS purge)
       // wipes bytes but the registry can still report isDownloaded=true from
@@ -1070,11 +1117,6 @@ export const RunAnywhere = {
       }
 
       if (existing.localPath && existing.isDownloaded) continue;
-
-      const isMultiFile = (existing.multiFile?.files?.length ?? 0) > 1;
-      const localPath = isMultiFile
-        ? `/opfs/RunAnywhere/Models/${dir}/${existing.id}`
-        : opfsPath;
 
       try {
         ModelRegistryCapability.updateModel({ ...existing, localPath, isDownloaded: true });
