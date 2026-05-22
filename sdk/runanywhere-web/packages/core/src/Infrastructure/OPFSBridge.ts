@@ -317,10 +317,13 @@ export class OPFSBridge {
 
     if (allModules.length === 0) return;
 
-    // Directory artifacts are mirrored back to MEMFS lazily on-demand via
-    // ensureModelPathReadyForLoad (per file); skip the file-shaped MEMFS-max
-    // check that does not apply to directories.
-    if (isDirectoryArtifact) return;
+    // Directory artifacts: mirror the entire tree into every module's MEMFS so
+    // a subsequent loadModel that runs in a non-downloader module (e.g. Sherpa
+    // STT loading a directory that commons extracted) can find the files.
+    if (isDirectoryArtifact) {
+      await OPFSBridge.restoreDirectoryToMemfsAll(allModules, localPath);
+      return;
+    }
 
     await OPFSBridge.restoreToMemfsAll(allModules, localPath);
     const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, localPath);
@@ -349,21 +352,102 @@ export class OPFSBridge {
     path: string,
   ): Promise<void> {
     if (modules.length === 0) return;
-    if (!pathToOPFSSegments(path)) return;
+    const segments = pathToOPFSSegments(path);
+    if (!segments) return;
 
-    let memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
+    // Fast-path: any module already has the file in MEMFS with bytes.
+    const memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
     if (memfsMax > 0) return;
 
-    if (isOPFSSupported() && !(await OPFSBridge.exists(path))) {
-      throw new Error(`Model load failed: '${path}' not found in OPFS`);
+    // Detect whether the OPFS counterpart is a file or a directory (tar.gz
+    // extract). Sherpa STT/TTS and VLM artifacts are directories; the
+    // file-only restore path leaves MEMFS empty so the C++ backend fails
+    // with "Model path does not exist".
+    const opfsSupported = isOPFSSupported();
+    if (opfsSupported) {
+      if (await OPFSBridge.isOPFSDirectory(segments)) {
+        await OPFSBridge.restoreDirectoryToMemfsAll(modules, path);
+        return;
+      }
+      if (!(await OPFSBridge.exists(path))) {
+        throw new Error(`Model load failed: '${path}' not found in OPFS`);
+      }
     }
 
     await OPFSBridge.restoreToMemfsAll(modules, path);
-    memfsMax = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
-    if (memfsMax === 0) {
+    const memfsMaxRetry = OPFSBridge.maxMemfsFileSizeAcrossModules(modules, path);
+    if (memfsMaxRetry === 0) {
       throw new Error(
         `Model load failed: '${path}' has 0 bytes in MEMFS after OPFS restore`,
       );
+    }
+  }
+
+  /** True when `segments` resolves to a directory handle in OPFS. */
+  static async isOPFSDirectory(segments: string[]): Promise<boolean> {
+    if (!isOPFSSupported()) return false;
+    try {
+      const dir = await resolveOPFSDirectory(segments, false);
+      return dir != null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Recursively restore every file under an OPFS directory tree into the
+   * matching MEMFS path of each module. Directory entries are mkdir'd; file
+   * entries are read from OPFS and written via FS.writeFile.
+   */
+  static async restoreDirectoryToMemfsAll(
+    modules: ModuleLike[],
+    dirPath: string,
+  ): Promise<void> {
+    if (!isOPFSSupported()) return;
+    const segments = pathToOPFSSegments(dirPath);
+    if (!segments) return;
+    const dir = await resolveOPFSDirectory(segments, false);
+    if (!dir) return;
+    for (const module of modules) {
+      const fs = getFS(module);
+      if (!fs) continue;
+      ensureMemfsDirectory(fs, dirPath);
+      await OPFSBridge.restoreOPFSDirToFs(dir, dirPath, fs);
+    }
+  }
+
+  private static async restoreOPFSDirToFs(
+    dir: FileSystemDirectoryHandle,
+    dirPath: string,
+    fs: EmscriptenFS,
+  ): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const entries = (dir as any).entries?.() ?? null;
+    if (!entries) return;
+    for await (const [name, handle] of entries) {
+      const childPath = `${dirPath}/${name}`;
+      if (handle.kind === 'file') {
+        try {
+          const fileHandle = handle as FileSystemFileHandle;
+          const bytes = await readBytesFromOPFSFile(fileHandle);
+          const parent = childPath.slice(0, childPath.lastIndexOf('/')) || '/';
+          ensureMemfsDirectory(fs, parent);
+          fs.writeFile(childPath, bytes);
+        } catch (err) {
+          logger.warning(
+            `restoreDirectoryToMemfsAll: failed to write '${childPath}' to MEMFS: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      } else if (handle.kind === 'directory') {
+        ensureMemfsDirectory(fs, childPath);
+        await OPFSBridge.restoreOPFSDirToFs(
+          handle as FileSystemDirectoryHandle,
+          childPath,
+          fs,
+        );
+      }
     }
   }
 
