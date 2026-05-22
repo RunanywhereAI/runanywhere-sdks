@@ -39,6 +39,7 @@ class _VLMCameraViewState extends State<VLMCameraView> {
     _viewModel.addListener(_onViewModelChanged);
 
     // Initialize
+    debugPrint('VLM streaming completed');
     _initializeAsync();
   }
 

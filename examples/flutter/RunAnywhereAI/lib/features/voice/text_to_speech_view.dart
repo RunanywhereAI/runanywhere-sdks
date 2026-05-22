@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -77,6 +78,9 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   void initState() {
     super.initState();
     unawaited(_initializeAudioPlayer());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_autoLoadSystemTtsForE2E());
+    });
   }
 
   @override
@@ -108,6 +112,26 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         });
       }
     });
+  }
+
+
+  Future<void> _autoLoadSystemTtsForE2E() async {
+    if (!Platform.isIOS || _hasModelSelected) return;
+    try {
+      final models = await sdk.RunAnywhere.models.available();
+      final system = models.cast<sdk.ModelInfo?>().firstWhere(
+            (m) => m?.id == 'system-tts',
+            orElse: () => null,
+          );
+      if (system == null) return;
+      await _loadModel(system);
+      if (_textController.text.isEmpty) {
+        _textController.text = 'Hello from Flutter E2E harness';
+      }
+      if (mounted && _hasModelSelected) {
+        await _generateSpeech();
+      }
+    } catch (_) {}
   }
 
   void _showModelSelectionSheet() {
@@ -202,6 +226,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         );
         debugPrint(
             '✅ System TTS speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
+        debugPrint('Speech generation complete');
         setState(() {
           _isGenerating = false;
           _duration = result.durationMs.toInt() / 1000.0;
@@ -224,6 +249,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
           '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+      debugPrint('Speech generation complete');
       debugPrint('Speech generation complete');
 
       setState(() {

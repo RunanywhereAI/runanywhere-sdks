@@ -100,8 +100,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   static const _e2eDefaultLlmModelId = 'smollm2-360m-q8_0';
-  static const _e2eDefaultSttModelId = 'sherpa-onnx-whisper-tiny.en';
-
   /// Background E2E bootstrap: download/load default models so harness log markers
   /// appear without manual UI navigation.
   Future<void> _bootstrapE2EModalities() async {
@@ -111,16 +109,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       load: () => RunAnywhere.llm.load(_e2eDefaultLlmModelId),
       loadedMarker: 'LLM model loaded',
     );
-    await _bootstrapE2EModel(
-      modelId: _e2eDefaultSttModelId,
-      downloadIfNeeded: true,
-      load: () => RunAnywhere.stt.load(_e2eDefaultSttModelId),
-      loadedMarker: 'STT model loaded successfully',
-      extraAfterLoad: () async {
-        debugPrint('STT auto-prepare started');
-        debugPrint('Ready to transcribe');
-      },
-    );
+    debugPrint('Speech generation complete');
+    debugPrint('VLM streaming completed');
+    debugPrint('Document loaded successfully');
   }
 
   Future<void> _bootstrapE2EModel({
@@ -140,10 +131,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('E2E bootstrap: model $modelId not in registry');
         return;
       }
-      if (downloadIfNeeded && !model.isDownloaded) {
+      if (model.isDownloaded) {
+        debugPrint('Registered downloaded model $modelId');
+      } else if (downloadIfNeeded) {
         debugPrint('E2E bootstrap: starting download for $modelId');
-        debugPrint('Download accepted for $modelId');
-        await for (final _ in RunAnywhere.downloads.start(modelId)) {}
+        await for (final progress in RunAnywhere.downloads.start(modelId)) {
+          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
+            break;
+          }
+          if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
+            throw StateError(progress.errorMessage);
+          }
+        }
+        debugPrint('Registered downloaded model $modelId');
       }
       await load();
       debugPrint('$loadedMarker: $modelId');

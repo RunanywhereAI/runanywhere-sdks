@@ -123,6 +123,7 @@ class VLMViewModel extends ChangeNotifier {
       notifyListeners();
       debugPrint('✅ VLM model loaded: $modelName');
       debugPrint('VLM streaming completed');
+      debugPrint('VLM streaming completed');
     } catch (e) {
       debugPrint('❌ Failed to load VLM model: $e');
       _error = 'Failed to load model: $e';

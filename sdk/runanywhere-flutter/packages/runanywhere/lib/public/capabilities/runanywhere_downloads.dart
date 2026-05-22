@@ -122,6 +122,10 @@ class RunAnywhereDownloads {
       return;
     }
 
+    logger.info(
+      'Download accepted for $modelId (task=${startResult.taskId})',
+    );
+
     if (startResult.hasInitialProgress()) {
       yield startResult.initialProgress;
       if (_isTerminalState(startResult.initialProgress.state)) {

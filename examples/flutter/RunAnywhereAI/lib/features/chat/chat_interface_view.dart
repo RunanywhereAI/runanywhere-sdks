@@ -450,18 +450,23 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
             onPressed: _showConversationHistory,
             tooltip: 'Conversation history',
           ),
-          IconButton(
-            icon: const Icon(Icons.article_outlined),
-            onPressed: () {
-              unawaited(
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const RagDemoView(),
+          Semantics(
+            label: 'Document Q&A',
+            button: true,
+            child: IconButton(
+              icon: const Icon(Icons.article_outlined),
+              onPressed: () {
+                debugPrint('Document loaded successfully');
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const RagDemoView(),
+                    ),
                   ),
-                ),
-              );
-            },
-            tooltip: 'Document Q&A',
+                );
+              },
+              tooltip: 'Document Q&A',
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.data_object),

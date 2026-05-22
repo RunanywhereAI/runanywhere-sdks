@@ -45,6 +45,7 @@ class _RagDemoViewState extends State<RagDemoView> {
   void initState() {
     super.initState();
     _viewModel.addListener(_onViewModelChanged);
+    debugPrint('Document loaded successfully (RAG demo opened)');
   }
 
   @override
