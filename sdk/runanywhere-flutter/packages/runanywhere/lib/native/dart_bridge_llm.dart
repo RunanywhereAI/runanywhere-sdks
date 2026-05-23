@@ -177,7 +177,31 @@ class DartBridgeLLM {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        callback = NativeCallable<RacLlmStreamProtoCallbackNative>.listener((
+        // FLUTTER-IOS-006 / FLUTTER-AND-PROTO-002: use `isolateLocal` (not
+        // `.listener`) so the callback runs synchronously on the same
+        // thread that invoked `rac_llm_generate_stream_proto`. The commons
+        // producer (`dispatch_stream_event` in rac_llm_proto_service.cpp:353)
+        // serializes into a `thread_local std::vector<uint8_t> scratch` slot
+        // and immediately calls the callback with `scratch.data()`. With
+        // `.listener` mode the callback is queued onto the Dart isolate's
+        // event loop and runs ASYNCHRONOUSLY — by then a subsequent token
+        // emission has already resized/overwritten the `scratch` slot,
+        // leaving the captured pointer pointing at partially-overwritten
+        // bytes. The decode then fails with `Protocol message end-group tag
+        // did not match expected tag` (FLUTTER-IOS-006) or
+        // `InvalidProtocolBufferException: invalid tag (zero)`
+        // (FLUTTER-AND-PROTO-002).
+        //
+        // `isolateLocal` is safe here because:
+        //   1. `rac_llm_generate_stream_proto` runs synchronously on the
+        //      caller's thread (the Dart isolate).
+        //   2. The engine vtable's `generate_stream` (llamacpp, onnx, etc.)
+        //      iterates tokens on that same thread, invoking the proto
+        //      callback synchronously per token.
+        //   3. Therefore the callback always fires on the Dart isolate that
+        //      created it — the exact precondition `isolateLocal` requires.
+        callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
+            (
           Pointer<Uint8> bytesPtr,
           int bytesLen,
           Pointer<Void> _,

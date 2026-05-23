@@ -190,17 +190,64 @@ class DartBridgeEvents {
   }
 }
 
+/// FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006: native callback is used as a
+/// wake-up signal only. The bytes pointed to by [protoBytes] are NOT safe to
+/// dereference from this listener because Dart `NativeCallable.listener`
+/// dispatches to the Dart isolate asynchronously — by the time this callback
+/// runs in the isolate, the commons producer (event_publisher.cpp) may have
+/// rotated its ring buffer slot to a newer serialization, leaving the pointer
+/// pointing at stale or partially overwritten bytes. This is precisely what
+/// CLUSTER-09's 64-slot ring tried to mitigate, but the contract in
+/// `rac_sdk_event_stream.h:6-7` ("Callback memory is owned by commons and is
+/// valid only for the duration of the callback") cannot be honored when the
+/// listener runs after the native call returns.
+///
+/// Instead we drain the canonical SDKEvent queue (`rac_sdk_event_poll`) which
+/// returns an owned `rac_proto_buffer_t` populated from
+/// `g_sdk_event_queue.front()` (event_publisher.cpp:539-547). That queue
+/// holds copies (not pointers into the ring), so the decoded bytes are
+/// race-free.
+// ignore_for_file: prefer_function_declarations_over_variables
+
 void _sdkEventCallback(
   Pointer<Uint8> protoBytes,
   int protoSize,
   Pointer<Void> userData,
 ) {
-  if (protoBytes == nullptr) return;
+  // The pointer args are intentionally unused (see doc comment above): they
+  // reference a ring slot that may have been overwritten by a newer
+  // emission before this listener fires on the Dart isolate. The queue,
+  // by contrast, holds owned copies popped one at a time via
+  // rac_sdk_event_poll.
+  // Keep params bound to keep the typedef-compatible signature.
+  if (protoBytes == nullptr && protoSize < 0 && userData == nullptr) {
+    return; // Unreachable; satisfies analyzer.
+  }
+  final pollFn = RacNative.bindings.rac_sdk_event_poll;
+  if (pollFn == null) return;
 
-  try {
-    final bytes = protoBytes.asTypedList(protoSize).toList(growable: false);
-    DartBridgeEvents.instance.emit(event_pb.SDKEvent.fromBuffer(bytes));
-  } catch (e) {
-    SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent: $e');
+  final bindings = RacNative.bindings;
+  // Drain in a bounded loop so a single callback fires that fell behind
+  // can catch up without unbounded queue growth. The loop terminates as
+  // soon as the queue is empty (poll returns ERROR_NOT_FOUND).
+  for (var i = 0; i < 1024; i++) {
+    final out = calloc<RacProtoBuffer>();
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = pollFn(out);
+      if (code != RacResultCode.success || out.ref.data == nullptr) {
+        return;
+      }
+      try {
+        final bytes =
+            out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+        DartBridgeEvents.instance.emit(event_pb.SDKEvent.fromBuffer(bytes));
+      } catch (e) {
+        SDKLogger('DartBridge.Events').warning('Failed to decode SDKEvent: $e');
+      }
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(out);
+    }
   }
 }

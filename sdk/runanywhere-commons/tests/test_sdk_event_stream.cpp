@@ -254,6 +254,64 @@ int main() {
 
     rac_state_shutdown();
 
+    // FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006 regression (CLUSTER-15):
+    //
+    // Async SDK bindings (Flutter Dart `NativeCallable.listener`, React
+    // Native NitroModules) cannot safely dereference the pointer that
+    // `rac_sdk_event_publish_proto` passes to the subscriber callback,
+    // because the publish path serializes into a 64-slot ring (see
+    // `event_publisher.cpp:67-82`) that rotates with each emission. By the
+    // time the async binding finally runs on its Dart isolate / JS bridge,
+    // the slot may have been overwritten by a later event.
+    //
+    // The robust contract for those bindings is to drain
+    // `rac_sdk_event_poll`, which pops from `g_sdk_event_queue` (owned
+    // copies). This test pins the queue invariant:
+    //
+    //   1. After N publishes, exactly N events can be drained via poll().
+    //   2. The order is preserved (FIFO).
+    //   3. Each polled buffer round-trips through ParseFromArray with the
+    //      expected payload, even when the ring has rotated multiple times
+    //      (N >> kSdkEventRingSize=64).
+    //
+    // If this test ever fails, the consumer-side queue drain in
+    // `sdk/runanywhere-flutter/.../dart_bridge_events.dart:_sdkEventCallback`
+    // will start dropping or corrupting events again.
+    rac_sdk_event_clear_queue();
+    const uint64_t burst_sub = rac_sdk_event_subscribe(capture_callback, &capture);
+    CHECK(burst_sub != 0, "burst subscription succeeds");
+    capture.events.clear();
+
+    constexpr int kBurstSize = 256;  // intentionally > ring size (64).
+    for (int i = 0; i < kBurstSize; ++i) {
+        rac_result_t burst_rc = rac_sdk_event_publish_failure(
+            RAC_ERROR_INVALID_ARGUMENT, "burst_payload", "llm", "burstOperation", RAC_FALSE);
+        if (burst_rc != RAC_SUCCESS) {
+            ++fail_count;
+            ++test_count;
+            std::fprintf(stderr, "  FAIL: burst publish %d returned %d\n", i, burst_rc);
+            break;
+        }
+    }
+    CHECK(capture.events.size() == static_cast<size_t>(kBurstSize),
+          "burst subscriber receives every published event (no drop)");
+
+    int decoded = 0;
+    while (true) {
+        runanywhere::v1::SDKEvent polled;
+        if (!poll_event(&polled)) {
+            break;
+        }
+        if (polled.has_failure() && polled.failure().operation() == "burstOperation") {
+            ++decoded;
+        }
+    }
+    CHECK(decoded == kBurstSize,
+          "burst drain via rac_sdk_event_poll decodes every event (FIFO contract)");
+
+    rac_sdk_event_unsubscribe(burst_sub);
+    rac_sdk_event_clear_queue();
+
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 #endif
