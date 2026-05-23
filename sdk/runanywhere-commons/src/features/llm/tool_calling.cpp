@@ -2600,7 +2600,7 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
             // LFM2 format - enhanced with more math examples for better reliability
             example += "## OUTPUT FORMAT\n";
             example += "You MUST respond with ONLY a tool call in this exact format:\n";
-            example += "<|tool_call_start|>[function_name(param=\"value\")]<|tool_call_end|>\n\n";
+            example += "<|tool_call_start|>[<tool_name>(<param>=\"<value>\")]<|tool_call_end|>\n\n";
             example +=
                 "CRITICAL: Always include the FULL format with <|tool_call_start|> and "
                 "<|tool_call_end|> tags.\n\n";
@@ -2626,8 +2626,8 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
             example += "## OUTPUT FORMAT\n";
             example += "You MUST respond with ONLY a tool call in this exact format:\n";
             example +=
-                "<tool_call>{\"tool\": \"function_name\", \"arguments\": {\"param\": "
-                "\"value\"}}</tool_call>\n\n";
+                "<tool_call>{\"tool\": \"<tool_name>\", \"arguments\": {\"<param>\": "
+                "\"<value>\"}}</tool_call>\n\n";
             example += "## EXAMPLES\n";
             example += "Q: What's the weather in NYC?\n";
             example +=

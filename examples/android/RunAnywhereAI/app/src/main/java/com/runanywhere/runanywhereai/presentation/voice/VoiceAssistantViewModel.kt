@@ -597,7 +597,11 @@ class VoiceAssistantViewModel(
      * iOS Reference: After selection, sync with SDK to get actual load state
      *
      * Note: The model is already loaded by ModelSelectionBottomSheet before this callback.
-     * We sync with SDK to get the actual load state instead of resetting to NOT_LOADED.
+     * Mirrors iOS `VoiceAgentViewModel.setTTSModel` (`ttsModelState = .loaded`):
+     * we optimistically mark the TTS load state as READY before syncing with the
+     * SDK so the "Start Voice Assistant" button enables immediately when System
+     * TTS is selected (System TTS has no model artifact, so `syncModelStates`
+     * cannot derive READY from a `tts` slot).
      */
     fun setTTSModel(
         framework: String,
@@ -607,7 +611,9 @@ class VoiceAssistantViewModel(
         _uiState.update {
             it.copy(
                 ttsModel = SelectedModel(framework, name, modelId),
-                // Don't reset ttsLoadState - model may already be loaded by ModelSelectionBottomSheet
+                // iOS parity: optimistically mark TTS as READY so callers don't
+                // need to wait on `syncModelStates` to enable Start.
+                ttsLoadState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY,
             )
         }
         Timber.i("TTS model selected: $name ($modelId)")

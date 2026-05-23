@@ -263,7 +263,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         ) {
             StorageOverviewRow(
                 icon = Icons.Filled.Storage,
-                label = "Total Usage",
+                // CLUSTER-08 / KOTLIN-AND-HARNESS-001: value comes from
+                // `StorageInfo.device.total_bytes` (device total disk size),
+                // not used-storage — rename label to match what's displayed.
+                label = "Total Disk Size",
                 value = Formatter.formatFileSize(context, uiState.totalStorageSize),
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

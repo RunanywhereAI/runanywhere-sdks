@@ -38,6 +38,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 // its ELF `__attribute__((constructor))` auto-registers the ONNX engine plugin
 // (which provides embedding_ops, required for RAG pipeline creation). Loads
 // are try/catch-wrapped so apps without those modules aren't blocked.
+//
+// CLUSTER-08 / KOTLIN-AND-RAG-002: `librac_backend_rag_jni.so` is currently
+// not packaged for arm64-v8a in many builds. The ONNX engine plugin
+// (`librac_backend_onnx.so`) is the canonical RAG backend and provides
+// embedding_ops; the RAG flow works end-to-end without the JNI shim. The
+// shim's absence is therefore demoted to DEBUG to avoid alarming users while
+// still being observable for backend development. The ONNX load failure
+// remains a WARNING because it really does block RAG pipeline creation.
 private val ragNativeLibsLoaded = AtomicBoolean(false)
 
 private fun ensureRagNativeLibsLoaded() {
@@ -46,7 +54,8 @@ private fun ensureRagNativeLibsLoaded() {
     try {
         System.loadLibrary("rac_backend_rag_jni")
     } catch (e: UnsatisfiedLinkError) {
-        logger.warning("rac_backend_rag_jni not present: ${e.message}")
+        // Optional JNI shim; ONNX engine plugin handles RAG without it.
+        logger.debug("rac_backend_rag_jni not present (optional): ${e.message}")
     }
     try {
         System.loadLibrary("rac_backend_onnx")
