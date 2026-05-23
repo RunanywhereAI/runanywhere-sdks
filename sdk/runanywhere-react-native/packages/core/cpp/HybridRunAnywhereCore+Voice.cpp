@@ -53,12 +53,20 @@ std::shared_ptr<ArrayBuffer> emptyVoiceProtoBuffer() {
 
 std::shared_ptr<ArrayBuffer> copyVoiceProtoBuffer(rac_proto_buffer_t& protoBuffer,
                                                   const char* operation) {
+    // Mirrors the canonical JNI thunk in commons (runanywhere_commons_jni.cpp
+    // `makeProtoCallResult` / `makeProtoBufferByteArray`): when the proto
+    // buffer carries a typed error (status != RAC_SUCCESS), surface it to the
+    // JS layer as a real exception with the typed `error_message`. Returning
+    // an empty ArrayBuffer here swallows the typed error and forces every
+    // JS consumer to throw a generic `protoDecodeFailed(operation)` instead
+    // of the actual reason (e.g. "VAD lifecycle model is not loaded").
     if (protoBuffer.status != RAC_SUCCESS) {
-        if (protoBuffer.error_message) {
-            LOGE("%s proto error: %s", operation, protoBuffer.error_message);
-        }
+        const std::string message = protoBuffer.error_message && protoBuffer.error_message[0]
+            ? std::string(protoBuffer.error_message)
+            : std::string(rac_error_message(protoBuffer.status));
+        LOGE("%s proto error: %s", operation, message.c_str());
         proto_compat::freeBuffer(&protoBuffer);
-        return emptyVoiceProtoBuffer();
+        throw std::runtime_error(std::string(operation) + ": " + message);
     }
     if (!protoBuffer.data || protoBuffer.size == 0) {
         proto_compat::freeBuffer(&protoBuffer);

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -21,6 +21,11 @@ import {
   ToolParameterType,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LoRAAdapterConfig } from '@runanywhere/proto-ts/lora_options';
+import {
+  ModelCategory,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing } from '../theme/spacing';
@@ -34,6 +39,15 @@ const ACTION_LOG_PREFIX = '[RN_VALIDATION_ACTION]';
 // "LoRA fixture deployment" for the per-platform copy commands
 // (RN-AND-005 / RN-IOS-007).
 const FIXTURE_ADAPTER_PATH = `${RNFS.DocumentDirectoryPath}/lora/identity-adapter.gguf`;
+// Mirrors Voice Assistant Setup in the iOS app (VoiceAgentViewModel.swift):
+// vad.synthetic_* actions invoke RunAnywhere.detectVoiceActivity, which in
+// turn calls rac_vad_process_lifecycle_proto. Without a loaded VAD model the
+// commons ABI returns "VAD lifecycle model is not loaded" — the harness must
+// load silero-vad up-front so the synthetic_silence / synthetic_tone actions
+// have a deterministic precondition (CLUSTER-03 / RN-VAD-001).
+const SILERO_VAD_MODEL_ID = 'silero-vad';
+
+type VadReadiness = 'idle' | 'loading' | 'ready' | 'failed';
 
 type HarnessStatus = 'PASS' | 'FAIL' | 'EXPECTED_ERROR';
 
@@ -151,6 +165,54 @@ const getErrorMessage = (error: unknown): string =>
 export const ValidationHarnessScreen: React.FC = () => {
   const [records, setRecords] = useState<HarnessRecord[]>([]);
   const [runningId, setRunningId] = useState<HarnessActionId | null>(null);
+  const [vadReadiness, setVadReadiness] = useState<VadReadiness>('idle');
+  const [vadError, setVadError] = useState<string | null>(null);
+
+  // Ensure silero-vad is loaded before vad.synthetic_* actions can run.
+  // Mirrors Voice Assistant Setup → silero-vad auto-load on iOS
+  // (VoiceAgentViewModel.swift): without this precondition the underlying
+  // rac_vad_process_lifecycle_proto returns RAC_ERROR_NOT_INITIALIZED with
+  // "VAD lifecycle model is not loaded" — see CLUSTER-03 / RN-VAD-001.
+  useEffect(() => {
+    let cancelled = false;
+    const ensureVadLoaded = async () => {
+      try {
+        const alreadyLoaded = await isModelLoadedForCategory(
+          ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+        );
+        if (cancelled) return;
+        if (alreadyLoaded) {
+          setVadReadiness('ready');
+          return;
+        }
+        setVadReadiness('loading');
+        const result = await RunAnywhere.loadModel(
+          ModelLoadRequest.fromPartial({
+            modelId: SILERO_VAD_MODEL_ID,
+            category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+            forceReload: false,
+            validateAvailability: true,
+          })
+        );
+        if (cancelled) return;
+        if (result.success) {
+          setVadReadiness('ready');
+          setVadError(null);
+        } else {
+          setVadReadiness('failed');
+          setVadError(result.errorMessage || 'Unknown VAD load error');
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setVadReadiness('failed');
+        setVadError(getErrorMessage(error));
+      }
+    };
+    void ensureVadLoaded();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const recordAction = useCallback(
     async (
@@ -396,9 +458,26 @@ export const ValidationHarnessScreen: React.FC = () => {
         style={styles.content}
         contentContainerStyle={styles.contentInset}
       >
+        <View
+          style={styles.statusBanner}
+          testID="validation-vad-status"
+        >
+          <Text style={styles.statusBannerText}>
+            {vadReadiness === 'loading'
+              ? `Loading VAD model (${SILERO_VAD_MODEL_ID})...`
+              : vadReadiness === 'ready'
+              ? `VAD ready: ${SILERO_VAD_MODEL_ID}`
+              : vadReadiness === 'failed'
+              ? `VAD load failed: ${vadError ?? 'unknown'}`
+              : 'Checking VAD model...'}
+          </Text>
+        </View>
+
         <View style={styles.actionGrid}>
           {actions.map((action) => {
-            const disabled = runningId !== null;
+            const isVadAction = action.id.startsWith('vad.');
+            const vadGate = isVadAction && vadReadiness !== 'ready';
+            const disabled = runningId !== null || vadGate;
             const isRunning = runningId === action.id;
             return (
               <TouchableOpacity
@@ -417,7 +496,13 @@ export const ValidationHarnessScreen: React.FC = () => {
                 <Text style={styles.actionTitle}>
                   {isRunning ? 'Running...' : action.title}
                 </Text>
-                <Text style={styles.actionDetail}>{action.detail}</Text>
+                <Text style={styles.actionDetail}>
+                  {vadGate && vadReadiness === 'loading'
+                    ? 'Loading VAD model...'
+                    : vadGate
+                    ? 'Waiting for VAD model load.'
+                    : action.detail}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -484,6 +569,18 @@ const styles = StyleSheet.create({
   },
   actionGrid: {
     gap: Spacing.smallMedium,
+  },
+  statusBanner: {
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderRadius: 8,
+    padding: Spacing.smallMedium,
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  statusBannerText: {
+    ...Typography.caption,
+    color: Colors.textPrimary,
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
   },
   actionButton: {
     borderWidth: 1,
