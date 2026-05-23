@@ -242,7 +242,7 @@ else
 fi
 
 echo
-echo "Run ${C_BOLD}make setup${C_RESET} to provision build files for everything you can build."
+echo "Run ${C_BOLD}./run setup${C_RESET} to provision build files for everything you can build."
 
 if [ "${VERBOSE}" = "1" ]; then
     echo
