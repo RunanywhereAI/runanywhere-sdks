@@ -1676,7 +1676,28 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         return serialize_proto_to_buffer(result, out_result);
     }
 
-    const rav1::ModelInfo& model = request.model();
+    // CLUSTER-10: Seed expected_files from multi_file when only multi_file
+    // is set so the per-descriptor download loop below picks up the real
+    // URLs each ModelFileDescriptor carries. Without this, multi-file VLM
+    // registrations (LFM2-VL, Qwen2-VL via registerMultiFileModel) fall
+    // through to the else branch and are rejected with
+    // "model.download_url must be an http(s) URL".
+    //
+    // Mirrors the resolution order in
+    // sdk/runanywhere-commons/src/infrastructure/model_management/
+    // artifact_expected_files_proto.cpp (Swift parity:
+    // RAModelInfo.expectedArtifactFiles + OneOf_Artifact.expectedFiles).
+    rav1::ModelInfo seeded_model;
+    const rav1::ModelInfo* model_ptr = &request.model();
+    if (!model_ptr->has_expected_files() && model_ptr->has_multi_file() &&
+        model_ptr->multi_file().files_size() > 0) {
+        seeded_model = *model_ptr;
+        seeded_model.mutable_expected_files()->mutable_files()->CopyFrom(
+            seeded_model.multi_file().files());
+        model_ptr = &seeded_model;
+    }
+    const rav1::ModelInfo& model = *model_ptr;
+
     rac_inference_framework_t framework = proto_framework_to_c(model.framework());
     if (framework == RAC_FRAMEWORK_UNKNOWN) {
         framework = RAC_FRAMEWORK_LLAMACPP;

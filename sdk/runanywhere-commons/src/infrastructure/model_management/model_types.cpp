@@ -1135,6 +1135,7 @@ void rac_model_file_descriptors_free(rac_model_file_descriptor_t* descriptors, s
     for (size_t i = 0; i < count; i++) {
         free((void*)descriptors[i].relative_path);
         free((void*)descriptors[i].destination_path);
+        free((void*)descriptors[i].url);
     }
     free(descriptors);
 }

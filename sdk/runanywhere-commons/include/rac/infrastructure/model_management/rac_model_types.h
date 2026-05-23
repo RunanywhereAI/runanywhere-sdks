@@ -110,6 +110,14 @@ typedef struct rac_model_file_descriptor {
 
     /** Semantic role for this file in the artifact */
     rac_model_file_role_t role;
+
+    /**
+     * Absolute download URL for this file (can be NULL when the caller
+     * derives the URL by joining a base download URL with relative_path).
+     * Preserved through proto serialization so registry round-trips do not
+     * drop the URL set by SDK callers via registerMultiFileModel.
+     */
+    const char* url;
 } rac_model_file_descriptor_t;
 
 // =============================================================================

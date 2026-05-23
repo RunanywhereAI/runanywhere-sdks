@@ -529,10 +529,23 @@ static void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artif
     for (size_t i = 0; i < artifact->file_descriptor_count; ++i) {
         const rac_model_file_descriptor_t& in = artifact->file_descriptors[i];
         ModelFileDescriptor* file = out->add_files();
-        if (in.relative_path)
+        // CLUSTER-10: emit the real URL when the descriptor carries one.
+        // Previously this always emitted relative_path as the URL, so a
+        // local filename like "lfm2-vl-1.2b-q4_k_m.gguf" was serialized as
+        // ModelFileDescriptor.url and the planner downstream rejected it as
+        // not http(s). Fall back to relative_path only when url is unset to
+        // preserve legacy behaviour for callers that have not been updated.
+        if (in.url && in.url[0] != '\0') {
+            file->set_url(in.url);
+        } else if (in.relative_path) {
             file->set_url(in.relative_path);
-        if (in.destination_path)
+        }
+        if (in.relative_path)
+            file->set_relative_path(in.relative_path);
+        if (in.destination_path) {
             file->set_filename(in.destination_path);
+            file->set_destination_path(in.destination_path);
+        }
         file->set_is_required(in.is_required == RAC_TRUE);
         file->set_role(model_file_role_to_proto(in.role));
     }
@@ -748,6 +761,14 @@ static bool apply_proto_artifact_to_model(const ModelInfo& proto, rac_model_info
                     out.destination_path = dup_optional_proto_string(destination);
                     out.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
                     out.role = model_file_role_from_proto(file.role());
+                    // CLUSTER-10: preserve ModelFileDescriptor.url through the
+                    // registry round-trip. Previously this field was dropped,
+                    // which caused the round-trip serializer to emit
+                    // relative_path as the URL (i.e. a local filename pretending
+                    // to be an http(s) URL), then the download planner's
+                    // expected_files fallback rejected the model with
+                    // "model.download_url must be an http(s) URL".
+                    out.url = dup_optional_proto_string(file.url());
                 }
             }
             break;
