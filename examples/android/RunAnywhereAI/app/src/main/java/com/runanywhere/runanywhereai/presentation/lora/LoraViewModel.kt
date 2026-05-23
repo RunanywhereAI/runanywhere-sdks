@@ -1,10 +1,12 @@
 package com.runanywhere.runanywhereai.presentation.lora
 
+import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
+import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import android.app.Application
@@ -12,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.deleteStorage
+import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.loraArtifactModelId
 import com.runanywhere.sdk.public.extensions.registerLoraArtifact
@@ -19,6 +22,7 @@ import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
 import com.runanywhere.sdk.public.types.RALoRAApplyRequest
 import com.runanywhere.sdk.public.types.RALoRARemoveRequest
 import com.runanywhere.sdk.public.types.RALoRAState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -184,48 +188,90 @@ class LoraViewModel(
     }
 
     /**
-     * Start a generated registry/download flow for a LoRA artifact.
+     * Download a LoRA adapter via the canonical generated download path.
      *
-     * TODO(SDK): `RunAnywhere.downloadModel(...)` / `cancelDownload(...)` /
-     * `deleteModel(...)` extensions were removed in the V2 storage-plan
-     * refactor. LoRA artifacts will flow through the generated
-     * registry-backed download/storage path once that bridge is restored.
-     * Until then, this method registers the catalog entry (so the catalog is
-     * still seeded) but reports an error so the UI surfaces the regression
-     * instead of silently spinning.
+     * Mirrors [com.runanywhere.runanywhereai.presentation.models.ModelSelectionViewModel.startDownload]
+     * (and iOS `LLMViewModel.ensureCatalogAdapterDownloaded`): register the
+     * catalog entry to produce the model-registry artifact, stream
+     * [RunAnywhere.downloadModel] progress into the UI, then persist completion
+     * through [RunAnywhere.lora.markDownloadCompleted] so the catalog row flips
+     * to "Downloaded".
      */
     fun downloadAdapter(entry: LoraAdapterCatalogEntry) {
         if (_uiState.value.downloadingAdapterId != null) return
 
         viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    // Still register the catalog entry + model-registry artifact so the
-                    // catalog stays consistent; downloading bytes is no longer wired.
-                    RunAnywhere.registerLoraArtifact(entry)
-                }
-                Timber.e(
-                    "LoRA download is temporarily disabled: RunAnywhere.downloadModel() " +
-                        "was removed in the V2 storage-plan refactor (entry=${entry.id}).",
+            _uiState.update {
+                it.copy(
+                    downloadingAdapterId = entry.id,
+                    downloadProgress = 0f,
+                    error = null,
                 )
-                _uiState.update {
-                    it.copy(
-                        downloadingAdapterId = null,
-                        downloadProgress = 0f,
-                        error =
-                            "LoRA downloads are temporarily disabled until the V2 " +
-                                "storage-plan download bridge is restored.",
+            }
+            try {
+                val artifact =
+                    withContext(Dispatchers.IO) {
+                        RunAnywhere.registerLoraArtifact(entry)
+                    }
+                var lastProgress: DownloadProgress? = null
+                RunAnywhere.downloadModel(artifact).collect { progress ->
+                    lastProgress = progress
+                    val fraction =
+                        if (progress.total_bytes > 0) {
+                            progress.bytes_downloaded.toFloat() / progress.total_bytes.toFloat()
+                        } else {
+                            progress.stage_progress
+                        }
+                    _uiState.update {
+                        it.copy(downloadProgress = fraction.coerceIn(0f, 1f))
+                    }
+                }
+                val localPath = lastProgress?.local_path?.takeIf { it.isNotBlank() } ?: artifact.local_path
+                if (localPath.isNullOrBlank()) {
+                    throw IllegalStateException(
+                        "LoRA adapter completion did not return a usable local path",
                     )
                 }
+                val completion =
+                    withContext(Dispatchers.IO) {
+                        RunAnywhere.lora.markDownloadCompleted(
+                            LoraAdapterDownloadCompletedRequest(
+                                adapter_id = entry.id,
+                                local_path = localPath,
+                                size_bytes = lastProgress?.bytes_downloaded?.takeIf { it > 0 },
+                                checksum_sha256 = entry.checksum_sha256,
+                                completed_at_unix_ms = System.currentTimeMillis(),
+                                imported = false,
+                                status_message = "download completed",
+                            ),
+                        )
+                    }
+                if (!completion.success) {
+                    val msg = completion.error_message.ifBlank { "download completion not persisted" }
+                    throw IllegalStateException(msg)
+                }
+                val completedEntry = completion.entry ?: entry
+                _uiState.update {
+                    it.copy(
+                        registeredAdapters = it.registeredAdapters.replaceEntry(completedEntry),
+                        compatibleAdapters = it.compatibleAdapters.replaceEntry(completedEntry),
+                        downloadingAdapterId = null,
+                        downloadProgress = 0f,
+                        error = null,
+                    )
+                }
+                Timber.i("Downloaded LoRA adapter: ${entry.id} -> $localPath")
             } catch (e: Exception) {
-                Timber.e(e, "Failed to register LoRA adapter for download")
+                Timber.e(e, "Failed to download LoRA adapter ${entry.id}")
+                val isCancel = e is CancellationException
                 _uiState.update {
                     it.copy(
                         downloadingAdapterId = null,
                         downloadProgress = 0f,
-                        error = "Failed to download ${entry.name}: ${e.message}",
+                        error = if (isCancel) null else "Failed to download ${entry.name}: ${e.message}",
                     )
                 }
+                if (isCancel) throw e
             }
         }
     }
