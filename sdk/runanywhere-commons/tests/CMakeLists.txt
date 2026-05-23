@@ -1183,6 +1183,28 @@ target_compile_features(test_extraction_no_program_fallback PRIVATE cxx_std_17)
 add_test(NAME extraction_no_program_fallback_tests
          COMMAND test_extraction_no_program_fallback --run-all)
 
+# --- CLUSTER-14 / WEB-EXTRACT-001: libarchive zlib link assertion.
+# CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed iOS slices but the iter-2 Web lane
+# shipped an Emscripten WASM that still had the libarchive `program("gzip -d")`
+# fallback registered (HAVE_ZLIB_H undefined). This test asserts the in-process
+# gzip/bzip2/xz filters succeed at registration time and that opening a canned
+# tar.gz works — both surfaces fail when libarchive lost zlib at build time.
+# Complements test_extraction_no_program_fallback by exercising libarchive's
+# low-level filter API directly so a regression points at build-time
+# misconfiguration rather than an ABI change.
+add_executable(test_libarchive_zlib_linked test_libarchive_zlib_linked.cpp)
+target_include_directories(test_libarchive_zlib_linked PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${libarchive_SOURCE_DIR}/libarchive
+    ${libarchive_BINARY_DIR}
+)
+target_link_libraries(test_libarchive_zlib_linked PRIVATE rac_commons)
+rac_link_archive_deps(test_libarchive_zlib_linked)
+target_compile_features(test_libarchive_zlib_linked PRIVATE cxx_std_17)
+add_test(NAME libarchive_zlib_linked_tests
+         COMMAND test_libarchive_zlib_linked --run-all)
+
 # --- v2 close-out Phase H / S5: rac_http_client C ABI tests ------------------
 # These were written against the old libcurl-backed client — they drove a
 # loopback HTTP/1.1 server and relied on libcurl to actually send the bytes.

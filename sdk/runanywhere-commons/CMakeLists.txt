@@ -202,6 +202,29 @@ if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
 endif()
 
+# CLUSTER-14 / WEB-EXTRACT-001: defense-in-depth normalization of the
+# ZLIB_VERSION cache. LoadVersions.cmake now strips a leading 'v' from
+# ZLIB_VERSION specifically (so engines that re-`include(LoadVersions)` don't
+# restore the raw form). Re-assert the strip here in case a future caller
+# passes `-DZLIB_VERSION=v1.3.2` on the command line. Also set
+# ZLIB_VERSION_STRING (the legacy alias CMake's FindZLIB sometimes consults)
+# so both stay in lockstep.
+#
+# RAC_ZLIB_VERSION (with prefix) holds the original GIT_TAG-form ('v1.3.2')
+# for FetchContent_Declare below; do not overwrite that one.
+if(DEFINED ZLIB_VERSION AND ZLIB_VERSION MATCHES "^v")
+    string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
+    set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
+    message(STATUS "CLUSTER-14: pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
+                   "(GIT_TAG '${RAC_ZLIB_VERSION}' preserved on RAC_ZLIB_VERSION for FetchContent) "
+                   "so libarchive's find_package(ZLIB 1.2.1) accepts it.")
+endif()
+if(NOT DEFINED ZLIB_VERSION_STRING OR ZLIB_VERSION_STRING MATCHES "^v")
+    if(DEFINED ZLIB_VERSION)
+        set(ZLIB_VERSION_STRING "${ZLIB_VERSION}" CACHE STRING "" FORCE)
+    endif()
+endif()
+
 if(_RAC_FORCE_BUNDLED_ZLIB)
     message(STATUS "${RAC_PLATFORM_NAME}: forcing bundled zlib (cross-compile target)")
     set(ZLIB_FOUND FALSE)
@@ -210,11 +233,11 @@ else()
 endif()
 
 if(NOT ZLIB_FOUND)
-    message(STATUS "System zlib not found — bundling from source...")
+    message(STATUS "System zlib not found — bundling from source (GIT_TAG=${RAC_ZLIB_VERSION})...")
     FetchContent_Declare(
         zlib_src
         GIT_REPOSITORY https://github.com/madler/zlib.git
-        GIT_TAG        ${ZLIB_VERSION}
+        GIT_TAG        ${RAC_ZLIB_VERSION}
         GIT_SHALLOW    TRUE
     )
     # Prevent zlib from installing or building examples
@@ -416,6 +439,68 @@ endif()
 if(TARGET zlibstatic AND TARGET archive_static)
     target_link_libraries(archive_static zlibstatic)
     target_include_directories(archive_static PRIVATE ${zlib_src_SOURCE_DIR} ${zlib_src_BINARY_DIR})
+endif()
+
+# -----------------------------------------------------------------------------
+# CLUSTER-14 / WEB-EXTRACT-001: configure-time assertion that libarchive's
+# generated config.h has HAVE_ZLIB_H defined on every cross-compile target
+# where the platform CANNOT fork+exec /usr/bin/gzip. Without this, an
+# accidentally-undefined HAVE_ZLIB_H silently re-enables the
+# archive_read_support_filter_program("gzip -d") fallback inside libarchive's
+# filter_gzip.c — which iOS app sandboxes and Emscripten/WASM both block.
+#
+# CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed this for iOS by:
+#   (a) forcing bundled zlib for IOS|ANDROID|EMSCRIPTEN
+#   (b) stripping the 'v' prefix from ZLIB_VERSION so libarchive's internal
+#       find_package(ZLIB 1.2.1) version check succeeds
+#
+# But the cross-compile cache is order-sensitive (the iter-2 web lane shipped
+# a build with HAVE_ZLIB_H still undefined because the libarchive subbuild
+# already ran before the v-strip lines executed in a stale FetchContent
+# state). Surface that class of regression here, while we still have a CMake
+# error path, rather than after the .wasm has shipped and OPFS extraction
+# fails inside the browser.
+# -----------------------------------------------------------------------------
+if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(_RAC_LIBARCHIVE_CONFIG_H "${libarchive_BINARY_DIR}/config.h")
+    if(EXISTS "${_RAC_LIBARCHIVE_CONFIG_H}")
+        file(READ "${_RAC_LIBARCHIVE_CONFIG_H}" _RAC_LIBARCHIVE_CONFIG_CONTENTS)
+        # Look for an active `#define HAVE_ZLIB_H 1` (NOT `/* #undef HAVE_ZLIB_H */`).
+        if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_ZLIB_H[ \t]+1")
+            message(FATAL_ERROR
+                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "is missing #define HAVE_ZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
+                "libarchive will fall back to archive_read_support_filter_program(\"gzip -d\"), "
+                "which iOS sandbox and Emscripten/WASM both block, so every .tar.gz "
+                "extraction will fail at runtime.\n"
+                "  config.h path: ${_RAC_LIBARCHIVE_CONFIG_H}\n"
+                "  ZLIB_VERSION cache: ${ZLIB_VERSION}\n"
+                "  ZLIB_LIBRARY cache: ${ZLIB_LIBRARY}\n"
+                "  ZLIB_INCLUDE_DIR cache: ${ZLIB_INCLUDE_DIR}\n"
+                "Fix: ensure ZLIB_VERSION is a plain numeric string (e.g. 1.3.2, "
+                "NOT v1.3.2) and re-configure from a clean build dir. See the "
+                "CLUSTER-02-FOLLOWUP v-strip block above for the canonical fix.")
+        endif()
+        # Same check for bzip2 — the iOS sandbox + Emscripten also block
+        # program(\"bzip2 -d\"), and the same find_package(BZip2) version
+        # quirks could leave HAVE_BZLIB_H undefined. Emscripten's iter-2
+        # cache already shows this can fail independently.
+        if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_BZLIB_H[ \t]+1")
+            message(FATAL_ERROR
+                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "is missing #define HAVE_BZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
+                "libarchive will fall back to archive_read_support_filter_program(\"bzip2 -d\"), "
+                "which iOS sandbox and Emscripten/WASM both block.\n"
+                "  config.h path: ${_RAC_LIBARCHIVE_CONFIG_H}\n"
+                "Fix: confirm bz2_bundled was built and BZIP2_* cache vars point at it.")
+        endif()
+        message(STATUS "libarchive config.h verified: HAVE_ZLIB_H + HAVE_BZLIB_H both defined (${RAC_PLATFORM_NAME})")
+    else()
+        message(WARNING
+            "CLUSTER-14: libarchive config.h not yet generated at ${_RAC_LIBARCHIVE_CONFIG_H} — "
+            "skipping HAVE_ZLIB_H assertion. Re-configure once libarchive has materialized "
+            "its build dir to enable the regression guard.")
+    endif()
 endif()
 
 # On MSVC multi-config generators, libarchive references "zlibstatic.lib" and

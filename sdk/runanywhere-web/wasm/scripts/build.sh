@@ -270,6 +270,17 @@ build_target() {
     # it OFF here even though the commons CMake also forces BUILD_SHARED_LIBS
     # OFF for the zlib FetchContent block. Passing it as a CMake variable is
     # enough — the variable is read inside zlib's own CMakeLists.txt.
+    #
+    # CLUSTER-14 / WEB-EXTRACT-001: also explicitly pass ZLIB_VERSION in its
+    # purely-numeric form so libarchive's nested `FIND_PACKAGE(ZLIB 1.2.1)`
+    # accepts it. The VERSIONS file holds `v1.3.2` (the GIT_TAG madler/zlib
+    # uses); CMake's FindZLIB rejects 'v1.3.2' against the `>= 1.2.1` request
+    # and leaves HAVE_ZLIB_H undefined, which silently re-enables libarchive's
+    # `program("gzip -d")` fallback. Emscripten/OPFS cannot fork+exec, so
+    # every .tar.gz extraction fails with "Can't initialize filter; unable
+    # to run program 'gzip -d'". Forcing the numeric form on the command
+    # line guarantees the value is correct even when the commons CMakeLists
+    # in-tree pre-normalization races a stale FetchContent cache.
     emcmake cmake \
         -B "${build_dir}" \
         -S "${REPO_ROOT}" \
@@ -281,6 +292,8 @@ build_target() {
         -DRAC_BUILD_PLATFORM=OFF \
         -DRAC_BUILD_SHARED=OFF \
         -DZLIB_BUILD_SHARED=OFF \
+        -DZLIB_VERSION="1.3.2" \
+        -DZLIB_VERSION_STRING="1.3.2" \
         -DRAC_WASM_PTHREADS="${pthreads_for_target}" \
         -DRAC_WASM_DEBUG="${DEBUG}" \
         -DRAC_WASM_BUILD_CORE="${wasm_core}" \
@@ -312,6 +325,46 @@ build_target() {
         echo "SUCCESS: ${label} build complete"
         echo "  ${out_name}.wasm: ${wasm_size}"
         echo "  ${out_name}.js:   ${js_size}"
+
+        # CLUSTER-14 / WEB-EXTRACT-001: assert the libarchive program() fallback
+        # is NOT linked into this artifact. The bug surface is libarchive's
+        # filter_gzip.c registering archive_read_support_filter_program("gzip -d")
+        # when HAVE_ZLIB_H is undefined; that pulls the string "gzip -d" plus
+        # the symbol prefix `archive_read_support_filter_program` into the
+        # final .wasm. After the CLUSTER-02 + CLUSTER-14 fixes neither should
+        # appear in the artifact. Fail the build if either is present so a
+        # regression cannot ship to the npm packages.
+        local _rac_libarchive_config_h="${build_dir}/_deps/libarchive-build/config.h"
+        if [ -f "${_rac_libarchive_config_h}" ]; then
+            if ! grep -q "^#define HAVE_ZLIB_H 1" "${_rac_libarchive_config_h}"; then
+                echo "ERROR: CLUSTER-14 regression — libarchive built WITHOUT HAVE_ZLIB_H."
+                echo "  config.h: ${_rac_libarchive_config_h}"
+                echo "  libarchive will fall back to program(\"gzip -d\"); Emscripten can't fork+exec."
+                grep -E "HAVE_ZLIB_H|HAVE_LIBZ|HAVE_BZLIB_H" "${_rac_libarchive_config_h}" || true
+                exit 1
+            fi
+            if ! grep -q "^#define HAVE_BZLIB_H 1" "${_rac_libarchive_config_h}"; then
+                echo "ERROR: CLUSTER-14 regression — libarchive built WITHOUT HAVE_BZLIB_H."
+                echo "  config.h: ${_rac_libarchive_config_h}"
+                exit 1
+            fi
+            echo "  libarchive config.h: HAVE_ZLIB_H + HAVE_BZLIB_H both defined (no program() fallback)"
+        else
+            echo "WARNING: ${_rac_libarchive_config_h} not found — cannot verify HAVE_ZLIB_H."
+        fi
+
+        # Surface-level guard: if the wasm artifact contains the literal
+        # "gzip -d" command string AND the program-filter symbol, the gzip
+        # external-program fallback survived linking. Search both via strings.
+        if command -v strings >/dev/null 2>&1; then
+            if strings "${wasm_file}" | grep -q '^gzip -d$'; then
+                echo "ERROR: CLUSTER-14 regression — '${wasm_file}' contains literal 'gzip -d' string."
+                echo "       This indicates libarchive's archive_read_support_filter_program(\"gzip -d\")"
+                echo "       compiled into the final bundle. Emscripten/OPFS cannot fork+exec."
+                exit 1
+            fi
+            echo "  WASM gzip-fallback string scan: clean (no 'gzip -d' literal)"
+        fi
 
         if [ "$pthreads_for_target" = "ON" ]; then
             local worker_file="${out_dir}/${out_name}.worker.js"
