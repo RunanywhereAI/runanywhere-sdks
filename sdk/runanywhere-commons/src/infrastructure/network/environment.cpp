@@ -78,6 +78,24 @@ const char* rac_env_description(rac_environment_t env) {
     }
 }
 
+// CLUSTER-12 (FLUTTER-IOS-007): in DEV mode the SDK targets an operator-
+// side DNS alias (e.g. dev.runanywhere.local). When the alias is not
+// configured locally the OS resolver burns its full default timeout
+// before the request can fail, blocking SDK init for ~30 s per cold
+// launch. Returning a short timeout here lets platform HTTP layers
+// (URLSession / Dart HttpClient / Kotlin HttpURLConnection) fail fast
+// in DEV without hurting production reliability.
+int32_t rac_env_default_http_timeout_ms(rac_environment_t env) {
+    switch (env) {
+        case RAC_ENV_DEVELOPMENT:
+            return 3000;  // 3s — fail fast on unreachable dev DNS
+        case RAC_ENV_STAGING:
+        case RAC_ENV_PRODUCTION:
+        default:
+            return 30000;  // 30s — generous default for real backends
+    }
+}
+
 // =============================================================================
 // URL Parsing Helpers
 // =============================================================================

@@ -217,7 +217,13 @@ private:
   nlohmann::json model_config_;
 
   int context_size_ = 0;
-  int max_default_context_ = 1024;
+  // CLUSTER-12 (WEB-LLM-COHERENCE): raised from 1024 to 2048 so small
+  // base models like SmolLM2-360M get enough room for a chat-template
+  // system+user+assistant turn (~600-900 tokens of template scaffolding
+  // alone) on Web/CPU builds where common_fit_params is not used. The
+  // model's own train context (e.g. 8192 for SmolLM2) is still the upper
+  // ceiling — this only raises the SDK's default cap.
+  int max_default_context_ = 2048;
   int batch_size_ = 0;
 
   std::vector<LoraAdapterEntry> lora_adapters_;

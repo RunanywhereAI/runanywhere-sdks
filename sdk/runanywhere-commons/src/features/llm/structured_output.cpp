@@ -970,6 +970,23 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
 // GET SYSTEM PROMPT - Ported from Swift lines 10-30
 // =============================================================================
 
+// CLUSTER-12 (COMMONS-STRUCT-001): Small base models (e.g. SmolLM2-360M)
+// cannot reliably produce structured JSON from a free-form prompt because
+// they have not been instruction-tuned on the "schema → JSON" task and the
+// llama.cpp backend currently does not pipe a grammar/json-mode parameter
+// through to the sampler. The system prompt below was hardened with an
+// explicit start-token cue ("Your reply must begin with %s ...") so the
+// model is more likely to emit JSON on the very first token instead of
+// echoing the prompt. The proper fix is grammar-constrained decoding:
+//
+//   TODO(cluster-12 follow-up): plumb rac_llm_options_t.grammar (or a
+//   schema-derived GBNF grammar) through rac_llm_llamacpp_generate and
+//   wire it to llama_sampler_init_grammar(). Until that lands, base
+//   models will produce best-effort (sometimes lenient) JSON output —
+//   tests should accept either a successful JSON parse or, for known
+//   base models, a prompt-echo PASS as documented in
+//   cross-platform-e2e-test-catalog.md.
+
 extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
                                                                 char** out_prompt) {
     if (!out_prompt) {
@@ -982,8 +999,15 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
     const char* end_token = expected_end_token(root_name);
 
     // Build the system prompt - matches Swift getSystemPrompt(for:)
+    //
+    // CLUSTER-12: the leading "Your reply MUST begin with %s" line was
+    // added to give base models (SmolLM2/TinyLlama family) a stronger
+    // first-token cue. Without grammar-constrained decoding this is the
+    // best heuristic nudge available.
     const char* format =
         "You are a JSON generator that outputs ONLY valid JSON without any additional text.\n"
+        "Your reply MUST begin with the character %s and nothing else — no greeting, no\n"
+        "restatement of the user prompt, no explanation.\n"
         "\n"
         "CRITICAL RULES:\n"
         "1. Your entire response must be valid JSON that can be parsed\n"
@@ -1000,14 +1024,16 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
         "\n"
         "Remember: Output ONLY the JSON %s, nothing else.";
 
-    size_t needed =
-        snprintf(nullptr, 0, format, root_name, start_token, end_token, schema, root_name) + 1;
+    size_t needed = snprintf(nullptr, 0, format, start_token, root_name, start_token, end_token,
+                             schema, root_name) +
+                    1;
     char* result = static_cast<char*>(malloc(needed));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    snprintf(result, needed, format, root_name, start_token, end_token, schema, root_name);
+    snprintf(result, needed, format, start_token, root_name, start_token, end_token, schema,
+             root_name);
     *out_prompt = result;
 
     return RAC_SUCCESS;
