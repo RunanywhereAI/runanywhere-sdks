@@ -252,6 +252,23 @@ if(NOT ZLIB_FOUND)
         set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
     endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+    # CLUSTER-02-FOLLOWUP: VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
+    # form madler/zlib uses). libarchive's bundled CMake module runs
+    # `find_package(ZLIB 1.2.1)`, which dispatches to CMake's FindZLIB module
+    # with `VERSION_VAR ZLIB_VERSION`. FindZLIB normally derives ZLIB_VERSION
+    # from `${ZLIB_INCLUDE_DIR}/zlib.h`, but our ZLIB_INCLUDE_DIR above is a
+    # semicolon-list (`src-dir;build-dir`) which fails its EXISTS check, so the
+    # version-extraction branch is skipped and ZLIB_VERSION keeps the value
+    # cached by LoadVersions.cmake from the VERSIONS file — the raw GIT_TAG
+    # `v1.3.2`. CMake's numeric comparator then rejects that as unsuitable for
+    # the `>= 1.2.1` requirement, HAVE_ZLIB_H is left undefined, and libarchive
+    # falls back to archive_read_support_filter_program("gzip -d") — the very
+    # fallback this whole block exists to prevent on iOS. Force a purely
+    # numeric form into both the VERSION_VAR (ZLIB_VERSION) and the legacy
+    # ZLIB_VERSION_STRING so FindZLIB hands libarchive an acceptable version.
+    string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
+    set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
+    set(ZLIB_VERSION_STRING "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
     # Create an imported ZLIB::ZLIB target that points to our zlibstatic
     if(NOT TARGET ZLIB::ZLIB)
         add_library(ZLIB::ZLIB ALIAS zlibstatic)
