@@ -136,7 +136,11 @@ include(FetchContent)
 # Cross-compilation targets that bundle zlib/BZip2 need a stable archive
 # output directory so downstream FetchContent projects can consume concrete
 # file paths instead of unresolved logical library names.
-if(MSVC OR ANDROID OR EMSCRIPTEN)
+# CLUSTER-02 / COMMONS-LIBARCHIVE-001: iOS is added here too because we now
+# force-bundle zlib for iOS slices (see comment below); libarchive's internal
+# find_package(ZLIB) needs a concrete archive path on cross-compile targets
+# the same way Android/Emscripten do.
+if(MSVC OR ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
 endif()
 
@@ -167,14 +171,29 @@ endif()
 # Zlib: Bundle from source when system zlib is not available.
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
+#
+# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled zlib for iOS and
+# Android cross-compilation. Without this, libarchive's own
+# `FIND_PACKAGE(ZLIB 1.2.1)` inside its FetchContent CMake project occasionally
+# fails when cross-compiling for iOS / iOS-simulator slices (the host toolchain
+# discovery doesn't reach the iOS SDK's libz.tbd reliably under every Xcode +
+# CMake combo). When that find fails, libarchive compiles with HAVE_ZLIB_H
+# UNDEFINED, which silently drops the built-in inflate path and falls back to
+# `program("gzip -d")` — a fork+exec of /usr/bin/gzip that is blocked by the
+# iOS app sandbox. The result is that every .tar.gz model extraction (Sherpa
+# Whisper Tiny, SmolVLM, Piper TTS) fails on Swift iOS + Flutter iOS with an
+# obscure "child process" error. Forcing bundled zlib guarantees a known-good
+# static zlib is on the libarchive include + link path, so its config.h
+# defines HAVE_ZLIB_H and the in-process inflate filter wins the bidder
+# competition before the program() fallback can register.
 # -----------------------------------------------------------------------------
 set(_RAC_FORCE_BUNDLED_ZLIB OFF)
-if(EMSCRIPTEN)
+if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
 endif()
 
 if(_RAC_FORCE_BUNDLED_ZLIB)
-    message(STATUS "Emscripten build: forcing bundled zlib")
+    message(STATUS "${RAC_PLATFORM_NAME}: forcing bundled zlib (cross-compile target)")
     set(ZLIB_FOUND FALSE)
 else()
     find_package(ZLIB QUIET)
@@ -200,7 +219,7 @@ if(NOT ZLIB_FOUND)
     FetchContent_MakeAvailable(zlib_src)
     set(BUILD_SHARED_LIBS ${_SAVED_BSL_ZLIB})
 
-    if((ANDROID OR EMSCRIPTEN) AND TARGET zlibstatic)
+    if((ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS") AND TARGET zlibstatic)
         set_target_properties(zlibstatic PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
         )
@@ -208,12 +227,13 @@ if(NOT ZLIB_FOUND)
     endif()
 
     # Set cache variables so libarchive/curl's find_package(ZLIB) picks up our
-    # build. Android/Emscripten need the concrete archive path here; passing
-    # the logical target name through cache variables leaks raw `zlibstatic`
-    # / `-lzlibstatic` entries into downstream link lines.
+    # build. Android/Emscripten/iOS need the concrete archive path here;
+    # passing the logical target name through cache variables leaks raw
+    # `zlibstatic` / `-lzlibstatic` entries into downstream link lines, and
+    # libarchive's internal find_package(ZLIB 1.2.1) reject that.
     set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
     set(ZLIB_INCLUDE_DIRS "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
-    if(ANDROID OR EMSCRIPTEN)
+    if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(ZLIB_LIBRARY "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(ZLIB_LIBRARY_RELEASE "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(ZLIB_LIBRARIES "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
@@ -242,9 +262,17 @@ endif()
 # BZip2: Bundle from source for cross-compilation targets
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
+#
+# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled BZip2 on iOS for the
+# same reason as zlib above. The Apple iOS SDK does ship libbz2.dylib, but
+# libarchive's `program("bzip2 -d")` fallback path (analogous to gzip) is
+# similarly blocked by the iOS sandbox. Forcing the bundled in-process
+# bzlib decoder guarantees `HAVE_BZLIB_H` is defined in libarchive's config.h,
+# which keeps the bidder competition resolved to the in-process filter and
+# never registers the program() fallback.
 # -----------------------------------------------------------------------------
 set(_RAC_FORCE_BUNDLED_BZIP2 OFF)
-if(ANDROID OR EMSCRIPTEN)
+if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_BZIP2 ON)
 endif()
 
@@ -276,7 +304,7 @@ if(NOT BZIP2_FOUND)
     target_include_directories(bz2_bundled PUBLIC ${bzip2_src_SOURCE_DIR})
     set_target_properties(bz2_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-    if((ANDROID OR EMSCRIPTEN) AND TARGET bz2_bundled)
+    if((ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS") AND TARGET bz2_bundled)
         set_target_properties(bz2_bundled PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
         )
@@ -284,9 +312,9 @@ if(NOT BZIP2_FOUND)
     endif()
 
     # Set cache variables so libarchive's find_package(BZip2) picks up our
-    # build. Android/Emscripten again need the concrete archive path.
+    # build. Android/Emscripten/iOS again need the concrete archive path.
     set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
-    if(ANDROID OR EMSCRIPTEN)
+    if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(BZIP2_LIBRARY "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(BZIP2_LIBRARY_RELEASE "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(BZIP2_LIBRARIES "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
@@ -387,7 +415,7 @@ if(MSVC)
         endif()
     endforeach()
     link_directories("${RAC_BUNDLED_LIB_DIR}")
-elseif(ANDROID OR EMSCRIPTEN)
+elseif(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     if(TARGET bz2_bundled)
         set_target_properties(bz2_bundled PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")

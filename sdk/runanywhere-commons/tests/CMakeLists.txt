@@ -1166,6 +1166,23 @@ rac_link_archive_deps(test_extraction)
 target_compile_features(test_extraction PRIVATE cxx_std_17)
 add_test(NAME extraction_tests COMMAND test_extraction --run-all)
 
+# --- CLUSTER-02 / COMMONS-LIBARCHIVE-001: program("gzip -d") fallback regression
+# Verifies rac_extract_archive_native() works on tar.gz via the in-process
+# zlib gzip filter ONLY — i.e. without ever fork/exec'ing /usr/bin/gzip.
+# This is the iOS sandbox failure mode (the sandbox blocks fork+exec), so the
+# test runs with PATH cleared on POSIX to mechanically prove no subprocess
+# is invoked. See comments in test_extraction_no_program_fallback.cpp.
+add_executable(test_extraction_no_program_fallback test_extraction_no_program_fallback.cpp)
+target_include_directories(test_extraction_no_program_fallback PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_extraction_no_program_fallback PRIVATE rac_commons)
+rac_link_archive_deps(test_extraction_no_program_fallback)
+target_compile_features(test_extraction_no_program_fallback PRIVATE cxx_std_17)
+add_test(NAME extraction_no_program_fallback_tests
+         COMMAND test_extraction_no_program_fallback --run-all)
+
 # --- v2 close-out Phase H / S5: rac_http_client C ABI tests ------------------
 # These were written against the old libcurl-backed client — they drove a
 # loopback HTTP/1.1 server and relied on libcurl to actually send the bytes.

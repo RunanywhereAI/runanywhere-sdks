@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import RNFS from 'react-native-fs';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   JSONSchema,
@@ -25,8 +26,14 @@ import { Typography } from '../theme/typography';
 import { Spacing } from '../theme/spacing';
 
 const ACTION_LOG_PREFIX = '[RN_VALIDATION_ACTION]';
-const FIXTURE_ADAPTER_PATH =
-  '/tmp/runanywhere-validation-fixtures/lora/identity-adapter.gguf';
+// LoRA fixture lives inside the app's sandboxed documents dir so the
+// validation harness works on real devices / fresh sims where the host
+// /tmp path is unreachable. The harness operator stages
+// `identity-adapter.gguf` into this path before the run; see
+// test_workflows/instructions/cross-platform-e2e-test-catalog.md §9b
+// "LoRA fixture deployment" for the per-platform copy commands
+// (RN-AND-005 / RN-IOS-007).
+const FIXTURE_ADAPTER_PATH = `${RNFS.DocumentDirectoryPath}/lora/identity-adapter.gguf`;
 
 type HarnessStatus = 'PASS' | 'FAIL' | 'EXPECTED_ERROR';
 

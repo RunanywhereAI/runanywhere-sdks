@@ -300,17 +300,26 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
         return RAC_ERROR_EXTRACTION_FAILED;
     }
 
-    // Enable all supported formats and filters for auto-detection
+    // Enable all supported formats for auto-detection.
     archive_read_support_format_all(a);
-#ifdef __EMSCRIPTEN__
-    // Emscripten has no gzip subprocess; register built-in gzip filter explicitly.
+    // CLUSTER-02 / COMMONS-LIBARCHIVE-001: register ONLY the built-in
+    // decompression filters that link against statically-bundled libraries
+    // (zlib, bzip2, xz). DO NOT call archive_read_support_filter_all() — that
+    // registers libarchive's `program("gzip -d" / "bzip2 -d" / "xz -d")`
+    // external-program fallbacks whenever the matching built-in symbol is
+    // missing at link time. iOS (Swift + Flutter) sandboxes block
+    // `fork+exec(/usr/bin/gzip)`, so any tar.gz extraction (Sherpa Whisper Tiny,
+    // SmolVLM, Piper TTS) silently failed with an obscure errno=1 from the
+    // child shell. Emscripten / WASM likewise has no subprocess primitive.
+    //
+    // Keeping the registration explicit also makes the failure mode loud and
+    // testable: if zlib is somehow not linked, archive_read_open_filename will
+    // surface a clear "gzip: unsupported compression" error instead of trying
+    // (and failing) to fork a non-existent /usr/bin/gzip.
     archive_read_support_filter_none(a);
     archive_read_support_filter_gzip(a);
     archive_read_support_filter_bzip2(a);
     archive_read_support_filter_xz(a);
-#else
-    archive_read_support_filter_all(a);
-#endif
 
     // Open the archive file with 10KB block size (streaming)
     int r = archive_read_open_filename(a, archive_path, 10240);
