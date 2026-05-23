@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <filesystem>
@@ -85,6 +86,17 @@ rac_bool_t no_adapter_chunk(const uint8_t*, size_t, uint64_t, uint64_t, void*) {
     return RAC_TRUE;
 }
 
+// CLUSTER-13 / HTTP-416-STRICT (iter 3): shared error-stub payload used by
+// both the streaming and resume transports to simulate a CDN HTTP 416 +
+// text/html error response. Defined here so both test_transport_stream and
+// test_transport_resume can reference it.
+//
+// 47-byte body chosen to mirror the production-observed 49-byte error stub
+// that overwrote 386 MB gguf files in iter 2 (FLUTTER-AND-DL-002 /
+// FLUTTER-IOS-004 / WEB-DOWNLOAD-001).
+constexpr const char* k416HtmlBody = "<html><body>Range Not Satisfiable</body></html>";
+constexpr size_t k416HtmlBodyLen = 47;  // strlen(k416HtmlBody)
+
 rac_result_t test_transport_send(void*, const rac_http_request_t*, rac_http_response_t* out_resp) {
     if (!out_resp)
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -108,6 +120,25 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
         cb(body, sizeof(body), sizeof(body), sizeof(body), cb_user_data);
         return RAC_SUCCESS;
     }
+    if (path == "/tiny-416") {
+        // CLUSTER-13 / HTTP-416-STRICT: fresh-download variant. The server
+        // returns 416 with a tiny text/html stub even on a non-resume request
+        // (some CDNs do this when the URL points at a resource that was
+        // re-uploaded with a smaller size between the catalog refresh and
+        // the download attempt). The runner must reject the body write and
+        // remove the destination so the next retry sees a clean slate.
+        out_resp_meta->status = 416;
+        out_resp_meta->headers = static_cast<rac_http_header_kv_t*>(
+            std::calloc(1, sizeof(rac_http_header_kv_t)));
+        if (out_resp_meta->headers) {
+            out_resp_meta->headers[0].name = strdup("Content-Type");
+            out_resp_meta->headers[0].value = strdup("text/html; charset=utf-8");
+            out_resp_meta->header_count = 1;
+        }
+        cb(reinterpret_cast<const uint8_t*>(k416HtmlBody), k416HtmlBodyLen, k416HtmlBodyLen,
+           k416HtmlBodyLen, cb_user_data);
+        return RAC_SUCCESS;
+    }
     out_resp_meta->status = 400;
     return RAC_SUCCESS;
 }
@@ -117,6 +148,13 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
 // Used by test_resume_falls_back_when_range_ignored to exercise the
 // rac_http_download_execute resume-fallback path (Range: bytes=N- → HTTP 200).
 std::atomic<bool> g_resume_returns_200{false};
+
+// CLUSTER-13 / HTTP-416-STRICT: when true the test transport replies to a
+// resume request with HTTP 416 + a 49-byte text/html error stub. This mirrors
+// Cloudflare/S3 behavior when the requested Range offset exceeds the resource
+// size — the wire shape that, in iter 2, was found to overwrite valid 386 MB
+// gguf files with 49 bytes of HTML on Flutter Android / iOS / Web targets.
+std::atomic<bool> g_resume_returns_416_html{false};
 
 // pass2-syn-116 regression: when a resume request returns 206 but the body
 // stream is truncated mid-way (network drop), the first resume attempt must
@@ -147,6 +185,33 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
         (void)resume_from_byte;
         return stream_payload_from(0, cb, cb_user_data) == RAC_TRUE ? RAC_SUCCESS
                                                                     : RAC_ERROR_CANCELLED;
+    }
+
+    if (g_resume_returns_416_html.load()) {
+        // CLUSTER-13 / HTTP-416-STRICT: simulate the CDN behavior that
+        // produced FLUTTER-AND-DL-002 / FLUTTER-IOS-004 / WEB-DOWNLOAD-001 —
+        // 416 status with a 47-byte text/html error stub. The runner MUST
+        // NOT let those 47 bytes overwrite the existing 386 MB payload on
+        // disk; it must roll back to the pre-request file size and return
+        // a network-error status.
+        out_resp_meta->status = 416;
+        // Synthesize a Content-Type: text/html response header. Allocated
+        // via malloc/strdup so rac_http_response_free can release them.
+        out_resp_meta->headers = static_cast<rac_http_header_kv_t*>(
+            std::calloc(1, sizeof(rac_http_header_kv_t)));
+        if (out_resp_meta->headers) {
+            out_resp_meta->headers[0].name = strdup("Content-Type");
+            out_resp_meta->headers[0].value = strdup("text/html; charset=utf-8");
+            out_resp_meta->header_count = 1;
+        }
+        // Deliver the tiny text/html error body via the streaming callback
+        // (mirrors the wire shape — the body IS appended to the destination
+        // by rac_http_download_execute's on_chunk before the post-response
+        // strict check rolls it back).
+        cb(reinterpret_cast<const uint8_t*>(k416HtmlBody), k416HtmlBodyLen, k416HtmlBodyLen,
+           k416HtmlBodyLen, cb_user_data);
+        (void)resume_from_byte;
+        return RAC_SUCCESS;
     }
     out_resp_meta->status = 206;
     size_t from = std::min<size_t>(static_cast<size_t>(resume_from_byte), g_payload.size());
@@ -812,6 +877,114 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     fs::remove(dest);
 }
 
+// CLUSTER-13 / HTTP-416-STRICT (iter 3) regression: a resume request that
+// receives HTTP 416 + a tiny text/html error stub MUST NOT overwrite the
+// existing valid prefix on disk. The runner must roll back to the pre-request
+// file size and surface a network error so callers don't accept the corrupted
+// state.
+//
+// Production scenario this reproduces:
+//   - Flutter Android / iOS / Web hit a CDN that returns 416 + 49 B text/html
+//     when the requested Range offset exceeds the resource end (e.g. after a
+//     re-upload changed the file size).
+//   - Without the strict rollback, the 47–49 B HTML stub gets appended to the
+//     386 MB gguf and the file is silently corrupted; subsequent loads fail.
+void test_resume_with_416_tiny_html_body_preserves_prefix() {
+    auto dest = tmp_file("resume-416-html.bin");
+    std::string dest_str = dest.string();
+    const size_t prefix_size = g_payload.size() / 3;
+
+    // Seed a "valid" prefix on disk (stand-in for the 386 MB gguf in
+    // the production scenario).
+    {
+        std::ofstream out(dest, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(g_payload.data()),
+                  static_cast<std::streamsize>(prefix_size));
+    }
+    T_CHECK(fs::file_size(dest) == prefix_size);
+
+    g_resume_returns_416_html.store(true);
+    rac_http_download_request_t req{};
+    auto u = url("/payload");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = prefix_size;
+    // No checksum verification — the strict rollback must not depend on
+    // having an expected SHA, mirroring the production paths that download
+    // model files without per-file checksum validation.
+    req.expected_sha256_hex = nullptr;
+
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    g_resume_returns_416_html.store(false);
+
+    // Strict gate: the runner returns a network error and refuses to treat
+    // the response as a recoverable resume.
+    T_CHECK(rc == RAC_HTTP_DL_NETWORK_ERROR);
+    T_CHECK(status == 416);
+
+    // The on-disk file MUST still be exactly `prefix_size` bytes — the same
+    // bytes that were there before the failed resume request. The 47-byte
+    // HTML stub must NOT have been appended.
+    T_CHECK(fs::exists(dest));
+    T_CHECK(fs::file_size(dest) == prefix_size);
+
+    // Byte-for-byte: the prefix is still the valid model payload prefix.
+    std::ifstream in(dest, std::ios::binary);
+    std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
+                                  std::istreambuf_iterator<char>());
+    T_CHECK(on_disk.size() == prefix_size);
+    T_CHECK(std::equal(on_disk.begin(), on_disk.end(), g_payload.begin()));
+
+    fs::remove(dest);
+}
+
+// Companion: fresh download (resume_from_byte == 0) that receives HTTP 416
+// + tiny text/html body must NOT leave the destination on disk as a 47-byte
+// stub. The runner must remove the file (or leave it empty) so the next
+// retry observes a clean "no partial" state.
+void test_fresh_download_with_416_tiny_html_body_removes_stub() {
+    auto dest = tmp_file("fresh-416-html.bin");
+    std::string dest_str = dest.string();
+
+    // No prior file on disk — confirm.
+    T_CHECK(!fs::exists(dest));
+
+    g_resume_returns_416_html.store(true);  // also intercepts /stream path? no
+    // For the fresh path we need test_transport_stream to also return 416 +
+    // tiny html body. Re-use the resume hook by exercising the same wire-shape
+    // through the existing /payload-tiny-416 stream endpoint defined below.
+    // Simpler approach: drive via the resume transport but with resume_from = 0
+    // — the runner promotes fresh downloads to resume when no on-disk prefix
+    // exists only if a previous file was present, otherwise opens trunc and
+    // calls request_stream. So we need a stream endpoint that returns 416.
+    g_resume_returns_416_html.store(false);
+
+    // Drive the stream endpoint with a dedicated `/tiny-416` path that the
+    // test transport returns 416 + tiny html body for.
+    rac_http_download_request_t req{};
+    auto u = url("/tiny-416");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = 0;
+    req.expected_sha256_hex = nullptr;
+
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    T_CHECK(rc == RAC_HTTP_DL_NETWORK_ERROR);
+    T_CHECK(status == 416);
+
+    // The file must have been removed (fresh path) so the next attempt
+    // starts from a clean slate.
+    T_CHECK(!fs::exists(dest));
+
+    fs::remove(dest);  // no-op safety
+}
+
 }  // namespace
 
 int main() {
@@ -841,6 +1014,10 @@ int main() {
         test_resume_with_200_full_body_replay_no_checksum();
         // pass2-syn-116 regression: mid-stream failure + retry must not corrupt.
         test_resume_mid_stream_failure_then_retry_completes_cleanly();
+        // CLUSTER-13 / HTTP-416-STRICT (iter 3) regression: 416 + tiny html
+        // body must NOT overwrite valid on-disk prefix.
+        test_resume_with_416_tiny_html_body_preserves_prefix();
+        test_fresh_download_with_416_tiny_html_body_removes_stub();
 
         rac_http_transport_register(nullptr, nullptr);
         stop();

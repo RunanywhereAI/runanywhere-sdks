@@ -214,6 +214,17 @@ struct dl_ctx {
     bool io_error;
 };
 
+// CLUSTER-13 / HTTP-416-STRICT (iter 3): treat any response body smaller than
+// this threshold as "could be an error stub" — gguf / safetensors / sherpa-onnx
+// WASM model payloads are all multi-MB at minimum, so a body smaller than
+// `kSuspiciousResponseThreshold` arriving alongside a 4xx/5xx status (or
+// alongside a content-type starting with `text/`) is structurally not a model
+// payload and must NOT be allowed to overwrite a valid on-disk prefix. The
+// threshold is generous so we never reject a real partial-body chunked stream
+// mid-flight; the post-response check below verifies status + size + content-
+// type together before deciding to roll back.
+constexpr uint64_t kSuspiciousResponseThreshold = 1024;  // 1 KiB
+
 // Fires on every adapter-delivered chunk. No time-based throttling — the
 // callback is a few hundred ns per call and cancellation has to be
 // observable mid-stream even when a transfer completes in <100 ms
@@ -483,6 +494,37 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             }
         }
     }
+
+    // CLUSTER-13 / HTTP-416-STRICT (iter 3): observe the response Content-Type
+    // so the strict 416/error-body rollback below can distinguish "text/html
+    // CDN error stub" from "application/octet-stream truncated payload". We
+    // also fold "no content-type" into the suspicious-body class — a 4xx with
+    // a missing content-type and a tiny body is overwhelmingly an error stub
+    // (S3 / Cloudflare / nginx all emit text-style stubs even when they fail
+    // to set Content-Type).
+    bool response_content_type_is_textlike = false;
+    bool response_content_type_present = false;
+    if (rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
+        for (size_t i = 0; i < resp_meta.header_count; ++i) {
+            const auto& kv = resp_meta.headers[i];
+            if (kv.name == nullptr || kv.value == nullptr) {
+                continue;
+            }
+            if (iequals(kv.name, "Content-Type")) {
+                response_content_type_present = true;
+                std::string value(kv.value);
+                // Case-fold the prefix for the startswith check.
+                for (auto& c : value) {
+                    if (c >= 'A' && c <= 'Z')
+                        c = static_cast<char>(c + 32);
+                }
+                if (value.rfind("text/", 0) == 0) {
+                    response_content_type_is_textlike = true;
+                }
+                break;
+            }
+        }
+    }
     rac_http_response_free(&resp_meta);
     rac_http_client_destroy(client);
 
@@ -494,6 +536,83 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     }
     if (ctx.cancelled) {
         return RAC_HTTP_DL_CANCELLED;
+    }
+
+    // ---- CLUSTER-13 / HTTP-416-STRICT (iter 3): strict body validation -----
+    //
+    // CLUSTER-01 (commit d0a5885b6) gated the shift-left fallback on
+    // status == 200 || (206 + Range-Honored:false), which prevents HTTP 416
+    // from chopping the file down to the error stub size. But the body itself
+    // was still APPENDED (resume) or WRITTEN (fresh) to the destination by the
+    // chunk callback before the runner observed the status. In the resume
+    // path this leaves `[386 MB valid prefix][49 B HTML stub]` on disk; the
+    // 49 B suffix corrupts the file even though the gross size only changed
+    // by a tiny fraction. iter 2 surfaced this as FLUTTER-AND-DL-002,
+    // FLUTTER-IOS-004, and WEB-DOWNLOAD-001 — all three lanes saw the 49 B
+    // HTML overwrite the gguf on the post-relaunch retry.
+    //
+    // Policy (strict gate, scoped to HTTP 416 per task spec):
+    //   - status is HTTP 416 Range Not Satisfiable (the canonical CDN response
+    //     to a resume offset past the resource end)
+    //   - AND body is suspiciously small (< kSuspiciousResponseThreshold)
+    //   - AND content-type starts with `text/` OR is absent
+    //   → roll back the appended/written bytes (truncate the destination back
+    //     to effective_resume_from on resume; remove the file on fresh) and
+    //     return RAC_HTTP_DL_NETWORK_ERROR so callers DON'T treat the on-disk
+    //     state as part of a successful payload.
+    //
+    // We scope this strict gate to HTTP 416 specifically (not all 4xx/5xx)
+    // so that the existing RAC_HTTP_DL_SERVER_ERROR semantics for non-Range
+    // error statuses (404 / 500 / etc.) remain unchanged. Other 4xx/5xx
+    // statuses with prior on-disk prefix are still partially defended by:
+    //   1. The shift-left gate (which already excludes them via its status
+    //      eligibility check) — no truncation of the valid prefix happens.
+    //   2. The download orchestrator's post-finalize size guard — refuses to
+    //      register `downloaded:true` for any file that ends up < 80% of
+    //      expected. The 49-byte HTML body from a 404 attached to a fresh
+    //      download would trip this guard during the next finalize.
+    const bool status_is_416 = http_status == 416;
+    const bool body_is_tiny = ctx.bytes_written < kSuspiciousResponseThreshold;
+    const bool body_is_textlike_or_unknown =
+        response_content_type_is_textlike || !response_content_type_present;
+    if (rc == RAC_SUCCESS && status_is_416 && body_is_tiny && body_is_textlike_or_unknown) {
+        RAC_LOG_WARNING(
+            kTag,
+            "HTTP 416 returned %llu-byte %s body; rejecting write and rolling back to %llu bytes "
+            "(CLUSTER-13 / HTTP-416-STRICT)",
+            static_cast<unsigned long long>(ctx.bytes_written),
+            response_content_type_is_textlike ? "text/* (error-stub-shaped)"
+                                              : "unknown-content-type",
+            static_cast<unsigned long long>(effective_resume_from));
+        if (effective_resume_from > 0) {
+            // Resume path: truncate the file back to the pre-request size so
+            // the valid prefix is preserved verbatim and a follow-up resume
+            // (from a fresh URL or after the server recovers) can pick up
+            // where it left off.
+            std::error_code trunc_ec;
+            fs::resize_file(dest, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
+            if (trunc_ec) {
+                RAC_LOG_ERROR(kTag,
+                              "rollback truncate failed: %s (file may have %llu garbage bytes "
+                              "appended past offset %llu)",
+                              trunc_ec.message().c_str(),
+                              static_cast<unsigned long long>(ctx.bytes_written),
+                              static_cast<unsigned long long>(effective_resume_from));
+                return RAC_HTTP_DL_FILE_ERROR;
+            }
+        } else {
+            // Fresh-download path: the file was opened in trunc mode and
+            // overwritten with the error stub. Remove it entirely so the
+            // caller observes a clean "no partial" state and can retry from
+            // scratch without the stub masquerading as a recoverable prefix.
+            std::error_code rm_ec;
+            fs::remove(dest, rm_ec);
+            // Best-effort: even if remove fails the file is just an HTML
+            // stub that the next iteration's promote-to-resume sniff will
+            // catch via the `looks_like_stub` heuristic.
+            (void)rm_ec;
+        }
+        return RAC_HTTP_DL_NETWORK_ERROR;
     }
 
     // ---- Resume fallback: server ignored Range and replayed full body --

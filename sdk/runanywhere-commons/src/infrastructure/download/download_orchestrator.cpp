@@ -1044,6 +1044,79 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     }
 
     int64_t completed_bytes = total_expected > 0 ? total_expected : completed_before_file;
+
+    // CLUSTER-13 / HTTP-416-STRICT (iter 3): post-finalize size guard.
+    //
+    // The per-file HTTP runner already enforces a strict body-validation gate
+    // for tiny error-stub responses (CLUSTER-13 in rac_http_download.cpp),
+    // but a download orchestration can still finish with a file that is
+    // structurally smaller than the expected payload — e.g. when the server
+    // streams 200 with a short body that doesn't match the descriptor's
+    // expected_bytes, or when an extraction step silently produces a smaller
+    // artifact than the archive headers claimed. Before we register
+    // `is_downloaded = true` and bind a local_path into the model registry,
+    // verify each file's on-disk size against the descriptor's expected size.
+    // If any file is < 80% of its expected payload, refuse to register and
+    // mark the task FAILED so callers retry from scratch.
+    //
+    // We use 80% (not 100%) because real-world deltas exist: descriptors
+    // sometimes round expected_bytes from CDN HEAD probes, archive extraction
+    // emits files whose summed size doesn't equal the archive size, and a few
+    // gguf quants ship with a smaller-than-declared payload after the format
+    // upgrade. 20% slack catches the catastrophic case (49 B HTML stub
+    // standing in for a 386 MB gguf, or a 152 MB partial standing in for a
+    // 386 MB final) without forcing a false-positive failure on the slop.
+    bool sanity_check_passed = true;
+    std::string sanity_error;
+    if (!task->files.empty()) {
+        for (size_t i = 0; i < task->files.size(); ++i) {
+            const auto& file = task->files[i];
+            if (file.expected_bytes <= 0) {
+                // No expected size declared (e.g. some archives w/ unknown
+                // payloads). Skip — we have no ground truth to compare to.
+                continue;
+            }
+            if (file.requires_extraction) {
+                // Archive entries were extracted into model_folder_path and
+                // the raw archive was deleted by run_proto_download_worker.
+                // Comparing against expected_bytes would require summing the
+                // extracted tree; we treat the extraction step as authoritative
+                // and skip the per-file size guard for extracted artifacts.
+                continue;
+            }
+            int64_t actual = file_size_or_zero(file.destination_path);
+            // 80% threshold: actual >= 0.8 * expected to pass.
+            // Using integer math (actual * 5 >= expected * 4) avoids the
+            // floating-point round-trip and keeps the check overflow-safe
+            // for any 64-bit file size.
+            if (actual * 5 < file.expected_bytes * 4) {
+                sanity_check_passed = false;
+                sanity_error =
+                    "post-finalize size guard tripped: file " + file.filename + " is " +
+                    std::to_string(actual) + " bytes on disk but expected " +
+                    std::to_string(file.expected_bytes) +
+                    " bytes (< 80% threshold; CLUSTER-13)";
+                RAC_LOG_ERROR(LOG_TAG,
+                              "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
+                              "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
+                              task->task_id.c_str(), i, static_cast<long long>(actual),
+                              static_cast<long long>(file.expected_bytes));
+                break;
+            }
+        }
+    }
+    if (!sanity_check_passed) {
+        int64_t failed_bytes = total_expected > 0 ? completed_before_file : completed_before_file;
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          failed_bytes, total_expected,
+                          static_cast<int32_t>(task->files.size() - 1),
+                          task->files.empty() ? "" : task->files.back().storage_key, "",
+                          sanity_error);
+        mark_task_stopped(task);
+        emit_progress(task);
+        return;
+    }
+
     // For multi-file downloads (e.g. VLM primary .gguf + mmproj, MiniLM
     // model.onnx + vocab.txt) report the model *folder* as the resolved
     // local_path instead of the last file's destination path. Downstream
