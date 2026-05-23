@@ -83,6 +83,17 @@ function shouldPrepareCpuForModelLoad(
   return modelId.includes('qwen');
 }
 
+// Categories the LlamaCpp backend actually services. STT/TTS/VAD/embedding
+// requests are owned by other backends (Sherpa, ONNX, ...) and must never
+// trigger LlamaCpp's WebGPU→CPU fallback path — otherwise unrelated load
+// failures (e.g. a Sherpa whisper signature mismatch) surface to the user
+// as a misleading "WebGPU model load failed" log + bogus CPU retry.
+const LLAMACPP_ELIGIBLE_CATEGORIES: ReadonlySet<ModelCategory> = new Set([
+  ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  ModelCategory.MODEL_CATEGORY_VISION,
+  ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+]);
+
 function shouldFallbackWebGPUModelLoad(
   bridge: LlamaCppBridge,
   request: unknown,
@@ -91,17 +102,19 @@ function shouldFallbackWebGPUModelLoad(
   if (bridge.accelerationMode !== 'webgpu') return false;
   const loadRequest = request as Partial<ModelLoadRequest> | null;
   if (!loadRequest?.modelId) return false;
+  // Require an explicit, LlamaCpp-eligible category. An undefined/unknown
+  // category is treated as "not ours" so STT/TTS requests that bubble up
+  // load failures don't get incorrectly retried through this hook.
   if (
-    loadRequest.category !== undefined &&
-    loadRequest.category !== ModelCategory.MODEL_CATEGORY_MULTIMODAL &&
-    loadRequest.category !== ModelCategory.MODEL_CATEGORY_VISION
+    loadRequest.category === undefined ||
+    !LLAMACPP_ELIGIBLE_CATEGORIES.has(loadRequest.category)
   ) {
     return false;
   }
   // Emscripten can throw either Error instances, RuntimeError instances, or
   // opaque C++ exception objects depending on how the wasm trap crosses JSPI.
-  // Once we know the failed request is a WebGPU model load for an uncategorized
-  // or VLM/Vision request, retrying on CPU is the safest recovery path.
+  // Once we know the failed request is a WebGPU model load for an LLM/VLM
+  // request, retrying on CPU is the safest recovery path.
   return Boolean(error);
 }
 

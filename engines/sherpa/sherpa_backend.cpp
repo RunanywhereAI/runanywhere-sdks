@@ -342,7 +342,7 @@ bool SherpaSTT::build_offline_recognizer_locked() {
 
   // Initialize all config fields explicitly to avoid any uninitialized pointer
   // issues. The struct layout MUST match the prebuilt libsherpa-onnx-c-api.so
-  // version (v1.12.20).
+  // version (v1.13.2).
   SherpaOnnxOfflineRecognizerConfig recognizer_config;
   memset(&recognizer_config, 0, sizeof(recognizer_config));
 
@@ -420,9 +420,9 @@ bool SherpaSTT::build_offline_recognizer_locked() {
   recognizer_config.model_config.wenet_ctc.model = "";
   recognizer_config.model_config.omnilingual.model = "";
 
-  // NOTE: Do NOT set medasr or funasr_nano here - they don't exist in
-  // Sherpa-ONNX v1.12.20 (the prebuilt .so version). Setting them would shift
-  // the struct layout and cause SherpaOnnxCreateOfflineRecognizer to crash.
+  // Any newer model slots (e.g. medasr, funasr_nano in 1.13.2) are already
+  // zero-initialized by the memset above; explicit assignments here are
+  // limited to the slots we actively populate.
 
   recognizer_config.lm_config.model = "";
   recognizer_config.lm_config.scale = 1.0f;
