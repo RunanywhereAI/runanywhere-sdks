@@ -77,18 +77,43 @@ class OnnxBindings {
   ///
   /// On Android, the Sherpa register entry point lives in
   /// `librac_backend_sherpa.so` and the plugin-registry symbols
-  /// (`rac_plugin_register` / `rac_plugin_unregister` /
-  /// `rac_plugin_entry_sherpa`) live in `librac_commons.so`. Both .so files
-  /// are preloaded by the Android plugin (`OnnxPlugin.kt`) and the core
-  /// runanywhere plugin (`RunAnywhereBridge.kt` calls
-  /// `System.loadLibrary("runanywhere_jni")` which transitively pulls in
-  /// commons), so RTLD_DEFAULT (`DynamicLibrary.process()`) can resolve them
-  /// even though `_lib` only contains the ONNX backend symbols.
+  /// (`rac_plugin_register` / `rac_plugin_unregister`) live in
+  /// `librac_commons.so`. `OnnxPlugin.kt` already calls
+  /// `System.loadLibrary("rac_backend_sherpa")` from its static initializer
+  /// and `RunAnywhereBridge.kt` pulls in `librac_commons.so` transitively via
+  /// `librunanywhere_jni.so`, but in practice Dart FFI can race the plugin
+  /// static initializers (the Onnx Dart module is exposed before the Flutter
+  /// embedder finishes class loading the plugin) — and even when the JVM has
+  /// loaded the .so, `dlsym(RTLD_DEFAULT, ...)` (`DynamicLibrary.process()`)
+  /// does not see those symbols on every Android device. We therefore open
+  /// `librac_backend_sherpa.so` directly from Dart so the returned handle has
+  /// the Sherpa entry symbols and (via the NEEDED dependency) the
+  /// commons-side plugin registry symbols. This is the same workaround the
+  /// React-Native ONNX hybrid uses (it calls the C entry points directly
+  /// from native C++, never through `RTLD_DEFAULT`). See FLUTTER-AND-SHERPA-002
+  /// (E2E-LOOP iter3 CLUSTER-17).
   ///
   /// On iOS/macOS everything is statically linked into the host binary, so
   /// `DynamicLibrary.process()` finds every exported symbol — the same lookup
   /// path that `PlatformLoader.loadCommons()` returns.
   static DynamicLibrary _loadPluginRegistryLibrary() {
+    if (Platform.isAndroid) {
+      // On Android open the Sherpa backend explicitly. This guarantees the
+      // Sherpa entry symbols are visible to FFI lookups even if OnnxPlugin's
+      // static initializer has not yet run (or ran on a different namespace).
+      // The .so's NEEDED dependency on librac_commons.so means the dynamic
+      // linker also resolves rac_plugin_register / rac_plugin_unregister so
+      // the same handle can be used for both Sherpa and unified plugin
+      // registry lookups.
+      try {
+        return DynamicLibrary.open('librac_backend_sherpa.so');
+      } catch (_) {
+        // Library may not be bundled in stripped-down builds. Fall through
+        // to RTLD_DEFAULT below — if the symbols are nowhere to be found,
+        // `registerSherpa()` returns RAC_ERROR_NOT_SUPPORTED instead of
+        // crashing.
+      }
+    }
     try {
       return DynamicLibrary.process();
     } catch (_) {
