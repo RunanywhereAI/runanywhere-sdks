@@ -7,6 +7,7 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -62,6 +63,23 @@ std::vector<Subscription> g_all_subscriptions;
 std::mutex g_sdk_event_mutex;
 std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
 std::deque<std::vector<uint8_t>> g_sdk_event_queue;
+
+// FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: ring of recently emitted SDKEvent
+// byte buffers. Mirrors the download_orchestrator proto_progress_sink ring
+// (BUG-FLT-ANDROID-001 / BUG-STREAMING-005). Async SDK bindings — Flutter
+// Dart `NativeCallable.listener`, React Native NitroModules — process the
+// callback on a different thread/isolate than the one that invoked it. A
+// stack-scoped `std::vector<uint8_t>` (the previous implementation) would be
+// freed by the time those bindings finally read the pointer, producing
+// `InvalidProtocolBufferException: invalid tag (zero)` on every SDKEvent.
+//
+// Keeping the last N serializations alive guarantees each emitted pointer
+// remains valid long enough for the slowest async binding to copy it out.
+// A ring size of 64 comfortably exceeds the SDKEvent burst observed during
+// a fresh-install E2E session (model lifecycle + download + load + run).
+constexpr size_t kSdkEventRingSize = 64;
+std::array<std::vector<uint8_t>, kSdkEventRingSize> g_sdk_event_ring;
+size_t g_sdk_event_ring_index = 0;
 
 uint64_t current_time_ms() {
     using namespace std::chrono;
@@ -456,6 +474,16 @@ void rac_sdk_event_unsubscribe(uint64_t subscription_id) {
                                               return false;
                                           });
     g_sdk_event_subscriptions.erase(removed.begin(), g_sdk_event_subscriptions.end());
+
+    // FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: free the SDKEvent ring buffers
+    // once the last subscriber leaves so an idle SDK doesn't pin up to 64
+    // serialized SDKEvent buffers for the rest of the process lifetime.
+    if (g_sdk_event_subscriptions.empty()) {
+        for (auto& slot : g_sdk_event_ring) {
+            std::vector<uint8_t>().swap(slot);
+        }
+        g_sdk_event_ring_index = 0;
+    }
 }
 
 rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t proto_size) {
@@ -463,22 +491,35 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::vector<uint8_t> bytes;
-    if (proto_size > 0) {
-        bytes.assign(proto_bytes, proto_bytes + proto_size);
-    }
-
+    // FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: route the emitted bytes through
+    // a persistent ring slot (held under g_sdk_event_mutex) so the pointer
+    // passed to async SDK bindings (Flutter Dart `NativeCallable.listener`,
+    // React Native NitroModules) remains valid until subsequent emissions
+    // rotate the slot. The previous implementation handed out a pointer to a
+    // stack-scoped `std::vector<uint8_t>` that was destroyed before the Dart
+    // isolate / RN bridge could decode it — yielding "invalid tag (zero)" on
+    // every SDKEvent (~13 per Flutter session, 25+ when combined with
+    // DownloadProgress).
+    //
+    // The C ABI contract (callback_data, bytes.size()) is preserved: the size
+    // strictly equals the serialized byte count, with no trailing padding.
     std::vector<SDKEventSubscription> subscriptions;
+    const uint8_t* callback_data = nullptr;
+    size_t callback_size = 0;
     {
         std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
-        g_sdk_event_queue.push_back(bytes);
+        std::vector<uint8_t>& slot = g_sdk_event_ring[g_sdk_event_ring_index];
+        g_sdk_event_ring_index = (g_sdk_event_ring_index + 1) % kSdkEventRingSize;
+        slot.assign(proto_bytes, proto_bytes + proto_size);
+        g_sdk_event_queue.push_back(slot);
         subscriptions = g_sdk_event_subscriptions;
+        callback_data = slot.empty() ? nullptr : slot.data();
+        callback_size = slot.size();
     }
 
-    const uint8_t* callback_data = bytes.empty() ? nullptr : bytes.data();
     for (const auto& sub : subscriptions) {
         if (sub.alive->load()) {
-            sub.callback(callback_data, bytes.size(), sub.user_data);
+            sub.callback(callback_data, callback_size, sub.user_data);
         }
     }
 
