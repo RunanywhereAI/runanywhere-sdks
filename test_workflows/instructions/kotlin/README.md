@@ -6,6 +6,8 @@
 **Automated driver:** `test_workflows/scripts/kotlin/run-kotlin-executor.sh`
 **MCP runbook:** [`../mcp-agent-runbook.md`](../mcp-agent-runbook.md)
 
+> ⚠️ **Mandatory fresh install for every executor run** — see [`../reusable-full-matrix-e2e-loop-prompt.md` §7.3](../reusable-full-matrix-e2e-loop-prompt.md#73-universal-lane-executor-sub-prompt) step 5. Each invocation (first attempt, resumed continuation, or Phase 9 re-verification) MUST `adb shell am force-stop`, `adb uninstall` (retry once if first call returns `DELETE_FAILED_INTERNAL_ERROR`), rebuild APK from worktree, `adb install -r`, grant runtime permissions, and `adb shell am start` the MainActivity. No "resume on existing install" mode. Pre-sweep stale processes: `pkill -9 -f 'logcat.*RunAnywhere'`.
+
 ## Identifiers
 
 | Field | Value |
