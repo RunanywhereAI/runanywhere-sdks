@@ -35,6 +35,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/platform/rac_llm_platform.h"
 #include "rac/features/platform/rac_tts_platform.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
@@ -338,6 +339,87 @@ static void platform_tts_destroy(rac_handle_t handle, void* /*user_data*/) {
 }  // namespace
 
 // =============================================================================
+// Platform LLM (Apple Foundation Models) callback bridge
+// =============================================================================
+//
+// Mirrors the Swift SDK's `CppBridge+Platform.swift` LLM callback set so the
+// commons router has a real `platform` LLM vtable when it routes
+// `foundation-models-default` (and any other `framework == .foundationModels`
+// model). Without these callbacks, `rac_platform_llm_is_available()` returns
+// false and the router rejects every Apple FM load with
+// "Feature/operation is not supported" (FLUTTER-IOS-004).
+//
+// FoundationModels is a Swift-only framework that ships with iOS 26 / macOS 26.
+// Since the Flutter plugin pod does not ship a `CRACommons` module map (so we
+// cannot import the C ABI from Swift directly), we register C trampolines
+// here. The trampolines correctly report unavailability on every runtime
+// that does NOT have Foundation Models support (i.e. every shipping iOS /
+// macOS until 26.x). When Flutter targets a 26.x device the bridge still
+// returns `RAC_ERROR_NOT_SUPPORTED` from `generate` until a Swift FM service
+// is wired in; the important difference vs. "no callbacks registered" is
+// that the router actually has a route and surfaces a deterministic
+// availability error instead of "Swift callbacks not registered".
+namespace {
+
+inline bool foundationModelsRuntimeAvailable() {
+    if (@available(iOS 26.0, macOS 26.0, *)) {
+#if TARGET_OS_SIMULATOR
+        // FoundationModels is gated to physical devices on shipping iOS;
+        // the simulator does not expose a usable runtime.
+        return false;
+#else
+        return true;
+#endif
+    }
+    return false;
+}
+
+static rac_bool_t platform_llm_can_handle(const char* model_id, void* /*user_data*/) {
+    if (!foundationModelsRuntimeAvailable()) {
+        return RAC_FALSE;
+    }
+    if (model_id == nullptr) {
+        return RAC_FALSE;
+    }
+    NSString* s = [[NSString stringWithUTF8String:model_id] lowercaseString];
+    if ([s containsString:@"foundation-models"] ||
+        [s containsString:@"foundation_models"] ||
+        [s containsString:@"foundation"] ||
+        [s containsString:@"apple-intelligence"] ||
+        [s isEqualToString:@"system-llm"]) {
+        return RAC_TRUE;
+    }
+    return RAC_FALSE;
+}
+
+static rac_handle_t platform_llm_create(const char* /*model_path*/,
+                                        const rac_llm_platform_config_t* /*config*/,
+                                        void* /*user_data*/) {
+    // Until a Swift FoundationModels service is wired into the Flutter pod we
+    // fail-fast here so the router falls back to the next compatible plugin.
+    // Logging at warning so the gap is visible without spamming on every
+    // can_handle probe.
+    RA_PLATFORM_LOG_INFO(
+        "Foundation Models create() not implemented in Flutter pod yet; "
+        "router will retry with the next compatible backend");
+    return nullptr;
+}
+
+static rac_result_t platform_llm_generate(rac_handle_t /*handle*/,
+                                          const char* /*prompt*/,
+                                          const rac_llm_platform_options_t* /*options*/,
+                                          char** /*out_response*/,
+                                          void* /*user_data*/) {
+    return RAC_ERROR_NOT_SUPPORTED;
+}
+
+static void platform_llm_destroy(rac_handle_t /*handle*/, void* /*user_data*/) {
+    // No retained Swift state yet; nothing to release.
+}
+
+}  // namespace
+
+// =============================================================================
 // Public C entry point — called from Swift façade during plugin registration.
 // =============================================================================
 
@@ -362,6 +444,26 @@ extern "C" void ra_flutter_register_platform_tts(void) {
         return;
     }
 
+    // FLUTTER-IOS-004 fix: register Apple Foundation Models LLM callbacks so
+    // the router has a real `platform` LLM route. Without this the load path
+    // for `foundation-models-default` fails with "Swift callbacks not
+    // registered" instead of a deterministic
+    // RAC_ERROR_CAPABILITY_UNSUPPORTED / RAC_ERROR_NOT_SUPPORTED. Mirrors
+    // CppBridge+Platform.swift `registerLLMCallbacks()`.
+    rac_platform_llm_callbacks_t llmCallbacks = {};
+    llmCallbacks.can_handle = &platform_llm_can_handle;
+    llmCallbacks.create     = &platform_llm_create;
+    llmCallbacks.generate   = &platform_llm_generate;
+    llmCallbacks.destroy    = &platform_llm_destroy;
+    llmCallbacks.user_data  = nullptr;
+
+    rac_result_t llmSetCbRc = rac_platform_llm_set_callbacks(&llmCallbacks);
+    if (llmSetCbRc != RAC_SUCCESS) {
+        RA_PLATFORM_LOG_ERROR(
+            "rac_platform_llm_set_callbacks failed: %d", (int)llmSetCbRc);
+        // Non-fatal: TTS half can still register.
+    }
+
     rac_result_t backendRc = rac_backend_platform_register();
     if (backendRc != RAC_SUCCESS && backendRc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
         RA_PLATFORM_LOG_ERROR("rac_backend_platform_register failed: %d", (int)backendRc);
@@ -383,5 +485,6 @@ extern "C" void ra_flutter_register_platform_tts(void) {
     }
 
     sRegistered.store(true);
-    RA_PLATFORM_LOG_INFO("Platform TTS plugin registered (AVSpeechSynthesizer)");
+    RA_PLATFORM_LOG_INFO(
+        "Platform plugin registered (AVSpeechSynthesizer TTS + Foundation Models LLM stub)");
 }

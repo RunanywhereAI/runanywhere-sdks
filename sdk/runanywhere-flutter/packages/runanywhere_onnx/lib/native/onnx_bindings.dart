@@ -27,6 +27,16 @@ import 'package:runanywhere/native/types/basic_types.dart';
 class OnnxBindings {
   final DynamicLibrary _lib;
 
+  // Symbol lookup scope for Sherpa + plugin-registry symbols. On Android these
+  // live in sibling .so files (librac_backend_sherpa.so, librac_commons.so)
+  // that OnnxPlugin.kt + RunAnywhereBridge.kt preload, so we resolve them via
+  // RTLD_DEFAULT (`DynamicLibrary.process()`) rather than searching `_lib`
+  // (which is just librac_backend_onnx.so on Android). On iOS/macOS the
+  // statically linked XCFramework already exposes every symbol through
+  // `DynamicLibrary.process()`, so this collapses to the same lookup we use
+  // for the ONNX backend. See FLUTTER-AND-001 (E2E-LOOP iter1 CLUSTER-06).
+  final DynamicLibrary _pluginRegistryLib;
+
   // Function pointers - only registration functions
   late final RacBackendOnnxRegisterDart? _register;
   late final RacBackendOnnxUnregisterDart? _unregister;
@@ -46,18 +56,48 @@ class OnnxBindings {
   ///
   /// - iOS: Uses DynamicLibrary.process() for statically linked XCFramework
   /// - Android: Loads librac_backend_onnx_jni.so separately
-  OnnxBindings() : _lib = _loadLibrary() {
+  OnnxBindings()
+      : _lib = _loadLibrary(),
+        _pluginRegistryLib = _loadPluginRegistryLibrary() {
     _bindFunctions();
   }
 
   /// Create bindings with a specific library (for testing).
-  OnnxBindings.withLibrary(this._lib) {
+  OnnxBindings.withLibrary(this._lib)
+      : _pluginRegistryLib = _loadPluginRegistryLibrary() {
     _bindFunctions();
   }
 
   /// Load the correct library for the current platform.
   static DynamicLibrary _loadLibrary() {
     return loadBackendLibrary();
+  }
+
+  /// Load the symbol scope used for Sherpa + unified plugin-registry lookups.
+  ///
+  /// On Android, the Sherpa register entry point lives in
+  /// `librac_backend_sherpa.so` and the plugin-registry symbols
+  /// (`rac_plugin_register` / `rac_plugin_unregister` /
+  /// `rac_plugin_entry_sherpa`) live in `librac_commons.so`. Both .so files
+  /// are preloaded by the Android plugin (`OnnxPlugin.kt`) and the core
+  /// runanywhere plugin (`RunAnywhereBridge.kt` calls
+  /// `System.loadLibrary("runanywhere_jni")` which transitively pulls in
+  /// commons), so RTLD_DEFAULT (`DynamicLibrary.process()`) can resolve them
+  /// even though `_lib` only contains the ONNX backend symbols.
+  ///
+  /// On iOS/macOS everything is statically linked into the host binary, so
+  /// `DynamicLibrary.process()` finds every exported symbol — the same lookup
+  /// path that `PlatformLoader.loadCommons()` returns.
+  static DynamicLibrary _loadPluginRegistryLibrary() {
+    try {
+      return DynamicLibrary.process();
+    } catch (_) {
+      // `DynamicLibrary.process()` should not fail on supported platforms,
+      // but if it does, fall through to the ONNX backend library — Sherpa
+      // bindings will end up null and `registerSherpa()` will return
+      // RAC_ERROR_NOT_SUPPORTED instead of crashing.
+      return loadBackendLibrary();
+    }
   }
 
   /// Load the ONNX backend library.
@@ -134,33 +174,45 @@ class OnnxBindings {
     // Sherpa lifecycle. Prefer the explicit wrapper (Android dynamic linkage);
     // if absent (iOS XCFramework drops the wrapper), bind the plugin-entry
     // pair so we can register Sherpa through the unified plugin registry.
+    //
+    // FLUTTER-AND-001 fix: resolve these via `_pluginRegistryLib`
+    // (`DynamicLibrary.process()` on Android, statically linked binary on
+    // iOS/macOS) instead of `_lib`. `_lib` is just `librac_backend_onnx.so` on
+    // Android — it does NOT export `rac_backend_sherpa_register`,
+    // `rac_plugin_entry_sherpa`, `rac_plugin_register`, or
+    // `rac_plugin_unregister`. Those live in `librac_backend_sherpa.so` and
+    // `librac_commons.so` respectively. OnnxPlugin.kt + RunAnywhereBridge.kt
+    // preload both, so RTLD_DEFAULT resolves them at FFI lookup time.
     try {
-      _sherpaRegister = _lib.lookupFunction<RacBackendSherpaRegisterNative,
+      _sherpaRegister = _pluginRegistryLib.lookupFunction<
+          RacBackendSherpaRegisterNative,
           RacBackendSherpaRegisterDart>('rac_backend_sherpa_register');
     } catch (_) {
       _sherpaRegister = null;
     }
     try {
-      _sherpaUnregister = _lib.lookupFunction<RacBackendSherpaUnregisterNative,
+      _sherpaUnregister = _pluginRegistryLib.lookupFunction<
+          RacBackendSherpaUnregisterNative,
           RacBackendSherpaUnregisterDart>('rac_backend_sherpa_unregister');
     } catch (_) {
       _sherpaUnregister = null;
     }
     try {
-      _sherpaPluginEntry = _lib.lookupFunction<RacPluginEntrySherpaNative,
+      _sherpaPluginEntry = _pluginRegistryLib.lookupFunction<
+          RacPluginEntrySherpaNative,
           RacPluginEntrySherpaDart>('rac_plugin_entry_sherpa');
     } catch (_) {
       _sherpaPluginEntry = null;
     }
     try {
-      _pluginRegister =
-          _lib.lookupFunction<RacPluginRegisterNative, RacPluginRegisterDart>(
+      _pluginRegister = _pluginRegistryLib
+          .lookupFunction<RacPluginRegisterNative, RacPluginRegisterDart>(
               'rac_plugin_register');
     } catch (_) {
       _pluginRegister = null;
     }
     try {
-      _pluginUnregister = _lib
+      _pluginUnregister = _pluginRegistryLib
           .lookupFunction<RacPluginUnregisterNative, RacPluginUnregisterDart>(
               'rac_plugin_unregister');
     } catch (_) {

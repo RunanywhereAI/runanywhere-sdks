@@ -4,8 +4,9 @@
 //
 //  Swift façade around the ObjC++ implementation in
 //  `PlatformPluginBridge.mm`. The ObjC++ file owns the
-//  `rac_platform_tts_callbacks_t` vtable, the AVSpeechSynthesizer
-//  machinery, and the plugin registration sequence; this file exposes
+//  `rac_platform_tts_callbacks_t` + `rac_platform_llm_callbacks_t`
+//  vtables, the AVSpeechSynthesizer machinery, and the plugin
+//  registration sequence; this file exposes
 //  `PlatformPluginBridge.register()` so the Flutter plugin can install
 //  the adapter from `RunAnywherePlugin.register(with:)`.
 //
@@ -22,17 +23,21 @@
 
 import Foundation
 
-/// AVSpeechSynthesizer-backed System TTS plugin registration.
+/// AVSpeechSynthesizer-backed System TTS plugin + Apple Foundation Models
+/// LLM stub registration.
 ///
 /// Wires the commons `platform` engine plugin into the unified plugin
-/// router so `tts.loadVoice("system-tts")` resolves on iOS. Safe to call
+/// router so `tts.loadVoice("system-tts")` resolves on iOS and so
+/// `foundation-models-default` (and any other `framework ==
+/// .foundationModels` model) gets a deterministic availability response
+/// instead of "Swift callbacks not registered". Safe to call
 /// `register()` multiple times — subsequent calls are no-ops (the ObjC++
 /// implementation guards with an atomic flag).
 public enum PlatformPluginBridge {
 
-    /// Install the AVSpeechSynthesizer-backed System TTS adapter and
-    /// register the platform engine plugin with the commons router.
-    /// Idempotent.
+    /// Install the AVSpeechSynthesizer-backed System TTS adapter and the
+    /// Apple Foundation Models LLM availability adapter, then register the
+    /// platform engine plugin with the commons router. Idempotent.
     public static func register() {
         RAFlutterRegisterPlatformTTS()
     }
