@@ -318,9 +318,69 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
+    // Bug C: when a fresh download was requested (`resume_from_byte == 0`)
+    // but a non-trivial partial file already lives at the destination
+    // (e.g. from a previous attempt that left a real gguf prefix on disk),
+    // truncating-then-replaying erases the only good copy of the prefix.
+    // If the next attempt then trips Bug B's shift-left fallback or a 416
+    // error stub, the file ends up as a 49-byte HTML page.
+    //
+    // Defensive policy:
+    //   1. If the on-disk file starts with an HTML/XML magic byte (`<`)
+    //      OR is small enough to be an error-page stub (<= 1 KiB), treat
+    //      it as garbage and truncate as before.
+    //   2. Otherwise, promote the fresh download to a resume from the
+    //      current file size so the existing bytes are preserved and only
+    //      the tail is re-fetched.
+    //
+    // This is intentionally a heuristic — without a server etag/If-Match
+    // we cannot prove the prefix matches the upstream payload. The shift-
+    // left fallback in the success path covers the case where the server
+    // re-serves the full body, so the worst-case outcome is one extra
+    // shift-left pass instead of permanent corruption.
+    uint64_t effective_resume_from = req->resume_from_byte;
+    if (req->resume_from_byte == 0 && fs::exists(dest, ec) && !ec) {
+        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(dest, ec));
+        if (!ec && existing_size > 0) {
+            bool looks_like_stub = false;
+            // Sniff the first 16 bytes. HTML/XML error pages start with '<'
+            // (whitespace tolerated). Tiny files (<= 1 KiB) are presumed to
+            // be transport-layer error stubs since gguf / safetensors /
+            // sherpa-onnx-wasm payloads are all multi-MB at minimum.
+            constexpr uint64_t kStubMaxBytes = 1024;
+            if (existing_size <= kStubMaxBytes) {
+                looks_like_stub = true;
+            } else {
+                std::ifstream sniff(dest, std::ios::binary);
+                if (sniff.is_open()) {
+                    char sniff_buf[16] = {0};
+                    sniff.read(sniff_buf, sizeof(sniff_buf));
+                    std::streamsize sniff_n = sniff.gcount();
+                    for (std::streamsize i = 0; i < sniff_n; ++i) {
+                        char c = sniff_buf[i];
+                        if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+                            continue;
+                        if (c == '<') {
+                            looks_like_stub = true;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (!looks_like_stub) {
+                RAC_LOG_WARNING(
+                    kTag,
+                    "fresh download but %llu bytes already on disk; promoting to resume to "
+                    "preserve prior partial (Bug C / COMMONS-DOWNLOAD-001)",
+                    static_cast<unsigned long long>(existing_size));
+                effective_resume_from = existing_size;
+            }
+        }
+    }
+
     // ---- Open destination file --------------------------------------
     std::ios::openmode mode = std::ios::binary | std::ios::out;
-    if (req->resume_from_byte > 0) {
+    if (effective_resume_from > 0) {
         mode |= std::ios::app;
     } else {
         mode |= std::ios::trunc;
@@ -347,14 +407,14 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     bool do_hash = (req->expected_sha256_hex != nullptr && req->expected_sha256_hex[0] != '\0');
     if (do_hash) {
         sha256_init(&hasher);
-        if (req->resume_from_byte > 0) {
+        if (effective_resume_from > 0) {
             std::ifstream in(dest, std::ios::binary);
             if (!in.is_open()) {
                 rac_http_client_destroy(client);
                 return RAC_HTTP_DL_FILE_ERROR;
             }
             std::vector<uint8_t> buf(static_cast<size_t>(64) * 1024);
-            uint64_t remaining = req->resume_from_byte;
+            uint64_t remaining = effective_resume_from;
             while (remaining > 0 && in.good()) {
                 size_t chunk = static_cast<size_t>(std::min<uint64_t>(buf.size(), remaining));
                 in.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(chunk));
@@ -382,14 +442,14 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     ctx.hasher = do_hash ? &hasher : nullptr;
     ctx.hashing = do_hash;
     ctx.bytes_written = 0;
-    ctx.resume_prefix = req->resume_from_byte;
+    ctx.resume_prefix = effective_resume_from;
     ctx.progress_cb = progress_cb;
     ctx.progress_user_data = progress_user_data;
 
     rac_http_response_t resp_meta{};
     rac_result_t rc;
-    if (req->resume_from_byte > 0) {
-        rc = rac_http_request_resume(client, &http_req, req->resume_from_byte, on_chunk, &ctx,
+    if (effective_resume_from > 0) {
+        rc = rac_http_request_resume(client, &http_req, effective_resume_from, on_chunk, &ctx,
                                      &resp_meta);
     } else {
         rc = rac_http_request_stream(client, &http_req, on_chunk, &ctx, &resp_meta);
@@ -411,7 +471,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // sdk/runanywhere-swift/Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift:496-505
     // and sdk/runanywhere-kotlin/.../OkHttpHttpTransport.kt:360-366.
     bool range_honored_signal_header = false;
-    if (req->resume_from_byte > 0 && rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
+    if (effective_resume_from > 0 && rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
         for (size_t i = 0; i < resp_meta.header_count; ++i) {
             const auto& kv = resp_meta.headers[i];
             if (kv.name == nullptr || kv.value == nullptr) {
@@ -438,25 +498,43 @@ rac_http_download_execute(const rac_http_download_request_t* req,
 
     // ---- Resume fallback: server ignored Range and replayed full body --
     //
-    // When the request was a resume (`resume_from_byte > 0`) but the server
-    // responded with HTTP 200 instead of 206, the body we just appended is
-    // the FULL payload — not the [resume_prefix : end] tail we asked for.
-    // The file on disk is now [original prefix][full payload]; the prefix
-    // is no longer valid. Shift left by `resume_prefix` so the file ends up
-    // as the full payload only. The operation succeeds deterministically
-    // instead of silently producing a corrupted file or surfacing a misleading
-    // CHECKSUM_FAILED. Mirrors the behavior callers expect from a CDN that
-    // does not honor Range (e.g. some S3 / GCS configurations and proxies
-    // that strip the header).
+    // When the request was a resume (`effective_resume_from > 0`) but the
+    // server responded with HTTP 200 instead of 206, the body we just
+    // appended is the FULL payload — not the [resume_prefix : end] tail
+    // we asked for. The file on disk is now [original prefix][full payload];
+    // the prefix is no longer valid. Shift left by `effective_resume_from`
+    // so the file ends up as the full payload only. The operation succeeds
+    // deterministically instead of silently producing a corrupted file or
+    // surfacing a misleading CHECKSUM_FAILED. Mirrors the behavior callers
+    // expect from a CDN that does not honor Range (e.g. some S3 / GCS
+    // configurations and proxies that strip the header).
     //
-    // Either an HTTP 200 status or an explicit X-RAC-Range-Honored=false
-    // header (snapshotted above) means the server replayed the full body.
-    if (req->resume_from_byte > 0 && rc == RAC_SUCCESS &&
-        (http_status == 200 || range_honored_signal_header)) {
+    // Bug B / COMMONS-DOWNLOAD-001: the previous gate (`http_status == 200
+    // || range_honored_signal_header`) ALSO fired for HTTP 416 + Range-
+    // not-honored header, which is the canonical CDN response to a resume
+    // request whose offset is past the resource end. The body for 416 is
+    // typically a few dozen bytes of HTML error page (Cloudflare returns
+    // exactly 49 bytes for some configs), and shift-left chops the file
+    // down to that tiny body — destroying the existing partial. Two
+    // defenses, both required:
+    //   1. Status gate: only HTTP 200 (full-body replay) OR the rare
+    //      HTTP 206 + Range-not-honored header (transport-layer signal
+    //      that a CDN replayed the full payload through a 206 wrapper).
+    //      All 4xx/5xx statuses — including 416 — are explicitly excluded.
+    //   2. Body-size gate: `ctx.bytes_written >= effective_resume_from`.
+    //      The shift would discard `effective_resume_from` bytes from the
+    //      front of the new body. If the body is shorter than the prefix
+    //      we'd throw away, the body is structurally not a full payload
+    //      and the shift can only cause data loss.
+    const bool shift_left_status_eligible =
+        http_status == 200 || (http_status == 206 && range_honored_signal_header);
+    const bool shift_left_body_sufficient = ctx.bytes_written >= effective_resume_from;
+    if (effective_resume_from > 0 && rc == RAC_SUCCESS && shift_left_status_eligible &&
+        shift_left_body_sufficient) {
         RAC_LOG_WARNING(kTag,
                         "resume request returned HTTP 200 (Range not honored); shifting "
                         "destination left by %llu bytes to recover the full payload",
-                        static_cast<unsigned long long>(req->resume_from_byte));
+                        static_cast<unsigned long long>(effective_resume_from));
         fs::path tmp_path(std::string(req->destination_path) + ".rac_resume_fallback.tmp");
         std::error_code ren_ec;
         fs::rename(dest, tmp_path, ren_ec);
@@ -471,7 +549,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                 fs::rename(tmp_path, dest, restore_ec);
                 return RAC_HTTP_DL_FILE_ERROR;
             }
-            src.seekg(static_cast<std::streamoff>(req->resume_from_byte));
+            src.seekg(static_cast<std::streamoff>(effective_resume_from));
             std::vector<char> shift_buf(static_cast<size_t>(64) * 1024);
             while (src.good()) {
                 src.read(shift_buf.data(), static_cast<std::streamsize>(shift_buf.size()));

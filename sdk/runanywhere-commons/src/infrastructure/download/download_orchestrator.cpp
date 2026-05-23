@@ -397,14 +397,23 @@ bool is_safe_relative_descriptor_path(const std::string& path) {
     if (path.empty())
         return false;
     if (is_absolute_path(path)) {
-        // Absolute paths are normally a policy decision the C++ writer must
-        // not be steered into. The single exception is a platform-trusted
-        // mount root (e.g. Emscripten OPFS) where the platform itself
-        // sandboxes everything below the prefix. We still verify that no
-        // component is empty / "." / ".." so traversal segments embedded in
-        // a trusted-prefix path are caught.
-        if (!is_platform_trusted_absolute_prefix(path))
-            return false;
+        // Absolute paths are accepted at this segment-validation layer when
+        // every component is non-empty / not "." / not ".." so traversal
+        // segments embedded inside an absolute path are rejected. The
+        // containment policy (must be under model_folder OR under a
+        // platform-trusted mount root such as Emscripten OPFS) is enforced
+        // in safe_descriptor_path_under — this function is purely a
+        // per-component sanity check.
+        //
+        // Historical context: the previous policy treated ALL non-OPFS
+        // absolute paths as a hard reject, but the trusted planner emits
+        // absolute paths rooted under the per-model folder
+        // (rac_download_compute_destination → rac_model_paths_get_*),
+        // which means a hard reject corrupted every download on platforms
+        // whose per-model folders are not under a platform-trusted prefix
+        // (iOS `<App>/Documents/...`, Android `/data/user/0/...`). The
+        // containment check in safe_descriptor_path_under is what gates
+        // policy now; per-segment validation remains here.
         size_t start = 1;  // skip the leading '/'
         while (start <= path.size()) {
             size_t end = path.find_first_of("/\\", start);
@@ -444,11 +453,24 @@ bool is_safe_relative_descriptor_path(const std::string& path) {
 // `model_folder` is trusted (built from rac_model_paths_get_*); only
 // `relative_path` is treated as untrusted.
 //
-// EXCEPTION: when `relative_path` is a platform-trusted absolute path
-// (e.g. Emscripten `/opfs/...`), the path is returned verbatim — the
-// model_folder containment check does not apply because the platform mount
-// root IS the trusted root. Per-segment validation has already rejected
-// traversal segments inside the absolute path.
+// Accepts three input shapes for `relative_path`:
+//   1. Relative path. Joined with model_folder; result must be lexically
+//      contained under the normalized model_folder.
+//   2. Absolute path under a platform-trusted mount root (e.g. Emscripten
+//      `/opfs/`). Returned verbatim — the platform mount IS the sandbox.
+//   3. Absolute path that is lexically contained under model_folder once
+//      both are canonicalized (best-effort via fs::weakly_canonical, which
+//      resolves any symlinks present and is well-defined for paths that
+//      don't yet exist). This is the trusted-planner shape: the planner
+//      builds destinations by joining a per-model folder (computed via
+//      rac_model_paths_get_model_folder + rac_download_compute_destination)
+//      onto a filename, which yields an absolute path on platforms whose
+//      per-model folders live outside any platform-trusted mount prefix
+//      (iOS `<App>/Documents/RunAnywhere/Models/...`, Android
+//      `/data/user/0/com.<pkg>/files/RunAnywhere/Models/...`).
+//
+// Per-component validation in is_safe_relative_descriptor_path has already
+// rejected '.' / '..' / empty / backslash-containing components.
 std::optional<std::string> safe_descriptor_path_under(const std::string& model_folder,
                                                       const std::string& relative_path) {
     if (!is_safe_relative_descriptor_path(relative_path))
@@ -463,8 +485,43 @@ std::optional<std::string> safe_descriptor_path_under(const std::string& model_f
     if (model_folder.empty())
         return std::nullopt;
 
-    fs::path root = fs::path(model_folder).lexically_normal();
-    fs::path joined = (root / relative_path).lexically_normal();
+    // Best-effort canonicalization. fs::weakly_canonical() is the C++17
+    // counterpart of POSIX realpath() that tolerates non-existent leaves;
+    // both root and candidate are run through it so symlink-traversed and
+    // lexical forms compare cleanly. On any std::error_code we fall back
+    // to lexically_normal so a failure doesn't degrade the security check
+    // into a permissive pass-through.
+    auto canonicalize = [](const fs::path& in) {
+        std::error_code ec;
+        fs::path canon = fs::weakly_canonical(in, ec);
+        if (ec || canon.empty()) {
+            return in.lexically_normal();
+        }
+        return canon.lexically_normal();
+    };
+
+    fs::path root = canonicalize(fs::path(model_folder));
+
+    if (is_absolute_path(relative_path)) {
+        // Absolute candidate: must be lexically contained under canonical
+        // model_folder. Per-segment validation has already rejected '..'
+        // segments so canonicalization can only collapse to the input or
+        // deeper, never escape — but we still verify containment defensively.
+        fs::path candidate = canonicalize(fs::path(relative_path));
+
+        auto root_it = root.begin();
+        auto cand_it = candidate.begin();
+        for (; root_it != root.end() && cand_it != candidate.end(); ++root_it, ++cand_it) {
+            if (*root_it != *cand_it)
+                return std::nullopt;
+        }
+        if (root_it != root.end())
+            return std::nullopt;
+
+        return candidate.string();
+    }
+
+    fs::path joined = canonicalize(fs::path(model_folder) / relative_path);
 
     // Verify joined still has root as a prefix (lexical containment check).
     auto root_it = root.begin();
