@@ -23,6 +23,7 @@ import {
 import type { LoRAAdapterConfig } from '@runanywhere/proto-ts/lora_options';
 import {
   ModelCategory,
+  ModelGetRequest,
   ModelLoadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
@@ -47,7 +48,7 @@ const FIXTURE_ADAPTER_PATH = `${RNFS.DocumentDirectoryPath}/lora/identity-adapte
 // have a deterministic precondition (CLUSTER-03 / RN-VAD-001).
 const SILERO_VAD_MODEL_ID = 'silero-vad';
 
-type VadReadiness = 'idle' | 'loading' | 'ready' | 'failed';
+type VadReadiness = 'idle' | 'downloading' | 'loading' | 'ready' | 'failed';
 
 type HarnessStatus = 'PASS' | 'FAIL' | 'EXPECTED_ERROR';
 
@@ -173,6 +174,13 @@ export const ValidationHarnessScreen: React.FC = () => {
   // (VoiceAgentViewModel.swift): without this precondition the underlying
   // rac_vad_process_lifecycle_proto returns RAC_ERROR_NOT_INITIALIZED with
   // "VAD lifecycle model is not loaded" — see CLUSTER-03 / RN-VAD-001.
+  //
+  // CLUSTER-16 (RN-IOS-VAD-002 + RN-AND-VAD-002): the auto-load must drive
+  // the canonical RunAnywhere.downloadModel(...) flow when the registry
+  // entry has no `localPath` yet. Without a downloaded artifact, commons
+  // `resolved_path_for_model` falls back to the bare modelId string, which
+  // Sherpa then receives as the file path and rejects with
+  // `Silero vad model file 'silero-vad' does not exist`.
   useEffect(() => {
     let cancelled = false;
     const ensureVadLoaded = async () => {
@@ -185,6 +193,45 @@ export const ValidationHarnessScreen: React.FC = () => {
           setVadReadiness('ready');
           return;
         }
+
+        // Step 1 — verify the registry has a resolvable artifact for the
+        // silero-vad model id. If `localPath` is empty (and the model is
+        // not marked downloaded), drive the canonical download flow first.
+        const getResult = await RunAnywhere.getModel(
+          ModelGetRequest.fromPartial({ modelId: SILERO_VAD_MODEL_ID })
+        );
+        if (cancelled) return;
+        if (!getResult.found || !getResult.model) {
+          setVadReadiness('failed');
+          setVadError(
+            getResult.errorMessage ||
+              `silero-vad is not registered in the model registry`
+          );
+          return;
+        }
+
+        const hasLocalPath =
+          (getResult.model.localPath?.length ?? 0) > 0 ||
+          getResult.model.isDownloaded === true;
+
+        if (!hasLocalPath) {
+          setVadReadiness('downloading');
+          // Manual async iteration — Hermes does not support for-await
+          // over NitroModules AsyncIterables (see CLAUDE.md / ModelSelectionSheet).
+          const iter =
+            RunAnywhere.downloadModel(SILERO_VAD_MODEL_ID)[
+              Symbol.asyncIterator
+            ]();
+          let step = await iter.next();
+          while (!step.done) {
+            if (cancelled) return;
+            step = await iter.next();
+          }
+        }
+        if (cancelled) return;
+
+        // Step 2 — load the model now that the registry entry has a
+        // resolved local file path.
         setVadReadiness('loading');
         const result = await RunAnywhere.loadModel(
           ModelLoadRequest.fromPartial({
@@ -458,18 +505,17 @@ export const ValidationHarnessScreen: React.FC = () => {
         style={styles.content}
         contentContainerStyle={styles.contentInset}
       >
-        <View
-          style={styles.statusBanner}
-          testID="validation-vad-status"
-        >
+        <View style={styles.statusBanner} testID="validation-vad-status">
           <Text style={styles.statusBannerText}>
-            {vadReadiness === 'loading'
-              ? `Loading VAD model (${SILERO_VAD_MODEL_ID})...`
-              : vadReadiness === 'ready'
-              ? `VAD ready: ${SILERO_VAD_MODEL_ID}`
-              : vadReadiness === 'failed'
-              ? `VAD load failed: ${vadError ?? 'unknown'}`
-              : 'Checking VAD model...'}
+            {vadReadiness === 'downloading'
+              ? `Downloading VAD model (${SILERO_VAD_MODEL_ID})...`
+              : vadReadiness === 'loading'
+                ? `Loading VAD model (${SILERO_VAD_MODEL_ID})...`
+                : vadReadiness === 'ready'
+                  ? `VAD ready: ${SILERO_VAD_MODEL_ID}`
+                  : vadReadiness === 'failed'
+                    ? `VAD load failed: ${vadError ?? 'unknown'}`
+                    : 'Checking VAD model...'}
           </Text>
         </View>
 
@@ -497,11 +543,13 @@ export const ValidationHarnessScreen: React.FC = () => {
                   {isRunning ? 'Running...' : action.title}
                 </Text>
                 <Text style={styles.actionDetail}>
-                  {vadGate && vadReadiness === 'loading'
-                    ? 'Loading VAD model...'
-                    : vadGate
-                    ? 'Waiting for VAD model load.'
-                    : action.detail}
+                  {vadGate && vadReadiness === 'downloading'
+                    ? 'Downloading VAD model...'
+                    : vadGate && vadReadiness === 'loading'
+                      ? 'Loading VAD model...'
+                      : vadGate
+                        ? 'Waiting for VAD model load.'
+                        : action.detail}
                 </Text>
               </TouchableOpacity>
             );
