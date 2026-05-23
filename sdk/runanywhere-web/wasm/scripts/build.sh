@@ -88,8 +88,14 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --rag)
+            # CLUSTER-05 / WEB-RAG-001: --rag emits the rac_rag_*_proto symbols
+            # into every requested target (llamacpp, webgpu, onnx). The default
+            # `--onnx` path already pulls in RAG via the ONNX embedding provider.
+            # `--rag` without `--onnx` is the Docs/RAG path where the llamacpp
+            # bundle exports the proto-byte ABI and the runtime layer surfaces
+            # RAC_ERROR_FEATURE_NOT_AVAILABLE when the embeddings provider has
+            # not been registered yet (matches the non-WASM platform contract).
             RAG="ON"
-            ONNX="ON"  # RAG embeddings require ONNX Runtime in the Web artifact.
             shift
             ;;
         --webgpu)
@@ -155,9 +161,12 @@ fi
 ORT_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
 SHERPA_WASM_ARCHIVE="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/libsherpa-onnx-c-api.a"
 
-if [ "$RAG" = "ON" ] || [ "$ONNX" = "ON" ]; then
+# ONNX target needs the ORT WASM archive. Standalone --rag (without --onnx)
+# does NOT — the RAG OBJECT library depends only on USearch + nlohmann_json
+# and the rac_embeddings_service vtable, both already in librac_commons.
+if [ "$ONNX" = "ON" ]; then
     if [ ! -f "${ORT_WASM_ARCHIVE}" ]; then
-        echo "ERROR: Web ONNX/RAG requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
+        echo "ERROR: Web ONNX requires sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a"
         echo "       Build or vendor ONNX Runtime WASM static archives first:"
         echo "       sdk/runanywhere-web/wasm/scripts/vendor-onnxruntime-wasm.sh"
         exit 1
@@ -281,6 +290,7 @@ build_target() {
         -DRAC_RUNTIME_ONNXRT="${wasm_onnx}" \
         -DRAC_WASM_WEBGPU="${wasm_webgpu}" \
         -DRAC_BACKEND_RAG="${RAG}" \
+        -DRAC_WASM_RAG_STANDALONE="${RAG}" \
         ${cmake_thread_args[@]+"${cmake_thread_args[@]}"} \
         ${cmake_link_args[@]+"${cmake_link_args[@]}"}
 

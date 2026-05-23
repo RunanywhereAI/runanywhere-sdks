@@ -45,10 +45,20 @@ option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # matched-set ORT + Sherpa archives ship under third_party/onnxruntime-wasm/
 # and third_party/sherpa-onnx-wasm/ (via @runanywhere/web-onnx), so RAG can
 # safely default ON whenever the ONNX backend is requested for the same
-# build. If a caller asks for an ONNX-less WASM (commons-only / llamacpp-only)
-# we force RAG off so the proto-byte RAG calls fail loudly with
-# BackendNotAvailable instead of routing through a missing embeddings vtable.
-if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX)
+# build.
+#
+# RAC_WASM_RAG_STANDALONE (CLUSTER-05 / WEB-RAG-001): the Web Docs/RAG tab
+# ships against the auto-loaded llamacpp WASM bundle, which is built with
+# RAC_BACKEND_ONNX=OFF. Forcing RAC_BACKEND_RAG=OFF on that artifact strips
+# the `rac_rag_*_proto` exports from the JS glue, so the TS bridge can't
+# even reach the runtime backend-availability check. Allow the build script
+# to opt the llamacpp WASM target into shipping the RAG proto-byte symbols
+# (their bodies live entirely inside librac_commons via the OBJECT-library
+# fold-in below); the runtime layer surfaces a clear
+# RAC_ERROR_FEATURE_NOT_AVAILABLE when the embeddings provider is missing,
+# which matches the non-WASM platform contract.
+option(RAC_WASM_RAG_STANDALONE "Emit rac_rag_* exports on Emscripten even without RAC_BACKEND_ONNX (runtime fails fast if no embeddings provider is registered)" OFF)
+if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX AND NOT RAC_WASM_RAG_STANDALONE)
     set(RAC_BACKEND_RAG OFF CACHE BOOL "RAG requires ONNX embeddings on Emscripten; force off when RAC_BACKEND_ONNX is not enabled" FORCE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)

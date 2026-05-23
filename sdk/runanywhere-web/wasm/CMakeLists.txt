@@ -833,10 +833,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
 
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
-    # library folds into rac_commons) and only become live when ONNX is also
-    # linked (RAG routes embeddings through the rac_embeddings_service vtable
-    # at runtime). See sdk/runanywhere-commons/CMakeLists.txt:
-    # `if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX) RAC_BACKEND_RAG OFF`.
+    # library folds into rac_commons). When RAC_BACKEND_RAG=ON these exports
+    # ride along with both the llamacpp target (CLUSTER-05 / WEB-RAG-001) and
+    # the ONNX-sherpa target; the runtime layer surfaces
+    # RAC_ERROR_FEATURE_NOT_AVAILABLE if no embeddings provider is registered.
+    # See sdk/runanywhere-commons/CMakeLists.txt's RAC_WASM_RAG_STANDALONE
+    # option for the Emscripten gating.
 
     # LoRA generated-proto service
     "_rac_get_lora_registry"
@@ -1322,6 +1324,18 @@ if(RAC_WASM_LLAMACPP)
     set(_llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
     list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_LLAMACPP})
 
+    # CLUSTER-05 / WEB-RAG-001: when RAG is enabled on the llamacpp WASM target
+    # (e.g. via build.sh --rag for the auto-loaded Docs/RAG bundle), append the
+    # rac_rag_*_proto exports so the TS proto-byte bridge can reach the symbols.
+    # The RAG OBJECT library has already been folded into librac_commons by
+    # sdk/runanywhere-commons/CMakeLists.txt — we just need to expose the
+    # 6 rac_rag_*_proto symbols in the emitted JS glue. The runtime layer
+    # returns RAC_ERROR_FEATURE_NOT_AVAILABLE if no embeddings provider is
+    # registered (matches the non-WASM platform contract).
+    if(RAC_BACKEND_RAG)
+        list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
+    endif()
+
     if(NOT RAC_WASM_WEBGPU)
         # CPU variant — keep EXPORT_NAME=createLlamaCppModule for backward
         # compatibility with the existing TS bridge.
@@ -1364,10 +1378,10 @@ if(RAC_WASM_ONNX)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_SHERPA})
     endif()
 
-    # RAG proto-byte exports: only meaningful here (ONNX provides embeddings).
-    # The RAG OBJECT library has already been folded into librac_commons by
-    # sdk/runanywhere-commons/CMakeLists.txt — we just need to make the
-    # 6 rac_rag_*_proto symbols visible in the emitted JS glue.
+    # RAG proto-byte exports: the ONNX target also ships RAG so the same
+    # bundle can serve embeddings via the ONNX provider. (The llamacpp target
+    # above receives the same exports when RAC_BACKEND_RAG=ON — see
+    # CLUSTER-05 / WEB-RAG-001.)
     if(RAC_BACKEND_RAG)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
     endif()
