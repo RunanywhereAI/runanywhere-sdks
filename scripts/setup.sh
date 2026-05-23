@@ -24,7 +24,7 @@ TARGETS:
   ios       swift package resolve + pod install (macOS only)
   web       yarn install for Web SDK + examples
 
-Build commands live under make sdk/* and make example/*.
+Build commands live under ./run sdk <name> <action> and ./run example <platform> <action>.
 
 Examples:
   $0
@@ -93,7 +93,7 @@ setup_android() {
     if ndk=$(resolve_android_ndk "${sdk}"); then
         note "Android NDK: ${ndk}"
     else
-        warn "Android NDK ${NDK_VERSION} not found — install it before running make sdk/commons/build"
+        warn "Android NDK ${NDK_VERSION} not found — install it before running ./run sdk commons build-android"
     fi
     ensure_local_props "${REPO_ROOT}/sdk/runanywhere-kotlin" "${sdk}" "${ndk}"
     ensure_local_props "${REPO_ROOT}/examples/android/RunAnywhereAI" "${sdk}" "${ndk}"
@@ -184,7 +184,7 @@ done
 
 echo
 if [ "${EXIT}" = "0" ]; then
-    ok "environment ready — run 'make help' to see build targets"
+    ok "environment ready — run './run help' to see commands"
 else
     warn "setup finished with some failures (see above)"
 fi
