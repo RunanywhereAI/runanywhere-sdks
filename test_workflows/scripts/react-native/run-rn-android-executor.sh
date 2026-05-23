@@ -19,6 +19,13 @@ PACKAGE_ID="${PACKAGE_ID:-com.runanywhereaI}"
 
 mkdir -p "${RAC_SESSION_ROOT}/logs"
 "${RAC_RN_EXEC_DIR}/ensure-metro.sh" "${RAC_SESSION_ROOT}/logs/metro.log"
+
+# Ensure RN bundle can reach Metro on the host (RN-AND-006).
+# adb reverse must be re-applied per device/session — running after
+# install / before app launch is the safe spot.
+adb -s "${RAC_ANDROID_SERIAL}" reverse tcp:8081 tcp:8081 \
+  >> "${RAC_SESSION_ROOT}/logs/adb_reverse.log" 2>&1 || true
+
 "${RAC_RN_EXEC_DIR}/capture-react-native-logs.sh" start "${RAC_RUN_ID}" android
 
 export RAC_TAB_CHAT="Chat"

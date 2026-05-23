@@ -20,6 +20,19 @@ BUNDLE_ID="${BUNDLE_ID:-com.runanywhere.runanywhereai}"
 
 mkdir -p "${RAC_SESSION_ROOT}/logs"
 "${RAC_RN_SCRIPT_DIR}/ensure-metro.sh" "${RAC_SESSION_ROOT}/logs/metro.log"
+
+# Simulator cycle pre-step (RN-IOS-009): when an explicit UDID is
+# provided, shut down stale boots and boot the target before driving
+# the lane. Skip when the caller asked for the implicit "booted"
+# simulator since shutting down would steal another agent's sim.
+if [[ "${RAC_IOS_SIM_UDID}" != "booted" ]]; then
+  {
+    xcrun simctl shutdown all 2>&1 || true
+    xcrun simctl boot "${RAC_IOS_SIM_UDID}" 2>&1 || true
+    xcrun simctl bootstatus "${RAC_IOS_SIM_UDID}" -b 2>&1 || true
+  } >> "${RAC_SESSION_ROOT}/logs/simctl_boot.log"
+fi
+
 "${RAC_RN_SCRIPT_DIR}/capture-react-native-logs.sh" start "${RAC_RUN_ID}" ios
 
 export RAC_TAB_CHAT="Chat"
