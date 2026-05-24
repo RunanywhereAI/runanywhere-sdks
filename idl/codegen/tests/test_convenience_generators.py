@@ -85,7 +85,7 @@ GENERATORS: list[tuple[str, str, Path]] = [
     (
         "kotlin",
         "generate_kotlin_convenience.py",
-        Path("sdk") / "runanywhere-kotlin" / "src" / "commonMain" / "kotlin"
+        Path("sdk") / "runanywhere-kotlin" / "src" / "main" / "kotlin"
         / "com" / "runanywhere" / "sdk" / "generated" / "convenience"
         / "RAConvenience.kt",
     ),

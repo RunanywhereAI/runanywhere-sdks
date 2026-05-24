@@ -134,7 +134,7 @@ class RAGViewModel : ViewModel() {
                 RunAnywhere.ragCreatePipeline(config)
 
                 Timber.i("Ingesting document text (${extractedText.length} chars)")
-                RunAnywhere.ragIngest(text = extractedText)
+                RunAnywhere.ragIngest(text = extractedText, metadataJSON = null)
 
                 Timber.i("Embedding generation complete")
 
@@ -182,7 +182,7 @@ class RAGViewModel : ViewModel() {
 
             try {
                 Timber.i("Querying RAG pipeline: $question")
-                val result = RunAnywhere.ragQuery(question = question)
+                val result = RunAnywhere.ragQuery(question = question, options = null)
 
                 val answerWithTiming = "${result.answer}\n\nAnswer generated in ${
                     String.format("%.1f", result.total_time_ms / 1000.0)

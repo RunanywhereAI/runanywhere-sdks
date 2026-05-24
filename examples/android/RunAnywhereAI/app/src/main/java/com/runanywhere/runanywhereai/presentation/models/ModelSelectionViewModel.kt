@@ -4,6 +4,7 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.ModelListRequest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -107,7 +108,7 @@ class ModelSelectionViewModel(
                 // `listModels()` replaced the removed `availableModels()` helper.
                 val allModels =
                     RunAnywhere
-                        .listModels()
+                        .listModels(ModelListRequest())
                         .models
                         ?.models
                         .orEmpty()
