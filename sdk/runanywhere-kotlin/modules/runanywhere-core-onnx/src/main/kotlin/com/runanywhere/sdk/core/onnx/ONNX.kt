@@ -118,8 +118,6 @@ object ONNX : RunAnywhereModule {
     }
 }
 
-
-
 private val logger = SDKLogger.onnx
 
 /**

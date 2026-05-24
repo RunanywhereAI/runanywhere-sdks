@@ -30,11 +30,6 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 
 // MARK: - Registry Discovery (Swift parity)
 
-
-
-
-
-
 private val modelsLogger = SDKLogger.models
 
 // MARK: - Internal Registration Helper

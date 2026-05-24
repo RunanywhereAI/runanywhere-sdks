@@ -13,7 +13,6 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
@@ -27,25 +26,15 @@ import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.public.types.RARAGConfiguration
 import com.runanywhere.sdk.public.types.RARAGDocument
 import com.runanywhere.sdk.public.types.RARAGStatistics
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 // MARK: - Pipeline Lifecycle
 
-
-
-
 // MARK: - Document Ingestion
 
-
-
-
-
-
-
 // MARK: - Query
-
 
 // RAG native library loading (relocated from the deleted RAGBridge.kt).
 //

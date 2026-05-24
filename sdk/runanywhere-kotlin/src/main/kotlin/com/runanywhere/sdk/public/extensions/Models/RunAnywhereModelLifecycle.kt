@@ -25,10 +25,6 @@ import kotlinx.coroutines.withContext
 
 // MARK: - Lifecycle Operations
 
-
-
-
-
 private fun requireLifecycleInitialized(sdk: RunAnywhere) {
     if (!sdk.isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")

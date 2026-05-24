@@ -38,19 +38,13 @@ import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 // TOOL REGISTRATION
 // =============================================================================
 
-
-
-
-
 // =============================================================================
 // TOOL EXECUTION
 // =============================================================================
 
-
 // =============================================================================
 // GENERATE WITH TOOLS
 // =============================================================================
-
 
 suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
     ToolCallingOrchestrator.registerTool(definition, executor)

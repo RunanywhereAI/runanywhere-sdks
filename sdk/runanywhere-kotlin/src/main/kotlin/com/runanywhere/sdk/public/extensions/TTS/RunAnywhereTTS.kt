@@ -12,7 +12,6 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
@@ -24,7 +23,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -33,16 +31,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 // MARK: - Synthesis
 
-
-
-
 // MARK: - Speak (Simple API)
-
-
-
 
 private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback

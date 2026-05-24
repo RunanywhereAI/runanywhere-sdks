@@ -30,11 +30,6 @@ typealias ComponentStates = RAVoiceAgentComponentStates
 
 // MARK: - Voice Agent Configuration
 
-
-
-
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Round 1 KOTLIN (Task 7 / G-E4): canonical streaming voice-agent entry-point.
 //
@@ -43,7 +38,6 @@ typealias ComponentStates = RAVoiceAgentComponentStates
 //     val handle = CppBridgeVoiceAgent.getHandle()
 //     VoiceAgentStreamAdapter(handle).stream()
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 private val voiceAgentLogger = SDKLogger.voiceAgent
 

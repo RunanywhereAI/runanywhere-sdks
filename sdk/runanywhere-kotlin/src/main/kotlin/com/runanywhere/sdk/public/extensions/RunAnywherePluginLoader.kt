@@ -37,12 +37,9 @@ data class PluginInfo(
 // PluginLoader — namespaced capability class
 // ---------------------------------------------------------------------------
 
-
-
 // ---------------------------------------------------------------------------
 // RunAnywhere.pluginLoader accessor
 // ---------------------------------------------------------------------------
-
 
 class PluginLoader {
     val apiVersion: UInt

@@ -28,10 +28,7 @@ import kotlinx.coroutines.runBlocking
 
 // MARK: - Text Generation
 
-
-
 // MARK: - Generation Control
-
 
 private val llmLogger = SDKLogger.llm
 

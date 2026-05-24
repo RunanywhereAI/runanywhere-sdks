@@ -13,7 +13,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASDKEvent
 
-
 fun RunAnywhere.subscribeSDKEvents(handler: (RASDKEvent) -> Boolean): Long =
     CppBridgeSDKEventStream.subscribe(handler)
 

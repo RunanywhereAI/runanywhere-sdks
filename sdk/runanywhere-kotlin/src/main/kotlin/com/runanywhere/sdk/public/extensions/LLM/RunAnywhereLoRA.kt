@@ -135,7 +135,6 @@ interface LoRANamespace {
     }
 }
 
-
 private const val LORA_ARTIFACT_MODEL_ID_PREFIX = "lora-adapter:"
 private const val LORA_ARTIFACT_TAG = "lora-adapter"
 

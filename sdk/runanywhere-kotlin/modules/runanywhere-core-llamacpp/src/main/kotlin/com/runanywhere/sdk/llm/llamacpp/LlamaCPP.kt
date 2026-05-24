@@ -121,8 +121,6 @@ object LlamaCPP : RunAnywhereModule {
     }
 }
 
-
-
 private val logger = SDKLogger.llamacpp
 
 /**

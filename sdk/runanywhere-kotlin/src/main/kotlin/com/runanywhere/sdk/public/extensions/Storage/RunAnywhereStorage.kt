@@ -46,22 +46,13 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - Model Registration
 
-
-
-
 // MARK: - Model Import
-
 
 // MARK: - Storage Information
 
-
-
 // MARK: - Storage Deletion
 
-
 // MARK: - Cache and Temp
-
-
 
 private fun requireStorageInitialized(sdk: RunAnywhere) {
     if (!sdk.isInitialized) {

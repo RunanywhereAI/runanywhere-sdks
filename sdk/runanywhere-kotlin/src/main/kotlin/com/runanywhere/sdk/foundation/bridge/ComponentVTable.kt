@@ -32,7 +32,6 @@ import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
-
 /**
  * jvmAndroid actual. See the commonMain `expect` declaration for the
  * shared contract.

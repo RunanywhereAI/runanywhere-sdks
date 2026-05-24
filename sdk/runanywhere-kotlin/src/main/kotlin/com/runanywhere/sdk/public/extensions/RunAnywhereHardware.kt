@@ -28,12 +28,9 @@ import com.runanywhere.sdk.public.RunAnywhere
 // Hardware — namespaced capability class
 // ---------------------------------------------------------------------------
 
-
-
 // ---------------------------------------------------------------------------
 // RunAnywhere.hardware accessor
 // ---------------------------------------------------------------------------
-
 
 class Hardware {
     fun getProfile(): HardwareProfileResult = CppBridgeHardware.getProfile()

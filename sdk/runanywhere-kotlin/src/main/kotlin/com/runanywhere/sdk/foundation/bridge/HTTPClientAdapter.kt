@@ -64,11 +64,6 @@ internal data class ApiErrorInfo(
     val requestUrl: String,
 )
 
-
-
-
-
-
 /**
  * HTTPClientAdapter — thin Kotlin bridge over `rac_http_client_*`.
  *

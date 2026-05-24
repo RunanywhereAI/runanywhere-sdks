@@ -22,7 +22,6 @@ import com.runanywhere.sdk.public.types.RAJSONSchema
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -30,12 +29,9 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 // MARK: - Structured Output
-
-
-
-
 
 suspend fun RunAnywhere.generateStructured(
     prompt: String,

@@ -9,9 +9,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.infrastructure.logging.LogDestination
 import com.runanywhere.sdk.infrastructure.logging.Logging
-import com.runanywhere.sdk.infrastructure.logging.LoggingConfiguration
 import com.runanywhere.sdk.public.RunAnywhere
 
 // MARK: - Log Level
@@ -43,21 +41,7 @@ enum class LogLevel(
 
 // MARK: - Logging Configuration
 
-
-
-
-
-
-
-
-
-
-
 // MARK: - Debugging Helpers
-
-
-
-
 
 internal fun RunAnywhere.setLogLevelInternal(level: LogLevel) {
     Logging.setMinLogLevel(level)

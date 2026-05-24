@@ -14,7 +14,6 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -29,13 +28,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 // MARK: - Inference
 
-
-
 // MARK: - Generation Control
-
 
 private val vlmLogger = SDKLogger("VLM")
 

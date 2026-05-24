@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 
-
 private val downloadLogger = SDKLogger("RunAnywhere.Download")
 
 fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =

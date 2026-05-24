@@ -36,9 +36,7 @@ public typealias RASTTPartialResult = ai.runanywhere.proto.v1.STTPartialResult
 
 // MARK: - Transcription
 
-
 // MARK: - Streaming Transcription
-
 
 private val sttLogger = SDKLogger.stt
 
