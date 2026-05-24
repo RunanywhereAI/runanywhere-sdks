@@ -25,6 +25,10 @@ sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensio
 sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/ToolCallingTypes.kt
 sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RAG/RAGProtoHelpers.kt
 sdk/runanywhere-kotlin/src/commonTest/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpersTest.kt
+# Flattened Android SDK layout (post-KMP collapse — same migration owner as commonMain entries)
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM/ToolCallingTypes.kt
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/RAG/RAGProtoHelpers.kt
 
 # ============================================================================
 # Swift SDK — hand-written *Types.swift DTO files
