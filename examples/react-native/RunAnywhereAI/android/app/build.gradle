@@ -75,6 +75,25 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn syncSdkNativeLibs
 }
 
+// CLUSTER-23 (RN-AND-PREFAB-001): react-native-vision-camera 4.7.3 + Gradle 9.0
+// has a task-dependency race where :app:configureCMakeDebug[<abi>] tries to read
+// the vision-camera prefab directory before :react-native-vision-camera:prefabDebugPackage
+// has produced it. AGP only auto-wires prefabDebugConfigurePackage (which sets up the
+// publication metadata) but not prefabDebugPackage (which writes the actual prefab
+// dir under build/intermediates/prefab_package/debug/prefab/). Forcing the package
+// task as a hard dependency of every configureCMake variant resolves CXX1429 with
+// "directory ... is not readable".
+afterEvaluate {
+    def visionCameraProject = rootProject.findProject(":react-native-vision-camera")
+    if (visionCameraProject != null) {
+        tasks.matching { it.name.startsWith("configureCMakeDebug") || it.name.startsWith("configureCMakeRelWithDebInfo") || it.name.startsWith("configureCMakeRelease") }.configureEach { configTask ->
+            visionCameraProject.tasks.matching { it.name.startsWith("prefab") && it.name.endsWith("Package") }.configureEach { prefabTask ->
+                configTask.dependsOn prefabTask
+            }
+        }
+    }
+}
+
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
