@@ -336,3 +336,7 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-25T20:00:00Z	7	phase2_matrix	orchestrator	ITERATION_END	OK	20260524-125843-matrix	iter=7 issues_resolved=6 issues_remaining=8 commits=6
 2026-05-25T20:00:00Z	7	phase2_matrix	matrix-coordinator-iter7	AGENT_DONE	OK	20260524-125843-matrix	iter7 matrix RED — 1 PASS / 6 PARTIAL / 1 FAIL; iter-08-remediation.md ready
 2026-05-25T20:34:08Z	8	phase8_fix	fix-agent-cluster-30	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-30 RN-AND-VAD-HARNESS-001: add RN-Android validation-action testID tap + VAD wait
+2026-05-25T20:35:00Z	8	phase8_fix	fix-agent-cluster-31	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-31 WEB-VLM-PTHREAD-001: Web TC-09 VLM LIMITED misattributed to Sherpa pthread
+2026-05-25T20:36:00Z	8	phase8_fix	fix-agent-cluster-31	COMMIT	OK	e4c5ad743	Sherpa TTS num_threads=1 on WASM + web-lane-e2e VLM-scoped infra + OPFS free before TC-09
+2026-05-25T20:36:00Z	8	phase8_fix	fix-agent-cluster-31	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-31 done: commons TTS pthread + harness TC-09; WASM rebuild for sherpa; iter8 verify TC-09
+2026-05-25T20:34:49Z	8	phase8_fix	fix-agent-cluster-30	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-30 done: commit 0aa1f061f; testID tap + VAD wait + validation harness sweep; expect TC-06/18/21 PASS on re-drive
