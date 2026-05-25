@@ -59,6 +59,7 @@ GEM
       ffi (>= 1.15.0)
       logger
     ffi (1.17.2)
+    ffi (1.17.2-arm64-darwin)
     ffi (1.17.2-x86_64-darwin)
     fourflusher (2.3.1)
     fuzzy_match (2.0.4)
@@ -92,6 +93,7 @@ GEM
     zeitwerk (2.6.18)
 
 PLATFORMS
+  arm64-darwin-23
   ruby
   x86_64-darwin
 
