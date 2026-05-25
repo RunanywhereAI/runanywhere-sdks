@@ -39,7 +39,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -49,7 +49,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// result describes. Mirrors the SDK_INIT_* analytics events (started /
 /// completed / failed) that exist in sdk_events.proto.
 /// ---------------------------------------------------------------------------
-public enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -103,7 +103,7 @@ public enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// (development=0, staging=1, production=2). Numeric values are part of the
 /// wire format; do not reorder.
 /// ---------------------------------------------------------------------------
-public enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case development // = 0
   case staging // = 1
@@ -150,7 +150,7 @@ public enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// memory) are registered separately via rac_platform_adapter_t prior to
 /// calling this entry point. This message is purely the data envelope.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitPhase1Request: Sendable {
+public nonisolated struct RASdkInitPhase1Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -178,7 +178,7 @@ public struct RASdkInitPhase1Request: Sendable {
 /// for future flags such as `force_refresh_assignments` or
 /// `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitPhase2Request: Sendable {
+public nonisolated struct RASdkInitPhase2Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -199,7 +199,7 @@ public struct RASdkInitPhase2Request: Sendable {
 /// success=true, http_configured=false, and warning carries the offline-mode
 /// notice.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitResult: @unchecked Sendable {
+public nonisolated struct RASdkInitResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -271,17 +271,17 @@ public struct RASdkInitResult: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_PHASE_UNSPECIFIED\0\u{1}SDK_INIT_PHASE_ONE\0\u{1}SDK_INIT_PHASE_TWO\0\u{1}SDK_INIT_PHASE_RETRY_HTTP\0")
 }
 
-extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
 }
 
-extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase1Request"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0")
 
@@ -326,7 +326,7 @@ extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase2Request"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
@@ -345,7 +345,7 @@ extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0")
 

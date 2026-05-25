@@ -58,7 +58,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -66,7 +66,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// ---------------------------------------------------------------------------
 /// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
 /// ---------------------------------------------------------------------------
-public enum RAEmbeddingsNormalizeMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAEmbeddingsNormalizeMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case none // = 1
@@ -107,7 +107,7 @@ public enum RAEmbeddingsNormalizeMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// ---------------------------------------------------------------------------
 /// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
 /// ---------------------------------------------------------------------------
-public enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case mean // = 1
@@ -154,7 +154,7 @@ public enum RAEmbeddingsPoolingStrategy: SwiftProtobuf.Enum, Swift.CaseIterable 
 /// transport-portable subset of rac_embeddings_config_t. Backend selection
 /// (preferred_framework) and pooling strategy live outside the wire schema.
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingsConfiguration: Sendable {
+public nonisolated struct RAEmbeddingsConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -224,7 +224,7 @@ public struct RAEmbeddingsConfiguration: Sendable {
 /// Per-call generation options. Overrides for a single embed / embed_batch
 /// invocation; any field left unset falls back to the configuration default.
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingsOptions: Sendable {
+public nonisolated struct RAEmbeddingsOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -281,7 +281,7 @@ public struct RAEmbeddingsOptions: Sendable {
 /// (lets clients short-circuit cosine-similarity when both sides know the
 /// vectors are already unit-normalized).
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingVector: Sendable {
+public nonisolated struct RAEmbeddingVector: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -334,7 +334,7 @@ public struct RAEmbeddingVector: Sendable {
 /// Request envelope for service-handle APIs. One text = embed, multiple texts =
 /// embed_batch.
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingsRequest: Sendable {
+public nonisolated struct RAEmbeddingsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -377,7 +377,7 @@ public struct RAEmbeddingsRequest: Sendable {
 /// total_tokens). `dimension` is duplicated at the result level so consumers
 /// can size buffers without inspecting an arbitrary vector first.
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingsResult: Sendable {
+public nonisolated struct RAEmbeddingsResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -425,7 +425,7 @@ public struct RAEmbeddingsResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAEmbeddingsServiceState: Sendable {
+public nonisolated struct RAEmbeddingsServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -471,7 +471,7 @@ public struct RAEmbeddingsServiceState: Sendable {
 /// The result carries an opaque uint64 handle the SDK uses for subsequent
 /// embed / embed_batch invocations.
 /// ---------------------------------------------------------------------------
-public struct RAEmbeddingsCreateRequest: Sendable {
+public nonisolated struct RAEmbeddingsCreateRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -511,7 +511,7 @@ public struct RAEmbeddingsCreateRequest: Sendable {
   fileprivate var _configJson: String? = nil
 }
 
-public struct RAEmbeddingsCreateResult: Sendable {
+public nonisolated struct RAEmbeddingsCreateResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -542,17 +542,17 @@ public struct RAEmbeddingsCreateResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAEmbeddingsNormalizeMode: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsNormalizeMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED\0\u{1}EMBEDDINGS_NORMALIZE_MODE_NONE\0\u{1}EMBEDDINGS_NORMALIZE_MODE_L2\0")
 }
 
-extension RAEmbeddingsPoolingStrategy: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsPoolingStrategy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED\0\u{1}EMBEDDINGS_POOLING_STRATEGY_MEAN\0\u{1}EMBEDDINGS_POOLING_STRATEGY_CLS\0\u{1}EMBEDDINGS_POOLING_STRATEGY_LAST\0")
 }
 
-extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}embedding_dimension\0\u{3}max_sequence_length\0\u{1}normalize\0\u{3}preferred_framework\0\u{3}max_tokens\0\u{3}normalize_mode\0\u{1}pooling\0\u{3}config_json\0")
 
@@ -626,7 +626,7 @@ extension RAEmbeddingsConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}normalize\0\u{1}truncate\0\u{3}batch_size\0\u{3}normalize_mode\0\u{1}pooling\0\u{3}n_threads\0")
 
@@ -685,7 +685,7 @@ extension RAEmbeddingsOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingVector"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{1}norm\0\u{1}text\0\u{1}dimension\0\u{3}input_index\0\u{1}metadata\0")
 
@@ -744,7 +744,7 @@ extension RAEmbeddingVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}texts\0\u{1}options\0\u{3}request_id\0\u{3}model_id\0\u{1}metadata\0")
 
@@ -798,7 +798,7 @@ extension RAEmbeddingsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAEmbeddingsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}vectors\0\u{1}dimension\0\u{3}processing_time_ms\0\u{3}tokens_used\0\u{3}model_id\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0")
 
@@ -867,7 +867,7 @@ extension RAEmbeddingsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAEmbeddingsServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{1}dimension\0\u{3}max_tokens\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -926,7 +926,7 @@ extension RAEmbeddingsServiceState: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}configuration\0\u{3}config_json\0")
 
@@ -970,7 +970,7 @@ extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAEmbeddingsCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEmbeddingsCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}handle\0\u{3}model_id\0\u{1}dimension\0\u{3}max_tokens\0\u{3}error_code\0\u{3}error_message\0")
 

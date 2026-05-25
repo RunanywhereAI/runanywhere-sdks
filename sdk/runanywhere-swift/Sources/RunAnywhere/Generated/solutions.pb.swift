@@ -22,7 +22,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -33,7 +33,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// oneof arms so frontends can switch on a single enum value rather than
 /// inspecting the oneof shape.
 /// ---------------------------------------------------------------------------
-public enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case voiceAgent // = 1
@@ -83,7 +83,7 @@ public enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAAudioSource: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAAudioSource: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -131,7 +131,7 @@ public enum RAAudioSource: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -174,7 +174,7 @@ public enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// Top-level union dispatched to the matching solution loader.
-public struct RASolutionConfig: Sendable {
+public nonisolated struct RASolutionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -223,7 +223,7 @@ public struct RASolutionConfig: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Config: Equatable, Sendable {
+  public nonisolated enum OneOf_Config: Equatable, Sendable {
     case voiceAgent(RAVoiceAgentConfig)
     case rag(RARAGConfig)
     case wakeWord(RAWakeWordConfig)
@@ -244,7 +244,7 @@ public struct RASolutionConfig: Sendable {
 /// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
 /// are issued against the C handle keyed by `handle_id`.
 /// ---------------------------------------------------------------------------
-public struct RASolutionHandle: Sendable {
+public nonisolated struct RASolutionHandle: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -283,7 +283,7 @@ public struct RASolutionHandle: Sendable {
 /// ---------------------------------------------------------------------------
 /// VoiceAgent — the canonical streaming voice AI loop.
 /// ---------------------------------------------------------------------------
-public struct RAVoiceAgentConfig: @unchecked Sendable {
+public nonisolated struct RAVoiceAgentConfig: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -409,7 +409,7 @@ public struct RAVoiceAgentConfig: @unchecked Sendable {
 /// ---------------------------------------------------------------------------
 /// RAG — retrieve → rerank → prompt → LLM.
 /// ---------------------------------------------------------------------------
-public struct RARAGConfig: Sendable {
+public nonisolated struct RARAGConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -466,7 +466,7 @@ public struct RARAGConfig: Sendable {
 /// ---------------------------------------------------------------------------
 /// Wake word — always-on listener that emits a pulse on keyword detection.
 /// ---------------------------------------------------------------------------
-public struct RAWakeWordConfig: Sendable {
+public nonisolated struct RAWakeWordConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -506,7 +506,7 @@ public struct RAWakeWordConfig: Sendable {
 /// ---------------------------------------------------------------------------
 /// Agent loop — multi-turn LLM with tool calling.
 /// ---------------------------------------------------------------------------
-public struct RAAgentLoopConfig: Sendable {
+public nonisolated struct RAAgentLoopConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -539,7 +539,7 @@ public struct RAAgentLoopConfig: Sendable {
   fileprivate var _typeKind: RASolutionType? = nil
 }
 
-public struct RAToolSpec: Sendable {
+public nonisolated struct RAToolSpec: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -559,7 +559,7 @@ public struct RAToolSpec: Sendable {
 /// ---------------------------------------------------------------------------
 /// Time series — window + anomaly_detect + generate_text.
 /// ---------------------------------------------------------------------------
-public struct RATimeSeriesConfig: Sendable {
+public nonisolated struct RATimeSeriesConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -594,21 +594,21 @@ public struct RATimeSeriesConfig: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASolutionType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASolutionType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SOLUTION_TYPE_UNSPECIFIED\0\u{1}SOLUTION_TYPE_VOICE_AGENT\0\u{1}SOLUTION_TYPE_RAG\0\u{1}SOLUTION_TYPE_WAKEWORD\0\u{1}SOLUTION_TYPE_TIME_SERIES\0\u{1}SOLUTION_TYPE_AGENT_LOOP\0")
 }
 
-extension RAAudioSource: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioSource: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUDIO_SOURCE_UNSPECIFIED\0\u{1}AUDIO_SOURCE_MICROPHONE\0\u{1}AUDIO_SOURCE_FILE\0\u{1}AUDIO_SOURCE_CALLBACK\0")
 }
 
-extension RAVectorStore: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVectorStore: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VECTOR_STORE_UNSPECIFIED\0\u{1}VECTOR_STORE_USEARCH\0\u{1}VECTOR_STORE_PGVECTOR\0")
 }
 
-extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SolutionConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{3}wake_word\0\u{3}agent_loop\0\u{3}time_series\0")
 
@@ -726,7 +726,7 @@ extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SolutionHandle"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{3}solution_type\0\u{3}created_at_ms\0\u{1}state\0")
 
@@ -775,7 +775,7 @@ extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{3}system_prompt\0\u{3}max_context_tokens\0\u{1}temperature\0\u{3}emit_partials\0\u{3}emit_thoughts\0\u{3}audio_file_path\0\u{3}type_kind\0\u{3}tts_voice_id\0")
 
@@ -957,7 +957,7 @@ extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embed_model_id\0\u{3}rerank_model_id\0\u{3}llm_model_id\0\u{3}vector_store\0\u{3}vector_store_path\0\u{3}retrieve_k\0\u{3}rerank_top\0\u{3}bm25_k1\0\u{3}bm25_b\0\u{3}rrf_k\0\u{3}prompt_template\0\u{3}type_kind\0")
 
@@ -1046,7 +1046,7 @@ extension RARAGConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAWakeWordConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAWakeWordConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WakeWordConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}keyword\0\u{1}threshold\0\u{3}pre_roll_ms\0\u{3}sample_rate_hz\0\u{3}type_kind\0")
 
@@ -1105,7 +1105,7 @@ extension RAWakeWordConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AgentLoopConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}system_prompt\0\u{1}tools\0\u{3}max_iterations\0\u{3}max_context_tokens\0\u{3}type_kind\0")
 
@@ -1164,7 +1164,7 @@ extension RAAgentLoopConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAToolSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolSpec"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}description\0\u{3}json_schema\0")
 
@@ -1204,7 +1204,7 @@ extension RAToolSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATimeSeriesConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TimeSeriesConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}anomaly_model_id\0\u{3}llm_model_id\0\u{3}window_size\0\u{1}stride\0\u{3}anomaly_threshold\0\u{3}type_kind\0")
 

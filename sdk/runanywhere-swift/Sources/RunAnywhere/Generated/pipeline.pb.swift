@@ -21,12 +21,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case any // = 1
@@ -74,7 +74,7 @@ public enum RADeviceAffinity: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAEdgePolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAEdgePolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -125,7 +125,7 @@ public enum RAEdgePolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// ---------------------------------------------------------------------------
 /// Pipeline lifecycle status — shared by compile/start/stop results.
 /// ---------------------------------------------------------------------------
-public enum RAPipelineStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAPipelineStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case ok // = 1
@@ -166,7 +166,7 @@ public enum RAPipelineStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// A pipeline is a labelled DAG of operators connected by typed edges. There
 /// are no cycles. Every input edge has a resolvable producer; every output
 /// edge has at least one consumer.
-public struct RAPipelineSpec: Sendable {
+public nonisolated struct RAPipelineSpec: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -194,7 +194,7 @@ public struct RAPipelineSpec: Sendable {
   fileprivate var _options: RAPipelineOptions? = nil
 }
 
-public struct RAOperatorSpec: Sendable {
+public nonisolated struct RAOperatorSpec: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -229,7 +229,7 @@ public struct RAOperatorSpec: Sendable {
   public init() {}
 }
 
-public struct RAEdgeSpec: Sendable {
+public nonisolated struct RAEdgeSpec: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -256,7 +256,7 @@ public struct RAEdgeSpec: Sendable {
   public init() {}
 }
 
-public struct RAPipelineOptions: Sendable {
+public nonisolated struct RAPipelineOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -279,7 +279,7 @@ public struct RAPipelineOptions: Sendable {
 }
 
 /// Result of compiling a PipelineSpec into a runnable graph.
-public struct RAPipelineCompileResult: Sendable {
+public nonisolated struct RAPipelineCompileResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -308,7 +308,7 @@ public struct RAPipelineCompileResult: Sendable {
 }
 
 /// Request to start a previously compiled pipeline.
-public struct RAPipelineStartRequest: Sendable {
+public nonisolated struct RAPipelineStartRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -322,7 +322,7 @@ public struct RAPipelineStartRequest: Sendable {
 }
 
 /// Live pipeline instance handle.
-public struct RAPipelineHandle: Sendable {
+public nonisolated struct RAPipelineHandle: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -350,7 +350,7 @@ public struct RAPipelineHandle: Sendable {
 }
 
 /// Result of stopping a pipeline instance.
-public struct RAPipelineStopResult: Sendable {
+public nonisolated struct RAPipelineStopResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -379,21 +379,21 @@ public struct RAPipelineStopResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RADeviceAffinity: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADeviceAffinity: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_AFFINITY_UNSPECIFIED\0\u{1}DEVICE_AFFINITY_ANY\0\u{1}DEVICE_AFFINITY_CPU\0\u{1}DEVICE_AFFINITY_GPU\0\u{1}DEVICE_AFFINITY_ANE\0")
 }
 
-extension RAEdgePolicy: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEdgePolicy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EDGE_POLICY_UNSPECIFIED\0\u{1}EDGE_POLICY_BLOCK\0\u{1}EDGE_POLICY_DROP_OLDEST\0\u{1}EDGE_POLICY_DROP_NEWEST\0")
 }
 
-extension RAPipelineStatus: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATUS_UNSPECIFIED\0\u{1}PIPELINE_STATUS_OK\0\u{1}PIPELINE_STATUS_FAILED\0")
 }
 
-extension RAPipelineSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineSpec"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}operators\0\u{1}edges\0\u{1}options\0")
 
@@ -442,7 +442,7 @@ extension RAPipelineSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAOperatorSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAOperatorSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".OperatorSpec"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}params\0\u{3}pinned_engine\0\u{3}model_id\0\u{1}device\0")
 
@@ -497,7 +497,7 @@ extension RAOperatorSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAEdgeSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEdgeSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EdgeSpec"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}from\0\u{1}to\0\u{1}capacity\0\u{1}policy\0")
 
@@ -542,7 +542,7 @@ extension RAEdgeSpec: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RAPipelineOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}latency_budget_ms\0\u{3}emit_metrics\0\u{3}strict_validation\0")
 
@@ -582,7 +582,7 @@ extension RAPipelineOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAPipelineCompileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineCompileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineCompileResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -631,7 +631,7 @@ extension RAPipelineCompileResult: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RAPipelineStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineStartRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0")
 
@@ -661,7 +661,7 @@ extension RAPipelineStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAPipelineHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineHandle"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{1}state\0")
 
@@ -705,7 +705,7 @@ extension RAPipelineHandle: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAPipelineStopResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineStopResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PipelineStopResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}handle_id\0\u{1}status\0\u{3}error_message\0\u{3}error_code\0")
 

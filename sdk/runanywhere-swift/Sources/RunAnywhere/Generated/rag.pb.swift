@@ -64,12 +64,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case retrievalStarted // = 1
@@ -132,7 +132,7 @@ public enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// registry. SDK callers MUST register the embedding / LLM / reranker models
 /// first and pass only their ids here.
 /// ---------------------------------------------------------------------------
-public struct RARAGConfiguration: Sendable {
+public nonisolated struct RARAGConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -233,7 +233,7 @@ public struct RARAGConfiguration: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGDocument — batch-ingest input item.
 /// ---------------------------------------------------------------------------
-public struct RARAGDocument: Sendable {
+public nonisolated struct RARAGDocument: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -287,7 +287,7 @@ public struct RARAGDocument: Sendable {
   fileprivate var _mediaType: String? = nil
 }
 
-public struct RARAGIngestRequest: Sendable {
+public nonisolated struct RARAGIngestRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -308,7 +308,7 @@ public struct RARAGIngestRequest: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGQueryOptions — per-query sampling and prompt overrides.
 /// ---------------------------------------------------------------------------
-public struct RARAGQueryOptions: Sendable {
+public nonisolated struct RARAGQueryOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -352,7 +352,7 @@ public struct RARAGQueryOptions: Sendable {
   fileprivate var _systemPrompt: String? = nil
 }
 
-public struct RARAGQueryRequest: Sendable {
+public nonisolated struct RARAGQueryRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -380,7 +380,7 @@ public struct RARAGQueryRequest: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGSearchResult — a single retrieved document chunk with similarity score.
 /// ---------------------------------------------------------------------------
-public struct RARAGSearchResult: Sendable {
+public nonisolated struct RARAGSearchResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -428,7 +428,7 @@ public struct RARAGSearchResult: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGResult — the full result of a RAG query.
 /// ---------------------------------------------------------------------------
-public struct RARAGResult: Sendable {
+public nonisolated struct RARAGResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -485,7 +485,7 @@ public struct RARAGResult: Sendable {
 ///
 /// Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
 /// ---------------------------------------------------------------------------
-public struct RARAGStatistics: Sendable {
+public nonisolated struct RARAGStatistics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -552,7 +552,7 @@ public struct RARAGStatistics: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RARAGIngestResult: Sendable {
+public nonisolated struct RARAGIngestResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -591,7 +591,7 @@ public struct RARAGIngestResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RARAGStreamEvent: @unchecked Sendable {
+public nonisolated struct RARAGStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -660,7 +660,7 @@ public struct RARAGStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RARAGServiceState: @unchecked Sendable {
+public nonisolated struct RARAGServiceState: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -721,13 +721,13 @@ public struct RARAGServiceState: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RARAGStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RAG_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED\0\u{1}RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED\0\u{1}RAG_STREAM_EVENT_KIND_CONTEXT_READY\0\u{1}RAG_STREAM_EVENT_KIND_TOKEN\0\u{1}RAG_STREAM_EVENT_KIND_COMPLETED\0\u{1}RAG_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_id\0\u{3}llm_model_id\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0\u{3}max_context_tokens\0\u{3}prompt_template\0\u{3}embedding_config_json\0\u{3}llm_config_json\0\u{3}index_path\0\u{3}persist_index\0\u{3}rerank_results\0\u{3}reranker_model_id\0")
 
@@ -831,7 +831,7 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{b}metadata_json\0\u{c}\u{3}\u{1}")
 
@@ -895,7 +895,7 @@ extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGIngestRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}documents\0\u{3}replace_existing\0\u{1}metadata\0")
 
@@ -940,7 +940,7 @@ extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0")
 
@@ -1014,7 +1014,7 @@ extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}options\0\u{1}metadata\0")
 
@@ -1058,7 +1058,7 @@ extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{b}metadata_json\0\u{c}\u{6}\u{1}")
 
@@ -1132,7 +1132,7 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0")
 
@@ -1221,7 +1221,7 @@ extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGStatistics"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0\u{3}stats_json\0\u{3}vector_store_size_bytes\0\u{3}is_persistent\0\u{3}last_query_ms\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1305,7 +1305,7 @@ extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGIngestResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}documents_ingested\0\u{3}chunks_ingested\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1364,7 +1364,7 @@ extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}chunk\0\u{1}token\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1490,7 +1490,7 @@ extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RARAGServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{1}statistics\0\u{3}is_indexing\0\u{3}is_querying\0\u{3}active_request_id\0\u{3}error_message\0\u{3}error_code\0")
 

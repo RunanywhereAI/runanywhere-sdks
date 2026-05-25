@@ -90,7 +90,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -104,7 +104,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// runtime config back to a `LoraAdapterCatalogEntry.id` — none of the current
 /// SDK shapes carry it, so it is encoded as a `proto3 optional` field.
 /// ---------------------------------------------------------------------------
-public struct RALoRAAdapterConfig: Sendable {
+public nonisolated struct RALoRAAdapterConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -143,7 +143,7 @@ public struct RALoRAAdapterConfig: Sendable {
 /// they are encoded as `proto3 optional` so the existing fields (path, scale,
 /// applied) round-trip exactly while reserving room for richer status reports.
 /// ---------------------------------------------------------------------------
-public struct RALoRAAdapterInfo: Sendable {
+public nonisolated struct RALoRAAdapterInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -190,7 +190,7 @@ public struct RALoRAAdapterInfo: Sendable {
 /// Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
 /// nullable / has-bit-tracked field.
 /// ---------------------------------------------------------------------------
-public struct RALoraAdapterCatalogEntry: @unchecked Sendable {
+public nonisolated struct RALoraAdapterCatalogEntry: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -336,7 +336,7 @@ public struct RALoraAdapterCatalogEntry: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RALoraAdapterCatalogQuery: Sendable {
+public nonisolated struct RALoraAdapterCatalogQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -389,7 +389,7 @@ public struct RALoraAdapterCatalogQuery: Sendable {
   fileprivate var _searchQuery: String? = nil
 }
 
-public struct RALoraAdapterCatalogListRequest: Sendable {
+public nonisolated struct RALoraAdapterCatalogListRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -412,7 +412,7 @@ public struct RALoraAdapterCatalogListRequest: Sendable {
   fileprivate var _query: RALoraAdapterCatalogQuery? = nil
 }
 
-public struct RALoraAdapterCatalogListResult: Sendable {
+public nonisolated struct RALoraAdapterCatalogListResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -434,7 +434,7 @@ public struct RALoraAdapterCatalogListResult: Sendable {
   public init() {}
 }
 
-public struct RALoraAdapterCatalogGetRequest: Sendable {
+public nonisolated struct RALoraAdapterCatalogGetRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -446,7 +446,7 @@ public struct RALoraAdapterCatalogGetRequest: Sendable {
   public init() {}
 }
 
-public struct RALoraAdapterCatalogGetResult: Sendable {
+public nonisolated struct RALoraAdapterCatalogGetResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -471,7 +471,7 @@ public struct RALoraAdapterCatalogGetResult: Sendable {
   fileprivate var _entry: RALoraAdapterCatalogEntry? = nil
 }
 
-public struct RALoraAdapterDownloadCompletedRequest: Sendable {
+public nonisolated struct RALoraAdapterDownloadCompletedRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -520,7 +520,7 @@ public struct RALoraAdapterDownloadCompletedRequest: Sendable {
   fileprivate var _completedAtUnixMs: Int64? = nil
 }
 
-public struct RALoraAdapterDownloadCompletedResult: Sendable {
+public nonisolated struct RALoraAdapterDownloadCompletedResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -554,7 +554,7 @@ public struct RALoraAdapterDownloadCompletedResult: Sendable {
 /// encoded as `proto3 optional` so a future implementation can surface "this
 /// adapter requires base model X" without breaking wire compatibility.
 /// ---------------------------------------------------------------------------
-public struct RALoraCompatibilityResult: Sendable {
+public nonisolated struct RALoraCompatibilityResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -593,7 +593,7 @@ public struct RALoraCompatibilityResult: Sendable {
   fileprivate var _baseModelRequired: String? = nil
 }
 
-public struct RALoRAApplyRequest: Sendable {
+public nonisolated struct RALoRAApplyRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -609,7 +609,7 @@ public struct RALoRAApplyRequest: Sendable {
   public init() {}
 }
 
-public struct RALoRAApplyResult: Sendable {
+public nonisolated struct RALoRAApplyResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -638,7 +638,7 @@ public struct RALoRAApplyResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RALoRARemoveRequest: Sendable {
+public nonisolated struct RALoRARemoveRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -656,7 +656,7 @@ public struct RALoRARemoveRequest: Sendable {
   public init() {}
 }
 
-public struct RALoRAState: Sendable {
+public nonisolated struct RALoRAState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -695,9 +695,9 @@ public struct RALoRAState: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRAAdapterConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_path\0\u{1}scale\0\u{3}adapter_id\0\u{1}metadata\0\u{3}target_modules\0")
 
@@ -751,7 +751,7 @@ extension RALoRAAdapterConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RALoRAAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRAAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRAAdapterInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}adapter_path\0\u{1}scale\0\u{1}applied\0\u{3}error_message\0\u{3}error_code\0\u{3}loaded_at_ms\0")
 
@@ -815,7 +815,7 @@ extension RALoRAAdapterInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogEntry"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}description\0\u{1}url\0\u{1}filename\0\u{3}compatible_models\0\u{3}size_bytes\0\u{1}author\0\u{3}default_scale\0\u{3}checksum_sha256\0\u{1}license\0\u{1}tags\0\u{1}metadata\0\u{3}local_path\0\u{3}is_downloaded\0\u{3}downloaded_at_unix_ms\0\u{3}is_imported\0\u{3}status_message\0")
 
@@ -1004,7 +1004,7 @@ extension RALoraAdapterCatalogEntry: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RALoraAdapterCatalogQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogQuery"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}model_id\0\u{3}downloaded_only\0\u{3}search_query\0\u{1}tags\0")
 
@@ -1058,7 +1058,7 @@ extension RALoraAdapterCatalogQuery: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogListRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{3}include_counts\0")
 
@@ -1097,7 +1097,7 @@ extension RALoraAdapterCatalogListRequest: SwiftProtobuf.Message, SwiftProtobuf.
   }
 }
 
-extension RALoraAdapterCatalogListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogListResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}entries\0\u{3}error_message\0\u{3}total_count\0\u{3}filtered_count\0\u{3}downloaded_count\0")
 
@@ -1152,7 +1152,7 @@ extension RALoraAdapterCatalogListResult: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension RALoraAdapterCatalogGetRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogGetRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogGetRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0")
 
@@ -1182,7 +1182,7 @@ extension RALoraAdapterCatalogGetRequest: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension RALoraAdapterCatalogGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterCatalogGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterCatalogGetResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{1}entry\0\u{3}error_message\0")
 
@@ -1226,7 +1226,7 @@ extension RALoraAdapterCatalogGetResult: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RALoraAdapterDownloadCompletedRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterDownloadCompletedRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterDownloadCompletedRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}adapter_id\0\u{3}local_path\0\u{3}size_bytes\0\u{3}checksum_sha256\0\u{3}completed_at_unix_ms\0\u{1}imported\0\u{3}status_message\0")
 
@@ -1290,7 +1290,7 @@ extension RALoraAdapterDownloadCompletedRequest: SwiftProtobuf.Message, SwiftPro
   }
 }
 
-extension RALoraAdapterDownloadCompletedResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraAdapterDownloadCompletedResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraAdapterDownloadCompletedResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}entry\0\u{3}error_message\0\u{1}persisted\0")
 
@@ -1339,7 +1339,7 @@ extension RALoraAdapterDownloadCompletedResult: SwiftProtobuf.Message, SwiftProt
   }
 }
 
-extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoraCompatibilityResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}error_message\0\u{3}base_model_required\0\u{1}warnings\0\u{3}error_code\0")
 
@@ -1393,7 +1393,7 @@ extension RALoraCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRAApplyRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{3}replace_existing\0")
 
@@ -1433,7 +1433,7 @@ extension RALoRAApplyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRAApplyResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}adapters\0\u{1}success\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1487,7 +1487,7 @@ extension RALoRAApplyResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RALoRARemoveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRARemoveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRARemoveRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}adapter_ids\0\u{3}adapter_paths\0\u{3}clear_all\0")
 
@@ -1532,7 +1532,7 @@ extension RALoRARemoveRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RALoRAState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALoRAState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LoRAState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}loaded_adapters\0\u{3}has_active_adapters\0\u{3}base_model_id\0\u{3}error_message\0\u{3}error_code\0")
 

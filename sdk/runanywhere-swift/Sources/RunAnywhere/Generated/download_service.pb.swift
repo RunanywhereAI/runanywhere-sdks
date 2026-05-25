@@ -22,12 +22,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RADownloadStage: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADownloadStage: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case downloading // = 1
@@ -73,7 +73,7 @@ public enum RADownloadStage: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pending // = 1
@@ -139,7 +139,7 @@ public enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public struct RADownloadSubscribeRequest: Sendable {
+public nonisolated struct RADownloadSubscribeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -153,7 +153,7 @@ public struct RADownloadSubscribeRequest: Sendable {
   public init() {}
 }
 
-public struct RADownloadProgress: @unchecked Sendable {
+public nonisolated struct RADownloadProgress: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -275,7 +275,7 @@ public struct RADownloadProgress: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RADownloadPlanRequest: Sendable {
+public nonisolated struct RADownloadPlanRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -312,7 +312,7 @@ public struct RADownloadPlanRequest: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RADownloadFilePlan: Sendable {
+public nonisolated struct RADownloadFilePlan: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -345,7 +345,7 @@ public struct RADownloadFilePlan: Sendable {
   fileprivate var _file: RAModelFileDescriptor? = nil
 }
 
-public struct RADownloadPlanResult: Sendable {
+public nonisolated struct RADownloadPlanResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -379,7 +379,7 @@ public struct RADownloadPlanResult: Sendable {
   public init() {}
 }
 
-public struct RADownloadStartRequest: Sendable {
+public nonisolated struct RADownloadStartRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -408,7 +408,7 @@ public struct RADownloadStartRequest: Sendable {
   fileprivate var _plan: RADownloadPlanResult? = nil
 }
 
-public struct RADownloadStartResult: Sendable {
+public nonisolated struct RADownloadStartResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -439,7 +439,7 @@ public struct RADownloadStartResult: Sendable {
   fileprivate var _initialProgress: RADownloadProgress? = nil
 }
 
-public struct RADownloadCancelRequest: Sendable {
+public nonisolated struct RADownloadCancelRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -455,7 +455,7 @@ public struct RADownloadCancelRequest: Sendable {
   public init() {}
 }
 
-public struct RADownloadCancelResult: Sendable {
+public nonisolated struct RADownloadCancelResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -481,7 +481,7 @@ public struct RADownloadCancelResult: Sendable {
   public init() {}
 }
 
-public struct RADownloadResumeRequest: Sendable {
+public nonisolated struct RADownloadResumeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -501,7 +501,7 @@ public struct RADownloadResumeRequest: Sendable {
   public init() {}
 }
 
-public struct RADownloadResumeResult: Sendable {
+public nonisolated struct RADownloadResumeResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -534,17 +534,17 @@ public struct RADownloadResumeResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RADownloadStage: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadStage: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STAGE_UNSPECIFIED\0\u{1}DOWNLOAD_STAGE_DOWNLOADING\0\u{1}DOWNLOAD_STAGE_EXTRACTING\0\u{1}DOWNLOAD_STAGE_VALIDATING\0\u{1}DOWNLOAD_STAGE_COMPLETED\0")
 }
 
-extension RADownloadState: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STATE_UNSPECIFIED\0\u{1}DOWNLOAD_STATE_PENDING\0\u{1}DOWNLOAD_STATE_DOWNLOADING\0\u{1}DOWNLOAD_STATE_EXTRACTING\0\u{1}DOWNLOAD_STATE_RETRYING\0\u{1}DOWNLOAD_STATE_COMPLETED\0\u{1}DOWNLOAD_STATE_FAILED\0\u{1}DOWNLOAD_STATE_CANCELLED\0\u{1}DOWNLOAD_STATE_PAUSED\0\u{1}DOWNLOAD_STATE_RESUMING\0")
 }
 
-extension RADownloadSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadSubscribeRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}task_id\0")
 
@@ -579,7 +579,7 @@ extension RADownloadSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadProgress"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}stage\0\u{3}bytes_downloaded\0\u{3}total_bytes\0\u{3}stage_progress\0\u{3}overall_speed_bps\0\u{3}eta_seconds\0\u{1}state\0\u{3}retry_attempt\0\u{3}error_message\0\u{3}task_id\0\u{3}current_file_index\0\u{3}total_files\0\u{3}storage_key\0\u{3}local_path\0\u{3}overall_progress\0\u{3}started_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}current_file_name\0\u{3}resume_token\0")
 
@@ -778,7 +778,7 @@ extension RADownloadProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadPlanRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}model\0\u{3}resume_existing\0\u{3}available_storage_bytes\0\u{3}allow_metered_network\0\u{3}storage_namespace\0\u{3}validate_existing_bytes\0\u{3}verify_checksums\0\u{3}required_free_bytes_after_download\0")
 
@@ -852,7 +852,7 @@ extension RADownloadPlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RADownloadFilePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadFilePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadFilePlan"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}storage_key\0\u{3}destination_path\0\u{3}expected_bytes\0\u{3}requires_extraction\0\u{3}checksum_sha256\0\u{3}is_resume_candidate\0")
 
@@ -916,7 +916,7 @@ extension RADownloadFilePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadPlanResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_start\0\u{3}model_id\0\u{1}files\0\u{3}total_bytes\0\u{3}requires_extraction\0\u{3}can_resume\0\u{3}resume_from_bytes\0\u{1}warnings\0\u{3}error_message\0\u{3}storage_namespace\0\u{3}resume_token\0\u{3}required_free_bytes_after_download\0")
 
@@ -1001,7 +1001,7 @@ extension RADownloadPlanResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadStartRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}plan\0\u{1}resume\0\u{3}resume_token\0\u{3}update_registry_on_completion\0")
 
@@ -1055,7 +1055,7 @@ extension RADownloadStartRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadStartResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}task_id\0\u{3}model_id\0\u{3}initial_progress\0\u{3}error_message\0\u{3}resume_token\0")
 
@@ -1114,7 +1114,7 @@ extension RADownloadStartResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RADownloadCancelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadCancelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadCancelRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}task_id\0\u{3}model_id\0\u{3}delete_partial_bytes\0")
 
@@ -1154,7 +1154,7 @@ extension RADownloadCancelRequest: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RADownloadCancelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadCancelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadCancelResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}task_id\0\u{3}model_id\0\u{3}partial_bytes_deleted\0\u{3}error_message\0\u{3}was_running\0\u{3}partial_bytes_preserved\0\u{3}resume_token\0")
 
@@ -1219,7 +1219,7 @@ extension RADownloadCancelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RADownloadResumeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadResumeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadResumeRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}task_id\0\u{3}model_id\0\u{3}resume_from_bytes\0\u{3}resume_token\0\u{3}validate_partial_bytes\0")
 
@@ -1269,7 +1269,7 @@ extension RADownloadResumeRequest: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RADownloadResumeResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadResumeResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadResumeResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}task_id\0\u{3}model_id\0\u{3}initial_progress\0\u{3}error_message\0\u{3}resume_token\0")
 

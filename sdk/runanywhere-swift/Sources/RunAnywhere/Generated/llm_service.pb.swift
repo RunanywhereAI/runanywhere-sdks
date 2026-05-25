@@ -22,12 +22,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -91,7 +91,7 @@ public enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
 /// proto carries tts_model_id but not tts_voice_id" issue) lives in
 /// idl/solutions.proto where VoiceAgentConfig is declared.
-public struct RALLMGenerateRequest: @unchecked Sendable {
+public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -251,7 +251,7 @@ public struct RALLMGenerateRequest: @unchecked Sendable {
 /// duplicates the scalar result fields instead of importing llm_options.proto:
 /// Square Wire treats files with/without go_package as different Kotlin
 /// packages, and that import creates a package cycle through sdk_events.
-public struct RALLMStreamFinalResult: Sendable {
+public nonisolated struct RALLMStreamFinalResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -309,7 +309,7 @@ public struct RALLMStreamFinalResult: Sendable {
 /// callbackFlow / StreamController / tokenQueue. One serialized event
 /// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
 /// from voice_events.proto so frontends can reuse gap-detection logic.
-public struct RALLMStreamEvent: @unchecked Sendable {
+public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -448,13 +448,13 @@ public struct RALLMStreamEvent: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}LLM_STREAM_EVENT_KIND_STARTED\0\u{1}LLM_STREAM_EVENT_KIND_TOKEN\0\u{1}LLM_STREAM_EVENT_KIND_THINKING\0\u{1}LLM_STREAM_EVENT_KIND_TOOL_CALL\0\u{1}LLM_STREAM_EVENT_KIND_PROGRESS\0\u{1}LLM_STREAM_EVENT_KIND_COMPLETED\0\u{1}LLM_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0")
 
@@ -688,7 +688,7 @@ extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamFinalResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0\u{3}error_code\0\u{3}error_message\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0")
 
@@ -792,7 +792,7 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0\u{3}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0\u{3}tool_call\0")
 
