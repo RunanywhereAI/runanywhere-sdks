@@ -325,3 +325,5 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-25T18:09:02Z	6	phase8_fix	fix-agent-cluster-29	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-29 done: commons fix 0113e2540; cmake+ctest llm 4/4 PASS; web typecheck PASS; WASM rebuild required for iter7 TC-04/05
 2026-05-25T11:11:05-07:00	2	phase1a_rerun	executor-02-swift-ios-iter6-full	AGENT_DONE	OK	20260524-125843-matrix	12P/0F/0BLK/7LIM/2NA; CLUSTER-02=LIMITED CLUSTER-10=LIMITED/LIMITED CLUSTER-16=PASS; wall=2026-05-25T18:08:47Z..2026-05-25T18:11:05Z (138s); iter6-full
 2026-05-25T19:15:00Z	6	phase8_fix	fix-agent-cluster-26	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-26/ANALYZER-MARKER-001 catalog §10 grep pattern alignment + iter5 regrade
+2026-05-25T19:20:00Z	6	phase8_fix	fix-agent-cluster-26	COMMIT	OK	32c0ba6b6	CLUSTER-26 catalog §10 + regrade script + executor fallbacks
+2026-05-25T19:20:00Z	6	phase8_fix	fix-agent-cluster-26	AGENT_DONE	OK	20260524-125843-matrix	8 marker LIMITED->PASS across 7 lanes (24 marker rows); commit 32c0ba6b6; tc02/tc05/tc08/tc09/tc10 regrades
