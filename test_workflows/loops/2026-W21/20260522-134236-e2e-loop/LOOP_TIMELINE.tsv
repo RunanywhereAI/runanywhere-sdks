@@ -327,3 +327,12 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-25T19:15:00Z	6	phase8_fix	fix-agent-cluster-26	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-26/ANALYZER-MARKER-001 catalog §10 grep pattern alignment + iter5 regrade
 2026-05-25T19:20:00Z	6	phase8_fix	fix-agent-cluster-26	COMMIT	OK	32c0ba6b6	CLUSTER-26 catalog §10 + regrade script + executor fallbacks
 2026-05-25T19:20:00Z	6	phase8_fix	fix-agent-cluster-26	AGENT_DONE	OK	20260524-125843-matrix	8 marker LIMITED->PASS across 7 lanes (24 marker rows); commit 32c0ba6b6; tc02/tc05/tc08/tc09/tc10 regrades
+2026-05-25T18:35:03Z	7	phase1a_rerun	executor-07-web-iter7-cluster29-verify	AGENT_SPAWN	OK	20260524-125843-matrix	Web iter7 CLUSTER-29 verify; rebuild WASM 0113e2540; TC-04/05/inference-cancel; start=2026-05-25T18:35:03Z
+2026-05-25T19:00:00Z	7	phase1a_rerun	executor-07-web-iter7-cluster29-verify	AGENT_DONE	OK	20260524-125843-matrix	Web iter7 CLUSTER-29=UNBLOCKED; 18P/1F/0BLK/0LIM/8NA; TC-04=PASS TC-05=PASS TC-Inference-cancel=PASS; wasm=OK vite=Y e2e_exit=0 wall_s=1491; lane=iter7-cluster29-verify
+2026-05-25T20:00:00Z	7	phase2_matrix	matrix-coordinator-iter7	AGENT_SPAWN	OK	20260524-125843-matrix	iter7 matrix coordinator + §10 green-check; consolidating 8 lanes (iter5-regrade + iter6-full Swift + iter7-cluster29 Web)
+2026-05-25T20:00:00Z	7	phase2_matrix	matrix-coordinator-iter7	phase2_done	OK	20260524-125843-matrix	MATRIX_REPORT.md + MATRIX_SUMMARY.tsv + MATRIX_BY_TC.tsv + sessions.json written under runs/20260524-125843-matrix/matrix-iter7/
+2026-05-25T20:00:00Z	7	phase7_plan	matrix-coordinator-iter7	iter8_plan_written	OK	20260524-125843-matrix	plans/iter-08-remediation.md written per §10 RED verdict
+2026-05-25T20:00:00Z	7	phase3_green_check	orchestrator	ITERATION_VERDICT	RED	20260524-125843-matrix	§10 not met — 83P/3F/1BLK/47LIM; iter 8 required (CLUSTER-26b/Web TC-09/RN-And tc06/Flutter-iOS tc10)
+2026-05-25T20:00:00Z	7	phase2_matrix	orchestrator	ITERATION_END	OK	20260524-125843-matrix	iter=7 issues_resolved=6 issues_remaining=8 commits=6
+2026-05-25T20:00:00Z	7	phase2_matrix	matrix-coordinator-iter7	AGENT_DONE	OK	20260524-125843-matrix	iter7 matrix RED — 1 PASS / 6 PARTIAL / 1 FAIL; iter-08-remediation.md ready
+2026-05-25T20:34:08Z	8	phase8_fix	fix-agent-cluster-30	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-30 RN-AND-VAD-HARNESS-001: add RN-Android validation-action testID tap + VAD wait
