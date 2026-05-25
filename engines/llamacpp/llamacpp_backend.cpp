@@ -349,6 +349,23 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
                  user_context_size);
   }
 
+  common_params_fit_status fit_status = COMMON_PARAMS_FIT_STATUS_FAILURE;
+
+#if defined(__EMSCRIPTEN__)
+  // WEB-LLM-LOAD-001 / CLUSTER-29: common_fit_params probes
+  // llama_max_devices() (16 on WASM) and never returns within practical
+  // timeouts on CPU WASM. Skip fit on Emscripten; ctx sizing falls through
+  // to max_default_context_ after model load (see below).
+  RAC_LOG_INFO("LLM.LlamaCpp",
+               "Emscripten: skipping common_fit_params (WASM device probe "
+               "hang); using conservative CPU defaults (n_gpu_layers=0, "
+               "n_ctx cap=%d)",
+               max_default_context_);
+  model_params.n_gpu_layers = 0;
+  if (ctx_params.n_ctx == 0) {
+    ctx_params.n_ctx = static_cast<uint32_t>(max_default_context_);
+  }
+#else
   size_t n_devices = llama_max_devices();
   size_t n_overrides = llama_max_tensor_buft_overrides();
 
@@ -384,7 +401,7 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
   // hypothetical `llama_params_fit*` names. Status constants are likewise
   // prefixed `COMMON_PARAMS_FIT_STATUS_*` (see common/fit.h in the tree
   // FetchContent pulls).
-  common_params_fit_status fit_status = common_fit_params(
+  fit_status = common_fit_params(
       resolved_path.c_str(), &model_params, &ctx_params, tensor_split.data(),
       tensor_buft_overrides.data(), margins.data(), n_ctx_min,
       GGML_LOG_LEVEL_INFO);
@@ -428,6 +445,7 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
     }
     break;
   }
+#endif
 
   // Apply user gpu_layers override after fit, respecting the CPU-only build
   // constraint. common_fit_params does not yet account for host memory in
