@@ -340,3 +340,5 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-25T20:36:00Z	8	phase8_fix	fix-agent-cluster-31	COMMIT	OK	e4c5ad743	Sherpa TTS num_threads=1 on WASM + web-lane-e2e VLM-scoped infra + OPFS free before TC-09
 2026-05-25T20:36:00Z	8	phase8_fix	fix-agent-cluster-31	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-31 done: commons TTS pthread + harness TC-09; WASM rebuild for sherpa; iter8 verify TC-09
 2026-05-25T20:34:49Z	8	phase8_fix	fix-agent-cluster-30	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-30 done: commit 0aa1f061f; testID tap + VAD wait + validation harness sweep; expect TC-06/18/21 PASS on re-drive
+2026-05-25T20:40:00Z	8	phase8_fix	fix-agent-cluster-26b	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-26b ANALYZER-MARKER-002: second-pass §10 patterns for 47 remaining LIMITED across 6 device lanes
+2026-05-25T20:42:00Z	8	phase8_fix	fix-agent-cluster-26b	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-26b done: +10 LIMITED→PASS (37 remain); patterns TC-03/13 + persistence/RAG/VLM/Swift LLM bootstrap

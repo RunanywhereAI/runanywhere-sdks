@@ -196,8 +196,8 @@ adb shell ls -la /sdcard/Download/rag-sample.txt
 | TC-Load-OOM | Load failure (no crash loop) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | TC-Inference-cancel | Stop mid-stream | ✓‡ | ✓‡ | ✓‡ | ✓‡ | ✓ |
 
-\* iOS: delete app from home screen (no Settings “clear data”).  
-† Use model download cancel if UI exposes it; LoRA cancel on Kotlin; otherwise mark **LIMITED**.  
+\* iOS: delete app from home screen (no Settings “clear data”).
+† Use model download cancel if UI exposes it; LoRA cancel on Kotlin; otherwise mark **LIMITED**.
 ‡ Chat stop may be absent; use **Vision** **Stop** (Android VLM) or Web **Clear** during stream; document **LIMITED** if no cancel control.
 
 ---
@@ -239,8 +239,8 @@ Run after **TC-02** (model downloaded) unless noted. Always capture logs + scree
 3. After boot, launch app (do **not** uninstall).
 4. Verify model still downloaded in **Chat** model sheet / **Storage**.
 
-**Pass:** Downloaded state survives reboot.  
-**Fail:** Registry empty after reboot.  
+**Pass:** Downloaded state survives reboot.
+**Fail:** Registry empty after reboot.
 **Logs:** Post-boot init without full catalog re-fetch of multi-GB artifact.
 
 ### TC-03c — Uninstall → reinstall (models must be GONE)
@@ -254,8 +254,8 @@ Run after **TC-02** (model downloaded) unless noted. Always capture logs + scree
 3. Reinstall fresh build; launch (TC-01).
 4. Open **Chat** → model sheet / **Storage**.
 
-**Pass:** **SmolLM2 360M Q8_0** shows **not downloaded**; storage near zero.  
-**Fail:** Model still **Downloaded** / **Ready** without new download (stale storage).  
+**Pass:** **SmolLM2 360M Q8_0** shows **not downloaded**; storage near zero.
+**Fail:** Model still **Downloaded** / **Ready** without new download (stale storage).
 **Logs:** Fresh init; no `hydrated N models` with N>0 on first launch (Web).
 
 ### TC-03d — Clear app data vs uninstall
@@ -279,7 +279,7 @@ adb shell pm clear com.runanywhereaI                     # RN
 
 **Steps:** After TC-02 → `pm clear` (or Web: clear storage only, keep tab open) → relaunch → check **Storage** + model sheet.
 
-**Pass:** Models gone; app may show onboarding (**Welcome!** / **Get Started**) again.  
+**Pass:** Models gone; app may show onboarding (**Welcome!** / **Get Started**) again.
 **Fail:** Models still listed with non-zero sizes after clear.
 
 ### TC-16 — Storage screen after lifecycle events
@@ -301,8 +301,8 @@ adb shell pm clear com.runanywhereaI                     # RN
 | RN | **Settings** → **Storage Overview**, **Model Catalog** | |
 | Web | Tab **Storage** | **Browser Storage (OPFS)**, **Registered Models**, **Manage Models** |
 
-**Pass:** UI matches expected state for each lifecycle phase.  
-**Fail:** **Downloaded Models** non-empty after clear/uninstall.  
+**Pass:** UI matches expected state for each lifecycle phase.
+**Fail:** **Downloaded Models** non-empty after clear/uninstall.
 **Logs:** `getStorageInfo` / storage delete paths; Web OPFS listing.
 
 ### TC-Storage-OPFS — Web OPFS persistence
@@ -319,8 +319,8 @@ adb shell pm clear com.runanywhereaI                     # RN
 4. Close tab completely; open new tab to same origin.
 5. Repeat step 3.
 
-**Pass:** Models survive hard refresh and tab close.  
-**Fail:** SAB/OPFS errors, empty registry after refresh.  
+**Pass:** Models survive hard refresh and tab close.
+**Fail:** SAB/OPFS errors, empty registry after refresh.
 **Fail signals:** Console `SharedArrayBuffer`, isolation headers missing.
 
 ### TC-Download-interrupt — Cancel mid-download
@@ -334,8 +334,8 @@ adb shell pm clear com.runanywhereaI                     # RN
 3. Observe UI: progress stops; row returns to not-downloaded or partial state per app.
 4. Start download again.
 
-**Pass:** No crash; second download completes OR app shows clear error (no infinite spinner).  
-**Fail:** ANR, stuck progress, corrupt “downloaded” state without files.  
+**Pass:** No crash; second download completes OR app shows clear error (no infinite spinner).
+**Fail:** ANR, stuck progress, corrupt “downloaded” state without files.
 **Logs:** `download` / cancel / checksum; no `FATAL EXCEPTION`.
 
 Mark **LIMITED** if platform has no download cancel in LLM sheet (document screenshot).
@@ -349,8 +349,8 @@ Mark **LIMITED** if platform has no download cancel in LLM sheet (document scree
 1. Download model; attempt **Use** / **Load** on low-memory emulator or after loading other heavy models.
 2. If load fails, observe error UI (**Model Load Error** dialog / toast).
 
-**Pass:** Single error surface; app remains usable; no crash loop on relaunch.  
-**Fail:** Repeated native crash on launch, OOM kill loop (`AndroidRuntime`, jetsam on iOS).  
+**Pass:** Single error surface; app remains usable; no crash loop on relaunch.
+**Fail:** Repeated native crash on launch, OOM kill loop (`AndroidRuntime`, jetsam on iOS).
 **Logs:** `Model load failed` / OOM; **no** repeated crash stack on every launch without user action.
 
 ### TC-Inference-cancel — Stop generation mid-stream
@@ -391,8 +391,8 @@ Mark **LIMITED** on Chat if only VLM/Web cancel tested — note in report.
 
 ## 4. Android Kotlin (lane `01_android_kotlin`)
 
-**Example path:** `examples/android/RunAnywhereAI/`  
-**Package (debug):** `com.runanywhere.runanywhereai.debug`  
+**Example path:** `examples/android/RunAnywhereAI/`
+**Package (debug):** `com.runanywhere.runanywhereai.debug`
 **Navigation:** Bottom tabs — **Chat**, **Vision**, **Voice**, **More**, **Settings**
 
 ### Prerequisites
@@ -450,7 +450,7 @@ test_workflows/instructions/logging/capture_logs.sh start android "$RUN_DIR" 01_
 - `LlamaCPP` / `ONNX` / `Sherpa` registration (no fatal)
 - Absence of: `FATAL EXCEPTION`, `UnsatisfiedLinkError`, `Hermes` proto crash (N/A on Kotlin), `proto decode failed`
 
-**Pass:** Home tabs visible; init completes without crash dialog; filtered logcat has no fatal errors.  
+**Pass:** Home tabs visible; init completes without crash dialog; filtered logcat has no fatal errors.
 **Fail:** Stuck splash, crash dialog, `AndroidRuntime` stack trace, 16 KB compatibility dialog.
 
 ---
@@ -472,7 +472,7 @@ test_workflows/instructions/logging/capture_logs.sh start android "$RUN_DIR" 01_
 
 **Expected logs (grep -Ei):** `Download accepted for` / `⬇️ Download accepted for` / `Registered downloaded model` / `Starting download for model:` / `task=download-proto` / model id `smollm2-360m-q8_0`; no stuck progress >15 min on fast network.
 
-**Pass:** Model shows downloaded; UI not frozen.  
+**Pass:** Model shows downloaded; UI not frozen.
 **Fail:** Download error dialog, checksum failure, 0% stuck, app ANR.
 
 ---
@@ -505,7 +505,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs (grep -Ei):** `Model load succeeded for` / `LLM model loaded` / `Found downloaded chat model` / `[ChatScreen] Text model loaded: true` / `✅ LLM model loaded:` / `smollm2-360m-q8_0`; no OOM kill in `dumpsys meminfo`.
 
-**Pass:** Chat input **Type a message...** enabled; model name in toolbar.  
+**Pass:** Chat input **Type a message...** enabled; model name in toolbar.
 **Fail:** **Model Load Error** dialog, native crash, empty toolbar after timeout.
 
 ---
@@ -524,7 +524,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs (grep -Ei):** `LLM stream complete` / `[PARAMS] generateStream` / `Streaming token` / stream completion marker; fallback: load marker from TC-04.
 
-**Pass:** Non-empty assistant reply; stream ends (cursor stops).  
+**Pass:** Non-empty assistant reply; stream ends (cursor stops).
 **Fail:** Empty response, infinite spinner, crash mid-stream.
 
 ---
@@ -544,7 +544,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs:** VAD lifecycle / `racVad` / state transitions; no JNI null from `processLifecycle`.
 
-**Pass:** Detects speech start and end (UI or log state change).  
+**Pass:** Detects speech start and end (UI or log state change).
 **Fail:** No transitions, permission denied without recovery, crash.
 
 ---
@@ -564,7 +564,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs (grep -Ei):** `Batch transcription complete` / `STT model loaded successfully` / `STT model loaded: true` / `Sherpa.STT.*STT model loaded` / transcription text.
 
-**Pass:** Final text contains key words (allow ASR variance).  
+**Pass:** Final text contains key words (allow ASR variance).
 **Fail:** Empty transcript, model load failure, timeout.
 
 ---
@@ -585,7 +585,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs (grep -Ei):** `Speech generation complete` / `Synthesis complete` / `Synthesis completed` / `Sherpa.TTS.*Synthesis complete` / duration / `System TTS started` for system path.
 
-**Pass:** Audible or logged synthesis complete.  
+**Pass:** Audible or logged synthesis complete.
 **Fail:** Silent failure, Piper load error on system path conflated.
 
 ---
@@ -606,7 +606,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 **Expected logs (grep -Ei):** `VLM streaming completed` / `VLM processing complete` / `Starting VLM streaming` / `Model load succeeded for smolvlm`.
 
-**Pass:** Non-empty vision response.  
+**Pass:** Non-empty vision response.
 **Fail:** mmproj/path errors, blank response, crash.
 
 ---
@@ -615,7 +615,7 @@ Superseded for detail by **TC-03a** (force-kill). Run TC-03a as the canonical pe
 
 Full UX on **More** → **Speech to Text**: model sheet, record button states, error banners, switching models. Re-run TC-07 with screenshots at: open, model sheet, recording, result.
 
-**Pass:** Coherent flow without dead-ends.  
+**Pass:** Coherent flow without dead-ends.
 **Fail:** Back stack broken, model sheet empty.
 
 ---
@@ -624,7 +624,7 @@ Full UX on **More** → **Speech to Text**: model sheet, record button states, e
 
 Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model**, text field, generate/stop controls.
 
-**Pass:** Generate and stop (if exposed) work.  
+**Pass:** Generate and stop (if exposed) work.
 **Fail:** UI stuck on generating.
 
 ---
@@ -644,7 +644,7 @@ Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model
 
 **Expected logs:** `Model states synced - STT: true, LLM: true, TTS: true`; transcription and TTS complete markers.
 
-**Pass:** All three components loaded; at least one full or partial turn with evidence.  
+**Pass:** All three components loaded; at least one full or partial turn with evidence.
 **Fail:** Component fails to load, session never starts.
 
 ---
@@ -665,7 +665,7 @@ Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model
 
 **Expected logs:** `ragIngest` / `ragQuery` / pipeline create; chunk retrieval.
 
-**Pass:** Grounded answer citing ingested content.  
+**Pass:** Grounded answer citing ingested content.
 **Fail:** Empty retrieval, pipeline create error.
 
 ---
@@ -685,7 +685,7 @@ Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model
 
 **Expected logs:** `registerTool` / tool execution / no proto encode errors.
 
-**Pass:** Tool invoked with visible result.  
+**Pass:** Tool invoked with visible result.
 **Fail:** Tool calling disabled silently, proto errors.
 
 ---
@@ -702,7 +702,7 @@ Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model
 2. Open **Downloaded Models**; confirm **SmolLM2 360M Q8_0** listed with plausible size.
 3. Do **not** delete unless running cleanup TC.
 
-**Pass:** Downloaded models listed; sizes > 0.  
+**Pass:** Downloaded models listed; sizes > 0.
 **Fail:** Empty list despite TC-02, negative sizes.
 
 ---
@@ -711,7 +711,7 @@ Full UX on **More** → **Text to Speech**. Re-run TC-08; capture **Select Model
 
 Run **TC-03a** then **TC-16** (storage UI after force-kill). See [§3 TC-16](#tc-16--storage-screen-after-lifecycle-events).
 
-**Pass:** Storage + **Chat** model state consistent after force-kill.  
+**Pass:** Storage + **Chat** model state consistent after force-kill.
 **Fail:** Storage cleared unexpectedly while model still shown downloaded.
 
 ---
@@ -742,7 +742,7 @@ Run **TC-03a** then **TC-16** (storage UI after force-kill). See [§3 TC-16](#tc
 2. Ensure LLM model loaded; tap **Run All Benchmarks** (or **Run Selected (N)**).
 3. Wait for run completion; open **Benchmark Details** if shown.
 
-**Pass:** At least one category completes without crash; metrics non-empty.  
+**Pass:** At least one category completes without crash; metrics non-empty.
 **Fail:** Benchmark Error dialog, hang at 0%.
 
 ---
@@ -755,7 +755,7 @@ Run **TC-03a** then **TC-16** (storage UI after force-kill). See [§3 TC-16](#tc
 2. Open **API Configuration (Testing)** sheet — verify opens (dev mode).
 3. Confirm **Logging Configuration** visible.
 
-**Pass:** Settings persist after leaving screen (optional re-open check).  
+**Pass:** Settings persist after leaving screen (optional re-open check).
 **Fail:** Crash opening API sheet.
 
 ---
@@ -774,15 +774,15 @@ Run **TC-03a** then **TC-16** (storage UI after force-kill). See [§3 TC-16](#tc
 3. Return to **Chat** with compatible LLM; run short inference.
 4. **Unload** / **Clear All Adapters**; verify removed.
 
-**Pass:** Apply/remove without crash; inference still works.  
+**Pass:** Apply/remove without crash; inference still works.
 **Fail:** Incompatible adapter crash, apply no-op with error log.
 
 ---
 
 ## 5. iOS Swift (lane `02_ios_swift`)
 
-**Example path:** `examples/ios/RunAnywhereAI/`  
-**Bundle ID:** `com.runanywhere.RunAnywhere`  
+**Example path:** `examples/ios/RunAnywhereAI/`
+**Bundle ID:** `com.runanywhere.RunAnywhere`
 **Navigation:** **Chat**, **Vision**, **Voice**, **More**, **Settings** (same tab labels as Kotlin)
 
 ### Prerequisites
@@ -825,7 +825,7 @@ test_workflows/scripts/capture-ios-simulator-logs.sh stop "$RUN_ID"
 
 **Expected logs:** `🎯 Initializing SDK...`, `✅ SDK initialized in DEVELOPMENT mode`, `✅ SDK successfully initialized!`, `Model registry refreshed`
 
-**Pass:** **Chat** tab interactive; no **Initialization Failed**.  
+**Pass:** **Chat** tab interactive; no **Initialization Failed**.
 **Fail:** Stuck **Initializing SDK...**, crash report in DiagnosticReports.
 
 ### TC-02 — Chat / LLM model download
@@ -834,7 +834,7 @@ test_workflows/scripts/capture-ios-simulator-logs.sh stop "$RUN_ID"
 2. Open sheet **Select LLM Model** → **SmolLM2 360M Q8_0** → tap **Get**.
 3. Wait for **Ready** / **Use**.
 
-**Pass:** Download completes; **Use** available.  
+**Pass:** Download completes; **Use** available.
 **Fail:** Stuck **Loading available models...**
 
 ### TC-03 — Model persistence
@@ -917,9 +917,9 @@ LoRA managed from **Chat** toolbar (sheet), not More tab. Example adapter name: 
 
 ## 6. Flutter (Android + iOS, lanes `05` / `06`)
 
-**Example path:** `examples/flutter/RunAnywhereAI/`  
-**Android package:** `com.runanywhere.runanywhere_ai`  
-**iOS bundle:** `com.runanywhere.runanywhereAi`  
+**Example path:** `examples/flutter/RunAnywhereAI/`
+**Android package:** `com.runanywhere.runanywhere_ai`
+**iOS bundle:** `com.runanywhere.runanywhereAi`
 **Tabs (8):** **Chat**, **Vision**, **STT**, **Speak**, **Voice**, **Tools**, **Solutions**, **Settings**
 
 ### Prerequisites
@@ -950,7 +950,7 @@ test_workflows/scripts/capture-flutter-logs.sh stop "$RUN_ID" android
 
 Launch app; wait for tabs. Logs: `🎯 Initializing SDK...`, `✅ SDK initialized in DEVELOPMENT mode`.
 
-**Pass:** All 8 tabs visible.  
+**Pass:** All 8 tabs visible.
 **Fail:** Red error screen, stuck init.
 
 ### TC-02 — Chat / LLM download
@@ -1041,9 +1041,9 @@ Tab **Settings** → generation + tool calling.
 
 ## 7. React Native (Android + iOS, lanes `03` / `04`)
 
-**Example path:** `examples/react-native/RunAnywhereAI/`  
-**Android package:** `com.runanywhereaI` (capital **I**)  
-**iOS bundle:** `com.runanywhere.runanywhereai`  
+**Example path:** `examples/react-native/RunAnywhereAI/`
+**Android package:** `com.runanywhereaI` (capital **I**)
+**iOS bundle:** `com.runanywhere.runanywhereai`
 **Tabs (9):** **Chat**, **Transcribe**, **Speak**, **Voice**, **RAG**, **Vision**, **Solutions**, **Validation**, **Settings**
 
 ### Prerequisites
@@ -1161,7 +1161,7 @@ Tab **Validation** — subtitle *Capture deterministic modality evidence as JSON
 
 **Steps:** Tap each action; grep Metro for `[RN_VALIDATION_ACTION]` JSON line; status `PASS` or `EXPECTED_ERROR` (plugin error only).
 
-**Pass:** All required actions emit JSONL records per `react_native/README.md`.  
+**Pass:** All required actions emit JSONL records per `react_native/README.md`.
 **Fail:** `FAIL` status or missing log line.
 
 > **Known limitation (CLUSTER-12 / COMMONS-STRUCT-001):** the
@@ -1194,8 +1194,8 @@ Run **LoRA List**, **Compatibility**, **Apply**, **Remove** on Validation tab. F
 
 ## 8. Web (lane `07_web`)
 
-**Example path:** `examples/web/RunAnywhereAI/`  
-**URL:** `http://127.0.0.1:5173` (Vite dev)  
+**Example path:** `examples/web/RunAnywhereAI/`
+**URL:** `http://127.0.0.1:5173` (Vite dev)
 **Tabs:** **Chat**, **Vision**, **Voice**, **Transcribe**, **Speak**, **Docs**, **Storage**, **Solutions**, **Settings**
 
 ### Prerequisites
@@ -1237,7 +1237,7 @@ Navigate to app; boot UI **Setting Up Your AI** → **Initializing SDK...** → 
 
 **Console grep:** `[RunAnywhere] llamacpp backend registered`, `[RunAnywhere] SDK initialized, version:`
 
-**Pass:** `window.__RUNANYWHERE_AI_READY__` or `data-runanywhere-ai-ready` indicates ready; no console errors on load.  
+**Pass:** `window.__RUNANYWHERE_AI_READY__` or `data-runanywhere-ai-ready` indicates ready; no console errors on load.
 **Fail:** WASM init failed, blank page, COOP/COEP blocking SharedArrayBuffer.
 
 ### TC-02 — Chat / LLM download
@@ -1364,7 +1364,7 @@ If the build under test lacks the **Clear** toolbar entry, mark
 
 ## 9. runanywhere-commons (C++)
 
-**Path:** `sdk/runanywhere-commons/`  
+**Path:** `sdk/runanywhere-commons/`
 **Gate:** Run before mobile E2E when validating native/core changes. Failures **BLOCK** device lanes until green.
 
 ### Quick commands (macOS dev)
@@ -1530,11 +1530,13 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 | --- | --- | --- | --- |
 | TC-01 init | `SDK initialization complete` | `Phase 1 complete`, `[App] All models registered` | `SDK Phase 1 ready\|Phase 1 complete\|SDK successfully initialized\|\[App\] All models registered` |
 | TC-02 download | `Download accepted for` | Kotlin `⬇️ Download accepted for`; C++ `Registered downloaded model`; Flutter `[RunAnywhere.Download] Download accepted`; Swift `task=download-proto-N` | `Download accepted for\|Registered downloaded model\|Starting download for model:\|task=download-proto` |
-| TC-04 load | `LLM model loaded` | C++/Swift `Model load succeeded for`; Kotlin `✅ Model load succeeded for`; RN `[ChatScreen] Text model loaded: true`; Flutter `Voice agent LLM model loaded:` | `Model load succeeded for\|LLM model loaded\|Found downloaded chat model\|Text model loaded: true` |
+| TC-03 persistence | `Phase 1 complete` after relaunch | RN `[App] All models registered`; Android `SDK Phase 1 proto initialized`; Flutter `[RunAnywhere.Init] Phase 1 complete`; Swift `App is ready to use` | `Phase 1 complete\|SDK Phase 1 ready\|App is ready\|\[App\] All models registered\|SDK Phase 1 proto initialized` |
+| TC-04 load | `LLM model loaded` | C++/Swift `Model load succeeded for`; Kotlin `✅ Model load succeeded for`; RN `[ChatScreen] Text model loaded: true`; Flutter `Voice agent LLM model loaded:`; Swift bootstrap `✅ LLM models registered` | `Model load succeeded for\|LLM model loaded\|Found downloaded chat model\|Text model loaded: true\|LLM models registered` |
 | TC-05 chat | `LLM stream complete` | Kotlin `[PARAMS] generateStream`; stream token events; executor fallback on load marker | `LLM stream complete\|\[PARAMS\] generateStream\|Streaming token` (+ TC-04 load fallback) |
-| TC-07 STT load | `STT model loaded successfully` | Flutter `STT model loaded:`; Kotlin `STT model loaded:`; Sherpa `Sherpa.STT.*STT model loaded successfully`; RN `[STTScreen] STT model loaded: true` | `STT model loaded successfully\|STT model loaded: true\|Sherpa\.STT.*STT model loaded` |
+| TC-07 STT load | `STT model loaded successfully` | Flutter `STT model loaded:`; Kotlin `STT model loaded:` / `Batch transcription complete`; Sherpa `Sherpa.STT.*STT model loaded successfully`; RN `[STTScreen] STT model loaded: true` | `STT model loaded successfully\|STT model loaded: true\|Sherpa\.STT.*STT model loaded\|Batch transcription complete` |
 | TC-08 TTS | `Speech generation complete` | Kotlin SDK `Synthesis complete`; C++ `Synthesis completed`; Flutter `debugPrint('Speech generation complete')` | `Speech generation complete\|Synthesis complete\|Synthesis completed` |
-| TC-09 VLM | `VLM streaming completed` | Kotlin `VLM processing complete` / `Starting VLM streaming`; example `Frame description completed` | `VLM streaming completed\|VLM processing complete\|Starting VLM streaming\|Frame description completed` |
+| TC-09 VLM | `VLM streaming completed` | Kotlin `VLM processing complete` / `Starting VLM streaming`; example `Frame description completed`; reject `VLM model loaded: false` | `VLM streaming completed\|VLM processing complete\|Starting VLM streaming\|Frame description completed\|VLM model loaded: true` |
+| TC-13 RAG | `Document loaded successfully` | Kotlin `Embedding generation complete`; Flutter/RN example `Document loaded successfully`; C++ `Query complete` | `Document loaded successfully\|Embedding generation complete\|Query complete\|ragIngest\|ragQuery` |
 
 ### Quick-reference table
 
@@ -1554,6 +1556,10 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 | `STT model loaded successfully` / `STT model loaded: true` | STT load OK |
 | `Speech generation complete` / `Synthesis complete` | TTS OK |
 | `VLM streaming completed` / `VLM processing complete` | VLM OK |
+| `Phase 1 complete` / `[App] All models registered` (post relaunch) | TC-03 persistence OK |
+| `Document loaded successfully` / `Embedding generation complete` | RAG ingest OK |
+| `Batch transcription complete` | STT batch inference OK |
+| `LLM models registered` | Swift catalog bootstrap (TC-04 fallback) |
 | `System TTS started` | Android system TTS path |
 | `Model states synced` | Voice agent components |
 | `ragIngest` / `ragQuery` / `RAG` | RAG pipeline |
@@ -1584,4 +1590,4 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 
 ---
 
-*Catalog version: 2026-05-25 (§10 CLUSTER-26 marker alignment). UI strings sourced from example apps; drift → grep `examples/*/RunAnywhereAI`.*
+*Catalog version: 2026-05-25 (§10 CLUSTER-26b marker alignment). UI strings sourced from example apps; drift → grep `examples/*/RunAnywhereAI`.*

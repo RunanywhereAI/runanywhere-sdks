@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-grade iter-5 lane modality_results.tsv using catalog §10 expanded patterns (read-only on executor evidence).
+# Re-grade lane modality_results.tsv using catalog §10 expanded patterns (read-only on executor evidence).
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
@@ -8,16 +8,22 @@ source "${REPO_ROOT}/test_workflows/scripts/_catalog_marker_patterns.sh"
 
 usage() {
   echo "Usage: $0 <lane_evidence_dir> [source_modality_results.tsv]" >&2
-  echo "  Writes <lane_evidence_dir>/iter5-regrade/modality_results.tsv + REGRADE_NOTES.md" >&2
+  echo "  Writes <out_dir>/modality_results.tsv + REGRADE_NOTES.md" >&2
+  echo "  Env: RAC_REGRADE_SUBDIR (default iter5-regrade), RAC_REGRADE_OUT_DIR (override out path)" >&2
 }
 
 [[ $# -ge 1 ]] || { usage; exit 1; }
 
 LANE_DIR="$(cd "$1" && pwd)"
 SRC_TSV="${2:-${LANE_DIR}/modality_results.tsv}"
-OUT_DIR="${LANE_DIR}/iter5-regrade"
+if [[ "${SRC_TSV}" != /* ]]; then
+  SRC_TSV="${LANE_DIR}/${SRC_TSV}"
+fi
+OUT_SUBDIR="${RAC_REGRADE_SUBDIR:-iter5-regrade}"
+OUT_DIR="${RAC_REGRADE_OUT_DIR:-${LANE_DIR}/${OUT_SUBDIR}}"
 OUT_TSV="${OUT_DIR}/modality_results.tsv"
 OUT_NOTES="${OUT_DIR}/REGRADE_NOTES.md"
+CLUSTER_TAG="${RAC_REGRADE_CLUSTER_TAG:-CLUSTER-26 / ANALYZER-MARKER-001}"
 
 [[ -f "${SRC_TSV}" ]] || { echo "missing ${SRC_TSV}" >&2; exit 1; }
 
@@ -63,7 +69,7 @@ declare -a conversion_lines=()
 } > "${OUT_TSV}"
 
 {
-  echo "# iter5-regrade — CLUSTER-26 / ANALYZER-MARKER-001"
+  echo "# ${OUT_SUBDIR} — ${CLUSTER_TAG}"
   echo
   echo "- Source: \`${SRC_TSV#${REPO_ROOT}/}\`"
   echo "- Log files searched: ${#LOG_FILES[@]}"
