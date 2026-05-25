@@ -1239,7 +1239,12 @@ bool SherpaTTS::load_model(const std::string &model_path,
   tts_config.model.vits.length_scale = 1.0f;
 
   tts_config.model.provider = "cpu";
+#if defined(__EMSCRIPTEN__)
+  // Match STT: single-threaded ORT on WASM (no pthread pool in racommons-onnx-sherpa).
+  tts_config.model.num_threads = 1;
+#else
   tts_config.model.num_threads = 2;
+#endif
   tts_config.model.debug = 1;
 
   RAC_LOG_INFO("Sherpa.TTS", "Creating SherpaOnnxOfflineTts (VITS/Piper)...");
