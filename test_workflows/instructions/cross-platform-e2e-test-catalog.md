@@ -1399,28 +1399,32 @@ ctest --test-dir build --output-on-failure
 
 Full backends (optional): `scripts/build-linux.sh --shared` per `AGENTS.md`.
 
-### Streaming parity (`tests/streaming/`)
+### Streaming parity (ctest `stream` subset)
 
-Golden producer fixtures for cross-SDK wire-format parity. The legacy
-`parity_test_cpp` / `perf_producer` / `cancel_producer` standalone binaries
-have been removed; their coverage is now exercised via the `stream` ctest
-subset (3 streaming tests):
+Cross-SDK wire-format parity (voice agent, LLM streaming, perf bench, cancel
+parity) is exercised via the ctest `stream` subset — **not** standalone
+executables. Do **not** build or invoke removed legacy targets
+(`parity_test_cpp`, `perf_producer`, `cancel_producer`).
 
 ```bash
 cmake --preset macos-debug -DRAC_BUILD_TESTS=ON
 cmake --build build/macos-debug
-ctest --test-dir build/macos-debug -R stream --output-on-failure
+
+# Parity gate — 3 streaming tests (llm_stream_proto, sdk_event_stream, stt_vad_stream_event)
+ctest --test-dir build/macos-debug -R "stream|parity" --output-on-failure
 ```
 
-Categories: voice agent (`golden_events.txt`), LLM streaming (`llm_golden_events.txt`), perf bench (p50 decode), cancel parity.
+Categories embedded in ctest: voice agent (`golden_events.txt`), LLM streaming
+(`llm_golden_events.txt`), perf bench (p50 decode), cancel parity (interrupt at
+index 500).
 
 ### Log capture
 
 ```bash
 RUN_ID="commons-$(date +%Y%m%d-%H%M%S)"
 test_workflows/scripts/capture-commons-test.sh run "$RUN_ID"
-# or reuse existing build:
-test_workflows/scripts/capture-commons-test.sh ctest "$RUN_ID" build/macos-debug --ctest-filter parity
+# or reuse existing build (stream parity subset only):
+test_workflows/scripts/capture-commons-test.sh ctest "$RUN_ID" build/macos-debug --ctest-filter 'stream|parity'
 ```
 
 Output: `test_workflows/logs/commons-<run-id>/logs/{cmake_configure,cmake_build,ctest,test_core}.log` + `command_summary.tsv`.
@@ -1435,7 +1439,9 @@ scripts/validation/run_commons_proto_checks.sh
 ### Pass criteria
 
 - `test_core --run-all` exits 0 (13 core tests, no models)
-- `ctest` parity targets pass when streaming touched
+- Full `ctest` exits 0 (112/112 on macos-debug)
+- `ctest -R "stream|parity"` exits 0 (3 streaming parity tests) when streaming
+  wire format is touched
 - No sanitizer crashes in `linux-asan` preset when used
 
 ---
