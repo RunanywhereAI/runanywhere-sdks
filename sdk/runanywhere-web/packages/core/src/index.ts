@@ -42,7 +42,11 @@ export type {
   PluginInfo,
   PluginLoaderCapability,
 } from './Public/Extensions/RunAnywhere+PluginLoader';
-export type { RAGDocumentSummary } from './Public/Extensions/RunAnywhere+RAG';
+export type {
+  RAGAvailability,
+  RAGDocumentSummary,
+  RAGEnsureReadyOptions,
+} from './Public/Extensions/RunAnywhere+RAG';
 export type {
   RegisterModelFile,
   RegisterModelOptions,

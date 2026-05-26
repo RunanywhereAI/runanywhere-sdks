@@ -70,6 +70,7 @@ import {
   registerModelArchive as registerModelArchiveImpl,
   registerModelFromUrl,
   registerModelMultiFile as registerModelMultiFileImpl,
+  setRegisterModelHydrateHook,
   type RegisterModelOptions,
   type RegisterMultiFileOptions,
 } from './Extensions/RunAnywhere+Storage';
@@ -746,6 +747,20 @@ export const RunAnywhere = {
             `Phase 2 init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
           );
         });
+
+        // Hydrate any pre-existing OPFS-backed models registered before
+        // `initialize()` returned, so the Storage tab paints the correct
+        // "Downloaded" state on first render. Catalogs registered AFTER
+        // `initialize()` resolves go through the new `registerModel(...)`
+        // overloads, which schedule their own follow-up hydrate. This
+        // call is idempotent and no-ops if the registry is empty.
+        try {
+          await RunAnywhere.hydrateModelRegistry();
+        } catch (err) {
+          logger.warning(
+            `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       } finally {
         _initializingPromise = null;
       }
@@ -1552,3 +1567,16 @@ export const RunAnywhere = {
     RunAnywhere.shutdown();
   },
 };
+
+// Install the post-register hydrate hook so the high-level
+// `RunAnywhere.registerModel*(...)` overloads in `RunAnywhere+Storage.ts`
+// automatically reconcile OPFS-backed model state with the freshly-added
+// catalog entry. Fire-and-forget — `hydrateModelRegistry()` is idempotent
+// and logs its own failures.
+setRegisterModelHydrateHook(() => {
+  void RunAnywhere.hydrateModelRegistry().catch((err) => {
+    logger.debug(
+      `post-register hydrate failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+});

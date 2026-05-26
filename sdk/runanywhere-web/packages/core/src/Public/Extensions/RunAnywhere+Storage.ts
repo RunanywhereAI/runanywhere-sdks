@@ -187,6 +187,29 @@ export interface RegisterMultiFileOptions {
   source?: ModelSource;
 }
 
+/**
+ * Hook that `RunAnywhere.initialize()` installs at module init so the
+ * `registerModel(...)` overloads can schedule a post-register OPFS
+ * hydrate without forming a circular import with `RunAnywhere.ts`.
+ */
+type RegisterModelHydrateHook = () => void;
+
+let _postRegisterHydrate: RegisterModelHydrateHook | null = null;
+
+export function setRegisterModelHydrateHook(fn: RegisterModelHydrateHook | null): void {
+  _postRegisterHydrate = fn;
+}
+
+function schedulePostRegisterHydrate(): void {
+  const fn = _postRegisterHydrate;
+  if (!fn) return;
+  try {
+    fn();
+  } catch {
+    /* hydrate is best-effort; failures are surfaced by hydrate itself */
+  }
+}
+
 function deriveIdFromUrl(url: string): string {
   const trailing = url.split('?')[0].split('/').pop() ?? '';
   return trailing.length > 0 ? trailing : `model-${Date.now()}`;
@@ -303,6 +326,7 @@ export function registerModelFromUrl(
       `Model registry rejected '${model.id}'. Ensure a backend module is registered before calling RunAnywhere.registerModel().`,
     );
   }
+  schedulePostRegisterHydrate();
   return model;
 }
 
@@ -341,5 +365,6 @@ export function registerModelMultiFile(options: RegisterMultiFileOptions): Model
       `Model registry rejected '${model.id}'. Ensure a backend module is registered before calling RunAnywhere.registerModel().`,
     );
   }
+  schedulePostRegisterHydrate();
   return model;
 }
