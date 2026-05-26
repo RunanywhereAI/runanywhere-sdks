@@ -380,6 +380,9 @@ rac_tc_drive_catalog() {
   if _rac_tc_is_deferred tc10; then
     if ! awk -F'	' '$1=="tc10"{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv"; then
       rac_tc_done tc10 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    elif awk -F'\t' '$1=="tc10" && $2=="BLOCKED" && ($3 ~ /toolchain|melos|bootstrap|build blocked|dart\/flutter/) {exit 0} END{exit 1}' \
+        "${RAC_SESSION_ROOT}/modality_results.tsv" 2>/dev/null; then
+      rac_tc_done tc10 "N/A" "cleared stale infra BLOCKED; ${RAC_TC_DEFER_NOTE:-dedicated Flutter modality flows}"
     fi
   fi
 }
