@@ -864,8 +864,19 @@ set(RAC_FEATURES_SOURCES
     src/features/platform/rac_platform_services.cpp
     # LoRA
     src/features/lora/rac_lora_service.cpp
-    # Voice Agent
+    # Voice Agent — commons-features-voice-003 SRP split:
+    #   voice_agent.cpp                       — lifecycle (create/destroy/init)
+    #   voice_agent_legacy_abi.cpp            — legacy non-proto C ABI
+    #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
+    #   voice_agent_d7_abi.cpp                — Wave D-7 full-session proto ABI
+    #   voice_agent_audio_pipeline_state.cpp  — audio pipeline state helpers
+    #   voice_agent_internal_helpers.cpp      — shared emit/state helpers
     src/features/voice_agent/voice_agent.cpp
+    src/features/voice_agent/voice_agent_internal_helpers.cpp
+    src/features/voice_agent/voice_agent_legacy_abi.cpp
+    src/features/voice_agent/voice_agent_proto_abi.cpp
+    src/features/voice_agent/voice_agent_d7_abi.cpp
+    src/features/voice_agent/voice_agent_audio_pipeline_state.cpp
     # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
     src/features/voice_agent/rac_voice_event_abi.cpp
     # GAP 05 Phase 2: GraphScheduler-driven VAD→STT→LLM→TTS pipeline.

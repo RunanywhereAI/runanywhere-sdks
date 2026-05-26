@@ -693,6 +693,18 @@ typedef RacHttpResponseFreeNative = ffi.Void Function(
     ffi.Pointer<RacHttpResponse>);
 typedef RacHttpResponseFreeDart = void Function(ffi.Pointer<RacHttpResponse>);
 
+/// Matches `rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_kvs, size_t* out_count)`.
+///
+/// The returned array is statically allocated inside commons — DO NOT free.
+typedef RacHttpDefaultHeadersNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
+  ffi.Pointer<ffi.Size>,
+);
+typedef RacHttpDefaultHeadersDart = int Function(
+  ffi.Pointer<ffi.Pointer<RacHttpHeaderKv>>,
+  ffi.Pointer<ffi.Size>,
+);
+
 // ============================================================================
 // Phase H HTTP download (rac_http_download.h)
 // ============================================================================
@@ -1480,6 +1492,11 @@ class RacBindings {
             RacHttpRequestSendDart>('rac_http_request_send'),
         rac_http_response_free = lib.lookupFunction<RacHttpResponseFreeNative,
             RacHttpResponseFreeDart>('rac_http_response_free'),
+        rac_http_default_headers =
+            _lookupOptional<RacHttpDefaultHeadersDart>(
+          () => lib.lookupFunction<RacHttpDefaultHeadersNative,
+              RacHttpDefaultHeadersDart>('rac_http_default_headers'),
+        ),
         rac_http_download_execute = lib.lookupFunction<
             RacHttpDownloadExecuteNative,
             RacHttpDownloadExecuteDart>('rac_http_download_execute'),
@@ -1981,6 +1998,12 @@ class RacBindings {
   final RacHttpRequestSendDart rac_http_request_send;
 
   final RacHttpResponseFreeDart rac_http_response_free;
+
+  /// commons-core-infra-flutter-core-006: canonical SDK header list.
+  ///
+  /// Optional (older RACommons binaries may not export it) — falls back to
+  /// hard-coded defaults in adapters/http_client_adapter.dart when null.
+  final RacHttpDefaultHeadersDart? rac_http_default_headers;
 
   // HTTP download ------------------------------------------------------------
 
