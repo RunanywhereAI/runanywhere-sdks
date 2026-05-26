@@ -44,7 +44,10 @@ function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
     ? ModelLifecycleAdapter.tryDefaultForFramework(framework as never)
     : ModelLifecycleAdapter.tryDefault();
   if (!adapter) {
-    throw new Error('RunAnywhere model lifecycle proto adapter is not installed');
+    throw SDKException.backendNotAvailable(
+      'ModelLifecycle',
+      'RunAnywhere model lifecycle proto adapter is not installed. Register a backend WASM module (e.g. LlamaCPP.register()) during app init.',
+    );
   }
   return adapter;
 }
