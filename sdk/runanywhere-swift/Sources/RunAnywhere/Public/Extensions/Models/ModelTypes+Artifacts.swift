@@ -284,7 +284,11 @@ public extension RAModelInfo {
         model.format = format
         model.downloadSizeBytes = downloadSizeBytes ?? 0
         if let contextLength {
-            model.contextLength = Int32(contextLength)
+            // Clamp into Int32 — the proto field is i32 and callers may pass
+            // an `Int` that doesn't fit (e.g. `Int.max` on a 64-bit host),
+            // which `Int32.init(_:)` would trap on. Cap at `Int32.max` /
+            // floor at `Int32.min` so we surface a saturated value instead.
+            model.contextLength = Int32(clamping: contextLength)
         }
         // Thinking is gated by category; the commons factory leaves the
         // per-call flag false, so honor the caller override here. Match the
