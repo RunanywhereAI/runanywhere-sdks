@@ -818,9 +818,20 @@ export const RunAnywhere = {
           environment: env,
         });
 
+        // Phase 2 (services) runs in the background so initialize() can
+        // resolve before the WASM-backed services come up. A failure must
+        // be observable to callers — surface it on the event bus and keep
+        // `areServicesReady === false` so polling consumers can react.
+        // The promise itself is intentionally fire-and-forget; consumers
+        // who need to wait can call `RunAnywhere.completeServicesInitialization()`
+        // (or `ensureServicesReady()`) directly and await the same promise.
         void RunAnywhere.completeServicesInitialization().catch((err) => {
-          logger.warning(
-            `Phase 2 init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          const message = err instanceof Error ? err.message : String(err);
+          logger.warning(`Phase 2 init failed (non-fatal): ${message}`);
+          EventBus.shared.emit(
+            'sdk.initializationFailed',
+            EventCategory.EVENT_CATEGORY_INITIALIZATION,
+            { error: message, source: 'completeServicesInitialization' },
           );
         });
 
