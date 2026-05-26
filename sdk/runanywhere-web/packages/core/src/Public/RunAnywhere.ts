@@ -23,6 +23,7 @@ import {
   InferenceFramework,
   ModelFileRole,
   ModelArtifactType,
+  ModelCategory,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -410,6 +411,50 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
     updatedAtUnixMs: Date.now(),
   };
   ModelRegistryCapability.registerModel(importedModel);
+}
+
+/**
+ * Reconcile the Web vision-language provider's private "loaded" flag with
+ * the canonical C++ lifecycle state. Called from `loadModel` and
+ * `unloadModel` so example app views never need to invoke
+ * `RunAnywhere.visionLanguage.loadCurrentModel()` themselves.
+ *
+ * Both `.multimodal` and `.vision` categories collapse to
+ * `SDK_COMPONENT_VLM` in C++ commons (same as iOS Swift); query both
+ * before deciding the provider should be unloaded.
+ *
+ * Errors are swallowed because backend availability is allowed to lag
+ * the lifecycle (e.g. LlamaCPP WASM still initializing). Real provider
+ * failures will surface when `processImage` next runs.
+ */
+async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
+  try {
+    const currentVLM =
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        includeModelMetadata: true,
+      }) ??
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_VISION,
+        includeModelMetadata: true,
+      });
+
+    const hasVLMModelLoaded = Boolean(currentVLM?.modelId);
+    const providerReportsLoaded = VisionLanguageCapability.isModelLoaded;
+
+    if (hasVLMModelLoaded && !providerReportsLoaded) {
+      await VisionLanguageCapability.loadCurrentModel();
+    } else if (!hasVLMModelLoaded && providerReportsLoaded) {
+      await VisionLanguageCapability.unloadModel();
+    }
+  } catch (err) {
+    if (err instanceof SDKException && err.code === SDKErrorCode.BackendNotAvailable) {
+      return;
+    }
+    logger.debug(
+      `vision-language provider sync skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 async function downloadMultiFileModel(
@@ -907,13 +952,32 @@ export const RunAnywhere = {
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.loadModelAsync>>> {
-    return ModelLifecycleCapability.loadModelAsync(request);
+    const result = await ModelLifecycleCapability.loadModelAsync(request);
+    // VLM lifecycle mirror: when the loaded model is multimodal/vision and a
+    // Web vision-language provider is registered, automatically populate
+    // its private `_modelLoaded` flag against the lifecycle-resolved
+    // current model. Without this, app code had to call
+    // `RunAnywhere.visionLanguage.loadCurrentModel()` itself after every
+    // load — the SDK now owns that coupling so example views stay free
+    // of SDK-internal lifecycle bridge calls.
+    if (result?.success) {
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
   },
 
   async unloadModel(
     request: Parameters<typeof ModelLifecycleCapability.unloadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.unloadModelAsync>>> {
-    return ModelLifecycleCapability.unloadModelAsync(request);
+    const result = await ModelLifecycleCapability.unloadModelAsync(request);
+    // Symmetric to loadModel above: drop the VLM provider's loaded flag
+    // when the lifecycle no longer reports a current VLM model so the
+    // next processImage call surfaces "no model loaded" instead of
+    // dispatching against a stale provider handle.
+    if (result?.success) {
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
   },
 
   currentModel(

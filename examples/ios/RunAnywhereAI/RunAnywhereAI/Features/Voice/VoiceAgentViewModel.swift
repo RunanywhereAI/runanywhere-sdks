@@ -499,31 +499,6 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Voice session stopped")
     }
 
-    /// Interrupt currently-playing speech. v3.1: handled at the C layer via
-    /// the voice agent's interrupted event. UI only needs to reset state;
-    /// actual audio-pipeline interruption is driven by the C++ agent when
-    /// VAD detects new speech or the user taps stop.
-    func interruptSpeaking() async {
-        // No-op at the Swift layer — the C voice agent owns barge-in.
-        // Future: expose rac_voice_agent_interrupt(handle) if needed.
-        logger.debug("interruptSpeaking: C-layer handled")
-    }
-
-    /// Push-to-talk: force-send the current audio buffer.
-    func sendAudioNow() async {
-        // No-op at the Swift layer — the C voice agent's VAD triggers on
-        // end-of-utterance. Future: expose rac_voice_agent_force_commit(handle).
-        logger.debug("sendAudioNow: C-layer handled (relies on VAD end-of-utterance)")
-    }
-
-    /// Resume listening after a turn.
-    func resumeListening() async {
-        // No-op at the Swift layer — the C voice agent loops back to
-        // listening automatically when continuousMode is set. For
-        // push-to-talk, calling startConversation() again re-initializes.
-        logger.debug("resumeListening: C-layer handled")
-    }
-
     // MARK: - Proto Event Handling (v3.1)
 
     // swiftlint:disable cyclomatic_complexity function_body_length
