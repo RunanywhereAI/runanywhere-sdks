@@ -129,14 +129,33 @@ object OkHttpHttpTransport {
     private val streamIdCounter: AtomicLong = AtomicLong(0L)
 
     /**
-     * Registry of in-flight streaming [Call] objects keyed by a monotonic id.
-     * Mirrors Swift's `StreamRegistry` (keyed by `URLSessionTask.taskIdentifier`).
-     * Used by [cancelAllStreams] to drive `Call.cancel()` on every active
-     * download during SDK teardown — the chunk-callback `return false` cancel
-     * contract still works per-call; this is the explicit teardown path when
-     * there is no callback on the stack to signal.
+     * Registry of in-flight streaming [StreamSlot]s keyed by a monotonic id.
+     * Mirrors Swift's `StreamRegistry` (keyed by `URLSessionTask.taskIdentifier`)
+     * and is used by [cancelAllStreams] to drive `Call.cancel()` on every
+     * active download during SDK teardown.
+     *
+     * Each slot is registered BEFORE `newCall()` runs so a `cancelAllStreams()`
+     * that lands between `streamIdCounter.incrementAndGet()` and the C
+     * library's `newCall(request)` is observed. When the slot's [StreamSlot.call]
+     * is still null at cancel time, the slot's `cancelRequested` flag is set
+     * and the streaming caller invokes `call.cancel()` itself once newCall
+     * returns. Without this, a cancel that races startup would miss the stream
+     * entirely and the request would proceed past the teardown signal.
      */
-    private val inFlightStreams: ConcurrentHashMap<Long, Call> = ConcurrentHashMap()
+    private val inFlightStreams: ConcurrentHashMap<Long, StreamSlot> = ConcurrentHashMap()
+
+    /**
+     * Per-stream slot tracking the eventual [Call] together with a
+     * cancel-requested flag. Pre-registered before `newCall(request)` so a
+     * [cancelAllStreams] that races startup can mark the slot for immediate
+     * cancellation once the Call materializes.
+     *
+     * Fields are guarded by the slot's own monitor (`synchronized(this)`).
+     */
+    private class StreamSlot {
+        var call: Call? = null
+        var cancelRequested: Boolean = false
+    }
 
     /**
      * Registration state guard. `AtomicReference<Boolean>` is used instead of
@@ -227,12 +246,24 @@ object OkHttpHttpTransport {
      */
     @JvmStatic
     fun cancelAllStreams() {
-        // Snapshot under the iterator, drive cancel() outside — the cancel
-        // races back through drainBody's IOException path and attempts to
-        // remove(streamId).
+        // Snapshot under the iterator, drive cancel() outside the slot's
+        // monitor — the cancel races back through drainBody's IOException path
+        // and attempts to remove(streamId).
+        //
+        // Slots that have already published their Call get cancelled directly.
+        // Slots that are still mid-startup (Call not yet stored) get their
+        // cancelRequested flag set; the streaming caller then runs
+        // `call.cancel()` itself as soon as `newCall(request)` returns
+        // (`streamInternal` checks `cancelRequested` immediately after the
+        // slot is finalised).
         val snapshot = inFlightStreams.values.toList()
-        for (call in snapshot) {
-            call.cancel()
+        for (slot in snapshot) {
+            val call =
+                synchronized(slot) {
+                    slot.cancelRequested = true
+                    slot.call
+                }
+            call?.cancel()
         }
     }
 
@@ -422,7 +453,13 @@ object OkHttpHttpTransport {
         resumeFromByte: Long,
     ): StreamResponse {
         val streamId = streamIdCounter.incrementAndGet()
-        var registered = false
+        // Pre-register the slot BEFORE building the Call so a cancelAllStreams()
+        // that lands during startup observes this stream. Without this, the
+        // newCall(request) → inFlightStreams[id] = call window let a cancel
+        // miss the stream entirely and the request would still execute past
+        // the teardown signal.
+        val slot = StreamSlot()
+        inFlightStreams[streamId] = slot
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
@@ -431,8 +468,18 @@ object OkHttpHttpTransport {
             val clientForCall = resolveStreamingClient(timeoutMs)
 
             val call = clientForCall.newCall(request)
-            inFlightStreams[streamId] = call
-            registered = true
+            // Publish the Call into the slot. If cancelAllStreams() landed
+            // between slot pre-registration and now, `cancelRequested` is
+            // already set; cancel the call immediately so execute() races
+            // straight to the IOException → cancelled-response path.
+            val cancelImmediately =
+                synchronized(slot) {
+                    slot.call = call
+                    slot.cancelRequested
+                }
+            if (cancelImmediately) {
+                call.cancel()
+            }
 
             call.execute().use { resp ->
                 // Range-honored disclosure: surface a synthetic header so the
@@ -482,9 +529,7 @@ object OkHttpHttpTransport {
                 cancelled = false,
             )
         } finally {
-            if (registered) {
-                inFlightStreams.remove(streamId)
-            }
+            inFlightStreams.remove(streamId)
         }
     }
 
