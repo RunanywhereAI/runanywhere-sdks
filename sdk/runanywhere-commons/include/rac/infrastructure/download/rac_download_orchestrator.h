@@ -167,6 +167,27 @@ RAC_API rac_result_t rac_download_progress_poll_proto(const uint8_t* request_byt
                                                       size_t request_size,
                                                       rac_proto_buffer_t* out_result);
 
+/**
+ * @brief Purge proto download tasks that are already in a terminal state
+ *        (COMPLETED, FAILED, or CANCELLED) from the orchestrator's task map.
+ *
+ * The proto workflow keeps a `proto_state().tasks` entry alive for each
+ * started download so cancel / resume / progress_poll can find the task by
+ * id / model_id / resume_token even after the worker thread exits. Without
+ * periodic cleanup the map grows unbounded for every successful or
+ * cancelled download in the process lifetime. SDK callers should invoke
+ * this once a download terminates (e.g. after the final progress event has
+ * been delivered to the consumer) to release the proto task slot.
+ *
+ * The call is idempotent and threadsafe; it skips tasks that are still
+ * running (state ∈ PENDING / RESUMING / DOWNLOADING / EXTRACTING).
+ *
+ * @param out_purged_count Optional output: number of tasks erased.
+ *                         Pass NULL if the count is not needed.
+ * @return RAC_SUCCESS on success.
+ */
+RAC_API rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_purged_count);
+
 // =============================================================================
 // POST-EXTRACTION MODEL PATH FINDING
 // =============================================================================

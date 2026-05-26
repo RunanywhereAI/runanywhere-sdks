@@ -2397,6 +2397,42 @@ extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t* request_
     }
     return serialize_proto_to_buffer(progress, out_result);
 }
+
+// commons-core-infra-004: erase proto_state().tasks entries whose worker has
+// reached a terminal state. Without this hook the map grows for every
+// successful, cancelled, or failed download — the SDK has no other way to
+// release the per-task slot since rac_download_cancel_proto / _resume_proto
+// must continue to resolve a task by id after its worker exits.
+extern "C" rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_purged_count) {
+    size_t purged = 0;
+    {
+        std::lock_guard<std::mutex> lock(proto_state().mutex);
+        for (auto it = proto_state().tasks.begin(); it != proto_state().tasks.end();) {
+            const auto& task = it->second;
+            bool terminal = false;
+            if (task) {
+                std::lock_guard<std::mutex> tlock(task->mutex);
+                const auto state = task->progress.state();
+                terminal = !task->running &&
+                           (state == rav1::DOWNLOAD_STATE_COMPLETED ||
+                            state == rav1::DOWNLOAD_STATE_FAILED ||
+                            state == rav1::DOWNLOAD_STATE_CANCELLED);
+            } else {
+                terminal = true;  // null shared_ptr — drop the slot
+            }
+            if (terminal) {
+                it = proto_state().tasks.erase(it);
+                ++purged;
+            } else {
+                ++it;
+            }
+        }
+    }
+    if (out_purged_count) {
+        *out_purged_count = purged;
+    }
+    return RAC_SUCCESS;
+}
 #else
 extern "C" rac_result_t
 rac_download_set_progress_proto_callback(rac_download_proto_progress_callback_fn, void*) {
@@ -2444,6 +2480,13 @@ extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t*, size_t,
     if (out_result) {
         rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                    "protobuf support is not available");
+    }
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+extern "C" rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_purged_count) {
+    if (out_purged_count) {
+        *out_purged_count = 0;
     }
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
@@ -2718,13 +2761,36 @@ rac_result_t rac_download_orchestrate_multi(
         // Download started — detached thread owns file_holder
     }
 
-    // Wait for all in-flight downloads to complete before reporting final status
+    // commons-core-infra-013: bound the wait so a detached worker that
+    // throws (or dies before it can decrement `pending`) cannot block the
+    // caller forever. The timeout is generous enough that a real multi-GB
+    // VLM download finishes before tripping, but tight enough that a stuck
+    // worker surfaces as a download failure instead of an indefinite hang.
+    // Computation: 1h per file * file_count, clamped to [1h, 12h]. The
+    // ceiling matches the upper bound CDN-served GGUF downloads observed
+    // in production.
+    constexpr auto kPerFileBudget = std::chrono::hours(1);
+    constexpr auto kMaxWait = std::chrono::hours(12);
+    auto wait_budget = kPerFileBudget * static_cast<int64_t>(file_count);
+    if (wait_budget > kMaxWait) {
+        wait_budget = kMaxWait;
+    }
+
+    bool barrier_completed = false;
     {
         std::unique_lock<std::mutex> lk(barrier->mtx);
-        barrier->cv.wait(lk, [&barrier] { return barrier->pending == 0; });
+        barrier_completed = barrier->cv.wait_for(
+            lk, wait_budget, [&barrier] { return barrier->pending == 0; });
     }
 
     bool any_failed = barrier->any_required_failed;
+    if (!barrier_completed) {
+        // Wait timed out — treat as a download failure rather than hanging
+        // forever. The detached file worker(s) still own their barrier
+        // reference, so they remain safe to complete (the barrier shared_ptr
+        // outlives this function).
+        any_failed = true;
+    }
 
     if (any_failed) {
         rac_download_manager_mark_failed(dm_handle, task_id, RAC_ERROR_DOWNLOAD_FAILED,
