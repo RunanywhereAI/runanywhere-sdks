@@ -7,9 +7,13 @@
 // packs request bytes and unpacks result bytes via
 // `DartBridgeStructuredOutput`.
 
+import 'dart:async';
+
+import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
+import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
 import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
@@ -76,32 +80,115 @@ class RunAnywhereStructuredOutput {
     return DartBridgeStructuredOutput.shared.generate(request);
   }
 
-  /// Stream-shaped structured output API. When the linked commons build lacks
-  /// a native structured-output stream ABI, this emits the generated result as
-  /// a single terminal proto event instead of inventing a Dart-only event type.
+  /// Stream-shaped structured output API. Mirrors Swift
+  /// `RunAnywhere.generateStructuredStream(prompt:schema:options:)` —
+  /// drives the underlying LLM token stream and re-emits one
+  /// `STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN` event per non-empty token,
+  /// then a terminal `COMPLETED` event carrying the schema-validated
+  /// `StructuredOutputResult` parsed from the accumulated text by commons
+  /// (`extractStructuredOutput`). Errors surface as a single terminal
+  /// `ERROR` event so consumers always receive a terminal frame.
   static Stream<StructuredOutputStreamEvent> generateStructuredStream({
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
-  }) async* {
-    try {
-      final result = await generateStructured(
-        prompt: prompt,
-        schema: schema,
-        options: options,
-      );
-      yield StructuredOutputStreamEvent(
-        kind: StructuredOutputStreamEventKind
-            .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
-        result: result,
-      );
-    } catch (e) {
-      yield StructuredOutputStreamEvent(
-        kind: StructuredOutputStreamEventKind
-            .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR,
-        errorMessage: e.toString(),
-      );
+  }) {
+    final controller = StreamController<StructuredOutputStreamEvent>();
+    StreamSubscription<LLMStreamEvent>? subscription;
+    var seq = Int64.ZERO;
+    final accumulated = StringBuffer();
+
+    StructuredOutputStreamEvent makeEvent(
+      StructuredOutputStreamEventKind kind, {
+      String? token,
+      StructuredOutputResult? result,
+      String? errorMessage,
+    }) {
+      seq += Int64.ONE;
+      final event = StructuredOutputStreamEvent(kind: kind, seq: seq);
+      if (token != null) event.token = token;
+      if (result != null) event.result = result;
+      if (errorMessage != null) event.errorMessage = errorMessage;
+      return event;
     }
+
+    Future<void> emitTerminalError(Object error) async {
+      if (controller.isClosed) return;
+      controller.add(
+        makeEvent(
+          StructuredOutputStreamEventKind
+              .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR,
+          errorMessage: error.toString(),
+        ),
+      );
+      await controller.close();
+    }
+
+    Future<void> start() async {
+      if (!DartBridge.isInitialized) {
+        await emitTerminalError(SDKException.notInitialized());
+        return;
+      }
+      try {
+        final effectiveOptions = LLMGenerationOptions();
+        if (options != null) effectiveOptions.mergeFromMessage(options);
+        effectiveOptions.structuredOutput =
+            StructuredOutputOptionsDefaults.defaults(schema: schema);
+
+        final llmStream = RunAnywhereLLM.shared.generateStream(
+          prompt,
+          effectiveOptions,
+        );
+
+        subscription = llmStream.listen(
+          (event) {
+            if (controller.isClosed) return;
+            if (event.token.isNotEmpty) {
+              accumulated.write(event.token);
+              controller.add(
+                makeEvent(
+                  StructuredOutputStreamEventKind
+                      .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+                  token: event.token,
+                ),
+              );
+            }
+          },
+          onError: (Object error) {
+            unawaited(emitTerminalError(error));
+          },
+          onDone: () async {
+            if (controller.isClosed) return;
+            try {
+              final result = RunAnywhereLLM.shared.extractStructuredOutput(
+                text: accumulated.toString(),
+                schema: schema,
+              );
+              controller.add(
+                makeEvent(
+                  StructuredOutputStreamEventKind
+                      .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+                  result: result,
+                ),
+              );
+              await controller.close();
+            } catch (e) {
+              await emitTerminalError(e);
+            }
+          },
+          cancelOnError: true,
+        );
+      } catch (e) {
+        await emitTerminalError(e);
+      }
+    }
+
+    controller.onListen = () => unawaited(start());
+    controller.onCancel = () async {
+      await subscription?.cancel();
+      subscription = null;
+    };
+    return controller.stream;
   }
 
   /// Apply a structured-output configuration to a normal LLM generation.
