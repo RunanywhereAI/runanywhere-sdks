@@ -451,6 +451,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"
     "_rac_model_info_is_downloaded"
+    # CONSOLIDATE-A (CLUSTER-14): derive parameterCountB + isSmallModel from
+    # RAModelInfo proto so the web example can drop its inlined heuristics.
+    "_rac_model_info_is_small_model_proto"
+    "_rac_model_info_parameter_count_b_proto"
     "_rac_model_info_alloc"
     "_rac_model_info_free"
     "_rac_model_info_array_free"
@@ -544,6 +548,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tool_call_format_name"
     "_rac_tool_call_detect_format"
     "_rac_tool_call_format_from_name"
+    # CONSOLIDATE-A (CLUSTER-14): derive tool-call format from RAModelInfo proto.
+    "_rac_tool_call_format_from_model_info_proto"
     "_rac_tool_call_format_prompt"
     "_rac_tool_call_format_prompt_with_format"
     "_rac_tool_call_format_prompt_json"
@@ -700,6 +706,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
     # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
     "_rac_voice_agent_set_proto_callback"
+    # commons-features-voice-002: caller-side shutdown helper.
+    "_rac_voice_agent_proto_quiesce"
     "_rac_voice_agent_initialize_proto"
     "_rac_voice_agent_component_states_proto"
     "_rac_voice_agent_process_voice_turn_proto"

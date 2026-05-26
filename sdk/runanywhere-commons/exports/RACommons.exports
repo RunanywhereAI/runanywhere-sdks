@@ -159,6 +159,8 @@ _rac_vad_stream_cancel_proto
 # struct event callbacks are now internal commons-only helpers.
 # GAP 09 Phase 15 / v3 Phase A4 — proto-byte streaming ABI.
 _rac_voice_agent_set_proto_callback
+# commons-features-voice-002: caller-side shutdown helper.
+_rac_voice_agent_proto_quiesce
 
 # LLM Structured Output — SDK-facing surface is proto-byte only.
 # Legacy hand-written parse/validate/prepare helpers are now internal.
@@ -681,6 +683,8 @@ _rac_model_info_alloc
 _rac_model_info_array_free
 _rac_model_info_free
 _rac_model_info_is_downloaded
+_rac_model_info_is_small_model_proto
+_rac_model_info_parameter_count_b_proto
 _rac_model_registry_create
 _rac_model_registry_discover_downloaded
 _rac_model_registry_get
@@ -1242,6 +1246,7 @@ _rac_telemetry_manager_payload_to_json
 _rac_telemetry_payload_default
 _rac_telemetry_payload_free
 _rac_tool_call_detect_format
+_rac_tool_call_format_from_model_info_proto
 _rac_tool_call_format_from_name
 _rac_tool_call_format_name
 _rac_tool_call_format_prompt_with_format

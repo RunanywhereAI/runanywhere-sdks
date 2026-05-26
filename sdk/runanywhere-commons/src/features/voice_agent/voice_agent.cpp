@@ -647,6 +647,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     // seq } from the previous session, corrupting the wire-seq sequence on
     // the very first VoiceEvent dispatch.
     rac_voice_agent_set_proto_callback(handle, nullptr, nullptr);
+    // commons-features-voice-002: spin-wait until every in-flight
+    // dispatch_proto_event/dispatch_proto_voice_event invocation on another
+    // thread has returned before freeing the handle memory. Without this,
+    // a thread that copied the CallbackSlot before the unset above can
+    // still be inside slot.fn() with a now-stale `handle`-derived
+    // user_data pointer when the caller frees it. Mirrors
+    // rac_vlm_proto_quiesce / rac_llm_proto_quiesce / rac_vad_proto_quiesce.
+    rac_voice_agent_proto_quiesce();
 
     // All threads that held/waited on mutex have now exited
     delete handle;

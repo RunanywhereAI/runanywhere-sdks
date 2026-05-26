@@ -26,10 +26,12 @@
 
 #include "rac_voice_event_abi_internal.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -57,6 +59,25 @@ std::unordered_map<rac_voice_agent_handle_t, CallbackSlot>& g_slots() {
     return m;
 }
 
+// commons-features-voice-002: in-flight counter for the proto-byte event
+// dispatcher. Mirrors the LLM/VLM/VAD stream quiesce pattern. Callers
+// freeing user_data must (a) unregister via rac_voice_agent_set_proto_callback
+// then (b) call rac_voice_agent_proto_quiesce to spin-wait until every
+// concurrent dispatch_proto_*_event invocation has returned before freeing
+// user_data. Without (b), a thread that copied the slot before (a) ran can
+// still be inside slot.fn() with a stale user_data pointer.
+std::atomic<int>& proto_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct ProtoInFlightGuard {
+    ProtoInFlightGuard() { proto_in_flight().fetch_add(1, std::memory_order_acq_rel); }
+    ~ProtoInFlightGuard() { proto_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    ProtoInFlightGuard(const ProtoInFlightGuard&) = delete;
+    ProtoInFlightGuard& operator=(const ProtoInFlightGuard&) = delete;
+};
+
 }  // namespace
 
 extern "C" {
@@ -78,6 +99,12 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t handle,
         g_slots()[handle] = CallbackSlot{.fn = callback, .user_data = user_data, .seq = 0};
     }
     return RAC_SUCCESS;
+}
+
+void rac_voice_agent_proto_quiesce(void) {
+    while (proto_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
 }
 
 }  // extern "C"
@@ -227,6 +254,10 @@ namespace rac::voice_agent {
  */
 void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event) {
+    // commons-features-voice-002: hold the in-flight guard across the whole
+    // dispatch so rac_voice_agent_proto_quiesce() can spin-wait on the
+    // counter before user_data is freed by a concurrent teardown thread.
+    ProtoInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq;
     {
@@ -529,6 +560,10 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
     if (event == nullptr)
         return;
 
+    // commons-features-voice-002: hold the in-flight guard across the whole
+    // dispatch so rac_voice_agent_proto_quiesce() can spin-wait on the
+    // counter before user_data is freed by a concurrent teardown thread.
+    ProtoInFlightGuard in_flight_guard;
     CallbackSlot slot;
     uint64_t seq;
     {

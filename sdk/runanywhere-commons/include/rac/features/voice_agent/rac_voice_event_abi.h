@@ -94,6 +94,29 @@ RAC_API rac_result_t rac_voice_agent_set_proto_callback(
     rac_voice_agent_handle_t handle, rac_voice_agent_proto_event_callback_fn callback,
     void* user_data);
 
+/**
+ * @brief Spin-wait until every in-flight voice-agent proto-byte event
+ *        dispatch has returned (commons-features-voice-002).
+ *
+ * Mirrors `rac_llm_proto_quiesce` / `rac_vlm_proto_quiesce` / `rac_vad_proto_quiesce`.
+ * Callers freeing the `user_data` passed into
+ * `rac_voice_agent_set_proto_callback`, or tearing down the voice agent
+ * altogether, MUST follow the sequence:
+ *
+ *   (a) `rac_voice_agent_set_proto_callback(handle, NULL, NULL)` — clears
+ *       the slot atomically so no NEW dispatches will fire;
+ *   (b) `rac_voice_agent_proto_quiesce()` — spin-waits until every in-flight
+ *       slot.fn() invocation has returned;
+ *   (c) free @p user_data.
+ *
+ * Without (b), a concurrent `dispatch_proto_event` / `dispatch_proto_voice_event`
+ * thread that copied the slot before (a) ran can still be inside `slot.fn()`
+ * with a stale `user_data` pointer when the caller frees it.
+ *
+ * Safe to call from any thread; non-blocking when no dispatch is active.
+ */
+RAC_API void rac_voice_agent_proto_quiesce(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
