@@ -907,21 +907,48 @@ export function clearRunanywhereModule(): void {
 }
 
 /**
+ * Canonical fallback precedence for `tryRunanywhereModule()` when no
+ * 'commons' module is registered. Insertion order of `_moduleByCapability`
+ * is not load-order deterministic (backends may register/unregister at
+ * runtime), so callers used to see different "primary" modules based on
+ * which backend booted first. Pin the order explicitly: LLM-bearing
+ * backends first (most likely to expose SDK-state proto exports), then
+ * speech, then the remaining specialized capabilities.
+ */
+const FALLBACK_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
+  'llm',
+  'vlm',
+  'embedding',
+  'rag',
+  'tool-calling',
+  'structured-output',
+  'lora',
+  'diffusion',
+  'stt',
+  'tts',
+  'vad',
+  'voice-agent',
+];
+
+/**
  * Return the COMMONS module, if registered. This is the closest analog of
  * the old monolithic singleton — facade reads that touch SDK-state surface
  * (init, auth, model registry, lifecycle, events) route through this.
  * Modality verbs should use `getModuleForCapability(...)` instead.
  */
 export function tryRunanywhereModule(): EmscriptenRunanywhereModule | null {
-  // Prefer the commons module; fall back to ANY registered module so the
-  // SDK-state APIs continue to work when only a backend (not commons) is
-  // loaded. This matches the pre-P4 behavior where the single installed
-  // module also satisfied commons reads.
+  // Prefer the commons module; fall back to a canonical precedence order
+  // (see FALLBACK_CAPABILITY_PRECEDENCE) so the SDK-state APIs continue to
+  // work when only a backend (not commons) is loaded. Deterministic
+  // precedence (rather than insertion order) keeps `tryRunanywhereModule`
+  // stable across register/unregister churn.
   const commons = _moduleByCapability.get('commons');
   if (commons) return commons;
-  // Fall back to whatever was registered first.
-  const iter = _moduleByCapability.values().next();
-  return iter.done ? null : iter.value;
+  for (const cap of FALLBACK_CAPABILITY_PRECEDENCE) {
+    const candidate = _moduleByCapability.get(cap);
+    if (candidate) return candidate;
+  }
+  return null;
 }
 
 /**
