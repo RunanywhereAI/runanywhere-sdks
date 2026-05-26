@@ -20,10 +20,10 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
-  InferenceFramework,
   ModelArtifactType,
   ModelCategory,
   AudioFormat,
+  type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -1642,7 +1642,7 @@ export const RunAnywhere = {
     }
     const detach = attachSignalToCancel(
       extra.signal,
-      () => VisionLanguageCapability.cancelVLMGeneration(),
+      () => { void VisionLanguageCapability.cancelVLMGeneration(); },
     );
     return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
@@ -1659,7 +1659,7 @@ export const RunAnywhere = {
     const stream = await VisionLanguageCapability.processImageStream(image, options);
     attachSignalToCancel(
       extra.signal,
-      () => VisionLanguageCapability.cancelVLMGeneration(),
+      () => { void VisionLanguageCapability.cancelVLMGeneration(); },
     );
     return stream;
   },
