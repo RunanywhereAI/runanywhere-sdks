@@ -470,15 +470,24 @@ static rac_result_t run_loop_impl(
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(ctx, cancel_state.get(), current_prompt, &response, &rc)) {
+            // pass3-syn-021 parity: distinguish cancel from other generate
+            // failures, mirroring run_generate_loop in tool_calling_session.cpp.
+            // A cancel that latched before/during generate surfaces as
+            // RAC_ERROR_CANCELLED with "LLM generation cancelled" so hosts can
+            // branch on error_code instead of message string matching.
+            const bool cancelled =
+                cancel_state->cancel_requested.load(std::memory_order_acquire);
+            const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
+            const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
             final_result.set_text(final_text);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
-            final_result.set_error_code(static_cast<int32_t>(rc));
-            final_result.set_error_message("LLM generation failed");
+            final_result.set_error_code(static_cast<int32_t>(report_rc));
+            final_result.set_error_message(msg);
             std::vector<uint8_t> bytes;
             serialize(final_result, &bytes);
             rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
-            return rc;
+            return report_rc;
         }
 
         std::string clean_text;
