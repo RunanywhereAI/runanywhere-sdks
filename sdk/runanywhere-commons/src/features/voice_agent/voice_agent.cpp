@@ -46,8 +46,10 @@
  *   `rac_voice_agent_process_stream`, individual `transcribe`/
  *   `generate_response`/`synthesize_speech`/`detect_speech` helpers) keep
  *   using `handle->*_handle` for backward compatibility — those entry
- *   points live in voice_agent_legacy_abi.cpp and are scheduled for
- *   removal in commons-features-voice-007.
+ *   points live in voice_agent_legacy_abi.cpp and are marked
+ *   `[[deprecated]]` via `RAC_VOICE_AGENT_LEGACY_DEPRECATED` so external
+ *   callers (Playground/linux-voice, commons tests) surface as
+ *   `-Wdeprecated-declarations` warnings (commons-features-voice-007).
  */
 
 #include <atomic>

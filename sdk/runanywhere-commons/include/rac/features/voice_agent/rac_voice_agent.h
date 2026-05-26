@@ -43,6 +43,18 @@
 #include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
+// commons-features-voice-007: legacy non-proto entry points are scheduled
+// for removal. They retain external callers today (Playground/linux-voice,
+// commons tests) so we mark them deprecated with -Wdeprecated-declarations
+// instead of deleting outright — clang-tidy / -Wdeprecated-declarations
+// flags any remaining caller for follow-up migration.
+#if defined(__clang__) || defined(__GNUC__)
+#define RAC_VOICE_AGENT_LEGACY_DEPRECATED \
+    __attribute__((deprecated("Use the proto-byte / Wave D-7 voice-agent ABI instead.")))
+#else
+#define RAC_VOICE_AGENT_LEGACY_DEPRECATED
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -594,9 +606,9 @@ RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
  * rac_voice_agent_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
-                                                        const void* audio_data, size_t audio_size,
-                                                        rac_voice_agent_result_t* out_result);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle, const void* audio_data,
+                                   size_t audio_size, rac_voice_agent_result_t* out_result);
 
 /**
  * @brief Process audio with streaming events.
@@ -611,10 +623,10 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle,
-                                                    const void* audio_data, size_t audio_size,
-                                                    rac_voice_agent_event_callback_fn callback,
-                                                    void* user_data);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, const void* audio_data,
+                               size_t audio_size, rac_voice_agent_event_callback_fn callback,
+                               void* user_data);
 
 // =============================================================================
 // INDIVIDUAL COMPONENT ACCESS API
@@ -631,9 +643,9 @@ RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t han
  * @param out_transcription Output: Transcribed text (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
-                                                const void* audio_data, size_t audio_size,
-                                                char** out_transcription);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_transcribe(rac_voice_agent_handle_t handle, const void* audio_data,
+                           size_t audio_size, char** out_transcription);
 
 /**
  * @brief Generate LLM response only.
@@ -645,8 +657,9 @@ RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
  * @param out_response Output: Generated response (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
-                                                       const char* prompt, char** out_response);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, const char* prompt,
+                                  char** out_response);
 
 /**
  * @brief Synthesize speech only.
@@ -659,9 +672,9 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  * @param out_audio_size Output: Size of audio data in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
-                                                       const char* text, void** out_audio,
-                                                       size_t* out_audio_size);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, const char* text,
+                                  void** out_audio, size_t* out_audio_size);
 
 /**
  * @brief Check if VAD detects speech.
@@ -674,9 +687,9 @@ RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t 
  * @param out_speech_detected Output: RAC_TRUE if speech detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle,
-                                                   const float* samples, size_t sample_count,
-                                                   rac_bool_t* out_speech_detected);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, const float* samples,
+                              size_t sample_count, rac_bool_t* out_speech_detected);
 
 // =============================================================================
 // MEMORY MANAGEMENT

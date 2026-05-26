@@ -25,6 +25,15 @@
  * voice_agent_pipeline.hpp.
  */
 
+// commons-features-voice-007: this TU implements the deprecated legacy
+// non-proto entry points declared with RAC_VOICE_AGENT_LEGACY_DEPRECATED.
+// Suppress -Wdeprecated-declarations in our own definitions; external
+// callers still see the warning at the call site.
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -567,3 +576,7 @@ void rac_voice_agent_result_free(rac_voice_agent_result_t* result) {
     result->synthesized_audio_size = 0;
     result->speech_detected = RAC_FALSE;
 }
+
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
