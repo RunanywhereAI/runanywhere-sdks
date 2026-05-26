@@ -86,7 +86,7 @@ public extension RunAnywhere {
         name: String,
         framework: InferenceFramework,
         modality: ModelCategory = .language,
-        archive archiveType: RAArchiveType? = nil,
+        archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false

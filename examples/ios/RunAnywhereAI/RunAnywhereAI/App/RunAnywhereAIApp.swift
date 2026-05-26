@@ -519,7 +519,7 @@ struct RunAnywhereAIApp: App {
                 name: name,
                 framework: framework,
                 modality: modality,
-                archive: archive,
+                archiveType: archive,
                 memoryRequirement: memoryRequirement
             )
         } catch {
