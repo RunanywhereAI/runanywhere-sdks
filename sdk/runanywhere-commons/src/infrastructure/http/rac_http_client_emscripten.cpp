@@ -634,32 +634,8 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_
     return dispatch_resume(req, resume_from_byte, cb, user_data, out_resp_meta);
 }
 
-extern "C" void rac_http_response_free(rac_http_response_t* resp) {
-    if (!resp) {
-        return;
-    }
-    if (resp->body_bytes) {
-        std::free(resp->body_bytes);
-        resp->body_bytes = nullptr;
-    }
-    resp->body_len = 0;
-    if (resp->headers) {
-        for (size_t i = 0; i < resp->header_count; ++i) {
-            if (resp->headers[i].name) {
-                std::free(const_cast<char*>(resp->headers[i].name));
-            }
-            if (resp->headers[i].value) {
-                std::free(const_cast<char*>(resp->headers[i].value));
-            }
-        }
-        std::free(resp->headers);
-        resp->headers = nullptr;
-    }
-    resp->header_count = 0;
-    if (resp->redirected_url) {
-        std::free(resp->redirected_url);
-        resp->redirected_url = nullptr;
-    }
-    resp->status = 0;
-    resp->elapsed_ms = 0;
-}
+// commons-core-infra-015: `rac_http_response_free` lives in
+// src/infrastructure/http/rac_http_response.cpp (compiled on every
+// target). The default and emscripten clients allocate the response
+// fields with std::malloc / strdup so the shared TU can free them
+// directly.

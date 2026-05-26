@@ -724,6 +724,9 @@ set(RAC_INFRASTRUCTURE_SOURCES
     #   adapter yet needs to handle the "no adapter registered" case).
     $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_default.cpp>
     $<$<BOOL:${EMSCRIPTEN}>:src/infrastructure/http/rac_http_client_emscripten.cpp>
+    # commons-core-infra-015 — single `rac_http_response_free` TU shared
+    # by the default + emscripten clients (was duplicated before).
+    src/infrastructure/http/rac_http_response.cpp
     src/infrastructure/http/rac_http_download.cpp
     # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
     # Platform SDKs register a native-stack adapter here (Swift URLSession,
