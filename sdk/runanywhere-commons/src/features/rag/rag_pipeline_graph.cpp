@@ -14,8 +14,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -385,11 +387,29 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         in->close();
     }
 
-    scheduler.wait();
+    // commons-features-llm-rag-008: propagate user cancel DURING wait, not
+    // after. The previous code called scheduler.cancel_all() AFTER
+    // scheduler.wait() returned — by that point every node had already
+    // drained, making the call a no-op. The token sink sets
+    // state->cancel_requested when the host wants to cancel mid-stream; spin
+    // a tiny watchdog that polls the flag and asks the scheduler to fan the
+    // cancel through the root token chain so any blocked node push/pop wakes
+    // up. The watchdog exits when wait() returns (we signal it via
+    // wait_done) so it never outlives the scheduler.
+    std::atomic<bool> wait_done{false};
+    std::thread cancel_watchdog([&]() {
+        while (!wait_done.load(std::memory_order_acquire)) {
+            if (state->cancel_requested.load(std::memory_order_acquire)) {
+                scheduler.cancel_all();
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    });
 
-    if (state->cancel_requested.load(std::memory_order_acquire)) {
-        scheduler.cancel_all();
-    }
+    scheduler.wait();
+    wait_done.store(true, std::memory_order_release);
+    cancel_watchdog.join();
 
     {
         std::lock_guard<std::mutex> lock(state->mu);
