@@ -40,6 +40,7 @@ import {
 import type { SDKInitOptions } from '../types/models';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
+import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
@@ -659,6 +660,8 @@ export const RunAnywhere = {
         } catch (err) {
           logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
         }
+
+        await requestPersistentStorage();
 
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native

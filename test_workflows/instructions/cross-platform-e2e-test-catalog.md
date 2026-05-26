@@ -181,7 +181,7 @@ adb shell ls -la /sdcard/Download/rag-sample.txt
 | iOS Swift | 19 (+ TC-17 deferred, TC-18 N/A) |
 | Flutter Android / iOS | 18 each (+ TC-17 deferred, TC-18/19/21 N/A) |
 | RN Android / iOS | 19 each (+ TC-17 deferred; TC-21 via Validation) |
-| Web | 17 (+ TC-17 deferred, TC-18/19/21 N/A, TC-06 VAD no dedicated UI) |
+| Web | 16 (+ TC-17 deferred, TC-09/18/19/21 N/A, TC-06 VAD no dedicated UI) |
 
 ### Edge-case & lifecycle TC index
 
@@ -1227,8 +1227,9 @@ Use **cursor-ide-browser MCP**:
 ### Known platform differences
 
 - **COOP/COEP** headers via Vite + `coi-serviceworker.js` for SharedArrayBuffer.
-- **OPFS** persistence: `[RunAnywhere] hydrated N model(s) from OPFS`.
+- **OPFS** persistence: `[RunAnywhere] hydrated N model(s) from OPFS`; SDK calls `navigator.storage.persist()` at init (may be denied headless — see TC-09 N/A).
 - **WebGPU** runtime badge vs CPU WASM artifact split.
+- **VLM / TC-09:** headless quota ceiling — catalog N/A; use persistent browser context for full VLM coverage.
 - No LoRA/Benchmarks/Validation UI.
 
 ### TC-01 — SDK initialization
@@ -1270,7 +1271,11 @@ Tab **Speak**; download TTS; synthesize fixed text.
 
 ### TC-09 — VLM
 
-Tab **Vision**; model **SmolVLM2 256M Video Instruct Q8_0**; image + `Describe what you see in this image.`
+**Status: N/A** for headless E2E (cursor-ide-browser / Playwright without a user gesture for storage persistence).
+
+**Reason:** **SmolVLM2 256M Video Instruct Q8_0** is ~256 MB on the wire and expands to **>1 GB** on disk after extract (weights + mmproj shards). Headless browsers often grant only a small transient OPFS quota; `navigator.storage.persist()` is denied without user interaction, so downloads fail with `storage quota exceeded` even when pthread/WASM are healthy. The Web SDK requests persistent storage at `RunAnywhere.initialize()`; headed sessions that grant persist may pass manual Vision checks.
+
+**Optional manual verification:** Tab **Vision** → **SmolVLM2 256M Video Instruct Q8_0** → image + `Describe what you see in this image.` in a headed Chrome/Safari profile with persistent storage granted (or a Playwright persistent context with a large `--disk-cache-size`).
 
 ### TC-10 — Transcribe UX
 
