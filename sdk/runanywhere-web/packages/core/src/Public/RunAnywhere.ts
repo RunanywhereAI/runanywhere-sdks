@@ -64,7 +64,14 @@ import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
 import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
-import { createStorageNamespace } from './Extensions/RunAnywhere+Storage';
+import {
+  createStorageNamespace,
+  registerModelArchive as registerModelArchiveImpl,
+  registerModelFromUrl,
+  registerModelMultiFile as registerModelMultiFileImpl,
+  type RegisterModelOptions,
+  type RegisterMultiFileOptions,
+} from './Extensions/RunAnywhere+Storage';
 import { disposeSpeechProvider } from './Extensions/SpeechProvider';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
@@ -943,6 +950,47 @@ export const RunAnywhere = {
 
   importModel(model: ModelInfo): boolean {
     return ModelRegistryCapability.registerModel(model);
+  },
+
+  /**
+   * Register a single-file remote model by URL. Mirrors Swift's
+   * `RunAnywhere.registerModel(id:name:url:framework:...)` so example
+   * catalogs read as declarative entries — the SDK assembles the
+   * `ModelInfo` proto.
+   */
+  registerModel(
+    url: string,
+    name: string,
+    framework: InferenceFramework,
+    options?: RegisterModelOptions,
+  ): ModelInfo {
+    return registerModelFromUrl(url, name, framework, options);
+  },
+
+  /**
+   * Register an archive-packaged model. The SDK stamps the canonical
+   * `artifactType` (`MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE`, etc.) onto the
+   * resulting `ModelInfo` and routes the download orchestrator through
+   * extraction.
+   */
+  registerModelArchive(
+    url: string,
+    name: string,
+    framework: InferenceFramework,
+    archiveType: ModelArtifactType,
+    options?: RegisterModelOptions,
+  ): ModelInfo {
+    return registerModelArchiveImpl(url, name, framework, archiveType, options);
+  },
+
+  /**
+   * Register a multi-file model (VLM = primary GGUF + mmproj sidecar,
+   * embedding = `model.onnx` + `vocab.txt`). The SDK builds the
+   * `MultiFileArtifact` proto + `ExpectedModelFiles` manifest from the
+   * provided file list.
+   */
+  registerModelMultiFile(options: RegisterMultiFileOptions): ModelInfo {
+    return registerModelMultiFileImpl(options);
   },
 
   async downloadModel(

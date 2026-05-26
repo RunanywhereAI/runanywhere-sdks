@@ -44,6 +44,11 @@ export type {
 } from './Public/Extensions/RunAnywhere+PluginLoader';
 export type { RAGDocumentSummary } from './Public/Extensions/RunAnywhere+RAG';
 export type {
+  RegisterModelFile,
+  RegisterModelOptions,
+  RegisterMultiFileOptions,
+} from './Public/Extensions/RunAnywhere+Storage';
+export type {
   BackendModalitySupport,
   OnnxBackendStatus,
 } from './Public/Extensions/Backends/onnxStatus';
