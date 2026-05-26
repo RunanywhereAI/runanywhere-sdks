@@ -46,11 +46,10 @@ public final class EventBus: @unchecked Sendable {
         }
     }
 
-    deinit {
-        if nativeSubscriptionId != 0 {
-            CppBridge.Events.unsubscribeSDKEvents(nativeSubscriptionId)
-        }
-    }
+    // No `deinit`: `shared` is the only allocation site and it lives for the
+    // process lifetime, so the previous unsubscribe-on-deinit path was dead
+    // code. Native subscription cleanup, when required, runs through
+    // `RunAnywhere.reset()` -> `CppBridge.shutdown()` instead.
 
     // MARK: - Publishing
 
