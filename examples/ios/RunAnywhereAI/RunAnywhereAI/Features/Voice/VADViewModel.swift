@@ -248,13 +248,9 @@ class VADViewModel: ObservableObject {
                 if bufferData.count >= 1024 { // 512 Int16 samples = 1024 bytes
                     self.audioBuffer = Data() // Clear buffer
 
-                    // Convert Int16 PCM to Float32
-                    let samples = self.convertInt16ToFloat(bufferData)
+                    let audioBytes = RunAnywhere.pcm16ToFloat32(bufferData)
 
                     do {
-                        let audioBytes = samples.withUnsafeBufferPointer {
-                            Data(buffer: $0)
-                        }
                         let vadResult = try await RunAnywhere.detectVoiceActivity(audioBytes)
                         let speechDetected = vadResult.isSpeech
 
@@ -275,15 +271,6 @@ class VADViewModel: ObservableObject {
 
                 try? await Task.sleep(nanoseconds: 30_000_000) // 30ms
             }
-        }
-    }
-
-    /// Convert Int16 PCM data to Float32 samples
-    private func convertInt16ToFloat(_ data: Data) -> [Float] {
-        let int16Count = data.count / MemoryLayout<Int16>.size
-        return data.withUnsafeBytes { rawBuffer in
-            let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
-            return (0..<int16Count).map { Float(int16Buffer[$0]) / 32768.0 }
         }
     }
 
