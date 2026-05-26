@@ -115,6 +115,15 @@ struct ToolCallingSession {
 
     std::string pending_tool_call_id;
     std::string pending_tool_name;
+
+    // commons-features-llm-rag-009: deferred-dispatch queue. emit_event runs
+    // under session->mu (held by create_proto / step_with_result_proto while
+    // run_generate_loop runs); invoking session.callback directly would
+    // deadlock if the host callback re-entered rac_tool_calling_session_*
+    // on the same handle. Instead we serialize the event under the lock,
+    // append the bytes here, and dispatch after the lock is released by the
+    // outer scope (see drain_and_dispatch).
+    std::vector<std::vector<uint8_t>> pending_dispatches;
 };
 
 struct SessionRegistry {
@@ -137,13 +146,41 @@ std::shared_ptr<ToolCallingSession> lookup_session(uint64_t handle) {
 
 void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSessionEvent event) {
     event.set_seq(++session.seq);
+    // commons-features-llm-rag-009: serialize under the lock the caller holds,
+    // queue bytes for deferred dispatch. drain_and_dispatch (invoked after the
+    // outer session_lock is released) fires session.callback for each entry.
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
     if (size > 0) {
         (void)event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()));
     }
-    if (session.callback) {
-        session.callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), session.user_data);
+    session.pending_dispatches.push_back(std::move(bytes));
+}
+
+// commons-features-llm-rag-009: dispatch queued events after the caller has
+// released session->mu. Snapshots the callback/user_data and pending bytes
+// under the registry mutex via session.mu, then releases before invoking the
+// host callback so a re-entrant call into rac_tool_calling_session_* on the
+// same handle does not self-deadlock.
+void drain_and_dispatch(const std::shared_ptr<ToolCallingSession>& session) {
+    if (!session)
+        return;
+    std::vector<std::vector<uint8_t>> drained;
+    rac_tool_calling_session_event_callback_fn cb = nullptr;
+    void* ud = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(session->mu);
+        if (session->pending_dispatches.empty()) {
+            return;
+        }
+        drained.swap(session->pending_dispatches);
+        cb = session->callback;
+        ud = session->user_data;
+    }
+    if (!cb)
+        return;
+    for (auto& payload : drained) {
+        cb(payload.empty() ? nullptr : payload.data(), payload.size(), ud);
     }
 }
 
@@ -591,15 +628,23 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
         reg.sessions[handle] = session;
     }
 
-    std::lock_guard<std::mutex> session_lock(session->mu);
+    // commons-features-llm-rag-009: hold session->mu while run_generate_loop
+    // queues events into session.pending_dispatches, then release the lock
+    // BEFORE drain_and_dispatch fires the host callback so a re-entrant
+    // step_with_result_proto / cancel / destroy from inside the callback
+    // does not deadlock on session->mu.
+    {
+        std::lock_guard<std::mutex> session_lock(session->mu);
 
-    session->current_prompt = build_initial_prompt(*session);
-    if (session->current_prompt.empty()) {
-        session->current_prompt = session->user_prompt;
+        session->current_prompt = build_initial_prompt(*session);
+        if (session->current_prompt.empty()) {
+            session->current_prompt = session->user_prompt;
+        }
+
+        session->state = SessionState::kGenerating;
+        run_generate_loop(*session);
     }
-
-    session->state = SessionState::kGenerating;
-    run_generate_loop(*session);
+    drain_and_dispatch(session);
 
     *out_session_handle = handle;
     return RAC_SUCCESS;
@@ -629,52 +674,60 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-    std::lock_guard<std::mutex> session_lock(session->mu);
-    // pass3-syn-021: a cancelled session is terminal. Once
-    // rac_tool_calling_session_cancel_proto has latched cancel_requested, any
-    // follow-up step_with_result_proto must be rejected so the host cannot
-    // silently feed the cancelled session more iterations (which would then
-    // auto-cancel at the first generate boundary because the per-session
-    // atomic survives every state transition). The host must destroy and
-    // recreate the session to continue.
-    if (session->cancel_requested.load(std::memory_order_acquire) ||
-        session->state == SessionState::kCancelled) {
-        RAC_LOG_WARNING(kTag, "step_with_result called on cancelled session");
-        return RAC_ERROR_INVALID_STATE;
-    }
-    if (session->state != SessionState::kWaitingForTool) {
-        RAC_LOG_WARNING(kTag, "step_with_result called in state %d (expected kWaitingForTool)",
-                        static_cast<int>(session->state));
-        return RAC_ERROR_INVALID_STATE;
-    }
+    // commons-features-llm-rag-009: hold session->mu only while we mutate
+    // session state and let run_generate_loop queue events. Drop the lock
+    // BEFORE dispatching queued events so a host callback that re-enters
+    // step_with_result_proto / cancel / destroy on the same handle does not
+    // deadlock on session->mu.
+    {
+        std::lock_guard<std::mutex> session_lock(session->mu);
+        // pass3-syn-021: a cancelled session is terminal. Once
+        // rac_tool_calling_session_cancel_proto has latched cancel_requested, any
+        // follow-up step_with_result_proto must be rejected so the host cannot
+        // silently feed the cancelled session more iterations (which would then
+        // auto-cancel at the first generate boundary because the per-session
+        // atomic survives every state transition). The host must destroy and
+        // recreate the session to continue.
+        if (session->cancel_requested.load(std::memory_order_acquire) ||
+            session->state == SessionState::kCancelled) {
+            RAC_LOG_WARNING(kTag, "step_with_result called on cancelled session");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        if (session->state != SessionState::kWaitingForTool) {
+            RAC_LOG_WARNING(kTag, "step_with_result called in state %d (expected kWaitingForTool)",
+                            static_cast<int>(session->state));
+            return RAC_ERROR_INVALID_STATE;
+        }
 
-    runanywhere::v1::ToolResult tr;
-    tr.set_tool_call_id(request.tool_call_id().empty() ? session->pending_tool_call_id
-                                                       : request.tool_call_id());
-    tr.set_name(session->pending_tool_name);
-    const bool has_error = request.has_error() && !request.error().empty();
-    if (has_error) {
-        tr.set_error(request.error());
-        tr.set_success(false);
-    } else {
-        tr.set_result_json(request.result_json().empty() ? std::string("{}")
-                                                         : request.result_json());
-        tr.set_success(true);
-    }
-    tr.set_call_id(tr.tool_call_id());
-    tr.set_started_at_ms(now_ms());
-    tr.set_completed_at_ms(now_ms());
-    session->all_tool_results.push_back(tr);
+        runanywhere::v1::ToolResult tr;
+        tr.set_tool_call_id(request.tool_call_id().empty() ? session->pending_tool_call_id
+                                                           : request.tool_call_id());
+        tr.set_name(session->pending_tool_name);
+        const bool has_error = request.has_error() && !request.error().empty();
+        if (has_error) {
+            tr.set_error(request.error());
+            tr.set_success(false);
+        } else {
+            tr.set_result_json(request.result_json().empty() ? std::string("{}")
+                                                             : request.result_json());
+            tr.set_success(true);
+        }
+        tr.set_call_id(tr.tool_call_id());
+        tr.set_started_at_ms(now_ms());
+        tr.set_completed_at_ms(now_ms());
+        session->all_tool_results.push_back(tr);
 
-    session->current_prompt = build_followup_prompt(*session, tr);
-    if (session->current_prompt.empty()) {
-        session->current_prompt = session->user_prompt;
-    }
+        session->current_prompt = build_followup_prompt(*session, tr);
+        if (session->current_prompt.empty()) {
+            session->current_prompt = session->user_prompt;
+        }
 
-    session->pending_tool_call_id.clear();
-    session->pending_tool_name.clear();
-    session->state = SessionState::kGenerating;
-    run_generate_loop(*session);
+        session->pending_tool_call_id.clear();
+        session->pending_tool_name.clear();
+        session->state = SessionState::kGenerating;
+        run_generate_loop(*session);
+    }
+    drain_and_dispatch(session);
 
     return RAC_SUCCESS;
 #endif
