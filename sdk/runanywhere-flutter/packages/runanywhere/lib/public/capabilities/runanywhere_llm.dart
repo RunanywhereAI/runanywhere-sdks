@@ -531,6 +531,19 @@ class RunAnywhereLLM {
         }
       } finally {
         calloc.free(requestPtr);
+        // CONSOLIDATE-D fix: drain in-flight LLM stream dispatches before
+        // closing the NativeCallable. `rac_llm_generate_stream_proto` may
+        // post the terminal callback from a worker thread; the dispatcher
+        // copies the user_data slot under commons' internal mutex, releases
+        // the mutex, then invokes the user callback (see
+        // `rac/features/llm/rac_llm_stream.h` warning). Without
+        // `rac_llm_proto_quiesce()` the C side can invoke the trampoline
+        // backed by the NativeCallable's user_data after `callback.close()`
+        // tore it down — UAF against the thread_local proto scratch buffer.
+        // Mirrors Swift `HandleStreamAdapter`'s lock-release-before-unregister
+        // pattern in
+        // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
+        RacNative.bindings.rac_llm_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
@@ -540,6 +553,10 @@ class RunAnywhereLLM {
       try {
         _cancelProto();
       } finally {
+        // Same CONSOLIDATE-D ordering as the `run()` teardown — quiesce
+        // first so any callbacks the cancel kicked off complete before we
+        // free the NativeCallable backing their user_data.
+        RacNative.bindings.rac_llm_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }

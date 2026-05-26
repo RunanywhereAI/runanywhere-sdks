@@ -10,7 +10,8 @@ import 'dart:ffi' as ffi;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:runanywhere/core/native/rac_native.dart' show RacProtoBuffer;
+import 'package:runanywhere/core/native/rac_native.dart'
+    show RacNative, RacProtoBuffer;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' show SDKEvent;
 import 'package:runanywhere/generated/vlm_options.pb.dart'
@@ -152,6 +153,15 @@ class DartBridgeVLM {
         }
       } finally {
         calloc.free(requestPtr);
+        // CONSOLIDATE-D fix: drain in-flight VLM stream dispatches before
+        // closing the NativeCallable. `rac_vlm_stream_proto` may post the
+        // terminal callback from a worker thread that copies the user_data
+        // slot under commons' internal mutex and releases it BEFORE invoking
+        // the callback (see `rac/features/vlm/rac_vlm_service.h` warning).
+        // Without `rac_vlm_proto_quiesce()` the C side can invoke the
+        // trampoline backed by NativeCallable user_data after
+        // `callback.close()` — UAF on the proto scratch buffer.
+        RacNative.bindings.rac_vlm_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
@@ -162,6 +172,7 @@ class DartBridgeVLM {
     };
     controller.onCancel = () {
       cancel();
+      RacNative.bindings.rac_vlm_proto_quiesce?.call();
       callback?.close();
       callback = null;
     };

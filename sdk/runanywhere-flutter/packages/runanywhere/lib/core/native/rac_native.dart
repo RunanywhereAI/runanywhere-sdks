@@ -255,6 +255,14 @@ typedef RacOutOnlyProtoNative = ffi.Int32 Function(
 );
 typedef RacOutOnlyProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
+/// `void (*)(void)` quiesce ABI exposed by every modality stream header
+/// (rac_llm_stream.h, rac_stt_stream.h, rac_tts_stream.h, rac_vad_stream.h,
+/// rac_diffusion_stream.h, rac_vlm_service.h, voice_agent). Callers spin-wait
+/// until all in-flight proto-byte stream dispatches have returned before
+/// freeing user_data passed to the matching set_*_callback ABI.
+typedef RacProtoQuiesceNative = ffi.Void Function();
+typedef RacProtoQuiesceDart = void Function();
+
 typedef RacVadProtoActivityCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
@@ -1826,6 +1834,30 @@ class RacBindings {
             _lookupOptional<RacLifecycleRequestProtoDart>(
           () => lib.lookupFunction<RacLifecycleRequestProtoNative,
               RacLifecycleRequestProtoDart>('rac_tool_value_from_json_proto'),
+        ),
+        rac_llm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_llm_proto_quiesce'),
+        ),
+        rac_stt_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_stt_proto_quiesce'),
+        ),
+        rac_tts_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_tts_proto_quiesce'),
+        ),
+        rac_vad_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_vad_proto_quiesce'),
+        ),
+        rac_vlm_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_vlm_proto_quiesce'),
+        ),
+        rac_voice_agent_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_voice_agent_proto_quiesce'),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -2158,6 +2190,37 @@ class RacBindings {
   /// into a `ToolValue` proto. Null when the commons binary predates the
   /// export.
   final RacLifecycleRequestProtoDart? rac_tool_value_from_json_proto;
+
+  // Per-modality proto-byte stream quiesce ABI ------------------------------
+  //
+  // Each `rac_<modality>_proto_quiesce()` spin-waits until every in-flight
+  // proto-byte stream dispatch on that modality has returned. Stream wrappers
+  // MUST call this before closing the `NativeCallable` whose `user_data`
+  // backed the C dispatcher; otherwise the dispatcher (which copies the
+  // callback slot under its internal mutex and releases it BEFORE invoking
+  // the user callback — see commons `*_stream.cpp` lock-release-before-callback
+  // comment) can fire on a freed `user_data`. Null fields tolerate older
+  // commons binaries that predate the quiesce export. Mirrors Swift's
+  // `HandleStreamAdapter` lock-release-then-unregister pattern in
+  // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
+
+  /// `rac_llm_proto_quiesce` — spin-wait LLM stream dispatches to drain.
+  final RacProtoQuiesceDart? rac_llm_proto_quiesce;
+
+  /// `rac_stt_proto_quiesce` — spin-wait STT stream dispatches to drain.
+  final RacProtoQuiesceDart? rac_stt_proto_quiesce;
+
+  /// `rac_tts_proto_quiesce` — spin-wait TTS stream dispatches to drain.
+  final RacProtoQuiesceDart? rac_tts_proto_quiesce;
+
+  /// `rac_vad_proto_quiesce` — spin-wait VAD activity dispatches to drain.
+  final RacProtoQuiesceDart? rac_vad_proto_quiesce;
+
+  /// `rac_vlm_proto_quiesce` — spin-wait VLM stream dispatches to drain.
+  final RacProtoQuiesceDart? rac_vlm_proto_quiesce;
+
+  /// `rac_voice_agent_proto_quiesce` — spin-wait voice-agent dispatches.
+  final RacProtoQuiesceDart? rac_voice_agent_proto_quiesce;
 }
 
 /// Entry point for the typed commons FFI bindings.

@@ -285,6 +285,16 @@ class DartBridgeTTS {
         }
       } finally {
         calloc.free(requestPtr);
+        // CONSOLIDATE-D fix: drain in-flight TTS chunk dispatches before
+        // closing the NativeCallable. `rac_tts_synthesize_stream_lifecycle_proto`
+        // may post the terminal COMPLETED/ERROR callback from a worker
+        // thread that copies the user_data slot under commons' internal
+        // mutex and releases it BEFORE invoking the callback (see
+        // `rac/features/tts/rac_tts_stream.h` warning). Without
+        // `rac_tts_proto_quiesce()` the C side can invoke the trampoline
+        // backed by NativeCallable user_data after `callback.close()` —
+        // UAF on the proto scratch buffer.
+        RacNative.bindings.rac_tts_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
@@ -307,6 +317,8 @@ class DartBridgeTTS {
       } catch (e) {
         _logger.debug('stopLifecycleProto on stream cancel failed: $e');
       }
+      // Same CONSOLIDATE-D ordering as the run() teardown — quiesce first.
+      RacNative.bindings.rac_tts_proto_quiesce?.call();
       callback?.close();
       callback = null;
     };
@@ -465,12 +477,17 @@ class DartBridgeTTS {
       } finally {
         calloc.free(textPtr);
         calloc.free(optionPtr);
+        // CONSOLIDATE-D: same quiesce-before-close ordering as the
+        // lifecycle-owned stream wrapper above. See
+        // `synthesizeStreamLifecycleProto`.
+        RacNative.bindings.rac_tts_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
     }
 
     controller.onCancel = () {
+      RacNative.bindings.rac_tts_proto_quiesce?.call();
       callback?.close();
       callback = null;
     };

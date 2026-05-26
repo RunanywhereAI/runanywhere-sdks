@@ -78,16 +78,45 @@ suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentSta
     return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
 
-suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
+/**
+ * Initialize the voice agent from currently-loaded STT / LLM / TTS models.
+ *
+ * Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
+ *
+ * The `ttsVoiceId` parameter is the voice id **within** the loaded TTS model,
+ * NOT the model id. For single-voice engines, leaving it `null` (the default)
+ * lets the engine pick its default voice. For multi-voice engines (Piper,
+ * eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller must supply the desired
+ * voice id explicitly; reusing the TTS model id here produces invalid voice
+ * selection for multi-voice models (see Swift comment at
+ * `RunAnywhere+VoiceAgent.swift:162-171`).
+ */
+suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
+    ttsVoiceId: String? = null,
+) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (voiceAgentInitialized && areAllComponentsLoaded()) return
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
         throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }
-    CppBridgeVoiceAgent.getHandle()
-    voiceAgentInitialized = true
-    voiceAgentLogger.info("VoiceAgent initialized successfully")
+
+    val sttSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_STT)
+    val llmSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_LLM)
+
+    val composeConfig =
+        RAVoiceAgentComposeConfig(
+            stt_model_id = sttSnap?.model_id?.takeIf { it.isNotBlank() },
+            llm_model_id = llmSnap?.model_id?.takeIf { it.isNotBlank() },
+            tts_voice_id = ttsVoiceId?.takeIf { it.isNotBlank() },
+        )
+
+    val handle = CppBridgeVoiceAgent.getHandle()
+    val states = CppBridgeVoiceAgent.initialize(handle, composeConfig)
+    voiceAgentInitialized = states.ready
+    voiceAgentLogger.info(
+        "VoiceAgent initialized from loaded models (ttsVoiceId=${ttsVoiceId ?: "<default>"}, ready=${states.ready})",
+    )
 }
 
 suspend fun RunAnywhere.cleanupVoiceAgent() {

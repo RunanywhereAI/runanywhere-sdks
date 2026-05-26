@@ -359,11 +359,25 @@ class DartBridgeVoiceAgent {
         } catch (e, st) {
           controller.addError(e, st);
         } finally {
+          // CONSOLIDATE-D fix: drain in-flight voice-agent dispatches before
+          // closing the NativeCallable. `rac_voice_agent_process_turn_proto`
+          // may post late events from a worker thread; the dispatcher copies
+          // the user_data slot under commons' internal mutex and releases it
+          // BEFORE invoking the user callback. Without
+          // `rac_voice_agent_proto_quiesce()` the C side can invoke the
+          // trampoline backed by NativeCallable user_data after
+          // `nativeCb.close()` — UAF on the proto scratch buffer.
+          RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
+          nativeCb?.close();
+          nativeCb = null;
           unawaited(controller.close());
         }
       }
       ..onCancel = () {
+        // Same CONSOLIDATE-D ordering as the run() teardown above.
+        RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
         nativeCb?.close();
+        nativeCb = null;
       };
 
     return controller.stream;

@@ -149,11 +149,21 @@ class _VoiceHandleFanOut {
   void _tearDown() {
     final cb = _nativeCb;
     if (cb == null) return;
+    // CONSOLIDATE-D ordering: (1) unregister the C callback so no NEW
+    // dispatches will fire, (2) `rac_voice_agent_proto_quiesce()` spins
+    // until every in-flight dispatch returns, (3) close the NativeCallable
+    // whose `user_data` was the dispatcher's argument. Skipping the quiesce
+    // step lets the dispatcher invoke the trampoline after the
+    // NativeCallable is freed (UAF). Mirrors Swift's
+    // `HandleStreamAdapter.tearDown()` lock-release-before-unregister
+    // pattern in
+    // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
     RacNative.bindings.rac_voice_agent_set_proto_callback(
       _handle,
       ffi.nullptr,
       ffi.nullptr,
     );
+    RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
     cb.close();
     _nativeCb = null;
     _onTornDown();

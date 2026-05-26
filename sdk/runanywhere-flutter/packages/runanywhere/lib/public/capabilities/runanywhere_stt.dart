@@ -270,7 +270,17 @@ class RunAnywhereSTT {
       }
       ..onCancel = () {
         _isStreaming = false;
+        // CONSOLIDATE-D fix: drain in-flight STT partial dispatches before
+        // closing the NativeCallable. `rac_stt_transcribe_stream_lifecycle_proto`
+        // may post late partials from a worker thread that copies the
+        // user_data slot under commons' internal mutex and releases it BEFORE
+        // invoking the callback (see `rac/features/stt/rac_stt_stream.h`
+        // warning). Without `rac_stt_proto_quiesce()` the C side can invoke
+        // the trampoline backed by NativeCallable user_data after
+        // `nativeCb.close()` tore it down — UAF on the proto scratch buffer.
+        RacNative.bindings.rac_stt_proto_quiesce?.call();
         nativeCb?.close();
+        nativeCb = null;
       };
 
     return controller.stream;
