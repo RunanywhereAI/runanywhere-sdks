@@ -19,10 +19,15 @@ import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeC
 import { HardwareAdapter } from '../../Adapters/HardwareAdapter';
 import {
   AccelerationPreference,
+  type AcceleratorInfo,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 
-export type { HardwareProfile, HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
+export type {
+  AcceleratorInfo,
+  HardwareProfile,
+  HardwareProfileResult,
+} from '@runanywhere/proto-ts/hardware_profile';
 
 type NavigatorWithExtras = Omit<Navigator, 'hardwareConcurrency'> & {
   deviceMemory?: number;
@@ -159,13 +164,23 @@ export const Hardware = {
     return Hardware.getProfile().profile?.accelerationMode || detectAccelerationMode();
   },
 
-  getAccelerators(): HardwareProfileResult {
-    return HardwareAdapter.tryDefault()?.getAccelerators() ?? {
-      accelerators: Hardware.getProfile().accelerators,
-    };
+  /**
+   * Returns the available accelerators as a list. Swift parity:
+   * `getAccelerators() throws -> [RAAcceleratorInfo]`. When the proto
+   * bridge is unavailable the browser-detected accelerator list is
+   * returned (single GPU/CPU entry, see {@link browserHardwareProfileResult}).
+   */
+  getAccelerators(): AcceleratorInfo[] {
+    const fromProto = HardwareAdapter.tryDefault()?.getAccelerators();
+    if (fromProto) return fromProto.accelerators;
+    return Hardware.getProfile().accelerators;
   },
 
-  setAccelerationPreference(preference: AccelerationPreference): boolean {
+  /**
+   * Set the preferred accelerator for subsequent inference. Swift parity:
+   * `setAcceleratorPreference(_ preference: RAAccelerationPreference)`.
+   */
+  setAcceleratorPreference(preference: AccelerationPreference): boolean {
     return HardwareAdapter.tryDefault()?.setAccelerationPreference(preference) ?? false;
   },
 };
