@@ -64,11 +64,8 @@ class STTViewModel: ObservableObject {
     // MARK: - Initialization State (for idempotency)
 
     private var isInitialized = false
-    private var didAutoPrepareSTT = false
     private var hasSubscribedToAudioLevel = false
     private var hasSubscribedToSDKEvents = false
-
-    private static let defaultSTTModelID = "sherpa-onnx-whisper-tiny.en"
 
     // MARK: - Initialization
 
@@ -105,58 +102,6 @@ class STTViewModel: ObservableObject {
 
         // Check initial STT model state
         await checkInitialModelState()
-        await prepareDefaultSTTModelIfNeeded()
-    }
-
-    /// Download and load the default Sherpa STT model when the Transcribe tab opens.
-    /// Runs before the model picker sheet so simulator harness reaches download/load
-    /// os_log markers without brittle Get taps (SWIFT-IOS-001).
-    private func prepareDefaultSTTModelIfNeeded() async {
-        guard !didAutoPrepareSTT else { return }
-        didAutoPrepareSTT = true
-
-        logger.info("STT auto-prepare started (SWIFT-IOS-001)")
-
-        await ModelListViewModel.shared.loadModels()
-        let sttModels = ModelListViewModel.shared.availableModels.filter {
-            $0.category == .speechRecognition && !$0.isBuiltIn
-        }
-
-        let preferred = sttModels.first { $0.id == Self.defaultSTTModelID }
-        let readyOnDisk = preferred.flatMap { $0.localPathURL != nil ? $0 : nil }
-            ?? sttModels.first { $0.localPathURL != nil }
-        let downloadable = preferred.flatMap { $0.localPathURL == nil ? $0 : nil }
-            ?? sttModels.first { $0.localPathURL == nil }
-
-        if let readyOnDisk {
-            await loadModelFromSelection(readyOnDisk)
-            return
-        }
-
-        guard let downloadable else {
-            logger.error(
-                "STT auto-prepare skipped: no downloadable STT model (registry count=\(sttModels.count, privacy: .public))"
-            )
-            return
-        }
-
-        isProcessing = true
-        errorMessage = nil
-        defer { isProcessing = false }
-
-        do {
-            try await RunAnywhere.downloadModel(downloadable) { _ in }
-            await ModelListViewModel.shared.loadModels()
-            let refreshed = ModelListViewModel.shared.availableModels.first { $0.id == downloadable.id }
-                ?? downloadable
-            await loadModelFromSelection(refreshed)
-        } catch {
-            let message = (error as? SDKException)?.message ?? error.localizedDescription
-            logger.error("STT auto-prepare download failed: \(message, privacy: .public)")
-            errorMessage = message.isEmpty
-                ? "Failed to download \(downloadable.name)."
-                : "Failed to download \(downloadable.name): \(message)"
-        }
     }
 
     /// Load model from ModelSelectionSheet selection

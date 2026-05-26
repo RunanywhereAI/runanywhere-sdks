@@ -246,7 +246,7 @@ struct BenchmarkDashboardView: View {
         }
         .task {
             viewModel.loadPastRuns()
-            await viewModel.prepareForBenchmarksIfNeeded()
+            viewModel.refreshAvailableModels()
         }
     }
 }

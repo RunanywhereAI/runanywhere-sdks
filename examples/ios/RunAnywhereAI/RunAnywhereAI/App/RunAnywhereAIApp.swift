@@ -137,10 +137,6 @@ struct RunAnywhereAIApp: App {
                 isSDKInitialized = true
             }
 
-            Task { @MainActor in
-                await BenchmarkViewModel().prepareForBenchmarksIfNeeded()
-            }
-
             logger.info("💡 Model registry refreshed, user can now download and select models")
         } catch {
             logger.error("❌ SDK initialization failed: \(error, privacy: .public)")

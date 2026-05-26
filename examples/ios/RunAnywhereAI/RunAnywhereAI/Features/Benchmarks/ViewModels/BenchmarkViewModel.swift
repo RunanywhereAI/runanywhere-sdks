@@ -50,9 +50,6 @@ final class BenchmarkViewModel {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Benchmarks")
     private var runTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
-    private var didAutoPrepareLLM = false
-
-    private static let defaultLLMModelID = "smollm2-360m-q8_0"
 
     // MARK: - Lifecycle
 
@@ -63,38 +60,6 @@ final class BenchmarkViewModel {
     func refreshAvailableModels() {
         Task {
             await reloadAvailableModels()
-        }
-    }
-
-    /// Download SmolLM2 when no LLM artifact is on disk (Benchmarks tab + TC-19 prefetch).
-    func prepareForBenchmarksIfNeeded() async {
-        await reloadAvailableModels()
-        if !(availableModels[.llm]?.isEmpty ?? true) { return }
-        guard !didAutoPrepareLLM else { return }
-        didAutoPrepareLLM = true
-
-        logger.info("Benchmark LLM auto-prepare started (SWIFT-IOS-002)")
-
-        await RunAnywhere.refreshModelRegistry()
-        let listResult = await RunAnywhere.listModels()
-        guard listResult.success else { return }
-
-        let llmModels = listResult.models.models.filter {
-            $0.category == .language && !$0.isBuiltIn
-        }
-        guard let downloadable = llmModels.first(where: { $0.id == Self.defaultLLMModelID })
-            ?? llmModels.first(where: { !$0.isDownloadedOnDisk }) else {
-            return
-        }
-
-        do {
-            try await RunAnywhere.downloadModel(downloadable) { _ in }
-            await RunAnywhere.refreshModelRegistry()
-            await reloadAvailableModels()
-            logger.info("Benchmark LLM auto-prepare completed model=\(downloadable.id, privacy: .public)")
-        } catch {
-            let message = (error as? SDKException)?.message ?? error.localizedDescription
-            logger.error("Benchmark LLM auto-prepare download failed: \(message, privacy: .public)")
         }
     }
 
