@@ -4,11 +4,16 @@
 # landed. SolutionRunner expands this into a PipelineSpec (see
 # solution_converter.cpp::expand_rag) and compiles it into a
 # GraphScheduler graph.
+#
+# Model IDs match the canonical catalog seeded by every example app
+# (iOS, Android, Flutter, React Native, Web). rerank_model_id is
+# intentionally omitted: no example app seeds a reranker, and
+# solution_converter.cpp treats an empty rerank_model_id as "skip
+# reranking" (only adds it to params when non-empty).
 
 rag:
-  embed_model_id: "bge-small-en-v1.5"
-  rerank_model_id: "bge-reranker-v2-m3"
-  llm_model_id: "qwen3-4b-q4_k_m"
+  embed_model_id: "all-minilm-l6-v2"
+  llm_model_id: "smollm2-360m-q8_0"
 
   vector_store: "usearch"
   vector_store_path: "/tmp/ra-rag.usearch"
