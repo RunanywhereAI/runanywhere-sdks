@@ -23,6 +23,7 @@ import {
   InferenceFramework,
   ModelArtifactType,
   ModelCategory,
+  AudioFormat,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
@@ -43,6 +44,7 @@ import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
+import { AudioPlayback } from '../Infrastructure/AudioPlayback';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
@@ -287,6 +289,54 @@ function readNullableCString(fn?: () => number): string | null {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Decode a TTSOutput's audio bytes into Float32 PCM samples suitable for
+ * `AudioPlayback.play(...)`. Mirrors the Swift `RunAnywhere+TTS.swift`
+ * `convertPCMToWAV` + AudioPlaybackManager pipeline: convert whatever the
+ * engine produced into the audio-frame shape the platform player needs.
+ *
+ * The Web Audio API ultimately wants Float32 samples in [-1, 1]; we
+ * interpret the engine bytes as follows:
+ *   - `AUDIO_FORMAT_PCM`: typed Float32 native bytes (4-byte aligned). This
+ *     is what the standalone Sherpa SpeechProvider produces.
+ *   - `AUDIO_FORMAT_PCM_S16LE`: signed 16-bit little-endian PCM; convert
+ *     by normalizing to [-1, 1].
+ *   - Any other (WAV/MP3/Opus/...): unsupported here without a decoder,
+ *     return null so the caller can warn and continue.
+ */
+function decodeTTSAudioToFloat32(output: {
+  audioFormat: AudioFormat;
+  audioData: Uint8Array;
+}): Float32Array | null {
+  const bytes = output.audioData;
+  if (!bytes || bytes.byteLength === 0) return null;
+  switch (output.audioFormat) {
+    case AudioFormat.AUDIO_FORMAT_PCM: {
+      // Float32 native bytes — copy via a DataView read because the source
+      // Uint8Array's byte offset is not guaranteed to be 4-aligned.
+      const sampleCount = Math.floor(bytes.byteLength / 4);
+      const out = new Float32Array(sampleCount);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 4);
+      for (let i = 0; i < sampleCount; i += 1) {
+        out[i] = view.getFloat32(i * 4, true);
+      }
+      return out;
+    }
+    case AudioFormat.AUDIO_FORMAT_PCM_S16LE: {
+      const usableBytes = bytes.byteLength - (bytes.byteLength % 2);
+      const sampleCount = usableBytes / 2;
+      const out = new Float32Array(sampleCount);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, usableBytes);
+      for (let i = 0; i < sampleCount; i += 1) {
+        out[i] = view.getInt16(i * 2, true) / 0x8000;
+      }
+      return out;
+    }
+    default:
+      return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1348,6 +1398,30 @@ export const RunAnywhere = {
     ...args: Parameters<typeof TTSCapability.synthesizeAuto>
   ): Promise<TTSSpeakResult> {
     const output = await TTSCapability.synthesizeAuto(...args);
+    // Swift parity: speak() must actually play the synthesized audio through
+    // the default device speakers. AudioPlayback expects Float32Array PCM
+    // samples; convert from the proto AudioFormat as needed. Failure to
+    // play audio is non-fatal — return the synthesis result either way so
+    // callers can still inspect timings / format metadata.
+    if (output.audioData && output.audioData.byteLength > 0) {
+      try {
+        const samples = decodeTTSAudioToFloat32(output);
+        if (samples && samples.length > 0) {
+          const playback = new AudioPlayback({
+            sampleRate: output.sampleRate > 0 ? output.sampleRate : 22050,
+          });
+          try {
+            await playback.play(samples, output.sampleRate || undefined);
+          } finally {
+            playback.dispose();
+          }
+        }
+      } catch (err) {
+        logger.warning(
+          `speak(): audio playback failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     return {
       audioFormat: output.audioFormat,
       sampleRate: output.sampleRate,
