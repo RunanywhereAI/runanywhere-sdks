@@ -322,13 +322,28 @@ class DartBridgeVoiceAgent {
             unawaited(controller.close());
             return;
           }
-          nativeCb =
-              NativeCallable<RacVoiceAgentProtoEventCallbackNative>.listener((
+          // flutter-core-001 fix: use `isolateLocal` (not `.listener`) so the
+          // callback fires SYNCHRONOUSLY on the same Dart isolate that
+          // invokes `rac_voice_agent_process_turn_proto`. The commons
+          // implementation in `voice_agent_d7_abi.cpp` runs the entire turn
+          // (STT → LLM → TTS) on the calling thread under `handle->mutex`
+          // and invokes `event_callback` for each VoiceEvent inline. With
+          // `.listener` mode the callbacks are queued onto the isolate's
+          // event loop and the `finally` below closes the controller before
+          // any of them drain — every event is silently dropped at
+          // `controller.add(...)` on a closed controller. `isolateLocal`
+          // ensures every emission lands on the still-open controller
+          // before `fn(...)` returns. This mirrors the canonical pattern in
+          // `dart_bridge_llm.dart` (`_generateStreamProto`).
+          nativeCb = NativeCallable<
+              RacVoiceAgentProtoEventCallbackNative>.isolateLocal((
             Pointer<Uint8> bytesPtr,
             int bytesLen,
             Pointer<Void> _,
           ) {
-            if (bytesLen <= 0 || bytesPtr == nullptr) return;
+            if (controller.isClosed || bytesLen <= 0 || bytesPtr == nullptr) {
+              return;
+            }
             final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
             try {
               controller.add(voice_events_pb.VoiceEvent.fromBuffer(copy));
@@ -359,14 +374,11 @@ class DartBridgeVoiceAgent {
         } catch (e, st) {
           controller.addError(e, st);
         } finally {
-          // CONSOLIDATE-D fix: drain in-flight voice-agent dispatches before
-          // closing the NativeCallable. `rac_voice_agent_process_turn_proto`
-          // may post late events from a worker thread; the dispatcher copies
-          // the user_data slot under commons' internal mutex and releases it
-          // BEFORE invoking the user callback. Without
-          // `rac_voice_agent_proto_quiesce()` the C side can invoke the
-          // trampoline backed by NativeCallable user_data after
-          // `nativeCb.close()` — UAF on the proto scratch buffer.
+          // CONSOLIDATE-D / flutter-core-001 teardown: with `isolateLocal`
+          // all events have already drained by the time `fn` returns, but
+          // `rac_voice_agent_proto_quiesce()` is still invoked as a defensive
+          // barrier in case a future commons revision posts late events from
+          // a worker thread.
           RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
           nativeCb?.close();
           nativeCb = null;
