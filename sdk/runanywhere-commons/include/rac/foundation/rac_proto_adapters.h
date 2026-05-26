@@ -134,14 +134,21 @@
 
 #include "rac/core/rac_structured_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/features/diffusion/rac_diffusion_types.h"
-#include "rac/features/embeddings/rac_embeddings_types.h"
-#include "rac/features/stt/rac_stt_types.h"
-#include "rac/features/tts/rac_tts_types.h"
-#include "rac/features/vad/rac_vad_types.h"
-#include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
+
+// commons-core-infra-003: foundation/ MUST NOT depend on features/.
+// The per-modality adapter declarations that previously lived in this
+// header (and forced six features/ includes) now live alongside their
+// C ABI type headers:
+//   - rac/features/stt/rac_stt_proto_adapters.h
+//   - rac/features/tts/rac_tts_proto_adapters.h
+//   - rac/features/vad/rac_vad_proto_adapters.h
+//   - rac/features/vlm/rac_vlm_proto_adapters.h
+//   - rac/features/diffusion/rac_diffusion_proto_adapters.h
+//   - rac/features/embeddings/rac_embeddings_proto_adapters.h
+// This header retains only adapters for cross-cutting types (LoRA,
+// Storage, Errors) whose C ABI types live in core/ or infrastructure/.
 
 #ifdef __cplusplus
 
@@ -162,56 +169,9 @@
 
 namespace runanywhere::v1 {
 
-// STT
-class STTConfiguration;
-class STTOptions;
-class STTOutput;
-class WordTimestamp;
-class TranscriptionMetadata;
-class TranscriptionAlternative;
-
-// TTS
-class TTSConfiguration;
-class TTSOptions;
-class TTSOutput;
-class TTSPhonemeTimestamp;
-class TTSSynthesisMetadata;
-class TTSSpeakResult;
-
-// VAD
-class VADConfiguration;
-class VADOptions;
-class VADResult;
-class VADStatistics;
-class SpeechActivityEvent;
-
-// VLM
-class VLMConfiguration;
-class VLMGenerationOptions;
-class VLMResult;
-class VLMImage;
-
-// Diffusion
-class DiffusionConfiguration;
-class DiffusionGenerationOptions;
-class DiffusionProgress;
-class DiffusionResult;
-
 // LoRA
 class LoraAdapterCatalogEntry;
 class LoRAAdapterInfo;
-
-// RAG
-class RAGConfiguration;
-class RAGQueryOptions;
-class RAGResult;
-class RAGSearchResult;
-
-// Embeddings
-class EmbeddingsConfiguration;
-class EmbeddingsOptions;
-class EmbeddingsResult;
-class EmbeddingVector;
 
 // Storage
 class DeviceStorageInfo;
@@ -232,167 +192,6 @@ enum ErrorCategory : int;
 namespace rac::foundation {
 
 // ===========================================================================
-// STT
-// ===========================================================================
-
-bool rac_stt_config_to_proto(const rac_stt_config_t* in, ::runanywhere::v1::STTConfiguration* out);
-bool rac_stt_config_from_proto(const ::runanywhere::v1::STTConfiguration& in,
-                               rac_stt_config_t* out);
-
-bool rac_stt_options_to_proto(const rac_stt_options_t* in, ::runanywhere::v1::STTOptions* out);
-bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt_options_t* out);
-
-bool rac_stt_word_to_proto(const rac_stt_word_t* in, ::runanywhere::v1::WordTimestamp* out);
-bool rac_stt_word_from_proto(const ::runanywhere::v1::WordTimestamp& in, rac_stt_word_t* out);
-
-bool rac_transcription_metadata_to_proto(const rac_transcription_metadata_t* in,
-                                         ::runanywhere::v1::TranscriptionMetadata* out);
-bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::TranscriptionMetadata& in,
-                                           rac_transcription_metadata_t* out);
-
-bool rac_transcription_alternative_to_proto(const rac_transcription_alternative_t* in,
-                                            ::runanywhere::v1::TranscriptionAlternative* out);
-bool rac_transcription_alternative_from_proto(const ::runanywhere::v1::TranscriptionAlternative& in,
-                                              rac_transcription_alternative_t* out);
-
-// rac_stt_output_t is the canonical STT output and aliases rac_stt_transcription_result_t.
-// The proto STTOutput does not carry a wall-clock timestamp_ms field; we drop
-// it on the to-proto path. metadata.processing_time_ms stays.
-bool rac_stt_output_to_proto(const rac_stt_output_t* in, ::runanywhere::v1::STTOutput* out);
-bool rac_stt_output_from_proto(const ::runanywhere::v1::STTOutput& in, rac_stt_output_t* out);
-
-// rac_stt_result_t is a smaller projection (text + words + lang + confidence
-// + processing_time_ms) than rac_stt_output_t. Adapter folds processing_time_ms
-// into proto metadata, leaves audio_length_ms unset.
-bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTOutput* out);
-bool rac_stt_result_from_proto(const ::runanywhere::v1::STTOutput& in, rac_stt_result_t* out);
-
-// ===========================================================================
-// TTS
-// ===========================================================================
-
-bool rac_tts_config_to_proto(const rac_tts_config_t* in, ::runanywhere::v1::TTSConfiguration* out);
-bool rac_tts_config_from_proto(const ::runanywhere::v1::TTSConfiguration& in,
-                               rac_tts_config_t* out);
-
-bool rac_tts_options_to_proto(const rac_tts_options_t* in, ::runanywhere::v1::TTSOptions* out);
-bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out);
-
-bool rac_tts_phoneme_timestamp_to_proto(const rac_tts_phoneme_timestamp_t* in,
-                                        ::runanywhere::v1::TTSPhonemeTimestamp* out);
-bool rac_tts_phoneme_timestamp_from_proto(const ::runanywhere::v1::TTSPhonemeTimestamp& in,
-                                          rac_tts_phoneme_timestamp_t* out);
-
-bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
-                                         ::runanywhere::v1::TTSSynthesisMetadata* out);
-bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesisMetadata& in,
-                                           rac_tts_synthesis_metadata_t* out);
-
-bool rac_tts_output_to_proto(const rac_tts_output_t* in, ::runanywhere::v1::TTSOutput* out);
-bool rac_tts_output_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_output_t* out);
-
-bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSOutput* out);
-bool rac_tts_result_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_result_t* out);
-
-bool rac_tts_speak_result_to_proto(const rac_tts_speak_result_t* in,
-                                   ::runanywhere::v1::TTSSpeakResult* out);
-bool rac_tts_speak_result_from_proto(const ::runanywhere::v1::TTSSpeakResult& in,
-                                     rac_tts_speak_result_t* out);
-
-// ===========================================================================
-// VAD
-// ===========================================================================
-
-bool rac_vad_config_to_proto(const rac_vad_config_t* in, ::runanywhere::v1::VADConfiguration* out);
-bool rac_vad_config_from_proto(const ::runanywhere::v1::VADConfiguration& in,
-                               rac_vad_config_t* out);
-
-// VAD has no first-class C "options" struct — the closest is
-// rac_vad_input_t::energy_threshold_override. We expose two adapters:
-//   - input -> proto VADOptions (only the threshold field; gates are
-//     constants in C ABI)
-//   - proto VADOptions -> input (writes threshold; ignores gates which
-//     callers must enforce themselves)
-bool rac_vad_input_to_proto_options(const rac_vad_input_t* in, ::runanywhere::v1::VADOptions* out);
-bool rac_vad_input_from_proto_options(const ::runanywhere::v1::VADOptions& in,
-                                      rac_vad_input_t* out);
-
-bool rac_vad_output_to_proto(const rac_vad_output_t* in, ::runanywhere::v1::VADResult* out);
-bool rac_vad_output_from_proto(const ::runanywhere::v1::VADResult& in, rac_vad_output_t* out);
-
-bool rac_vad_statistics_to_proto(const rac_vad_statistics_t* in,
-                                 ::runanywhere::v1::VADStatistics* out);
-bool rac_vad_statistics_from_proto(const ::runanywhere::v1::VADStatistics& in,
-                                   rac_vad_statistics_t* out);
-
-bool rac_speech_activity_to_proto(rac_speech_activity_t in_kind, int64_t in_timestamp_ms,
-                                  int32_t in_duration_ms,
-                                  ::runanywhere::v1::SpeechActivityEvent* out);
-bool rac_speech_activity_from_proto(const ::runanywhere::v1::SpeechActivityEvent& in,
-                                    rac_speech_activity_t* out_kind, int64_t* out_timestamp_ms,
-                                    int32_t* out_duration_ms);
-
-// ===========================================================================
-// VLM
-// ===========================================================================
-
-bool rac_vlm_config_to_proto(const rac_vlm_config_t* in, ::runanywhere::v1::VLMConfiguration* out);
-bool rac_vlm_config_from_proto(const ::runanywhere::v1::VLMConfiguration& in,
-                               rac_vlm_config_t* out);
-
-// VLM proto VLMGenerationOptions round-trips the full C ABI rac_vlm_options_t
-// surface: prompt, max_tokens, temperature, top_p, max_image_size, n_threads,
-// use_gpu, model_family, streaming_enabled, system_prompt, stop_sequences[],
-// custom_chat_template (heap-allocated rac_vlm_chat_template_t with its owned
-// template_str / image_marker / default_system_prompt strings), and
-// image_marker_override. Adapter-owned allocations produced by
-// `rac_vlm_options_from_proto` must be released with `rac_vlm_options_free_owned`.
-bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt /*can be NULL*/,
-                              ::runanywhere::v1::VLMGenerationOptions* out);
-bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
-                                rac_vlm_options_t* out, const char** out_prompt /*optional*/);
-
-/**
- * Frees the request-scoped allocations (`system_prompt`,
- * `stop_sequences`/`num_stop_sequences`, `custom_chat_template` and its owned
- * `template_str`/`image_marker`/`default_system_prompt`, and
- * `image_marker_override`) that `rac_vlm_options_from_proto` allocated into
- * `options`. Safe to call on a default-initialized `rac_vlm_options_t`. Resets
- * freed pointers to RAC_NULL so the struct is safe to re-use.
- */
-void rac_vlm_options_free_owned(rac_vlm_options_t* options);
-
-bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out);
-bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in, rac_vlm_result_t* out);
-
-bool rac_vlm_image_to_proto(const rac_vlm_image_t* in, ::runanywhere::v1::VLMImage* out);
-bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out);
-
-// ===========================================================================
-// DIFFUSION
-// ===========================================================================
-
-bool rac_diffusion_config_to_proto(const rac_diffusion_config_t* in,
-                                   ::runanywhere::v1::DiffusionConfiguration* out);
-bool rac_diffusion_config_from_proto(const ::runanywhere::v1::DiffusionConfiguration& in,
-                                     rac_diffusion_config_t* out);
-
-bool rac_diffusion_options_to_proto(const rac_diffusion_options_t* in,
-                                    ::runanywhere::v1::DiffusionGenerationOptions* out);
-bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
-                                      rac_diffusion_options_t* out);
-
-bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
-                                     ::runanywhere::v1::DiffusionProgress* out);
-bool rac_diffusion_progress_from_proto(const ::runanywhere::v1::DiffusionProgress& in,
-                                       rac_diffusion_progress_t* out);
-
-bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
-                                   ::runanywhere::v1::DiffusionResult* out);
-bool rac_diffusion_result_from_proto(const ::runanywhere::v1::DiffusionResult& in,
-                                     rac_diffusion_result_t* out);
-
-// ===========================================================================
 // LoRA
 // ===========================================================================
 
@@ -411,30 +210,6 @@ bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
                               char** out_adapter_id /*owned*/, char** out_adapter_path /*owned*/,
                               float* out_scale, bool* out_applied,
                               char** out_error_message /*owned, may be NULL*/);
-
-// ===========================================================================
-// EMBEDDINGS
-// ===========================================================================
-
-bool rac_embeddings_config_to_proto(const rac_embeddings_config_t* in,
-                                    ::runanywhere::v1::EmbeddingsConfiguration* out);
-bool rac_embeddings_config_from_proto(const ::runanywhere::v1::EmbeddingsConfiguration& in,
-                                      rac_embeddings_config_t* out);
-
-bool rac_embeddings_options_to_proto(const rac_embeddings_options_t* in,
-                                     ::runanywhere::v1::EmbeddingsOptions* out);
-bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
-                                       rac_embeddings_options_t* out);
-
-bool rac_embedding_vector_to_proto(const rac_embedding_vector_t* in,
-                                   ::runanywhere::v1::EmbeddingVector* out);
-bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& in,
-                                     rac_embedding_vector_t* out);
-
-bool rac_embeddings_result_to_proto(const rac_embeddings_result_t* in,
-                                    ::runanywhere::v1::EmbeddingsResult* out);
-bool rac_embeddings_result_from_proto(const ::runanywhere::v1::EmbeddingsResult& in,
-                                      rac_embeddings_result_t* out);
 
 // ===========================================================================
 // STORAGE

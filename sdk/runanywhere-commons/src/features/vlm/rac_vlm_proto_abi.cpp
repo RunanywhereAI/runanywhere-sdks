@@ -16,8 +16,8 @@
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/vlm/rac_vlm_proto_adapters.h"
 #include "rac/features/vlm/rac_vlm_service.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
