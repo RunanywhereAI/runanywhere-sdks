@@ -8,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import RNFS from 'react-native-fs';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   JSONSchema,
@@ -20,26 +19,18 @@ import {
   ToolDefinition,
   ToolParameterType,
 } from '@runanywhere/proto-ts/tool_calling';
-import type { LoRAAdapterConfig } from '@runanywhere/proto-ts/lora_options';
 import {
   ModelCategory,
   ModelGetRequest,
   ModelLoadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
+import { attachLoRAFixture } from '../utils/loraFixture';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing } from '../theme/spacing';
 
 const ACTION_LOG_PREFIX = '[RN_VALIDATION_ACTION]';
-// LoRA fixture lives inside the app's sandboxed documents dir so the
-// validation harness works on real devices / fresh sims where the host
-// /tmp path is unreachable. The harness operator stages
-// `identity-adapter.gguf` into this path before the run; see
-// test_workflows/instructions/cross-platform-e2e-test-catalog.md §9b
-// "LoRA fixture deployment" for the per-platform copy commands
-// (RN-AND-005 / RN-IOS-007).
-const FIXTURE_ADAPTER_PATH = `${RNFS.DocumentDirectoryPath}/lora/identity-adapter.gguf`;
 // Mirrors Voice Assistant Setup in the iOS app (VoiceAgentViewModel.swift):
 // vad.synthetic_* actions invoke RunAnywhere.detectVoiceActivity, which in
 // turn calls rac_vad_process_lifecycle_proto. Without a loaded VAD model the
@@ -138,16 +129,6 @@ const createStructuredSchema = (): JSONSchema =>
     },
   });
 
-const createLoRAFixtureConfig = (): LoRAAdapterConfig => ({
-  adapterPath: FIXTURE_ADAPTER_PATH,
-  adapterId: 'rn-validation-identity',
-  scale: 0.5,
-  metadata: {
-    lane: 'react-native-validation',
-    fixture: 'identity-adapter',
-  },
-  targetModules: ['q_proj', 'v_proj'],
-});
 
 const createSyntheticAudio = (kind: 'silence' | 'tone'): Float32Array => {
   const sampleRate = 16000;
@@ -421,31 +402,37 @@ export const ValidationHarnessScreen: React.FC = () => {
         id: 'lora.compatibility',
         title: 'LoRA Compatibility',
         detail: 'Check a deterministic fixture adapter config.',
-        run: async () =>
-          RunAnywhere.lora.checkCompatibility(createLoRAFixtureConfig()),
+        run: async () => {
+          const { config } = await attachLoRAFixture();
+          return RunAnywhere.lora.checkCompatibility(config);
+        },
       },
       {
         id: 'lora.apply_fixture',
         title: 'LoRA Apply',
         detail: 'Apply the fixture path and capture success or bridge error.',
-        run: async () =>
-          RunAnywhere.lora.apply({
+        run: async () => {
+          const { config } = await attachLoRAFixture();
+          return RunAnywhere.lora.apply({
             requestId: `rn-validation-lora-apply-${Date.now()}`,
-            adapters: [createLoRAFixtureConfig()],
+            adapters: [config],
             replaceExisting: true,
-          }),
+          });
+        },
       },
       {
         id: 'lora.remove_fixture',
         title: 'LoRA Remove',
         detail: 'Remove the fixture adapter id/path and capture state.',
-        run: async () =>
-          RunAnywhere.lora.remove({
+        run: async () => {
+          const { adapterPath } = await attachLoRAFixture();
+          return RunAnywhere.lora.remove({
             requestId: `rn-validation-lora-remove-${Date.now()}`,
             adapterIds: ['rn-validation-identity'],
-            adapterPaths: [FIXTURE_ADAPTER_PATH],
+            adapterPaths: [adapterPath],
             clearAll: false,
-          }),
+          });
+        },
       },
       {
         id: 'pluginloader.snapshot',
@@ -471,14 +458,20 @@ export const ValidationHarnessScreen: React.FC = () => {
   const runHarnessAction = useCallback(
     async (action: HarnessAction) => {
       const expectedError = action.id === 'pluginloader.load_empty_error';
+      let fixtureAdapterPath: string | undefined;
+      if (action.id.startsWith('lora.')) {
+        try {
+          fixtureAdapterPath = (await attachLoRAFixture()).adapterPath;
+        } catch {
+          fixtureAdapterPath = undefined;
+        }
+      }
       await recordAction(
         action.id,
         {
           screen: 'Validation',
           action: action.title,
-          fixtureAdapterPath: action.id.startsWith('lora.')
-            ? FIXTURE_ADAPTER_PATH
-            : undefined,
+          fixtureAdapterPath,
         },
         action.run,
         expectedError

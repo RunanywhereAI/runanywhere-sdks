@@ -280,6 +280,80 @@ async function markDownloadCompleted(
 }
 
 // ============================================================================
+// Attach (high-level adapter staging)
+// ============================================================================
+
+/**
+ * Input shape for `RunAnywhere.lora.attachAdapter({...})`. The
+ * convenience API resolves an adapter file by id, returning the
+ * sandboxed local path where the artifact is staged so consumers do
+ * not need to know about platform-specific sandboxed file system
+ * roots (RNFS.DocumentDirectoryPath, etc.).
+ */
+export interface LoRAAttachAdapterRequest {
+  /** Stable adapter identifier (catalog-id / fixture-id). */
+  adapterId: string;
+  /** Model id this adapter binds to. */
+  modelId: string;
+  /** Optional download URL — used for catalog registration only. */
+  url?: string;
+  /** Filename on disk under the SDK's sandboxed lora/ directory. */
+  filename: string;
+  /** Adapter scale (defaults to 1.0). */
+  scale?: number;
+  /** Optional target modules (e.g. ["q_proj", "v_proj"]). */
+  targetModules?: string[];
+  /** Optional adapter metadata. */
+  metadata?: Record<string, string>;
+}
+
+/**
+ * Result of `RunAnywhere.lora.attachAdapter({...})`. Carries the
+ * fully-resolved `LoRAAdapterConfig` ready for `lora.apply(...)` and
+ * the absolute sandboxed `adapterPath` the SDK staged for the
+ * caller.
+ */
+export interface LoRAAttachAdapterResult {
+  config: LoRAAdapterConfig;
+  adapterPath: string;
+}
+
+const SANDBOX_LORA_DIR = 'lora';
+
+function resolveAdapterPath(filename: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const RNFS = require('react-native-fs');
+  return `${RNFS.DocumentDirectoryPath}/${SANDBOX_LORA_DIR}/${filename}`;
+}
+
+/**
+ * Compose a `LoRAAdapterConfig` for a sandboxed adapter file without
+ * the example app having to know about platform sandbox layout. The
+ * file must already be present at the returned `adapterPath` (the
+ * harness operator stages it per
+ * `cross-platform-e2e-test-catalog.md §9b`).
+ *
+ * The returned `config` is ready to feed directly into
+ * `RunAnywhere.lora.apply(...)`.
+ */
+async function attachAdapter(
+  request: LoRAAttachAdapterRequest
+): Promise<LoRAAttachAdapterResult> {
+  const adapterPath = resolveAdapterPath(request.filename);
+  const config: LoRAAdapterConfig = LoRAAdapterConfigMessage.create({
+    adapterPath,
+    adapterId: request.adapterId,
+    scale: request.scale ?? 1.0,
+    targetModules: request.targetModules ?? [],
+    metadata: request.metadata ?? {},
+  });
+  logger.info(
+    `LoRA attach resolved sandboxed adapter '${request.adapterId}' for model '${request.modelId}' -> ${adapterPath}`
+  );
+  return { config, adapterPath };
+}
+
+// ============================================================================
 // Canonical namespace export
 // ============================================================================
 
@@ -297,4 +371,5 @@ export const lora = {
   queryCatalog,
   getCatalogEntry,
   markDownloadCompleted,
+  attachAdapter,
 };
