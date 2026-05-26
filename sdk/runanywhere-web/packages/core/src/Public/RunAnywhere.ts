@@ -1228,7 +1228,14 @@ export const RunAnywhere = {
       DownloadState.DOWNLOAD_STATE_CANCELLED,
     ]);
     let lastProgress = start.initialProgress;
-    if (lastProgress) request.onProgress?.(lastProgress);
+    // Suppress COMPLETED here for the same reason as the poll loop below:
+    // a cached download whose `start.initialProgress` is already COMPLETED
+    // would otherwise produce two onProgress callbacks (one here, one after
+    // the OPFS flush below). The single post-flush emit at the bottom of
+    // downloadModel() is the canonical "download done" signal.
+    if (lastProgress && lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+      request.onProgress?.(lastProgress);
+    }
 
     while (!lastProgress || !terminal.has(lastProgress.state)) {
       await delay(request.pollIntervalMs ?? 250);
@@ -1286,6 +1293,11 @@ export const RunAnywhere = {
       }
     }
 
+    // Single canonical COMPLETED emit (WEB-001): both the start.initialProgress
+    // branch and the poll loop intentionally suppress COMPLETED so the only
+    // place this fires is HERE, AFTER OPFSBridge.ensureDownloadPersisted has
+    // resolved. UI/E2E observers gate loadModel on this; firing earlier races
+    // the MEMFS→OPFS persist.
     request.onProgress?.(lastProgress);
 
     // CPP-02 self-heal may only update the commons WASM registry. Mirror
