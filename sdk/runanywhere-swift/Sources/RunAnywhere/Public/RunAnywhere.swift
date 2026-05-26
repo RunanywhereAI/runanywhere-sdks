@@ -18,8 +18,6 @@
 //
 
 import Foundation
-#if os(iOS) || os(tvOS) || os(watchOS)
-#endif
 
 /// The RunAnywhere SDK - Single entry point for on-device AI
 public enum RunAnywhere {
