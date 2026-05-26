@@ -403,7 +403,6 @@ class STTViewModel: ObservableObject {
 
         // Reset initialization flags to allow re-initialization if needed
         isInitialized = false
-        didAutoPrepareSTT = false
         hasSubscribedToAudioLevel = false
         hasSubscribedToSDKEvents = false
     }
