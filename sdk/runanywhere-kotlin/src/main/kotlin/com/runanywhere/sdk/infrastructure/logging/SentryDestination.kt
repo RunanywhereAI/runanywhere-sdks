@@ -53,21 +53,18 @@ class SentryDestination : LogDestination {
      * @param entry The log entry to write
      */
     override fun write(entry: LogEntry) {
-        // Public LogLevel: smaller value = more severe (NONE=0, ERROR=1,
-        // WARNING=2, …). Send to Sentry iff entry severity is at or above
-        // the min Sentry level.
-        if (!isAvailable ||
-            entry.level == LogLevel.NONE ||
-            entry.level.value > minSentryLevel.value
-        ) {
+        // Public LogLevel: larger value = more severe (DEBUG=0, INFO=1,
+        // WARNING=2, ERROR=3, FAULT=4). Send to Sentry iff entry severity
+        // is at or above the min Sentry level.
+        if (!isAvailable || entry.level.value < minSentryLevel.value) {
             return
         }
 
         // Add as breadcrumb for context trail
         addBreadcrumb(entry)
 
-        // For ERROR level (most severe in the consolidated enum), capture as Sentry event
-        if (entry.level.value <= LogLevel.ERROR.value) {
+        // ERROR + FAULT capture as Sentry events; WARNING stays a breadcrumb.
+        if (entry.level.value >= LogLevel.ERROR.value) {
             captureEvent(entry)
         }
     }
@@ -143,12 +140,11 @@ class SentryDestination : LogDestination {
      */
     private fun convertToSentryLevel(level: LogLevel): SentryLevel {
         return when (level) {
-            LogLevel.NONE -> SentryLevel.DEBUG
-            LogLevel.VERBOSE -> SentryLevel.DEBUG
             LogLevel.DEBUG -> SentryLevel.DEBUG
             LogLevel.INFO -> SentryLevel.INFO
             LogLevel.WARNING -> SentryLevel.WARNING
             LogLevel.ERROR -> SentryLevel.ERROR
+            LogLevel.FAULT -> SentryLevel.FATAL
         }
     }
 }

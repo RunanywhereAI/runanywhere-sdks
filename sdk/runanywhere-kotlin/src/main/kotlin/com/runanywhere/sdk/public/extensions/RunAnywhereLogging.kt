@@ -18,27 +18,28 @@ import com.runanywhere.sdk.public.RunAnywhere
 
 /**
  * Log level for SDK logging.
+ *
+ * Cross-SDK contract: values match Swift `LogLevel` (debug=0, info=1, warning=2,
+ * error=3, fault=4). Ordering is `larger value = more severe`, so the SDK
+ * logger emits entries iff `level.value >= minLogLevel.value`.
  */
 enum class LogLevel(
     val value: Int,
 ) {
-    /** No logging */
-    NONE(0),
+    /** Debug level logging (most verbose) */
+    DEBUG(0),
 
-    /** Error level logging */
-    ERROR(1),
+    /** Info level logging */
+    INFO(1),
 
     /** Warning level logging */
     WARNING(2),
 
-    /** Info level logging */
-    INFO(3),
+    /** Error level logging */
+    ERROR(3),
 
-    /** Debug level logging */
-    DEBUG(4),
-
-    /** Verbose level logging (all messages) */
-    VERBOSE(5),
+    /** Fault level logging (critical system errors) */
+    FAULT(4),
 }
 
 // MARK: - Logging Configuration
