@@ -445,19 +445,13 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
-    // swiftlint:disable function_body_length
-
     /// Start a voice conversation using the canonical
     /// `RunAnywhere.streamVoiceAgent()` proto-stream API.
     ///
-    /// Pipeline:
-    ///   1. Initialize voice agent against already-loaded STT/LLM/TTS models.
-    ///   2. Consume `AsyncStream<RAVoiceEvent>` from `streamVoiceAgent()`.
-    ///   3. Drive UI state by switching on `event.payload` in
-    ///      `handleProtoEvent(_:)`.
-    ///
-    /// The SDK exposes the proto stream directly so example apps no longer
-    /// reach into `CppBridge` / `CRACommons`.
+    /// The SDK owns the multi-step bootstrap (VAD auto-load + model
+    /// composition + initialization) via
+    /// `initializeVoiceAgentWithLoadedModels()`; this view-model only
+    /// drives UI state and consumes the resulting proto stream.
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")
@@ -469,61 +463,15 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
-
-        // Clear previous conversation when starting a new one
         currentTranscript = ""
         assistantResponse = ""
 
         do {
-            // SWIFT-VOICE-AGENT-001: auto-load the default Silero VAD if the
-            // user hasn't already loaded one from the standalone VAD tab. The
-            // voice agent's VAD slot is not represented in the setup-card UI,
-            // but a Silero commit is what Phase 6h/6VAD needs to fire
-            // speech-start / speech-end events through the lifecycle surface.
-            // The energy-based fallback does not produce the events the
-            // voice-agent orchestrator listens for, so without a VAD lifecycle
-            // load the session stays silent after init.
-            var vadCurrentRequest = RACurrentModelRequest()
-            vadCurrentRequest.category = .voiceActivityDetection
-            let vadSnap = RunAnywhere.currentModel(vadCurrentRequest)
-            if !vadSnap.found {
-                logger.info("Auto-loading default Silero VAD for Voice Agent session")
-                var vadLoad = RAModelLoadRequest()
-                vadLoad.modelID = "silero-vad"
-                vadLoad.category = .voiceActivityDetection
-                let vadResult = await RunAnywhere.loadModel(vadLoad)
-                if !vadResult.success {
-                    // swiftlint:disable:next line_length
-                    logger.warning("Silero VAD auto-load failed: \(vadResult.errorMessage) — voice agent will use energy-based fallback")
-                }
-            }
-
-            // Initialize voice agent against the currently-loaded models.
-            // Compose from the canonical currentModel(_:) snapshots per category.
-            var composeConfig = RAVoiceAgentComposeConfig()
-            var sttRequest = RACurrentModelRequest()
-            sttRequest.category = .speechRecognition
-            let sttSnap = RunAnywhere.currentModel(sttRequest)
-            if sttSnap.found { composeConfig.sttModelID = sttSnap.modelID }
-
-            var llmRequest = RACurrentModelRequest()
-            llmRequest.category = .language
-            let llmSnap = RunAnywhere.currentModel(llmRequest)
-            if llmSnap.found { composeConfig.llmModelID = llmSnap.modelID }
-
-            var ttsRequest = RACurrentModelRequest()
-            ttsRequest.category = .speechSynthesis
-            let ttsSnap = RunAnywhere.currentModel(ttsRequest)
-            if ttsSnap.found { composeConfig.ttsVoiceID = ttsSnap.modelID }
-
-            try await RunAnywhere.initializeVoiceAgent(composeConfig)
+            try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
             sessionState = .listening
             currentStatus = "Listening..."
 
-            // Consume the public proto-event stream. The SDK constructs the
-            // adapter internally and tears it down via `onTermination` when
-            // the consuming task is cancelled.
             eventTask = Task { [weak self] in
                 for await event in RunAnywhere.streamVoiceAgent() {
                     await MainActor.run { self?.handleProtoEvent(event) }
@@ -538,8 +486,6 @@ final class VoiceAgentViewModel: ObservableObject {
             logger.error("Failed to start voice session: \(error.localizedDescription)")
         }
     }
-
-    // swiftlint:enable function_body_length
 
     /// Stop the current voice conversation.
     func stopConversation() async {
