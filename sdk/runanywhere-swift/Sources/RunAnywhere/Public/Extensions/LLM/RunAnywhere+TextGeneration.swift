@@ -12,6 +12,32 @@
 
 public extension RunAnywhere {
 
+    /// Generate text from a plain prompt — convenience overload that mirrors
+    /// the Kotlin `RunAnywhere.generate(prompt:options:)` signature.
+    /// Forwards to the proto-request variant after assembling the request
+    /// from `options ?? .defaults()`.
+    static func generate(
+        prompt: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> RALLMGenerationResult {
+        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = false
+        return try await generate(request)
+    }
+
+    /// Stream text generation from a plain prompt — convenience overload that
+    /// mirrors the Kotlin `RunAnywhere.generateStream(prompt:options:)`
+    /// signature. Forwards to the proto-request variant after assembling
+    /// the request from `options ?? .defaults()` and enabling streaming.
+    static func generateStream(
+        prompt: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> AsyncStream<RALLMStreamEvent> {
+        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
+        return try await generateStream(request)
+    }
+
     /// Generate text through the generated-proto C++ LLM service ABI.
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
         guard isInitialized else {
