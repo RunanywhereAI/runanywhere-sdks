@@ -14,6 +14,7 @@
 #include <memory>
 #include <string>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"
 
@@ -252,9 +253,8 @@ rac_result_t rac_stt_whispercpp_detect_language(
   }
 
   std::vector<float> float_samples(num_samples);
-  for (size_t i = 0; i < num_samples; ++i) {
-    float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
-  }
+  rac::audio::rac_audio_pcm16_to_float32(samples, num_samples,
+                                         float_samples.data());
 
   runanywhere::STTRequest request;
   request.audio_samples = std::move(float_samples);

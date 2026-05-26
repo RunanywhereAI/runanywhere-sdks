@@ -11,6 +11,7 @@
 #include <cstring>
 #include <vector>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -27,6 +28,11 @@ const char *LOG_CAT = "WhisperCPP";
 
 /**
  * Convert Int16 PCM audio to Float32 normalized to [-1.0, 1.0].
+ *
+ * Thin wrapper around commons `rac::audio::rac_audio_pcm16_to_float32` to
+ * keep the vtable trampoline ergonomic (returns owned vector). The actual
+ * sample scaling lives in include/rac/audio/rac_audio_convert.h so every
+ * STT engine shares the same Int16->Float32 contract.
  */
 static std::vector<float> convert_int16_to_float32(const void *int16_data,
                                                    size_t byte_count) {
@@ -34,10 +40,8 @@ static std::vector<float> convert_int16_to_float32(const void *int16_data,
   size_t num_samples = byte_count / sizeof(int16_t);
 
   std::vector<float> float_samples(num_samples);
-  for (size_t i = 0; i < num_samples; ++i) {
-    float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
-  }
-
+  rac::audio::rac_audio_pcm16_to_float32(samples, num_samples,
+                                         float_samples.data());
   return float_samples;
 }
 

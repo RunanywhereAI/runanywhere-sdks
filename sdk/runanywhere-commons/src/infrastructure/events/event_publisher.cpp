@@ -7,7 +7,6 @@
  */
 
 #include <algorithm>
-#include <array>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -62,24 +61,26 @@ std::vector<Subscription> g_all_subscriptions;
 
 std::mutex g_sdk_event_mutex;
 std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
-std::deque<std::vector<uint8_t>> g_sdk_event_queue;
 
-// FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: ring of recently emitted SDKEvent
-// byte buffers. Mirrors the download_orchestrator proto_progress_sink ring
-// (BUG-FLT-ANDROID-001 / BUG-STREAMING-005). Async SDK bindings — Flutter
-// Dart `NativeCallable.listener`, React Native NitroModules — process the
-// callback on a different thread/isolate than the one that invoked it. A
-// stack-scoped `std::vector<uint8_t>` (the previous implementation) would be
-// freed by the time those bindings finally read the pointer, producing
-// `InvalidProtocolBufferException: invalid tag (zero)` on every SDKEvent.
-//
-// Keeping the last N serializations alive guarantees each emitted pointer
-// remains valid long enough for the slowest async binding to copy it out.
-// A ring size of 64 comfortably exceeds the SDKEvent burst observed during
-// a fresh-install E2E session (model lifecycle + download + load + run).
-constexpr size_t kSdkEventRingSize = 64;
-std::array<std::vector<uint8_t>, kSdkEventRingSize> g_sdk_event_ring;
-size_t g_sdk_event_ring_index = 0;
+// commons-core-infra-005 / -014: each publish allocates an owned byte
+// buffer wrapped in a shared_ptr. The same shared_ptr is enqueued for
+// `rac_sdk_event_poll` consumers AND captured into the snapshot used to
+// deliver synchronous callbacks. The buffer stays alive until both the
+// queue entry is drained (or evicted) and the last callback consumer
+// drops its reference, eliminating the prior race where a concurrent
+// publish overwrote a stack-shared 64-slot ring before subscribers had
+// read the pointer (commons-core-infra-014).
+using SDKEventBytes = std::shared_ptr<std::vector<uint8_t>>;
+std::deque<SDKEventBytes> g_sdk_event_queue;
+
+// commons-core-infra-005: cap the poll-side queue. When no consumer
+// polls, prior behavior grew g_sdk_event_queue without bound. We
+// retain the most recent kSdkEventQueueMaxSize entries (drop-oldest);
+// the cap is comfortably above the 256-event burst that
+// `sdk_event_stream_tests` exercises so existing FIFO-drain semantics
+// hold for any well-behaved consumer.
+constexpr size_t kSdkEventQueueMaxSize = 1024;
+std::atomic<uint64_t> g_sdk_event_queue_dropped{0};
 
 uint64_t current_time_ms() {
     using namespace std::chrono;
@@ -474,16 +475,6 @@ void rac_sdk_event_unsubscribe(uint64_t subscription_id) {
                                               return false;
                                           });
     g_sdk_event_subscriptions.erase(removed.begin(), g_sdk_event_subscriptions.end());
-
-    // FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: free the SDKEvent ring buffers
-    // once the last subscriber leaves so an idle SDK doesn't pin up to 64
-    // serialized SDKEvent buffers for the rest of the process lifetime.
-    if (g_sdk_event_subscriptions.empty()) {
-        for (auto& slot : g_sdk_event_ring) {
-            std::vector<uint8_t>().swap(slot);
-        }
-        g_sdk_event_ring_index = 0;
-    }
 }
 
 rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t proto_size) {
@@ -491,32 +482,37 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // FLUTTER-AND-PROTO-001 / FLUTTER-IOS-005: route the emitted bytes through
-    // a persistent ring slot (held under g_sdk_event_mutex) so the pointer
-    // passed to async SDK bindings (Flutter Dart `NativeCallable.listener`,
-    // React Native NitroModules) remains valid until subsequent emissions
-    // rotate the slot. The previous implementation handed out a pointer to a
-    // stack-scoped `std::vector<uint8_t>` that was destroyed before the Dart
-    // isolate / RN bridge could decode it — yielding "invalid tag (zero)" on
-    // every SDKEvent (~13 per Flutter session, 25+ when combined with
-    // DownloadProgress).
+    // commons-core-infra-014: per-publish ownership. The serialized bytes
+    // live in a heap buffer owned by a shared_ptr, copied into the poll
+    // queue AND captured by the synchronous-callback snapshot. The buffer
+    // outlives every subscriber callback regardless of how many subsequent
+    // publishes interleave on other threads — fixing the prior race where
+    // a fixed 64-slot ring was rotated by the next publisher before slow
+    // async bindings (Flutter `NativeCallable.listener`, RN NitroModules)
+    // dereferenced their pointer.
     //
-    // The C ABI contract (callback_data, bytes.size()) is preserved: the size
-    // strictly equals the serialized byte count, with no trailing padding.
-    std::vector<SDKEventSubscription> subscriptions;
-    const uint8_t* callback_data = nullptr;
-    size_t callback_size = 0;
-    {
-        std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
-        std::vector<uint8_t>& slot = g_sdk_event_ring[g_sdk_event_ring_index];
-        g_sdk_event_ring_index = (g_sdk_event_ring_index + 1) % kSdkEventRingSize;
-        slot.assign(proto_bytes, proto_bytes + proto_size);
-        g_sdk_event_queue.push_back(slot);
-        subscriptions = g_sdk_event_subscriptions;
-        callback_data = slot.empty() ? nullptr : slot.data();
-        callback_size = slot.size();
+    // commons-core-infra-005: the queue itself is capped at
+    // kSdkEventQueueMaxSize entries with drop-oldest eviction so an
+    // SDK that publishes without a corresponding poll consumer cannot
+    // pin unbounded memory.
+    auto buffer = std::make_shared<std::vector<uint8_t>>();
+    if (proto_size > 0 && proto_bytes != nullptr) {
+        buffer->assign(proto_bytes, proto_bytes + proto_size);
     }
 
+    std::vector<SDKEventSubscription> subscriptions;
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
+        g_sdk_event_queue.push_back(buffer);
+        while (g_sdk_event_queue.size() > kSdkEventQueueMaxSize) {
+            g_sdk_event_queue.pop_front();
+            g_sdk_event_queue_dropped.fetch_add(1, std::memory_order_relaxed);
+        }
+        subscriptions = g_sdk_event_subscriptions;
+    }
+
+    const uint8_t* callback_data = buffer->empty() ? nullptr : buffer->data();
+    const size_t callback_size = buffer->size();
     for (const auto& sub : subscriptions) {
         if (sub.alive->load()) {
             sub.callback(callback_data, callback_size, sub.user_data);
@@ -531,20 +527,19 @@ rac_result_t rac_sdk_event_poll(rac_proto_buffer_t* out_event) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
-    if (g_sdk_event_queue.empty()) {
-        return RAC_ERROR_NOT_FOUND;
+    SDKEventBytes front;
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_mutex);
+        if (g_sdk_event_queue.empty()) {
+            return RAC_ERROR_NOT_FOUND;
+        }
+        front = g_sdk_event_queue.front();
+        g_sdk_event_queue.pop_front();
     }
 
-    const auto& bytes = g_sdk_event_queue.front();
-    rac_result_t rc =
-        rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_event);
-    if (rc != RAC_SUCCESS) {
-        return rc;
-    }
-
-    g_sdk_event_queue.pop_front();
-    return RAC_SUCCESS;
+    const auto* bytes_ptr = (front && !front->empty()) ? front->data() : nullptr;
+    const size_t bytes_len = front ? front->size() : 0;
+    return rac_proto_buffer_copy(bytes_ptr, bytes_len, out_event);
 }
 
 rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code, const char* message,

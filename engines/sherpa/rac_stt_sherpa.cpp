@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"
 
@@ -308,9 +309,8 @@ rac_result_t rac_stt_sherpa_detect_language(rac_handle_t handle,
 
   runanywhere::STTRequest request;
   request.audio_samples.resize(num_samples);
-  for (size_t i = 0; i < num_samples; ++i) {
-    request.audio_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
-  }
+  rac::audio::rac_audio_pcm16_to_float32(samples, num_samples,
+                                         request.audio_samples.data());
   request.sample_rate =
       (options && options->sample_rate > 0) ? options->sample_rate : 16000;
   request.detect_language = true;
