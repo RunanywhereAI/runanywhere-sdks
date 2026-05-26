@@ -592,6 +592,56 @@ function unavailableCapabilities(): RAGProviderCapabilities {
   };
 }
 
+/**
+ * Bootstrap options for `RunAnywhere.rag.ensureReady(...)`. When the RAG
+ * proto exports are present but no session is registered yet (the
+ * `wasm-exports` availability source), the SDK creates the native
+ * session for the caller using the supplied embedding/LLM model ids
+ * plus any other defaults.
+ */
+export interface RAGEnsureReadyOptions {
+  embeddingModelId: string;
+  llmModelId: string;
+  config?: Partial<RAGConfiguration>;
+}
+
+/**
+ * Ensure a RAG pipeline is live; idempotent. Absorbs the
+ * `availability() + createPipeline(defaultConfiguration({...}))`
+ * bootstrap step that example apps used to inline. Returns the final
+ * availability snapshot so callers can decide whether to surface a
+ * "RAG unavailable" placeholder (`source === 'unavailable'`) without
+ * re-querying the availability oracle separately.
+ *
+ * Mirrors the lifecycle ownership pattern used by Swift's RAG facade —
+ * app code never reaches into `defaultConfiguration` itself.
+ */
+export async function ragEnsureReady(
+  options: RAGEnsureReadyOptions,
+): Promise<RAGAvailability> {
+  let availability = getRAGAvailability();
+  if (availability.available) {
+    return availability;
+  }
+  if (availability.source !== 'wasm-exports') {
+    return availability;
+  }
+  try {
+    await ragCreatePipeline(createDefaultRAGConfiguration({
+      ...options.config,
+      embeddingModelId: options.embeddingModelId,
+      llmModelId: options.llmModelId,
+    }));
+  } catch (err) {
+    logger.warning(
+      `RAG.ensureReady() bootstrap failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+  availability = getRAGAvailability();
+  return availability;
+}
+
 export const RAG = {
   setProvider: setRAGProvider,
   createNativeProvider: createRAGNativeProvider,
@@ -602,6 +652,7 @@ export const RAG = {
   defaultConfiguration: createDefaultRAGConfiguration,
   createPipeline: ragCreatePipeline,
   destroyPipeline: ragDestroyPipeline,
+  ensureReady: ragEnsureReady,
   ingest: ragIngest,
   addDocumentsBatch: ragAddDocumentsBatch,
   query: ragQuery,
