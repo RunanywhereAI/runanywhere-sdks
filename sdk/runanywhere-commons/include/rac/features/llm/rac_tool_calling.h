@@ -317,6 +317,39 @@ RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_outpu
  */
 RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 
+/**
+ * @brief Derive the tool-call format from a serialized RAModelInfo.
+ *
+ * CONSOLIDATE-A canonical replacement for per-example heuristics like Swift's
+ * `LLMViewModel.detectToolCallFormat(for:)`, Flutter's
+ * `_detectToolCallFormat()`, Kotlin's `ToolSettingsViewModel.detectToolCallFormat()`,
+ * and the React Native equivalent. Every example was duplicating the same
+ * `name.contains("lfm2") && name.contains("tool")` mapping; this commons-owned
+ * accessor centralizes the rule so SDKs derive the format from `RAModelInfo`
+ * proto bytes and example apps never reach into model-naming conventions.
+ *
+ * Inspection rule (case-insensitive on `name`, `id`, and `description`):
+ *   - LiquidAI LFM2-Tool family (e.g. "LFM2-1.2B-Tool", "LFM2-350M-Tool") →
+ *     RAC_TOOL_FORMAT_LFM2 (Pythonic <|tool_call_start|>...<|tool_call_end|>).
+ *   - Anything else → RAC_TOOL_FORMAT_DEFAULT (JSON-tagged <tool_call>…</tool_call>).
+ *
+ * Empty / NULL model_info_proto_bytes (size==0) is accepted and returns
+ * RAC_TOOL_FORMAT_DEFAULT — examples occasionally call the helper while the
+ * model registry is empty.
+ *
+ * @param model_info_proto_bytes Borrowed runanywhere.v1.ModelInfo bytes (may
+ *                               be NULL when @p size is 0).
+ * @param size                   Byte count of @p model_info_proto_bytes.
+ * @param out_format             Output: derived tool-call format. Must not be
+ *                               NULL. Set to RAC_TOOL_FORMAT_DEFAULT on
+ *                               recoverable failures (empty/invalid bytes).
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER when @p out_format is
+ *         NULL, RAC_ERROR_DECODING_ERROR when the bytes do not parse as
+ *         runanywhere.v1.ModelInfo.
+ */
+RAC_API rac_result_t rac_tool_call_format_from_model_info_proto(
+    const uint8_t* model_info_proto_bytes, size_t size, rac_tool_call_format_t* out_format);
+
 // =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
 // =============================================================================
@@ -718,31 +751,37 @@ RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_proto(
 typedef void (*rac_tool_calling_run_loop_on_handle_published_cb_t)(uint64_t run_loop_handle,
                                                                    void* user_data);
 
-/*
- * @brief (pass3-syn-028 future ABI) Variant of
- *        rac_tool_calling_run_loop_with_handle_proto that adds a
- *        synchronous handle-publication callback. This signature is
- *        DECLARATION-RESERVED — implementation lands in a follow-up so
- *        SDKs can converge on this shape rather than reinventing per-SDK
- *        handle-publication races (Swift `HandleBox.set` from a different
- *        thread, RN Nitro `onHandle` not exposed, Kotlin
- *        `invokeOnCompletion` disposal timing). The typedef
- *        rac_tool_calling_run_loop_on_handle_published_cb_t above is
- *        already stable so SDK code can type its trampolines today; once
- *        the commons-side implementation lands the function below will be
- *        un-commented and SDKs flip from the pointer-shape to the
- *        callback-shape uniformly. See the @warning block above
- *        rac_tool_calling_run_loop_with_handle_proto for the rationale.
+/**
+ * @brief Variant of rac_tool_calling_run_loop_with_handle_proto that adds a
+ *        synchronous handle-publication callback (pass3-syn-028).
  *
- *        Followup tracker: pass3-syn-028-followup-commons.json
+ * Fires @p on_handle_published(handle, on_handle_user_data) SYNCHRONOUSLY
+ * the moment the cancellable run-loop handle is minted, BEFORE the first
+ * generate iteration runs. This lets SDKs route the handle into a
+ * thread-safe sink (Swift `HandleBox.set`, Kotlin `CompletableDeferred`,
+ * RN JS-thread callback, Flutter `Completer`, Web synchronous capture)
+ * without racing the worker thread that owns the run-loop. The pointer-shape
+ * @p out_run_loop_handle is still populated so legacy hosts that observe
+ * both have a stable contract.
  *
- * RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
- *     const uint8_t* in_request_bytes, size_t in_size,
- *     rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
- *     rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
- *     void* on_handle_user_data, uint64_t* out_run_loop_handle,
- *     rac_proto_buffer_t* out_result);
+ * @param in_request_bytes        Borrowed serialized
+ *                                runanywhere.v1.ToolCallingSessionCreateRequest.
+ * @param in_size                 Size of in_request_bytes.
+ * @param on_execute              Synchronous tool-execute callback.
+ * @param on_execute_user_data    Opaque pointer forwarded to on_execute.
+ * @param on_handle_published     Synchronous handle-publication callback.
+ *                                Pass NULL to use the pointer-shape only.
+ * @param on_handle_user_data     Opaque pointer forwarded to on_handle_published.
+ * @param out_run_loop_handle     Output handle for cancellation. 0 if unavailable.
+ * @param out_result              Owned serialized ToolCallingResult on success.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
  */
+RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
+    const uint8_t* in_request_bytes, size_t in_size,
+    rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+    void* on_handle_user_data, uint64_t* out_run_loop_handle,
+    rac_proto_buffer_t* out_result);
 
 /**
  * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).
