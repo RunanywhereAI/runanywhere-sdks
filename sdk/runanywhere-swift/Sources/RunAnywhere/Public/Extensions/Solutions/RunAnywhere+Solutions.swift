@@ -108,10 +108,35 @@ public final class SolutionHandle: @unchecked Sendable {
         guard result == RAC_SUCCESS else {
             throw SDKException(
                 code: .processingFailed,
-                message: "Solution call failed with rac_result_t \(result)",
+                message: SolutionHandle.errorMessage(
+                    op: "Solution lifecycle call",
+                    rc: result
+                ),
                 category: .internal
             )
         }
+    }
+
+    /// Compose a human-readable failure message from a `rac_result_t`.
+    ///
+    /// Pairs `rac_error_message(rc)` (canonical static description per
+    /// code) with `rac_error_get_details()` (thread-local detail set by
+    /// the failing C call, if any) so callers see the underlying cause
+    /// instead of just a numeric code.
+    fileprivate static func errorMessage(op: String, rc: rac_result_t) -> String {
+        var message = "\(op) failed"
+        let description = String(cString: rac_error_message(rc))
+        if !description.isEmpty {
+            message += ": \(description)"
+        }
+        if let detailPtr = rac_error_get_details() {
+            let detail = String(cString: detailPtr)
+            if !detail.isEmpty {
+                message += " (\(detail))"
+            }
+        }
+        message += " [rc=\(rc)]"
+        return message
     }
 }
 
@@ -152,7 +177,10 @@ public extension RunAnywhere {
             guard result == RAC_SUCCESS, let raw else {
                 throw SDKException(
                     code: .invalidConfiguration,
-                    message: "rac_solution_create_from_proto failed with \(result)",
+                    message: SolutionHandle.errorMessage(
+                        op: "rac_solution_create_from_proto",
+                        rc: result
+                    ),
                     category: .internal
                 )
             }
@@ -181,7 +209,10 @@ public extension RunAnywhere {
             guard result == RAC_SUCCESS, let raw else {
                 throw SDKException(
                     code: .invalidConfiguration,
-                    message: "rac_solution_create_from_yaml failed with \(result)",
+                    message: SolutionHandle.errorMessage(
+                        op: "rac_solution_create_from_yaml",
+                        rc: result
+                    ),
                     category: .internal
                 )
             }
