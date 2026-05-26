@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
-import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.CoroutineScope
@@ -140,14 +139,16 @@ class RunAnywhereApplication : Application() {
         // If custom config is set, use production environment to enable the custom backend
         val environment = if (hasCustomConfig) SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION else defaultEnvironment
 
-        // Initialize platform context first
-        AndroidPlatformContext.initialize(this@RunAnywhereApplication)
-
-        // Try to initialize SDK - log failures but continue regardless
+        // Try to initialize SDK - log failures but continue regardless. The
+        // `RunAnywhere.initialize(Context, ...)` overload absorbs the
+        // previously-explicit `AndroidPlatformContext.initialize(...)` call so
+        // the example does not import SDK-internal foundation packages.
+        val appContext = this@RunAnywhereApplication
         try {
             if (hasCustomConfig) {
                 // Custom configuration mode - use stored API key and base URL
                 RunAnywhere.initialize(
+                    context = appContext,
                     apiKey = customApiKey!!,
                     baseURL = customBaseURL!!,
                     environment = environment,
@@ -156,6 +157,7 @@ class RunAnywhereApplication : Application() {
             } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
+                    context = appContext,
                     environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
                 )
                 Timber.i("✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
@@ -172,10 +174,14 @@ class RunAnywhereApplication : Application() {
                             "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
                     )
                     // Fall back to development mode
-                    RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
+                    RunAnywhere.initialize(
+                        context = appContext,
+                        environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+                    )
                     Timber.i("✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
                 } else {
                     RunAnywhere.initialize(
+                        context = appContext,
                         apiKey = apiKey,
                         baseURL = baseURL,
                         environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
@@ -198,6 +204,7 @@ class RunAnywhereApplication : Application() {
             try {
                 // Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
+                    context = appContext,
                     environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
                 )
                 Timber.i("✅ SDK initialized in OFFLINE mode (local models only)")
