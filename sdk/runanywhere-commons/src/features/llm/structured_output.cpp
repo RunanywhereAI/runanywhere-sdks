@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -1322,9 +1323,22 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     rac_llm_result_t raw{};
-    rc = (ref.ops && ref.ops->generate)
-             ? ref.ops->generate(ref.impl, prepared_prompt.c_str(), &options, &raw)
-             : RAC_ERROR_NOT_SUPPORTED;
+    // Defensive: catch any C++ exception that escapes the engine vtable so it
+    // cannot propagate across the extern "C" boundary. See parallel guard in
+    // rac_llm_proto_service.cpp generate_stream path.
+    if (ref.ops && ref.ops->generate) {
+        try {
+            rc = ref.ops->generate(ref.impl, prepared_prompt.c_str(), &options, &raw);
+        } catch (const std::exception& e) {
+            rac_error_set_details(e.what());
+            rc = RAC_ERROR_INFERENCE_FAILED;
+        } catch (...) {
+            rac_error_set_details("Unknown C++ exception escaped LLM engine generate");
+            rc = RAC_ERROR_INFERENCE_FAILED;
+        }
+    } else {
+        rc = RAC_ERROR_NOT_SUPPORTED;
+    }
     if (rc != RAC_SUCCESS) {
         rac::llm::release_lifecycle_llm(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -1408,8 +1422,19 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.config = has_options ? &converted.config : nullptr;
     ctx.request_id = request.request_id();
 
-    rc = ref.ops->generate_stream(ref.impl, prepared_prompt.c_str(), &options,
-                                  structured_stream_token_callback, &ctx);
+    // Defensive: catch any C++ exception that escapes the engine vtable so it
+    // cannot propagate across the extern "C" boundary. See parallel guard in
+    // rac_llm_proto_service.cpp generate_stream path.
+    try {
+        rc = ref.ops->generate_stream(ref.impl, prepared_prompt.c_str(), &options,
+                                      structured_stream_token_callback, &ctx);
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        rc = RAC_ERROR_INFERENCE_FAILED;
+    } catch (...) {
+        rac_error_set_details("Unknown C++ exception escaped LLM engine generate_stream");
+        rc = RAC_ERROR_INFERENCE_FAILED;
+    }
 
     const bool cancelled = rac::llm::lifecycle_llm_cancel_requested(&ref) ||
                            rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
