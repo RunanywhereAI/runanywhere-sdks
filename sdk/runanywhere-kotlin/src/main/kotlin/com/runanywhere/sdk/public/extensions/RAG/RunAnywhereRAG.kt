@@ -121,6 +121,26 @@ private suspend fun loadRagArtifactModel(
     return result
 }
 
+/**
+ * Create the RAG pipeline from registry models. Model artifact layout is
+ * resolved by commons lifecycle rather than by file-name heuristics, so callers
+ * can hand in [RAModelInfo] entries from the catalogue without first building a
+ * [RARAGConfiguration] by hand. Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`.
+ */
+suspend fun RunAnywhere.ragCreatePipeline(
+    embeddingModel: RAModelInfo,
+    llmModel: RAModelInfo,
+    baseConfiguration: RARAGConfiguration = RARAGConfiguration.defaults(),
+) {
+    val resolved =
+        ragResolvedConfiguration(
+            embeddingModel = embeddingModel,
+            llmModel = llmModel,
+            baseConfiguration = baseConfiguration,
+        )
+    ragCreatePipeline(resolved)
+}
+
 suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureRagNativeLibsLoaded()
