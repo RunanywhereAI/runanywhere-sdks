@@ -892,6 +892,12 @@ export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
 /** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {
   _moduleByCapability.clear();
+  // Framework→module map mirrors the capability registry and is populated
+  // alongside it via `registerWasmModule(_, _, frameworks)`. Without this
+  // clear, a fresh tab boot followed by re-registration would see stale
+  // framework rows from the previous session (e.g. plugin-route lookups
+  // routing 'llamacpp' to a torn-down WASM instance).
+  _moduleByFramework.clear();
   DownloadAdapter.clearDefaultModule();
   HardwareAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
