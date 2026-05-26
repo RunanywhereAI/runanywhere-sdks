@@ -171,7 +171,7 @@ struct AddModelFromURLView: View {
     }
 
     private func addModel() async {
-        guard let url = URL(string: modelURL) else {
+        guard URL(string: modelURL) != nil else {
             errorMessage = "Invalid URL format"
             return
         }
@@ -179,30 +179,16 @@ struct AddModelFromURLView: View {
         isAdding = true
         errorMessage = nil
 
-        // Compose a canonical RAModelImportRequest from the user input.
-        var modelInfo = RAModelInfo()
-        modelInfo.id = UUID().uuidString
-        modelInfo.name = modelName
-        modelInfo.framework = selectedFramework
-        modelInfo.memoryRequiredBytes = Int64(estimatedSize) ?? 0
-        modelInfo.supportsThinking = supportsThinking
-        modelInfo.downloadURL = url.absoluteString
-
-        var request = RAModelImportRequest()
-        request.model = modelInfo
-        request.sourcePath = url.absoluteString
-
         do {
-            let result = try await RunAnywhere.importModel(request)
-            guard result.success, result.hasModel else {
-                throw SDKException(
-                    code: .unknown,
-                    message: result.warnings.joined(separator: "; "),
-                    category: .internal
-                )
-            }
+            let model = try await RunAnywhere.registerModel(
+                name: modelName,
+                url: modelURL,
+                framework: selectedFramework,
+                memoryRequirement: Int64(estimatedSize),
+                supportsThinking: supportsThinking
+            )
             await MainActor.run {
-                onModelAdded(result.model)
+                onModelAdded(model)
                 dismiss()
             }
         } catch {
