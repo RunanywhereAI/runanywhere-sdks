@@ -51,7 +51,6 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
-import "model_types.proto";
 import "rac_options.proto";
 
 option cc_enable_arenas          = true;
