@@ -92,6 +92,59 @@ OkHttpTransportGlobals& globals() {
     return g;
 }
 
+// commons-core-infra-008: snapshot the JNI handles the request entry
+// points need under `g.mu` so destroy() (which clears them, also under
+// `g.mu`) cannot race with a concurrent send/stream/resume. The
+// snapshot is a copy of the cached jclass / jmethodID / jfieldID
+// values; the underlying global refs stay valid for the call's
+// duration because destroy() can only run AFTER
+// `rac_http_transport_register` retires the slot (and the slot's
+// refcount drops to zero — see rac_http_transport.cpp,
+// commons-core-infra-006). Even with that registry-level guarantee,
+// the per-handle reads themselves must be locked to satisfy TSAN +
+// CheckJNI: a torn read of a 64-bit jmethodID would surface as an
+// undefined-method dereference, not a clean RAC_ERROR_INTERNAL.
+struct OkHttpHandlesSnapshot {
+    bool ok = false;
+    JavaVM* jvm = nullptr;
+    jclass transport_cls = nullptr;
+    jmethodID execute_request_mid = nullptr;
+    jmethodID execute_streaming_request_mid = nullptr;
+    jmethodID execute_resume_request_mid = nullptr;
+    jfieldID f_status_code = nullptr;
+    jfieldID f_headers = nullptr;
+    jfieldID f_body_bytes = nullptr;
+    jfieldID f_error_message = nullptr;
+    jfieldID f_sr_status_code = nullptr;
+    jfieldID f_sr_headers = nullptr;
+    jfieldID f_sr_error_message = nullptr;
+    jfieldID f_sr_cancelled = nullptr;
+};
+
+OkHttpHandlesSnapshot snapshot_globals_locked() {
+    OkHttpHandlesSnapshot s;
+    auto& g = globals();
+    std::lock_guard<std::mutex> lock(g.mu);
+    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr) {
+        return s;
+    }
+    s.ok = true;
+    s.jvm = g.jvm;
+    s.transport_cls = g.transport_cls;
+    s.execute_request_mid = g.execute_request_mid;
+    s.execute_streaming_request_mid = g.execute_streaming_request_mid;
+    s.execute_resume_request_mid = g.execute_resume_request_mid;
+    s.f_status_code = g.f_status_code;
+    s.f_headers = g.f_headers;
+    s.f_body_bytes = g.f_body_bytes;
+    s.f_error_message = g.f_error_message;
+    s.f_sr_status_code = g.f_sr_status_code;
+    s.f_sr_headers = g.f_sr_headers;
+    s.f_sr_error_message = g.f_sr_error_message;
+    s.f_sr_cancelled = g.f_sr_cancelled;
+    return s;
+}
+
 // RAII helper — attaches the current thread on construction (if not
 // already attached), and detaches only if WE were the attacher. Safe
 // to nest: nested attaches become no-ops.
@@ -242,9 +295,10 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto& g = globals();
-    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr ||
-        g.execute_request_mid == nullptr) {
+    // commons-core-infra-008: snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_request_mid == nullptr) {
         LOGe("okhttp_request_send: adapter not fully initialized");
         return RAC_ERROR_INTERNAL;
     }
@@ -396,9 +450,10 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto& g = globals();
-    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr ||
-        g.execute_streaming_request_mid == nullptr) {
+    // commons-core-infra-008: snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_streaming_request_mid == nullptr) {
         LOGe("okhttp_request_stream: adapter not fully initialized");
         return RAC_ERROR_INTERNAL;
     }
@@ -533,9 +588,10 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    auto& g = globals();
-    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr ||
-        g.execute_resume_request_mid == nullptr) {
+    // commons-core-infra-008: snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_resume_request_mid == nullptr) {
         LOGe("okhttp_request_resume: adapter not fully initialized");
         return RAC_ERROR_INTERNAL;
     }
