@@ -51,7 +51,6 @@ import {
   ModelSelectionContext,
 } from '../components/model';
 import { STTMode } from '../types/voice';
-import { createModelInfoSummary } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
@@ -227,36 +226,14 @@ export const STTScreen: React.FC = () => {
         downloadedModels.map((m) => m.id)
       );
 
-      // Check if model is already loaded
-      const isLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-      );
-      console.debug('[STTScreen] STT model loaded:', isLoaded);
-      if (isLoaded && !currentModel) {
-        // Try to find which model is loaded from downloaded models
-        const downloadedStt = sttModels.filter((m) => m.isDownloaded);
-        if (downloadedStt.length > 0) {
-          const firstModel = downloadedStt[0];
-          if (firstModel) {
-            setCurrentModel({
-              ...firstModel,
-              preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-            });
-            console.warn(
-              '[STTScreen] Set currentModel from downloaded:',
-              firstModel.name
-            );
-          }
-        } else {
-          setCurrentModel(
-            createModelInfoSummary({
-              id: 'stt-model',
-              name: 'STT Model (Loaded)',
-              category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-              framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-            })
-          );
-          console.warn('[STTScreen] Set currentModel as generic STT Model');
+      // Ask the SDK for the loaded STT model directly.
+      if (!currentModel) {
+        const loaded = await RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        );
+        if (loaded) {
+          setCurrentModel(loaded);
+          console.warn('[STTScreen] Loaded STT model:', loaded.name);
         }
       }
     } catch (error) {

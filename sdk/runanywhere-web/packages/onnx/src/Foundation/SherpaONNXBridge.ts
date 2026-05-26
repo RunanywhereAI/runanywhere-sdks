@@ -7,12 +7,14 @@
  * `racommons-onnx-sherpa.wasm` artifact this bridge owns.
  *
  * Responsibilities:
- *  1. Acquire the commons WASM module — either from a sibling backend that
- *     already called `setRunanywhereModule(...)` (preferred) or by loading
- *     `racommons-onnx-sherpa.wasm` itself.
- *  2. If we loaded the module ourselves, call `rac_init()` and install it
- *     via `setRunanywhereModule(...)` so the proto-byte adapters in core
- *     can find it.
+ *  1. Load the dedicated `racommons-onnx-sherpa.{js,wasm}` artifact as an
+ *     independent Emscripten module. Each per-package WASM is
+ *     self-contained — the bridge never reuses a sibling backend's module
+ *     because no other artifact exports `_rac_backend_onnx_register` or
+ *     `_rac_backend_sherpa_register`.
+ *  2. Call `rac_init()` with a zero-initialised platform-adapter stub and
+ *     claim the speech/embedding/RAG capabilities on the per-capability
+ *     registry so the core proto-byte adapters can resolve this module.
  *  3. Call `_rac_backend_onnx_register()` and
  *     `_rac_backend_sherpa_register()` to register the ONNX runtime and
  *     Sherpa speech vtables with the C++ plugin registry. After this, all
@@ -111,12 +113,12 @@ export class SherpaONNXBridge {
    */
   private _stubAdapterPtr = 0;
   /**
-   * `true` when this bridge owned the commons module install (i.e.
-   * `_doLoad` had to load the WASM glue + call `_rac_init` + install via
-   * `setRunanywhereModule` because `tryRunanywhereModule()` returned null).
-   * When ownership is held, `unregister()` mirrors LlamaCppBridge._teardown
-   * and calls `_rac_shutdown` + `clearRunanywhereModule()`. Otherwise the
-   * commons module belongs to a sibling backend and we leave it alone.
+   * `true` when this bridge has loaded the dedicated
+   * `racommons-onnx-sherpa` WASM and called `_rac_init` on it (i.e.
+   * `_doLoad` ran to completion). When ownership is held, `unregister()`
+   * mirrors LlamaCppBridge teardown and calls `_rac_shutdown` plus
+   * frees the stub platform-adapter allocation before dropping the
+   * module from the capability registry.
    */
   private _bridgeOwnedInit = false;
 

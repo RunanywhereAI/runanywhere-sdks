@@ -578,6 +578,7 @@ export const RunAnywhere = {
   loadModel: Lifecycle.loadModel,
   unloadModel: Lifecycle.unloadModel,
   currentModel: Lifecycle.currentModel,
+  modelInfoForCategory: Lifecycle.modelInfoForCategory,
   componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
 
 };

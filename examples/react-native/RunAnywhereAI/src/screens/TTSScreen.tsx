@@ -289,37 +289,15 @@ export const TTSScreen: React.FC = () => {
         downloadedModels.map((m) => m.id)
       );
 
-      // Check if model is already loaded
-      const isLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-      );
-      console.debug('[TTSScreen] TTS model loaded:', isLoaded);
-      if (isLoaded && !currentModel) {
-        // Try to find which model is loaded from downloaded models
-        const downloadedTts = ttsModels.filter((m) => m.isDownloaded);
-        if (downloadedTts.length > 0) {
-          // Use the first downloaded model as the likely loaded one
-          const firstModel = downloadedTts[0];
-          if (firstModel) {
-            setCurrentModel({
-              ...firstModel,
-              preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-            });
-            console.warn(
-              '[TTSScreen] Set currentModel from downloaded:',
-              firstModel.name
-            );
-          }
-        } else {
-          setCurrentModel(
-            createModelInfoSummary({
-              id: 'tts-model',
-              name: 'TTS Model (Loaded)',
-              category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-              framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-            })
-          );
-          console.warn('[TTSScreen] Set currentModel as generic TTS Model');
+      // Ask the SDK for the loaded TTS model directly so the banner
+      // reflects the actual loaded model name (no fabricated stand-in).
+      if (!currentModel) {
+        const loaded = await RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        );
+        if (loaded) {
+          setCurrentModel(loaded);
+          console.warn('[TTSScreen] Loaded TTS model:', loaded.name);
         }
       }
     } catch (error) {

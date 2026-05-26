@@ -34,8 +34,6 @@ import {
 } from '../components/model';
 import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
-import { createModelInfoSummary } from '../utils/modelDisplay';
-
 // Import RunAnywhere SDK. Voice uses the Swift-shaped public stream facade.
 import { RunAnywhere } from '@runanywhere/core';
 import {
@@ -47,7 +45,6 @@ import {
 import { PipelineState as VoiceEventPipelineState } from '@runanywhere/proto-ts/voice_events';
 import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
-import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
 const listModels = async (): Promise<SDKModelInfo[]> =>
@@ -121,46 +118,21 @@ export const VoiceAssistantScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const sttLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-      );
-      const llmLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_LANGUAGE
-      );
-      const ttsLoaded = await isModelLoadedForCategory(
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-      );
+      const [sttModel, llmModel, ttsModel] = await Promise.all([
+        RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        ),
+        RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_LANGUAGE
+        ),
+        RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        ),
+      ]);
 
-      if (sttLoaded) {
-        setSTTModel(
-          createModelInfoSummary({
-            id: 'stt-loaded',
-            name: 'STT Model (Loaded)',
-            category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-            framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-          })
-        );
-      }
-      if (llmLoaded) {
-        setLLMModel(
-          createModelInfoSummary({
-            id: 'llm-loaded',
-            name: 'LLM Model (Loaded)',
-            category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-            framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-          })
-        );
-      }
-      if (ttsLoaded) {
-        setTTSModel(
-          createModelInfoSummary({
-            id: 'tts-loaded',
-            name: 'TTS Model (Loaded)',
-            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-            framework: InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
-          })
-        );
-      }
+      if (sttModel) setSTTModel(sttModel);
+      if (llmModel) setLLMModel(llmModel);
+      if (ttsModel) setTTSModel(ttsModel);
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
     }

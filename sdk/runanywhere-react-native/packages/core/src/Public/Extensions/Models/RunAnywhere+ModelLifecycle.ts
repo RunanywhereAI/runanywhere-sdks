@@ -9,6 +9,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import {
   CurrentModelRequest,
   CurrentModelResult,
+  ModelCategory,
   ModelFileRole,
   ModelLoadRequest,
   ModelLoadResult,
@@ -19,6 +20,7 @@ import type {
   CurrentModelRequest as CurrentModelRequestMessage,
   CurrentModelResult as CurrentModelResultMessage,
   ModelFileDescriptor,
+  ModelInfo,
   ModelLoadRequest as ModelLoadRequestMessage,
   ModelLoadResult as ModelLoadResultMessage,
   ModelUnloadRequest as ModelUnloadRequestMessage,
@@ -167,6 +169,29 @@ export async function currentModel(
   );
   const bytes = arrayBufferToBytes(buffer);
   return bytes.byteLength === 0 ? null : CurrentModelResult.decode(bytes);
+}
+
+/**
+ * Convenience wrapper around `currentModel(...)` that returns the full
+ * `ModelInfo` snapshot for the model currently loaded under the given
+ * category, or `null` when nothing is loaded.
+ *
+ * Mirrors the iOS surface used by view-models that need the loaded
+ * model's display name / framework without fabricating a stand-in
+ * `ModelInfo`. Forces `includeModelMetadata=true` so the commons
+ * lifecycle returns the full proto rather than just the id.
+ */
+export async function modelInfoForCategory(
+  category: ModelCategory
+): Promise<ModelInfo | null> {
+  const result = await currentModel(
+    CurrentModelRequest.fromPartial({
+      category,
+      includeModelMetadata: true,
+    })
+  );
+  if (!result || !result.found) return null;
+  return result.model ?? null;
 }
 
 export async function componentLifecycleSnapshot(
