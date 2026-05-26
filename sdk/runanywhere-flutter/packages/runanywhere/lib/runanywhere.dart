@@ -48,4 +48,5 @@ export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
 export 'public/extensions/stt/stt_options_helpers.dart';
 export 'public/runanywhere.dart' show RunAnywhere;
+export 'public/system_tts.dart' show SystemTTS;
 export 'runanywhere_protos.dart';
