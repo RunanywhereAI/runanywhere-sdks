@@ -12,6 +12,11 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/runanywhere.dart';
 
 /// Model registry capability surface.
@@ -34,8 +39,8 @@ class RunAnywhereModels {
 
     await RunAnywhere.runDiscoveryIfNeeded();
 
-    final cppModels =
-        await DartBridgeModelRegistry.instance.getAllProtoModels();
+    final cppModels = await DartBridgeModelRegistry.instance
+        .getAllProtoModels();
     return List.unmodifiable(cppModels);
   }
 
@@ -70,8 +75,9 @@ class RunAnywhereModels {
     if (!DartBridge.isInitialized) {
       return ModelGetResult(found: false, errorMessage: 'SDK not initialized');
     }
-    final model =
-        await DartBridgeModelRegistry.instance.getProtoModel(request.modelId);
+    final model = await DartBridgeModelRegistry.instance.getProtoModel(
+      request.modelId,
+    );
     if (model == null) {
       return ModelGetResult(found: false);
     }
@@ -89,8 +95,8 @@ class RunAnywhereModels {
       throw SDKException.notInitialized();
     }
 
-    final models =
-        await DartBridgeModelRegistry.instance.listDownloadedProtoModels();
+    final models = await DartBridgeModelRegistry.instance
+        .listDownloadedProtoModels();
     return ModelListResult(
       success: true,
       models: ModelInfoList(models: models),
@@ -106,11 +112,12 @@ class RunAnywhereModels {
 
     final logger = SDKLogger('RunAnywhere.Discovery');
 
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+    final result = await DartBridgeModelRegistry.instance
+        .discoverDownloadedModels();
     if (result.discoveredModels.isNotEmpty) {
       logger.info(
-          'Discovery found ${result.discoveredModels.length} downloaded models');
+        'Discovery found ${result.discoveredModels.length} downloaded models',
+      );
     }
 
     final ok = await DartBridgeModelRegistry.instance.refresh(
@@ -201,6 +208,80 @@ class RunAnywhereModels {
   Future<void> remove(String modelId) =>
       DartBridgeModelRegistry.instance.removeModel(modelId);
 
+  /// Polymorphic load entry — dispatches on [ModelInfo.category] so callers
+  /// do not hand-roll a per-capability switch.
+  ///
+  /// Mirrors Swift `RunAnywhere.loadModel(_:)` which routes `RAModelInfo` to
+  /// the right component lifecycle. Categories without a dedicated capability
+  /// fall through to the LLM lifecycle as the generic default, matching
+  /// Swift's behaviour.
+  Future<void> loadModel(ModelInfo model) async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    switch (model.category) {
+      case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+        return RunAnywhereLLM.shared.load(model.id);
+      case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      case ModelCategory.MODEL_CATEGORY_VISION:
+        return RunAnywhereVLM.shared.load(model.id);
+      case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+        return RunAnywhereSTT.shared.load(model.id);
+      case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+        return RunAnywhereTTS.shared.loadVoice(model.id);
+      case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+        return RunAnywhereVAD.shared.loadModel(model.id);
+      default:
+        return RunAnywhereLLM.shared.load(model.id);
+    }
+  }
+
+  /// Polymorphic unload entry — dispatches on [ModelInfo.category]. Mirrors
+  /// Swift `RunAnywhere.unloadModel(_:)` with category routing.
+  Future<void> unloadModel(ModelInfo model) async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    switch (model.category) {
+      case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+        return RunAnywhereLLM.shared.unload();
+      case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      case ModelCategory.MODEL_CATEGORY_VISION:
+        return RunAnywhereVLM.shared.unload();
+      case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+        return RunAnywhereSTT.shared.unload();
+      case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+        return RunAnywhereTTS.shared.unloadVoice();
+      case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+        return RunAnywhereVAD.shared.unloadModel();
+      default:
+        return RunAnywhereLLM.shared.unload();
+    }
+  }
+
+  /// Currently-loaded model id for a given [category], or null when nothing
+  /// is loaded. Lets callers do the "already-loaded?" check without
+  /// hand-rolling a per-capability switch.
+  Future<String?> currentLoadedId(ModelCategory category) async {
+    switch (category) {
+      case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+        final m = await RunAnywhereLLM.shared.currentModel();
+        return m?.id;
+      case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      case ModelCategory.MODEL_CATEGORY_VISION:
+        return RunAnywhereVLM.shared.currentModelId;
+      case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+        return RunAnywhereSTT.shared.currentModelId;
+      case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+        return RunAnywhereTTS.shared.currentVoiceId;
+      case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+        return RunAnywhereVAD.shared.currentModelId;
+      default:
+        final m = await RunAnywhereLLM.shared.currentModel();
+        return m?.id;
+    }
+  }
+
   /// Resolve the primary load target for a generated [ModelInfo].
   ///
   /// Delegates artifact layout, archive shape, and companion-file handling to
@@ -228,15 +309,21 @@ class RunAnywhereModels {
 
   static void _saveToCppRegistry(ModelInfo model) {
     unawaited(
-      DartBridgeModelRegistry.instance.saveProtoModel(model).then((success) {
-        final logger = SDKLogger('RunAnywhere.Models');
-        if (!success) {
-          logger.warning('Failed to save model to C++ registry: ${model.id}');
-        }
-      }).catchError((Object error) {
-        SDKLogger('RunAnywhere.Models')
-            .error('Error saving model to C++ registry: $error');
-      }),
+      DartBridgeModelRegistry.instance
+          .saveProtoModel(model)
+          .then((success) {
+            final logger = SDKLogger('RunAnywhere.Models');
+            if (!success) {
+              logger.warning(
+                'Failed to save model to C++ registry: ${model.id}',
+              );
+            }
+          })
+          .catchError((Object error) {
+            SDKLogger(
+              'RunAnywhere.Models',
+            ).error('Error saving model to C++ registry: $error');
+          }),
     );
   }
 

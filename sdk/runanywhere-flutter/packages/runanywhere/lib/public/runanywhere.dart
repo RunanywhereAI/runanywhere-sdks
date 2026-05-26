@@ -267,9 +267,11 @@ abstract final class RunAnywhere {
       // here (non-critical) but still observable to direct awaiters.
       final phase2 = _runPhase2(params, logger);
       _servicesInitFuture = phase2;
-      unawaited(phase2.catchError((Object error, StackTrace _) {
-        logger.warning('Phase 2 failed (non-critical): $error');
-      }));
+      unawaited(
+        phase2.catchError((Object error, StackTrace _) {
+          logger.warning('Phase 2 failed (non-critical): $error');
+        }),
+      );
     } catch (e) {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
@@ -332,10 +334,12 @@ abstract final class RunAnywhere {
     // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
     // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
     // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
-    unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
-      durationMs: 0,
-      environment: params.environment.name,
-    ));
+    unawaited(
+      DartBridgeTelemetry.instance.emitSDKInitialized(
+        durationMs: 0,
+        environment: params.environment.name,
+      ),
+    );
 
     // Step 6: Background services — device registration + auth. Failures
     // here are non-critical (offline inference still works), so they are
@@ -417,8 +421,8 @@ abstract final class RunAnywhere {
   static Future<void> runDiscoveryIfNeeded() async {
     if (_hasRunDiscovery) return;
     final logger = SDKLogger('RunAnywhere.Discovery');
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+    final result = await DartBridgeModelRegistry.instance
+        .discoverDownloadedModels();
     if (result.discoveredModels.isNotEmpty) {
       logger.info(
         'Discovered ${result.discoveredModels.length} downloaded models',
@@ -571,25 +575,36 @@ abstract final class RunAnywhere {
   static Future<void> refreshModelRegistry() =>
       RunAnywhereModels.shared.refreshModelRegistry();
 
+  /// Polymorphic load — dispatch on [ModelInfo.category]. Mirrors Swift
+  /// `RunAnywhere.loadModel(_:)`. Drop-in replacement for the per-capability
+  /// `llm.load` / `stt.load` / `tts.loadVoice` / `vlm.load` / `vad.loadModel`
+  /// switch ladders that example view-models otherwise hand-roll.
+  static Future<void> loadModel(ModelInfo model) =>
+      RunAnywhereModels.shared.loadModel(model);
+
+  /// Polymorphic unload — dispatch on [ModelInfo.category]. Mirrors Swift
+  /// `RunAnywhere.unloadModel(_:)`.
+  static Future<void> unloadModel(ModelInfo model) =>
+      RunAnywhereModels.shared.unloadModel(model);
+
   /// Proto-backed model lifecycle load.
   static Future<ModelLoadResult> loadModelLifecycle(ModelLoadRequest request) =>
       RunAnywhereModelLifecycle.shared.load(request);
 
   /// Proto-backed model lifecycle unload.
   static Future<ModelUnloadResult> unloadModelLifecycle(
-          ModelUnloadRequest request) =>
-      RunAnywhereModelLifecycle.shared.unload(request);
+    ModelUnloadRequest request,
+  ) => RunAnywhereModelLifecycle.shared.unload(request);
 
   /// Proto-backed current-model query.
-  static Future<CurrentModelResult> currentModel(
-          [CurrentModelRequest? request]) =>
-      RunAnywhereModelLifecycle.shared.current(request);
+  static Future<CurrentModelResult> currentModel([
+    CurrentModelRequest? request,
+  ]) => RunAnywhereModelLifecycle.shared.current(request);
 
   /// Proto-backed component lifecycle snapshot.
   static sdk_events_pb.ComponentLifecycleSnapshot? componentLifecycleSnapshot(
     SDKComponent component,
-  ) =>
-      RunAnywhereModelLifecycle.shared.componentSnapshot(component);
+  ) => RunAnywhereModelLifecycle.shared.componentSnapshot(component);
 
   // --- Canonical flat methods (§3-§10 of spec) --------------------------------
 
@@ -622,9 +637,10 @@ abstract final class RunAnywhere {
 
   /// Flat streaming alias — real FFI-backed streaming STT.
   /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
-  static Stream<STTPartialResult> transcribeStream(Uint8List audio,
-          {STTOptions? options}) =>
-      RunAnywhereSTT.shared.transcribeStream(audio, options: options);
+  static Stream<STTPartialResult> transcribeStream(
+    Uint8List audio, {
+    STTOptions? options,
+  }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
 
   /// Flat alias — synthesize text to proto [TTSOutput].
   /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
@@ -658,28 +674,24 @@ abstract final class RunAnywhere {
   static Future<LLMGenerationResult> generate(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) =>
-      RunAnywhereLLM.shared.generate(prompt, options);
+  ]) => RunAnywhereLLM.shared.generate(prompt, options);
 
   /// Flat generated-proto LLM request.
   static Future<LLMGenerationResult> generateRequest(
     LLMGenerateRequest request,
-  ) =>
-      RunAnywhereLLM.shared.generateRequest(request);
+  ) => RunAnywhereLLM.shared.generateRequest(request);
 
   /// Flat streaming generate.
   /// Mirrors Swift / RN / Web `RunAnywhere.generateStream(prompt:options:)`.
   static Stream<LLMStreamEvent> generateStream(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) =>
-      RunAnywhereLLM.shared.generateStream(prompt, options);
+  ]) => RunAnywhereLLM.shared.generateStream(prompt, options);
 
   /// Flat generated-proto streaming LLM request.
   static Stream<LLMStreamEvent> generateStreamRequest(
     LLMGenerateRequest request,
-  ) =>
-      RunAnywhereLLM.shared.generateStreamRequest(request);
+  ) => RunAnywhereLLM.shared.generateStreamRequest(request);
 
   /// Extract structured output from raw model text using a typed schema.
   static StructuredOutputResult extractStructuredOutput({
@@ -693,36 +705,33 @@ abstract final class RunAnywhere {
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateStructured(
-        prompt: prompt,
-        schema: schema,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateStructured(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
 
   /// Stream structured output events.
   static Stream<StructuredOutputStreamEvent> generateStructuredStream({
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateStructuredStream(
-        prompt: prompt,
-        schema: schema,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateStructuredStream(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
 
   /// Generate raw LLM text with a structured-output configuration.
   static Future<LLMGenerationResult> generateWithStructuredOutput({
     required String prompt,
     required StructuredOutputOptions structuredOutput,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateWithStructuredOutput(
-        prompt: prompt,
-        structuredOutput: structuredOutput,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateWithStructuredOutput(
+    prompt: prompt,
+    structuredOutput: structuredOutput,
+    options: options,
+  );
 
   /// Register a tool executor.
   static void registerTool(ToolDefinition definition, ToolExecutor executor) =>
@@ -732,8 +741,7 @@ abstract final class RunAnywhere {
   static void registerTypedTool(
     ToolDefinition definition,
     TypedToolExecutor executor,
-  ) =>
-      RunAnywhereTools.shared.registerTypedTool(definition, executor);
+  ) => RunAnywhereTools.shared.registerTypedTool(definition, executor);
 
   /// Unregister a tool by name.
   static void unregisterTool(String toolName) =>
@@ -754,32 +762,29 @@ abstract final class RunAnywhere {
   static Future<ToolCallingResult> generateWithTools(
     String prompt, {
     ToolCallingOptions? options,
-  }) =>
-      RunAnywhereTools.shared.generateWithTools(prompt, options: options);
+  }) => RunAnywhereTools.shared.generateWithTools(prompt, options: options);
 
   /// Continue generation after a manual tool result.
   static Future<ToolCallingResult> continueWithToolResult(
     String originalPrompt,
     ToolResult toolResult, {
     ToolCallingOptions? options,
-  }) =>
-      RunAnywhereTools.shared.continueWithToolResult(
-        originalPrompt,
-        toolResult,
-        options: options,
-      );
+  }) => RunAnywhereTools.shared.continueWithToolResult(
+    originalPrompt,
+    toolResult,
+    options: options,
+  );
 
   /// RAG lifecycle-resolution helper.
   static Future<RAGConfiguration> ragResolvedConfiguration({
     required ModelInfo embeddingModel,
     required ModelInfo llmModel,
     RAGConfiguration? baseConfiguration,
-  }) =>
-      RunAnywhereRAG.shared.ragResolvedConfiguration(
-        embeddingModel: embeddingModel,
-        llmModel: llmModel,
-        baseConfiguration: baseConfiguration,
-      );
+  }) => RunAnywhereRAG.shared.ragResolvedConfiguration(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
 
   /// Create a RAG pipeline from generated config.
   static Future<void> ragCreatePipeline(RAGConfiguration config) =>
@@ -790,12 +795,11 @@ abstract final class RunAnywhere {
     required ModelInfo embeddingModel,
     required ModelInfo llmModel,
     RAGConfiguration? baseConfiguration,
-  }) =>
-      RunAnywhereRAG.shared.ragCreatePipelineForModels(
-        embeddingModel: embeddingModel,
-        llmModel: llmModel,
-        baseConfiguration: baseConfiguration,
-      );
+  }) => RunAnywhereRAG.shared.ragCreatePipelineForModels(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
 
   /// Destroy the RAG pipeline.
   static Future<void> ragDestroyPipeline() =>
