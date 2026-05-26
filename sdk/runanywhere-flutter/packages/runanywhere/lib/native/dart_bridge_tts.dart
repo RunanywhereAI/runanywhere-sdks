@@ -293,8 +293,10 @@ class DartBridgeTTS {
         // `rac/features/tts/rac_tts_stream.h` warning). Without
         // `rac_tts_proto_quiesce()` the C side can invoke the trampoline
         // backed by NativeCallable user_data after `callback.close()` —
-        // UAF on the proto scratch buffer.
-        RacNative.bindings.rac_tts_proto_quiesce?.call();
+        // UAF on the proto scratch buffer. Best-effort — if the commons
+        // binary predates the export (or, in unit-test harnesses, the
+        // native library is not staged) the call is skipped.
+        _quiesceBestEffort();
         callback?.close();
         callback = null;
       }
@@ -318,7 +320,7 @@ class DartBridgeTTS {
         _logger.debug('stopLifecycleProto on stream cancel failed: $e');
       }
       // Same CONSOLIDATE-D ordering as the run() teardown — quiesce first.
-      RacNative.bindings.rac_tts_proto_quiesce?.call();
+      _quiesceBestEffort();
       callback?.close();
       callback = null;
     };
@@ -480,14 +482,14 @@ class DartBridgeTTS {
         // CONSOLIDATE-D: same quiesce-before-close ordering as the
         // lifecycle-owned stream wrapper above. See
         // `synthesizeStreamLifecycleProto`.
-        RacNative.bindings.rac_tts_proto_quiesce?.call();
+        _quiesceBestEffort();
         callback?.close();
         callback = null;
       }
     }
 
     controller.onCancel = () {
-      RacNative.bindings.rac_tts_proto_quiesce?.call();
+      _quiesceBestEffort();
       callback?.close();
       callback = null;
     };
@@ -517,6 +519,18 @@ class DartBridgeTTS {
       throw ArgumentError(
         'TTSSynthesisRequest.text or ssml is required for lifecycle TTS',
       );
+    }
+  }
+
+  /// CONSOLIDATE-D best-effort quiesce. Wraps the FFI lookup in a try/catch
+  /// so the unit-test harness (which can't `dlopen` librac_commons via the
+  /// test seams' `streamOverride` path) does not crash when the production
+  /// onCancel / finally cleanup runs without a native library staged.
+  void _quiesceBestEffort() {
+    try {
+      RacNative.bindings.rac_tts_proto_quiesce?.call();
+    } catch (e) {
+      _logger.debug('rac_tts_proto_quiesce skipped: $e');
     }
   }
 }
