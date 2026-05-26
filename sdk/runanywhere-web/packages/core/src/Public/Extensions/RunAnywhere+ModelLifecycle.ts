@@ -7,7 +7,7 @@ import type {
   ModelUnloadRequest,
   ModelUnloadResult,
 } from '@runanywhere/proto-ts/model_types';
-import { InferenceFramework, ModelFileRole } from '@runanywhere/proto-ts/model_types';
+import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
@@ -18,6 +18,10 @@ import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/Runt
 import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import {
+  frameworkOPFSDir,
+  primaryFilenameFromModel,
+} from '../../Infrastructure/FrameworkOPFSPaths';
 import { getAllRegisteredModules } from '../../runtime/EmscriptenModule';
 
 export type {
@@ -45,27 +49,10 @@ function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
   return adapter;
 }
 
-const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
-  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
-  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
-  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
-};
-
-function primaryFilenameFromModel(model: ModelInfo): string | null {
-  const primary = model.multiFile?.files?.find(
-    (file) => file.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-  ) ?? model.multiFile?.files?.[0];
-  if (primary?.filename) return primary.filename;
-  const trailing = (model.downloadUrl ?? '').split('?')[0].split('/').pop() ?? '';
-  return trailing.length > 0 ? trailing : null;
-}
-
 async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null> {
   if (model.localPath) return model.localPath;
 
-  const frameworkDir = FRAMEWORK_OPFS_DIR[model.framework as InferenceFramework];
+  const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
   if (!frameworkDir) return null;
 
   const filename = primaryFilenameFromModel(model);

@@ -21,7 +21,6 @@ import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
   InferenceFramework,
-  ModelFileRole,
   ModelArtifactType,
   ModelCategory,
   type ModelInfo,
@@ -44,6 +43,10 @@ import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
+import {
+  frameworkOPFSDir,
+  primaryFilenameFromModel,
+} from '../Infrastructure/FrameworkOPFSPaths';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
@@ -289,30 +292,6 @@ function delay(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 // Multi-file Download Helpers (Web / OPFS platform layer)
 // ---------------------------------------------------------------------------
-
-// Mirrors C++ rac_framework_raw_value — directory names under
-// /opfs/RunAnywhere/Models/<dir>/<modelId>/<filename>.
-const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
-  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
-  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
-  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
-};
-
-function frameworkOPFSDir(framework: InferenceFramework): string | null {
-  return FRAMEWORK_OPFS_DIR[framework] ?? null;
-}
-
-function primaryFilenameFromModel(model: ModelInfo): string | null {
-  const primary = model.multiFile?.files?.find(
-    (f) => f.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-  ) ?? model.multiFile?.files?.[0];
-  if (primary?.filename) return primary.filename;
-  const url = model.downloadUrl ?? '';
-  const trailing = url.split('?')[0].split('/').pop() ?? '';
-  return trailing.length > 0 ? trailing : null;
-}
 
 function isTarGzArchiveArtifact(model: ModelInfo): boolean {
   return model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
