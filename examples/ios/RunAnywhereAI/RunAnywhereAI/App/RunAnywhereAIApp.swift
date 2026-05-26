@@ -542,7 +542,7 @@ struct RunAnywhereAIApp: App {
         let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
             guard let fileURL = URL(string: file.url) else { return nil }
             var descriptor = RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: true)
-            descriptor.role = Self.inferModelFileRole(filename: file.filename, modality: modality)
+            descriptor.role = RunAnywhere.inferModelFileRole(filename: file.filename, modality: modality)
             return descriptor
         }
         guard descriptors.count == files.count else {
@@ -565,22 +565,6 @@ struct RunAnywhereAIApp: App {
         }
     }
     // swiftlint:enable function_parameter_count
-
-    /// Infer the `RAModelFileRole` for a multi-file model descriptor based on
-    /// filename conventions. Needed so the C++ VLM loader can resolve the
-    /// primary LLM weights (`role == .primaryModel`) and the separate vision
-    /// projector (`role == .visionProjector`) after download.
-    private static func inferModelFileRole(
-        filename: String,
-        modality: ModelCategory
-    ) -> RAModelFileRole {
-        let lower = filename.lowercased()
-        if lower.contains("mmproj") { return .visionProjector }
-        if lower.hasSuffix("vocab.txt") { return .vocabulary }
-        if lower.hasSuffix("tokenizer.json") || lower.hasSuffix("tokenizer.model") { return .tokenizer }
-        if lower.hasSuffix("config.json") { return .config }
-        return .primaryModel
-    }
 }
 // swiftlint:enable type_body_length
 
