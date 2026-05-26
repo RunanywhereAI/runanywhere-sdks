@@ -306,10 +306,33 @@ export const RunAnywhere = {
   // ============================================================================
   // Authentication Info (Production/Staging only)
   // Matches Swift SDK: RunAnywhere.getUserId(), getOrganizationId(), etc.
+  //
+  // Platform shape (RN vs Swift):
+  //   These getters are async on React Native because every call has to
+  //   cross the JS<->native bridge. Nitro Modules' proto-bytes methods
+  //   (`getUserId`, `getOrganizationId`, `isAuthenticated`,
+  //   `isDeviceRegistered`, `getDeviceId`, `getPersistentDeviceUUID`)
+  //   return `Promise<...>`; JS cannot observe the resolved C++ state
+  //   synchronously the way Swift can read `CppBridge.State.userId` /
+  //   `CppBridge.Auth.isAuthenticated` directly. The Swift surface
+  //   exposes these as plain `String?` / `Bool` properties because the
+  //   bridge is in-process and lock-free on read; the RN bridge is
+  //   asynchronous by construction. The semantics (when the value
+  //   becomes non-empty / true, what falsy means) match exactly — only
+  //   the call shape differs.
+  //
+  // Swift reference:
+  //   sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift:66,82-91
   // ============================================================================
 
   /**
-   * Get current user ID from authentication
+   * Get current user ID from authentication.
+   *
+   * Matches Swift `RunAnywhere.getUserId() -> String?`. RN returns
+   * `Promise<string>` instead of `String?` because the user-id read
+   * crosses the Nitro JS<->C++ bridge; resolves to `''` when there is
+   * no authenticated user.
+   *
    * @returns User ID if authenticated, empty string otherwise
    */
   async getUserId(): Promise<string> {
@@ -320,7 +343,13 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get current organization ID from authentication
+   * Get current organization ID from authentication.
+   *
+   * Matches Swift `RunAnywhere.getOrganizationId() -> String?`. RN
+   * returns `Promise<string>` (rather than `String?`) because the read
+   * crosses the Nitro JS<->C++ bridge; resolves to `''` when there is
+   * no authenticated org.
+   *
    * @returns Organization ID if authenticated, empty string otherwise
    */
   async getOrganizationId(): Promise<string> {
@@ -333,7 +362,10 @@ export const RunAnywhere = {
   /**
    * Check if currently authenticated.
    *
-   * Matches Swift: `RunAnywhere.isAuthenticated`, delegated to native auth state.
+   * Matches Swift `RunAnywhere.isAuthenticated: Bool` (sync property).
+   * On RN this is `Promise<boolean>` because authentication state lives
+   * in native C++ behind the Nitro async bridge; JS cannot read it
+   * synchronously.
    */
   get isAuthenticated(): Promise<boolean> {
     if (!isNativeModuleAvailable()) return Promise.resolve(false);
@@ -342,7 +374,11 @@ export const RunAnywhere = {
   },
 
   /**
-   * Check if device is registered with backend
+   * Check if device is registered with backend.
+   *
+   * Matches Swift `RunAnywhere.isDeviceRegistered() -> Bool` (sync).
+   * RN returns `Promise<boolean>` because device-registration state is
+   * read across the Nitro async bridge.
    */
   async isDeviceRegistered(): Promise<boolean> {
     if (!isNativeModuleAvailable()) return false;
@@ -352,6 +388,11 @@ export const RunAnywhere = {
 
   /**
    * Get device ID from native device state.
+   *
+   * Matches Swift `RunAnywhere.deviceId: String` (sync property). RN
+   * returns `Promise<string>` because the value lives in
+   * Keychain/Keystore behind the Nitro async bridge; falls back to the
+   * persistent device UUID and finally `''` if neither is resolvable.
    */
   async getDeviceId(): Promise<string> {
     if (!isNativeModuleAvailable()) return '';
@@ -361,7 +402,11 @@ export const RunAnywhere = {
 
   /**
    * Device ID (Keychain/Keystore-persisted, survives reinstalls).
-   * RN resolves this through the async native bridge.
+   *
+   * RN-only property accessor — matches Swift's sync
+   * `RunAnywhere.deviceId: String` in semantics, but returns
+   * `Promise<string>` because RN resolves this through the Nitro async
+   * native bridge. Identical to calling `getDeviceId()`.
    */
   get deviceId(): Promise<string> {
     return this.getDeviceId();
