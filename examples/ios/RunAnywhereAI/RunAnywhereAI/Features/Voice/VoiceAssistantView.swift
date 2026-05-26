@@ -423,14 +423,26 @@ extension VoiceAssistantView {
                 action: {
                     // Snapshot state synchronously so the decision can't race with
                     // state updates that happen between the tap and the Task firing.
-                    // Tap is only meaningful from an idle state (.disconnected /
-                    // .error) — barge-in / force-commit / resume are driven by
-                    // the C voice agent itself today, so taps in the speaking /
-                    // listening / connected states are intentionally inert.
-                    let isActive = viewModel.isActive
+                    let isSpeaking = viewModel.isSpeaking
+                    let isListening = viewModel.isListening
                     let isConnected = viewModel.sessionState == .connected
-                    guard !isActive && !isConnected else { return }
-                    Task { await viewModel.startConversation() }
+                    let isActive = viewModel.isActive
+                    let action: (() async -> Void)? = {
+                        if isSpeaking {
+                            return { await viewModel.interruptSpeaking() }
+                        } else if isListening {
+                            return { await viewModel.sendAudioNow() }
+                        } else if isConnected {
+                            return { await viewModel.resumeListening() }
+                        } else if !isActive {
+                            return { await viewModel.startConversation() }
+                        } else {
+                            return nil
+                        }
+                    }()
+                    if let action = action {
+                        Task { await action() }
+                    }
                 },
                 onLongPress: {
                     // Snapshot state synchronously before spawning the Task.
