@@ -87,18 +87,6 @@ typedef RacLlmStreamProtoCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Void>,
 );
 
-typedef RacLlmSetStreamProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-
-typedef RacLlmSetStreamProtoCallbackDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-);
-
 // ============================================================================
 // Generated-proto modality APIs
 // ============================================================================
@@ -1157,14 +1145,6 @@ class RacBindings {
                 RacVoiceAgentSetProtoCallbackNative,
                 RacVoiceAgentSetProtoCallbackDart>(
             'rac_voice_agent_set_proto_callback'),
-        rac_llm_set_stream_proto_callback = lib.lookupFunction<
-                RacLlmSetStreamProtoCallbackNative,
-                RacLlmSetStreamProtoCallbackDart>(
-            'rac_llm_set_stream_proto_callback'),
-        rac_llm_unset_stream_proto_callback = lib.lookupFunction<
-            ffi.Int32 Function(ffi.Pointer<ffi.Void>),
-            int Function(
-                ffi.Pointer<ffi.Void>)>('rac_llm_unset_stream_proto_callback'),
         rac_llm_generate_proto = _lookupOptional<RacLlmGenerateProtoDart>(
           () => lib.lookupFunction<RacLlmGenerateProtoNative,
               RacLlmGenerateProtoDart>('rac_llm_generate_proto'),
@@ -1857,10 +1837,6 @@ class RacBindings {
   // Streaming callbacks ------------------------------------------------------
 
   final RacVoiceAgentSetProtoCallbackDart rac_voice_agent_set_proto_callback;
-
-  final RacLlmSetStreamProtoCallbackDart rac_llm_set_stream_proto_callback;
-
-  final int Function(ffi.Pointer<ffi.Void>) rac_llm_unset_stream_proto_callback;
 
   // Generated-proto modality APIs -------------------------------------------
 
