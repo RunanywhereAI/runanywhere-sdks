@@ -240,8 +240,7 @@ class DartBridgeVLM {
   /// already releases that state. We still cancel any in-flight lifecycle
   /// generation so workers don't keep burning CPU after shutdown, mirroring
   /// what Swift's `ComponentActor.destroy()` does internally before tearing
-  /// down its retained handle. If/when Flutter gains a Dart-side VLM handle,
-  /// this entry point becomes the place to also call `rac_vlm_component_destroy`.
+  /// down its retained handle.
   void destroy() {
     try {
       cancel();
