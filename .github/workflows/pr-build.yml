@@ -279,6 +279,15 @@ jobs:
       - name: ESLint (@runanywhere/core lint lane)
         continue-on-error: true
         run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
+      # CLUSTER-07 / cross-cutting-006: per-SDK unit-test lane. Smoke tests
+      # cover Foundation/Errors and services/Proto* utilities; the runner
+      # (ts-jest) is wired in `packages/core/jest.config.js`. Soft
+      # (continue-on-error) until the in-tree jest devDependencies are
+      # installed in the workspace lock — flip to required once the lane
+      # exits 0 cleanly.
+      - name: Jest unit tests (@runanywhere/core)
+        continue-on-error: true
+        run: yarn workspace @runanywhere/core run test || echo "jest devDeps not yet installed in workspace lock"
 
   web-typecheck:
     runs-on: ubuntu-22.04
