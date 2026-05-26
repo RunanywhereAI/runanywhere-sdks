@@ -246,13 +246,23 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    private enum ModelType { case stt, llm, tts }
+    private enum ModelType {
+        case stt, llm, tts
+
+        var category: ModelCategory {
+            switch self {
+            case .stt: return .speechRecognition
+            case .llm: return .language
+            case .tts: return .speechSynthesis
+            }
+        }
+    }
 
     private func updateModel(_ type: ModelType, id: String) {
         // Find model info from shared model list
         let model = ModelListViewModel.shared.availableModels.first { $0.id == id }
         let name = model?.name ?? id
-        let framework = model?.framework ?? (type == .llm ? .llamaCpp : .onnx)  // Fallback only if no model selected
+        let framework = model?.framework ?? type.category.defaultFramework
         let selectedModel = SelectedModelInfo(framework: framework, name: name, id: id)
 
         switch type {
