@@ -355,3 +355,5 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-26T01:00:00Z	9	phase2_matrix	orchestrator	LOOP_END	SUCCESS	20260524-125843-matrix	loop_complete FUNCTIONAL_GREEN — 92 cross-lane PASS; SDK E2E verified all 8 lanes; 39 harness LIMITED deferred to continuous improvement
 2026-05-26T01:00:00Z	9	phase2_matrix	matrix-coordinator-iter9-final	AGENT_DONE	OK	20260524-125843-matrix	iter9 matrix FUNCTIONAL_GREEN — 2 PASS / 6 PARTIAL lanes; LOOP_END SUCCESS
 2026-05-26T02:23:13Z	10	phase8_fix	fix-agent-cluster-33	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-33/COMMONS-PARITY-HARNESS-001: catalog §9 remove legacy parity executables; use ctest -R stream subset
+2026-05-26T02:23:35Z	10	phase8_fix	fix-agent-cluster-33	COMMIT	OK	4deaf7b20	CLUSTER-33 catalog §9 ctest stream parity gate + iter10 regrade commons_parity FAIL->PASS
+2026-05-26T02:23:35Z	10	phase8_fix	fix-agent-cluster-33	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-33 done: catalog §9 updated; ctest -R stream 3/3 PASS; commons_parity FAIL->PASS; commit 4deaf7b20
