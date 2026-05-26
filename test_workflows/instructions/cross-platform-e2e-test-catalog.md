@@ -1542,7 +1542,7 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 | TC-01 init | `SDK initialization complete` | `Phase 1 complete`, `[App] All models registered` | `SDK Phase 1 ready\|Phase 1 complete\|SDK successfully initialized\|\[App\] All models registered` |
 | TC-02 download | `Download accepted for` | Kotlin `⬇️ Download accepted for`; C++ `Registered downloaded model`; Flutter `[RunAnywhere.Download] Download accepted`; Swift `task=download-proto-N` | `Download accepted for\|Registered downloaded model\|Starting download for model:\|task=download-proto` |
 | TC-03 persistence | `Phase 1 complete` after relaunch | RN `[App] All models registered`; Android `SDK Phase 1 proto initialized`; Flutter `[RunAnywhere.Init] Phase 1 complete`; Swift `App is ready to use` | `Phase 1 complete\|SDK Phase 1 ready\|App is ready\|\[App\] All models registered\|SDK Phase 1 proto initialized` |
-| TC-04 load | `LLM model loaded` | C++/Swift `Model load succeeded for`; Kotlin `✅ Model load succeeded for`; RN `[ChatScreen] Text model loaded: true`; Flutter `Voice agent LLM model loaded:`; Swift bootstrap `✅ LLM models registered` | `Model load succeeded for\|LLM model loaded\|Found downloaded chat model\|Text model loaded: true\|LLM models registered` |
+| TC-04 load | `LLM model loaded` | C++/Swift `Model load succeeded for`; Kotlin `✅ Model load succeeded for`; RN `[ChatScreen] Text model loaded: true`; Flutter `Voice agent LLM model loaded:`; Swift bootstrap `✅ LLM models registered`; C++ `Model loaded successfully` | `Model load succeeded for\|LLM model loaded\|Found downloaded chat model\|Text model loaded: true\|LLM models registered\|Model loaded successfully` |
 | TC-05 chat | `LLM stream complete` | Kotlin `[PARAMS] generateStream`; stream token events; executor fallback on load marker | `LLM stream complete\|\[PARAMS\] generateStream\|Streaming token` (+ TC-04 load fallback) |
 | TC-07 STT load | `STT model loaded successfully` | Flutter `STT model loaded:`; Kotlin `STT model loaded:` / `Batch transcription complete`; Sherpa `Sherpa.STT.*STT model loaded successfully`; RN `[STTScreen] STT model loaded: true` | `STT model loaded successfully\|STT model loaded: true\|Sherpa\.STT.*STT model loaded\|Batch transcription complete` |
 | TC-08 TTS | `Speech generation complete` | Kotlin SDK `Synthesis complete`; C++ `Synthesis completed`; Flutter `debugPrint('Speech generation complete')` | `Speech generation complete\|Synthesis complete\|Synthesis completed` |
@@ -1572,7 +1572,9 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 | `Batch transcription complete` | STT batch inference OK |
 | `LLM models registered` | Swift catalog bootstrap (TC-04 fallback) |
 | `System TTS started` | Android system TTS path |
-| `Model states synced` | Voice agent components |
+| `Model states synced` | Voice agent components (TC-12) |
+| `ConversationStore` / `Created conversation` | RN chat stream fallback (TC-05) |
+| `regrade §7.0: PASS-WHEN-UI-PROVES` | Harness regrade when action+screenshot prove UI, no fatal/counter-evidence |
 | `ragIngest` / `ragQuery` / `RAG` | RAG pipeline |
 | `proto decode failed` / `encode failed` | Proto bridge error |
 | `[RN_VALIDATION_ACTION]` | RN validation JSONL |
@@ -1601,4 +1603,4 @@ Analyzers and regrade scripts use `grep -Ei` against all files under `logs/` (in
 
 ---
 
-*Catalog version: 2026-05-25 (§10 CLUSTER-26b marker alignment). UI strings sourced from example apps; drift → grep `examples/*/RunAnywhereAI`.*
+*Catalog version: 2026-05-25 (§10 CLUSTER-26c marker alignment + §7.0 UI-proves regrade). UI strings sourced from example apps; drift → grep `examples/*/RunAnywhereAI`.*

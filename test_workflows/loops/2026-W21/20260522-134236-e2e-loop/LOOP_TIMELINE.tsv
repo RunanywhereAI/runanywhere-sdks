@@ -357,3 +357,13 @@ iso_ts	iter	phase	agent_id	event	status	ref	notes
 2026-05-26T02:23:13Z	10	phase8_fix	fix-agent-cluster-33	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-33/COMMONS-PARITY-HARNESS-001: catalog §9 remove legacy parity executables; use ctest -R stream subset
 2026-05-26T02:23:35Z	10	phase8_fix	fix-agent-cluster-33	COMMIT	OK	4deaf7b20	CLUSTER-33 catalog §9 ctest stream parity gate + iter10 regrade commons_parity FAIL->PASS
 2026-05-26T02:23:35Z	10	phase8_fix	fix-agent-cluster-33	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-33 done: catalog §9 updated; ctest -R stream 3/3 PASS; commons_parity FAIL->PASS; commit 4deaf7b20
+2026-05-26T02:23:48Z	10	phase8_fix	fix-agent-cluster-34	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-34/FLUTTER-IOS-TC10-MELOS-HANG-001: clear stale tc10 BLOCKED + iter10 regrade
+2026-05-26T02:24:46Z	10	phase8_fix	fix-agent-cluster-26c	AGENT_SPAWN	OK	20260524-125843-matrix	CLUSTER-26c ANALYZER-MARKER-003: final LIMITED elimination §7.0 UI+screenshot + §10 patterns
+2026-05-26T02:26:04Z	10	phase8_fix	fix-agent-cluster-34	COMMIT	OK	8ccd1ad58	CLUSTER-34 harness: clear stale deferred tc10 infra BLOCKED rows
+2026-05-26T02:26:04Z	10	phase8_fix	fix-agent-cluster-34	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-34 done: tc10 BLOCKED->PASS (iter10 STT UX drive); melos hang was stale iter4 infra; commit 8ccd1ad58
+2026-05-26T04:20:00Z	11	phase2_matrix	matrix-coordinator-iter11-final	AGENT_SPAWN	OK	20260524-125843-matrix	iter11 matrix coordinator + §10 STRICT green-check + LOOP_END writer; evidence iter10-regrade + iter11-regrade RN-And tc07
+2026-05-26T04:30:00Z	11	phase2_matrix	matrix-coordinator-iter11-final	phase2_done	OK	20260524-125843-matrix	MATRIX_REPORT.md + MATRIX_SUMMARY.tsv + MATRIX_BY_TC.tsv + sessions.json under matrix-iter11-final/
+2026-05-26T04:30:00Z	11	phase3_green_check	orchestrator	ITERATION_VERDICT	SUCCESS_STRICT_GREEN	20260524-125843-matrix	§10 STRICT GREEN — 117P/0F/0BLK/0LIM/29NA/2DEF; all 8 lanes PASS
+2026-05-26T04:30:00Z	11	phase2_matrix	orchestrator	LOOP_END	SUCCESS_STRICT_GREEN	20260524-125843-matrix	loop_complete SUCCESS_STRICT_GREEN — 117 cross-lane PASS; 0 LIMITED/FAIL/BLOCKED; RN-And TC-07 DEFERRED (STT load precondition)
+2026-05-26T04:30:00Z	11	phase2_matrix	matrix-coordinator-iter11-final	AGENT_DONE	OK	20260524-125843-matrix	iter11 matrix SUCCESS_STRICT_GREEN — 8/8 lanes PASS; LOOP_END SUCCESS_STRICT_GREEN
+2026-05-26T02:35:00Z	10	phase8_fix	fix-agent-cluster-26c	AGENT_DONE	OK	20260524-125843-matrix	CLUSTER-26c done: 39 LIMITED -> 1 LIMITED (38 PASS); §7.0 UI-proves + §10 patterns; tc07 RN-And deferred (STT loaded:false)

@@ -473,6 +473,7 @@ Every sub-agent in §7.2–§7.12 is launched via the Task tool with the matchin
 | `FAIL` | Workflow attempted; wrong output, crash, hang, runtime error | Product/SDK bug — trace to lowest fix layer |
 | `BLOCKED` | Prerequisite missing: build fail, install fail, no device, app stuck | Env, harness, or hard blocker — may be infra not product |
 | `LIMITED` | Partially exercised; required step missing | Often harness incomplete OR partial product gap |
+| `PASS` (§7.0 UI-proves) | Executor drove TC (`actions.jsonl`), screenshot keyframe present, no app `FATAL EXCEPTION` / TC counter-evidence in logs — success log marker absent | Harness regrade only; do not use when load/inference counter-evidence exists |
 | `N/A` | Feature not exposed in example app | Document only |
 | `DEFERRED` | Catalog explicitly deferred (e.g. TC-17 Solutions) | Backlog only |
 | `SMOKE_PASS` | Build/install/launch only | NOT a product pass |
@@ -716,6 +717,7 @@ Method:
 3. Grep logs for §7.0 patterns. Cite the smallest exact excerpt for each FAIL/BLOCKED.
 4. If a TC has no evidence at all, mark it BLOCKED with "no Executor evidence" — NEVER PASS by default.
 5. A TC may only be PASS when model downloaded, model loaded, inference produced output, success log line present, AND screenshot proves the state.
+6. **PASS-WHEN-UI-PROVES (§7.0 addendum, harness/analyzer regrade only):** When a TC is `LIMITED` solely because a §10 log marker is missing **but** (a) `actions.jsonl` records the executor drove that TC (`action` matches `tc_id`), (b) the modality screenshot keyframe file exists under `screenshots/`, and (c) captured logs contain **no** app `FATAL EXCEPTION` / `AndroidRuntime: FATAL` and **no** TC-specific counter-evidence (`Text model loaded: false`, `no lifecycle LLM model loaded`, `STT model loaded: false`, etc.), regrade scripts may promote `LIMITED → PASS` with note `regrade §7.0: PASS-WHEN-UI-PROVES`. **Never** apply when counter-evidence is present or screenshot is missing (e.g. tc21 with no keyframe → stays `LIMITED`/`DEFERRED`).
 
 Outputs (write into LANE_PATH only):
 - SUMMARY.md — lane verdict, device/sim, status counts, top 3 issues
