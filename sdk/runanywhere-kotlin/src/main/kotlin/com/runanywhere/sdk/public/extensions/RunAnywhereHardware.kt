@@ -21,7 +21,6 @@ import ai.runanywhere.proto.v1.AccelerationPreference
 import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHardware
-import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 
 // ---------------------------------------------------------------------------
@@ -35,24 +34,22 @@ import com.runanywhere.sdk.public.RunAnywhere
 class Hardware {
     fun getProfile(): HardwareProfileResult = CppBridgeHardware.getProfile()
 
-    suspend fun getAccelerators(): List<AcceleratorInfo> {
-        // TODO: Wire `rac_hardware_get_accelerators` once a JNI thunk
-        //       (`racHardwareGetAccelerators`) is bound in
-        //       sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp.
-        //       Until then the Kotlin surface matches Swift's "not supported"
-        //       fallback behaviour (rac_result_t == RAC_ERROR_NOT_SUPPORTED).
-        throw SDKException.notImplemented("Hardware.getAccelerators")
-    }
+    /**
+     * Get available accelerators (NNAPI / GPU / NPU / etc.) as canonical proto
+     * data. Mirrors Swift `CppBridge.Hardware.getAccelerators()` which decodes
+     * the same `RAHardwareProfileResult` shape but exposes only its
+     * `accelerators` list (the `profile` field is left empty by the commons
+     * ABI for this entry point).
+     */
+    fun getAccelerators(): List<AcceleratorInfo> = CppBridgeHardware.getAccelerators()
 
-    suspend fun setAcceleratorPreference(pref: AccelerationPreference) {
-        // TODO: Wire `rac_hardware_set_accelerator_preference(pref.value)`
-        //       once a JNI thunk (`racHardwareSetAcceleratorPreference`) is
-        //       bound in
-        //       sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp.
-        //       Until then the Kotlin surface matches Swift's "not supported"
-        //       fallback behaviour (rac_result_t == RAC_ERROR_NOT_SUPPORTED).
-        throw SDKException.notImplemented("Hardware.setAcceleratorPreference")
-    }
+    /**
+     * Set the preferred accelerator for subsequent inference calls. Mirrors
+     * Swift `CppBridge.Hardware.setAcceleratorPreference(_:)`. Throws
+     * `SDKException` on commons rc != RAC_SUCCESS.
+     */
+    fun setAcceleratorPreference(pref: AccelerationPreference) =
+        CppBridgeHardware.setAcceleratorPreference(pref)
 }
 
 private val hardwareInstance = Hardware()

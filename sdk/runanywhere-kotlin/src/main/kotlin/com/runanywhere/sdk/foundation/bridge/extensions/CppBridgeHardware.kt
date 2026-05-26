@@ -16,7 +16,10 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.AccelerationPreference
+import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.HardwareProfileResult
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -53,6 +56,39 @@ object CppBridgeHardware {
             HardwareProfileResult.ADAPTER.decode(bytes)
         } else {
             HardwareProfileResult()
+        }
+    }
+
+    /**
+     * Decode the lightweight accelerator-only `HardwareProfileResult` returned
+     * by `rac_hardware_get_accelerators` and surface just its `accelerators`
+     * list. Mirrors Swift `CppBridge.Hardware.getAccelerators()`. Returns an
+     * empty list when the commons ABI returns null/empty (matches Swift's
+     * empty-`accelerators` result when the symbol is missing).
+     */
+    fun getAccelerators(): List<AcceleratorInfo> {
+        val bytes = RunAnywhereBridge.racHardwareGetAccelerators()
+        return if (bytes != null && bytes.isNotEmpty()) {
+            HardwareProfileResult.ADAPTER.decode(bytes).accelerators
+        } else {
+            emptyList()
+        }
+    }
+
+    /**
+     * Set the preferred accelerator for subsequent routing / inference calls.
+     * Mirrors Swift `CppBridge.Hardware.setAcceleratorPreference(_:)`: throws
+     * `SDKException` when the commons ABI returns a non-success `rac_result_t`.
+     */
+    fun setAcceleratorPreference(pref: AccelerationPreference) {
+        val rc =
+            RunAnywhereBridge.racHardwareSetAcceleratorPreference(
+                AccelerationPreference.ADAPTER.encode(pref),
+            )
+        if (rc != 0) {
+            throw SDKException.operation(
+                "Failed to set accelerator preference: rc=$rc",
+            )
         }
     }
 
