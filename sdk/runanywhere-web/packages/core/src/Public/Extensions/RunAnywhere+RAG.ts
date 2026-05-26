@@ -486,7 +486,13 @@ export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>
 }
 
 export async function ragDestroyPipeline(): Promise<void> {
-  await requireProvider('RAG.destroyPipeline').ragDestroyPipeline();
+  // Swift parity: `ragDestroyPipeline` is idempotent. When no provider has
+  // been installed there is nothing to tear down, so resolve quietly rather
+  // than throwing `backendNotAvailable`.
+  const provider = activeProvider();
+  if (!provider) return;
+  await provider.ragDestroyPipeline();
+  _provider = null;
   logger.info('RAG pipeline destroyed');
 }
 
