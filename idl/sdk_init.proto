@@ -50,15 +50,24 @@ enum SdkInitPhase {
 }
 
 // ---------------------------------------------------------------------------
-// Environment values — must match RAC_ENV_* in
+// Environment values — must align with RAC_ENV_* in
 // sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-// (development=0, staging=1, production=2). Numeric values are part of the
-// wire format; do not reorder.
+// (development=0, staging=1, production=2). Per proto3 convention the zero
+// value is reserved as UNSPECIFIED; SDKs that omit the field default to
+// DEVELOPMENT inside to_rac_environment() (sdk_init.cpp). The wire-format
+// numeric values are part of the protocol contract; do not reorder.
+//
+// idl-002: semantically duplicates model_types.proto::SDKEnvironment (same
+// development/staging/production tristate), but is kept as a separate enum
+// to avoid pulling model_types.proto into the SDK init dependency graph.
+// Callers crossing the boundary (e.g. RunAnywhere.ts mapSdkInitEnvironment,
+// CppBridge+SdkInit.swift mapEnvironment) translate between the two.
 // ---------------------------------------------------------------------------
 enum SdkInitEnvironment {
-    SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0;
-    SDK_INIT_ENVIRONMENT_STAGING     = 1;
-    SDK_INIT_ENVIRONMENT_PRODUCTION  = 2;
+    SDK_INIT_ENVIRONMENT_UNSPECIFIED = 0;
+    SDK_INIT_ENVIRONMENT_DEVELOPMENT = 1;
+    SDK_INIT_ENVIRONMENT_STAGING     = 2;
+    SDK_INIT_ENVIRONMENT_PRODUCTION  = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,4 +118,18 @@ message SdkInitResult {
     uint32       discovered_orphans     = 7;  // Phase 2: count of on-disk folders without registry rows.
     string       warning                = 8;  // Optional non-fatal note (e.g. "offline mode", "auth deferred").
     int64        duration_ms            = 9;  // Wall-clock duration for this phase.
+
+    // flutter-core-009: explicit two-phase HTTP-setup completion flag,
+    // decoupled from services-init completion so SDKs that initialize
+    // offline (no connectivity) can still report success=true with
+    // has_completed_http_setup=false and retry HTTP later via the
+    // SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+    // (`internal static var hasCompletedHTTPSetup`) and is the canonical
+    // signal Flutter / Web / RN consume to decide whether the next
+    // download/authenticated call can proceed without a retryHTTP step.
+    //
+    // Distinct from `http_configured` (field 4) which historically meant
+    // "HTTP transport wired up at this phase's call site"; this field is
+    // the cross-phase latched bit that survives between phase calls.
+    bool         has_completed_http_setup = 10;
 }

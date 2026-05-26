@@ -98,42 +98,54 @@ public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Environment values — must match RAC_ENV_* in
+/// Environment values — must align with RAC_ENV_* in
 /// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-/// (development=0, staging=1, production=2). Numeric values are part of the
-/// wire format; do not reorder.
+/// (development=0, staging=1, production=2). Per proto3 convention the zero
+/// value is reserved as UNSPECIFIED; SDKs that omit the field default to
+/// DEVELOPMENT inside to_rac_environment() (sdk_init.cpp). The wire-format
+/// numeric values are part of the protocol contract; do not reorder.
+///
+/// idl-002: semantically duplicates model_types.proto::SDKEnvironment (same
+/// development/staging/production tristate), but is kept as a separate enum
+/// to avoid pulling model_types.proto into the SDK init dependency graph.
+/// Callers crossing the boundary (e.g. RunAnywhere.ts mapSdkInitEnvironment,
+/// CppBridge+SdkInit.swift mapEnvironment) translate between the two.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
-  case development // = 0
-  case staging // = 1
-  case production // = 2
+  case unspecified // = 0
+  case development // = 1
+  case staging // = 2
+  case production // = 3
   case UNRECOGNIZED(Int)
 
   public init() {
-    self = .development
+    self = .unspecified
   }
 
   public init?(rawValue: Int) {
     switch rawValue {
-    case 0: self = .development
-    case 1: self = .staging
-    case 2: self = .production
+    case 0: self = .unspecified
+    case 1: self = .development
+    case 2: self = .staging
+    case 3: self = .production
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
 
   public var rawValue: Int {
     switch self {
-    case .development: return 0
-    case .staging: return 1
-    case .production: return 2
+    case .unspecified: return 0
+    case .development: return 1
+    case .staging: return 2
+    case .production: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
   public static let allCases: [RASdkInitEnvironment] = [
+    .unspecified,
     .development,
     .staging,
     .production,
@@ -155,7 +167,7 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var environment: RASdkInitEnvironment = .development
+  public var environment: RASdkInitEnvironment = .unspecified
 
   /// May be empty in development mode.
   public var apiKey: String = String()
@@ -262,6 +274,23 @@ public nonisolated struct RASdkInitResult: @unchecked Sendable {
     set {_uniqueStorage()._durationMs = newValue}
   }
 
+  /// flutter-core-009: explicit two-phase HTTP-setup completion flag,
+  /// decoupled from services-init completion so SDKs that initialize
+  /// offline (no connectivity) can still report success=true with
+  /// has_completed_http_setup=false and retry HTTP later via the
+  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
+  /// signal Flutter / Web / RN consume to decide whether the next
+  /// download/authenticated call can proceed without a retryHTTP step.
+  ///
+  /// Distinct from `http_configured` (field 4) which historically meant
+  /// "HTTP transport wired up at this phase's call site"; this field is
+  /// the cross-phase latched bit that survives between phase calls.
+  public var hasCompletedHTTPSetup_p: Bool {
+    get {_storage._hasCompletedHTTPSetup_p}
+    set {_uniqueStorage()._hasCompletedHTTPSetup_p = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -278,7 +307,7 @@ nonisolated extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_UNSPECIFIED\0\u{1}SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
 }
 
 nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -301,7 +330,7 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.environment != .development {
+    if self.environment != .unspecified {
       try visitor.visitSingularEnumField(value: self.environment, fieldNumber: 1)
     }
     if !self.apiKey.isEmpty {
@@ -347,7 +376,7 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0")
 
   fileprivate class _StorageClass {
     var _phase: RASdkInitPhase = .unspecified
@@ -359,6 +388,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
     var _discoveredOrphans: UInt32 = 0
     var _warning: String = String()
     var _durationMs: Int64 = 0
+    var _hasCompletedHTTPSetup_p: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -378,6 +408,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
       _discoveredOrphans = source._discoveredOrphans
       _warning = source._warning
       _durationMs = source._durationMs
+      _hasCompletedHTTPSetup_p = source._hasCompletedHTTPSetup_p
     }
   }
 
@@ -405,6 +436,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._discoveredOrphans) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._warning) }()
         case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._durationMs) }()
+        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._hasCompletedHTTPSetup_p) }()
         default: break
         }
       }
@@ -444,6 +476,9 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
       if _storage._durationMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._durationMs, fieldNumber: 9)
       }
+      if _storage._hasCompletedHTTPSetup_p != false {
+        try visitor.visitSingularBoolField(value: _storage._hasCompletedHTTPSetup_p, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -462,6 +497,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         if _storage._discoveredOrphans != rhs_storage._discoveredOrphans {return false}
         if _storage._warning != rhs_storage._warning {return false}
         if _storage._durationMs != rhs_storage._durationMs {return false}
+        if _storage._hasCompletedHTTPSetup_p != rhs_storage._hasCompletedHTTPSetup_p {return false}
         return true
       }
       if !storagesAreEqual {return false}
