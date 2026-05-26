@@ -3260,6 +3260,15 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 
         if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
                                       callbacks->user_data) != RAC_SUCCESS) {
+            // commons-core-infra-016: defensive guard. The list_directory
+            // contract says "no allocation on failure"; the C ABI is
+            // implemented by every platform SDK and a future regression
+            // could leave a partial allocation here. If callers DID populate
+            // model_folders before returning non-success, free it through
+            // their canonical entry point so we don't leak.
+            if (model_folders && callbacks->free_entries) {
+                callbacks->free_entries(model_folders, folder_count, callbacks->user_data);
+            }
             continue;
         }
 
