@@ -44,6 +44,17 @@ const RAC_ERROR_CANCELLED = -233;
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
 
+/**
+ * Chunk size used to fan a fully-received body out through the C-side
+ * `rac_http_body_chunk_fn` callback. Sync XHR cannot expose a true network
+ * stream (the browser holds the response until completion), but splitting
+ * the in-memory buffer into bounded chunks keeps the WASM heap-scratch
+ * footprint small and gives the C-side progress callback meaningful
+ * granularity. Mirrors the commons-side `RAC_HTTP_DEFAULT_CHUNK_SIZE_BYTES`
+ * default in `rac_http_transport.h`. 1 MiB matches the commons producer.
+ */
+const STREAM_CHUNK_SIZE = 1 * 1024 * 1024;
+
 function i64ToNumber(value: number | bigint): number {
   return typeof value === 'bigint' ? Number(value) : value;
 }
@@ -312,15 +323,32 @@ export class FetchHttpTransport {
           : new Uint8Array(0);
       const total = body.length;
 
-      // Deliver the whole buffer in a single callback (matching the
-      // coarse-granularity behaviour of the emscripten_fetch path). A
-      // future refactor can split into multiple chunks for large
-      // downloads if fine-grained progress is needed.
+      // Deliver the body through `STREAM_CHUNK_SIZE`-sized callbacks so the
+      // C-side `rac_http_body_chunk_fn` sees meaningful progress and the
+      // WASM heap-scratch buffer (allocated inside `invokeChunkCallback`)
+      // stays bounded — without this, a multi-GB GGUF download would
+      // malloc the entire body twice (once in `xhr.response`, once in the
+      // heap scratch) and trip the engine's quota.
+      //
+      // Note: sync XHR cannot expose a true network stream; the browser
+      // already holds the full body in memory by this point. The chunk
+      // fan-out below recovers progress granularity and bounds the
+      // scratch allocation, which is the part of the OOM risk the SDK
+      // can address from JS land. Truly streaming network reads require
+      // an async transport (fetch + ReadableStream) and JSPI/ASYNCIFY in
+      // the WASM build — tracked separately.
       let cancelled = false;
       if (cbPtr !== 0 && total > 0) {
-        const keepGoing = this.invokeChunkCallback(cbPtr, body, total, total, cbUd);
-        if (keepGoing === RAC_FALSE) {
-          cancelled = true;
+        let offset = 0;
+        while (offset < total) {
+          const end = Math.min(offset + STREAM_CHUNK_SIZE, total);
+          const chunk = body.subarray(offset, end);
+          const keepGoing = this.invokeChunkCallback(cbPtr, chunk, end, total, cbUd);
+          if (keepGoing === RAC_FALSE) {
+            cancelled = true;
+            break;
+          }
+          offset = end;
         }
       }
 
