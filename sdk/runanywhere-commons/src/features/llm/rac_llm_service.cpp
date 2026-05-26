@@ -166,7 +166,18 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     }
     service->ops = vt->llm_ops;
     service->impl = impl;
+    // commons-features-llm-rag-005: strdup can return NULL on allocation
+    // failure. Previously the result was assigned without checking, so a
+    // failing strdup left service->model_id NULL and the service shipped
+    // with a half-initialized record. Honor RAC_ERROR_OUT_OF_MEMORY and
+    // unwind the partially constructed service + backend impl.
     service->model_id = strdup(model_id);
+    if (!service->model_id) {
+        if (vt->llm_ops->destroy)
+            vt->llm_ops->destroy(impl);
+        free(service);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     *out_handle = service;
 
     // DUP-06: single source of truth for the "*.backend.created" telemetry
