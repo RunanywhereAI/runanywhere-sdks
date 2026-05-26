@@ -648,16 +648,41 @@ export async function ragEnsureReady(
   return availability;
 }
 
+/**
+ * Public `RunAnywhere.rag.*` namespace. Members marked `@webOnly` are
+ * Web-platform extensions that do not appear in the Swift source-of-truth
+ * (`RunAnywhere+RAG.swift`). They live here until either the cross-SDK
+ * spec adopts them (Kotlin / Flutter / RN / Swift) or the consumer surface
+ * migrates to the Swift-aligned subset. See CLUSTER-44 / web-core-011.
+ *
+ * Swift-aligned surface (cross-SDK canonical):
+ *   - `createPipeline`     ↔ `ragCreatePipeline`
+ *   - `destroyPipeline`    ↔ `ragDestroyPipeline`
+ *   - `ingest`             ↔ `ragIngest`
+ *   - `addDocumentsBatch`  ↔ `ragAddDocumentsBatch`
+ *   - `query`              ↔ `ragQuery`
+ *   - `clearDocuments`     ↔ `ragClearDocuments`
+ *   - `getDocumentCount`   ↔ `ragGetDocumentCount`
+ *   - `getStatistics`      ↔ `ragGetStatistics`
+ */
 export const RAG = {
+  /** @webOnly Provider wiring entry point. Backend packages call this during register(). */
   setProvider: setRAGProvider,
+  /** @webOnly Construct a native (WASM-session-backed) RAG provider. */
   createNativeProvider: createRAGNativeProvider,
+  /** @webOnly Install a pre-existing native RAG session handle as the active provider. */
   setSessionHandle: setRAGSessionHandle,
+  /** @webOnly Inspect provider/availability without throwing. */
   availability: getRAGAvailability,
+  /** @webOnly Convenience boolean for availability checks. */
   isAvailable: isRAGAvailable,
+  /** @webOnly Inspect the active provider's declared capabilities (listing/removal/persistence). */
   capabilities: ragGetCapabilities,
+  /** @webOnly Build a default `RAGConfiguration` with sensible field defaults. */
   defaultConfiguration: createDefaultRAGConfiguration,
   createPipeline: ragCreatePipeline,
   destroyPipeline: ragDestroyPipeline,
+  /** @webOnly Idempotent "create-if-missing" bootstrap used by Web example apps. */
   ensureReady: ragEnsureReady,
   ingest: ragIngest,
   addDocumentsBatch: ragAddDocumentsBatch,
@@ -665,7 +690,9 @@ export const RAG = {
   clearDocuments: ragClearDocuments,
   getDocumentCount: ragGetDocumentCount,
   getStatistics: ragGetStatistics,
+  /** @webOnly Document-level listing — pending the cross-SDK native list API. */
   listDocuments: ragListDocuments,
+  /** @webOnly Document-level removal — pending the cross-SDK native remove API. */
   removeDocument: ragRemoveDocument,
 };
 
