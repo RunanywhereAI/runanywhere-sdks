@@ -187,13 +187,16 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     // racing destroy() against an in-flight run is safe once the
     // shared_ptr copy is established without UB.
     //
-    // pass3-syn-090: First-pass snapshot may be empty if a process_stream
-    // call won the outer mutex before destroy and has not yet stored its
-    // pipeline. We always re-snapshot and re-cancel AFTER acquiring the
-    // outer mutex below (cancel is idempotent) to close that gap. The
-    // matching guard in process_stream (is_shutting_down check under the
-    // outer mutex) ensures any process_stream call that observes the
-    // shutdown flag bails out without storing a pipeline at all.
+    // commons-features-voice-008: a second "late_snapshot" re-cancel
+    // pass once we acquire the outer mutex would only fire if a
+    // concurrent process_stream stored a fresh pipeline AFTER our pre-
+    // mutex snapshot ran. process_stream holds handle->mutex from the
+    // moment it stores `handle->pipeline = pipeline` through `reset()`
+    // on the way out, so by the time we acquire the outer mutex below
+    // any such concurrent run has already drained and reset the
+    // pipeline back to null. The previously-emitted late-snapshot
+    // branch was unreachable; removed to keep the teardown path
+    // straightforward.
     std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
     {
         std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
@@ -210,20 +213,6 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
-
-        // pass3-syn-090: re-snapshot pipeline under the outer mutex and
-        // cancel again. If a process_stream call interleaved between the
-        // first snapshot above and this lock acquire, it may have stored
-        // a fresh pipeline before observing is_shutting_down. cancel() is
-        // non-blocking and idempotent.
-        std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> late_snapshot;
-        {
-            std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-            late_snapshot = handle->pipeline;
-        }
-        if (late_snapshot && late_snapshot != pipeline_snapshot) {
-            late_snapshot->cancel();
-        }
 
         // Drop the pipeline before component handles so its nodes (which
         // call into stt/llm/tts/vad) cannot outlive the handles they use.
@@ -333,6 +322,12 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     // and cancel_all() is the only way out of a stalled stage.
     // commons-features-voice-003: snapshot under pipeline_mutex so the
     // shared_ptr copy is synchronized with process_stream's store/reset.
+    //
+    // commons-features-voice-008: process_stream holds handle->mutex for
+    // the entire store->run->reset window. By the time we acquire the
+    // outer mutex below, any concurrent run has drained and reset
+    // handle->pipeline to null, so the previously-emitted late-snapshot
+    // re-cancel branch was unreachable; removed for clarity.
     std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
     {
         std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
@@ -345,18 +340,6 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     RAC_LOG_INFO("VoiceAgent", "Cleaning up Voice Agent");
-
-    // pass3-syn-090: re-snapshot pipeline under the outer mutex and cancel
-    // again. A process_stream call may have won the outer mutex first and
-    // stored a pipeline AFTER our pre-lock snapshot ran.
-    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> late_snapshot;
-    {
-        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-        late_snapshot = handle->pipeline;
-    }
-    if (late_snapshot && late_snapshot != pipeline_snapshot) {
-        late_snapshot->cancel();
-    }
 
     // Tear the pipeline down before the underlying components so its
     // worker threads cannot dispatch into stt/llm/tts/vad after cleanup.
