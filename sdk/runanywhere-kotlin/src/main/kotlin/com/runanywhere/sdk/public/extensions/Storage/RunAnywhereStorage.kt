@@ -31,6 +31,7 @@ import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
@@ -258,6 +259,22 @@ suspend fun RunAnywhere.cleanTempFiles() {
     if (!CppBridgeFileManager.clearTemp()) {
         throw SDKException.storage("Failed to clean temp files")
     }
+}
+
+// MARK: - Device Registration
+
+/**
+ * Clear the persisted device-registration flag so the next services
+ * initialization re-runs the device-registration handshake against the
+ * configured backend. Persists the cleared state through the secure-storage
+ * adapter the SDK already uses for the `runanywhere_device_registered`
+ * key — callers must NOT reach into app-private SharedPreferences to wipe
+ * `runanywhere_sdk`/`com.runanywhere.sdk.deviceRegistered`, which never
+ * shadowed the real flag.
+ */
+fun RunAnywhere.resetDeviceRegistration() {
+    requireStorageInitialized(this)
+    CppBridgeDevice.setRegisteredCallback(false)
 }
 
 // MARK: - Helpers
