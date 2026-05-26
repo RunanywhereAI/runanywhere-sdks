@@ -283,11 +283,9 @@ class DartBridge {
   /// do not leak across `RunAnywhere.reset()` -> `initialize()` cycles.
   ///
   /// Mirrors Swift `CppBridge.shutdown()`
-  /// (`sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift`):
+  /// (`sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift:176`):
   /// destroys AI components (LLM -> STT -> TTS -> VAD -> VoiceAgent -> VLM)
-  /// sequentially BEFORE Telemetry + Events teardown. Note: VAD and VLM
-  /// Dart bridges currently expose no `destroy()` (their state lives in
-  /// commons model lifecycle); they are intentionally skipped here.
+  /// sequentially BEFORE Telemetry + Events teardown.
   static Future<void> shutdown() async {
     if (!_isInitialized) {
       _logger.debug('Not initialized, nothing to shutdown');
@@ -298,12 +296,14 @@ class DartBridge {
 
     // Destroy per-modality component handles FIRST so commons-side state
     // is released while Telemetry/Events are still wired (mirrors Swift's
-    // CppBridge.shutdown() order). Each destroy() is best-effort and
-    // swallows its own errors internally.
+    // CppBridge.shutdown() order at CppBridge.swift:181-186). Each destroy()
+    // is best-effort and swallows its own errors internally.
     DartBridgeLLM.shared.destroy();
     DartBridgeSTT.shared.destroy();
     DartBridgeTTS.shared.destroy();
+    DartBridgeVAD.shared.destroy();
     DartBridgeVoiceAgent.shared.destroy();
+    DartBridgeVLM.shared.destroy();
 
     // Shutdown in reverse order of initialization
     DartBridgeTelemetry.shutdown();

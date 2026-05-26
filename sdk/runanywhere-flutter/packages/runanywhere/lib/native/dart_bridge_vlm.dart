@@ -229,4 +229,25 @@ class DartBridgeVLM {
       return null;
     }
   }
+
+  // MARK: - Cleanup
+
+  /// Best-effort VLM teardown for `DartBridge.shutdown()`. Mirrors Swift
+  /// `CppBridge+VLM.destroy()` so the Flutter shutdown path is shape-symmetric
+  /// with the other modalities (LLM, STT, TTS, VAD, VoiceAgent). The current
+  /// Dart VLM bridge does not pin a level-3 handle — VLM generate/stream/cancel
+  /// route through the lifecycle-owned proto ABIs, so the commons unload path
+  /// already releases that state. We still cancel any in-flight lifecycle
+  /// generation so workers don't keep burning CPU after shutdown, mirroring
+  /// what Swift's `ComponentActor.destroy()` does internally before tearing
+  /// down its retained handle. If/when Flutter gains a Dart-side VLM handle,
+  /// this entry point becomes the place to also call `rac_vlm_component_destroy`.
+  void destroy() {
+    try {
+      cancel();
+      _logger.debug('VLM lifecycle cancelled on shutdown');
+    } catch (e) {
+      _logger.debug('VLM cancel-on-destroy failed: $e');
+    }
+  }
 }
