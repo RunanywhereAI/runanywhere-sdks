@@ -558,11 +558,20 @@ private final class ToolExecuteContext: @unchecked Sendable {
 }
 
 /// Synchronously invoke the registered Swift `ToolExecutor` for a tool call
-/// emitted by the C loop. Bridges async to sync via `DispatchSemaphore`,
-/// matching the canonical Swift bridge pattern used elsewhere
-/// (e.g. `CppBridge+Device.swift` HTTP callbacks). Errors / unknown tools are
-/// surfaced as a failed `ToolResult` so the C loop can record them and
-/// continue or terminate per its policy.
+/// emitted by the C loop. Bridges async-to-sync via an `NSCondition`-backed
+/// `ToolResultBox`: a detached Task runs the executor on the cooperative
+/// pool, and the calling C thread parks on `NSCondition.wait(until:)` with
+/// a generous timeout. Using `NSCondition` instead of `DispatchSemaphore`
+/// keeps libdispatch's worker-thread budget free for the cooperative pool
+/// to make progress under high concurrency (50× simultaneous tool calls in
+/// the regression test, swift-public-features-013): semaphore wait pins one
+/// libdispatch worker per in-flight tool, while `NSCondition.wait` releases
+/// the underlying mutex and parks the thread on a kernel wait queue with no
+/// libdispatch entanglement. The timeout caps the worst case so a hung
+/// executor surfaces as a failed `ToolResult` instead of an indefinite
+/// thread-pool stall. Errors / unknown tools are returned as failed
+/// `ToolResult`s so the C loop can record them and continue or terminate
+/// per its policy.
 private let toolExecuteTrampoline: ToolCallingRunLoopProtoABI.ExecuteCallback = { inBytes, inSize, outBuffer, userData in
     guard let outBuffer else {
         return RAC_ERROR_NULL_POINTER
@@ -590,34 +599,58 @@ private let toolExecuteTrampoline: ToolCallingRunLoopProtoABI.ExecuteCallback = 
         return writeToolResult(toolResult: failed, into: outBuffer, logger: logger)
     }
 
-    // Bridge the async Swift executor to the synchronous C callback.
-    let semaphore = DispatchSemaphore(value: 0)
+    // Park on an `NSCondition`-backed result box while the detached Task
+    // resolves the executor. The detached Task gets explicit
+    // `.userInitiated` priority so the cooperative scheduler hoists it over
+    // background work; the calling thread parks via `awaitResult(timeout:)`
+    // with a generous cap so a misbehaving executor cannot wedge the C
+    // loop indefinitely.
     let resultBox = ToolResultBox()
-    Task.detached {
+    Task.detached(priority: .userInitiated) {
         let result = await RunAnywhere.executeTool(toolCall)
         resultBox.set(result)
-        semaphore.signal()
     }
-    semaphore.wait()
-    let toolResult = resultBox.value ?? failedResult(
+    let toolResult = resultBox.awaitResult(timeout: 120.0) ?? failedResult(
         name: toolCall.name,
-        error: "Tool executor returned no result"
+        error: "Tool executor timed out or returned no result"
     )
 
     return writeToolResult(toolResult: toolResult, into: outBuffer, logger: logger)
 }
 
 /// Single-slot box used to ferry an async-produced `RAToolResult` back to the
-/// blocking C trampoline. The semaphore enforces happens-before, but a
-/// concurrency-safe wrapper keeps Swift 6 strict-concurrency happy.
+/// blocking C trampoline. `NSCondition` provides both mutual exclusion and
+/// thread parking; the calling C thread waits on the condition while the
+/// detached executor Task delivers the result. This avoids
+/// `DispatchSemaphore`'s tendency to occupy a libdispatch worker thread for
+/// the duration of the wait, which under heavy concurrent tool-call load
+/// (swift-public-features-013) could starve the libdispatch pool the
+/// cooperative scheduler also draws from.
 private final class ToolResultBox: @unchecked Sendable {
+    private let condition = NSCondition()
     private var stored: RAToolResult?
 
     func set(_ value: RAToolResult) {
+        condition.lock()
         stored = value
+        condition.signal()
+        condition.unlock()
     }
 
-    var value: RAToolResult? { stored }
+    /// Park the calling thread on the condition until a result is set or the
+    /// deadline elapses. Returns `nil` if the timeout fires before the
+    /// detached executor delivered a result.
+    func awaitResult(timeout: TimeInterval) -> RAToolResult? {
+        let deadline = Date(timeIntervalSinceNow: timeout)
+        condition.lock()
+        defer { condition.unlock() }
+        while stored == nil {
+            if !condition.wait(until: deadline) {
+                return nil
+            }
+        }
+        return stored
+    }
 }
 
 /// pass2-syn-007 / pass3-syn-059: shared handle slot between the
