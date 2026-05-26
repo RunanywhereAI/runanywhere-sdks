@@ -43,6 +43,10 @@ export type {
   PluginLoaderCapability,
 } from './Public/Extensions/RunAnywhere+PluginLoader';
 export type { RAGDocumentSummary } from './Public/Extensions/RunAnywhere+RAG';
+export type {
+  BackendModalitySupport,
+  OnnxBackendStatus,
+} from './Public/Extensions/Backends/onnxStatus';
 export { LogLevel } from './Public/Extensions/RunAnywhere+Logging';
 export type {
   HardwareProfile,

@@ -19,8 +19,10 @@
 
 package com.runanywhere.sdk.public
 
+import android.content.Context
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -280,6 +282,38 @@ object RunAnywhere {
             }
 
         performCoreInit(params = params, startBackgroundServices = true)
+    }
+
+    /**
+     * Initialize the RunAnywhere SDK with an Android [Context] (Android-specific
+     * convenience overload). Absorbs the previously example-side
+     * `AndroidPlatformContext.initialize(context)` call so callers do not need
+     * to reach into SDK-internal foundation packages.
+     *
+     * The Context is wired into [AndroidPlatformContext] (which feeds
+     * `CppBridgePlatformAdapter` for secure storage and `CppBridgeModelPaths`
+     * for filesDir/cacheDir resolution) before Phase 1 starts. Subsequent calls
+     * with the same application context are no-ops at the `AndroidPlatformContext`
+     * level.
+     *
+     * Equivalent to the Swift `RunAnywhere.initialize(apiKey:baseURL:environment:)`
+     * entry point — Apple platforms do not need an explicit Context handle
+     * (Keychain is process-scoped).
+     *
+     * @param context Android application context (any Context is fine — the
+     *                application context will be retained, not the activity).
+     * @param apiKey  API key (optional for development).
+     * @param baseURL Backend API base URL (optional for development).
+     * @param environment SDK environment (default: DEVELOPMENT).
+     */
+    fun initialize(
+        context: Context,
+        apiKey: String? = null,
+        baseURL: String? = null,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    ) {
+        AndroidPlatformContext.initialize(context)
+        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
     }
 
     /**

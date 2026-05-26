@@ -63,6 +63,7 @@ import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
 import { createStorageNamespace } from './Extensions/RunAnywhere+Storage';
 import { disposeSpeechProvider } from './Extensions/SpeechProvider';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
@@ -884,6 +885,13 @@ export const RunAnywhere = {
 
   /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
   hardware: HardwareCapability,
+
+  /**
+   * Backend availability snapshots — `RunAnywhere.backends.onnxStatus()`
+   * etc. Returns build-flag-free reasons that example apps can render
+   * directly without leaking CMake symbol names into the UI.
+   */
+  backends: BackendsCapability,
 
   // =========================================================================
   // Swift-shaped flat facade
