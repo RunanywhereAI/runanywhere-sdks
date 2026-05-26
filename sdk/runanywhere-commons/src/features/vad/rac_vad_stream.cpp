@@ -34,6 +34,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "vad_threshold_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "vad_options.pb.h"
@@ -90,36 +91,6 @@ std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
 
 std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     static std::unordered_map<uint64_t, StreamSession> m;
-    return m;
-}
-
-// pass3-syn-088: per-handle mutex serializing the get/set/process/restore
-// threshold sequence below. Without it, two threads feeding different
-// sessions on the same VAD component handle can interleave their
-// rac_vad_component_{get,set}_energy_threshold calls and the second
-// thread's "restore" can clobber the first thread's persistent threshold
-// with a stale value. The lock is held for the entire get→set→process→
-// restore window so the component-level mutex acquisitions inside
-// vad_component.cpp become a single critical section from the streaming
-// path's point of view. The map is owned via shared_ptr because we
-// release g_mu() before locking the per-handle mutex (we must not call
-// into the VAD component while holding g_mu(), which is also taken by
-// the dispatch path); shared_ptr keeps the mutex alive across that gap
-// even if a teardown thread erases the map entry concurrently.
-std::unordered_map<rac_handle_t, std::shared_ptr<std::mutex>>& g_threshold_mutexes() {
-    static std::unordered_map<rac_handle_t, std::shared_ptr<std::mutex>> m;
-    return m;
-}
-
-std::shared_ptr<std::mutex> get_or_create_threshold_mutex(rac_handle_t handle) {
-    std::lock_guard<std::mutex> lock(g_mu());
-    auto& mutexes = g_threshold_mutexes();
-    auto it = mutexes.find(handle);
-    if (it != mutexes.end()) {
-        return it->second;
-    }
-    auto m = std::make_shared<std::mutex>();
-    mutexes.emplace(handle, m);
     return m;
 }
 
@@ -309,7 +280,7 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     rac_bool_t is_speech = RAC_FALSE;
     rac_result_t rc = RAC_SUCCESS;
     if (threshold_override > 0.0f) {
-        auto handle_mutex = get_or_create_threshold_mutex(component_handle);
+        auto handle_mutex = rac::vad::get_or_create_threshold_mutex(component_handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(component_handle);
         (void)rac_vad_component_set_energy_threshold(component_handle, threshold_override);

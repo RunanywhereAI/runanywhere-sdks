@@ -39,6 +39,7 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/rac_route.h"
 #include "rac/router/rac_routing_hints.h"
+#include "vad_threshold_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "sdk_events.pb.h"
@@ -1051,17 +1052,27 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
                                                               : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     }
 
-    const float original_threshold = threshold;
     const bool has_override = options.threshold() > 0.0f;
+
+    // commons-features-voice-001: serialize the get→set(override)→process→
+    // restore window on the same per-handle mutex used by the streaming
+    // proto path (rac_vad_stream.cpp). Without it, two threads on the same
+    // VAD handle (one one-shot, one streaming, or two of either) can
+    // interleave their set/restore calls and corrupt the persistent
+    // energy_threshold. Only acquire the mutex when an override is in
+    // effect; the common no-override path stays lock-free.
+    rac_bool_t is_speech = RAC_FALSE;
+    rac_result_t rc = RAC_SUCCESS;
     if (has_override) {
+        auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
+        std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
+        const float original_threshold = rac_vad_component_get_energy_threshold(handle);
         (void)rac_vad_component_set_energy_threshold(handle, options.threshold());
         threshold = options.threshold();
-    }
-
-    rac_bool_t is_speech = RAC_FALSE;
-    rac_result_t rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
-    if (has_override) {
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
         (void)rac_vad_component_set_energy_threshold(handle, original_threshold);
+    } else {
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
     }
     if (rc != RAC_SUCCESS) {
         publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);

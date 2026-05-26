@@ -829,6 +829,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # CPP-03: lifecycle-owned proto-byte VADStreamEvent ABI
     src/features/vad/rac_vad_stream.cpp
+    # commons-features-voice-001/006: shared per-handle threshold-mutex registry.
+    src/features/vad/vad_threshold_registry.cpp
     # Wake Word — high-level service scaffold was removed in Phase F of the
     # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
