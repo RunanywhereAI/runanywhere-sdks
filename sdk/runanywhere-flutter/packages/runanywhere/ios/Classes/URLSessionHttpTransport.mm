@@ -524,7 +524,16 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
     NSURLSessionDataTask* task = [session dataTaskWithRequest:urlRequest];
     if (!ownsSession) {
         // Host-provided sessions carry their own delegate. Bind the callbacks
-        // directly onto the task via the task-delegate API (iOS 15+).
+        // directly onto the task via the task-delegate API (iOS 15+). Assign
+        // BEFORE we publish the task anywhere (registry, delegate.task
+        // backref, [task resume]) — `task.delegate` is a weak property and
+        // host-provided sessions can have an active delegateQueue from
+        // unrelated in-flight work, so we must guarantee the per-task
+        // delegate is wired before any code path (cancelAllStreams via the
+        // registry, URLSession's own dispatch on resume) can observe the
+        // task. Mirrors the Swift reference's
+        // `task.delegate = delegate; task.resume()` ordering in
+        // `sdk/runanywhere-swift/Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift`.
         task.delegate = delegate;
     }
     delegate.task = task;
