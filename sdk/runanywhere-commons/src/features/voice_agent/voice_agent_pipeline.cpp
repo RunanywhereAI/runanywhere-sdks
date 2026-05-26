@@ -20,16 +20,28 @@
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/graph/graph_scheduler.hpp"
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/graph/stream_edge.hpp"
+
+// commons-features-voice-004: pipeline nodes prefer the global lifecycle
+// bridge (level-1 impl + ops) so callers that loaded models via
+// rac_model_lifecycle_load_proto / RunAnywhere.loadModel are served by the
+// graph pipeline too. Fallback to the per-handle component preserves the
+// legacy load path (rac_voice_agent_load_*_model). Mirrors the dispatch
+// pattern used by rac_voice_agent_process_voice_turn_proto.
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
 
 namespace rac::voice_agent {
 
@@ -181,9 +193,24 @@ class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
 
    protected:
     void process(AudioFrame frame, OutputEdge& out) override {
+        // commons-features-voice-004: prefer the canonical lifecycle STT
+        // ref so callers that loaded models via the lifecycle bridge are
+        // served by the pipeline. Fall back to the per-handle component
+        // for legacy load paths.
+        rac::lifecycle::LifecycleSttRef ref{};
+        const bool have_lifecycle =
+            rac::lifecycle::acquire_lifecycle_stt(&ref) == RAC_SUCCESS;
         rac_stt_result_t r = {};
-        rac_result_t status =
-            rac_stt_component_transcribe(stt_, frame.data, frame.size, nullptr, &r);
+        rac_result_t status;
+        if (have_lifecycle) {
+            rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
+            status = rac_stt_transcribe(&service, frame.data, frame.size, nullptr, &r);
+        } else {
+            status = rac_stt_component_transcribe(stt_, frame.data, frame.size, nullptr, &r);
+        }
+        if (have_lifecycle) {
+            rac::lifecycle::release_lifecycle_stt(&ref);
+        }
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
@@ -217,8 +244,21 @@ class LLMNode : public rac::graph::PipelineNode<Transcript, Response> {
 
    protected:
     void process(Transcript prompt, OutputEdge& out) override {
+        // commons-features-voice-004: prefer lifecycle LLM ref with
+        // per-handle fallback.
+        rac::llm::LifecycleLlmRef ref{};
+        const bool have_lifecycle = rac::llm::acquire_lifecycle_llm(&ref) == RAC_SUCCESS;
         rac_llm_result_t r = {};
-        rac_result_t status = rac_llm_component_generate(llm_, prompt.text.c_str(), nullptr, &r);
+        rac_result_t status;
+        if (have_lifecycle) {
+            rac_llm_service_t service{ref.ops, ref.impl, ref.model_id};
+            status = rac_llm_generate(&service, prompt.text.c_str(), nullptr, &r);
+        } else {
+            status = rac_llm_component_generate(llm_, prompt.text.c_str(), nullptr, &r);
+        }
+        if (have_lifecycle) {
+            rac::llm::release_lifecycle_llm(&ref);
+        }
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
@@ -256,8 +296,22 @@ class TTSNode : public rac::graph::PipelineNode<Response, ProcessedPayload> {
 
    protected:
     void process(Response resp, OutputEdge& out) override {
+        // commons-features-voice-004: prefer lifecycle TTS ref with
+        // per-handle fallback.
+        rac::lifecycle::LifecycleTtsRef ref{};
+        const bool have_lifecycle =
+            rac::lifecycle::acquire_lifecycle_tts(&ref) == RAC_SUCCESS;
         rac_tts_result_t r = {};
-        rac_result_t status = rac_tts_component_synthesize(tts_, resp.text.c_str(), nullptr, &r);
+        rac_result_t status;
+        if (have_lifecycle) {
+            rac_tts_service_t service{ref.ops, ref.impl, ref.model_id};
+            status = rac_tts_synthesize(&service, resp.text.c_str(), nullptr, &r);
+        } else {
+            status = rac_tts_component_synthesize(tts_, resp.text.c_str(), nullptr, &r);
+        }
+        if (have_lifecycle) {
+            rac::lifecycle::release_lifecycle_tts(&ref);
+        }
         if (status != RAC_SUCCESS) {
             dispatcher_.emit_error(status);
             return;
