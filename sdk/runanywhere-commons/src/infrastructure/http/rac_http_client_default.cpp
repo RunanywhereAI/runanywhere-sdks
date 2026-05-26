@@ -45,6 +45,11 @@
 // =============================================================================
 namespace rac_internal {
 bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
+// commons-core-infra-006: paired release. Every successful
+// `get_http_transport` MUST be followed by exactly one call to
+// `put_http_transport` so the registry can run the adapter's
+// destroy() outside the dispatch window.
+void put_http_transport(void);
 }
 
 namespace {
@@ -136,30 +141,47 @@ PreparedRequest prepare_request(const rac_http_request_t* req) {
 rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_send == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
+        RAC_LOG_ERROR(kTag,
+                      "rac_http_request_send: no platform HTTP transport registered. "
+                      "Every SDK must call rac_http_transport_register() during init.");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (ops == nullptr || ops->request_send == nullptr) {
+        rac_internal::put_http_transport();
         RAC_LOG_ERROR(kTag,
                       "rac_http_request_send: no platform HTTP transport registered. "
                       "Every SDK must call rac_http_transport_register() during init.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
     PreparedRequest prepared = prepare_request(req);
-    return ops->request_send(ud, &prepared.effective_request, out_resp);
+    rac_result_t rc = ops->request_send(ud, &prepared.effective_request, out_resp);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
                              void* user_data, rac_http_response_t* out_resp_meta) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_stream == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
+        RAC_LOG_ERROR(kTag,
+                      "rac_http_request_stream: no platform HTTP transport (or adapter lacks "
+                      "request_stream op). Every SDK must register a streaming-capable adapter.");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (ops == nullptr || ops->request_stream == nullptr) {
+        rac_internal::put_http_transport();
         RAC_LOG_ERROR(kTag,
                       "rac_http_request_stream: no platform HTTP transport (or adapter lacks "
                       "request_stream op). Every SDK must register a streaming-capable adapter.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
     PreparedRequest prepared = prepare_request(req);
-    return ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
+    rac_result_t rc =
+        ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
@@ -167,16 +189,24 @@ rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from
                              rac_http_response_t* out_resp_meta) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_resume == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
+        RAC_LOG_ERROR(kTag,
+                      "rac_http_request_resume: no platform HTTP transport (or adapter lacks "
+                      "request_resume op). Every SDK must register a resumable-capable adapter.");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (ops == nullptr || ops->request_resume == nullptr) {
+        rac_internal::put_http_transport();
         RAC_LOG_ERROR(kTag,
                       "rac_http_request_resume: no platform HTTP transport (or adapter lacks "
                       "request_resume op). Every SDK must register a resumable-capable adapter.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
     PreparedRequest prepared = prepare_request(req);
-    return ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb, user_data,
-                               out_resp_meta);
+    rac_result_t rc = ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb,
+                                          user_data, out_resp_meta);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 }  // namespace

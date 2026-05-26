@@ -501,6 +501,9 @@ struct rac_http_client {
 
 namespace rac_internal {
 bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
+// commons-core-infra-006: paired release for `get_http_transport`.
+// Must be called exactly once after every successful `get_*`.
+void put_http_transport(void);
 }
 
 namespace {
@@ -548,12 +551,18 @@ rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* o
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_send == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
         return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
                                        out_resp);
     }
-    return ops->request_send(ud, &prepared.effective_request, out_resp);
+    if (ops == nullptr || ops->request_send == nullptr) {
+        rac_internal::put_http_transport();
+        return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
+                                       out_resp);
+    }
+    rac_result_t rc = ops->request_send(ud, &prepared.effective_request, out_resp);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
@@ -561,12 +570,19 @@ rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_stream == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
         return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
                                          user_data, out_resp_meta);
     }
-    return ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
+    if (ops == nullptr || ops->request_stream == nullptr) {
+        rac_internal::put_http_transport();
+        return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
+                                         user_data, out_resp_meta);
+    }
+    rac_result_t rc =
+        ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
@@ -575,13 +591,19 @@ rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_resume == nullptr) {
+    if (!rac_internal::get_http_transport(&ops, &ud)) {
         return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
                                          resume_from_byte, cb, user_data, out_resp_meta);
     }
-    return ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb, user_data,
-                               out_resp_meta);
+    if (ops == nullptr || ops->request_resume == nullptr) {
+        rac_internal::put_http_transport();
+        return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
+                                         resume_from_byte, cb, user_data, out_resp_meta);
+    }
+    rac_result_t rc = ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb,
+                                          user_data, out_resp_meta);
+    rac_internal::put_http_transport();
+    return rc;
 }
 
 }  // namespace
