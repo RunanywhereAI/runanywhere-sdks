@@ -720,6 +720,22 @@ if(TARGET rac_backend_rag)
     target_compile_features(test_rag_request_defaults PRIVATE cxx_std_17)
     rac_test_define_have_protobuf(test_rag_request_defaults)
     add_test(NAME rag_request_defaults_tests COMMAND test_rag_request_defaults)
+
+    # commons-features-llm-rag-007: direct ctest for the GraphScheduler-driven
+    # RAG pipeline (rag_pipeline_graph.cpp). Exercises run_rag_query() input
+    # validation and the RAGTokenSink cancel contract that
+    # commons-features-llm-rag-008 relies on.
+    add_executable(test_rag_pipeline_graph test_rag_pipeline_graph.cpp)
+    target_include_directories(test_rag_pipeline_graph PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    )
+    target_link_libraries(test_rag_pipeline_graph PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_pipeline_graph)
+    target_compile_features(test_rag_pipeline_graph PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_pipeline_graph)
+    add_test(NAME rag_pipeline_graph_tests COMMAND test_rag_pipeline_graph)
 endif()
 
 # --- Per-framework "is this file a model file?" parity tests -----------------
