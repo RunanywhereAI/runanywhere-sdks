@@ -161,33 +161,65 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
+// idl-005: pick the canonical system_prompt from the embedded
+// LLMGenerationOptions when set, falling back to the legacy inline field.
+std::string system_prompt_from_request(const LLMGenerateRequest& request) {
+    if (request.has_options() && request.options().has_system_prompt() &&
+        !request.options().system_prompt().empty()) {
+        return request.options().system_prompt();
+    }
+    return request.system_prompt();
+}
+
 // Fills `options` from `request`. The caller-owned `stop_storage`/`stop_ptrs`
 // must outlive every generate/generate_stream dispatch that observes
 // `options.stop_sequences` — they hold the backing memory the C ABI points
 // into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
 // copies stopSequences into the canonical proto request.
+//
+// idl-005: prefer values from the canonical `request.options()` embedded
+// LLMGenerationOptions message when set; fall back to the legacy inline
+// scalar fields for backwards compatibility with callers that have not
+// yet migrated.
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
                                        std::vector<const char*>& stop_ptrs) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    if (request.max_tokens() > 0) {
-        options.max_tokens = request.max_tokens();
+
+    const bool has_options = request.has_options();
+    const auto& opts = request.options();
+
+    const int max_tokens =
+        (has_options && opts.max_tokens() > 0) ? opts.max_tokens() : request.max_tokens();
+    if (max_tokens > 0) {
+        options.max_tokens = max_tokens;
     }
-    if (request.temperature() > 0.0f) {
-        options.temperature = request.temperature();
+
+    const float temperature =
+        (has_options && opts.temperature() > 0.0f) ? opts.temperature() : request.temperature();
+    if (temperature > 0.0f) {
+        options.temperature = temperature;
     }
-    if (request.top_p() > 0.0f) {
-        options.top_p = request.top_p();
+
+    const float top_p =
+        (has_options && opts.top_p() > 0.0f) ? opts.top_p() : request.top_p();
+    if (top_p > 0.0f) {
+        options.top_p = top_p;
     }
+
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     stop_storage.clear();
     stop_ptrs.clear();
-    const int stop_count = request.stop_sequences_size();
+
+    const auto& canonical_stop_sequences =
+        (has_options && opts.stop_sequences_size() > 0) ? opts.stop_sequences()
+                                                        : request.stop_sequences();
+    const int stop_count = canonical_stop_sequences.size();
     if (stop_count > 0) {
         stop_storage.reserve(static_cast<size_t>(stop_count));
-        for (const auto& seq : request.stop_sequences()) {
+        for (const auto& seq : canonical_stop_sequences) {
             if (!seq.empty()) {
                 stop_storage.push_back(seq);
             }
@@ -595,7 +627,7 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                              request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
                              0);
 
-    const std::string system_prompt = request.system_prompt();
+    const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     rac_llm_options_t options =
@@ -687,7 +719,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                              request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
                              0);
 
-    const std::string system_prompt = request.system_prompt();
+    const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
     rac_llm_options_t options =

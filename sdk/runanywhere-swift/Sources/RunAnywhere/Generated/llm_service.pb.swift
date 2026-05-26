@@ -85,9 +85,14 @@ public nonisolated enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// pass3-syn-025: structured field gaps below are intentional and documented;
-/// the wire schema is consciously decoupled from llm_options.proto to avoid
-/// the sdk_events ↔ llm_options package cycle. The companion fix for
+/// pass3-syn-025: the inline scalar fields below historically existed to avoid
+/// importing llm_options.proto. The cycle-avoidance rationale no longer holds
+/// (sdk_events.proto has no transitive dependency on llm_options.proto), so
+/// idl-005 introduces the canonical `LLMGenerationOptions options` embedded
+/// message at field 26. The inline scalar fields are RETAINED for wire-format
+/// backwards compatibility but are deprecated; new code SHOULD populate
+/// `options.*` and consumers SHOULD prefer `options.*` when set (falling back
+/// to the inline fields for legacy callers). The companion fix for
 /// VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
 /// proto carries tts_model_id but not tts_voice_id" issue) lives in
 /// idl/solutions.proto where VoiceAgentConfig is declared.
@@ -101,26 +106,31 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
     set {_uniqueStorage()._prompt = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var maxTokens: Int32 {
     get {_storage._maxTokens}
     set {_uniqueStorage()._maxTokens = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var temperature: Float {
     get {_storage._temperature}
     set {_uniqueStorage()._temperature = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var topP: Float {
     get {_storage._topP}
     set {_uniqueStorage()._topP = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var topK: Int32 {
     get {_storage._topK}
     set {_uniqueStorage()._topK = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var systemPrompt: String {
     get {_storage._systemPrompt}
     set {_uniqueStorage()._systemPrompt = newValue}
@@ -132,12 +142,11 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
     set {_uniqueStorage()._emitThoughts = newValue}
   }
 
-  /// Additional LLMGenerationOptions fields kept inline to avoid a codegen
-  /// package cycle between service stubs and option messages.
+  /// Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
   ///
-  /// idl-002: Intentionally omitted from this streaming request (no current
-  /// streaming consumer; route them through the non-streaming
-  /// rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+  /// Streaming gaps below remain intentional: a streaming consumer that
+  /// requires these advanced knobs MUST set them on `options.*` rather than
+  /// inline (no inline duplicate exists):
   ///   - thinking_pattern (LLMGenerationOptions field 11)
   ///   - structured_output (LLMGenerationOptions field 13)
   ///   - enable_real_time_tracking (LLMGenerationOptions field 14)
@@ -145,36 +154,42 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
   ///   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
   ///     is not yet supported on the LLM.Generate rpc; tool sessions must
   ///     use the non-streaming generation path with LLMGenerationOptions.
-  /// Additionally, preferred_framework (field 11) and execution_target
-  /// (field 13) are degraded to `string` here instead of the InferenceFramework
-  /// / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
-  /// Callers must use the canonical enum string values (see
-  /// llm_options.proto:69 and :85). See also synthesis idl-002.
+  /// Note the inline `preferred_framework` (field 11) and `execution_target`
+  /// (field 13) are degraded to `string` for backwards compatibility;
+  /// `options.preferred_framework` and `options.execution_target` carry the
+  /// canonical InferenceFramework / ExecutionTarget enums.
+  ///
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var repetitionPenalty: Float {
     get {_storage._repetitionPenalty}
     set {_uniqueStorage()._repetitionPenalty = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var stopSequences: [String] {
     get {_storage._stopSequences}
     set {_uniqueStorage()._stopSequences = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var streamingEnabled: Bool {
     get {_storage._streamingEnabled}
     set {_uniqueStorage()._streamingEnabled = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var preferredFramework: String {
     get {_storage._preferredFramework}
     set {_uniqueStorage()._preferredFramework = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var jsonSchema: String {
     get {_storage._jsonSchema}
     set {_uniqueStorage()._jsonSchema = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var executionTarget: String {
     get {_storage._executionTarget}
     set {_uniqueStorage()._executionTarget = newValue}
@@ -195,41 +210,49 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
     set {_uniqueStorage()._conversationID = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var seed: Int64 {
     get {_storage._seed}
     set {_uniqueStorage()._seed = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var frequencyPenalty: Float {
     get {_storage._frequencyPenalty}
     set {_uniqueStorage()._frequencyPenalty = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var presencePenalty: Float {
     get {_storage._presencePenalty}
     set {_uniqueStorage()._presencePenalty = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var minP: Float {
     get {_storage._minP}
     set {_uniqueStorage()._minP = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var grammar: String {
     get {_storage._grammar}
     set {_uniqueStorage()._grammar = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var responseFormat: String {
     get {_storage._responseFormat}
     set {_uniqueStorage()._responseFormat = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var echoPrompt: Bool {
     get {_storage._echoPrompt}
     set {_uniqueStorage()._echoPrompt = newValue}
   }
 
+  /// NOTE: This field was marked as deprecated in the .proto file.
   public var nThreads: Int32 {
     get {_storage._nThreads}
     set {_uniqueStorage()._nThreads = newValue}
@@ -239,6 +262,19 @@ public nonisolated struct RALLMGenerateRequest: @unchecked Sendable {
     get {_storage._metadata}
     set {_uniqueStorage()._metadata = newValue}
   }
+
+  /// idl-005: canonical generation options. When set, consumers SHOULD use
+  /// the values here in preference to the legacy inline scalar fields above.
+  /// The wire schema retains the inline fields to avoid breaking existing
+  /// serialized requests; new callers should only populate `options`.
+  public var options: RALLMGenerationOptions {
+    get {_storage._options ?? RALLMGenerationOptions()}
+    set {_uniqueStorage()._options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {_storage._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {_uniqueStorage()._options = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -456,7 +492,7 @@ nonisolated extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0\u{1}options\0")
 
   fileprivate class _StorageClass {
     var _prompt: String = String()
@@ -484,6 +520,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
     var _echoPrompt: Bool = false
     var _nThreads: Int32 = 0
     var _metadata: Dictionary<String,String> = [:]
+    var _options: RALLMGenerationOptions? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -519,6 +556,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
       _echoPrompt = source._echoPrompt
       _nThreads = source._nThreads
       _metadata = source._metadata
+      _options = source._options
     }
   }
 
@@ -562,6 +600,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
         case 23: try { try decoder.decodeSingularBoolField(value: &_storage._echoPrompt) }()
         case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
         case 25: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
+        case 26: try { try decoder.decodeSingularMessageField(value: &_storage._options) }()
         default: break
         }
       }
@@ -570,6 +609,10 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
       if !_storage._prompt.isEmpty {
         try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
       }
@@ -645,6 +688,9 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
       if !_storage._metadata.isEmpty {
         try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 25)
       }
+      try { if let v = _storage._options {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 26)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -679,6 +725,7 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._echoPrompt != rhs_storage._echoPrompt {return false}
         if _storage._nThreads != rhs_storage._nThreads {return false}
         if _storage._metadata != rhs_storage._metadata {return false}
+        if _storage._options != rhs_storage._options {return false}
         return true
       }
       if !storagesAreEqual {return false}

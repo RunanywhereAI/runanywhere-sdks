@@ -13,10 +13,18 @@ import "voice_events.proto";
 // hotspot-idl-002: ToolCall / ToolResult are needed on the LLM streaming
 // event path (event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL is meaningless
 // without a structured tool-call payload). tool_calling.proto has no
-// upstream imports today so adding it here does NOT reintroduce the
-// llm_options ↔ sdk_events package cycle that motivated the inline-fields
-// duplication on LLMGenerateRequest / LLMStreamFinalResult.
+// upstream imports today so adding it here does NOT reintroduce any
+// historical concern about an llm_options ↔ sdk_events package cycle.
 import "tool_calling.proto";
+// idl-005: import the canonical LLMGenerationOptions definition so new
+// callers can populate `LLMGenerateRequest.options` instead of the legacy
+// inline scalar fields. The previous justification for inlining fields
+// (a "Square Wire / sdk_events package cycle") does not hold: sdk_events
+// has no dependency on llm_options.proto in either direction (verified by
+// proto-import graph). The inline scalar fields below are kept for
+// backwards compatibility but are deprecated; consumers SHOULD prefer
+// `options.*`.
+import "llm_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -27,27 +35,31 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// pass3-syn-025: structured field gaps below are intentional and documented;
-// the wire schema is consciously decoupled from llm_options.proto to avoid
-// the sdk_events ↔ llm_options package cycle. The companion fix for
+// pass3-syn-025: the inline scalar fields below historically existed to avoid
+// importing llm_options.proto. The cycle-avoidance rationale no longer holds
+// (sdk_events.proto has no transitive dependency on llm_options.proto), so
+// idl-005 introduces the canonical `LLMGenerationOptions options` embedded
+// message at field 26. The inline scalar fields are RETAINED for wire-format
+// backwards compatibility but are deprecated; new code SHOULD populate
+// `options.*` and consumers SHOULD prefer `options.*` when set (falling back
+// to the inline fields for legacy callers). The companion fix for
 // VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
 // proto carries tts_model_id but not tts_voice_id" issue) lives in
 // idl/solutions.proto where VoiceAgentConfig is declared.
 message LLMGenerateRequest {
     string prompt           = 1;
-    int32  max_tokens       = 2;
-    float  temperature      = 3;
-    float  top_p            = 4;
-    int32  top_k            = 5;
-    string system_prompt    = 6;
+    int32  max_tokens       = 2 [deprecated = true];
+    float  temperature      = 3 [deprecated = true];
+    float  top_p            = 4 [deprecated = true];
+    int32  top_k            = 5 [deprecated = true];
+    string system_prompt    = 6 [deprecated = true];
     bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
 
-    // Additional LLMGenerationOptions fields kept inline to avoid a codegen
-    // package cycle between service stubs and option messages.
+    // Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
     //
-    // idl-002: Intentionally omitted from this streaming request (no current
-    // streaming consumer; route them through the non-streaming
-    // rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+    // Streaming gaps below remain intentional: a streaming consumer that
+    // requires these advanced knobs MUST set them on `options.*` rather than
+    // inline (no inline duplicate exists):
     //   - thinking_pattern (LLMGenerationOptions field 11)
     //   - structured_output (LLMGenerationOptions field 13)
     //   - enable_real_time_tracking (LLMGenerationOptions field 14)
@@ -55,29 +67,34 @@ message LLMGenerateRequest {
     //   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
     //     is not yet supported on the LLM.Generate rpc; tool sessions must
     //     use the non-streaming generation path with LLMGenerationOptions.
-    // Additionally, preferred_framework (field 11) and execution_target
-    // (field 13) are degraded to `string` here instead of the InferenceFramework
-    // / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
-    // Callers must use the canonical enum string values (see
-    // llm_options.proto:69 and :85). See also synthesis idl-002.
-    float  repetition_penalty = 8;
-    repeated string stop_sequences = 9;
-    bool   streaming_enabled = 10;
-    string preferred_framework = 11;
-    string json_schema = 12;
-    string execution_target = 13;
+    // Note the inline `preferred_framework` (field 11) and `execution_target`
+    // (field 13) are degraded to `string` for backwards compatibility;
+    // `options.preferred_framework` and `options.execution_target` carry the
+    // canonical InferenceFramework / ExecutionTarget enums.
+    float  repetition_penalty = 8 [deprecated = true];
+    repeated string stop_sequences = 9 [deprecated = true];
+    bool   streaming_enabled = 10 [deprecated = true];
+    string preferred_framework = 11 [deprecated = true];
+    string json_schema = 12 [deprecated = true];
+    string execution_target = 13 [deprecated = true];
     string request_id = 14;
     string model_id = 15;
     string conversation_id = 16;
-    int64  seed = 17;
-    float  frequency_penalty = 18;
-    float  presence_penalty = 19;
-    float  min_p = 20;
-    string grammar = 21;
-    string response_format = 22;
-    bool   echo_prompt = 23;
-    int32  n_threads = 24;
+    int64  seed = 17 [deprecated = true];
+    float  frequency_penalty = 18 [deprecated = true];
+    float  presence_penalty = 19 [deprecated = true];
+    float  min_p = 20 [deprecated = true];
+    string grammar = 21 [deprecated = true];
+    string response_format = 22 [deprecated = true];
+    bool   echo_prompt = 23 [deprecated = true];
+    int32  n_threads = 24 [deprecated = true];
     map<string, string> metadata = 25;
+
+    // idl-005: canonical generation options. When set, consumers SHOULD use
+    // the values here in preference to the legacy inline scalar fields above.
+    // The wire schema retains the inline fields to avoid breaking existing
+    // serialized requests; new callers should only populate `options`.
+    optional LLMGenerationOptions options = 26;
 }
 
 // Aggregate result carried on the terminal LLMStreamEvent. This intentionally
