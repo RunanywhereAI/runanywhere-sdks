@@ -140,6 +140,23 @@ abstract final class RunAnywhere {
     return _servicesInitFuture ?? Future<void>.value();
   }
 
+  /// One-call "wait until everything is ready" entry point. Mirrors Swift's
+  /// `RunAnywhere.ensureServicesReady()` (internal) and lets callers drop the
+  /// two-step `await initialize() + await completeServicesInitialization()`
+  /// dance in favour of a single waitable promise after `await initialize()`.
+  ///
+  /// Returns immediately if Phase 2 already completed; otherwise awaits the
+  /// in-flight Phase-2 future. Re-running after a successful Phase 2 is a
+  /// no-op — concurrent callers share the same future, so the work executes
+  /// at most once.
+  static Future<void> ensureServicesReady() {
+    if (!isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    if (areServicesReady) return Future<void>.value();
+    return _servicesInitFuture ?? Future<void>.value();
+  }
+
   /// Initialization params (apiKey, baseURL, environment) — null
   /// until [initialize] runs. Cached from the most recent
   /// `initializeWithParams` call so callers can introspect what was
