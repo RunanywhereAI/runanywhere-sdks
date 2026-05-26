@@ -550,3 +550,41 @@ extension CppBridge {
     /// `Generated/ModalityProtoABI+Generated.swift`.
     public enum EmbeddingsProto {}
 }
+
+// MARK: - Embeddings lifecycle proto ABI (parity with Flutter's
+// `rac_embeddings_embed_batch_lifecycle_proto` path)
+//
+// Mirrors the lifecycle pattern used by VLM (`rac_vlm_cancel_lifecycle_proto`):
+// no handle threading — commons resolves the active embeddings lifecycle
+// component internally. Public callers reach this through
+// `RunAnywhere.embeddings.embedBatch(_:)`.
+
+private enum EmbeddingsLifecycleProtoABI {
+    typealias EmbedBatchLifecycle = NativeProtoABI.ProtoRequest
+
+    static let embedBatchLifecycleName = "rac_embeddings_embed_batch_lifecycle_proto"
+
+    static let embedBatchLifecycle = NativeProtoABI.load(
+        embedBatchLifecycleName,
+        as: EmbedBatchLifecycle.self
+    )
+}
+
+extension CppBridge.EmbeddingsProto {
+    /// Generate embeddings using the lifecycle-loaded embeddings model.
+    ///
+    /// Backed by `rac_embeddings_embed_batch_lifecycle_proto`. The caller is
+    /// expected to have already loaded an embeddings model into the commons
+    /// lifecycle (e.g. via `RunAnywhere.loadModel(_:)` with
+    /// `category = .embedding`).
+    public static func embedBatchLifecycle(
+        _ request: RAEmbeddingsRequest
+    ) throws -> RAEmbeddingsResult {
+        return try NativeProtoABI.invoke(
+            request,
+            symbol: EmbeddingsLifecycleProtoABI.embedBatchLifecycle,
+            symbolName: EmbeddingsLifecycleProtoABI.embedBatchLifecycleName,
+            responseType: RAEmbeddingsResult.self
+        )
+    }
+}
