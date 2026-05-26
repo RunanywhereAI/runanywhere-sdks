@@ -256,6 +256,22 @@ target_compile_features(test_tool_calling PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
+# --- CONSOLIDATE-A (CLUSTER-14): commons-owned RAModelInfo heuristics --------
+# Exercises rac_tool_call_format_from_model_info_proto +
+# rac_model_info_parameter_count_b_proto + rac_model_info_is_small_model_proto.
+# Replaces example-side detectToolCallFormat / isLikelySmallModel duplication.
+add_executable(test_model_heuristics test_model_heuristics.cpp)
+target_include_directories(test_model_heuristics PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_model_heuristics PRIVATE rac_commons)
+rac_link_archive_deps(test_model_heuristics)
+target_compile_features(test_model_heuristics PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_heuristics)
+add_test(NAME model_heuristics_tests COMMAND test_model_heuristics)
+
 # --- G3: ToolValue <-> JSON proto-byte ABI parity tests --------------------
 # Validates the 5 oneof branches (string/number/bool/array/object) that
 # Swift/Kotlin/Dart/RN/Web previously hand-rolled. Single source of truth.

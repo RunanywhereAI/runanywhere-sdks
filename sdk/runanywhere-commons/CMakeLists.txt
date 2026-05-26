@@ -794,6 +794,11 @@ set(RAC_FEATURES_SOURCES
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
+    # CONSOLIDATE-A (CLUSTER-14): commons-owned heuristics derived from
+    # RAModelInfo (tool-call format + parameterCountB + isSmallModel). Replaces
+    # the duplicated detectToolCallFormat / isLikelySmallModel helpers that
+    # examples-flutter, -ios, -android, -react-native were each hand-rolling.
+    src/features/llm/rac_model_heuristics.cpp
     # G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
     src/features/llm/rac_tool_value_json.cpp
     # Wave D-4: tool-calling session state machine (collapses per-SDK
