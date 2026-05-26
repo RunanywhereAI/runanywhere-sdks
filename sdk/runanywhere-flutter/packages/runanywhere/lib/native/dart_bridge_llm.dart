@@ -201,28 +201,25 @@ class DartBridgeLLM {
         //   3. Therefore the callback always fires on the Dart isolate that
         //      created it — the exact precondition `isolateLocal` requires.
         callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
-            (
-          Pointer<Uint8> bytesPtr,
-          int bytesLen,
-          Pointer<Void> _,
-        ) {
-          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
-            return;
-          }
+          (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+            if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+              return;
+            }
 
-          try {
-            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            final event = LLMStreamEvent.fromBuffer(copy);
-            sawTerminalEvent = sawTerminalEvent || event.isFinal;
-            controller.add(event);
-            if (event.isFinal) {
+            try {
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              final event = LLMStreamEvent.fromBuffer(copy);
+              sawTerminalEvent = sawTerminalEvent || event.isFinal;
+              controller.add(event);
+              if (event.isFinal) {
+                unawaited(controller.close());
+              }
+            } catch (e, st) {
+              controller.addError(e, st);
               unawaited(controller.close());
             }
-          } catch (e, st) {
-            controller.addError(e, st);
-            unawaited(controller.close());
-          }
-        });
+          },
+        );
 
         final rc = fn(
           requestPtr,
@@ -231,10 +228,12 @@ class DartBridgeLLM {
           nullptr,
         );
         if (rc != RAC_SUCCESS && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_llm_generate_stream_proto failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
+          controller.addError(
+            StateError(
+              'rac_llm_generate_stream_proto failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ),
+          );
           await controller.close();
         } else if (!sawTerminalEvent && !controller.isClosed) {
           await controller.close();
@@ -246,13 +245,27 @@ class DartBridgeLLM {
         }
       } finally {
         calloc.free(requestPtr);
+        // flutter-core-014: quiesce first so any tail emissions the engine
+        // worker still has queued through this NativeCallable land BEFORE
+        // we tear it down. Matches the CONSOLIDATE-D pattern used by the
+        // voice-agent / STT / TTS / VAD / VLM streaming bridges.
+        RacNative.bindings.rac_llm_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
     }
 
     controller.onCancel = () {
+      // flutter-core-014: cancel → quiesce → close. `rac_llm_cancel_proto`
+      // only signals the engine to abort; the inference loop may still be
+      // mid-token and invoke this NativeCallable once more before noticing
+      // the flag. Spin-wait via `rac_llm_proto_quiesce` (no-op if commons
+      // does not export it) so the C side has fully drained any in-flight
+      // dispatch through the trampoline before we close the
+      // NativeCallable — without this the engine can call into a freed
+      // callback (UAF) on the proto scratch buffer.
       cancelProto();
+      RacNative.bindings.rac_llm_proto_quiesce?.call();
       callback?.close();
       callback = null;
     };
