@@ -297,45 +297,63 @@ public extension RunAnywhere {
             named: ToolCallingRunLoopProtoABI.runLoopName
         )
 
-        // Drain the run loop on a background thread so the synchronous C call
-        // doesn't block the structured-concurrency thread pool.
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let context = ToolExecuteContext()
-                let contextPtr = Unmanaged.passRetained(context).toOpaque()
-                var outBuffer = rac_proto_buffer_t()
-                let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
-                    runLoop(
-                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        rawBuffer.count,
-                        toolExecuteTrampoline,
-                        contextPtr,
-                        &outBuffer
-                    )
-                }
-                Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
+        // The legacy ABI has no cancel entry point, so the in-flight C call
+        // itself runs to completion regardless of Task state. Even so, route
+        // it through `withTaskCancellationHandler` + an upfront
+        // `Task.checkCancellation()` so a Task cancelled before — or by the
+        // time — the C call returns surfaces a `CancellationError` instead of
+        // silently delivering the result. Matches the with-handle path's
+        // Swift-level cancellation contract; only the in-flight cancel
+        // remains a no-op until the with-handle ABI is exported.
+        try Task.checkCancellation()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<RAToolCallingResult, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let context = ToolExecuteContext()
+                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                    var outBuffer = rac_proto_buffer_t()
+                    let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
+                        runLoop(
+                            rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            rawBuffer.count,
+                            toolExecuteTrampoline,
+                            contextPtr,
+                            &outBuffer
+                        )
+                    }
+                    Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
 
-                defer { NativeProtoABI.free(&outBuffer) }
-                guard status == RAC_SUCCESS else {
-                    let message = outBuffer.error_message.map { String(cString: $0) }
-                        ?? "Tool calling run loop failed: \(status)"
-                    continuation.resume(throwing: SDKException(
-                        code: .processingFailed,
-                        message: message,
-                        category: .component
-                    ))
-                    return
-                }
-                do {
-                    let result = try NativeProtoABI.decode(
-                        RAToolCallingResult.self,
-                        from: outBuffer
-                    )
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
+                    defer { NativeProtoABI.free(&outBuffer) }
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    guard status == RAC_SUCCESS else {
+                        let message = outBuffer.error_message.map { String(cString: $0) }
+                            ?? "Tool calling run loop failed: \(status)"
+                        continuation.resume(throwing: SDKException(
+                            code: .processingFailed,
+                            message: message,
+                            category: .component
+                        ))
+                        return
+                    }
+                    do {
+                        let result = try NativeProtoABI.decode(
+                            RAToolCallingResult.self,
+                            from: outBuffer
+                        )
+                        continuation.resume(returning: result)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
+        } onCancel: {
+            // Best-effort: the legacy ABI cannot interrupt the in-flight
+            // native loop. The post-call `Task.isCancelled` check in the
+            // continuation body translates the Swift Task cancel into a
+            // `CancellationError` once the C call returns.
         }
     }
 
