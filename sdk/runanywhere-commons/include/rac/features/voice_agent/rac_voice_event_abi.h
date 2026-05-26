@@ -73,8 +73,10 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
 /**
  * @brief Register a proto-byte event callback on a voice agent handle.
  *
- * Coexists with the struct callback registered via the existing
- * `rac_voice_agent_set_event_callback()` API. Both fire on every event.
+ * Coexists with the per-call struct callback passed to
+ * `rac_voice_agent_process_stream(..., rac_voice_agent_event_callback_fn,
+ * void* user_data)` (declared in `rac_voice_agent.h`). Both fire on every
+ * event when both are installed.
  *
  * @param handle     Voice agent handle obtained from rac_voice_agent_create().
  * @param callback   Proto-byte event callback function. Pass NULL to clear.
