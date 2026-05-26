@@ -82,14 +82,21 @@ public extension RAToolValue {
         return String(data: pretty, encoding: .utf8) ?? wrapper.json
     }
 
-    static func parseObjectJSON(_ json: String) -> [String: RAToolValue] {
+    /// Parse a JSON object string into a `[String: RAToolValue]` map.
+    ///
+    /// Throws an `SDKException` (category `.internal`) when the input is not
+    /// valid JSON or the commons bridge cannot decode the payload. Callers
+    /// that previously relied on the silent-empty-dict fallback must now
+    /// translate the thrown error into their own failure surface (e.g.
+    /// `RAToolResult.success = false`).
+    static func parseObjectJSON(_ json: String) throws -> [String: RAToolValue] {
         var wrapper = RAToolValueJSON(); wrapper.json = json
-        guard let value: RAToolValue = try? NativeProtoABI.invoke(
+        let value: RAToolValue = try NativeProtoABI.invoke(
             wrapper,
             symbol: ToolValueJSONABI.fromJSON,
             symbolName: ToolValueJSONABI.fromJSONName,
             responseType: RAToolValue.self
-        ) else { return [:] }
+        )
         if case .objectValue(let obj)? = value.kind { return obj.fields }
         return [:]
     }

@@ -168,8 +168,24 @@ public extension RunAnywhere {
             )
         }
 
+        let parsedArgs: [String: RAToolValue]
         do {
-            let result = try await tool.executor(RAToolValue.parseObjectJSON(toolCall.argumentsJson))
+            parsedArgs = try RAToolValue.parseObjectJSON(toolCall.argumentsJson)
+        } catch {
+            // Parse failure used to be swallowed into an empty dict, which made
+            // bad-JSON inputs look like success with no arguments. Surface the
+            // failure as success=false so callers can distinguish parse errors
+            // from genuine empty-argument calls.
+            return makeToolResult(
+                name: toolName,
+                success: false,
+                error: "Failed to parse tool arguments: \(error.localizedDescription)",
+                toolCallID: toolCallID
+            )
+        }
+
+        do {
+            let result = try await tool.executor(parsedArgs)
             return makeToolResult(
                 name: toolName,
                 success: true,

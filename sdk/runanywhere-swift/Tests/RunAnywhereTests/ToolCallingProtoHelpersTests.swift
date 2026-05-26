@@ -75,6 +75,30 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
 
         XCTAssertEqual(options.resolvedFormatName, "openai")
     }
+
+    func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {
+        // CLUSTER-38: parseObjectJSON used to silently swallow malformed JSON
+        // into an empty dict, so executeTool reported success=true with no
+        // arguments. Now the parse failure must propagate as success=false
+        // with a non-empty error message regardless of whether the native
+        // ABI symbol is resolvable in the test environment.
+        let definition = RAToolDefinition(
+            name: "echo",
+            description: "echo tool",
+            parameters: []
+        )
+        await RunAnywhere.registerTool(definition) { _ in [:] }
+        defer { Task { await RunAnywhere.unregisterTool("echo") } }
+
+        var toolCall = RAToolCall()
+        toolCall.name = "echo"
+        toolCall.argumentsJson = "{not valid json}"
+        toolCall.id = "call_parse_fail"
+
+        let result = await RunAnywhere.executeTool(toolCall)
+        XCTAssertFalse(result.success)
+        XCTAssertFalse(result.error.isEmpty)
+    }
 }
 
 // swiftlint:enable avoid_any_type
