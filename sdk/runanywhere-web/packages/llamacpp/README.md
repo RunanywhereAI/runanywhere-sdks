@@ -1,6 +1,6 @@
 # @runanywhere/web-llamacpp
 
-LLM, VLM, tool calling, structured output, embeddings, and diffusion backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web) — powered by [llama.cpp](https://github.com/ggerganov/llama.cpp) compiled to WebAssembly.
+LLM, VLM, tool calling, and structured output backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web) — powered by [llama.cpp](https://github.com/ggerganov/llama.cpp) compiled to WebAssembly.
 
 > **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
 
@@ -45,14 +45,12 @@ for await (const token of stream.stream) {
 
 ## Capabilities
 
-| Feature | Class | Description |
-|---------|-------|-------------|
+| Feature | Entry point | Description |
+|---------|-------------|-------------|
 | **Text Generation** | `RunAnywhere.generate` / `RunAnywhere.generateStream` | LLM inference with streaming, system prompts, temperature, top-k/top-p |
-| **Vision Language Models** | `RunAnywhere.processImage` | Multimodal inference through llama.cpp mtmd and the shared C++ lifecycle |
-| **Tool Calling** | `ToolCalling` | Function calling with typed definitions (Hermes-style and generic) |
-| **Structured Output** | `StructuredOutput` | JSON schema-guided generation |
-| **Embeddings** | `Embeddings` | Vector embedding generation with configurable normalization/pooling |
-| **Diffusion** | `Diffusion` | Image generation (WebGPU, scaffold) |
+| **Vision Language Models** | `RunAnywhere.processImage` / `RunAnywhere.processImageStream` | Multimodal inference through llama.cpp mtmd and the shared C++ lifecycle |
+| **Tool Calling** | `RunAnywhere.generateWithTools` | Function calling with typed definitions (Hermes-style and generic) |
+| **Structured Output** | `RunAnywhere.generateStructured` / `RunAnywhere.generateStructuredStream` | JSON schema-guided generation |
 
 ## WASM Files
 
