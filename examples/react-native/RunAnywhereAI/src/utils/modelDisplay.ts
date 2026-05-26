@@ -1,4 +1,5 @@
 import { Colors } from '../theme/colors';
+import { RunAnywhere } from '@runanywhere/core';
 import type { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   InferenceFramework,
@@ -13,51 +14,11 @@ export const DEFAULT_INFERENCE_FRAMEWORK =
 export const SYSTEM_TTS_FRAMEWORK =
   InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
 
-export const INFERENCE_FRAMEWORK_DISPLAY_NAMES: Partial<
-  Record<InferenceFramework, string>
-> = {
-  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'Llama.cpp',
-  [InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS]:
-    'Foundation Models',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS]: 'System TTS',
-  [InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO]: 'Fluid Audio',
-  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'Core ML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML]:
-    'WhisperKit Core ML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_METALRT]: 'MetalRT',
-  [InferenceFramework.INFERENCE_FRAMEWORK_GENIE]: 'Genie',
-  [InferenceFramework.INFERENCE_FRAMEWORK_TFLITE]: 'TensorFlow Lite',
-  [InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH]: 'ExecuTorch',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE]: 'MediaPipe',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLC]: 'MLC',
-  [InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM]: 'PicoLLM',
-  [InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS]: 'Piper TTS',
-  [InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT]: 'WhisperKit',
-  [InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER]: 'OpenAI Whisper',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS]:
-    'Swift Transformers',
-  [InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN]: 'Built In',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
-};
-
-export const getFrameworkDisplayName = (
-  framework?: InferenceFramework | null
-): string => {
-  if (
-    framework == null ||
-    framework === InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED ||
-    framework === InferenceFramework.UNRECOGNIZED
-  ) {
-    return 'Unknown';
-  }
-  return (
-    INFERENCE_FRAMEWORK_DISPLAY_NAMES[framework] ??
-    InferenceFramework[framework] ??
-    String(framework)
-  );
-};
+// Display-name table lives in the SDK (`RunAnywhere.formatFramework`),
+// proxying the canonical `rac_framework_display_name` C ABI in
+// runanywhere-commons. Re-export for backward compatibility with the
+// existing view code that imported `getFrameworkDisplayName` from here.
+export const getFrameworkDisplayName = RunAnywhere.formatFramework;
 
 export const getFrameworkColor = (
   framework?: InferenceFramework | null
