@@ -48,6 +48,14 @@ public enum RunAnywhere {
     /// Check if SDK is initialized (Phase 1 complete).
     public static var isInitialized: Bool { isInitializedFlag }
 
+    /// Backward-compatible alias for `isInitialized`.
+    /// Pre-refactor callers spelled the property `isSDKInitialized`; keep the
+    /// old spelling alive as a soft-deprecation so existing example apps
+    /// (e.g. RunAnywhereAIApp.swift, YapRunApp.swift) and any SDK consumers
+    /// against the previous symbol still compile and link.
+    @available(*, deprecated, renamed: "isInitialized", message: "Use isInitialized")
+    public static var isSDKInitialized: Bool { isInitialized }
+
     /// Check if services are fully ready (Phase 2 complete)
     public static var areServicesReady: Bool { hasCompletedServicesInit }
 
