@@ -292,6 +292,53 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * Optional extra args accepted by the Swift-shaped flat facade verbs that
+ * mirror the cancellation contract Swift expresses through Task cancellation.
+ * Mirrors the `{ signal?: AbortSignal }` shape already used by
+ * `toolCalling.generateWithTools`.
+ */
+export interface CancellableCall {
+  signal?: AbortSignal;
+}
+
+/**
+ * Pre-check an AbortSignal before issuing a blocking native call. The Swift
+ * source dispatches via `Task.checkCancellation()` at each suspension point;
+ * the Web port can only short-circuit at the entry boundary because every
+ * `_rac_*` invocation runs synchronously inside a single WASM worker tick.
+ * Mirrors the eager-check pattern in `RunAnywhere+ToolCalling.ts`.
+ */
+function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
+  if (signal?.aborted) {
+    throw SDKException.fromCode(
+      SDKErrorCode.GenerationCancelled,
+      `${verb} cancelled`,
+      'AbortSignal was already aborted before the call was invoked',
+    );
+  }
+}
+
+/**
+ * Wire an AbortSignal into the synchronous WASM cancel ABI for a streaming
+ * call: the cancel function is invoked on abort so commons stops pulling
+ * more tokens. The returned cleanup detaches the listener. Suitable for
+ * `generateStream` / `transcribeStream` / `synthesizeStream` / VLM stream.
+ */
+function attachSignalToCancel(
+  signal: AbortSignal | undefined,
+  cancel: () => void,
+): () => void {
+  if (!signal) return () => undefined;
+  const onAbort = (): void => {
+    try {
+      cancel();
+    } catch { /* best-effort; native cancel may not be wired yet */ }
+  };
+  signal.addEventListener('abort', onAbort);
+  return () => signal.removeEventListener('abort', onAbort);
+}
+
+/**
  * Decode a TTSOutput's audio bytes into Float32 PCM samples suitable for
  * `AudioPlayback.play(...)`. Mirrors the Swift `RunAnywhere+TTS.swift`
  * `convertPCMToWAV` + AudioPlaybackManager pipeline: convert whatever the
@@ -1331,14 +1378,24 @@ export const RunAnywhere = {
 
   generate(
     options: Parameters<typeof TextGenerationCapability.generate>[0],
+    extra: CancellableCall = {},
   ): ReturnType<typeof TextGenerationCapability.generate> {
-    return TextGenerationCapability.generate(options);
+    throwIfAborted(extra.signal, 'generate');
+    // Mirror Swift's Task cancellation: bridge the abort signal to commons
+    // cancelGeneration so the synchronous WASM call returns early.
+    const detach = attachSignalToCancel(extra.signal, () => TextGenerationCapability.cancelGeneration());
+    return TextGenerationCapability.generate(options).finally(detach);
   },
 
-  generateStream(
+  async generateStream(
     options: Parameters<typeof TextGenerationCapability.generateStream>[0],
-  ): ReturnType<typeof TextGenerationCapability.generateStream> {
-    return TextGenerationCapability.generateStream(options);
+    extra: CancellableCall = {},
+  ): Promise<Awaited<ReturnType<typeof TextGenerationCapability.generateStream>>> {
+    throwIfAborted(extra.signal, 'generateStream');
+    const stream = await TextGenerationCapability.generateStream(options);
+    const detach = attachSignalToCancel(extra.signal, () => stream.cancel());
+    void stream.result.finally(detach);
+    return stream;
   },
 
   cancelGeneration(): void {
@@ -1371,26 +1428,40 @@ export const RunAnywhere = {
   },
 
   transcribe(
-    ...args: Parameters<typeof STTCapability.transcribeAuto>
+    audio: Parameters<typeof STTCapability.transcribeAuto>[0],
+    options?: Parameters<typeof STTCapability.transcribeAuto>[1],
+    extra: CancellableCall = {},
   ): ReturnType<typeof STTCapability.transcribeAuto> {
-    return STTCapability.transcribeAuto(...args);
+    throwIfAborted(extra.signal, 'transcribe');
+    return STTCapability.transcribeAuto(audio, options);
   },
 
   transcribeStream(
     ...args: Parameters<typeof STTCapability.transcribeStream>
   ): ReturnType<typeof STTCapability.transcribeStream> {
+    // The handle-driven stream APIs accept cancellation through the
+    // existing stop/destroy verbs and the AbortSignal pattern on the flat
+    // verb; callers wanting to plumb a signal should pre-check it before
+    // entering the loop.
     return STTCapability.transcribeStream(...args);
   },
 
   synthesize(
-    ...args: Parameters<typeof TTSCapability.synthesizeAuto>
+    text: Parameters<typeof TTSCapability.synthesizeAuto>[0],
+    options?: Parameters<typeof TTSCapability.synthesizeAuto>[1],
+    extra: CancellableCall = {},
   ): ReturnType<typeof TTSCapability.synthesizeAuto> {
-    return TTSCapability.synthesizeAuto(...args);
+    throwIfAborted(extra.signal, 'synthesize');
+    return TTSCapability.synthesizeAuto(text, options);
   },
 
   synthesizeStream(
     ...args: Parameters<typeof TTSCapability.synthesizeStream>
   ): ReturnType<typeof TTSCapability.synthesizeStream> {
+    // The handle-driven stream APIs accept cancellation through the
+    // existing stop/destroy verbs and the AbortSignal pattern on the flat
+    // verb; callers wanting to plumb a signal should pre-check it before
+    // entering the loop.
     return TTSCapability.synthesizeStream(...args);
   },
 
@@ -1538,21 +1609,36 @@ export const RunAnywhere = {
   },
 
   async processImage(
-    ...args: Parameters<typeof VisionLanguageCapability.processImage>
+    image: Parameters<typeof VisionLanguageCapability.processImage>[0],
+    options: Parameters<typeof VisionLanguageCapability.processImage>[1],
+    extra: CancellableCall = {},
   ): Promise<Awaited<ReturnType<typeof VisionLanguageCapability.processImage>>> {
+    throwIfAborted(extra.signal, 'processImage');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    return VisionLanguageCapability.processImage(...args);
+    const detach = attachSignalToCancel(
+      extra.signal,
+      () => VisionLanguageCapability.cancelVLMGeneration(),
+    );
+    return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
 
   async processImageStream(
-    ...args: Parameters<typeof VisionLanguageCapability.processImageStream>
+    image: Parameters<typeof VisionLanguageCapability.processImageStream>[0],
+    options: Parameters<typeof VisionLanguageCapability.processImageStream>[1],
+    extra: CancellableCall = {},
   ): ReturnType<typeof VisionLanguageCapability.processImageStream> {
+    throwIfAborted(extra.signal, 'processImageStream');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    return VisionLanguageCapability.processImageStream(...args);
+    const stream = await VisionLanguageCapability.processImageStream(image, options);
+    attachSignalToCancel(
+      extra.signal,
+      () => VisionLanguageCapability.cancelVLMGeneration(),
+    );
+    return stream;
   },
 
   cancelVLMGeneration(): ReturnType<typeof VisionLanguageCapability.cancelVLMGeneration> {
