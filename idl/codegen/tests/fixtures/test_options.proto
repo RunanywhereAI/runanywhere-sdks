@@ -29,12 +29,14 @@ package runanywhere.v1;
 
 import "rac_options.proto";
 
+option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
 option java_outer_classname  = "RacTestOptionsProto";
 option objc_class_prefix     = "RAV1";
 option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 // ----------------------------------------------------------------------------
 // Enum exercising rac_display_name + rac_analytics_key + rac_wire_string.
