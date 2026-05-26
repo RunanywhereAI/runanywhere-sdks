@@ -2,7 +2,6 @@ package com.runanywhere.sdk.llm.llamacpp
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
  * LlamaCPP module for LLM text generation.
@@ -39,7 +38,7 @@ import com.runanywhere.sdk.public.RunAnywhereModule
  *
  * Matches iOS LlamaCPP.swift exactly.
  */
-object LlamaCPP : RunAnywhereModule {
+object LlamaCPP {
     private val logger = SDKLogger.llamacpp
 
     // MARK: - Module Info
@@ -50,9 +49,8 @@ object LlamaCPP : RunAnywhereModule {
     /** LlamaCPP library version (underlying C++ library) */
     const val llamaCppVersion = "b7199"
 
-    // MARK: - RunAnywhereModule Conformance
-
-    override val moduleName: String = "LlamaCPP"
+    /** Human-readable module name (LlamaCPP). */
+    const val moduleName: String = "LlamaCPP"
 
     // MARK: - Registration State
 
@@ -62,21 +60,21 @@ object LlamaCPP : RunAnywhereModule {
     // MARK: - Registration
 
     /**
-     * Register LlamaCPP backend with the C++ service registry (RunAnywhereModule override).
+     * Register LlamaCPP backend with the C++ service registry.
      *
      * Mirrors iOS `LlamaCPP.register()`. The unified `rac_backend_llamacpp_register()`
      * registers a single vtable that exposes both LLM and VLM modality slots, so
      * there is no separate VLM registration step.
      * Suspend so that callers can await module bootstrap from a coroutine scope.
      */
-    override suspend fun register() {
+    suspend fun register() {
         registerInternal()
     }
 
     /**
-     * Unregister the LlamaCPP backend from C++ registry (RunAnywhereModule override).
+     * Unregister the LlamaCPP backend from C++ registry.
      */
-    override suspend fun unregister() {
+    suspend fun unregister() {
         if (!isRegistered) return
 
         unregisterNative()

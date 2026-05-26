@@ -95,14 +95,12 @@ Async Swift bridged to synchronous C ABI via `DispatchSemaphore` or `DispatchGro
 
 ### Backend Module Pattern
 
-Each runtime backend (`LlamaCPPRuntime`, `ONNXRuntime`, `MetalRTRuntime`, `WhisperKitRuntime`) is a thin `public enum` conforming to `RunAnywhereModule` whose primary job is calling a single `rac_backend_*_register()` C function. Registration is guarded by a static `isRegistered` bool.
+Each runtime backend (`LlamaCPPRuntime`, `ONNXRuntime`) is a thin `public enum` exposing static `register(priority:)` / `unregister()` / `autoRegister` whose primary job is calling a single `rac_backend_*_register()` C function. Registration is guarded by a static `isRegistered` bool.
 
-| Module | Capabilities | Priority | Framework |
-|--------|-------------|----------|-----------|
-| `LlamaCPP` | `.llm` | 100 | `.llamaCpp` |
-| `ONNX` | `.stt, .tts, .vad` | 100 | `.onnx` |
-| `MetalRT` | `.llm, .vlm, .stt, .tts` | 100 | `.metalrt` |
-| `WhisperKitSTT` | `.stt` | 200 | `.whisperKitCoreML` |
+| Module | Capabilities | Framework |
+|--------|-------------|-----------|
+| `LlamaCPP` | LLM + VLM (unified llama.cpp vtable) | `.llamaCpp` |
+| `ONNX` | Embeddings + Sherpa-ONNX engine plugin (STT / TTS / VAD) | `.onnx` |
 
 ### Streaming Architecture
 
@@ -116,7 +114,7 @@ Two paths sharing the same transport vtable:
 
 ### Type System
 
-Proto-generated types (`RA*` prefix from `.pb.swift` files in `Generated/`) are the canonical wire types. Public Swift types are typealiases stripping the prefix (e.g., `typealias SDKComponent = RASDKComponent`, `typealias InferenceFramework = RAInferenceFramework`). Extensions on these typealiases add Swift-side computed properties, C-bridge methods (`withCOptions<T>(_:)`, `init(from cResult:)`), and `Codable` conformance.
+Proto-generated types (`RA*` prefix from `.pb.swift` files in `Generated/`) are the canonical wire types. A small set of public Swift typealiases strip the prefix where the type is part of the SDK surface (e.g., `typealias InferenceFramework = RAInferenceFramework` in `Public/Extensions/Models/ModelTypes.swift`); the rest of the SDK uses the `RA`-prefixed proto types directly (e.g., `RASDKComponent` on `Public/Extensions/Models/RunAnywhere+ModelLifecycle.swift`). Extensions on these types add Swift-side computed properties, C-bridge methods (`withCOptions<T>(_:)`, `init(from cResult:)`), and `Codable` conformance.
 
 ### Error System
 
@@ -196,8 +194,7 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | `Sources/RunAnywhere/Foundation/Security/KeychainManager.swift` | Keychain CRUD |
 | `Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift` | Logging system |
 | `Sources/RunAnywhere/Foundation/Errors/SDKException.swift` | Error type wrapping RASDKError |
-| `Sources/RunAnywhere/Core/Module/RunAnywhereModule.swift` | Backend module protocol |
-| `Sources/{LlamaCPPRuntime,ONNXRuntime,MetalRTRuntime,WhisperKitRuntime}/` | Backend module registrations |
+| `Sources/{LlamaCPPRuntime,ONNXRuntime}/` | Backend module registrations |
 | `Sources/RunAnywhere/Features/` | Platform services (AudioCapture, AudioPlayback, SystemTTS, FoundationModels, Diffusion) |
 
 ## Dependencies

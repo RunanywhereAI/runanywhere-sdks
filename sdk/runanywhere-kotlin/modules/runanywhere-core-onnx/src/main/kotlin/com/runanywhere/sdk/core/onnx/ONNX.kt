@@ -2,7 +2,6 @@ package com.runanywhere.sdk.core.onnx
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
  * ONNX Runtime module for STT, TTS, and VAD services.
@@ -37,7 +36,7 @@ import com.runanywhere.sdk.public.RunAnywhereModule
  *
  * Matches iOS ONNX.swift exactly.
  */
-object ONNX : RunAnywhereModule {
+object ONNX {
     private val logger = SDKLogger.onnx
 
     // MARK: - Module Info
@@ -48,9 +47,8 @@ object ONNX : RunAnywhereModule {
     /** ONNX Runtime library version (underlying C library) */
     const val onnxRuntimeVersion = "1.23.2"
 
-    // MARK: - RunAnywhereModule Conformance
-
-    override val moduleName: String = "ONNX"
+    /** Human-readable module name (ONNX). */
+    const val moduleName: String = "ONNX"
 
     // MARK: - Registration State
 
@@ -60,20 +58,20 @@ object ONNX : RunAnywhereModule {
     // MARK: - Registration
 
     /**
-     * Register ONNX backend with the C++ service registry (RunAnywhereModule override).
+     * Register ONNX backend with the C++ service registry.
      *
      * Calls `rac_backend_onnx_register()` to register all ONNX service providers
      * (STT, TTS, VAD) with the C++ commons layer. Suspend so that callers can
      * await module bootstrap from a coroutine scope.
      */
-    override suspend fun register() {
+    suspend fun register() {
         registerInternal()
     }
 
     /**
-     * Unregister the ONNX backend from C++ registry (RunAnywhereModule override).
+     * Unregister the ONNX backend from C++ registry.
      */
-    override suspend fun unregister() {
+    suspend fun unregister() {
         if (!isRegistered) return
 
         unregisterNative()
