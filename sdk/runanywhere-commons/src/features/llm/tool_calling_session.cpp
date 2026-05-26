@@ -737,9 +737,49 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     if (session_handle == 0) {
         return RAC_SUCCESS;
     }
+    // commons-features-llm-rag-003: quiesce before erasing the registry entry.
+    // Without this, destroy_proto can return while a concurrent
+    // rac_tool_calling_session_step_with_result_proto / create_proto on this
+    // handle is still inside run_generate_loop holding session->mu. The host
+    // then frees user_data captured by the event callback before that
+    // in-flight call has dispatched its final event, yielding a use-after-free
+    // when emit_event / drain_and_dispatch fires. Mirrors the quiesce path
+    // used by rac_vlm_proto_quiesce / rac_llm_proto_quiesce / voice_agent
+    // destroy (voice_agent.cpp:598).
+    std::shared_ptr<ToolCallingSession> session;
     auto& reg = registry();
-    std::lock_guard<std::mutex> lg(reg.mu);
-    reg.sessions.erase(session_handle);
+    {
+        std::lock_guard<std::mutex> lg(reg.mu);
+        auto it = reg.sessions.find(session_handle);
+        if (it == reg.sessions.end()) {
+            return RAC_SUCCESS;  // idempotent
+        }
+        session = it->second;
+        reg.sessions.erase(it);
+    }
+    if (!session) {
+        return RAC_SUCCESS;
+    }
+    // Latch cancel so any in-flight generate exits at the next cancel
+    // boundary instead of dragging out the destroy by max_iterations.
+    session->cancel_requested.store(true, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> guard(session->active_ref_mu);
+        if (session->active_ref) {
+            rac::llm::request_lifecycle_llm_cancel(session->active_ref);
+        }
+    }
+    // Block until the in-flight create/step releases session->mu. Once we
+    // acquire it, no further generate iterations will run on this session
+    // because the registry entry is gone (no new step_with_result_proto can
+    // look it up). Drop the lock immediately — the callback is no longer the
+    // host's; pending dispatches still queued under the lock are discarded by
+    // virtue of dropping the shared_ptr below, which is the documented
+    // contract per the @warning blocks in rac_*_set_stream_proto_callback.
+    { std::lock_guard<std::mutex> session_lock(session->mu); }
+    // session shared_ptr goes out of scope here; if no other thread holds it,
+    // the ToolCallingSession is freed and any leftover pending_dispatches
+    // bytes are released along with it. The host can now safely free user_data.
     return RAC_SUCCESS;
 }
 
