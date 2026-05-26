@@ -30,7 +30,6 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -545,45 +544,40 @@ export const ChatScreen: React.FC = () => {
         nThreads: 0,
       });
 
-      if (Platform.OS === 'android') {
-        // NitroModules async iterator bridge doesn't deliver token
-        // callbacks on Android — fall back to non-streaming generate().
-        const result = await RunAnywhere.generate(prompt, genOptions);
-        accumulatedText = result.text ?? '';
-      } else {
-        // Stream tokens as they arrive — canonical cross-SDK path (§1 spec).
-        const stream = RunAnywhere.generateStream(prompt, genOptions);
-
-        // Manual async iteration — Hermes `for await` doesn't recognise
-        // NitroModules' custom async iterables, so we call the protocol
-        // methods directly.
-        const iterator = stream[Symbol.asyncIterator]();
-        let iterResult = await iterator.next();
-        while (!iterResult.done) {
-          const event = iterResult.value;
-          if (event.token) {
-            accumulatedText += event.token;
-            const frameworkName = getFrameworkDisplayName(
-              currentModel?.preferredFramework ?? currentModel?.framework
-            );
-            const partialMessage: Message = {
-              id: assistantMessageId,
-              role: MessageRole.Assistant,
-              content: accumulatedText,
-              timestamp: new Date(),
-              modelInfo: {
-                modelId: currentModel?.id || 'unknown',
-                modelName: currentModel?.name || 'Unknown Model',
-                framework: frameworkName,
-                frameworkDisplayName: frameworkName,
-              },
-            };
-            await addMessage(partialMessage, currentConversation.id);
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }
-          if (event.isFinal) break;
-          iterResult = await iterator.next();
+      // Stream tokens as they arrive — canonical cross-SDK path (§1
+      // spec). The SDK's `generateStream` wraps the native proto-byte
+      // callback bridge in a plain JS AsyncIterable, so the same code
+      // path works on iOS and Android. Manual async iteration is used
+      // because Hermes' `for await` doesn't recognise SDK async
+      // iterables produced this way; we call the protocol methods
+      // directly.
+      const stream = RunAnywhere.generateStream(prompt, genOptions);
+      const iterator = stream[Symbol.asyncIterator]();
+      let iterResult = await iterator.next();
+      while (!iterResult.done) {
+        const event = iterResult.value;
+        if (event.token) {
+          accumulatedText += event.token;
+          const frameworkName = getFrameworkDisplayName(
+            currentModel?.preferredFramework ?? currentModel?.framework
+          );
+          const partialMessage: Message = {
+            id: assistantMessageId,
+            role: MessageRole.Assistant,
+            content: accumulatedText,
+            timestamp: new Date(),
+            modelInfo: {
+              modelId: currentModel?.id || 'unknown',
+              modelName: currentModel?.name || 'Unknown Model',
+              framework: frameworkName,
+              frameworkDisplayName: frameworkName,
+            },
+          };
+          await addMessage(partialMessage, currentConversation.id);
+          flatListRef.current?.scrollToEnd({ animated: false });
         }
+        if (event.isFinal) break;
+        iterResult = await iterator.next();
       }
 
       const finalContent = accumulatedText || '(No response generated)';
