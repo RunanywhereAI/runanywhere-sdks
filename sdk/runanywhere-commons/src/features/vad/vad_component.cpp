@@ -521,6 +521,12 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
     rac_vad_proto_quiesce();
 
+    // commons-features-voice-006: drop the registry's strong reference to
+    // this handle's threshold mutex so the map does not grow unbounded
+    // across the lifetime of the process. Concurrent threads still holding
+    // shared_ptr copies keep the mutex alive until they release it.
+    rac::vad::erase_threshold_mutex(handle);
+
     RAC_LOG_INFO("VAD.Component", "VAD component destroyed");
 
     delete component;
