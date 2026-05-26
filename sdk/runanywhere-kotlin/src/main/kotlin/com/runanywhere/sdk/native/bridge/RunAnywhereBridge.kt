@@ -446,6 +446,21 @@ object RunAnywhereBridge {
     external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
 
     /**
+     * Canonical "register a model from a URL" entry point (P2-T6). Forwards to
+     * `rac_register_model_from_url_proto`, which translates a serialized
+     * runanywhere.v1.RegisterModelFromUrlRequest into a ModelInfoMakeRequest and
+     * composes the existing registry save path so SDKs replace the build-and-save
+     * glue with a single ABI call.
+     *
+     * Input is serialized runanywhere.v1.RegisterModelFromUrlRequest bytes; output
+     * is the saved runanywhere.v1.ModelInfo bytes (matches Swift parity), or null
+     * when the native proto ABI is unavailable so the Kotlin caller can fall back
+     * to the local build-and-save path.
+     */
+    @JvmStatic
+    external fun racRegisterModelFromUrlProto(requestBytes: ByteArray): ByteArray?
+
+    /**
      * Infer a ModelFormat from a portable URL/file-path string.
      *
      * The JNI implementation forwards to `rac_model_format_from_url_proto`.
