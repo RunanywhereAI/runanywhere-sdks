@@ -1,24 +1,22 @@
 package com.runanywhere.runanywhereai.data
 
-import ai.runanywhere.proto.v1.ArchiveArtifact
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
-import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
-import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelListRequest
-import ai.runanywhere.proto.v1.MultiFileArtifact
-import ai.runanywhere.proto.v1.SingleFileArtifact
+import ai.runanywhere.proto.v1.ModelSource
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
+import com.runanywhere.sdk.public.extensions.pluginLoader
+import com.runanywhere.sdk.public.extensions.registerModel
 import timber.log.Timber
 
 /**
@@ -75,8 +73,8 @@ object ModelBootstrap {
             //   - Android (here): `SystemTTSModule.register()` seeds a real
             //     built-in `system-tts` `RAModelInfo` (framework =
             //     INFERENCE_FRAMEWORK_SYSTEM_TTS, built_in = true,
-            //     is_downloaded = true) into the proto registry via
-            //     `registerModelInternal(...)` → `CppBridgeModelRegistry.save`.
+            //     is_downloaded = true) into the proto registry via the
+            //     SDK module's internal registration path.
             //     `listModels()` returns it like any other ready entry, and
             //     `ModelSelectionBottomSheet` treats
             //     `INFERENCE_FRAMEWORK_SYSTEM_TTS` as built-in alongside
@@ -104,14 +102,11 @@ object ModelBootstrap {
             Timber.e(e, "Failed to register core backends")
         }
         // Diagnostic: list all plugins registered with the unified plugin
-        // registry. Helps debug "no backend route" issues by surfacing exactly
+        // registry via the public `RunAnywhere.pluginLoader.registeredNames()`
+        // surface. Helps debug "no backend route" issues by surfacing exactly
         // which plugin names made it past rac_plugin_register.
         try {
-            val names =
-                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-                    .racRegistryGetRegisteredNames()
-                    ?.toList()
-                    .orEmpty()
+            val names = RunAnywhere.pluginLoader.registeredNames()
             Timber.i("🔌 Plugins registered (count=${names.size}): ${names.joinToString()}")
         } catch (e: Throwable) {
             Timber.w(e, "Plugin diagnostic listing failed")
@@ -232,21 +227,25 @@ object ModelBootstrap {
         Timber.i("🌱 LoRA adapter seed complete — registered=$registered, failed=$failed")
     }
 
-    private fun tryRegisterSingle(m: SingleFileModel): Boolean =
+    /**
+     * Register a single-file model via the canonical
+     * `RunAnywhere.registerModel(...)` public API (mirrors Swift's
+     * `registerLLM` helper in
+     * `examples/ios/RunAnywhereAI/.../App/RunAnywhereAIApp.swift`).
+     */
+    private suspend fun tryRegisterSingle(m: SingleFileModel): Boolean =
         try {
-            val info =
-                ModelInfo(
-                    id = m.id,
-                    name = m.name,
-                    download_url = m.url,
-                    framework = m.framework,
-                    category = m.category,
-                    memory_required_bytes = m.memoryBytes,
-                    supports_lora = m.supportsLora,
-                    supports_thinking = m.supportsThinking,
-                    single_file = SingleFileArtifact(),
-                )
-            CppBridgeModelRegistry.save(info)
+            RunAnywhere.registerModel(
+                id = m.id,
+                name = m.name,
+                url = m.url,
+                framework = m.framework,
+                modality = m.category,
+                artifactType = null,
+                memoryRequirement = m.memoryBytes,
+                supportsThinking = m.supportsThinking,
+                supportsLora = m.supportsLora,
+            )
             true
         } catch (e: Exception) {
             Timber.e(e, "tryRegisterSingle failed: ${m.id}")
@@ -254,45 +253,42 @@ object ModelBootstrap {
         }
 
     /**
-     * Register an archive-based model (sherpa STT/TTS .tar.gz). Mirrors Swift's
-     * `registerModel(archive:structure:archive:...)` which sets the proto
-     * `archive_artifact` field so the C++ download orchestrator extracts the
-     * archive into a nested directory after download. Without this, the
-     * .tar.gz lands on disk unextracted and the sherpa backend fails to load.
+     * Register an archive-based model (sherpa STT/TTS .tar.gz) via the
+     * canonical `RunAnywhere.registerModel(archiveUrl:structure:...)`
+     * public API. Preserves archive type + on-disk layout so the C++
+     * download orchestrator extracts the archive into the directory
+     * layout each backend expects (without this, the .tar.gz lands on
+     * disk unextracted and the sherpa backend fails to load).
      */
-    private fun tryRegisterArchive(m: ArchiveModel): Boolean =
+    private suspend fun tryRegisterArchive(m: ArchiveModel): Boolean =
         try {
-            val artifactType =
-                when (m.archiveType) {
-                    ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-                    ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
-                    ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
-                    ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
-                    else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
-                }
-            val info =
-                ModelInfo(
-                    id = m.id,
-                    name = m.name,
-                    download_url = m.url,
-                    framework = m.framework,
-                    category = m.category,
-                    memory_required_bytes = m.memoryBytes,
-                    artifact_type = artifactType,
-                    archive =
-                        ArchiveArtifact(
-                            type = m.archiveType,
-                            structure = m.structure,
-                        ),
-                )
-            CppBridgeModelRegistry.save(info)
+            RunAnywhere.registerModel(
+                archiveUrl = m.url,
+                structure = m.structure,
+                id = m.id,
+                name = m.name,
+                framework = m.framework,
+                modality = m.category,
+                archiveType = m.archiveType,
+                memoryRequirement = m.memoryBytes,
+                supportsThinking = false,
+                supportsLora = false,
+            )
             true
         } catch (e: Exception) {
             Timber.e(e, "tryRegisterArchive failed: ${m.id}")
             false
         }
 
-    private fun tryRegisterMultiFile(m: MultiFileModel): Boolean =
+    /**
+     * Register a multi-file model (e.g. VLMs with a separate mmproj,
+     * MiniLM embedding with vocab.txt) via the canonical
+     * `RunAnywhere.registerModel(multiFile:...)` public API. The SDK
+     * seeds the proto `expected_files` from the descriptors so the
+     * commons download planner walks the per-descriptor loop instead of
+     * falling through to the single-URL branch.
+     */
+    private suspend fun tryRegisterMultiFile(m: MultiFileModel): Boolean =
         try {
             val descriptors =
                 m.files.mapIndexed { idx, (url, filename) ->
@@ -302,31 +298,23 @@ object ModelBootstrap {
                         is_required = true,
                         role =
                             if (idx == 0) {
-                                ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+                                ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
                             } else {
-                                ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_COMPANION
+                                ModelFileRole.MODEL_FILE_ROLE_COMPANION
                             },
                     )
                 }
-            // Mirror Swift's RAModelInfo.setArtifact: when populating the
-            // multi_file oneof, also seed expected_files from the descriptors.
-            // The commons download planner only walks model.expected_files.files
-            // for the per-descriptor loop; without this, the download falls
-            // through to the single-URL branch and rejects with
-            // "model.download_url must be an http(s) URL".
-            val info =
-                ModelInfo(
-                    id = m.id,
-                    name = m.name,
-                    framework = m.framework,
-                    category = m.category,
-                    memory_required_bytes = m.memoryBytes,
-                    multi_file = MultiFileArtifact(files = descriptors),
-                    expected_files =
-                        ai.runanywhere.proto.v1
-                            .ExpectedModelFiles(files = descriptors),
-                )
-            CppBridgeModelRegistry.save(info)
+            RunAnywhere.registerModel(
+                multiFile = descriptors,
+                id = m.id,
+                name = m.name,
+                framework = m.framework,
+                modality = m.category,
+                memoryRequirement = m.memoryBytes,
+                contextLength = null,
+                supportsThinking = false,
+                source = ModelSource.MODEL_SOURCE_REMOTE,
+            )
             true
         } catch (e: Exception) {
             Timber.e(e, "tryRegisterMultiFile failed: ${m.id}")
