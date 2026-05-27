@@ -517,6 +517,14 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
         std::vector<NSInteger> ids_shape = multiarray_shape(ids_desc, {1, 77});
         const size_t ids_count = shape_count(ids_shape);
         const size_t seq_len = ids_shape.empty() ? ids_count : static_cast<size_t>(ids_shape.back());
+        // A malformed CoreML bundle could publish an input_ids shape whose
+        // sequence dimension is 0; encode_prompt_tokens(prompt, 0) returns
+        // an empty vector and the attention-mask `i % seq_len` modulo below
+        // would divide by zero. Refuse the request up front.
+        if (seq_len == 0) {
+            return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                             "TextEncoder input_ids shape has zero sequence length");
+        }
         MLMultiArray* ids_array =
             make_multiarray(ids_shape, multiarray_data_type(ids_desc, MLMultiArrayDataTypeInt32));
         if (!ids_array) {
@@ -525,7 +533,7 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
         }
 
         std::vector<int32_t> token_ids = encode_prompt_tokens(impl, prompt, seq_len);
-        const size_t batches = seq_len == 0 ? 1 : ids_count / seq_len;
+        const size_t batches = ids_count / seq_len;
         for (size_t b = 0; b < batches; ++b) {
             for (size_t i = 0; i < seq_len; ++i) {
                 array_set_int(ids_array, b * seq_len + i, token_ids[i]);
@@ -1236,6 +1244,20 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
                           model_path);
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
+
+        // rac_coreml_load_model_in_dir returns a retained MLModel
+        // (NS_RETURNS_RETAINED). Re-initializing with the same impl would
+        // overwrite the strong pointer fields and leak the prior retain on
+        // each of the four model slots; release any previously held models
+        // before reassignment to keep init idempotent.
+        [impl->text_encoder release];
+        [impl->unet release];
+        [impl->vae_decoder release];
+        [impl->safety_checker release];
+        impl->text_encoder = nil;
+        impl->unet = nil;
+        impl->vae_decoder = nil;
+        impl->safety_checker = nil;
 
         impl->text_encoder =
             rac_coreml_load_model_in_dir(dir, @"TextEncoder", /*required=*/true, kLogCat);
