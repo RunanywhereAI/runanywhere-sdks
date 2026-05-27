@@ -7,17 +7,21 @@
 
 #include "metalrt_c_api.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "rac/core/rac_logger.h"
 #include "rac_runtime_metal.h"
 
 static const char *LOG_CAT = "TTS.MetalRT";
 
+// engines-other-008: see rac_llm_metalrt.cpp for the ADR; mirror pattern.
 struct rac_tts_metalrt_impl {
-  void *handle; // metalrt_tts_create() handle
-  bool loaded = false;
+  void *handle = nullptr; // metalrt_tts_create() handle
+  std::atomic<bool> loaded{false};
+  mutable std::mutex mutex_;
 };
 
 extern "C" {
@@ -47,7 +51,7 @@ rac_result_t rac_tts_metalrt_create(const char *model_path,
       rac_error_set_details("metalrt_tts_load() failed");
       return RAC_ERROR_MODEL_LOAD_FAILED;
     }
-    impl->loaded = true;
+    impl->loaded.store(true, std::memory_order_release);
     RAC_LOG_INFO(LOG_CAT, "Kokoro TTS model loaded: %s", model_path);
   }
 
@@ -59,8 +63,13 @@ void rac_tts_metalrt_destroy(rac_handle_t handle) {
   if (!handle)
     return;
   auto *impl = static_cast<rac_tts_metalrt_impl *>(handle);
-  if (impl->handle) {
-    metalrt_tts_destroy(impl->handle);
+  {
+    std::lock_guard<std::mutex> lock(impl->mutex_);
+    if (impl->handle) {
+      metalrt_tts_destroy(impl->handle);
+      impl->handle = nullptr;
+    }
+    impl->loaded.store(false, std::memory_order_release);
   }
   delete impl;
 }
@@ -71,7 +80,7 @@ rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char *text,
   if (!handle || !text || !out_result)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_tts_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   const char *voice = "af_heart"; // default voice

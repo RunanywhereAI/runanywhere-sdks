@@ -7,8 +7,10 @@
 
 #include "metalrt_c_api.h"
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "rac/core/rac_logger.h"
 #include "rac_runtime_metal.h"
@@ -19,9 +21,20 @@ static const char *LOG_CAT = "LLM.MetalRT";
 // INTERNAL HANDLE
 // =============================================================================
 
+// engines-other-008: MetalRT's underlying engine is a closed-source vendor
+// library with no documented thread-safety guarantee. To make the wrapper's
+// bookkeeping safe under concurrent lifecycle calls (create / destroy /
+// load racing with an in-flight generate), we guard the impl's mutable
+// fields with `mutex_` and keep the actual generate / generate_stream paths
+// lock-free — cancellation is driven by the streaming-callback return
+// value, not a side-channel call. Callers must still externally serialize
+// their own state machine if they want to teardown the impl from a
+// different thread than the active generate; the mutex protects the
+// wrapper from torn reads, not the engine from concurrent inference.
 struct rac_llm_metalrt_impl {
-  void *handle; // metalrt_create() handle
-  bool loaded = false;
+  void *handle = nullptr; // metalrt_create() handle
+  std::atomic<bool> loaded{false};
+  mutable std::mutex mutex_;
 };
 
 // =============================================================================
@@ -58,7 +71,7 @@ rac_result_t rac_llm_metalrt_create(const char *model_path,
       rac_error_set_details("metalrt_load() failed");
       return RAC_ERROR_MODEL_LOAD_FAILED;
     }
-    impl->loaded = true;
+    impl->loaded.store(true, std::memory_order_release);
     RAC_LOG_INFO(LOG_CAT, "Model loaded: %s", model_path);
   }
 
@@ -70,8 +83,13 @@ void rac_llm_metalrt_destroy(rac_handle_t handle) {
   if (!handle)
     return;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (impl->handle) {
-    metalrt_destroy(impl->handle);
+  {
+    std::lock_guard<std::mutex> lock(impl->mutex_);
+    if (impl->handle) {
+      metalrt_destroy(impl->handle);
+      impl->handle = nullptr;
+    }
+    impl->loaded.store(false, std::memory_order_release);
   }
   delete impl;
 }
@@ -80,7 +98,7 @@ rac_bool_t rac_llm_metalrt_is_loaded(rac_handle_t handle) {
   if (!handle)
     return RAC_FALSE;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  return impl->loaded ? RAC_TRUE : RAC_FALSE;
+  return impl->loaded.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char *prompt,
@@ -89,7 +107,7 @@ rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char *prompt,
   if (!handle || !prompt || !out_result)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   struct MetalRTOptions opts = {};
@@ -149,7 +167,7 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle,
   if (!handle || !prompt || !callback)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   int32_t max_tok = options ? options->max_tokens : 100;
@@ -180,7 +198,7 @@ rac_result_t rac_llm_metalrt_inject_system_prompt(rac_handle_t handle,
   if (!handle || !prompt)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
   metalrt_set_system_prompt(impl->handle, prompt);
   return RAC_SUCCESS;
@@ -191,7 +209,7 @@ rac_result_t rac_llm_metalrt_append_context(rac_handle_t handle,
   if (!handle || !text)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
   metalrt_cache_prompt(impl->handle, text);
   return RAC_SUCCESS;
@@ -204,7 +222,7 @@ rac_llm_metalrt_generate_from_context(rac_handle_t handle, const char *query,
   if (!handle || !query || !out_result)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   struct MetalRTOptions opts = {};
@@ -235,7 +253,7 @@ rac_result_t rac_llm_metalrt_clear_context(rac_handle_t handle) {
   if (!handle)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_llm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
   metalrt_clear_kv(impl->handle);
   return RAC_SUCCESS;

@@ -8,11 +8,13 @@
 
 #include "metalrt_c_api.h"
 
+#include <atomic>
 #include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -35,9 +37,11 @@ static std::vector<uint8_t> rgb_to_rgba(const uint8_t *rgb, uint32_t w,
   return rgba;
 }
 
+// engines-other-008: see rac_llm_metalrt.cpp for the ADR; mirror pattern.
 struct rac_vlm_metalrt_impl {
   void *handle = nullptr; // metalrt_vision_create() handle
-  bool loaded = false;
+  std::atomic<bool> loaded{false};
+  mutable std::mutex mutex_;
 };
 
 extern "C" {
@@ -69,7 +73,7 @@ rac_result_t rac_vlm_metalrt_create(const char *model_path,
       rac_error_set_details("metalrt_vision_load() failed");
       return RAC_ERROR_MODEL_LOAD_FAILED;
     }
-    impl->loaded = true;
+    impl->loaded.store(true, std::memory_order_release);
     RAC_LOG_INFO(LOG_CAT, "Vision model loaded: %s", model_path);
   }
 
@@ -81,8 +85,13 @@ void rac_vlm_metalrt_destroy(rac_handle_t handle) {
   if (!handle)
     return;
   auto *impl = static_cast<rac_vlm_metalrt_impl *>(handle);
-  if (impl->handle) {
-    metalrt_vision_destroy(impl->handle);
+  {
+    std::lock_guard<std::mutex> lock(impl->mutex_);
+    if (impl->handle) {
+      metalrt_vision_destroy(impl->handle);
+      impl->handle = nullptr;
+    }
+    impl->loaded.store(false, std::memory_order_release);
   }
   delete impl;
 }
@@ -95,7 +104,7 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle,
   if (!handle || !image || !prompt || !out_result)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_vlm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   struct MetalRTVisionOptions vopts = {};
@@ -178,7 +187,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle,
   if (!handle || !image || !prompt || !callback)
     return RAC_ERROR_NULL_POINTER;
   auto *impl = static_cast<rac_vlm_metalrt_impl *>(handle);
-  if (!impl->loaded)
+  if (!impl->loaded.load(std::memory_order_acquire))
     return RAC_ERROR_BACKEND_NOT_READY;
 
   struct MetalRTVisionOptions vopts = {};
