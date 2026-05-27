@@ -54,8 +54,7 @@ static const rac_engine_manifest_t k_onnx_manifest = {
     .capability_flags = 0,
 #if defined(RAC_BACKEND_RAG)
     .primitives = k_onnx_primitives,
-    .primitives_count =
-        sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+    .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
 #else
     .primitives = nullptr,
     .primitives_count = 0,
@@ -100,8 +99,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(onnx) {
-  return rac_engine_entry_with_manifest(&k_onnx_manifest,
-                                        &g_onnx_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_onnx_manifest, &g_onnx_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"
