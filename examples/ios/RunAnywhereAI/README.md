@@ -198,7 +198,9 @@ RunAnywhereAI/
 │   │   │   ├── AppTypes.swift            # Shared data models
 │   │   │   └── MarkdownDetector.swift    # Markdown parsing utilities
 │   │   └── Services/
-│   │       └── ModelManager.swift        # Model lifecycle management
+│   │       ├── ConversationStore.swift   # Conversation persistence
+│   │       ├── DeviceInfoService.swift   # Hardware info
+│   │       └── KeychainService.swift     # API credential storage
 │   │
 │   ├── Features/
 │   │   ├── Chat/
