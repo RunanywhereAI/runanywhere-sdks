@@ -1209,6 +1209,10 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
   const std::vector<std::string> user_stops = collect_stop_sequences(options);
   const size_t user_stop_max_len = max_stop_length(user_stops);
 
+  // Surface decode failure to the caller instead of returning RAC_SUCCESS
+  // with a truncated response. Mirrors the streaming path below.
+  bool decode_failed = false;
+
   for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
     // Diagnostic: on first token, inspect logits for NaN/corruption
 #ifdef RAC_VLM_ENABLE_DIAGNOSTICS
@@ -1319,11 +1323,17 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
     batch.n_tokens = 1;
 
     if (llama_decode(backend->ctx, batch) != 0) {
+      RAC_LOG_ERROR(LOG_CAT, "llama_decode failed during VLM process");
+      decode_failed = true;
       break;
     }
   }
 
   llama_batch_free(batch);
+
+  if (decode_failed) {
+    return RAC_ERROR_INFERENCE_FAILED;
+  }
 
   // Fill result
   out_result->text = strdup(response.c_str());
