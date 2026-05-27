@@ -2,7 +2,6 @@
 
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
-
 #include <cstdlib>
 #include <new>
 
@@ -39,7 +38,8 @@ void coreml_destroy(void) {}
 
 rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
                                    rac_runtime_session_t** out) {
-    if (!desc || !out) return RAC_ERROR_NULL_POINTER;
+    if (!desc || !out)
+        return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
     if (!desc->model_path || desc->model_path[0] == '\0') {
         return RAC_ERROR_INVALID_PARAMETER;
@@ -56,14 +56,13 @@ rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
                                            configuration:cfg
                                                    error:&err];
         if (!model) {
-            RAC_LOG_ERROR(kLogCat,
-                          "CoreML create_session failed (%s): %s",
-                          desc->model_path,
+            RAC_LOG_ERROR(kLogCat, "CoreML create_session failed (%s): %s", desc->model_path,
                           err ? [[err localizedDescription] UTF8String] : "unknown");
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }
         auto* sess = new (std::nothrow) CoreMLSession();
-        if (!sess) return RAC_ERROR_OUT_OF_MEMORY;
+        if (!sess)
+            return RAC_ERROR_OUT_OF_MEMORY;
         // `model` was returned autoreleased by +[MLModel modelWithContentsOfURL:].
         // Without an explicit retain it dies when this @autoreleasepool drains,
         // leaving CoreMLSession::model dangling for every subsequent prediction
@@ -77,14 +76,16 @@ rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
 
 void coreml_destroy_session(rac_runtime_session_t* session) {
     auto* sess = reinterpret_cast<CoreMLSession*>(session);
-    if (!sess) return;
+    if (!sess)
+        return;
     [sess->model release];
     sess->model = nil;
     delete sess;
 }
 
 rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_NPU;
     out->device_id = "apple-coreml";
@@ -93,19 +94,22 @@ rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
 }
 
 rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
     out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path lands.
+    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path
+    // lands.
     out->supported_primitives = nullptr;
     out->supported_primitives_count = 0;
     return RAC_SUCCESS;
 }
 
 void coreml_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (!tensor) return;
+    if (!tensor)
+        return;
     if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
         std::free(tensor->data);
     }
@@ -144,9 +148,11 @@ const rac_runtime_vtable_t k_coreml_vtable = {
         /* .version                 = */ nullptr,
         /* .priority                = */ 90,
         /* .supported_formats       = */ k_supported_formats,
-        /* .supported_formats_count = */ sizeof(k_supported_formats) / sizeof(k_supported_formats[0]),
+        /* .supported_formats_count = */ sizeof(k_supported_formats) /
+            sizeof(k_supported_formats[0]),
         /* .supported_devices       = */ k_supported_devices,
-        /* .supported_devices_count = */ sizeof(k_supported_devices) / sizeof(k_supported_devices[0]),
+        /* .supported_devices_count = */ sizeof(k_supported_devices) /
+            sizeof(k_supported_devices[0]),
         /* .reserved_0              = */ 0,
         /* .reserved_1              = */ 0,
     },
@@ -178,21 +184,22 @@ MLModelConfiguration* rac_coreml_default_model_configuration(void) {
 }
 
 bool rac_coreml_file_exists(NSString* path) {
-    if (!path) return false;
+    if (!path)
+        return false;
     return [[NSFileManager defaultManager] fileExistsAtPath:path];
 }
 
 NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_model_name) {
     NSString* model_name = required_model_name ?: @"Unet";
-    NSString* direct_model = [base_dir stringByAppendingPathComponent:
-                                [model_name stringByAppendingString:@".mlmodelc"]];
+    NSString* direct_model =
+        [base_dir stringByAppendingPathComponent:[model_name stringByAppendingString:@".mlmodelc"]];
     if (rac_coreml_file_exists(direct_model)) {
         return base_dir;
     }
 
     NSArray<NSURL*>* contents =
         [[NSFileManager defaultManager] contentsOfDirectoryAtURL:[NSURL fileURLWithPath:base_dir]
-                                      includingPropertiesForKeys:@[NSURLIsDirectoryKey]
+                                      includingPropertiesForKeys:@[ NSURLIsDirectoryKey ]
                                                          options:0
                                                            error:nil];
     for (NSURL* item in contents) {
@@ -201,9 +208,8 @@ NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_mo
         if (![is_dir boolValue]) {
             continue;
         }
-        NSString* nested_model =
-            [[item path] stringByAppendingPathComponent:
-                [model_name stringByAppendingString:@".mlmodelc"]];
+        NSString* nested_model = [[item path]
+            stringByAppendingPathComponent:[model_name stringByAppendingString:@".mlmodelc"]];
         if (rac_coreml_file_exists(nested_model)) {
             return [item path];
         }
@@ -211,11 +217,10 @@ NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_mo
     return base_dir;
 }
 
-MLModel* rac_coreml_load_model_in_dir(NSString* dir,
-                                      NSString* name,
-                                      bool required,
+MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool required,
                                       const char* log_category) {
-    NSString* path = [dir stringByAppendingPathComponent:[name stringByAppendingString:@".mlmodelc"]];
+    NSString* path =
+        [dir stringByAppendingPathComponent:[name stringByAppendingString:@".mlmodelc"]];
     NSURL* url = [NSURL fileURLWithPath:path];
     const char* category = log_category ? log_category : kLogCat;
 
@@ -230,9 +235,7 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir,
     MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
     MLModel* model = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
     if (!model) {
-        RAC_LOG_ERROR(category,
-                      "MLModel load failed (%s): %s",
-                      [name UTF8String],
+        RAC_LOG_ERROR(category, "MLModel load failed (%s): %s", [name UTF8String],
                       err ? [[err localizedDescription] UTF8String] : "unknown");
         return nil;
     }
@@ -245,9 +248,8 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir,
 }
 
 extern "C" rac_result_t rac_coreml_runtime_require_available(void) {
-    return rac_runtime_get_by_id(RAC_RUNTIME_COREML) != nullptr
-               ? RAC_SUCCESS
-               : RAC_ERROR_BACKEND_UNAVAILABLE;
+    return rac_runtime_get_by_id(RAC_RUNTIME_COREML) != nullptr ? RAC_SUCCESS
+                                                                : RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_coreml(void) {
