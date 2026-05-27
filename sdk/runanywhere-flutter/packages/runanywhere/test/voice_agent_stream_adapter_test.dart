@@ -27,6 +27,13 @@
 //      `controller.isClosed` check in `_VoiceHandleFanOut._broadcast`).
 //   6. Error broadcast — an error fans out to every subscriber and tears
 //      the fan-out down (mirrors `_broadcastError`).
+//   7. Multi-handle isolation — two distinct handles each get an isolated
+//      fan-out; events dispatched on one never leak into the other
+//      (mirrors `_VoiceFanOutRegistry.fanOutFor(handle.address)`).
+//   8. Install-failure — when the C-side registration fails the subscriber
+//      receives a `StateError` and the stream closes (mirrors the
+//      `attach` returning `false` branch in
+//      `VoiceAgentStreamAdapter.stream.onListen`).
 
 import 'dart:async';
 
@@ -177,6 +184,72 @@ void main() {
           reason: '_broadcastError must tearDown the fan-out');
       expect(fanOut.tearDownCalls, equals(1));
     });
+
+    test(
+        'two distinct handles route to isolated fan-outs '
+        '(no cross-leak)', () async {
+      // Models `_VoiceFanOutRegistry.fanOutFor(handle.address)`: each
+      // native handle gets its OWN `_VoiceHandleFanOut`, and dispatching on
+      // one must not surface on subscribers attached to the other.
+      final registry = _FakeVoiceFanOutRegistry();
+      final fanOutA = registry.fanOutFor(handleAddress: 0xA);
+      final fanOutB = registry.fanOutFor(handleAddress: 0xB);
+      expect(identical(fanOutA, fanOutB), isFalse,
+          reason: 'distinct handles must yield distinct fan-outs');
+      expect(identical(fanOutA, registry.fanOutFor(handleAddress: 0xA)), isTrue,
+          reason: 'same handle must reuse its fan-out');
+
+      final aEvents = <VoiceEvent>[];
+      final bEvents = <VoiceEvent>[];
+      final subA = _FakeVoiceAgentStreamAdapter(fanOutA).stream().listen(
+            aEvents.add,
+          );
+      final subB = _FakeVoiceAgentStreamAdapter(fanOutB).stream().listen(
+            bEvents.add,
+          );
+
+      fanOutA.dispatch(VoiceEvent(
+        seq: $fixnum.Int64(1),
+        sessionId: 'handle-A',
+      ));
+      fanOutB.dispatch(VoiceEvent(
+        seq: $fixnum.Int64(2),
+        sessionId: 'handle-B',
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(aEvents.map((e) => e.sessionId).toList(), equals(['handle-A']));
+      expect(bEvents.map((e) => e.sessionId).toList(), equals(['handle-B']));
+
+      await subA.cancel();
+      await subB.cancel();
+      expect(fanOutA.tornDown, isTrue);
+      expect(fanOutB.tornDown, isTrue);
+    });
+
+    test(
+        'attach failure surfaces a StateError to the subscriber and closes '
+        'the stream', () async {
+      // Models the `VoiceAgentStreamAdapter.stream.onListen` branch where
+      // `_install()` returns false (e.g. commons predates Protobuf or
+      // `rac_voice_agent_set_proto_callback` returns non-zero): the adapter
+      // adds a `StateError` then closes the controller.
+      final fanOut = _FakeVoiceFanOut(installSucceeds: false);
+      final adapter = _FakeVoiceAgentStreamAdapter(fanOut);
+
+      Object? capturedError;
+      final done = Completer<void>();
+      adapter.stream().listen(
+            (_) {},
+            onError: (Object e, StackTrace _) => capturedError = e,
+            onDone: done.complete,
+          );
+
+      await done.future;
+      expect(capturedError, isA<StateError>());
+      expect((capturedError! as StateError).message,
+          contains('rac_voice_agent_set_proto_callback'));
+    });
   });
 }
 
@@ -194,12 +267,25 @@ void main() {
 /// `streaming_listener_drain_test.dart` for the same strategy applied to the
 /// single-subscription bridges (STT/TTS/VLM).
 class _FakeVoiceFanOut {
+  _FakeVoiceFanOut({this.installSucceeds = true});
+
+  /// Mirrors the boolean returned by the production `_install()` — when
+  /// false, `attach` must surface the error to the caller and refuse to
+  /// register the controller (matching the production
+  /// `cb.close(); return false;` branch).
+  final bool installSucceeds;
   final Set<StreamController<VoiceEvent>> _controllers = {};
   bool tornDown = false;
   int tearDownCalls = 0;
 
-  void attach(StreamController<VoiceEvent> controller) {
+  /// Returns `true` when the native registration succeeded and the
+  /// controller was attached; `false` mirrors the install-failure branch.
+  bool attach(StreamController<VoiceEvent> controller) {
+    if (!installSucceeds) {
+      return false;
+    }
     _controllers.add(controller);
+    return true;
   }
 
   void detach(StreamController<VoiceEvent> controller) {
@@ -255,9 +341,33 @@ class _FakeVoiceAgentStreamAdapter {
   Stream<VoiceEvent> stream() {
     late StreamController<VoiceEvent> controller;
     controller = StreamController<VoiceEvent>(
-      onListen: () => _fanOut.attach(controller),
+      onListen: () {
+        final attached = _fanOut.attach(controller);
+        if (!attached) {
+          // Mirrors production: `cb.close(); return false;` →
+          // `controller.addError(StateError(...)); controller.close();`.
+          controller.addError(StateError(
+            'rac_voice_agent_set_proto_callback failed '
+            '(Protobuf may not be linked)',
+          ));
+          unawaited(controller.close());
+        }
+      },
       onCancel: () => _fanOut.detach(controller),
     );
     return controller.stream;
+  }
+}
+
+/// Test double for the singleton `_VoiceFanOutRegistry`. The production
+/// registry keys on `handle.address`; this fake keys on a caller-supplied
+/// integer so the multi-handle isolation test can model two distinct
+/// handles without dealing with `ffi.Pointer` instantiation in unit-test
+/// code (which would require staging a native library).
+class _FakeVoiceFanOutRegistry {
+  final Map<int, _FakeVoiceFanOut> _fanOuts = <int, _FakeVoiceFanOut>{};
+
+  _FakeVoiceFanOut fanOutFor({required int handleAddress}) {
+    return _fanOuts.putIfAbsent(handleAddress, _FakeVoiceFanOut.new);
   }
 }
