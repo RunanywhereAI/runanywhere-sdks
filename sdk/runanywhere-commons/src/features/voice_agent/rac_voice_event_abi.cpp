@@ -132,7 +132,7 @@ int64_t now_us() {
  *   RESPONSE                         → assistant_token (is_final=true)
  *   AUDIO_SYNTHESIZED                → audio
  *   ERROR                            → error
- *   WAKEWORD_DETECTED                → state (transition to LISTENING)
+ *   WAKEWORD_DETECTED                → wakeword_detected
  *
  * Proto's `interrupted` arm has no current C-side producer; reserved
  * for the GAP 08 voice barge-in path.
@@ -221,14 +221,14 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED: {
-            dst.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
+            dst.set_category(runanywhere::v1::EVENT_CATEGORY_WAKEWORD);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_WAKEWORD);
-            /* No proto arm for wakeword today — surface as a state change
-             * to LISTENING so frontends can react via the standard state
-             * stream without losing the signal. */
-            auto* s = dst.mutable_state();
-            s->set_previous(runanywhere::v1::PIPELINE_STATE_IDLE);
-            s->set_current(runanywhere::v1::PIPELINE_STATE_LISTENING);
+            auto* w = dst.mutable_wakeword_detected();
+            if (src.data.wakeword.wake_word) {
+                w->set_wake_word(src.data.wakeword.wake_word);
+            }
+            w->set_confidence(src.data.wakeword.confidence);
+            w->set_timestamp_ms(src.data.wakeword.timestamp_ms);
             break;
         }
     }
@@ -331,6 +331,7 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
 //       StateChangeEvent    state           = 15;
 //       ErrorEvent          error           = 16;
 //       MetricsEvent        metrics         = 17;
+//       WakeWordDetectedEvent wakeword_detected = 26;
 //     }
 //   }
 //
@@ -408,6 +409,18 @@ inline void wire_double_field(std::vector<uint8_t>& out, uint32_t field, double 
     for (int i = 0; i < 8; ++i) {
         out.push_back(static_cast<uint8_t>((bits >> (i * 8)) & 0xff));
     }
+}
+
+inline void wire_float_field(std::vector<uint8_t>& out, uint32_t field, float value) {
+    if (value == 0.0f)
+        return;
+    wire_tag(out, field, /*wire_type=*/5);  // fixed32
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    out.push_back(static_cast<uint8_t>(bits & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 8) & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 16) & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 24) & 0xff));
 }
 
 inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const char* str) {
@@ -520,6 +533,16 @@ void encode_error(std::vector<uint8_t>& s, int32_t code) {
     /*  4: bool   is_recoverable  (false → omitted) */
 }
 
+void encode_wakeword_detected(std::vector<uint8_t>& s, const char* wake_word, float confidence,
+                              int64_t timestamp_ms) {
+    /*  1: string wake_word        */
+    wire_string_field(s, 1, wake_word);
+    /*  2: float  confidence       */
+    wire_float_field(s, 2, confidence);
+    /*  3: int64  timestamp_ms     */
+    wire_int64_field(s, 3, timestamp_ms);
+}
+
 void encode_metrics(std::vector<uint8_t>& /*s*/) {
     /*  1: double stt_final_ms       (0 → omitted)
      *  2: double llm_first_token_ms (0 → omitted)
@@ -629,9 +652,10 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED:
-            /* Surface as IDLE → LISTENING (matches the protobuf path). */
-            wire_submessage(scratch, /*field=*/15, [](std::vector<uint8_t>& s) {
-                encode_state_change(s, /*previous=*/1, /*current=*/2);
+            wire_submessage(scratch, /*field=*/26, [&](std::vector<uint8_t>& s) {
+                encode_wakeword_detected(s, event->data.wakeword.wake_word,
+                                         event->data.wakeword.confidence,
+                                         event->data.wakeword.timestamp_ms);
             });
             break;
     }

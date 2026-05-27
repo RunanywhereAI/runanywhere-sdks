@@ -11,10 +11,12 @@
 #   sdk/runanywhere-commons/src/generated/proto/
 #
 # The generated headers live inside sdk/runanywhere-commons so the C ABI shim
-# layer can `#include "runanywhere/idl/model_types.pb.h"` for
-# proto-encoded wire conversions. CMake's `idl/CMakeLists.txt` generates the
-# same files at build time for the `rac_idl` library; this script keeps a
-# committed copy for IDE navigation + the CI drift check.
+# layer can `#include "model_types.pb.h"` for proto-encoded wire conversions.
+# protoc emits bare filenames directly into OUT_DIR (no runanywhere/idl/
+# prefix). CMake's `idl/CMakeLists.txt` generates the same files at build
+# time for the `rac_idl` library and adds the generated directory to the
+# include path; this script keeps a committed copy for IDE navigation + the
+# CI drift check.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
