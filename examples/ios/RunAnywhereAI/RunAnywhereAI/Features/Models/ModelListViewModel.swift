@@ -209,7 +209,7 @@ class ModelListViewModel: ObservableObject {
     }
 
     /// Add a custom model from URL via the canonical `RunAnywhere.registerModel`
-    /// public API. The SDK composes the RAModelImportRequest internally via
+    /// public API. The SDK composes the proto import request internally via
     /// `rac_register_model_from_url_proto`; example side only collects user
     /// input and reloads the registry.
     func addModelFromURL(name: String, url: URL, framework: InferenceFramework, estimatedSize: Int64?) async {
