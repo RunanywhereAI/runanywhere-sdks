@@ -85,6 +85,7 @@ object CppBridgeVLM {
      * Do not route through [ComponentActor.getHandle]: the VLM vtable
      * `createFn` returns `0L` by design and the actor rejects that as failure.
      */
+    @Suppress("FunctionOnlyReturningConstant")
     suspend fun getHandle(): Long = 0L
 
     suspend fun destroy() {

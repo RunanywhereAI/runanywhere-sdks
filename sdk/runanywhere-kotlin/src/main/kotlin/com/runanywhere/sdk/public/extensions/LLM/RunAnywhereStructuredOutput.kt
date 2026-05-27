@@ -103,6 +103,7 @@ suspend fun RunAnywhere.extractStructuredOutput(
     }
 }
 
+@Suppress("UnusedParameter")
 fun RunAnywhere.generateStructuredStream(
     prompt: String,
     schema: RAJSONSchema,
@@ -114,6 +115,11 @@ fun RunAnywhere.generateStructuredStream(
     // TOKEN / PARTIAL_JSON events as complete JSON values become available,
     // and a single terminal COMPLETED / ERROR event with the parsed result.
     // Kotlin simply decodes and forwards — no client-side accumulation.
+    // `options` is intentionally accepted for Swift signature parity but
+    // not yet threaded through the StructuredOutputRequest proto; LLM
+    // generation options are picked up from the lifecycle-owned LLM
+    // service. Wiring user-supplied options through the streaming proto
+    // surface is a follow-up parity item.
     return callbackFlow {
         val requestId = UUID.randomUUID().toString()
         val driver =

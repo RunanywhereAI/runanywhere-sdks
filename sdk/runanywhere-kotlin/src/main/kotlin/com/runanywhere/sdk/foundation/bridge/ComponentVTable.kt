@@ -51,8 +51,12 @@ public class ComponentVTable internal constructor(
      * snapshot reports `COMPONENT_LIFECYCLE_STATE_READY` (the only state
      * indicating an active, usable, loaded asset). Falls back to
      * `false` if the snapshot is unavailable, matching Swift's
-     * `rac_*_component_is_loaded` semantics.
+     * `rac_*_component_is_loaded` semantics. `handle` is part of the
+     * vtable contract (parity with Swift's `rac_*_component_is_loaded`
+     * C ABI) but the proto-canonical readiness check routes through
+     * the lifecycle snapshot, which is keyed by component.
      */
+    @Suppress("UnusedParameter")
     public fun isLoaded(handle: Long): Boolean {
         val snapshot: ComponentLifecycleSnapshot =
             CppBridgeModelLifecycle.snapshot(component) ?: return false
@@ -63,7 +67,11 @@ public class ComponentVTable internal constructor(
      * Cleanup via the canonical proto unload path. Best-effort —
      * mirrors Swift where `rac_*_component_cleanup` errors are
      * intentionally discarded (the cleanup is fire-and-forget).
+     * `handle` is part of the vtable contract (parity with Swift's
+     * `rac_*_component_cleanup` C ABI) but the unload routes through
+     * the lifecycle, which is keyed by component.
      */
+    @Suppress("UnusedParameter")
     public fun cleanup(handle: Long) {
         CppBridgeModelLifecycle.unload(
             ModelUnloadRequest(unload_all = true),
