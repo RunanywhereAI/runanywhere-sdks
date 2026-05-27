@@ -616,6 +616,17 @@ public:
         }
       }
 
+      // Guard mean_pooling against undersized output tensors: it reads up to
+      // pad_length * actual_hidden_dim float32s, so byte budget must cover
+      // that. An undersized buffer (e.g. mocked test fault injection or a
+      // truncated runtime response) previously caused OOB reads of garbage.
+      const size_t required_floats = pad_length * actual_hidden_dim;
+      if (output.bytes.size() < required_floats * sizeof(float)) {
+        LOGE("Embedding output buffer underflow: %zu bytes < required %zu",
+             output.bytes.size(), required_floats * sizeof(float));
+        return {};
+      }
+
       const float *output_floats =
           reinterpret_cast<const float *>(output.bytes.data());
       auto pooled = mean_pooling(output_floats, attention_mask, pad_length,
@@ -759,6 +770,16 @@ private:
 
       std::vector<std::vector<float>> results(count);
       const size_t stride = actual_seq_len * actual_hidden_dim;
+      // Mean-pooling each sentence reads `stride` float32s from the model
+      // output; refuse to proceed if the byte budget is short of the count
+      // we'd dereference across all sentences (mirrors the single-embed
+      // guard added for engines-other-003).
+      const size_t required_floats = count * stride;
+      if (output.bytes.size() < required_floats * sizeof(float)) {
+        LOGE("Batch embedding output buffer underflow: %zu bytes < required %zu",
+             output.bytes.size(), required_floats * sizeof(float));
+        return {};
+      }
       const float *output_floats =
           reinterpret_cast<const float *>(output.bytes.data());
 
