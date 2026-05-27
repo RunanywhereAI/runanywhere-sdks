@@ -52,6 +52,8 @@
  *   `-Wdeprecated-declarations` warnings (commons-features-voice-007).
  */
 
+#include "voice_agent_internal.h"
+
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -66,8 +68,6 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
-
-#include "voice_agent_internal.h"
 #include "voice_agent_pipeline.hpp"
 
 // =============================================================================

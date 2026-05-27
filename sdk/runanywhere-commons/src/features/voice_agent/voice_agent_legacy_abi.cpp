@@ -34,6 +34,10 @@
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 
+#include "rac_voice_event_abi_internal.h"
+#include "voice_agent_internal.h"
+#include "voice_agent_internal_helpers.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -58,10 +62,6 @@
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
-
-#include "rac_voice_event_abi_internal.h"
-#include "voice_agent_internal.h"
-#include "voice_agent_internal_helpers.h"
 #include "voice_agent_pipeline.hpp"
 
 namespace {
@@ -280,7 +280,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    rac_result_t validation_result = rac::voice_agent::detail::validate_all_components_ready(handle);
+    rac_result_t validation_result =
+        rac::voice_agent::detail::validate_all_components_ready(handle);
     if (validation_result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process");
         return validation_result;
@@ -397,7 +398,8 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    rac_result_t validation_result = rac::voice_agent::detail::validate_all_components_ready(handle);
+    rac_result_t validation_result =
+        rac::voice_agent::detail::validate_all_components_ready(handle);
     if (validation_result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process stream");
         rac_voice_agent_event_t error_event = {};

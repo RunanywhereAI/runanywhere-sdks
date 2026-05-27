@@ -358,11 +358,12 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 //      the value into a thread-safe sink (Swift HandleBox, Kotlin
 //      CompletableDeferred, RN JS-thread callback, Flutter Completer, Web
 //      synchronous capture) BEFORE the first generate iteration runs.
-static rac_result_t run_loop_impl(
-    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* on_execute_user_data,
-    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
-    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+static rac_result_t
+run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
+              rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+              rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+              void* on_handle_user_data, uint64_t* out_run_loop_handle,
+              rac_proto_buffer_t* out_result) {
     if (!on_execute || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -475,8 +476,7 @@ static rac_result_t run_loop_impl(
             // A cancel that latched before/during generate surfaces as
             // RAC_ERROR_CANCELLED with "LLM generation cancelled" so hosts can
             // branch on error_code instead of message string matching.
-            const bool cancelled =
-                cancel_state->cancel_requested.load(std::memory_order_acquire);
+            const bool cancelled = cancel_state->cancel_requested.load(std::memory_order_acquire);
             const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
             const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
             final_result.set_text(final_text);

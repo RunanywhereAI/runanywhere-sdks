@@ -152,8 +152,9 @@ constexpr float kSmallModelThresholdB = 1.0f;
 
 }  // namespace
 
-extern "C" rac_result_t rac_tool_call_format_from_model_info_proto(
-    const uint8_t* model_info_proto_bytes, size_t size, rac_tool_call_format_t* out_format) {
+extern "C" rac_result_t
+rac_tool_call_format_from_model_info_proto(const uint8_t* model_info_proto_bytes, size_t size,
+                                           rac_tool_call_format_t* out_format) {
     if (!out_format) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -184,8 +185,9 @@ extern "C" rac_result_t rac_tool_call_format_from_model_info_proto(
 #endif
 }
 
-extern "C" rac_result_t rac_model_info_parameter_count_b_proto(
-    const uint8_t* model_info_proto_bytes, size_t size, float* out_parameter_count_b) {
+extern "C" rac_result_t
+rac_model_info_parameter_count_b_proto(const uint8_t* model_info_proto_bytes, size_t size,
+                                       float* out_parameter_count_b) {
     if (!out_parameter_count_b) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -224,7 +226,6 @@ extern "C" rac_result_t rac_model_info_is_small_model_proto(const uint8_t* model
     if (rc != RAC_SUCCESS) {
         return rc;
     }
-    *out_is_small =
-        (params_b > 0.0f && params_b < kSmallModelThresholdB) ? RAC_TRUE : RAC_FALSE;
+    *out_is_small = (params_b > 0.0f && params_b < kSmallModelThresholdB) ? RAC_TRUE : RAC_FALSE;
     return RAC_SUCCESS;
 }

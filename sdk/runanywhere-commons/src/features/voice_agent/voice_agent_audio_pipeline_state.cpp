@@ -9,9 +9,8 @@
  * Split out of voice_agent.cpp under commons-features-voice-003.
  */
 
-#include "rac/features/voice_agent/rac_voice_agent.h"
-
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
 
 const char* rac_audio_pipeline_state_name(rac_audio_pipeline_state_t state) {
     switch (state) {

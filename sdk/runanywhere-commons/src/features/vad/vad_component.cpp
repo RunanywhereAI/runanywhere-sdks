@@ -9,6 +9,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include "vad_threshold_registry.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -39,7 +41,6 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/router/rac_route.h"
 #include "rac/router/rac_routing_hints.h"
-#include "vad_threshold_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "sdk_events.pb.h"

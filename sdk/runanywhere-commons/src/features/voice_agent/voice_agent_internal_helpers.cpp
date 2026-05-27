@@ -31,11 +31,11 @@
 // SWIFT-VOICE-AGENT-001 (T16 / Path X) — voice agent proto path consults
 // the global model lifecycle (level 1: impl + ops) instead of dereferencing
 // the per-component handles stored on the rac_voice_agent struct (level 3).
-#include "features/llm/rac_llm_lifecycle_bridge.h"
-#include "features/rac_nonllm_lifecycle_bridge.h"
-
 #include "rac_voice_event_abi_internal.h"
 #include "voice_agent_internal.h"
+
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
 
 namespace rac::voice_agent::detail {
 

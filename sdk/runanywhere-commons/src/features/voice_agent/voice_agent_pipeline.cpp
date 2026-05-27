@@ -198,8 +198,7 @@ class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
         // served by the pipeline. Fall back to the per-handle component
         // for legacy load paths.
         rac::lifecycle::LifecycleSttRef ref{};
-        const bool have_lifecycle =
-            rac::lifecycle::acquire_lifecycle_stt(&ref) == RAC_SUCCESS;
+        const bool have_lifecycle = rac::lifecycle::acquire_lifecycle_stt(&ref) == RAC_SUCCESS;
         rac_stt_result_t r = {};
         rac_result_t status;
         if (have_lifecycle) {
@@ -299,8 +298,7 @@ class TTSNode : public rac::graph::PipelineNode<Response, ProcessedPayload> {
         // commons-features-voice-004: prefer lifecycle TTS ref with
         // per-handle fallback.
         rac::lifecycle::LifecycleTtsRef ref{};
-        const bool have_lifecycle =
-            rac::lifecycle::acquire_lifecycle_tts(&ref) == RAC_SUCCESS;
+        const bool have_lifecycle = rac::lifecycle::acquire_lifecycle_tts(&ref) == RAC_SUCCESS;
         rac_tts_result_t r = {};
         rac_result_t status;
         if (have_lifecycle) {

@@ -19,6 +19,8 @@
 
 #include "rac/features/vad/rac_vad_stream.h"
 
+#include "vad_threshold_registry.h"
+
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -34,7 +36,6 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
-#include "vad_threshold_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "vad_options.pb.h"

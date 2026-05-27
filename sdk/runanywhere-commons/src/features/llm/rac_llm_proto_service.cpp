@@ -202,8 +202,7 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
         options.temperature = temperature;
     }
 
-    const float top_p =
-        (has_options && opts.top_p() > 0.0f) ? opts.top_p() : request.top_p();
+    const float top_p = (has_options && opts.top_p() > 0.0f) ? opts.top_p() : request.top_p();
     if (top_p > 0.0f) {
         options.top_p = top_p;
     }
@@ -213,9 +212,9 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     stop_storage.clear();
     stop_ptrs.clear();
 
-    const auto& canonical_stop_sequences =
-        (has_options && opts.stop_sequences_size() > 0) ? opts.stop_sequences()
-                                                        : request.stop_sequences();
+    const auto& canonical_stop_sequences = (has_options && opts.stop_sequences_size() > 0)
+                                               ? opts.stop_sequences()
+                                               : request.stop_sequences();
     const int stop_count = canonical_stop_sequences.size();
     if (stop_count > 0) {
         stop_storage.reserve(static_cast<size_t>(stop_count));

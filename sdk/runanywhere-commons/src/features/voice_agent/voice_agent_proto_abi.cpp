@@ -12,26 +12,25 @@
 #include <cstring>
 #include <mutex>
 
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/foundation/rac_proto_buffer.h"
-
-#include "features/llm/rac_llm_lifecycle_bridge.h"
-#include "features/rac_nonllm_lifecycle_bridge.h"
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/features/stt/rac_stt_service.h"
-#include "rac/features/tts/rac_tts_service.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
