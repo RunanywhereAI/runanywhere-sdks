@@ -102,7 +102,10 @@ bump_pubspec_version() {
 # outside the monorepo workspace.
 bump_pubspec_runanywhere_dep() {
     local file="$1"
-    bump_line "$file" '^  runanywhere: \^[0-9]+\.[0-9]+\.[0-9]+' \
+    # Match the entire value (including any `-test` / `-rc.1` / etc. pre-release
+    # suffix) up to end-of-line / inline-comment so the replacement does not
+    # accidentally preserve a stale suffix when bumping past a pre-release.
+    bump_line "$file" '^  runanywhere: \^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?[[:space:]]*(#.*)?$' \
         "  runanywhere: ^${NEW_VERSION}"
 }
 
