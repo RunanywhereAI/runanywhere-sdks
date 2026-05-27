@@ -115,6 +115,7 @@ WhisperCppSTT::~WhisperCppSTT() {
 }
 
 bool WhisperCppSTT::is_ready() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   return model_loaded_ && ctx_ != nullptr;
 }
 
@@ -165,7 +166,10 @@ bool WhisperCppSTT::load_model(const std::string &model_path,
   return true;
 }
 
-bool WhisperCppSTT::is_model_loaded() const { return model_loaded_; }
+bool WhisperCppSTT::is_model_loaded() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return model_loaded_;
+}
 
 bool WhisperCppSTT::unload_model() {
   std::lock_guard<std::mutex> lock(mutex_);
