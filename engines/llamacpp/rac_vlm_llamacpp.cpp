@@ -33,6 +33,7 @@
 #include "mtmd-helper.h"
 #include "mtmd.h"
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/utils/rac_image_utils.h"
 
@@ -772,6 +773,12 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
 
     if (eval_result != 0) {
       RAC_LOG_ERROR(LOG_CAT, "Failed to evaluate chunks: %d", eval_result);
+      char detail[128];
+      snprintf(detail, sizeof(detail),
+               "VLM prepare failed: mtmd_helper_eval_chunks returned %d "
+               "(image/text decode error)",
+               eval_result);
+      rac_error_set_details(detail);
       return RAC_ERROR_PROCESSING_FAILED;
     }
 
@@ -807,6 +814,9 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend *backend,
     if (llama_decode(backend->ctx, batch) != 0) {
       llama_batch_free(batch);
       RAC_LOG_ERROR(LOG_CAT, "Failed to decode prompt");
+      rac_error_set_details(
+          "VLM prepare failed: llama_decode returned non-zero while "
+          "evaluating text-only prompt batch");
       return RAC_ERROR_PROCESSING_FAILED;
     }
 
@@ -1324,6 +1334,9 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
 
     if (llama_decode(backend->ctx, batch) != 0) {
       RAC_LOG_ERROR(LOG_CAT, "llama_decode failed during VLM process");
+      rac_error_set_details(
+          "VLM generation failed: llama_decode returned non-zero "
+          "(mid-stream decode error in non-streaming process())");
       decode_failed = true;
       break;
     }
@@ -1516,6 +1529,9 @@ rac_result_t rac_vlm_llamacpp_process_stream(
 
     if (llama_decode(backend->ctx, batch) != 0) {
       RAC_LOG_ERROR(LOG_CAT, "llama_decode failed during VLM streaming");
+      rac_error_set_details(
+          "VLM generation failed: llama_decode returned non-zero "
+          "(mid-stream decode error in streaming process_stream())");
       decode_failed = true;
       break;
     }
