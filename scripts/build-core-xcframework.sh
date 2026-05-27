@@ -382,6 +382,29 @@ EOF
     exit 1
 fi
 
+# ────────────────────────────────────────────────────────────────────────────
+# Prereq: the iOS Sherpa-ONNX xcframework. Required when the sherpa backend
+# is enabled (default). Without it, engines/sherpa's CMake gate sets
+# SHERPA_ONNX_AVAILABLE=0 → RAC_SHERPA_ROUTABLE=0, which strips
+# stt_ops/tts_ops/vad_ops from the sherpa plugin vtable. The xcframework
+# still ships, but every STT/TTS/VAD load with `framework=sherpa` hits the
+# "no backend route supports requested model" router rejection (FIXLOOP-TR-1).
+# ────────────────────────────────────────────────────────────────────────────
+IOS_SHERPA="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ] && [ ! -d "${IOS_SHERPA}" ] && [ "${DRY_RUN}" != "1" ]; then
+    cat >&2 <<EOF
+error: Sherpa-ONNX iOS xcframework not found at
+  ${IOS_SHERPA}
+
+Run this first (one-time, per checkout):
+  ./sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
+
+Or re-run with RAC_BACKEND_SHERPA=OFF to skip the Sherpa-ONNX backend (this
+will disable STT/TTS/VAD via Whisper/Piper/Silero on iOS).
+EOF
+    exit 1
+fi
+
 mkdir -p "${DEST}"
 run rm -rf "${STAGING_DIR}"
 run mkdir -p "${STAGING_DIR}"

@@ -151,7 +151,15 @@ ONNX_VERSION_WINDOWS=1.24.4
 # =============================================================================
 # iOS version (matched set with ONNX_VERSION_IOS — sherpa-onnx links ORT
 # statically into its xcframework on iOS, so the two must move together).
-SHERPA_ONNX_VERSION_IOS=1.13.2
+# FIXLOOP-TR-1 (2026-05-27): the matching v1.13.2 iOS xcframework was never
+# published to runanywhere-binaries (only v1.12.18 is available there). Pin
+# back to v1.12.18 so `scripts/ios/download-sherpa-onnx.sh` can actually
+# resolve the prebuilt; without it, build-core-xcframework.sh ships a
+# non-routable RABackendSherpa.xcframework (RAC_SHERPA_ROUTABLE=0) and
+# every STT/TTS load with `framework=sherpa` fails the router with
+# "no backend route". Sherpa C-API is ABI-stable across 1.12→1.13 so this
+# lag is safe; bump back to 1.13.2 when the iOS xcframework is published.
+SHERPA_ONNX_VERSION_IOS=1.12.18
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
 # ⚠️  IMPORTANT: When changing this version, you MUST re-download BOTH the
