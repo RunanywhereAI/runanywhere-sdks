@@ -8,10 +8,9 @@
 
 #include "diffusion_coreml_backend.h"
 
-#include "rac_runtime_coreml.h"
-
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -28,6 +27,7 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+#include "rac_runtime_coreml.h"
 
 namespace {
 constexpr const char* kLogCat = "Diffusion.CoreML";
@@ -572,9 +572,9 @@ struct LatentShape {
 
 LatentShape resolve_latent_shape(MLFeatureDescription* sample_desc, int32_t image_width,
                                  int32_t image_height) {
-    std::vector<NSInteger> shape = multiarray_shape(
-        sample_desc,
-        {1, 4, std::max<int32_t>(1, image_height / 8), std::max<int32_t>(1, image_width / 8)});
+    std::vector<NSInteger> shape =
+        multiarray_shape(sample_desc, {1, 4, std::max<int32_t>(1, image_height / 8),
+                                       std::max<int32_t>(1, image_width / 8)});
     LatentShape out;
     if (shape.size() >= 4) {
         out.batch = shape[shape.size() - 4];
@@ -1277,10 +1277,11 @@ rac_result_t rac_diffusion_coreml_generate(rac_diffusion_coreml_impl_t* impl,
     return generate_internal(impl, options, nullptr, nullptr, out_result);
 }
 
-rac_result_t rac_diffusion_coreml_generate_with_progress(
-    rac_diffusion_coreml_impl_t* impl, const rac_diffusion_options_t* options,
-    rac_diffusion_progress_callback_fn progress_cb, void* user_data,
-    rac_diffusion_result_t* out_result) {
+rac_result_t
+rac_diffusion_coreml_generate_with_progress(rac_diffusion_coreml_impl_t* impl,
+                                            const rac_diffusion_options_t* options,
+                                            rac_diffusion_progress_callback_fn progress_cb,
+                                            void* user_data, rac_diffusion_result_t* out_result) {
     return generate_internal(impl, options, progress_cb, user_data, out_result);
 }
 
