@@ -23,6 +23,7 @@ import {
   openSheet as openModelSheet,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 let container: HTMLElement;
@@ -218,13 +219,4 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
   if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
   return `${Math.round(bytes / 1_000)} KB`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

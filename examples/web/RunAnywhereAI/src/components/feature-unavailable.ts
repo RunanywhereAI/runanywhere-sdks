@@ -8,6 +8,8 @@
  * app keeps the tab interactive but refuses to dispatch inference verbs.
  */
 
+import { escapeHtml } from '../services/escape-html';
+
 export interface FeatureUnavailableOptions {
   /** Display name of the tab (Chat, Vision, Voice, Transcribe, ...). */
   title: string;
@@ -19,12 +21,12 @@ export interface FeatureUnavailableOptions {
 
 export function renderFeatureUnavailable(host: HTMLElement, options: FeatureUnavailableOptions): void {
   const requirementList = options.requires
-    .map((name) => `<li><code>${escape(name)}</code></li>`)
+    .map((name) => `<li><code>${escapeHtml(name)}</code></li>`)
     .join('');
 
   host.innerHTML = `
     <div class="toolbar">
-      <div class="toolbar-title">${escape(options.title)}</div>
+      <div class="toolbar-title">${escapeHtml(options.title)}</div>
       <div class="toolbar-actions"></div>
     </div>
     <div class="feature-unavailable">
@@ -35,8 +37,8 @@ export function renderFeatureUnavailable(host: HTMLElement, options: FeatureUnav
           <line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
       </div>
-      <h2>${escape(options.title)} is not wired up</h2>
-      <p class="feature-unavailable__description">${escape(options.description)}</p>
+      <h2>${escapeHtml(options.title)} is not wired up</h2>
+      <p class="feature-unavailable__description">${escapeHtml(options.description)}</p>
       <p class="feature-unavailable__hint">
         The app uses the Swift-shaped <code>RunAnywhere</code> root facade.
         LLM and VLM route through the llama.cpp proto-byte WASM bridge. The
@@ -52,13 +54,4 @@ export function renderFeatureUnavailable(host: HTMLElement, options: FeatureUnav
       </p>
     </div>
   `;
-}
-
-function escape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

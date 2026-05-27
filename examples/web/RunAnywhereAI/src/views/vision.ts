@@ -34,6 +34,7 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 const VLM_PICKER_FILTER: readonly ModelCategory[] = [
@@ -166,14 +167,14 @@ function renderView(): void {
         <label class="form-label" for="vision-prompt">Prompt</label>
         <textarea id="vision-prompt" class="chat-input" rows="2"
           ${isBusy ? 'disabled' : ''}
-          placeholder="What's in this image?">${escape(DEFAULT_PROMPT)}</textarea>
+          placeholder="What's in this image?">${escapeHtml(DEFAULT_PROMPT)}</textarea>
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="vision-analyze-btn" ${canAnalyze ? '' : 'disabled'}>
             ${isBusy ? 'Analyzing…' : 'Capture & analyze'}
           </button>
         </div>
-        <div id="vision-status" class="docs-status">${escape(status)}</div>
-        <pre id="vision-output" class="docs-pre">${escape(lastResult ?? '(no response yet)')}</pre>
+        <div id="vision-status" class="docs-status">${escapeHtml(status)}</div>
+        <pre id="vision-output" class="docs-pre">${escapeHtml(lastResult ?? '(no response yet)')}</pre>
       </div>
     </div>
   `;
@@ -374,14 +375,6 @@ function formatErr(err: unknown): string {
   return formatError(err);
 }
 
-function escape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Dispose subscription on full panel teardown (mirrors chat.ts pattern).
 const disposeObserver =

@@ -13,6 +13,7 @@ import {
 } from '@runanywhere/web';
 import { ONNX } from '@runanywhere/web-onnx';
 import { ensureCatalogRegistered } from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 const TOP_K = 3;
@@ -323,8 +324,4 @@ function createDocumentId(): string {
     return crypto.randomUUID();
   }
   return Math.random().toString(36).slice(2);
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
