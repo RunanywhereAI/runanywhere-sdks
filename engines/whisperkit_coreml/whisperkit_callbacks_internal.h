@@ -22,11 +22,10 @@
 
 namespace runanywhere::engines::whisperkit_coreml {
 
-bool snapshot_callbacks(rac_whisperkit_coreml_stt_callbacks_t *out);
+bool snapshot_callbacks(rac_whisperkit_coreml_stt_callbacks_t* out);
 
-bool snapshot_cached_destroy(rac_whisperkit_coreml_stt_destroy_fn *out_fn,
-                             void **out_user_data);
+bool snapshot_cached_destroy(rac_whisperkit_coreml_stt_destroy_fn* out_fn, void** out_user_data);
 
-} // namespace runanywhere::engines::whisperkit_coreml
+}  // namespace runanywhere::engines::whisperkit_coreml
 
-#endif // RAC_ENGINES_WHISPERKIT_COREML_CALLBACKS_INTERNAL_H
+#endif  // RAC_ENGINES_WHISPERKIT_COREML_CALLBACKS_INTERNAL_H

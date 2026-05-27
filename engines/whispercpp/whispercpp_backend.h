@@ -26,10 +26,10 @@ namespace runanywhere {
 // =============================================================================
 
 enum class DeviceType {
-  CPU = 0,
-  GPU = 1,
-  METAL = 3,
-  CUDA = 4,
+    CPU = 0,
+    GPU = 1,
+    METAL = 3,
+    CUDA = 4,
 };
 
 enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, CUSTOM };
@@ -39,38 +39,38 @@ enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, CUSTOM };
 // =============================================================================
 
 struct WordTiming {
-  std::string word;
-  double start_time_ms = 0.0;
-  double end_time_ms = 0.0;
-  float confidence = 0.0f;
+    std::string word;
+    double start_time_ms = 0.0;
+    double end_time_ms = 0.0;
+    float confidence = 0.0f;
 };
 
 struct AudioSegment {
-  std::string text;
-  double start_time_ms = 0.0;
-  double end_time_ms = 0.0;
-  float confidence = 0.0f;
-  std::string language;
+    std::string text;
+    double start_time_ms = 0.0;
+    double end_time_ms = 0.0;
+    float confidence = 0.0f;
+    std::string language;
 };
 
 struct STTRequest {
-  std::vector<float> audio_samples;
-  int sample_rate = 16000;
-  std::string language;
-  bool detect_language = false;
-  bool word_timestamps = false;
-  bool translate_to_english = false;
+    std::vector<float> audio_samples;
+    int sample_rate = 16000;
+    std::string language;
+    bool detect_language = false;
+    bool word_timestamps = false;
+    bool translate_to_english = false;
 };
 
 struct STTResult {
-  std::string text;
-  std::string detected_language;
-  std::vector<AudioSegment> segments;
-  std::vector<WordTiming> word_timings;
-  double audio_duration_ms = 0.0;
-  double inference_time_ms = 0.0;
-  float confidence = 0.0f;
-  bool is_final = true;
+    std::string text;
+    std::string detected_language;
+    std::vector<AudioSegment> segments;
+    std::vector<WordTiming> word_timings;
+    double audio_duration_ms = 0.0;
+    double inference_time_ms = 0.0;
+    float confidence = 0.0f;
+    bool is_final = true;
 };
 
 // =============================================================================
@@ -84,31 +84,31 @@ class WhisperCppSTT;
 // =============================================================================
 
 class WhisperCppBackend {
-public:
-  WhisperCppBackend();
-  ~WhisperCppBackend();
+   public:
+    WhisperCppBackend();
+    ~WhisperCppBackend();
 
-  bool initialize(const nlohmann::json &config = {});
-  bool is_initialized() const;
-  void cleanup();
+    bool initialize(const nlohmann::json& config = {});
+    bool is_initialized() const;
+    void cleanup();
 
-  DeviceType get_device_type() const;
-  size_t get_memory_usage() const;
+    DeviceType get_device_type() const;
+    size_t get_memory_usage() const;
 
-  int get_num_threads() const { return num_threads_; }
-  bool is_gpu_enabled() const { return use_gpu_; }
+    int get_num_threads() const { return num_threads_; }
+    bool is_gpu_enabled() const { return use_gpu_; }
 
-  WhisperCppSTT *get_stt() { return stt_.get(); }
+    WhisperCppSTT* get_stt() { return stt_.get(); }
 
-private:
-  void create_stt();
+   private:
+    void create_stt();
 
-  bool initialized_ = false;
-  nlohmann::json config_;
-  int num_threads_ = 0;
-  bool use_gpu_ = true;
-  std::unique_ptr<WhisperCppSTT> stt_;
-  mutable std::mutex mutex_;
+    bool initialized_ = false;
+    nlohmann::json config_;
+    int num_threads_ = 0;
+    bool use_gpu_ = true;
+    std::unique_ptr<WhisperCppSTT> stt_;
+    mutable std::mutex mutex_;
 };
 
 // =============================================================================
@@ -116,43 +116,39 @@ private:
 // =============================================================================
 
 class WhisperCppSTT {
-public:
-  explicit WhisperCppSTT(WhisperCppBackend *backend);
-  ~WhisperCppSTT();
+   public:
+    explicit WhisperCppSTT(WhisperCppBackend* backend);
+    ~WhisperCppSTT();
 
-  bool is_ready() const;
-  bool load_model(const std::string &model_path,
-                  STTModelType model_type = STTModelType::WHISPER,
-                  const nlohmann::json &config = {});
-  bool is_model_loaded() const;
-  bool unload_model();
-  STTModelType get_model_type() const;
+    bool is_ready() const;
+    bool load_model(const std::string& model_path, STTModelType model_type = STTModelType::WHISPER,
+                    const nlohmann::json& config = {});
+    bool is_model_loaded() const;
+    bool unload_model();
+    STTModelType get_model_type() const;
 
-  STTResult transcribe(const STTRequest &request);
+    STTResult transcribe(const STTRequest& request);
 
-  void cancel();
-  std::vector<std::string> get_supported_languages() const;
+    void cancel();
+    std::vector<std::string> get_supported_languages() const;
 
-private:
-  STTResult transcribe_internal(const std::vector<float> &audio,
-                                const std::string &language,
-                                bool detect_language, bool translate,
-                                bool word_timestamps);
-  std::vector<float> resample_to_16khz(const std::vector<float> &samples,
-                                       int source_rate);
+   private:
+    STTResult transcribe_internal(const std::vector<float>& audio, const std::string& language,
+                                  bool detect_language, bool translate, bool word_timestamps);
+    std::vector<float> resample_to_16khz(const std::vector<float>& samples, int source_rate);
 
-  WhisperCppBackend *backend_;
-  whisper_context *ctx_ = nullptr;
+    WhisperCppBackend* backend_;
+    whisper_context* ctx_ = nullptr;
 
-  bool model_loaded_ = false;
-  std::atomic<bool> cancel_requested_{false};
+    bool model_loaded_ = false;
+    std::atomic<bool> cancel_requested_{false};
 
-  std::string model_path_;
-  nlohmann::json model_config_;
+    std::string model_path_;
+    nlohmann::json model_config_;
 
-  mutable std::mutex mutex_;
+    mutable std::mutex mutex_;
 };
 
-} // namespace runanywhere
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_WHISPERCPP_BACKEND_H
+#endif  // RUNANYWHERE_WHISPERCPP_BACKEND_H

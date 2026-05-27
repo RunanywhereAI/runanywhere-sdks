@@ -7,6 +7,8 @@
  * CoreML inference on Apple Neural Engine.
  */
 
+#include "whisperkit_callbacks_internal.h"
+
 #include <cstdlib>
 #include <cstring>
 
@@ -18,7 +20,6 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_whisperkit_coreml.h"
-#include "whisperkit_callbacks_internal.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -26,97 +27,91 @@
 
 namespace {
 
-const char *LOG_CAT = "WhisperKitCoreML";
+const char* LOG_CAT = "WhisperKitCoreML";
 
-static rac_result_t
-whisperkit_coreml_stt_vtable_initialize(void *impl, const char *model_path) {
-  (void)impl;
-  (void)model_path;
-  return RAC_SUCCESS;
+static rac_result_t whisperkit_coreml_stt_vtable_initialize(void* impl, const char* model_path) {
+    (void)impl;
+    (void)model_path;
+    return RAC_SUCCESS;
 }
 
-static rac_result_t whisperkit_coreml_stt_vtable_transcribe(
-    void *impl, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, rac_stt_result_t *out_result) {
-  if (!impl || !audio_data || !out_result)
-    return RAC_ERROR_NULL_POINTER;
+static rac_result_t whisperkit_coreml_stt_vtable_transcribe(void* impl, const void* audio_data,
+                                                            size_t audio_size,
+                                                            const rac_stt_options_t* options,
+                                                            rac_stt_result_t* out_result) {
+    if (!impl || !audio_data || !out_result)
+        return RAC_ERROR_NULL_POINTER;
 
-  // engines-other-007: snapshot the callback struct under the registration
-  // lock to avoid dereferencing a pointer whose target may be racing with
-  // rac_whisperkit_coreml_stt_set_callbacks on another thread.
-  rac_whisperkit_coreml_stt_callbacks_t cbs{};
-  if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
-      cbs.transcribe == nullptr) {
-    RAC_LOG_ERROR(LOG_CAT, "Swift transcribe callback not registered");
-    return RAC_ERROR_NOT_SUPPORTED;
-  }
+    // engines-other-007: snapshot the callback struct under the registration
+    // lock to avoid dereferencing a pointer whose target may be racing with
+    // rac_whisperkit_coreml_stt_set_callbacks on another thread.
+    rac_whisperkit_coreml_stt_callbacks_t cbs{};
+    if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
+        cbs.transcribe == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift transcribe callback not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
 
-  return cbs.transcribe(impl, audio_data, audio_size, options, out_result,
-                        cbs.user_data);
+    return cbs.transcribe(impl, audio_data, audio_size, options, out_result, cbs.user_data);
 }
 
 static rac_result_t whisperkit_coreml_stt_vtable_transcribe_stream(
-    void *impl, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, rac_stt_stream_callback_t callback,
-    void *user_data) {
-  rac_stt_result_t result = {};
-  rac_result_t status = whisperkit_coreml_stt_vtable_transcribe(
-      impl, audio_data, audio_size, options, &result);
-  if (status == RAC_SUCCESS && callback && result.text) {
-    callback(result.text, RAC_TRUE, user_data);
-  }
-  rac_stt_result_free(&result);
-  return status;
+    void* impl, const void* audio_data, size_t audio_size, const rac_stt_options_t* options,
+    rac_stt_stream_callback_t callback, void* user_data) {
+    rac_stt_result_t result = {};
+    rac_result_t status =
+        whisperkit_coreml_stt_vtable_transcribe(impl, audio_data, audio_size, options, &result);
+    if (status == RAC_SUCCESS && callback && result.text) {
+        callback(result.text, RAC_TRUE, user_data);
+    }
+    rac_stt_result_free(&result);
+    return status;
 }
 
-static rac_result_t
-whisperkit_coreml_stt_vtable_get_info(void *impl, rac_stt_info_t *out_info) {
-  (void)impl;
-  if (!out_info)
-    return RAC_ERROR_NULL_POINTER;
+static rac_result_t whisperkit_coreml_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
+    (void)impl;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
 
-  out_info->is_ready = (impl != nullptr) ? RAC_TRUE : RAC_FALSE;
-  out_info->supports_streaming = RAC_FALSE;
-  out_info->current_model = nullptr;
+    out_info->is_ready = (impl != nullptr) ? RAC_TRUE : RAC_FALSE;
+    out_info->supports_streaming = RAC_FALSE;
+    out_info->current_model = nullptr;
 
-  return RAC_SUCCESS;
+    return RAC_SUCCESS;
 }
 
-static rac_result_t whisperkit_coreml_stt_vtable_cleanup(void *impl) {
-  (void)impl;
-  return RAC_SUCCESS;
+static rac_result_t whisperkit_coreml_stt_vtable_cleanup(void* impl) {
+    (void)impl;
+    return RAC_SUCCESS;
 }
 
-static void whisperkit_coreml_stt_vtable_destroy(void *impl) {
-  if (!impl)
-    return;
+static void whisperkit_coreml_stt_vtable_destroy(void* impl) {
+    if (!impl)
+        return;
 
-  // engines-other-006: prefer the live registration (consistent with the
-  // active callbacks the impl was created against). If callbacks were
-  // unset/zeroed before destroy fires, fall back to the cached destroy fn
-  // captured at the first set_callbacks() so we don't silently leak the
-  // Swift backend handle.
-  rac_whisperkit_coreml_stt_callbacks_t cbs{};
-  if (runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) &&
-      cbs.destroy != nullptr) {
-    cbs.destroy(impl, cbs.user_data);
-    return;
-  }
+    // engines-other-006: prefer the live registration (consistent with the
+    // active callbacks the impl was created against). If callbacks were
+    // unset/zeroed before destroy fires, fall back to the cached destroy fn
+    // captured at the first set_callbacks() so we don't silently leak the
+    // Swift backend handle.
+    rac_whisperkit_coreml_stt_callbacks_t cbs{};
+    if (runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) &&
+        cbs.destroy != nullptr) {
+        cbs.destroy(impl, cbs.user_data);
+        return;
+    }
 
-  rac_whisperkit_coreml_stt_destroy_fn cached_destroy = nullptr;
-  void *cached_user_data = nullptr;
-  if (runanywhere::engines::whisperkit_coreml::snapshot_cached_destroy(
-          &cached_destroy, &cached_user_data) &&
-      cached_destroy != nullptr) {
-    RAC_LOG_WARNING(LOG_CAT,
-                    "destroy: live callbacks unset; using cached destroy fn");
-    cached_destroy(impl, cached_user_data);
-    return;
-  }
+    rac_whisperkit_coreml_stt_destroy_fn cached_destroy = nullptr;
+    void* cached_user_data = nullptr;
+    if (runanywhere::engines::whisperkit_coreml::snapshot_cached_destroy(&cached_destroy,
+                                                                         &cached_user_data) &&
+        cached_destroy != nullptr) {
+        RAC_LOG_WARNING(LOG_CAT, "destroy: live callbacks unset; using cached destroy fn");
+        cached_destroy(impl, cached_user_data);
+        return;
+    }
 
-  RAC_LOG_ERROR(LOG_CAT,
-                "destroy: no Swift destroy callback available; leaking impl=%p",
-                impl);
+    RAC_LOG_ERROR(LOG_CAT, "destroy: no Swift destroy callback available; leaking impl=%p", impl);
 }
 
 // v3 Phase B5: WhisperKit CoreML `create` adapter. Delegates to the
@@ -127,66 +122,66 @@ static void whisperkit_coreml_stt_vtable_destroy(void *impl) {
 // model_id as both the model path and the model id — the legacy factory
 // used request->model_path ?: request->identifier, both of which mapped
 // to the same value in the consumer path.
-static rac_result_t whisperkit_coreml_stt_create_impl(
-    const char *model_id, const char * /*config_json*/, void **out_impl) {
-  if (!out_impl)
-    return RAC_ERROR_NULL_POINTER;
-  *out_impl = nullptr;
+static rac_result_t whisperkit_coreml_stt_create_impl(const char* model_id,
+                                                      const char* /*config_json*/,
+                                                      void** out_impl) {
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
 
-  // engines-other-007: snapshot the callback struct under the registration
-  // lock so the create + user_data we pass to Swift cannot be torn out by
-  // a parallel rac_whisperkit_coreml_stt_set_callbacks.
-  rac_whisperkit_coreml_stt_callbacks_t cbs{};
-  if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
-      cbs.create == nullptr) {
-    RAC_LOG_ERROR(LOG_CAT, "create: Swift callbacks not registered");
-    return RAC_ERROR_NOT_SUPPORTED;
-  }
+    // engines-other-007: snapshot the callback struct under the registration
+    // lock so the create + user_data we pass to Swift cannot be torn out by
+    // a parallel rac_whisperkit_coreml_stt_set_callbacks.
+    rac_whisperkit_coreml_stt_callbacks_t cbs{};
+    if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
+        cbs.create == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "create: Swift callbacks not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
 
-  RAC_LOG_INFO(LOG_CAT, "whisperkit_coreml_stt_create_impl: model=%s",
-               model_id ? model_id : "(default)");
+    RAC_LOG_INFO(LOG_CAT, "whisperkit_coreml_stt_create_impl: model=%s",
+                 model_id ? model_id : "(default)");
 
-  rac_handle_t backend_handle =
-      cbs.create(model_id, model_id, cbs.user_data);
-  if (!backend_handle) {
-    RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
-    return RAC_ERROR_UNKNOWN;
-  }
-  *out_impl = backend_handle;
-  return RAC_SUCCESS;
+    rac_handle_t backend_handle = cbs.create(model_id, model_id, cbs.user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
+        return RAC_ERROR_UNKNOWN;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
 }
 
 // SF-04: WhisperKit CoreML does not currently surface language enumeration
 // or language detection through the Swift bridge. Provide explicit
 // trampolines that return RAC_ERROR_NOT_SUPPORTED so callers receive a
 // well-defined error rather than NULL-derefing zero-initialized slots.
-static rac_result_t
-whisperkit_coreml_stt_vtable_get_languages(void *impl, char **out_json) {
-  (void)impl;
-  if (out_json) {
-    *out_json = nullptr;
-  }
-  return RAC_ERROR_NOT_SUPPORTED;
+static rac_result_t whisperkit_coreml_stt_vtable_get_languages(void* impl, char** out_json) {
+    (void)impl;
+    if (out_json) {
+        *out_json = nullptr;
+    }
+    return RAC_ERROR_NOT_SUPPORTED;
 }
 
-static rac_result_t whisperkit_coreml_stt_vtable_detect_language(
-    void *impl, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, char **out_language) {
-  (void)impl;
-  (void)audio_data;
-  (void)audio_size;
-  (void)options;
-  if (out_language) {
-    *out_language = nullptr;
-  }
-  return RAC_ERROR_NOT_SUPPORTED;
+static rac_result_t whisperkit_coreml_stt_vtable_detect_language(void* impl, const void* audio_data,
+                                                                 size_t audio_size,
+                                                                 const rac_stt_options_t* options,
+                                                                 char** out_language) {
+    (void)impl;
+    (void)audio_data;
+    (void)audio_size;
+    (void)options;
+    if (out_language) {
+        *out_language = nullptr;
+    }
+    return RAC_ERROR_NOT_SUPPORTED;
 }
 
 // =============================================================================
 // MODULE IDENTITY
 // =============================================================================
 
-const char *const MODULE_ID = "whisperkit_coreml";
+const char* const MODULE_ID = "whisperkit_coreml";
 
 // v3: legacy rac_service_request_t factories removed. Framework gating
 // (RAC_FRAMEWORK_WHISPERKIT_COREML) + availability check is now in
@@ -194,7 +189,7 @@ const char *const MODULE_ID = "whisperkit_coreml";
 
 bool g_registered = false;
 
-} // namespace
+}  // namespace
 
 // MF-02: keep external C linkage so rac_plugin_entry_whisperkit_coreml.cpp's
 // `extern const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops` declaration
@@ -221,74 +216,70 @@ extern "C" const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
 extern "C" {
 
 rac_result_t rac_backend_whisperkit_coreml_register(void) {
-  if (g_registered) {
-    return RAC_ERROR_MODULE_ALREADY_REGISTERED;
-  }
+    if (g_registered) {
+        return RAC_ERROR_MODULE_ALREADY_REGISTERED;
+    }
 
 #if defined(__APPLE__)
-  if (rac_whisperkit_coreml_stt_is_available() != RAC_TRUE) {
-    RAC_LOG_WARNING(LOG_CAT,
-                    "WhisperKit CoreML callbacks are not fully registered; "
-                    "not advertising STT capability");
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
-  }
+    if (rac_whisperkit_coreml_stt_is_available() != RAC_TRUE) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "WhisperKit CoreML callbacks are not fully registered; "
+                        "not advertising STT capability");
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
 #else
-  return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #endif
 
-  rac_module_info_t module_info = {};
-  module_info.id = MODULE_ID;
-  module_info.name = "WhisperKit CoreML";
-  module_info.version = "1.0.0";
-  module_info.description =
-      "STT backend using WhisperKit CoreML (Apple Neural Engine)";
+    rac_module_info_t module_info = {};
+    module_info.id = MODULE_ID;
+    module_info.name = "WhisperKit CoreML";
+    module_info.version = "1.0.0";
+    module_info.description = "STT backend using WhisperKit CoreML (Apple Neural Engine)";
 
-  rac_capability_t capabilities[] = {RAC_CAPABILITY_STT};
-  module_info.capabilities = capabilities;
-  module_info.num_capabilities = 1;
+    rac_capability_t capabilities[] = {RAC_CAPABILITY_STT};
+    module_info.capabilities = capabilities;
+    module_info.num_capabilities = 1;
 
-  rac_result_t result = rac_module_register(&module_info);
-  if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-    return result;
-  }
-
-  // STT routing dispatches from the unified plugin registry (see
-  // rac_stt_service.cpp:108-127), not the legacy module registry. Without
-  // this call, models pinned to RAC_FRAMEWORK_WHISPERKIT_COREML fail to
-  // resolve a TRANSCRIBE plugin even though the Swift callbacks are
-  // installed and module state is registered (engine-others-001).
-  const rac_engine_vtable_t *vt = rac_plugin_entry_whisperkit_coreml();
-  if (vt != nullptr) {
-    rac_result_t plugin_rc = rac_plugin_register(vt);
-    if (plugin_rc != RAC_SUCCESS &&
-        plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
-    } else {
-      RAC_LOG_INFO(LOG_CAT,
-                   "rac_plugin_register succeeded for 'whisperkit_coreml'");
+    rac_result_t result = rac_module_register(&module_info);
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        return result;
     }
-  }
 
-  g_registered = true;
-  RAC_LOG_INFO(LOG_CAT,
-               "WhisperKit CoreML backend registered (module + plugin)");
-  return RAC_SUCCESS;
+    // STT routing dispatches from the unified plugin registry (see
+    // rac_stt_service.cpp:108-127), not the legacy module registry. Without
+    // this call, models pinned to RAC_FRAMEWORK_WHISPERKIT_COREML fail to
+    // resolve a TRANSCRIBE plugin even though the Swift callbacks are
+    // installed and module state is registered (engine-others-001).
+    const rac_engine_vtable_t* vt = rac_plugin_entry_whisperkit_coreml();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'whisperkit_coreml'");
+        }
+    }
+
+    g_registered = true;
+    RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML backend registered (module + plugin)");
+    return RAC_SUCCESS;
 }
 
 rac_result_t rac_backend_whisperkit_coreml_unregister(void) {
-  if (!g_registered) {
-    return RAC_ERROR_MODULE_NOT_FOUND;
-  }
+    if (!g_registered) {
+        return RAC_ERROR_MODULE_NOT_FOUND;
+    }
 
-  // Tear down the unified plugin route alongside the legacy module entry
-  // so service routing sees a consistent state and reload paths can
-  // re-register cleanly.
-  rac_plugin_unregister("whisperkit_coreml");
-  rac_module_unregister(MODULE_ID);
+    // Tear down the unified plugin route alongside the legacy module entry
+    // so service routing sees a consistent state and reload paths can
+    // re-register cleanly.
+    rac_plugin_unregister("whisperkit_coreml");
+    rac_module_unregister(MODULE_ID);
 
-  g_registered = false;
-  RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML backend unregistered");
-  return RAC_SUCCESS;
+    g_registered = false;
+    RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML backend unregistered");
+    return RAC_SUCCESS;
 }
 
-} // extern "C"
+}  // extern "C"

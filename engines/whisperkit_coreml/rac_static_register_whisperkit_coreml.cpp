@@ -46,15 +46,15 @@ extern "C" rac_result_t rac_backend_whisperkit_coreml_register(void);
 namespace rac_plugin_autoreg_whisperkit_coreml {
 
 struct Registrar {
-  Registrar() noexcept {
-    // Fire and forget — the register function returns
-    // RAC_ERROR_BACKEND_UNAVAILABLE when Swift-side callbacks have not
-    // been installed yet, which is expected at static-init time. The
-    // Swift WhisperKit bootstrap re-invokes registration later via its
-    // own bridge path; this static ctor is the iOS Release fallback for
-    // builds where the Swift bootstrap has been short-circuited.
-    (void)::rac_backend_whisperkit_coreml_register();
-  }
+    Registrar() noexcept {
+        // Fire and forget — the register function returns
+        // RAC_ERROR_BACKEND_UNAVAILABLE when Swift-side callbacks have not
+        // been installed yet, which is expected at static-init time. The
+        // Swift WhisperKit bootstrap re-invokes registration later via its
+        // own bridge path; this static ctor is the iOS Release fallback for
+        // builds where the Swift bootstrap has been short-circuited.
+        (void)::rac_backend_whisperkit_coreml_register();
+    }
 };
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -62,7 +62,7 @@ __attribute__((used))
 #endif
 static Registrar g_registrar;
 
-} // namespace rac_plugin_autoreg_whisperkit_coreml
+}  // namespace rac_plugin_autoreg_whisperkit_coreml
 
 // Force at least one externally-visible symbol per plugin so the linker
 // can be asked to keep the TU by name without `-force_load`. Mirrors the
@@ -70,7 +70,6 @@ static Registrar g_registrar;
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((used))
 #endif
-extern "C" const char *const rac_plugin_static_marker_whisperkit_coreml =
-    "whisperkit_coreml";
+extern "C" const char* const rac_plugin_static_marker_whisperkit_coreml = "whisperkit_coreml";
 
-#endif // RAC_PLUGIN_MODE_STATIC
+#endif  // RAC_PLUGIN_MODE_STATIC

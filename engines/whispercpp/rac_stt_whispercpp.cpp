@@ -23,9 +23,9 @@
 // =============================================================================
 
 struct rac_whispercpp_handle_impl {
-  std::unique_ptr<runanywhere::WhisperCppBackend> backend;
-  runanywhere::WhisperCppSTT *stt; // Owned by backend
-  std::string detected_language;
+    std::unique_ptr<runanywhere::WhisperCppBackend> backend;
+    runanywhere::WhisperCppSTT* stt;  // Owned by backend
+    std::string detected_language;
 };
 
 // =============================================================================
@@ -34,277 +34,266 @@ struct rac_whispercpp_handle_impl {
 
 extern "C" {
 
-rac_result_t
-rac_stt_whispercpp_create(const char *model_path,
-                          const rac_stt_whispercpp_config_t *config,
-                          rac_handle_t *out_handle) {
-  if (out_handle == nullptr) {
-    return RAC_ERROR_NULL_POINTER;
-  }
-
-  auto *handle = new (std::nothrow) rac_whispercpp_handle_impl();
-  if (!handle) {
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
-
-  // Create and initialize backend
-  handle->backend = std::make_unique<runanywhere::WhisperCppBackend>();
-
-  nlohmann::json init_config;
-  if (config != nullptr) {
-    if (config->num_threads > 0) {
-      init_config["num_threads"] = config->num_threads;
-    }
-    init_config["use_gpu"] = config->use_gpu == RAC_TRUE;
-  }
-
-  if (!handle->backend->initialize(init_config)) {
-    delete handle;
-    rac_error_set_details("Failed to initialize WhisperCPP backend");
-    return RAC_ERROR_BACKEND_INIT_FAILED;
-  }
-
-  // Get STT component
-  handle->stt = handle->backend->get_stt();
-  if (!handle->stt) {
-    delete handle;
-    rac_error_set_details("STT component not available");
-    return RAC_ERROR_BACKEND_INIT_FAILED;
-  }
-
-  // Load model if path provided
-  if (model_path != nullptr) {
-    nlohmann::json model_config;
-    if (config != nullptr && config->translate == RAC_TRUE) {
-      model_config["translate"] = true;
+rac_result_t rac_stt_whispercpp_create(const char* model_path,
+                                       const rac_stt_whispercpp_config_t* config,
+                                       rac_handle_t* out_handle) {
+    if (out_handle == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
     }
 
-    if (!handle->stt->load_model(model_path, runanywhere::STTModelType::WHISPER,
-                                 model_config)) {
-      delete handle;
-      rac_error_set_details("Failed to load WhisperCPP model");
-      return RAC_ERROR_MODEL_LOAD_FAILED;
+    auto* handle = new (std::nothrow) rac_whispercpp_handle_impl();
+    if (!handle) {
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
-  }
 
-  *out_handle = static_cast<rac_handle_t>(handle);
+    // Create and initialize backend
+    handle->backend = std::make_unique<runanywhere::WhisperCppBackend>();
 
-  rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT,
-                  RAC_EVENT_DESTINATION_ALL, R"({"backend":"whispercpp"})");
-
-  return RAC_SUCCESS;
-}
-
-rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle,
-                                           const float *audio_samples,
-                                           size_t num_samples,
-                                           const rac_stt_options_t *options,
-                                           rac_stt_result_t *out_result) {
-  if (handle == nullptr || audio_samples == nullptr || out_result == nullptr) {
-    return RAC_ERROR_NULL_POINTER;
-  }
-
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
-  if (!h->stt) {
-    return RAC_ERROR_INVALID_HANDLE;
-  }
-
-  // Prepare request
-  runanywhere::STTRequest request;
-  request.audio_samples.assign(audio_samples, audio_samples + num_samples);
-  request.sample_rate =
-      (options && options->sample_rate > 0) ? options->sample_rate : 16000;
-
-  if (options && options->language) {
-    request.language = options->language;
-  }
-
-  // Perform transcription
-  auto result = h->stt->transcribe(request);
-
-  // Store detected language for later retrieval
-  h->detected_language = result.detected_language;
-
-  // Fill output
-  out_result->text =
-      result.text.empty() ? nullptr : strdup(result.text.c_str());
-  if (!result.text.empty() && !out_result->text) {
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
-  out_result->detected_language =
-      result.detected_language.empty()
-          ? nullptr
-          : strdup(result.detected_language.c_str());
-  if (!result.detected_language.empty() && !out_result->detected_language) {
-    free(out_result->text);
-    out_result->text = nullptr;
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
-  out_result->confidence = result.confidence;
-  out_result->processing_time_ms = result.inference_time_ms;
-
-  // Word-level timestamps
-  out_result->words = nullptr;
-  out_result->num_words = 0;
-  if (!result.word_timings.empty()) {
-    out_result->words = static_cast<rac_stt_word_t *>(
-        malloc(result.word_timings.size() * sizeof(rac_stt_word_t)));
-    if (out_result->words) {
-      out_result->num_words = result.word_timings.size();
-      for (size_t i = 0; i < result.word_timings.size(); i++) {
-        out_result->words[i].text = strdup(result.word_timings[i].word.c_str());
-        if (!out_result->words[i].text) {
-          // Clean up already-allocated word texts
-          for (size_t j = 0; j < i; j++) {
-            free(out_result->words[j].text);
-          }
-          free(out_result->words);
-          out_result->words = nullptr;
-          out_result->num_words = 0;
-          // Continue without word timings rather than failing entirely
-          break;
+    nlohmann::json init_config;
+    if (config != nullptr) {
+        if (config->num_threads > 0) {
+            init_config["num_threads"] = config->num_threads;
         }
-        out_result->words[i].start_ms =
-            static_cast<int64_t>(result.word_timings[i].start_time_ms);
-        out_result->words[i].end_ms =
-            static_cast<int64_t>(result.word_timings[i].end_time_ms);
-        out_result->words[i].confidence = result.word_timings[i].confidence;
-      }
+        init_config["use_gpu"] = config->use_gpu == RAC_TRUE;
     }
-  }
 
-  rac_event_track("stt.transcription.completed", RAC_EVENT_CATEGORY_STT,
-                  RAC_EVENT_DESTINATION_ALL, R"({"backend":"whispercpp"})");
+    if (!handle->backend->initialize(init_config)) {
+        delete handle;
+        rac_error_set_details("Failed to initialize WhisperCPP backend");
+        return RAC_ERROR_BACKEND_INIT_FAILED;
+    }
 
-  return RAC_SUCCESS;
+    // Get STT component
+    handle->stt = handle->backend->get_stt();
+    if (!handle->stt) {
+        delete handle;
+        rac_error_set_details("STT component not available");
+        return RAC_ERROR_BACKEND_INIT_FAILED;
+    }
+
+    // Load model if path provided
+    if (model_path != nullptr) {
+        nlohmann::json model_config;
+        if (config != nullptr && config->translate == RAC_TRUE) {
+            model_config["translate"] = true;
+        }
+
+        if (!handle->stt->load_model(model_path, runanywhere::STTModelType::WHISPER,
+                                     model_config)) {
+            delete handle;
+            rac_error_set_details("Failed to load WhisperCPP model");
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+    }
+
+    *out_handle = static_cast<rac_handle_t>(handle);
+
+    rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
+                    R"({"backend":"whispercpp"})");
+
+    return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle,
-                                             char **out_language) {
-  if (handle == nullptr || out_language == nullptr) {
-    return RAC_ERROR_NULL_POINTER;
-  }
+rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle, const float* audio_samples,
+                                           size_t num_samples, const rac_stt_options_t* options,
+                                           rac_stt_result_t* out_result) {
+    if (handle == nullptr || audio_samples == nullptr || out_result == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
 
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
 
-  if (h->detected_language.empty()) {
-    return RAC_ERROR_BACKEND_NOT_READY;
-  }
+    // Prepare request
+    runanywhere::STTRequest request;
+    request.audio_samples.assign(audio_samples, audio_samples + num_samples);
+    request.sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
 
-  *out_language = strdup(h->detected_language.c_str());
-  if (!*out_language) {
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
-  return RAC_SUCCESS;
+    if (options && options->language) {
+        request.language = options->language;
+    }
+
+    // Perform transcription
+    auto result = h->stt->transcribe(request);
+
+    // Store detected language for later retrieval
+    h->detected_language = result.detected_language;
+
+    // Fill output
+    out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
+    if (!result.text.empty() && !out_result->text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    out_result->detected_language =
+        result.detected_language.empty() ? nullptr : strdup(result.detected_language.c_str());
+    if (!result.detected_language.empty() && !out_result->detected_language) {
+        free(out_result->text);
+        out_result->text = nullptr;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    out_result->confidence = result.confidence;
+    out_result->processing_time_ms = result.inference_time_ms;
+
+    // Word-level timestamps
+    out_result->words = nullptr;
+    out_result->num_words = 0;
+    if (!result.word_timings.empty()) {
+        out_result->words = static_cast<rac_stt_word_t*>(
+            malloc(result.word_timings.size() * sizeof(rac_stt_word_t)));
+        if (out_result->words) {
+            out_result->num_words = result.word_timings.size();
+            for (size_t i = 0; i < result.word_timings.size(); i++) {
+                out_result->words[i].text = strdup(result.word_timings[i].word.c_str());
+                if (!out_result->words[i].text) {
+                    // Clean up already-allocated word texts
+                    for (size_t j = 0; j < i; j++) {
+                        free(out_result->words[j].text);
+                    }
+                    free(out_result->words);
+                    out_result->words = nullptr;
+                    out_result->num_words = 0;
+                    // Continue without word timings rather than failing entirely
+                    break;
+                }
+                out_result->words[i].start_ms =
+                    static_cast<int64_t>(result.word_timings[i].start_time_ms);
+                out_result->words[i].end_ms =
+                    static_cast<int64_t>(result.word_timings[i].end_time_ms);
+                out_result->words[i].confidence = result.word_timings[i].confidence;
+            }
+        }
+    }
+
+    rac_event_track("stt.transcription.completed", RAC_EVENT_CATEGORY_STT,
+                    RAC_EVENT_DESTINATION_ALL, R"({"backend":"whispercpp"})");
+
+    return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_whispercpp_get_languages(rac_handle_t handle,
-                                              char **out_json) {
-  if (handle == nullptr || out_json == nullptr) {
-    return RAC_ERROR_NULL_POINTER;
-  }
+rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle, char** out_language) {
+    if (handle == nullptr || out_language == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
 
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
-  if (!h->stt) {
-    return RAC_ERROR_INVALID_HANDLE;
-  }
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
 
-  const std::vector<std::string> languages = h->stt->get_supported_languages();
+    if (h->detected_language.empty()) {
+        return RAC_ERROR_BACKEND_NOT_READY;
+    }
 
-  // Emit a minimal JSON array with proper escaping. whisper language codes
-  // are ASCII letters only so escaping is trivial but we quote defensively.
-  std::string json;
-  json.reserve(languages.size() * 6 + 2);
-  json.push_back('[');
-  for (size_t i = 0; i < languages.size(); ++i) {
-    if (i > 0)
-      json.push_back(',');
-    json.push_back('"');
-    json.append(languages[i]);
-    json.push_back('"');
-  }
-  json.push_back(']');
-
-  *out_json = strdup(json.c_str());
-  if (!*out_json) {
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
-  return RAC_SUCCESS;
+    *out_language = strdup(h->detected_language.c_str());
+    if (!*out_language) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_whispercpp_detect_language(
-    rac_handle_t handle, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, char **out_language) {
-  if (handle == nullptr || audio_data == nullptr || out_language == nullptr) {
-    return RAC_ERROR_NULL_POINTER;
-  }
+rac_result_t rac_stt_whispercpp_get_languages(rac_handle_t handle, char** out_json) {
+    if (handle == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
 
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
-  if (!h->stt) {
-    return RAC_ERROR_INVALID_HANDLE;
-  }
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
 
-  // Convert Int16 PCM -> Float32, matching the whispercpp vtable transcribe
-  // path.
-  const int16_t *samples = static_cast<const int16_t *>(audio_data);
-  const size_t num_samples = audio_size / sizeof(int16_t);
-  if (num_samples == 0) {
-    return RAC_ERROR_INVALID_ARGUMENT;
-  }
+    const std::vector<std::string> languages = h->stt->get_supported_languages();
 
-  std::vector<float> float_samples(num_samples);
-  rac::audio::rac_audio_pcm16_to_float32(samples, num_samples,
-                                         float_samples.data());
+    // Emit a minimal JSON array with proper escaping. whisper language codes
+    // are ASCII letters only so escaping is trivial but we quote defensively.
+    std::string json;
+    json.reserve(languages.size() * 6 + 2);
+    json.push_back('[');
+    for (size_t i = 0; i < languages.size(); ++i) {
+        if (i > 0)
+            json.push_back(',');
+        json.push_back('"');
+        json.append(languages[i]);
+        json.push_back('"');
+    }
+    json.push_back(']');
 
-  runanywhere::STTRequest request;
-  request.audio_samples = std::move(float_samples);
-  request.sample_rate =
-      (options && options->sample_rate > 0) ? options->sample_rate : 16000;
-  request.detect_language = true;
-  // Force empty language to trigger detection regardless of options->language.
-  request.language.clear();
+    *out_json = strdup(json.c_str());
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
 
-  const auto result = h->stt->transcribe(request);
+rac_result_t rac_stt_whispercpp_detect_language(rac_handle_t handle, const void* audio_data,
+                                                size_t audio_size, const rac_stt_options_t* options,
+                                                char** out_language) {
+    if (handle == nullptr || audio_data == nullptr || out_language == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
 
-  if (result.detected_language.empty()) {
-    return RAC_ERROR_BACKEND_NOT_READY;
-  }
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
 
-  *out_language = strdup(result.detected_language.c_str());
-  if (!*out_language) {
-    return RAC_ERROR_OUT_OF_MEMORY;
-  }
+    // Convert Int16 PCM -> Float32, matching the whispercpp vtable transcribe
+    // path.
+    const int16_t* samples = static_cast<const int16_t*>(audio_data);
+    const size_t num_samples = audio_size / sizeof(int16_t);
+    if (num_samples == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
-  // Cache for get_language() compatibility.
-  h->detected_language = result.detected_language;
-  return RAC_SUCCESS;
+    std::vector<float> float_samples(num_samples);
+    rac::audio::rac_audio_pcm16_to_float32(samples, num_samples, float_samples.data());
+
+    runanywhere::STTRequest request;
+    request.audio_samples = std::move(float_samples);
+    request.sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
+    request.detect_language = true;
+    // Force empty language to trigger detection regardless of options->language.
+    request.language.clear();
+
+    const auto result = h->stt->transcribe(request);
+
+    if (result.detected_language.empty()) {
+        return RAC_ERROR_BACKEND_NOT_READY;
+    }
+
+    *out_language = strdup(result.detected_language.c_str());
+    if (!*out_language) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Cache for get_language() compatibility.
+    h->detected_language = result.detected_language;
+    return RAC_SUCCESS;
 }
 
 rac_bool_t rac_stt_whispercpp_is_ready(rac_handle_t handle) {
-  if (handle == nullptr) {
-    return RAC_FALSE;
-  }
+    if (handle == nullptr) {
+        return RAC_FALSE;
+    }
 
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
-  return (h->stt && h->stt->is_ready()) ? RAC_TRUE : RAC_FALSE;
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    return (h->stt && h->stt->is_ready()) ? RAC_TRUE : RAC_FALSE;
 }
 
 void rac_stt_whispercpp_destroy(rac_handle_t handle) {
-  if (handle == nullptr) {
-    return;
-  }
+    if (handle == nullptr) {
+        return;
+    }
 
-  auto *h = static_cast<rac_whispercpp_handle_impl *>(handle);
-  if (h->stt) {
-    h->stt->unload_model();
-  }
-  if (h->backend) {
-    h->backend->cleanup();
-  }
-  delete h;
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (h->stt) {
+        h->stt->unload_model();
+    }
+    if (h->backend) {
+        h->backend->cleanup();
+    }
+    delete h;
 
-  rac_event_track("stt.backend.destroyed", RAC_EVENT_CATEGORY_STT,
-                  RAC_EVENT_DESTINATION_ALL, R"({"backend":"whispercpp"})");
+    rac_event_track("stt.backend.destroyed", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
+                    R"({"backend":"whispercpp"})");
 }
 
-} // extern "C"
+}  // extern "C"
