@@ -24,6 +24,7 @@ export declare enum Edition {
      */
     EDITION_2023 = 1000,
     EDITION_2024 = 1001,
+    EDITION_2026 = 1002,
     /** EDITION_UNSTABLE - A placeholder edition for developing and testing unscheduled features. */
     EDITION_UNSTABLE = 9999,
     /**
@@ -1044,6 +1045,7 @@ export declare enum FeatureSet_EnforceNamingStyle {
     ENFORCE_NAMING_STYLE_UNKNOWN = 0,
     STYLE2024 = 1,
     STYLE_LEGACY = 2,
+    STYLE2026 = 3,
     UNRECOGNIZED = -1
 }
 export declare function featureSet_EnforceNamingStyleFromJSON(object: any): FeatureSet_EnforceNamingStyle;
