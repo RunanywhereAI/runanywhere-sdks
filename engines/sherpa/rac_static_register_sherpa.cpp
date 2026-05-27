@@ -48,7 +48,7 @@ struct Registrar {
 __attribute__((used))
 #endif
 static Registrar g_registrar;
-}
+}  // namespace rac_static_sherpa
 
 // Keep the per-plugin externally visible marker symbol the linker uses to
 // retain the TU when the host invokes `-force_load` by file rather than
@@ -58,5 +58,5 @@ extern "C"
 #if defined(__GNUC__) || defined(__clang__)
     __attribute__((used))
 #endif
-        const char *const rac_plugin_static_marker_sherpa = "sherpa";
+    const char* const rac_plugin_static_marker_sherpa = "sherpa";
 #endif
