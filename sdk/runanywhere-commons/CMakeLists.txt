@@ -34,6 +34,15 @@ option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 
+# [FIXLOOP iter1 FINAL-LINT/scripts-ci] Ensure EMSCRIPTEN is always defined so
+# generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
+# CMake's --warn-uninitialized check on native (non-Emscripten) builds. The
+# Emscripten toolchain file sets EMSCRIPTEN=1 itself; we only paper over the
+# native case where the variable is otherwise unset.
+if(NOT DEFINED EMSCRIPTEN)
+    set(EMSCRIPTEN "")
+endif()
+
 # T5.4: per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
 # Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
@@ -426,10 +435,20 @@ set(ENABLE_ACL OFF CACHE BOOL "" FORCE)
 set(ENABLE_XATTR OFF CACHE BOOL "" FORCE)
 set(ENABLE_ICONV OFF CACHE BOOL "" FORCE)
 # Save and restore BUILD_SHARED_LIBS since libarchive respects it
-set(_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+# Use DEFINED check to avoid uninitialized-variable warning when not set upstream.
+if(DEFINED BUILD_SHARED_LIBS)
+    set(_SAVED_BUILD_SHARED_LIBS "${BUILD_SHARED_LIBS}")
+    set(_HAD_BUILD_SHARED_LIBS TRUE)
+else()
+    set(_HAD_BUILD_SHARED_LIBS FALSE)
+endif()
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(libarchive)
-set(BUILD_SHARED_LIBS ${_SAVED_BUILD_SHARED_LIBS})
+if(_HAD_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS "${_SAVED_BUILD_SHARED_LIBS}")
+else()
+    unset(BUILD_SHARED_LIBS)
+endif()
 
 if(TARGET bz2_bundled AND TARGET archive_static)
     target_link_libraries(archive_static bz2_bundled)
