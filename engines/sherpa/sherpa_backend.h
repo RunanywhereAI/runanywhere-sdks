@@ -359,6 +359,13 @@ private:
   TTSModelType model_type_ = TTSModelType::PIPER;
   std::atomic<bool> model_loaded_{false};
   std::atomic<bool> cancel_requested_{false};
+  // engines-sherpa-008: cancel epoch counter incremented every time cancel()
+  // is observed. synthesize() snapshots this at entry (before clearing
+  // cancel_requested_) and re-reads it post-generate to honor cancels that
+  // raced into the lock between two synthesize() calls. Without this, a
+  // stop issued between the post-result drop of call #1 and call #2's lock
+  // acquisition (where cancel_requested_ is reset) was silently lost.
+  std::atomic<uint64_t> cancel_epoch_{0};
   std::atomic<int> active_synthesis_count_{0};
   std::vector<VoiceInfo> voices_;
   std::string model_dir_;

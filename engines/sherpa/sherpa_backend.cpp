@@ -1372,6 +1372,15 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
   // 0 when observed under the same mutex. Both the guard and the warning are
   // dead and have been removed.
 
+  // engines-sherpa-008: snapshot the cancel epoch BEFORE clearing
+  // cancel_requested_ so a stop issued between the previous synthesize()'s
+  // post-generate drop and this call's lock acquisition is still observed.
+  // cancel() (lock-free) bumps cancel_epoch_ on every invocation; if the
+  // post-generate check sees the epoch has advanced past entry_epoch we
+  // honor the cancel even if cancel_requested_ happened to be set/cleared
+  // in between by an unrelated reset.
+  const uint64_t entry_epoch = cancel_epoch_.load(std::memory_order_acquire);
+
   // hotspot-engine-sherpa-004: clear any stale cancel signal from a prior
   // synthesis so cancel() observed during THIS call's blocking
   // SherpaOnnxOfflineTtsGenerate is what we react to. The Sherpa-ONNX C TTS
@@ -1428,14 +1437,16 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
     return result;
   }
 
-  // hotspot-engine-sherpa-004: drop the post-stop result if cancel() fired
-  // while SherpaOnnxOfflineTtsGenerate was running. We can't preempt the
-  // blocking Piper generator, but we MUST NOT surface its chunk/completion
-  // through the stream wrapper after the SDK requested a stop — empty
-  // audio_samples here makes the rac_tts_sherpa_synthesize wrapper return
-  // RAC_ERROR_INFERENCE_FAILED so the lifecycle stream/one-shot path does
-  // not deliver phantom audio.
-  if (cancel_requested_.load(std::memory_order_acquire)) {
+  // hotspot-engine-sherpa-004 + engines-sherpa-008: drop the post-stop
+  // result if cancel() fired while SherpaOnnxOfflineTtsGenerate was running
+  // OR before we acquired the mutex (epoch bumped past entry_epoch). We
+  // can't preempt the blocking Piper generator, but we MUST NOT surface its
+  // chunk/completion through the stream wrapper after the SDK requested a
+  // stop — empty audio_samples here makes the rac_tts_sherpa_synthesize
+  // wrapper return RAC_ERROR_INFERENCE_FAILED so the lifecycle stream/
+  // one-shot path does not deliver phantom audio.
+  if (cancel_requested_.load(std::memory_order_acquire) ||
+      cancel_epoch_.load(std::memory_order_acquire) != entry_epoch) {
     int dropped_samples = audio->n;
     SherpaOnnxDestroyOfflineTtsGeneratedAudio(audio);
     RAC_LOG_WARNING("Sherpa.TTS",
@@ -1469,7 +1480,15 @@ TTSResult SherpaTTS::synthesize(const TTSRequest &request) {
 
 bool SherpaTTS::supports_streaming() const { return false; }
 
-void SherpaTTS::cancel() { cancel_requested_ = true; }
+void SherpaTTS::cancel() {
+  // engines-sherpa-008: bump epoch BEFORE setting the flag so that
+  // synthesize()'s post-generate check, which reads epoch with acquire
+  // ordering after a release on cancel_requested_, always observes the
+  // epoch increment when it sees the flag. The flag preserves the original
+  // wake-the-generator semantics for callers that only inspect it.
+  cancel_epoch_.fetch_add(1, std::memory_order_acq_rel);
+  cancel_requested_.store(true, std::memory_order_release);
+}
 
 std::vector<VoiceInfo> SherpaTTS::get_voices() const {
   std::lock_guard<std::mutex> lock(mutex_);
