@@ -1746,6 +1746,14 @@ bool LlamaCppTextGeneration::remove_lora_adapter(
     return false;
   }
 
+  // Free the underlying llama adapter before dropping the entry so the
+  // adapter buffers (loaded via llama_adapter_lora_init) are released. The
+  // erase() below only destroys the LoraAdapterEntry wrapper; without the
+  // explicit free the adapter remains in heap.
+  if (it->adapter != nullptr) {
+    llama_adapter_lora_free(it->adapter);
+    it->adapter = nullptr;
+  }
   lora_adapters_.erase(it);
 
   // Re-apply remaining adapters (or clear if none left)
@@ -1775,6 +1783,15 @@ void LlamaCppTextGeneration::clear_lora_adapters() {
     llama_memory_clear(llama_get_memory(context_), true);
   }
 
+  // Release every adapter's underlying llama buffers before clearing the
+  // vector — the vector destroys the wrappers but does not call
+  // llama_adapter_lora_free on the raw pointers it holds.
+  for (auto &entry : lora_adapters_) {
+    if (entry.adapter != nullptr) {
+      llama_adapter_lora_free(entry.adapter);
+      entry.adapter = nullptr;
+    }
+  }
   lora_adapters_.clear();
   RAC_LOG_INFO("LLM.LlamaCpp", "All LoRA adapters cleared");
 }
