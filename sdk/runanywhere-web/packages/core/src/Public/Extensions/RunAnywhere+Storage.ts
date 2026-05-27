@@ -10,12 +10,12 @@
 
 import type {
   ExpectedModelFiles,
+  InferenceFramework,
   ModelFileDescriptor,
   ModelInfo,
   MultiFileArtifact,
 } from '@runanywhere/proto-ts/model_types';
 import {
-  InferenceFramework,
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
