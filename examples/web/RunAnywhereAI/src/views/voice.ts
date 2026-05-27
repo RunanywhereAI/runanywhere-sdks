@@ -24,10 +24,9 @@
  *      and call `RunAnywhere.cleanupVoiceAgent()`.
  *
  * The voice agent itself owns audio pacing (the energy-VAD inside the C++
- * agent runs against the mic samples once registered). Until the ONNX/Sherpa
- * WASM is rebuilt with the matched-set bump, `ONNX.register()` may resolve
- * but `initializeVoiceAgentWithLoadedModels()` will raise
- * `BackendNotAvailable` — the view surfaces that as an inline error.
+ * agent runs against the mic samples once registered). When the ONNX/Sherpa
+ * backend isn't available, `initializeVoiceAgentWithLoadedModels()` raises
+ * `BackendNotAvailable` and the view surfaces that as an inline error.
  */
 
 import type { TabLifecycle } from '../app';
