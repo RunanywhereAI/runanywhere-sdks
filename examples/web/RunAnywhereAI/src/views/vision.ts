@@ -161,8 +161,7 @@ function renderView(): void {
         <h3>Analyze</h3>
         <p class="text-secondary">
           Runs <code>RunAnywhere.processImage(image, options)</code> on the last
-          captured frame. The provider decodes the proto message and calls
-          <code>_rac_vlm_process_proto</code>.
+          captured frame.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
         <textarea id="vision-prompt" class="chat-input" rows="2"
