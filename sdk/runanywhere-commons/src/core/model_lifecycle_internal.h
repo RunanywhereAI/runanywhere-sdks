@@ -49,11 +49,11 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include <google/protobuf/message_lite.h>
-
 #include "download_service.pb.h"
 #include "model_types.pb.h"
 #include "sdk_events.pb.h"
+
+#include <google/protobuf/message_lite.h>
 #endif
 
 namespace rac::core::model_lifecycle::detail {
@@ -68,8 +68,7 @@ struct LoadedModel {
     std::string resolved_path;
     std::string mmproj_path;
     std::vector<runanywhere::v1::ModelFileDescriptor> resolved_artifacts;
-    runanywhere::v1::InferenceFramework framework{
-        runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED};
+    runanywhere::v1::InferenceFramework framework{runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED};
     std::string framework_name;
     runanywhere::v1::ModelCategory category{runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED};
     runanywhere::v1::ModelInfo model;
@@ -164,11 +163,11 @@ void add_artifacts_to_result(
     const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
     google::protobuf::RepeatedPtrField<runanywhere::v1::ModelFileDescriptor>* out);
 
-runanywhere::v1::ModelLoadResult make_load_result(
-    bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
-    runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
-    const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts, int64_t loaded_at_ms,
-    const std::string& error);
+runanywhere::v1::ModelLoadResult
+make_load_result(bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
+                 runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
+                 const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
+                 int64_t loaded_at_ms, const std::string& error);
 
 bool matches_current_filter(const LoadedModel& loaded, bool has_category,
                             runanywhere::v1::ModelCategory category, bool has_framework,
@@ -177,13 +176,13 @@ bool matches_current_filter(const LoadedModel& loaded, bool has_category,
 void fill_snapshot(const LoadedModel* loaded, runanywhere::v1::SDKComponent component,
                    runanywhere::v1::ComponentLifecycleSnapshot* out);
 
-runanywhere::v1::InferenceFramework preferred_framework_for(
-    const runanywhere::v1::ModelLoadRequest& request,
-    const runanywhere::v1::ModelInfo& model);
+runanywhere::v1::InferenceFramework
+preferred_framework_for(const runanywhere::v1::ModelLoadRequest& request,
+                        const runanywhere::v1::ModelInfo& model);
 
-runanywhere::v1::ModelCategory preferred_category_for(
-    const runanywhere::v1::ModelLoadRequest& request,
-    const runanywhere::v1::ModelInfo& model);
+runanywhere::v1::ModelCategory
+preferred_category_for(const runanywhere::v1::ModelLoadRequest& request,
+                       const runanywhere::v1::ModelInfo& model);
 
 // =============================================================================
 // Auto-download helpers (defined in `model_lifecycle_download.cpp`)
@@ -194,8 +193,7 @@ bool model_has_download_source(const runanywhere::v1::ModelInfo& model);
 
 rac_result_t download_and_wait_for_model(const std::string& model_id,
                                          const runanywhere::v1::ModelInfo& registered_model,
-                                         std::string* out_error,
-                                         int timeout_seconds = 300);
+                                         std::string* out_error, int timeout_seconds = 300);
 
 #endif  // RAC_HAVE_PROTOBUF
 

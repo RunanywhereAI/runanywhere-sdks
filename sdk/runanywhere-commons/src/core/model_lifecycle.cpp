@@ -74,9 +74,8 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
 namespace {
 
 rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t primitive,
-                                 const std::string& resolved_path,
-                                 const std::string& mmproj_path, void** out_impl,
-                                 std::function<void()>* out_destroy) {
+                                 const std::string& resolved_path, const std::string& mmproj_path,
+                                 void** out_impl, std::function<void()>* out_destroy) {
     if (!vt || !out_impl || !out_destroy) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -357,7 +356,8 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             detail::download_and_wait_for_model(request.model_id(), model, &dl_error);
         if (dl_rc != RAC_SUCCESS) {
             const ModelCategory fail_category = detail::preferred_category_for(request, model);
-            const InferenceFramework fail_framework = detail::preferred_framework_for(request, model);
+            const InferenceFramework fail_framework =
+                detail::preferred_framework_for(request, model);
             ModelLoadResult result = detail::make_load_result(
                 false, request.model_id(), fail_category, fail_framework, "", {}, 0,
                 dl_error.empty() ? "auto-download failed" : dl_error);
@@ -396,14 +396,14 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
 
     if (component == runanywhere::v1::SDK_COMPONENT_UNSPECIFIED ||
         primitive == RAC_PRIMITIVE_UNSPECIFIED) {
-        ModelLoadResult result = detail::make_load_result(
-            false, request.model_id(), category, framework, resolved_path,
-            artifact_resolution.artifacts, 0,
-            "model category is not supported by lifecycle routing");
-        detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                        request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+        ModelLoadResult result =
+            detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
+                                     artifact_resolution.artifacts, 0,
+                                     "model category is not supported by lifecycle routing");
+        detail::publish_component_event(
+            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
+            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
+            result.error_message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -449,9 +449,9 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             error += " for framework ";
             error += hints.preferred_engine_name;
         }
-        ModelLoadResult result = detail::make_load_result(false, request.model_id(), category,
-                                                          framework, resolved_path,
-                                                          artifact_resolution.artifacts, 0, error);
+        ModelLoadResult result =
+            detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
+                                     artifact_resolution.artifacts, 0, error);
         {
             std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
             auto failed = std::make_shared<detail::LoadedModel>();
@@ -468,10 +468,10 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             failed->error_message = error;
             detail::g_loaded[component] = std::move(failed);
         }
-        detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                        request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+        detail::publish_component_event(
+            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
+            result.error_message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -499,10 +499,10 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             failed->error_message = result.error_message();
             detail::g_loaded[component] = std::move(failed);
         }
-        detail::publish_component_event(component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                        runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                        request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+        detail::publish_component_event(
+            component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
+            result.error_message().c_str());
         return detail::copy_proto(result, out_result);
     }
 

@@ -116,13 +116,12 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
     }
     rac_proto_buffer_t plan_out = {};
     rac_proto_buffer_init(&plan_out);
-    rac_result_t rc =
-        rac_download_plan_proto(plan_bytes.empty() ? nullptr : plan_bytes.data(),
-                                plan_bytes.size(), &plan_out);
+    rac_result_t rc = rac_download_plan_proto(plan_bytes.empty() ? nullptr : plan_bytes.data(),
+                                              plan_bytes.size(), &plan_out);
     if (rc != RAC_SUCCESS) {
         if (out_error) {
-            *out_error = plan_out.error_message ? plan_out.error_message
-                                                : "rac_download_plan_proto failed";
+            *out_error =
+                plan_out.error_message ? plan_out.error_message : "rac_download_plan_proto failed";
         }
         rac_proto_buffer_free(&plan_out);
         return rc;
@@ -156,8 +155,7 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
     start_request.set_update_registry_on_completion(true);
     std::vector<uint8_t> start_bytes(start_request.ByteSizeLong());
     if (!start_bytes.empty() &&
-        !start_request.SerializeToArray(start_bytes.data(),
-                                        static_cast<int>(start_bytes.size()))) {
+        !start_request.SerializeToArray(start_bytes.data(), static_cast<int>(start_bytes.size()))) {
         if (out_error) {
             *out_error = "failed to serialize DownloadStartRequest";
         }
@@ -195,8 +193,7 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
     }
 
     const std::string task_id = start_result.task_id();
-    const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
 
     // Step 3 — poll DownloadSubscribeRequest until the task reaches a
     // terminal state. The orchestrator's progress poll is a cheap read of
@@ -226,14 +223,13 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
 
         rac_proto_buffer_t progress_out = {};
         rac_proto_buffer_init(&progress_out);
-        rc = rac_download_progress_poll_proto(
-            subscribe_bytes.empty() ? nullptr : subscribe_bytes.data(),
-            subscribe_bytes.size(), &progress_out);
+        rc = rac_download_progress_poll_proto(subscribe_bytes.empty() ? nullptr
+                                                                      : subscribe_bytes.data(),
+                                              subscribe_bytes.size(), &progress_out);
         if (rc != RAC_SUCCESS) {
             if (out_error) {
-                *out_error = progress_out.error_message
-                                 ? progress_out.error_message
-                                 : "rac_download_progress_poll_proto failed";
+                *out_error = progress_out.error_message ? progress_out.error_message
+                                                        : "rac_download_progress_poll_proto failed";
             }
             rac_proto_buffer_free(&progress_out);
             return rc;

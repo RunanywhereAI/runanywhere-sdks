@@ -220,7 +220,8 @@ void synthesize_artifact_resolution_from_descriptors(const runanywhere::v1::Mode
             }
         }
         if (out->resolved_path == artifact_root && model.has_expected_files()) {
-            for (const runanywhere::v1::ModelFileDescriptor& file : model.expected_files().files()) {
+            for (const runanywhere::v1::ModelFileDescriptor& file :
+                 model.expected_files().files()) {
                 if (out->resolved_path != artifact_root) {
                     break;
                 }
@@ -356,7 +357,8 @@ struct ProtoModelPathBridge {
             }
         }
         if (proto.has_expected_files()) {
-            for (const runanywhere::v1::ModelFileDescriptor& file : proto.expected_files().files()) {
+            for (const runanywhere::v1::ModelFileDescriptor& file :
+                 proto.expected_files().files()) {
                 add_descriptor(file);
                 rac_model_file_descriptor_t descriptor{};
                 descriptor.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
@@ -395,8 +397,8 @@ struct ProtoModelPathBridge {
     }
 };
 
-runanywhere::v1::ModelFileDescriptor descriptor_from_resolved_file(
-    const rac_resolved_model_file_t& file) {
+runanywhere::v1::ModelFileDescriptor
+descriptor_from_resolved_file(const rac_resolved_model_file_t& file) {
     runanywhere::v1::ModelFileDescriptor descriptor;
     if (file.relative_path) {
         descriptor.set_relative_path(file.relative_path);
@@ -439,8 +441,7 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     // an already-declared single-file local path would otherwise rewrite
     // resolved_path based on directory contents that may not match the
     // declared filename (e.g. tests using synthetic /tmp paths).
-    if (!model.local_path().empty() && !model.has_multi_file() &&
-        !model.has_expected_files()) {
+    if (!model.local_path().empty() && !model.has_multi_file() && !model.has_expected_files()) {
         return out;
     }
     // Registry local_path may point at a single file (legacy self-heal picked
@@ -459,8 +460,8 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     const char* checksum = model.has_checksum_sha256() && !model.checksum_sha256().empty()
                                ? model.checksum_sha256().c_str()
                                : nullptr;
-    const rac_result_t rc = rac_model_paths_resolve_artifact(
-        &bridge.model, artifact_root.c_str(), checksum, &resolution);
+    const rac_result_t rc = rac_model_paths_resolve_artifact(&bridge.model, artifact_root.c_str(),
+                                                             checksum, &resolution);
     if ((rc == RAC_SUCCESS || resolution.primary_model_path || resolution.file_count > 0) &&
         resolution.primary_model_path) {
         out.resolved_path = resolution.primary_model_path;
@@ -479,11 +480,11 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     return out;
 }
 
-runanywhere::v1::ModelLoadResult make_load_result(
-    bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
-    runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
-    const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts, int64_t loaded_at_ms,
-    const std::string& error) {
+runanywhere::v1::ModelLoadResult
+make_load_result(bool success, const std::string& model_id, runanywhere::v1::ModelCategory category,
+                 runanywhere::v1::InferenceFramework framework, const std::string& resolved_path,
+                 const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
+                 int64_t loaded_at_ms, const std::string& error) {
     runanywhere::v1::ModelLoadResult result;
     result.set_success(success);
     result.set_model_id(model_id);
@@ -527,9 +528,9 @@ void fill_snapshot(const LoadedModel* loaded, runanywhere::v1::SDKComponent comp
     out->mutable_model()->CopyFrom(loaded->model);
 }
 
-runanywhere::v1::InferenceFramework preferred_framework_for(
-    const runanywhere::v1::ModelLoadRequest& request,
-    const runanywhere::v1::ModelInfo& model) {
+runanywhere::v1::InferenceFramework
+preferred_framework_for(const runanywhere::v1::ModelLoadRequest& request,
+                        const runanywhere::v1::ModelInfo& model) {
     if (request.has_framework()) {
         return request.framework();
     }
@@ -539,9 +540,9 @@ runanywhere::v1::InferenceFramework preferred_framework_for(
     return model.framework();
 }
 
-runanywhere::v1::ModelCategory preferred_category_for(
-    const runanywhere::v1::ModelLoadRequest& request,
-    const runanywhere::v1::ModelInfo& model) {
+runanywhere::v1::ModelCategory
+preferred_category_for(const runanywhere::v1::ModelLoadRequest& request,
+                       const runanywhere::v1::ModelInfo& model) {
     if (request.has_category()) {
         return request.category();
     }
