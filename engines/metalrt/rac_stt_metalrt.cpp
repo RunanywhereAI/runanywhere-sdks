@@ -14,6 +14,7 @@
 #include <mutex>
 #include <vector>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_logger.h"
 #include "rac_runtime_metal.h"
 
@@ -97,9 +98,9 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle,
   int sample_rate = 16000;
 
   std::vector<float> float_samples(n_samples);
-  for (int i = 0; i < n_samples; i++) {
-    float_samples[i] = static_cast<float>(int16_samples[i]) / 32768.0f;
-  }
+  rac::audio::rac_audio_pcm16_to_float32(int16_samples,
+                                         static_cast<size_t>(n_samples),
+                                         float_samples.data());
 
   RAC_LOG_INFO(LOG_CAT, "Transcribing %d samples (%.1fs) at %d Hz", n_samples,
                static_cast<float>(n_samples) / sample_rate, sample_rate);
