@@ -183,13 +183,59 @@ std::string format_vlm_prompt_manual(const std::string &user_content,
 }
 
 /**
- * Detect VLM model type from model name metadata.
+ * Detect VLM model type from model architecture and name metadata.
+ *
+ * The primary signal is `general.architecture` from the GGUF metadata —
+ * llama.cpp publishes canonical arch strings (`qwen2vl`, `qwen3vl`,
+ * `qwen3vlmoe`, `llava`, ...) that map deterministically to a chat-template
+ * family. Falling back to a bare `name.find("qwen") != npos` substring
+ * misclassified future siblings (e.g. plain text-only `qwen3`) as Qwen2-VL
+ * and forced unrelated arches onto the chatml manual template.
+ *
+ * Fallbacks (name + chat-template sniffing) only run when arch is missing
+ * or unrecognized, preserving SmolVLM detection for builds whose
+ * architecture is just `smollm` / `llama`.
  */
 VLMModelType detect_vlm_model_type(llama_model *model) {
   if (!model)
     return VLMModelType::Generic;
 
-  // Try to get model name from metadata
+  // Primary signal: general.architecture from GGUF metadata. llama.cpp
+  // publishes canonical arch strings (qwen2vl, qwen3vl, qwen3vlmoe, llava
+  // variants, smolvlm, ...) that map deterministically to a chat template
+  // family. Avoid the bare-name substring match that caught siblings.
+  char arch_buf[64] = {0};
+  int32_t arch_len = llama_model_meta_val_str(
+      model, "general.architecture", arch_buf, sizeof(arch_buf));
+  if (arch_len > 0) {
+    std::string arch(arch_buf);
+    for (auto &c : arch)
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    RAC_LOG_DEBUG(LOG_CAT, "Model architecture from metadata: %s",
+                  arch.c_str());
+
+    // Match any Qwen-VL variant: qwen2vl, qwen3vl, qwen3vlmoe, qwen35vl, ...
+    if (arch.find("qwenvl") != std::string::npos ||
+        arch.find("qwen2vl") != std::string::npos ||
+        arch.find("qwen3vl") != std::string::npos ||
+        arch.find("qwen35vl") != std::string::npos) {
+      RAC_LOG_DEBUG(LOG_CAT, "Detected Qwen-VL model type from architecture");
+      return VLMModelType::Qwen2VL;
+    }
+    if (arch.find("llava") != std::string::npos) {
+      RAC_LOG_DEBUG(LOG_CAT, "Detected LLaVA model type from architecture");
+      return VLMModelType::LLaVA;
+    }
+    if (arch.find("smolvlm") != std::string::npos) {
+      RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type from architecture");
+      return VLMModelType::SmolVLM;
+    }
+  }
+
+  // Fallback: model name metadata when architecture is missing or generic
+  // (SmolVLM is often shipped as a `smollm` / `llama` arch with the VLM
+  // identity encoded only in the name).
   char name_buf[256] = {0};
   int32_t len = llama_model_meta_val_str(model, "general.name", name_buf,
                                          sizeof(name_buf));
@@ -200,7 +246,6 @@ VLMModelType detect_vlm_model_type(llama_model *model) {
 
   if (len > 0) {
     std::string name(name_buf);
-    // Convert to lowercase for comparison
     for (auto &c : name)
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
@@ -208,20 +253,17 @@ VLMModelType detect_vlm_model_type(llama_model *model) {
 
     if (name.find("smolvlm") != std::string::npos ||
         name.find("smol") != std::string::npos) {
-      RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type");
+      RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type from name");
       return VLMModelType::SmolVLM;
     }
-    if (name.find("qwen") != std::string::npos) {
-      RAC_LOG_DEBUG(LOG_CAT, "Detected Qwen2-VL model type");
-      return VLMModelType::Qwen2VL;
-    }
     if (name.find("llava") != std::string::npos) {
-      RAC_LOG_DEBUG(LOG_CAT, "Detected LLaVA model type");
+      RAC_LOG_DEBUG(LOG_CAT, "Detected LLaVA model type from name");
       return VLMModelType::LLaVA;
     }
   }
 
-  // Check chat template as fallback
+  // Final fallback: chat-template sniffing for SmolVLM-style models that
+  // expose neither a VLM arch nor a SmolVLM name.
   const char *chat_template = llama_model_chat_template(model, nullptr);
   if (chat_template) {
     std::string tmpl(chat_template);
