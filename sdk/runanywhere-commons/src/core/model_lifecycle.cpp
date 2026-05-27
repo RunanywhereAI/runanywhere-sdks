@@ -876,6 +876,19 @@ ModelArtifactResolution resolve_model_artifacts(const ModelInfo& model) {
     if (out.resolved_path.empty()) {
         return out;
     }
+    // Fast-path: when the registered ModelInfo already declares a single-file
+    // local artifact (non-empty local_path, no multi-file/expected-files
+    // descriptors), trust the registered path and skip the artifact-root scan.
+    // The scan is only needed when the registry entry is multi-file or when
+    // the auto-download path has just landed bytes whose final layout the
+    // resolver needs to discover. Calling rac_model_paths_resolve_artifact on
+    // an already-declared single-file local path would otherwise rewrite
+    // resolved_path based on directory contents that may not match the
+    // declared filename (e.g. tests using synthetic /tmp paths).
+    if (!model.local_path().empty() && !model.has_multi_file() &&
+        !model.has_expected_files()) {
+        return out;
+    }
     // Registry local_path may point at a single file (legacy self-heal picked
     // mmproj first). Scan the containing folder so primary + companions resolve.
     std::string artifact_root = out.resolved_path;
