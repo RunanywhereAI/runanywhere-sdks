@@ -72,11 +72,9 @@ static const rac_engine_manifest_t k_llamacpp_manifest = {
     .priority = 100,
     .capability_flags = 0,
     .primitives = k_llamacpp_primitives,
-    .primitives_count =
-        sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
+    .primitives_count = sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
     .runtimes = k_llamacpp_runtimes,
-    .runtimes_count =
-        sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
+    .runtimes_count = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
     .formats = k_llamacpp_formats,
     .formats_count = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
     .reserved_0 = 0,
@@ -84,7 +82,9 @@ static const rac_engine_manifest_t k_llamacpp_manifest = {
 };
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
-static void llamacpp_on_unload(void) { rac_llamacpp_cpu_runtime_unregister(); }
+static void llamacpp_on_unload(void) {
+    rac_llamacpp_cpu_runtime_unregister();
+}
 
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_manifest),
@@ -114,12 +114,12 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp) {
-  const rac_engine_vtable_t *vt = rac_engine_entry_with_manifest(
-      &k_llamacpp_manifest, &g_llamacpp_engine_vtable);
-  if (vt != nullptr) {
-    (void)rac_llamacpp_cpu_runtime_register();
-  }
-  return vt;
+    const rac_engine_vtable_t* vt =
+        rac_engine_entry_with_manifest(&k_llamacpp_manifest, &g_llamacpp_engine_vtable);
+    if (vt != nullptr) {
+        (void)rac_llamacpp_cpu_runtime_register();
+    }
+    return vt;
 }
 
 /* The legacy "llamacpp_vlm" plugin alias was removed: the unified
@@ -129,4 +129,4 @@ RAC_PLUGIN_ENTRY_DEF(llamacpp) {
  * rac_route.cpp normalize_legacy_engine_pin). Registering the alias as a
  * second plugin only added registry noise. */
 
-} // extern "C"
+}  // extern "C"
