@@ -4,12 +4,16 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:runanywhere/runanywhere.dart';
 
 import 'package:runanywhere_ai/core/models/app_types.dart';
 
 /// DeviceInfoService (mirroring iOS DeviceInfoService.swift)
 ///
-/// Retrieves device information (model, chip, memory, OS version, Neural Engine availability).
+/// Retrieves device information (model, OS version) and delegates chip,
+/// neural-engine, and memory facts to `RunAnywhere.hardware.getProfile()`.
+/// The SDK's hardware ABI is the single source of truth; example code must
+/// not reimplement chip/NPU heuristics (AGENTS.md Business Logic Layering).
 class DeviceInfoService extends ChangeNotifier {
   static final DeviceInfoService shared = DeviceInfoService._();
 
@@ -32,49 +36,34 @@ class DeviceInfoService extends ChangeNotifier {
       final packageInfo = await PackageInfo.fromPlatform();
 
       String modelName = '';
-      String chipName = '';
-      int totalMemory = 0;
-      int availableMemory = 0;
-      bool neuralEngineAvailable = false;
       String osVersion = '';
 
       if (Platform.isIOS) {
         final iosInfo = await deviceInfoPlugin.iosInfo;
         modelName = iosInfo.utsname.machine;
-        chipName = _getChipNameFromModel(modelName);
         osVersion = iosInfo.systemVersion;
-        neuralEngineAvailable = _checkNeuralEngineAvailability(modelName);
-        // iOS does not expose total/available RAM without a native plugin.
-        // Leave as 0 so the UI can hide the row.
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         modelName = '${androidInfo.manufacturer} ${androidInfo.model}';
-        chipName = androidInfo.hardware;
         osVersion = 'Android ${androidInfo.version.release}';
-        neuralEngineAvailable = true; // Android devices generally have NPU
-        // Android memory info would require ActivityManager.MemoryInfo via a
-        // platform channel; leave as 0 so the UI can hide the row.
       } else if (Platform.isMacOS) {
         final macOSInfo = await deviceInfoPlugin.macOsInfo;
         modelName = macOSInfo.model;
-        chipName = _getChipNameFromModel(modelName);
         osVersion = 'macOS ${macOSInfo.osRelease}';
-        totalMemory = macOSInfo.memorySize;
-        availableMemory = totalMemory ~/ 2; // Estimate
-        neuralEngineAvailable = modelName.contains('arm64') ||
-            chipName.contains('Apple') ||
-            chipName.contains('M1') ||
-            chipName.contains('M2') ||
-            chipName.contains('M3') ||
-            chipName.contains('M4');
       }
+
+      // Hardware facts come from the commons hardware ABI via the SDK so new
+      // chips/NPUs are picked up without an example release. When the native
+      // probe is unavailable (debug builds without commons, simulator drift),
+      // fall back to empty values so the UI can hide the rows gracefully.
+      final profile = await _tryGetHardwareProfile();
 
       _deviceInfo = SystemDeviceInfo(
         modelName: modelName,
-        chipName: chipName,
-        totalMemory: totalMemory,
-        availableMemory: availableMemory,
-        neuralEngineAvailable: neuralEngineAvailable,
+        chipName: profile?.chip ?? '',
+        totalMemory: profile?.totalMemoryBytes.toInt() ?? 0,
+        availableMemory: 0,
+        neuralEngineAvailable: profile?.hasNeuralEngine ?? false,
         osVersion: osVersion,
         appVersion: packageInfo.version,
       );
@@ -92,36 +81,13 @@ class DeviceInfoService extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _getChipNameFromModel(String modelName) {
-    // iOS device chip detection
-    if (modelName.contains('iPhone')) {
-      if (modelName.contains('iPhone17')) return 'A18 Pro';
-      if (modelName.contains('iPhone16')) return 'A17 Pro';
-      if (modelName.contains('iPhone15')) return 'A16 Bionic';
-      if (modelName.contains('iPhone14')) return 'A15 Bionic';
-      if (modelName.contains('iPhone13')) return 'A15 Bionic';
-      if (modelName.contains('iPhone12')) return 'A14 Bionic';
-      return 'Apple Silicon';
+  Future<HardwareProfile?> _tryGetHardwareProfile() async {
+    try {
+      final result = await RunAnywhere.hardware.getProfile();
+      return result.hasProfile() ? result.profile : null;
+    } catch (e) {
+      debugPrint('Hardware profile unavailable: $e');
+      return null;
     }
-
-    // Mac chip detection
-    if (modelName.contains('Mac')) {
-      if (modelName.contains('arm64')) return 'Apple Silicon';
-      return 'Intel';
-    }
-
-    return 'Unknown';
-  }
-
-  bool _checkNeuralEngineAvailability(String modelName) {
-    // Neural Engine available on A11+ chips (iPhone 8 and later)
-    if (modelName.contains('iPhone')) {
-      final match = RegExp(r'iPhone(\d+)').firstMatch(modelName);
-      if (match != null) {
-        final version = int.tryParse(match.group(1) ?? '0') ?? 0;
-        return version >= 10; // iPhone 8 = iPhone10
-      }
-    }
-    return true; // Assume available for modern devices
   }
 }
