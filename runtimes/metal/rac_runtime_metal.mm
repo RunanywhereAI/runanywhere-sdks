@@ -5,6 +5,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <new>
 
 #include "rac/plugin/rac_model_format_ids.h"
@@ -12,6 +13,19 @@
 #include "rac/plugin/rac_runtime_vtable.h"
 
 namespace {
+
+/* runtimes-003: serialize all access to the g_device / g_queue file-scope
+ * globals. The registry calls vtable->init() and vtable->destroy() outside
+ * the registry lock (see sdk/runanywhere-commons/src/plugin/
+ * rac_runtime_registry.cpp:264), so two concurrent
+ * rac_runtime_register/_unregister calls -- or an alloc_buffer arriving
+ * during tear-down -- could read/write these without ordering. One mutex
+ * is enough to make init/destroy idempotent and to keep the
+ * consult-and-use sequence in alloc_buffer / device_info atomic. */
+std::mutex &metal_globals_mutex() {
+    static std::mutex m;
+    return m;
+}
 
 id<MTLDevice> g_device = nil;
 id<MTLCommandQueue> g_queue = nil;
@@ -31,6 +45,7 @@ const uint32_t k_supported_formats[] = {
 };
 
 rac_result_t metal_init(void) {
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
     if (g_device != nil) return RAC_SUCCESS;
     g_device = MTLCreateSystemDefaultDevice();
     if (g_device == nil) {
@@ -46,6 +61,7 @@ rac_result_t metal_init(void) {
 }
 
 void metal_destroy(void) {
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
     if (g_queue != nil) {
         [g_queue release];
         g_queue = nil;
@@ -59,6 +75,10 @@ void metal_destroy(void) {
 rac_result_t metal_alloc_buffer(size_t bytes, rac_runtime_buffer_t** out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
+    /* runtimes-003: hold the globals mutex across the device read and the
+     * newBufferWithLength: call so destroy() cannot run between the nil
+     * check and the buffer allocation. */
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
     if (g_device == nil) return RAC_ERROR_BACKEND_UNAVAILABLE;
     auto* buffer = new (std::nothrow) MetalRuntimeBuffer();
     if (!buffer) return RAC_ERROR_OUT_OF_MEMORY;
@@ -200,6 +220,10 @@ void metal_release_tensor(rac_runtime_tensor_t* tensor) {
 
 rac_result_t metal_device_info(rac_runtime_device_info_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
+    /* runtimes-003: lock across the device read + property query so a
+     * concurrent destroy() cannot release g_device between the nil check
+     * and the recommendedMaxWorkingSetSize call. */
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
     if (g_device == nil) return RAC_ERROR_BACKEND_UNAVAILABLE;
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_GPU;
