@@ -17,13 +17,26 @@ const { existsSync } = require('node:fs');
 const { execSync } = require('node:child_process');
 const path = require('node:path');
 
+const cwd = process.cwd();
+
+// Always sync the canonical commons solution YAMLs into the generated TS
+// module — typecheck imports it, so CI (which skips patch-package + pod-install
+// below) still needs this side effect.
+try {
+  execSync('node scripts/sync-solutions-yamls.js', { stdio: 'inherit', cwd });
+} catch (err) {
+  process.stderr.write(
+    `[postinstall] sync-solutions-yamls failed: ${err.message}\n`
+  );
+  process.exit(err.status ?? 1);
+}
+
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
 if (isCI) {
   process.stdout.write('[postinstall] CI=true detected; skipping patch-package + pod-install.\n');
   process.exit(0);
 }
 
-const cwd = process.cwd();
 const localRN = path.join(cwd, 'node_modules', 'react-native', 'package.json');
 
 if (existsSync(localRN)) {

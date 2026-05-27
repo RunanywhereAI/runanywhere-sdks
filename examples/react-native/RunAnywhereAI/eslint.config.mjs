@@ -23,6 +23,7 @@ export default [
       'babel.config.js',
       'metro.config.js',
       'scripts/**',
+      'src/generated/**',
     ],
   },
   ...reactNativeFlat,

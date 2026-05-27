@@ -9,7 +9,7 @@
     "test": "jest",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" \"App.tsx\" --fix",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/sync-solutions-yamls.js && tsc --noEmit",
     "format": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --check",
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
