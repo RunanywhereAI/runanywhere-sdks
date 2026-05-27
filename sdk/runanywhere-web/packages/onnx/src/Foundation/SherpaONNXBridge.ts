@@ -3,15 +3,17 @@
  *
  * STT/TTS/VAD inference flows entirely through the RACommons proto-byte
  * C ABI (`_rac_stt_component_*_proto`, `_rac_tts_component_*_proto`,
- * `_rac_vad_component_*_proto`) exported by the dedicated
- * `racommons-onnx-sherpa.wasm` artifact this bridge owns.
+ * `_rac_vad_component_*_proto`) exported by this bridge's dedicated
+ * `racommons-onnx-sherpa.wasm` artifact.
  *
  * Responsibilities:
- *  1. Load the dedicated `racommons-onnx-sherpa.{js,wasm}` artifact as an
- *     independent Emscripten module. Each per-package WASM is
- *     self-contained — the bridge never reuses a sibling backend's module
- *     because no other artifact exports `_rac_backend_onnx_register` or
- *     `_rac_backend_sherpa_register`.
+ *  1. Always load this package's own `racommons-onnx-sherpa.{js,wasm}`
+ *     artifact as an independent Emscripten module. The bridge does not
+ *     piggy-back on any other package's WASM module — the ONNX and
+ *     Sherpa backend registration entry points
+ *     (`_rac_backend_onnx_register` / `_rac_backend_sherpa_register`) are
+ *     only exported by this artifact, so each ONNX bridge instance owns
+ *     its own dedicated module.
  *  2. Call `rac_init()` with a zero-initialised platform-adapter stub and
  *     claim the speech/embedding/RAG capabilities on the per-capability
  *     registry so the core proto-byte adapters can resolve this module.
