@@ -180,19 +180,22 @@ final class BenchmarkViewModel {
             errorMessage = error.localizedDescription
         }
 
-        // Persist completed work only — skip empty failed preflight runs so TC-19
-        // grading waits for a real benchmark history entry.
-        if !run.results.isEmpty || run.status == .cancelled {
-            store.save(run: run)
-            if !run.results.isEmpty {
-                let duration = run.duration ?? 0
-                logger.info(
-                    "\(Self.historySavedLogMarker, privacy: .public) results=\(run.results.count) duration=\(duration, privacy: .public)s"
-                )
-            }
-        }
+        persistRunIfNeeded(run)
         loadPastRuns()
         isRunning = false
+    }
+
+    private func persistRunIfNeeded(_ run: BenchmarkRun) {
+        // Persist completed work only — skip empty failed preflight runs so TC-19
+        // grading waits for a real benchmark history entry.
+        guard !run.results.isEmpty || run.status == .cancelled else { return }
+        store.save(run: run)
+        guard !run.results.isEmpty else { return }
+        let duration = run.duration ?? 0
+        let marker = Self.historySavedLogMarker
+        logger.info(
+            "\(marker, privacy: .public) results=\(run.results.count) duration=\(duration, privacy: .public)s"
+        )
     }
 
     func cancel() {

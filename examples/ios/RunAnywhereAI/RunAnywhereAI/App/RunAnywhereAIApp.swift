@@ -39,7 +39,8 @@ struct RunAnywhereAIApp: App {
     #endif
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.scenePhase)
+    private var scenePhase
 
     var body: some Scene {
         WindowGroup {

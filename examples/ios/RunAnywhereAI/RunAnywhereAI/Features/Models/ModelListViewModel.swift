@@ -227,5 +227,4 @@ class ModelListViewModel: ObservableObject {
         // Reload models to include the new one
         await loadModelsFromRegistry()
     }
-
 }
