@@ -122,56 +122,11 @@ RAC_PLUGIN_ENTRY_DEF(llamacpp) {
   return vt;
 }
 
-/* Legacy alias kept for older rac_commons builds that still pin VLM loads to
- * the pre-unification engine name "llamacpp_vlm". Same ops vtable, distinct
- * manifest name so rac_plugin_route(no_fallback + pin) succeeds. */
-static const rac_engine_manifest_t k_llamacpp_vlm_legacy_manifest = {
-    .name = "llamacpp_vlm",
-    .display_name = "llama.cpp VLM (legacy alias)",
-    .version = nullptr,
-    .package_owner = "runanywhere",
-    .package_name = "runanywhere_llamacpp",
-    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority = 100,
-    .capability_flags = 0,
-    .primitives = k_llamacpp_primitives,
-    .primitives_count =
-        sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
-    .runtimes = k_llamacpp_runtimes,
-    .runtimes_count =
-        sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
-    .formats = k_llamacpp_formats,
-    .formats_count = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
-    .reserved_0 = 0,
-    .reserved_1 = 0,
-};
-
-static const rac_engine_vtable_t g_llamacpp_vlm_legacy_vtable = {
-    RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_vlm_legacy_manifest),
-    nullptr,
-    llamacpp_on_unload,
-    &g_llamacpp_ops,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    &g_llamacpp_vlm_ops,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-};
-
-RAC_PLUGIN_ENTRY_DEF(llamacpp_vlm) {
-  return rac_engine_entry_with_manifest(&k_llamacpp_vlm_legacy_manifest,
-                                        &g_llamacpp_vlm_legacy_vtable);
-}
+/* The legacy "llamacpp_vlm" plugin alias was removed: the unified
+ * "llamacpp" plugin already serves both LLM and VLM primitives, and the
+ * commons router normalizes any pre-unification "llamacpp_vlm" pin to
+ * "llamacpp" before scoring (see sdk/runanywhere-commons/src/router/
+ * rac_route.cpp normalize_legacy_engine_pin). Registering the alias as a
+ * second plugin only added registry noise. */
 
 } // extern "C"

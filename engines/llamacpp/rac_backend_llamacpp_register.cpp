@@ -479,6 +479,10 @@ rac_result_t rac_backend_llamacpp_register(void) {
   // rac_plugin_route(framework=llamacpp) can find the unified vtable (with
   // both llm_ops and vlm_ops slots filled). Mirrors the pattern in
   // rac_backend_onnx_register.cpp.
+  // The unified llamacpp plugin already serves both LLM and VLM primitives;
+  // any pre-unification "llamacpp_vlm" pin is normalized to "llamacpp" by
+  // the commons router (rac_route.cpp normalize_legacy_engine_pin), so the
+  // legacy alias plugin entry no longer exists and is not registered here.
   const rac_engine_vtable_t *vt = rac_plugin_entry_llamacpp();
   if (vt != nullptr) {
     rac_result_t plugin_rc = rac_plugin_register(vt);
@@ -487,19 +491,6 @@ rac_result_t rac_backend_llamacpp_register(void) {
       RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
     } else {
       RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");
-    }
-  }
-
-  const rac_engine_vtable_t *legacy_vlm_vt = rac_plugin_entry_llamacpp_vlm();
-  if (legacy_vlm_vt != nullptr) {
-    rac_result_t legacy_rc = rac_plugin_register(legacy_vlm_vt);
-    if (legacy_rc != RAC_SUCCESS &&
-        legacy_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed for llamacpp_vlm: %d",
-                      legacy_rc);
-    } else {
-      RAC_LOG_INFO(LOG_CAT,
-                  "rac_plugin_register succeeded for legacy alias 'llamacpp_vlm'");
     }
   }
 
