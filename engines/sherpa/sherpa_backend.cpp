@@ -1495,10 +1495,6 @@ std::vector<VoiceInfo> SherpaTTS::get_voices() const {
   return voices_;
 }
 
-std::string SherpaTTS::get_default_voice(const std::string &language) const {
-  return "0";
-}
-
 // =============================================================================
 // SherpaVAD Implementation - Silero VAD via Sherpa-ONNX
 // =============================================================================

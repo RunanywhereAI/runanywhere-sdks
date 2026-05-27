@@ -347,7 +347,6 @@ public:
 
   void cancel();
   std::vector<VoiceInfo> get_voices() const;
-  std::string get_default_voice(const std::string &language) const;
 
 private:
   SherpaBackend *backend_;
