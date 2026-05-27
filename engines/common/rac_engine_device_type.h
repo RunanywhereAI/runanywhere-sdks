@@ -15,14 +15,14 @@
 namespace runanywhere {
 
 enum class DeviceType {
-  CPU = 0,
-  GPU = 1,
-  NEURAL_ENGINE = 2,
-  METAL = 3,
-  CUDA = 4,
-  WEBGPU = 5,
+    CPU = 0,
+    GPU = 1,
+    NEURAL_ENGINE = 2,
+    METAL = 3,
+    CUDA = 4,
+    WEBGPU = 5,
 };
 
-} // namespace runanywhere
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_ENGINES_COMMON_DEVICE_TYPE_H
+#endif  // RUNANYWHERE_ENGINES_COMMON_DEVICE_TYPE_H

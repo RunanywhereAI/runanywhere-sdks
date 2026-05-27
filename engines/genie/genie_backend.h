@@ -47,7 +47,7 @@ extern "C" {
  * Lets tests assert the shell compiled against the expected SDK
  * visibility without pulling any Qualcomm headers.
  */
-const char *genie_backend_build_info(void);
+const char* genie_backend_build_info(void);
 
 /**
  * @brief Shared helper used by every llm_ops stub to produce a
@@ -63,4 +63,4 @@ rac_result_t genie_backend_unavailable(void);
 }
 #endif
 
-#endif // RUNANYWHERE_GENIE_BACKEND_H
+#endif  // RUNANYWHERE_GENIE_BACKEND_H

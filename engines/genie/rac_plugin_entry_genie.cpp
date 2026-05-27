@@ -26,9 +26,8 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE &&             \
-    defined(__ANDROID__) && defined(RAC_GENIE_LLM_OPS_AVAILABLE) &&            \
-    RAC_GENIE_LLM_OPS_AVAILABLE
+#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && defined(__ANDROID__) && \
+    defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
 #define RAC_GENIE_ROUTABLE 1
 #else
 #define RAC_GENIE_ROUTABLE 0
@@ -43,44 +42,43 @@ namespace {
 // linked. Explicitly named rather than a generic lambda so stack traces
 // during debugging point at the primitive the caller tried to invoke.
 
-rac_result_t genie_llm_create(const char * /*model_id*/,
-                              const char * /*config_json*/, void **out_impl) {
-  if (out_impl)
-    *out_impl = nullptr;
-  return genie_backend_unavailable();
+rac_result_t genie_llm_create(const char* /*model_id*/, const char* /*config_json*/,
+                              void** out_impl) {
+    if (out_impl)
+        *out_impl = nullptr;
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_initialize(void * /*impl*/,
-                                  const char * /*model_path*/) {
-  return genie_backend_unavailable();
+rac_result_t genie_llm_initialize(void* /*impl*/, const char* /*model_path*/) {
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_generate(void * /*impl*/, const char * /*prompt*/,
-                                const rac_llm_options_t * /*opts*/,
-                                rac_llm_result_t * /*out*/) {
-  return genie_backend_unavailable();
+rac_result_t genie_llm_generate(void* /*impl*/, const char* /*prompt*/,
+                                const rac_llm_options_t* /*opts*/, rac_llm_result_t* /*out*/) {
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_generate_stream(void * /*impl*/, const char * /*prompt*/,
-                                       const rac_llm_options_t * /*opts*/,
-                                       rac_llm_stream_callback_fn /*cb*/,
-                                       void * /*user_data*/) {
-  return genie_backend_unavailable();
+rac_result_t genie_llm_generate_stream(void* /*impl*/, const char* /*prompt*/,
+                                       const rac_llm_options_t* /*opts*/,
+                                       rac_llm_stream_callback_fn /*cb*/, void* /*user_data*/) {
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_get_info(void * /*impl*/, rac_llm_info_t * /*out*/) {
-  return genie_backend_unavailable();
+rac_result_t genie_llm_get_info(void* /*impl*/, rac_llm_info_t* /*out*/) {
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_cancel(void * /*impl*/) {
-  return genie_backend_unavailable();
+rac_result_t genie_llm_cancel(void* /*impl*/) {
+    return genie_backend_unavailable();
 }
 
-rac_result_t genie_llm_cleanup(void * /*impl*/) { return RAC_SUCCESS; }
+rac_result_t genie_llm_cleanup(void* /*impl*/) {
+    return RAC_SUCCESS;
+}
 
-void genie_llm_destroy(void * /*impl*/) {
-  /* No-op: create always returned RAC_ERROR_BACKEND_UNAVAILABLE so impl
-   * is NULL. Safe to call. */
+void genie_llm_destroy(void* /*impl*/) {
+    /* No-op: create always returned RAC_ERROR_BACKEND_UNAVAILABLE so impl
+     * is NULL. Safe to call. */
 }
 
 // capability_check runs during rac_plugin_register. Reject the shell so the
@@ -89,17 +87,17 @@ void genie_llm_destroy(void * /*impl*/) {
 // Android.
 rac_result_t genie_capability_check(void) {
 #if !defined(RAC_GENIE_SDK_AVAILABLE) || !RAC_GENIE_SDK_AVAILABLE
-  return RAC_ERROR_BACKEND_UNAVAILABLE;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #elif !defined(__ANDROID__)
-  return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #elif !defined(RAC_GENIE_LLM_OPS_AVAILABLE) || !RAC_GENIE_LLM_OPS_AVAILABLE
-  return RAC_ERROR_BACKEND_UNAVAILABLE;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
-  return RAC_SUCCESS;
+    return RAC_SUCCESS;
 #endif
 }
 
-} // namespace
+}  // namespace
 
 extern "C" const rac_llm_service_ops_t g_genie_llm_ops = {
     .initialize = genie_llm_initialize,
@@ -230,8 +228,7 @@ static const rac_engine_vtable_t g_genie_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(genie) {
-  return rac_engine_entry_with_manifest(&k_genie_manifest,
-                                        &g_genie_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_genie_manifest, &g_genie_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"

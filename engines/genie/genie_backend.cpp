@@ -22,20 +22,20 @@
 
 extern "C" {
 
-const char *genie_backend_build_info(void) {
+const char* genie_backend_build_info(void) {
 #if RAC_GENIE_SDK_AVAILABLE
-  return "genie:sdk-available";
+    return "genie:sdk-available";
 #else
-  return "genie:sdk-unavailable";
+    return "genie:sdk-unavailable";
 #endif
 }
 
 rac_result_t genie_backend_unavailable(void) {
-  RAC_LOG_WARNING(
-      "Genie", "Genie backend unavailable. It requires an Android build "
-               "with -DRAC_BACKEND_GENIE=ON, "
-               "-DRAC_GENIE_SDK_ROOT=<qnn-sdk-path>, and SDK-backed LLM ops.");
-  return RAC_ERROR_BACKEND_UNAVAILABLE;
+    RAC_LOG_WARNING("Genie",
+                    "Genie backend unavailable. It requires an Android build "
+                    "with -DRAC_BACKEND_GENIE=ON, "
+                    "-DRAC_GENIE_SDK_ROOT=<qnn-sdk-path>, and SDK-backed LLM ops.");
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
-} // extern "C"
+}  // extern "C"
