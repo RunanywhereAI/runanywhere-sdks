@@ -18,7 +18,7 @@
 #
 # Common builds:
 #   cmake --preset macos-release && cmake --build --preset macos-release
-#   cmake --preset linux-release-asan && cmake --build --preset linux-release-asan
+#   cmake --preset linux-asan       && cmake --build --preset linux-asan
 #   cmake --preset android-arm64    && cmake --build --preset android-arm64
 #   cmake --preset ios-device       && cmake --build --preset ios-device
 #   cmake --preset wasm             && cmake --build --preset wasm
