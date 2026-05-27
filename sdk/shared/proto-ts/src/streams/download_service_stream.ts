@@ -14,69 +14,15 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
+import { streamFactory, type StreamTransport } from "./_streamFactory";
 import type { DownloadSubscribeRequest } from "../download_service";
 import type { DownloadProgress } from "../download_service";
 
-export interface DownloadStreamTransport {
-    subscribe(
-        req: DownloadSubscribeRequest,
-        onMessage: (msg: DownloadProgress) => void,
-        onError:   (err: Error) => void,
-        onDone:    () => void,
-    ): () => void;   // returns a cancel function
-}
+export interface DownloadStreamTransport extends StreamTransport<DownloadSubscribeRequest, DownloadProgress> {}
 
-/**
- * Wrap the platform `transport.subscribe` callback into an
- * `AsyncIterable<DownloadProgress>`. Cancellation is propagated by
- * `break`-ing out of `for await` (the iterator's `return()` calls the
- * transport's cancel function).
- */
 export function subscribeDownload(
     transport: DownloadStreamTransport,
     req: DownloadSubscribeRequest,
 ): AsyncIterable<DownloadProgress> {
-    return {
-        [Symbol.asyncIterator](): AsyncIterator<DownloadProgress> {
-            const queue: DownloadProgress[] = [];
-            let resolve: ((v: IteratorResult<DownloadProgress>) => void) | null = null;
-            let reject: ((reason: Error) => void) | null = null;
-            let error: Error | null = null;
-            let done = false;
-
-            const cancel = transport.subscribe(
-                req,
-                (msg) => {
-                    if (resolve) { const r = resolve; resolve = null; reject = null; r({ value: msg, done: false }); }
-                    else queue.push(msg);
-                },
-                (err) => {
-                    // idl-007: surface the error to the current and any subsequent
-                    // `next()` waiters by rejecting the pending promise (not resolving
-                    // with done:true, which silently ends the iteration before the
-                    // consumer ever sees the failure). `error` is sticky and the
-                    // `next()` body re-checks it on every subsequent call.
-                    error = err;
-                    if (reject) { const rej = reject; resolve = null; reject = null; rej(err); }
-                },
-                () => {
-                    done = true;
-                    if (resolve) { const r = resolve; resolve = null; reject = null; r({ value: undefined as any, done: true }); }
-                },
-            );
-
-            return {
-                next(): Promise<IteratorResult<DownloadProgress>> {
-                    if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false });
-                    if (error) return Promise.reject(error);
-                    if (done)  return Promise.resolve({ value: undefined as any, done: true });
-                    return new Promise((res, rej) => { resolve = res; reject = rej; });
-                },
-                return(): Promise<IteratorResult<DownloadProgress>> {
-                    cancel();
-                    return Promise.resolve({ value: undefined as any, done: true });
-                },
-            };
-        },
-    };
+    return streamFactory(transport, req);
 }
