@@ -117,12 +117,13 @@ public final class SolutionHandle: @unchecked Sendable {
         }
     }
 
-    /// Compose a human-readable failure message from a `rac_result_t`.
-    ///
-    /// Pairs `rac_error_message(rc)` (canonical static description per
-    /// code) with `rac_error_get_details()` (thread-local detail set by
-    /// the failing C call, if any) so callers see the underlying cause
-    /// instead of just a numeric code.
+    // Compose a human-readable failure message from a `rac_result_t`.
+    //
+    // Pairs `rac_error_message(rc)` (canonical static description per
+    // code) with `rac_error_get_details()` (thread-local detail set by
+    // the failing C call, if any) so callers see the underlying cause
+    // instead of just a numeric code.
+    // swiftlint:disable:next strict_fileprivate
     fileprivate static func errorMessage(op: String, rc: rac_result_t) -> String {
         var message = "\(op) failed"
         let description = String(cString: rac_error_message(rc))
