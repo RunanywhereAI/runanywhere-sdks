@@ -72,7 +72,14 @@ fi
 # IDL-16 / CPP-10: verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
 # (loaded from VERSIONS). The plugin does not expose --version in older
 # releases; fall back to a best-effort check.
-if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
+#
+# IMPORTANT: stdin must be redirected from /dev/null. protoc plugins (including
+# protoc_plugin) implement the CodeGeneratorRequest/Response protocol over
+# stdin/stdout — if stdin is left attached to a terminal or a parent's stdin,
+# the plugin blocks indefinitely waiting for a request, even when --version is
+# passed. Without `</dev/null` this hangs generate_dart.sh forever when run
+# from generate_all.sh.
+if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version </dev/null 2>&1)"; then
     if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "${PROTOC_GEN_DART_VERSION}"; then
         echo "warning: protoc_plugin version could not be verified as ${PROTOC_GEN_DART_VERSION}." >&2
         echo "         Got: ${PLUGIN_VERSION_OUT}" >&2

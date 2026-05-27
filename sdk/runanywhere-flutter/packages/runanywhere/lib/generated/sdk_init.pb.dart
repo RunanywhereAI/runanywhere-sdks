@@ -189,6 +189,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
     $core.int? discoveredOrphans,
     $core.String? warning,
     $fixnum.Int64? durationMs,
+    $core.bool? hasCompletedHttpSetup,
   }) {
     final result = create();
     if (phase != null) result.phase = phase;
@@ -200,6 +201,8 @@ class SdkInitResult extends $pb.GeneratedMessage {
     if (discoveredOrphans != null) result.discoveredOrphans = discoveredOrphans;
     if (warning != null) result.warning = warning;
     if (durationMs != null) result.durationMs = durationMs;
+    if (hasCompletedHttpSetup != null)
+      result.hasCompletedHttpSetup = hasCompletedHttpSetup;
     return result;
   }
 
@@ -229,6 +232,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(8, _omitFieldNames ? '' : 'warning')
     ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
+    ..aOB(10, _omitFieldNames ? '' : 'hasCompletedHttpSetup')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -332,6 +336,27 @@ class SdkInitResult extends $pb.GeneratedMessage {
   $core.bool hasDurationMs() => $_has(8);
   @$pb.TagNumber(9)
   void clearDurationMs() => $_clearField(9);
+
+  /// flutter-core-009: explicit two-phase HTTP-setup completion flag,
+  /// decoupled from services-init completion so SDKs that initialize
+  /// offline (no connectivity) can still report success=true with
+  /// has_completed_http_setup=false and retry HTTP later via the
+  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
+  /// signal Flutter / Web / RN consume to decide whether the next
+  /// download/authenticated call can proceed without a retryHTTP step.
+  ///
+  /// Distinct from `http_configured` (field 4) which historically meant
+  /// "HTTP transport wired up at this phase's call site"; this field is
+  /// the cross-phase latched bit that survives between phase calls.
+  @$pb.TagNumber(10)
+  $core.bool get hasCompletedHttpSetup => $_getBF(9);
+  @$pb.TagNumber(10)
+  set hasCompletedHttpSetup($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasHasCompletedHttpSetup() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearHasCompletedHttpSetup() => $_clearField(10);
 }
 
 const $core.bool _omitFieldNames =
