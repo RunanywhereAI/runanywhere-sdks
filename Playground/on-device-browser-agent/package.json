@@ -11,7 +11,7 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@mlc-ai/web-llm": "^0.2.78",
-    "react": "^18.3.1",
+    "react": "19.0.0",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
