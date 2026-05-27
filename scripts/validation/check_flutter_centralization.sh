@@ -55,7 +55,7 @@ DRIFT_COUNT=0
 # Extract the registry into a `name => version` map serialized as `name<TAB>version`
 # lines, e.g.:
 #   ffi    ^2.1.0
-#   protoc_plugin    21.1.2
+#   protoc_plugin    25.0.0
 #
 # AWK state machine — locked to the YAML indentation that pubspec.yaml uses.
 parse_registry() {
