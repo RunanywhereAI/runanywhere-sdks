@@ -845,8 +845,6 @@ bool LlamaCppTextGeneration::generate_stream(
   RAC_LOG_INFO("LLM.LlamaCpp", "Generating with prompt length: %zu",
                prompt.length());
 
-  llama_memory_clear(llama_get_memory(context_), true);
-
   const auto tokens_list = common_tokenize(context_, prompt, true, true);
 
   const int n_ctx = llama_n_ctx(context_);

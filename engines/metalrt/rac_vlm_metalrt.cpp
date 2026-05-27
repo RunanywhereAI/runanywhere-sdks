@@ -147,17 +147,26 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle,
   return RAC_SUCCESS;
 }
 
-// Stream adapter
+// Stream adapter. Records whether the caller requested cancellation so the
+// outer entrypoint can surface RAC_ERROR_STREAM_CANCELLED (the engine's
+// stream API has no separate cancellation return channel — it just stops
+// emitting tokens when the bridge returns false). Mirrors the convention
+// used by rac_llm_metalrt_generate_stream / metalrt_stream_bridge.
 struct VLMStreamCtx {
   rac_vlm_stream_callback_fn callback;
   void *user_data;
+  bool client_cancelled;
 };
 
 static bool vlm_stream_bridge(const char *piece, void *ctx) {
   auto *adapter = static_cast<VLMStreamCtx *>(ctx);
   if (!adapter || !adapter->callback)
     return false;
-  return adapter->callback(piece, adapter->user_data) == RAC_TRUE;
+  if (adapter->callback(piece, adapter->user_data) != RAC_TRUE) {
+    adapter->client_cancelled = true;
+    return false;
+  }
+  return true;
 }
 
 rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle,
@@ -178,7 +187,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle,
   vopts.top_k = 40;
   vopts.think = false;
 
-  VLMStreamCtx ctx = {callback, user_data};
+  VLMStreamCtx ctx = {callback, user_data, false};
   struct MetalRTVisionResult result = {};
 
   if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
@@ -205,7 +214,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle,
   }
 
   metalrt_vision_free_result(result);
-  return RAC_SUCCESS;
+  return ctx.client_cancelled ? RAC_ERROR_STREAM_CANCELLED : RAC_SUCCESS;
 }
 
 void rac_vlm_metalrt_reset(rac_handle_t handle) {
