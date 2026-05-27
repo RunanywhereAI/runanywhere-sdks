@@ -1440,29 +1440,64 @@ rac_result_t rac_vlm_llamacpp_process_stream(
     if (len > 0) {
       buf[len] = '\0';
       const rac_bool_t final_flag = is_eog ? RAC_TRUE : RAC_FALSE;
-      const rac_bool_t cb_rc = callback(buf, final_flag, user_data);
-      if (final_flag == RAC_TRUE) {
-        terminal_emitted = true;
-      }
-      if (cb_rc == RAC_FALSE) {
-        break; // Callback requested stop
-      }
 
-      // Maintain a tail buffer for caller-supplied stop sequences. Tokens are
-      // emitted to the callback before this check, so we cannot "unsend" a
-      // partial match — but we can terminate the stream the moment any stop
-      // sequence first appears in the accumulated tail.
-      if (!user_stops.empty()) {
-        stop_window.append(buf, len);
-        if (stop_window.size() > user_stop_max_len * 2) {
-          stop_window.erase(0, stop_window.size() - user_stop_max_len * 2);
+      if (user_stops.empty()) {
+        // No caller stops -> emit immediately; saves a copy per token in the
+        // common case (no caller-supplied stop sequence).
+        const rac_bool_t cb_rc = callback(buf, final_flag, user_data);
+        if (final_flag == RAC_TRUE) {
+          terminal_emitted = true;
         }
-        if (find_first_stop_sequence(stop_window, user_stops) !=
-            std::string::npos) {
+        if (cb_rc == RAC_FALSE) {
+          break; // Callback requested stop
+        }
+      } else {
+        // Defer emission: a stop sequence can span multiple token pieces, so
+        // hold back the trailing `user_stop_max_len` bytes until we know
+        // they're not part of a stop. When a stop is found, emit only the
+        // bytes BEFORE the match — never leaking the stop prefix to the
+        // callback. Mirrors the LLM backend's stop_window pattern at
+        // engines/llamacpp/llamacpp_backend.cpp:1031-1076.
+        stop_window.append(buf, len);
+
+        const size_t found_pos =
+            find_first_stop_sequence(stop_window, user_stops);
+        if (found_pos != std::string::npos) {
           RAC_LOG_INFO(LOG_CAT, "Caller stop sequence matched, halting stream");
+          if (found_pos > 0) {
+            // Emit the part before the stop as a normal (non-final) chunk so
+            // the caller's accumulator captures it, then send the terminal
+            // marker. NUL-terminate via a temporary buffer.
+            const std::string safe_prefix = stop_window.substr(0, found_pos);
+            callback(safe_prefix.c_str(), RAC_FALSE, user_data);
+          }
           callback("", RAC_TRUE, user_data);
           terminal_emitted = true;
           break;
+        }
+
+        // No stop match yet — flush everything that cannot possibly become
+        // part of a stop sequence (i.e. bytes older than user_stop_max_len
+        // from the end of stop_window). Keep the trailing user_stop_max_len
+        // bytes in stop_window for the next iteration.
+        if (final_flag == RAC_TRUE) {
+          // EOG: flush the whole remaining window and signal terminal.
+          if (!stop_window.empty()) {
+            callback(stop_window.c_str(), RAC_TRUE, user_data);
+          } else {
+            callback("", RAC_TRUE, user_data);
+          }
+          terminal_emitted = true;
+          stop_window.clear();
+        } else if (stop_window.size() > user_stop_max_len) {
+          const size_t safe_len = stop_window.size() - user_stop_max_len;
+          const std::string safe_chunk = stop_window.substr(0, safe_len);
+          stop_window.erase(0, safe_len);
+          const rac_bool_t cb_rc =
+              callback(safe_chunk.c_str(), RAC_FALSE, user_data);
+          if (cb_rc == RAC_FALSE) {
+            break; // Callback requested stop
+          }
         }
       }
     }
@@ -1487,9 +1522,16 @@ rac_result_t rac_vlm_llamacpp_process_stream(
   }
 
   // Guarantee the terminal marker on every successful exit path so direct
-  // engine-API callers can rely on is_final=true to close the stream.
+  // engine-API callers can rely on is_final=true to close the stream. When
+  // caller stops were active and no stop hit, flush whatever's left in the
+  // stop_window so the user sees the full response.
   if (!terminal_emitted) {
-    callback("", RAC_TRUE, user_data);
+    if (!user_stops.empty() && !stop_window.empty() && !decode_failed) {
+      callback(stop_window.c_str(), RAC_TRUE, user_data);
+    } else {
+      callback("", RAC_TRUE, user_data);
+    }
+    terminal_emitted = true;
   }
 
   llama_batch_free(batch);
