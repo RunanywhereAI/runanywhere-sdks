@@ -478,7 +478,7 @@ All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to t
 |----------|------------|------------|--------------|
 | iOS | 17.0 | Xcode 15+ | Swift 5.9+ |
 | macOS | 14.0 | Xcode 15+ | Swift 5.9+ |
-| Android | API 24 | AGP 8.13.0 | Kotlin 2.1.21, NDK 27.0.12077973 |
+| Android | API 24 | AGP 8.13.0 | Kotlin 2.1.21, NDK 27.3.13750724 |
 | JVM | 17 | Gradle 8.13 | Kotlin 2.1.21 |
 | Flutter | 3.10+ | Melos | Dart 3.0+ |
 | React Native | 0.83.1 | Yarn Berry 3.6.1 | NitroModules, Hermes |
@@ -532,7 +532,7 @@ Manually configured (no `applyDefaultHierarchyTemplate`). Use `expect/actual` on
 
 **`gradle.properties`** — `runanywhere.useLocalNatives=true` means local `.so` files. CI overrides with `-Prunanywhere.useLocalNatives=false` to download from GitHub Releases.
 
-**NDK version** — `racNdkVersion=27.0.12077973` is the single pin for Kotlin/RN/Commons AND Flutter (`racFlutterNdkVersion` resolves to the same value). The two properties were unified to 16 KB-aligned NDK 27 for Android 15+ compliance — see `gradle.properties:23-28` for the migration rationale (NDK 25.x's 4 KB-aligned `libc++_shared.so` / `libomp.so` would trip Android 16's 16 KB page-size enforcement).
+**NDK version** — `racNdkVersion=27.3.13750724` (matches `sdk/runanywhere-commons/VERSIONS::NDK_VERSION`, the single source of truth) is the pin for the Kotlin SDK in `sdk/runanywhere-kotlin/gradle.properties`. NDK 27 is the current LTS line (r27d) and provides 16 KB page-alignment required by Android 15+ (NDK 25.x's 4 KB-aligned `libc++_shared.so` / `libomp.so` would trip Android 16's 16 KB page-size enforcement). Flutter/RN Android build files carry their own `?: "..."` fallback literals but the canonical version lives in `VERSIONS`; mirror it whenever bumping.
 
 **Flutter xcframework workaround** — `build-core-xcframework.sh` strips `rac_plugin_entry_whisperkit_coreml.o` from Flutter's copy of the commons archive because Flutter uses `-all_load` which would drag in an unresolvable symbol.
 

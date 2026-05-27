@@ -122,7 +122,7 @@ Build native libs from source first, then publish:
 ```bash
 # 1. Build C++ native libs (all backends, all ABIs)
 cd sdk/runanywhere-commons
-export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.0.12077973"
+export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.3.13750724"
 ./scripts/build-android.sh all arm64-v8a,armeabi-v7a,x86_64
 
 # 2. Distribute libs to each module's jniLibs (self-contained)

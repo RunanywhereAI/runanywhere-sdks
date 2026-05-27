@@ -29,7 +29,7 @@ fun androidNdkHomeForRuntime(): File {
     val ndkVersion =
         rootProject.findProperty("racNdkVersion")?.toString()
             ?: project.findProperty("racNdkVersion")?.toString()
-            ?: "27.0.12077973"
+            ?: "27.3.13750724"
     return file("$androidSdk/ndk/$ndkVersion")
 }
 
