@@ -49,7 +49,7 @@ bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_use
 // `get_http_transport` MUST be followed by exactly one call to
 // `put_http_transport` so the registry can run the adapter's
 // destroy() outside the dispatch window.
-void put_http_transport(void);
+void put_http_transport();
 }  // namespace rac_internal
 
 namespace {

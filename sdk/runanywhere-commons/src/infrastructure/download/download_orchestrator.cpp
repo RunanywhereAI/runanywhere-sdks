@@ -1106,7 +1106,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
         }
     }
     if (!sanity_check_passed) {
-        int64_t failed_bytes = total_expected > 0 ? completed_before_file : completed_before_file;
+        int64_t failed_bytes = total_expected > 0 ? completed_before_file : 0;
         set_task_progress(
             task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING, failed_bytes,
             total_expected, static_cast<int32_t>(task->files.size() - 1),

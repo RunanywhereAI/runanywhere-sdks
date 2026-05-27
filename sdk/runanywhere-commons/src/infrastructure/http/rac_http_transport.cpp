@@ -198,7 +198,7 @@ bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_use
     return true;
 }
 
-void put_http_transport(void) {
+void put_http_transport() {
     auto& stack = in_flight_stack();
     if (stack.empty()) {
         return;
