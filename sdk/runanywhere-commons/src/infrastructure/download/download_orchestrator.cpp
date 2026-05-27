@@ -2783,13 +2783,18 @@ rac_result_t rac_download_orchestrate_multi(
             lk, wait_budget, [&barrier] { return barrier->pending == 0; });
     }
 
-    bool any_failed = barrier->any_required_failed;
+    const bool any_failed = barrier->any_required_failed;
     if (!barrier_completed) {
-        // Wait timed out — treat as a download failure rather than hanging
-        // forever. The detached file worker(s) still own their barrier
-        // reference, so they remain safe to complete (the barrier shared_ptr
-        // outlives this function).
-        any_failed = true;
+        // commons-core-infra-013 (deferred follow-up): surface the bounded
+        // wait timeout as RAC_ERROR_TIMEOUT distinct from the existing
+        // per-file download failure code. The detached file worker(s) still
+        // own their barrier reference so they remain safe to complete after
+        // this function returns (the barrier shared_ptr outlives the call).
+        rac_download_manager_mark_failed(
+            dm_handle, task_id, RAC_ERROR_TIMEOUT,
+            "Multi-file download timed out waiting for per-file workers");
+        *out_task_id = task_id;
+        return RAC_ERROR_TIMEOUT;
     }
 
     if (any_failed) {
