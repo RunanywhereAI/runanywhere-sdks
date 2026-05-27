@@ -272,41 +272,6 @@ final class LLMViewModel {
         await finalizeGeneration(at: messageIndex)
     }
 
-    // Formats the current conversation as a ChatML string for instruction-tuned models
-    // (LFM2, Qwen, and any other model using the im_start/im_end template).
-    // Reads `messages`, which already contains the latest user turn and a trailing
-    // empty assistant placeholder added by prepareMessagesForSending(); the placeholder
-    // is excluded — we close with <|im_start|>assistant to trigger generation.
-    private func buildChatMLPrompt(systemPrompt: String?) -> String {
-        var parts: [String] = []
-        if let system = systemPrompt, !system.isEmpty {
-            parts.append("<|im_start|>system\n\(system)<|im_end|>")
-        }
-        // Drop the trailing empty assistant placeholder.
-        let conversationMessages = messages.dropLast()
-        let isThinkingModel = loadedModelSupportsThinking
-        let thinkingDisablePrefix: String = {
-            guard isThinkingModel else { return "" }
-            return SettingsViewModel.shared.thinkingModeEnabled ? "" : "/no_think\n"
-        }()
-        for (index, msg) in conversationMessages.enumerated() {
-            switch msg.role {
-            case .system:
-                break   // System prompt is included above via the options parameter
-            case .user:
-                let isLast = index == conversationMessages.index(before: conversationMessages.endIndex)
-                let content = isLast ? (thinkingDisablePrefix + msg.content) : msg.content
-                parts.append("<|im_start|>user\n\(content)<|im_end|>")
-            case .assistant:
-                if !msg.content.isEmpty {
-                    parts.append("<|im_start|>assistant\n\(msg.content)<|im_end|>")
-                }
-            }
-        }
-        parts.append("<|im_start|>assistant")
-        return parts.joined(separator: "\n")
-    }
-
     private func performGeneration(
         prompt: String,
         options: RALLMGenerationOptions,
