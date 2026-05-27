@@ -226,18 +226,22 @@ static rac_result_t sherpa_tts_vtable_synthesize_stream(
 }
 
 static rac_result_t sherpa_tts_vtable_stop(void *impl) {
-  // hotspot-engine-sherpa-004: still mark the in-flight cancel flag so any
-  // synthesize() that is currently blocked inside SherpaOnnxOfflineTtsGenerate
-  // will drop its post-generation result instead of emitting it. But the
-  // Sherpa-ONNX C TTS API exposes no preemption hook for VITS/Piper
-  // generation, so we cannot truly stop ongoing compute. Returning
-  // RAC_SUCCESS here would mislead the lifecycle stop ABI
-  // (rac_tts_stop_lifecycle_proto -> TTSServiceState.is_ready=true) and the
-  // Kotlin / Flutter / RN / Swift stream-cancellation paths into believing
-  // synthesis was actually stopped while Piper continues to run. Surface the
-  // capability gap honestly with RAC_ERROR_NOT_SUPPORTED.
+  // engines-sherpa-004: set the in-flight cancel flag so any synthesize() that
+  // is currently blocked inside SherpaOnnxOfflineTtsGenerate will drop its
+  // post-generation result (sherpa_backend.cpp:1423 honors cancel_requested_
+  // after the blocking generator returns). The Sherpa-ONNX C TTS API has no
+  // preemption hook for VITS/Piper, so ongoing compute cannot be truly
+  // killed, but the stop *request* at the ABI level succeeds — the audio
+  // chunk/completion is suppressed via the cancel flag. Returning
+  // RAC_ERROR_NOT_SUPPORTED here made rac_tts_stop_lifecycle_proto report
+  // TTSServiceState.is_ready=false on every stop, leaving Kotlin / Flutter /
+  // RN / Swift lifecycle state stuck after a normal cancel. RAC_SUCCESS is
+  // the correct semantic for "stop accepted; in-flight result will be
+  // dropped". Backends that need to advertise preemption-not-supported as a
+  // capability should do so via vtable capability_check, not by failing every
+  // stop call.
   rac_tts_sherpa_stop(impl);
-  return RAC_ERROR_NOT_SUPPORTED;
+  return RAC_SUCCESS;
 }
 
 static rac_result_t sherpa_tts_vtable_get_info(void *impl,
