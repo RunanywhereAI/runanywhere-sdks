@@ -128,6 +128,30 @@ rac_result_t rac_stt_sherpa_transcribe(rac_handle_t handle,
 
   auto result = h->stt->transcribe(request);
 
+  // engines-sherpa-002: SherpaSTT::transcribe encodes its failure paths as
+  // result.text = "[Error: ...]" sentinels (model-not-loaded, recognizer
+  // build/rebuild failures, language-not-supported, stream creation, etc.).
+  // Returning that string under RAC_SUCCESS would lie to the C-API caller —
+  // SDK consumers expect non-success on transcribe failure and out_result->text
+  // == nullptr. Map the sentinel back to a structured error code here; the
+  // human-readable detail still reaches operators via rac_error_set_details.
+  if (!result.text.empty() && result.text.compare(0, 8, "[Error: ") == 0) {
+    rac_error_set_details(result.text.c_str());
+    out_result->text = nullptr;
+    out_result->detected_language = nullptr;
+    out_result->words = nullptr;
+    out_result->num_words = 0;
+    out_result->confidence = 0.0f;
+    out_result->processing_time_ms = result.inference_time_ms;
+    if (result.text.find("not loaded") != std::string::npos) {
+      return RAC_ERROR_BACKEND_NOT_READY;
+    }
+    if (result.text.find("language not supported") != std::string::npos) {
+      return RAC_ERROR_NOT_SUPPORTED;
+    }
+    return RAC_ERROR_INFERENCE_FAILED;
+  }
+
   out_result->text =
       result.text.empty() ? nullptr : strdup(result.text.c_str());
   if (!result.text.empty() && !out_result->text) {
