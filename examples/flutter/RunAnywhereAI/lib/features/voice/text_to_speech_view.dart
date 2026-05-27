@@ -250,7 +250,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       debugPrint(
           '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
       debugPrint('Speech generation complete');
-      debugPrint('Speech generation complete');
 
       setState(() {
         _isGenerating = false;
