@@ -655,7 +655,15 @@ set(RAC_CORE_SOURCES
     src/core/sdk_state.cpp
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
+    # commons-core-infra-010: model_lifecycle.cpp was split per SRP into
+    # five TUs (proto<->C translation, artifact resolution, auto-download,
+    # per-modality accessors, and the C ABI entry points). All five share
+    # the internal layout declared in `model_lifecycle_internal.h`.
     src/core/model_lifecycle.cpp
+    src/core/model_lifecycle_translation.cpp
+    src/core/model_lifecycle_resolve.cpp
+    src/core/model_lifecycle_download.cpp
+    src/core/model_lifecycle_accessors.cpp
     src/core/rac_error_model.cpp
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
