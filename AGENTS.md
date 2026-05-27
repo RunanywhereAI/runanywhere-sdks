@@ -58,7 +58,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | SDK | Path | Bridge Mechanism | Platforms |
 |-----|------|-----------------|-----------|
 | Swift | `sdk/runanywhere-swift/` | XCFramework + CRACommons module map | iOS 17+, macOS 14+ |
-| Kotlin Multiplatform | `sdk/runanywhere-kotlin/` | JNI (`librunanywhere_jni.so`) | Android (min 24), JVM 17 |
+| Kotlin (Android library) | `sdk/runanywhere-kotlin/` | JNI (`librunanywhere_jni.so`) | Android (min 24) |
 | Flutter | `sdk/runanywhere-flutter/` | Dart FFI (`ffi` package) | iOS, Android |
 | React Native | `sdk/runanywhere-react-native/` | NitroModules (JSI HybridObject) | iOS 15.1+, Android arm64 |
 | Web | `sdk/runanywhere-web/` | Emscripten WASM + TypeScript | Browsers (Chrome, Safari, Firefox) |
@@ -234,18 +234,16 @@ swiftlint
 ```bash
 cd sdk/runanywhere-kotlin/
 
-# Build all (JVM + Android)
+# Build (Android library)
 ./gradlew build
 
 # Individual targets
-./gradlew jvmJar               # JVM JAR
 ./gradlew assembleDebug        # Android Debug AAR
 ./gradlew assembleRelease      # Android Release AAR
 
 # Test
-./gradlew allTests             # All tests
-./gradlew jvmTest              # JVM only
-./gradlew testDebugUnitTest    # Android unit tests only
+./gradlew testDebugUnitTest    # Android unit tests
+./gradlew test                 # All unit tests (debug + release variants)
 
 # Publish to Maven Local
 ./gradlew publishToMavenLocal
@@ -256,7 +254,7 @@ cd sdk/runanywhere-kotlin/
 ./gradlew downloadJniLibs         # Download pre-built .so from GitHub Releases
 ```
 
-Build outputs: `build/libs/RunAnywhereKotlinSDK-jvm-*.jar`, `build/outputs/aar/RunAnywhereKotlinSDK-*.aar`
+Build outputs: `build/outputs/aar/runanywhere-kotlin-{debug,release}.aar` (plus sub-module AARs under `modules/runanywhere-core-{llamacpp,onnx}/build/outputs/aar/`).
 
 Backend modules at `modules/runanywhere-core-llamacpp/` and `modules/runanywhere-core-onnx/`.
 
@@ -450,10 +448,10 @@ Test categories: voice agent parity (`golden_events.txt`), LLM streaming parity 
 ## Key Architectural Decisions
 
 ### iOS SDK is Source of Truth
-When implementing features in any other SDK (especially Kotlin KMP), always check the iOS Swift implementation first. Copy logic exactly, adapting only for language syntax, not business logic.
+When implementing features in any other SDK (especially Kotlin), always check the iOS Swift implementation first. Copy logic exactly, adapting only for language syntax, not business logic.
 
-### All Business Logic in C++ or commonMain
-Platform-specific code should only handle: native library loading, platform adapter registration, audio capture/playback, secure storage, and UI. All AI inference, model management, event routing, and pipeline orchestration live in C++ (`runanywhere-commons`) or Kotlin `commonMain`.
+### All Business Logic in C++ commons (or the SDK shared layer)
+Platform-specific code should only handle: native library loading, platform adapter registration, audio capture/playback, secure storage, and UI. All AI inference, model management, event routing, and pipeline orchestration live in C++ (`runanywhere-commons`) or — when intentionally Kotlin-side — under the Kotlin SDK's shared `src/main/kotlin/com/runanywhere/sdk/` tree.
 
 ### Backend Registration Pattern
 All SDKs follow the same pattern:
@@ -487,39 +485,42 @@ All cross-platform types are defined in `idl/*.proto`. SDKs use typealiases to t
 
 ---
 
-## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
+## Kotlin SDK - Critical Implementation Rules
+
+The Kotlin SDK (`sdk/runanywhere-kotlin/`) ships as an Android library (`alias(libs.plugins.android.library)` in `sdk/runanywhere-kotlin/build.gradle.kts`), not as a Kotlin Multiplatform module. It targets Android only and consumes the C++ commons core through JNI (`librunanywhere_jni.so`). JVM 17 is the toolchain for the Gradle build itself, not a published target.
 
 ### iOS as Source of Truth
-**NEVER make assumptions when implementing KMP code. ALWAYS refer to the iOS implementation as the definitive source of truth.**
+**NEVER make assumptions when implementing the Kotlin SDK. ALWAYS refer to the iOS implementation as the definitive source of truth.**
 
-1. **iOS First**: When encountering missing logic or unclear requirements in KMP, check the corresponding iOS implementation, copy the logic exactly, adapt only for Kotlin syntax.
+1. **iOS First**: When encountering missing logic or unclear requirements in the Kotlin SDK, check the corresponding iOS implementation, copy the logic exactly, adapt only for Kotlin syntax.
 
-2. **commonMain First**: ALL business logic, interfaces, data models, and enums MUST be in `commonMain/`. Platform-specific modules (`androidMain`, `jvmMain`) only contain platform service implementations.
+2. **Public API symmetry**: The Kotlin SDK mirrors the Swift `RunAnywhere` surface as an `object RunAnywhere` singleton with extension functions one-per-feature in `src/main/kotlin/com/runanywhere/sdk/public/extensions/`. Add new public API only after the Swift facade has landed.
 
-3. **Platform Naming Convention**: Platform-specific implementations MUST use prefixes: `AndroidTTSService.kt`, `JvmTTSService.kt`, `IosTTSService.kt`.
+3. **Platform naming convention**: Android-only adapters keep an explicit `Android` prefix (e.g. `AndroidTTSService.kt`) so file naming makes the target unambiguous if a JVM-only or KMP variant is ever reintroduced.
 
-### KMP Source Set Hierarchy
+### Source Set Layout
 
 ```
-commonMain           (~80 hand-written .kt + ~190 Wire-generated proto files)
-    └── jvmAndroidMain    (~62 files — JNI bridge, CppBridge*, OkHttp)
-            ├── androidMain   (~19 files — AudioRecord, EncryptedSharedPreferences)
-            └── jvmMain       (~16 files — javax.sound, file-based crypto)
+sdk/runanywhere-kotlin/
+    src/main/kotlin/        (all Kotlin sources — public API, JNI bridges, generated Wire proto types)
+    src/main/jniLibs/       (prebuilt .so files staged by build-core-android.sh)
+    src/test/kotlin/        (unit tests — no JNI required)
+    modules/runanywhere-core-{llamacpp,onnx}/  (Android library sub-modules that register C++ backends)
 ```
 
-Manually configured (no `applyDefaultHierarchyTemplate`). Use `expect/actual` only for truly platform-specific code.
+Standard Android library layout. There is no `commonMain`/`jvmAndroidMain`/`androidMain`/`jvmMain` hierarchy at this level (the SDK was migrated away from KMP). Any `expect`/`actual` pairs you see in legacy documentation describe the previous topology; the current build is single-target Android. Reviewer-area names like `A-kotlin-common-domain` in `test_workflows/.../SCOPE_MANIFEST.json` are kept for historical filtering and do not imply KMP source sets exist today.
 
 ### Cross-SDK Alignment
 
-| Concern | iOS Swift | Kotlin KMP | Flutter | React Native | Web |
-|---------|-----------|-----------|---------|-------------|-----|
+| Concern | iOS Swift | Kotlin (Android) | Flutter | React Native | Web |
+|---------|-----------|------------------|---------|-------------|-----|
 | Entry point | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhere` (abstract final class with static members) | `RunAnywhere` object | `RunAnywhere` object |
 | Two-phase init | `initialize()` + `completeServicesInitialization()` | Same | Same | Same | Same |
 | Bridge layer | `CppBridge` enum + extensions | `CppBridge` object + extensions | `DartBridge` + `DartBridge*.dart` | `HybridRunAnywhereCore` (Nitro) | `LlamaCppBridge` + `SherpaONNXBridge` |
 | Streaming | `AsyncStream` | `Flow` | `Stream` (via `StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |
 | Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (custom pub/sub via dart:async broadcast StreamController) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
 | Error type | `SDKException` (proto-backed) | `SDKException` (proto-backed) | `SDKException` | `SDKException` | `SDKException` |
-| Secure storage | Keychain | EncryptedSharedPrefs (Android), AES files (JVM) | flutter_secure_storage + cache | Keychain (iOS), EncryptedSharedPrefs (Android) | localStorage |
+| Secure storage | Keychain | EncryptedSharedPrefs | flutter_secure_storage + cache | Keychain (iOS), EncryptedSharedPrefs (Android) | localStorage |
 | HTTP transport | URLSession | OkHttp | OkHttp (Android), URLSession (iOS) | OkHttp (Android), URLSession (iOS) | emscripten_fetch / fetch() |
 
 ---
@@ -575,7 +576,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 
 | Component | Build | Test | Lint | Notes |
 |-----------|-------|------|------|-------|
-| Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | JVM target has a known issue: `RAGBridge.kt` in `jvmAndroidMain` imports `@Keep` from `androidx.annotation` which is unavailable for JVM compilation |
+| Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
 | Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |

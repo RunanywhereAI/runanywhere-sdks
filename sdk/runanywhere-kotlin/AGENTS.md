@@ -5,18 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Development Commands
 
 ```bash
-# Build all platforms (JVM + Android)
+# Build (Android library)
 ./gradlew build
 
-# Individual platform builds
-./gradlew jvmJar                    # JVM JAR only
+# Individual builds
 ./gradlew assembleDebug             # Android Debug AAR
 ./gradlew assembleRelease           # Android Release AAR
 
 # Tests
-./gradlew allTests                  # All tests (JVM + Android)
-./gradlew jvmTest                   # JVM tests only
-./gradlew testDebugUnitTest         # Android unit tests only
+./gradlew test                      # All unit tests (debug + release variants)
+./gradlew testDebugUnitTest         # Android Debug unit tests only
 
 # Code quality
 ./gradlew detekt                    # Static analysis (maxIssues: 0, warningsAsErrors)
@@ -37,8 +35,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 **Build outputs:**
-- JVM JAR: `build/libs/RunAnywhereKotlinSDK-jvm-*.jar`
-- Android AAR: `build/outputs/aar/RunAnywhereKotlinSDK-{debug,release}.aar`
+- Android AAR: `build/outputs/aar/runanywhere-kotlin-{debug,release}.aar`
+- Sub-module AARs: `modules/runanywhere-core-{llamacpp,onnx}/build/outputs/aar/*.aar`
 
 **Native lib sourcing** is controlled by `gradle.properties`:
 - `runanywhere.useLocalNatives=true` → runs `build-core-android.sh` to compile C++ from source
@@ -48,26 +46,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Core Pattern: Kotlin Wrapper over C++ Core
 
-All AI inference (LLM, STT, TTS, VAD, VLM, RAG, diffusion) runs in a shared C++ library (`librac_commons.so` + `librunanywhere_jni.so`). The Kotlin SDK is a typed wrapper that provides:
-- Platform-agnostic public API via `expect`/`actual`
+The Kotlin SDK builds as an Android library (`alias(libs.plugins.android.library)` in `build.gradle.kts`), not as a Kotlin Multiplatform module. All AI inference (LLM, STT, TTS, VAD, VLM, RAG, diffusion) runs in a shared C++ library (`librac_commons.so` + `librunanywhere_jni.so`). The Kotlin SDK is a typed wrapper that provides:
+- Public API surface (`object RunAnywhere` + extension functions, mirrors Swift `enum RunAnywhere`)
 - JNI bridge to the C++ `rac_*` function API
 - Kotlin coroutines/Flow integration for async and streaming
 - Wire protobuf types as the canonical data model
 
-### Source Set Hierarchy
+### Source Set Layout
 
 ```
-commonMain          (public API, types, interfaces, proto extensions — NO inference logic)
-    │
-    └── jvmAndroidMain    (JNI bridge, CppBridge, OkHttp transport, Sentry — shared JVM+Android)
-            ├── androidMain    (Android platform actuals: AudioRecord, EncryptedSharedPreferences, Build.*)
-            └── jvmMain        (JVM desktop actuals: javax.sound, File-based encryption, System.getProperty)
+sdk/runanywhere-kotlin/
+    src/main/kotlin/        (all Kotlin sources — public API, JNI bridges, ~190 Wire-generated proto classes)
+    src/main/jniLibs/       (prebuilt .so files staged by build-core-android.sh)
+    src/test/kotlin/        (unit tests — no JNI required)
+    modules/
+        runanywhere-core-llamacpp/  (Android library sub-module; registers llama.cpp backend, bundles librac_backend_llamacpp_jni.so)
+        runanywhere-core-onnx/      (Android library sub-module; registers ONNX/Sherpa backend, bundles librac_backend_onnx_jni.so)
 ```
 
-- **`commonMain`** (~174 files): All business logic, public API surface, type definitions, proto extensions. Contains zero inference code — everything delegates to `expect` functions.
-- **`jvmAndroidMain`** (~62 files): The JNI bridge layer. Contains `RunAnywhereBridge.kt` (~1,650 lines of `external fun` JNI declarations), `CppBridge.kt` (two-phase init coordinator), 22+ `CppBridge*` extension objects, OkHttp HTTP transport, Sentry logging, and all `actual` implementations for feature extension functions.
-- **`androidMain`** (~19 files): Android-only `actual` implementations using Android APIs.
-- **`jvmMain`** (~16 files): JVM desktop `actual` implementations using `java.io`, `javax.sound`, `java.util.prefs`.
+Standard single-target Android library — there is no `commonMain`/`jvmAndroidMain`/`androidMain`/`jvmMain` hierarchy. Subdirectories named `JNI` or `bridge` under `src/main/kotlin/com/runanywhere/sdk/` mirror the iOS bridge layout but compile as a single Android target. Platform-specific suffixes like `AndroidTTSService.kt` are kept by convention so future re-introduction of a JVM or KMP variant remains low-friction.
 
 ### Two-Phase Initialization
 
@@ -93,16 +90,16 @@ Kotlin code (RunAnywhere extensions)
             → librac_commons.so C functions (rac_llm_*, rac_stt_*, etc.)
 ```
 
-Key files in this chain:
-- `jvmAndroidMain/.../native/bridge/RunAnywhereBridge.kt` — all JNI `external fun` declarations
-- `jvmAndroidMain/.../foundation/bridge/CppBridge.kt` — initialization orchestrator
-- `jvmAndroidMain/.../foundation/bridge/extensions/CppBridge*.kt` — per-domain bridge wrappers (Auth, LLM, STT, TTS, VAD, VLM, Download, Device, Telemetry, etc.)
-- `jvmAndroidMain/.../foundation/http/OkHttpTransport.kt` — HTTP transport registered into C++ vtable
-- `jvmAndroidMain/.../public/PlatformBridge.kt` — `actual` for the three core `expect` functions from RunAnywhere.kt
+Key files in this chain (all under `src/main/kotlin/com/runanywhere/sdk/`):
+- `native/bridge/RunAnywhereBridge.kt` — all JNI `external fun` declarations
+- `foundation/bridge/CppBridge.kt` — initialization orchestrator
+- `foundation/bridge/extensions/CppBridge*.kt` — per-domain bridge wrappers (Auth, LLM, STT, TTS, VAD, VLM, Download, Device, Telemetry, etc.)
+- `foundation/http/OkHttpTransport.kt` — HTTP transport registered into C++ vtable
+- `public/PlatformBridge.kt` — Android platform implementation for the three core platform functions used by `RunAnywhere.kt`
 
 ### Public API Surface
 
-The entry point is `RunAnywhere` (a Kotlin `object` singleton in `commonMain/public/RunAnywhere.kt`). All feature APIs are `expect` extension functions on `RunAnywhere`, organized one-per-file in `commonMain/public/extensions/`:
+The entry point is `RunAnywhere` (a Kotlin `object` singleton in `src/main/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt`). All feature APIs are extension functions on `RunAnywhere`, organized one-per-file under `src/main/kotlin/com/runanywhere/sdk/public/extensions/`:
 
 | File | Capability |
 |------|-----------|
@@ -126,7 +123,7 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `commonMain/pub
 
 ### Type System
 
-**Wire protobuf types are the canonical data model.** Generated bindings live in `commonMain/generated/ai/runanywhere/proto/v1/` (~190 files). The SDK uses these directly or via typealiases:
+**Wire protobuf types are the canonical data model.** Generated bindings live in `src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/` (~190 files). The SDK uses these directly or via typealiases:
 
 ```kotlin
 typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
@@ -135,7 +132,7 @@ typealias AudioFormat = ai.runanywhere.proto.v1.AudioFormat
 
 Consumers construct the Wire-generated types directly (for example `VLMImage(raw_rgb = bytes.toByteString(), width = w, height = h, format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB)`). There is no `foundation/protoext/` package — previous ergonomic wrappers were removed in KOT-DEAD-PROTOEXT after they were found to have zero active consumers.
 
-Hand-rolled Kotlin types exist in `commonMain/public/extensions/` for public API ergonomics: `LLMTypes.kt`, `ToolCallingTypes.kt`, `ModelTypes.kt`, `VoiceAgentTypes.kt`, `VLMStreamingResult.kt`.
+Hand-rolled Kotlin types exist in `src/main/kotlin/com/runanywhere/sdk/public/extensions/` for public API ergonomics: `LLMTypes.kt`, `ToolCallingTypes.kt`, `ModelTypes.kt`, `VoiceAgentTypes.kt`, `VLMStreamingResult.kt`.
 
 ### Error Handling
 
@@ -167,20 +164,19 @@ Two optional backend modules in `modules/`:
 - **`runanywhere-core-llamacpp`** — LLM backend. Single file (`LlamaCPP.kt`) calling `rac_backend_llamacpp_register()`. Bundles `librac_backend_llamacpp_jni.so`.
 - **`runanywhere-core-onnx`** — STT/TTS/VAD backend. Single file (`ONNX.kt`) calling `rac_backend_onnx_register()`. Bundles sherpa-onnx and ONNX Runtime `.so` files.
 
-Both follow the same pattern: thin KMP wrappers that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
+Both follow the same pattern: thin Android-library sub-modules that register a C++ backend with the core's plugin system. They depend on the root SDK via `api()`.
 
 ### Streaming Adapters
 
-`LLMStreamAdapter` and `VoiceAgentStreamAdapter` (`jvmAndroidMain/adapters/`) solve the single-callback-slot problem: C++ only supports one callback per handle, but Kotlin needs multiple concurrent `Flow` collectors. They use `SharedFlow` fan-out with `ConcurrentHashMap<(handle, bridge), FanOut>`.
+`LLMStreamAdapter` and `VoiceAgentStreamAdapter` (`src/main/kotlin/com/runanywhere/sdk/adapters/`) solve the single-callback-slot problem: C++ only supports one callback per handle, but Kotlin needs multiple concurrent `Flow` collectors. They use `SharedFlow` fan-out with `ConcurrentHashMap<(handle, bridge), FanOut>`.
 
 ## Key Conventions
 
-- **iOS is the source of truth.** When implementing or fixing KMP features, check the corresponding iOS Swift SDK implementation first. Translate logic exactly; adapt only syntax.
-- **All business logic in `commonMain`.** Platform source sets only contain `actual` implementations of `expect` declarations.
-- **Platform file naming:** `AndroidTTSService.kt`, `JvmTTSService.kt` — always prefix with platform name.
+- **iOS is the source of truth.** When implementing or fixing Kotlin SDK features, check the corresponding iOS Swift SDK implementation first. Translate logic exactly; adapt only syntax.
+- **All business logic in `src/main/kotlin/com/runanywhere/sdk/`.** Keep the public API surface under `public/` and JNI bridges under `foundation/bridge/`; do not push business logic into the Android `Activity`/`Service` layer or into example apps.
+- **Platform file naming:** `AndroidTTSService.kt` — keep the `Android` prefix on platform-bound services so future JVM/desktop or KMP reintroductions stay low-friction.
 - **Proto types over hand-rolled types.** Use Wire-generated types from `generated/` as the canonical representation; construct them directly with named arguments. Do not re-introduce a `foundation/protoext/` wrapper package.
 - **Structured types, never raw strings.** Use enums, sealed classes, and data classes for all configuration and return values.
-- **`expect`/`actual` for platform divergence only.** The `jvmAndroidMain` shared source set handles 90% of platform code; `androidMain` and `jvmMain` only differ where Android/JVM APIs genuinely diverge.
 - **VLM on Android routes through core JNI, not llamacpp-JNI.** The dedicated `librac_backend_llamacpp_jni.so` bridge only exposes LLM primitives (`nativeCreate`, `nativeGenerate`, `nativeCancel`) plus the two registration shims. Kotlin VLM callers invoke the commons `rac_vlm_component_*` proto APIs via `librunanywhere_jni.so` (same path iOS uses via `CppBridgeVLM`). Do not add `nativeCreateVLM` / `nativeProcessVLM` entry points to the llamacpp JNI — the VLM plugin registers its vtable, and `rac_plugin_route` dispatches from core.
 
 ## Build System Details
@@ -189,7 +185,7 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 
 **Version catalog:** Shared at `../../gradle/libs.versions.toml` (monorepo-level, used by all SDKs).
 
-**KMP hierarchy:** Manual (`kotlin.mpp.applyDefaultHierarchyTemplate=false`). The `jvmAndroidMain` intermediate source set is configured explicitly with `dependsOn(commonMain)`, and both `jvmMain`/`androidMain` depend on it.
+**Source layout:** Single-target Android library — `src/main/kotlin/` and `src/test/kotlin/` only. No KMP source-set hierarchy. Backend sub-modules (`modules/runanywhere-core-llamacpp/`, `modules/runanywhere-core-onnx/`) follow the same Android-library plugin layout.
 
 **Wire codegen:** The Wire Gradle plugin is defined in the catalog but NOT applied (Kotlin DSL clash). Generated proto files are committed to git. Regenerate via `idl/codegen/generate_kotlin.sh`. A CI workflow (`idl-drift-check.yml`) enforces freshness.
 
@@ -199,12 +195,7 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 
 ## Testing
 
-Tests live in two source sets:
-
-- `src/test/` — Kotlin-layer surface tests (generated proto adapters, extension surfaces) that run on any target. No JNI required.
-- `src/jvmTest/` — JVM-only tests that exercise code which only exists in `jvmAndroidMain`.
-
-Notable test: `VoiceAgentStreamAdapterFanOutTest` (`src/jvmTest/`) verifies `SharedFlow` fan-out for concurrent collectors on `VoiceAgentStreamAdapter`.
+Tests live under `src/test/kotlin/` (Android library test source set). They cover Kotlin-layer surface tests (generated proto adapters, extension surfaces, stream adapter fan-out) and do not require JNI.
 
 There is no shared cross-SDK streaming parity harness wired into this module today. A prior revision of this file referenced an external `../../tests/streaming/` srcDir mount and `PerfBenchTest` / `CancelParityTest` / `ChecksumPlumbingTest` classes — none of those paths or files exist. The only streaming-parity coverage anywhere in the repo is Flutter's self-contained `sdk/runanywhere-flutter/packages/runanywhere/test/parity_test.dart` (and its sibling `cancel_parity_test.dart`), which builds its own fixtures in-package and does not drive other SDKs. See backlog row `BUG-STREAMING-HARNESS-NEW` if the shared harness is re-prioritized.
 
@@ -213,6 +204,6 @@ Most tests can run without JNI loaded (they test Kotlin-layer logic). Tests requ
 ## CI/CD
 
 - **`pr-build.yml`** — Triggered on PRs to `main` and pushes to `main`/`feat/v2-architecture`. Builds C++ from source, then runs `./gradlew assembleDebug`.
-- **`release.yml`** — Triggered by `v*.*.*` tags. Matrix-builds native libs for 4 ABIs, stages into `jniLibs/`, runs `assembleRelease jvmJar`, uploads artifacts with SHA256 checksums.
+- **`release.yml`** — Triggered by `v*.*.*` tags. Matrix-builds native libs for 4 ABIs, stages into `src/main/jniLibs/`, runs `assembleRelease`, uploads artifacts with SHA256 checksums.
 - **`idl-drift-check.yml`** — Monitors `generated/` directory. Regenerates proto bindings and fails on any `git diff`.
 - **`scripts/package-sdk.sh`** — CI packaging script. Accepts `--natives-from PATH` for pre-staged `.so` files, builds all targets, outputs to `dist/sdk-kotlin/` with checksums.
