@@ -33,6 +33,7 @@ import AppKit
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
+    @StateObject private var modelManager = ModelManager.shared
     #if os(iOS)
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
@@ -46,6 +47,7 @@ struct RunAnywhereAIApp: App {
             Group {
                 if isSDKInitialized {
                     ContentView()
+                        .environmentObject(modelManager)
                         #if os(iOS)
                         .environmentObject(flowSession)
                         .onOpenURL { url in
