@@ -102,6 +102,21 @@ bool SherpaSTT::load_model(const std::string &model_path,
     sherpa_recognizer_ = nullptr;
   }
 
+  // engines-sherpa-001: the per-language LRU cache populated by transcribe()
+  // belongs to the *previous* model. Without this teardown a swap from model A
+  // to model B would leave A's recognizers parked in recognizer_cache_, and a
+  // subsequent transcribe() with the cached language would silently reuse the
+  // wrong-model recognizer (and leak A's ONNX-runtime sessions). Mirror the
+  // unload_model() teardown so the cache is always coherent with the loaded
+  // model.
+  for (auto &entry : recognizer_cache_) {
+    if (entry.second) {
+      SherpaOnnxDestroyOfflineRecognizer(entry.second);
+    }
+  }
+  recognizer_cache_.clear();
+  recognizer_lru_.clear();
+
   model_type_ = model_type;
   model_dir_ = model_path;
 
