@@ -211,7 +211,7 @@ rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle,
 
 rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
                                        const float *audio_samples,
-                                       size_t num_samples) {
+                                       size_t num_samples, int sample_rate) {
   if (handle == nullptr || stream == nullptr || audio_samples == nullptr) {
     return RAC_ERROR_NULL_POINTER;
   }
@@ -219,8 +219,15 @@ rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
   auto *h = static_cast<rac_sherpa_stt_handle_impl *>(handle);
   auto *stream_id = static_cast<char *>(stream);
 
+  // engines-sherpa-003: thread the caller's sample rate through to the
+  // backend instead of hard-coding 16000. The previous fixed rate forced
+  // every non-16k capture (e.g. 48k AVAudioEngine, 44.1k MediaRecorder) to
+  // be silently re-interpreted at 16k, producing tempo-distorted feature
+  // frames. A non-positive rate falls back to 16k to preserve the historic
+  // default for callers that have not been updated yet.
+  const int effective_rate = sample_rate > 0 ? sample_rate : 16000;
   std::vector<float> samples(audio_samples, audio_samples + num_samples);
-  bool success = h->stt->feed_audio(stream_id, samples, 16000);
+  bool success = h->stt->feed_audio(stream_id, samples, effective_rate);
 
   return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
 }

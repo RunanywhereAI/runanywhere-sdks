@@ -83,8 +83,6 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(
     void *impl, const void *audio_data, size_t audio_size,
     const rac_stt_options_t *options, rac_stt_stream_callback_t callback,
     void *user_data) {
-  (void)options;
-
   rac_handle_t stream = nullptr;
   rac_result_t result = rac_stt_sherpa_create_stream(impl, &stream);
   if (result != RAC_SUCCESS) {
@@ -94,8 +92,13 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(
   std::vector<float> float_samples =
       convert_int16_to_float32(audio_data, audio_size);
 
+  // engines-sherpa-003: forward the caller's sample rate from options so
+  // 48k/44.1k captures are not silently re-interpreted as 16k inside the
+  // backend feature frontend.
+  const int sample_rate =
+      (options && options->sample_rate > 0) ? options->sample_rate : 16000;
   result = rac_stt_sherpa_feed_audio(impl, stream, float_samples.data(),
-                                     float_samples.size());
+                                     float_samples.size(), sample_rate);
   if (result != RAC_SUCCESS) {
     rac_stt_sherpa_destroy_stream(impl, stream);
     return result;

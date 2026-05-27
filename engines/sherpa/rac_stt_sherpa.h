@@ -29,7 +29,7 @@ rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle,
                                           rac_handle_t *out_stream);
 rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
                                        const float *audio_samples,
-                                       size_t num_samples);
+                                       size_t num_samples, int sample_rate);
 rac_bool_t rac_stt_sherpa_stream_is_ready(rac_handle_t handle,
                                           rac_handle_t stream);
 rac_result_t rac_stt_sherpa_decode_stream(rac_handle_t handle,

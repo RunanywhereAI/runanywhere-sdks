@@ -443,7 +443,7 @@ static TestResult test_streaming_workflow() {
     std::vector<float> silence = generate_silence(total_samples);
 
     for (size_t offset = 0; offset + chunk_size <= total_samples; offset += chunk_size) {
-        rc = rac_stt_sherpa_feed_audio(handle, stream, silence.data() + offset, chunk_size);
+        rc = rac_stt_sherpa_feed_audio(handle, stream, silence.data() + offset, chunk_size, 16000);
         if (rc != RAC_SUCCESS) {
             result.passed = false;
             result.details =
