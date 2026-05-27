@@ -1858,6 +1858,11 @@ class RacBindings {
         rac_voice_agent_proto_quiesce = _lookupOptional<RacProtoQuiesceDart>(
           () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
               'rac_voice_agent_proto_quiesce'),
+        ),
+        rac_tool_calling_session_proto_quiesce =
+            _lookupOptional<RacProtoQuiesceDart>(
+          () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
+              'rac_tool_calling_session_proto_quiesce'),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -2221,6 +2226,11 @@ class RacBindings {
 
   /// `rac_voice_agent_proto_quiesce` — spin-wait voice-agent dispatches.
   final RacProtoQuiesceDart? rac_voice_agent_proto_quiesce;
+
+  /// `rac_tool_calling_session_proto_quiesce` — spin-wait tool-calling session
+  /// dispatches. Null when the loaded commons binary predates the export
+  /// (commit `9f7030fa2` `[FIXLOOP iter1 CLUSTER-03/commons-features-llm-rag-003]`).
+  final RacProtoQuiesceDart? rac_tool_calling_session_proto_quiesce;
 }
 
 /// Entry point for the typed commons FFI bindings.

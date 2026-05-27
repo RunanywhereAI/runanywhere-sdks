@@ -264,6 +264,17 @@ class ToolCallingSessionHandle {
     if (_closed) return;
     _closed = true;
     DartBridgeToolCalling.shared.destroySession(sessionHandle);
+    // CONSOLIDATE-D ordering: (1) destroy the session above so commons stops
+    // accepting new dispatches into this NativeCallable, (2) quiesce so the
+    // dispatcher returns from any in-flight callback whose `user_data` slot
+    // was snapshotted under the commons mutex before the destroy landed
+    // (see `rac_tool_calling.h:642` + `tool_calling_session.cpp:841`),
+    // (3) close the NativeCallable backing that `user_data`. Skipping the
+    // quiesce step lets the dispatcher invoke the trampoline after Dart frees
+    // the user_data pointer (UAF). Mirrors the same ordering used by every
+    // other Flutter stream wrapper (LLM/STT/TTS/VLM/voice-agent) and Swift's
+    // `HandleStreamAdapter.tearDown()`.
+    RacNative.bindings.rac_tool_calling_session_proto_quiesce?.call();
     _nativeCb.close();
     await _events.close();
   }
