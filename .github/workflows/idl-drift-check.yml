@@ -124,13 +124,19 @@ jobs:
           sdk: stable
 
       - name: Install Dart plugin (protoc-gen-dart)
+        # Pinned to PROTOC_GEN_DART_VERSION in sdk/runanywhere-commons/VERSIONS
+        # (single source of truth for IDL codegen toolchain). Bump there first
+        # — this workflow mirrors that pin.
         run: |
-          dart pub global activate protoc_plugin 21.1.2
+          dart pub global activate protoc_plugin 25.0.0
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
+        # Pinned to TS_PROTO_VERSION in sdk/runanywhere-commons/VERSIONS
+        # (single source of truth). Major-bumped to 2.x; generated TS still
+        # parses under tsc 5.9 strict.
         run: |
-          npm install -g ts-proto@1.181.1 protobufjs
+          npm install -g ts-proto@2.11.8 protobufjs
 
       - name: Install Python protobuf + pyyaml runtime
         # idl/codegen/generate_*_convenience.py drivers import
