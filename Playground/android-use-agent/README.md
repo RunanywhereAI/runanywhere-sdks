@@ -210,12 +210,7 @@ All UI actions are registered as tools that the LLM can invoke:
 - Android 8.0+ (API 26)
 - arm64-v8a device (on-device LLM inference requires 64-bit ARM)
 - Accessibility service permission (for screen reading and gesture execution)
-- JDK 17 (for the Gradle build)
 - (Optional) OpenAI API key for GPT-4o cloud fallback
-
-### Build toolchain (Playground exemption)
-
-This demo is a **Playground** project (see [`AGENTS.md` §Playground](../../AGENTS.md)) and is intentionally **not** wired into the workspace's Melos / Gradle composite build. It consumes the RunAnywhere SDK as a published JitPack artifact (`io.github.sanchitmonga22:runanywhere-sdk-android:0.20.6`) rather than the in-tree `sdk/runanywhere-kotlin` module, so its AGP and Kotlin versions are pinned to whatever was current when that SDK release shipped (AGP 8.13.2 / Kotlin 2.2.0) rather than the workspace-wide pin used by `sdk/runanywhere-kotlin` and `examples/android/RunAnywhereAI` (AGP 9.2.1 / Kotlin 2.2.20+). The Gradle wrapper itself (9.4.1) matches the workspace pin so `./gradlew help` works under the standard JDK 17 toolchain.
 
 ## Setup
 

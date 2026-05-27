@@ -11,7 +11,7 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@mlc-ai/web-llm": "^0.2.78",
-    "react": "19.0.0",
+    "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
@@ -20,7 +20,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.9.3",
+    "typescript": "^5.6.3",
     "vite": "^5.4.11"
   }
 }
