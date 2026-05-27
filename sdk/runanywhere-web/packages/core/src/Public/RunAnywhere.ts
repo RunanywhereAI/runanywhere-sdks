@@ -439,37 +439,6 @@ async function resolveHydratedModelPath(
   return { exists, localPath: exists ? opfsPath : modelDir };
 }
 
-async function fetchFileBytes(
-  url: string,
-  onProgress?: (loaded: number) => void,
-): Promise<Uint8Array> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`fetch(${url}) returned HTTP ${response.status}`);
-  }
-  const reader = response.body?.getReader();
-  if (!reader) {
-    const buf = new Uint8Array(await response.arrayBuffer());
-    onProgress?.(buf.byteLength);
-    return buf;
-  }
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      received += value.byteLength;
-      onProgress?.(received);
-    }
-  }
-  const out = new Uint8Array(received);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-  return out;
-}
-
 /**
  * Mirror a completed download into the user-visible model registry so
  * `getModel()` / `downloadedModels()` reflect on-disk state immediately.
@@ -534,107 +503,18 @@ async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
   }
 }
 
-async function downloadMultiFileModel(
-  request: DownloadModelOptions,
-  model: ModelInfo,
-  onProgress?: (progress: DownloadProgress) => void,
-): Promise<DownloadProgress> {
-  const files = model.multiFile?.files ?? [];
-  const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
-  if (!frameworkDir) {
-    throw new Error(`Multi-file download: unsupported framework ${model.framework}`);
-  }
-
-  const folderSegments = ['RunAnywhere', 'Models', frameworkDir, request.modelId];
-  const opfsFolder = `/opfs/${folderSegments.join('/')}`;
-  const totalBytes = files.reduce((s, f) => s + (f.sizeBytes || 0), 0);
-  let downloadedBytes = 0;
-
-  const allModules = getAllRegisteredModules();
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (!file.url || !file.filename) continue;
-
-    const bytes = await fetchFileBytes(file.url, (loaded) => {
-      const overall = totalBytes > 0 ? (downloadedBytes + loaded) / totalBytes : 0;
-      onProgress?.({
-        modelId: request.modelId,
-        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
-        overallProgress: Math.min(1, overall),
-        bytesDownloaded: downloadedBytes + loaded,
-        totalBytes,
-        stageProgress: overall,
-        overallSpeedBps: 0,
-        etaSeconds: -1,
-        retryAttempt: 0,
-        errorMessage: '',
-        taskId: '',
-        stage: i,
-        currentFileIndex: i,
-        totalFiles: files.length,
-        storageKey: '',
-        localPath: '',
-        startedAtUnixMs: 0,
-        updatedAtUnixMs: Date.now(),
-        currentFileName: file.filename,
-        resumeToken: '',
-      });
-    });
-
-    downloadedBytes += bytes.byteLength;
-
-    // Persist to OPFS
-    await OPFSBridge.writeFileToOPFS([...folderSegments, file.filename], bytes);
-
-    // Mirror into every backend MEMFS so immediate loadModel works
-    const filePath = `${opfsFolder}/${file.filename}`;
-    if (allModules.length > 0) {
-      await OPFSBridge.restoreToMemfsAll(allModules, filePath);
-      if (OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, filePath) === 0) {
-        throw SDKException.fromCode(
-          SDKErrorCode.StorageError,
-          `Multi-file persist failed: '${filePath}' has 0 bytes in MEMFS`,
-          'downloadModel',
-        );
-      }
-    }
-  }
-
-  // Mirror folder path into every WASM module's registry (WEB-001).
-  try {
-    mirrorDownloadCompletionToRegistry(model, opfsFolder);
-  } catch (err) {
-    logger.warning(
-      `Multi-file registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-
-  const completed: DownloadProgress = {
-    modelId: request.modelId,
-    state: DownloadState.DOWNLOAD_STATE_COMPLETED,
-    overallProgress: 1,
-    bytesDownloaded: downloadedBytes,
-    totalBytes,
-    stageProgress: 1,
-    overallSpeedBps: 0,
-    etaSeconds: 0,
-    retryAttempt: 0,
-    errorMessage: '',
-    taskId: '',
-    stage: 0,
-    currentFileIndex: files.length,
-    totalFiles: files.length,
-    storageKey: '',
-    localPath: opfsFolder,
-    startedAtUnixMs: 0,
-    updatedAtUnixMs: Date.now(),
-    currentFileName: '',
-    resumeToken: '',
-  };
-  onProgress?.(completed);
-  return completed;
-}
+// commons-core-infra (web-core-005 DEMOTE): the previous in-TS multi-file
+// orchestrator that walked `model.multiFile.files`, fetched each URL,
+// wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
+// download orchestrator already drives the same flow via
+// `rac_download_plan_proto` / `rac_download_start_proto` /
+// `rac_download_progress_poll_proto` (the multi_file_plan branch in
+// `download_orchestrator.cpp` writes the folder path back as
+// `completion_local_path`), and the post-download
+// `OPFSBridge.ensureDownloadPersisted` already detects directory artifacts
+// and flushes them recursively into OPFS via `flushDirectoryFromMemfs`.
+// Multi-file models now share the single canonical download codepath as
+// every other framework SDK; nothing Web-specific belongs in the TS layer.
 
 // ---------------------------------------------------------------------------
 // RunAnywhere Public API
@@ -1171,14 +1051,13 @@ export const RunAnywhere = {
       );
     }
 
-    // Multi-file models (VLM = primary GGUF + mmproj sidecar, embeddings =
-    // model.onnx + vocab.txt) cannot use the C++ download orchestrator on
-    // Web because that path writes to MEMFS and reports the folder as
-    // `localPath`; OPFSBridge.flushFromMemfs treats that as a single file
-    // and silently no-ops. Use the browser-side fetch path instead.
-    if ((model.multiFile?.files?.length ?? 0) > 1) {
-      return downloadMultiFileModel(request, model, request.onProgress);
-    }
+    // web-core-005 DEMOTE: multi-file models (VLM = primary GGUF + mmproj
+    // sidecar, embeddings = model.onnx + vocab.txt) now flow through the
+    // same canonical plan/start/poll path. The C++ orchestrator's
+    // multi_file_plan branch reports the folder path as
+    // `completion_local_path`, and `OPFSBridge.ensureDownloadPersisted`
+    // recursively flushes the directory contents to OPFS + mirrors them
+    // into every module's MEMFS. No Web-specific orchestrator below.
 
     await prepareModelLoad({
       request: {
