@@ -26,6 +26,11 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.swift_version = '5.0'
 
   # Source files: Swift plugin entry point + URLSession HTTP transport.
+  # The URLSession ObjC++ wrapper at Classes/URLSessionHttpTransport.mm
+  # `#include`s the canonical implementation at
+  # sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
+  # (shared with React Native) via a path RELATIVE to the .mm file on disk,
+  # so no additional HEADER_SEARCH_PATHS entry is needed.
   s.source_files = 'Classes/**/*'
 
   s.dependency 'Flutter'
@@ -36,8 +41,14 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
 
   # Keep the xcframework next to the installed pod so downstream toolchains
-  # can resolve headers.
-  s.preserve_paths = ['Frameworks/**/*']
+  # can resolve headers. The canonical shared URLSessionHttpTransportImpl.inc.mm
+  # is referenced here to document the cross-pod dependency (the actual file
+  # is reached through a source-relative `#include`, no HEADER_SEARCH_PATHS
+  # entry required).
+  s.preserve_paths = [
+    'Frameworks/**/*',
+    '../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm',
+  ]
 
   # Required frameworks
   s.frameworks = [

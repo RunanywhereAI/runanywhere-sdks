@@ -25,6 +25,13 @@ Pod::Spec.new do |s|
   ]
 
   # Source files
+  # flutter-core-012: ios/URLSessionHttpTransport.mm is now a thin wrapper
+  # that `#include`s the canonical implementation at
+  # ../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
+  # (shared with the Flutter plugin) via a path RELATIVE to the .mm file on
+  # disk, so no additional HEADER_SEARCH_PATHS entry is needed. The .inc.mm
+  # itself is NOT compiled directly — it is brought in via the wrapper's
+  # `#include` line.
   s.source_files = [
     "ios/**/*.{swift}",
     "ios/**/*.{h,m,mm}",
@@ -37,6 +44,9 @@ Pod::Spec.new do |s|
     "cpp/HybridVoiceAgent.cpp",
     "cpp/HybridVoiceAgent.hpp",
     "cpp/bridges/**/*.{cpp,hpp}",
+  ]
+  s.preserve_paths = [
+    "../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
   ]
 
   # Build header search paths: include the Headers root (for qualified includes
