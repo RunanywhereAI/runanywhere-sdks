@@ -79,8 +79,8 @@ static bool is_cache_valid() {
 // Reimplementation: scan once with an explicit in-string state machine.
 static std::string json_get_string(const std::string& json, const std::string& key) {
     auto skip_ws = [&](size_t& i) {
-        while (i < json.size() && (json[i] == ' ' || json[i] == '\t' || json[i] == '\n' ||
-                                   json[i] == '\r')) {
+        while (i < json.size() &&
+               (json[i] == ' ' || json[i] == '\t' || json[i] == '\n' || json[i] == '\r')) {
             ++i;
         }
     };
@@ -199,13 +199,12 @@ static std::string json_get_string(const std::string& json, const std::string& k
             }
             // Number / boolean — stop at the next top-level delimiter.
             size_t end = v;
-            while (end < json.size() && json[end] != ',' && json[end] != '}' &&
-                   json[end] != ']') {
+            while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
                 ++end;
             }
             std::string val = json.substr(v, end - v);
-            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' ||
-                                    val.back() == '\n' || val.back() == '\r')) {
+            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\n' ||
+                                    val.back() == '\r')) {
                 val.pop_back();
             }
             return val;

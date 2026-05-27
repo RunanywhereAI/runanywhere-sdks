@@ -660,8 +660,9 @@ class RetrieveNode final : public OperatorNode {
         }
 #else
         (void)session;
-        set_error_detail(name(),
-                         "Solutions RetrieveNode requires RAG backend; rebuild with -DRAC_BACKEND_RAG=ON");
+        set_error_detail(
+            name(),
+            "Solutions RetrieveNode requires RAG backend; rebuild with -DRAC_BACKEND_RAG=ON");
         cancel_graph(this->cancel_token());
         return;
 #endif

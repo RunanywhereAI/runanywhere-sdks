@@ -504,7 +504,7 @@ bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_use
 // commons-core-infra-006: paired release for `get_http_transport`.
 // Must be called exactly once after every successful `get_*`.
 void put_http_transport(void);
-}
+}  // namespace rac_internal
 
 namespace {
 

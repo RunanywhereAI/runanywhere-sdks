@@ -50,7 +50,7 @@ bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_use
 // `put_http_transport` so the registry can run the adapter's
 // destroy() outside the dispatch window.
 void put_http_transport(void);
-}
+}  // namespace rac_internal
 
 namespace {
 constexpr const char* kTag = "rac_http_client_default";

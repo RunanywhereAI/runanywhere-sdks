@@ -26,13 +26,6 @@
 // Per-modality adapter declarations now live in features/ headers
 // (commons-core-infra-003). The .cpp pulls them in alongside the
 // foundation header so it can define all adapter bodies.
-#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
-#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
-#include "rac/features/stt/rac_stt_proto_adapters.h"
-#include "rac/features/tts/rac_tts_proto_adapters.h"
-#include "rac/features/vad/rac_vad_proto_adapters.h"
-#include "rac/features/vlm/rac_vlm_proto_adapters.h"
-
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -41,6 +34,13 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+
+#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
+#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
+#include "rac/features/stt/rac_stt_proto_adapters.h"
+#include "rac/features/tts/rac_tts_proto_adapters.h"
+#include "rac/features/vad/rac_vad_proto_adapters.h"
+#include "rac/features/vlm/rac_vlm_proto_adapters.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 

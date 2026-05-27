@@ -1091,27 +1091,26 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
             // for any 64-bit file size.
             if (actual * 5 < file.expected_bytes * 4) {
                 sanity_check_passed = false;
-                sanity_error =
-                    "post-finalize size guard tripped: file " + file.filename + " is " +
-                    std::to_string(actual) + " bytes on disk but expected " +
-                    std::to_string(file.expected_bytes) +
-                    " bytes (< 80% threshold; CLUSTER-13)";
-                RAC_LOG_ERROR(LOG_TAG,
-                              "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
-                              "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
-                              task->task_id.c_str(), i, static_cast<long long>(actual),
-                              static_cast<long long>(file.expected_bytes));
+                sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
+                               std::to_string(actual) + " bytes on disk but expected " +
+                               std::to_string(file.expected_bytes) +
+                               " bytes (< 80% threshold; CLUSTER-13)";
+                RAC_LOG_ERROR(
+                    LOG_TAG,
+                    "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
+                    "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
+                    task->task_id.c_str(), i, static_cast<long long>(actual),
+                    static_cast<long long>(file.expected_bytes));
                 break;
             }
         }
     }
     if (!sanity_check_passed) {
         int64_t failed_bytes = total_expected > 0 ? completed_before_file : completed_before_file;
-        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                          failed_bytes, total_expected,
-                          static_cast<int32_t>(task->files.size() - 1),
-                          task->files.empty() ? "" : task->files.back().storage_key, "",
-                          sanity_error);
+        set_task_progress(
+            task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING, failed_bytes,
+            total_expected, static_cast<int32_t>(task->files.size() - 1),
+            task->files.empty() ? "" : task->files.back().storage_key, "", sanity_error);
         mark_task_stopped(task);
         emit_progress(task);
         return;
@@ -1973,15 +1972,15 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         std::lock_guard<std::mutex> lock(proto_state().mutex);
         for (const auto& entry : proto_state().tasks) {
             const auto& existing = entry.second;
-            if (!existing || existing->model_id != model_id) continue;
+            if (!existing || existing->model_id != model_id)
+                continue;
             std::lock_guard<std::mutex> task_lock(existing->mutex);
             const auto state = existing->progress.state();
-            const bool active =
-                state == rav1::DOWNLOAD_STATE_PENDING ||
-                state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
-                state == rav1::DOWNLOAD_STATE_EXTRACTING ||
-                state == rav1::DOWNLOAD_STATE_RESUMING ||
-                state == rav1::DOWNLOAD_STATE_RETRYING;
+            const bool active = state == rav1::DOWNLOAD_STATE_PENDING ||
+                                state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
+                                state == rav1::DOWNLOAD_STATE_EXTRACTING ||
+                                state == rav1::DOWNLOAD_STATE_RESUMING ||
+                                state == rav1::DOWNLOAD_STATE_RETRYING;
             if (active) {
                 result.set_accepted(true);
                 result.set_task_id(existing->task_id);
@@ -2413,10 +2412,9 @@ extern "C" rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_pu
             if (task) {
                 std::lock_guard<std::mutex> tlock(task->mutex);
                 const auto state = task->progress.state();
-                terminal = !task->running &&
-                           (state == rav1::DOWNLOAD_STATE_COMPLETED ||
-                            state == rav1::DOWNLOAD_STATE_FAILED ||
-                            state == rav1::DOWNLOAD_STATE_CANCELLED);
+                terminal = !task->running && (state == rav1::DOWNLOAD_STATE_COMPLETED ||
+                                              state == rav1::DOWNLOAD_STATE_FAILED ||
+                                              state == rav1::DOWNLOAD_STATE_CANCELLED);
             } else {
                 terminal = true;  // null shared_ptr — drop the slot
             }
@@ -2779,8 +2777,8 @@ rac_result_t rac_download_orchestrate_multi(
     bool barrier_completed = false;
     {
         std::unique_lock<std::mutex> lk(barrier->mtx);
-        barrier_completed = barrier->cv.wait_for(
-            lk, wait_budget, [&barrier] { return barrier->pending == 0; });
+        barrier_completed =
+            barrier->cv.wait_for(lk, wait_budget, [&barrier] { return barrier->pending == 0; });
     }
 
     const bool any_failed = barrier->any_required_failed;
