@@ -23,8 +23,7 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(__APPLE__) && defined(RAC_METALRT_ENGINE_AVAILABLE) &&             \
-    RAC_METALRT_ENGINE_AVAILABLE
+#if defined(__APPLE__) && defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
 #define RAC_METALRT_ROUTABLE 1
 #else
 #define RAC_METALRT_ROUTABLE 0
@@ -39,11 +38,11 @@ extern const rac_vlm_service_ops_t g_metalrt_vlm_ops;
 
 static rac_result_t metalrt_capability_check(void) {
 #if !defined(__APPLE__)
-  return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #elif defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
-  return RAC_SUCCESS;
+    return RAC_SUCCESS;
 #else
-  return RAC_ERROR_BACKEND_UNAVAILABLE;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #endif
 }
 
@@ -54,8 +53,7 @@ static const rac_runtime_id_t k_metalrt_runtimes[] = {
 };
 
 static const uint32_t k_metalrt_formats[] = {
-    RAC_MODEL_FORMAT_ID_COREML,
-    RAC_MODEL_FORMAT_ID_MLPACKAGE,
+    RAC_MODEL_FORMAT_ID_COREML, RAC_MODEL_FORMAT_ID_MLPACKAGE,
     RAC_MODEL_FORMAT_ID_GGUF, /* for the LLM ops slot */
 };
 
@@ -173,8 +171,7 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(metalrt) {
-  return rac_engine_entry_with_manifest(&k_metalrt_manifest,
-                                        &g_metalrt_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_metalrt_manifest, &g_metalrt_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"
