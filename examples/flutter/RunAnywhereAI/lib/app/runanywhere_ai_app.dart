@@ -146,7 +146,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 500000000,
+      memoryRequirement: 386404416,
     );
     _registerLanguageModel(
       id: 'llama-2-7b-chat-q4_k_m',

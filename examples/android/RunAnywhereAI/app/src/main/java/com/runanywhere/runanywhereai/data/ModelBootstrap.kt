@@ -374,7 +374,7 @@ object ModelBootstrap {
                 url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
                 category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                memoryBytes = 500_000_000,
+                memoryBytes = 386_404_416,
             ),
             SingleFileModel(
                 id = "llama-2-7b-chat-q4_k_m",

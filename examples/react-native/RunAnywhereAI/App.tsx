@@ -170,7 +170,7 @@ async function registerModulesAndModels(): Promise<void> {
         name: 'SmolLM2 360M Q8_0',
         url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 500_000_000,
+        memoryRequirement: 386_404_416,
       }),
       registerModel({
         id: 'llama-2-7b-chat-q4_k_m',

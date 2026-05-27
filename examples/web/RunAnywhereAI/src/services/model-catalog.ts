@@ -78,7 +78,7 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-    downloadSizeBytes: 400_000_000,
+    downloadSizeBytes: 386_404_416,
     memoryRequiredBytes: 500_000_000,
     contextLength: 2048,
   },
