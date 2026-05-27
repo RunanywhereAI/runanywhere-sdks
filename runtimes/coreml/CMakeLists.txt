@@ -26,6 +26,3 @@ target_link_libraries(rac_runtime_coreml PUBLIC
     "-framework Foundation"
     "-framework CoreML"
 )
-
-set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_RUNTIMES coreml)
-set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_coreml_DEVICE_CLASS NPU)

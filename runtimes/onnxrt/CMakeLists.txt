@@ -58,10 +58,3 @@ if(APPLE)
     # CoreML` are in every ORT Apple binary we ship via FetchONNXRuntime.
     target_compile_definitions(rac_runtime_onnxrt PRIVATE RAC_ONNXRT_EP_COREML_ENABLED)
 endif()
-
-set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_RUNTIMES onnxrt)
-set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_onnxrt_DEVICE_CLASS CPU)
-if(APPLE)
-    set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_onnxrt_DEVICE_CLASS NPU)
-    set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_onnxrt_DEVICE_CLASS GPU)
-endif()

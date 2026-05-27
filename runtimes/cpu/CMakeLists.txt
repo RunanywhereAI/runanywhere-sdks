@@ -25,7 +25,3 @@ target_include_directories(rac_runtime_cpu PRIVATE
     ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-# Tooling metadata — mirrors what rac_add_engine_plugin records for engines.
-set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_RUNTIMES cpu)
-set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_cpu_DEVICE_CLASS CPU)
