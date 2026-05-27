@@ -26,6 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -144,6 +145,32 @@ std::shared_ptr<ToolCallingSession> lookup_session(uint64_t handle) {
     return it == reg.sessions.end() ? nullptr : it->second;
 }
 
+// commons-features-llm-rag-003: process-global in-flight counter for the
+// tool-calling-session event dispatcher. Mirrors the rac_llm_proto_quiesce /
+// rac_vlm_proto_quiesce / rac_stt_proto_quiesce pattern. drain_and_dispatch
+// snapshots (callback, user_data) under session->mu, releases the lock, then
+// fires the host callback. A concurrent rac_tool_calling_session_destroy_proto
+// can race the dispatcher between the unlock and the callback fire, freeing
+// user_data before cb(payload, size, ud) executes. The InFlightGuard wraps the
+// entire drain_and_dispatch so rac_tool_calling_session_proto_quiesce() can
+// spin-wait until every pending callback has returned before destroy returns
+// to the host.
+std::atomic<int>& tool_calling_session_in_flight() {
+    static std::atomic<int> counter{0};
+    return counter;
+}
+
+struct ToolCallingSessionInFlightGuard {
+    ToolCallingSessionInFlightGuard() {
+        tool_calling_session_in_flight().fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~ToolCallingSessionInFlightGuard() {
+        tool_calling_session_in_flight().fetch_sub(1, std::memory_order_acq_rel);
+    }
+    ToolCallingSessionInFlightGuard(const ToolCallingSessionInFlightGuard&) = delete;
+    ToolCallingSessionInFlightGuard& operator=(const ToolCallingSessionInFlightGuard&) = delete;
+};
+
 void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSessionEvent event) {
     event.set_seq(++session.seq);
     // commons-features-llm-rag-009: serialize under the lock the caller holds,
@@ -162,9 +189,18 @@ void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSession
 // under the registry mutex via session.mu, then releases before invoking the
 // host callback so a re-entrant call into rac_tool_calling_session_* on the
 // same handle does not self-deadlock.
+//
+// commons-features-llm-rag-003: hold a ToolCallingSessionInFlightGuard for
+// the entire body so rac_tool_calling_session_proto_quiesce() can spin-wait
+// until every pending callback has returned. Without the guard,
+// rac_tool_calling_session_destroy_proto can return while this function is
+// between releasing session->mu (after snapshotting cb/ud) and firing
+// cb(payload, size, ud), letting the host free user_data before the
+// callback executes — yielding a use-after-free on ud.
 void drain_and_dispatch(const std::shared_ptr<ToolCallingSession>& session) {
     if (!session)
         return;
+    ToolCallingSessionInFlightGuard in_flight_guard;
     std::vector<std::vector<uint8_t>> drained;
     rac_tool_calling_session_event_callback_fn cb = nullptr;
     void* ud = nullptr;
@@ -737,15 +773,19 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     if (session_handle == 0) {
         return RAC_SUCCESS;
     }
-    // commons-features-llm-rag-003: quiesce before erasing the registry entry.
-    // Without this, destroy_proto can return while a concurrent
-    // rac_tool_calling_session_step_with_result_proto / create_proto on this
-    // handle is still inside run_generate_loop holding session->mu. The host
-    // then frees user_data captured by the event callback before that
-    // in-flight call has dispatched its final event, yielding a use-after-free
-    // when emit_event / drain_and_dispatch fires. Mirrors the quiesce path
-    // used by rac_vlm_proto_quiesce / rac_llm_proto_quiesce / voice_agent
-    // destroy (voice_agent.cpp:598).
+    // commons-features-llm-rag-003: quiesce before returning. Two races to
+    // close:
+    //   (a) a concurrent rac_tool_calling_session_step_with_result_proto /
+    //       create_proto is still inside run_generate_loop holding
+    //       session->mu — the inner session_lock acquire/release below
+    //       serializes against that path; AND
+    //   (b) drain_and_dispatch is between releasing session->mu (after
+    //       snapshotting cb/ud) and firing cb(payload, size, ud) — the
+    //       acquire/release of session->mu does NOT cover this gap, so we
+    //       additionally clear the callback under the lock and then call
+    //       rac_tool_calling_session_proto_quiesce() to spin-wait for any
+    //       in-progress dispatch to drain. Mirrors rac_vlm_proto_quiesce /
+    //       rac_llm_proto_quiesce / voice_agent destroy (voice_agent.cpp:598).
     std::shared_ptr<ToolCallingSession> session;
     auto& reg = registry();
     {
@@ -769,18 +809,41 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
             rac::llm::request_lifecycle_llm_cancel(session->active_ref);
         }
     }
-    // Block until the in-flight create/step releases session->mu. Once we
-    // acquire it, no further generate iterations will run on this session
-    // because the registry entry is gone (no new step_with_result_proto can
-    // look it up). Drop the lock immediately — the callback is no longer the
-    // host's; pending dispatches still queued under the lock are discarded by
-    // virtue of dropping the shared_ptr below, which is the documented
-    // contract per the @warning blocks in rac_*_set_stream_proto_callback.
-    { std::lock_guard<std::mutex> session_lock(session->mu); }
+    // Block until the in-flight create/step releases session->mu, then null
+    // out the host callback/user_data so any NEW drain_and_dispatch cycle
+    // that races us (e.g. a dispatch the in-flight generate had not yet
+    // queued when we acquired the lock) snapshots cb=nullptr and exits
+    // without invoking the host. The shared_ptr we hold keeps
+    // pending_dispatches bytes alive long enough for that snapshot.
+    {
+        std::lock_guard<std::mutex> session_lock(session->mu);
+        session->callback = nullptr;
+        session->user_data = nullptr;
+    }
+    // Spin-wait for any drain_and_dispatch that snapshotted cb/ud BEFORE we
+    // cleared them above to finish firing the host callback. This is the
+    // load-bearing barrier for race (b) in the comment above — without it,
+    // destroy_proto can return while cb(payload, size, ud) is mid-flight on
+    // another thread and the host then frees user_data.
+    rac_tool_calling_session_proto_quiesce();
     // session shared_ptr goes out of scope here; if no other thread holds it,
     // the ToolCallingSession is freed and any leftover pending_dispatches
     // bytes are released along with it. The host can now safely free user_data.
     return RAC_SUCCESS;
+}
+
+// commons-features-llm-rag-003: public quiesce helper. Spin-waits until every
+// in-flight drain_and_dispatch invocation has returned. Mirrors
+// rac_llm_proto_quiesce / rac_vlm_proto_quiesce / rac_stt_proto_quiesce.
+// Called from rac_tool_calling_session_destroy_proto and exposed to SDK
+// bridges that need to coordinate user_data lifetime with a concurrent
+// tool-calling event dispatcher. Safe to call from any thread.
+extern "C" void rac_tool_calling_session_proto_quiesce(void) {
+#if defined(RAC_HAVE_PROTOBUF)
+    while (tool_calling_session_in_flight().load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
+#endif
 }
 
 extern "C" rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle) {

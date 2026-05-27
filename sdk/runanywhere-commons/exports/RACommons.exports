@@ -189,6 +189,9 @@ _rac_tool_value_from_json_proto
 _rac_tool_calling_session_create_proto
 _rac_tool_calling_session_step_with_result_proto
 _rac_tool_calling_session_destroy_proto
+# commons-features-llm-rag-003: public quiesce for the tool-calling-session
+# event dispatcher (mirrors rac_llm_proto_quiesce / rac_vlm_proto_quiesce).
+_rac_tool_calling_session_proto_quiesce
 
 # P2-T8: Synchronous single-call tool-calling loop. Mirrors the session
 # machinery but exposes one C ABI call instead of an outer-driven event

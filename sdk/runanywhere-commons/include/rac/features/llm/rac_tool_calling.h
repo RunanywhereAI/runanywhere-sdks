@@ -620,6 +620,27 @@ RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_han
  */
 RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle);
 
+/**
+ * @brief Spin-wait until all in-flight tool-calling session event dispatches
+ *        have returned (commons-features-llm-rag-003).
+ *
+ * The tool-calling session event dispatcher (drain_and_dispatch) snapshots
+ * (callback, user_data) under the session mutex, releases the lock, then
+ * fires the host callback. A concurrent rac_tool_calling_session_destroy_proto
+ * can race the dispatcher between the unlock and the callback fire, freeing
+ * @c user_data before @c cb(payload, size, ud) executes. This helper
+ * spin-waits on a process-global in-flight counter so destroy paths can
+ * guarantee no callback is mid-flight before returning to the host.
+ *
+ * Mirrors @c rac_llm_proto_quiesce / @c rac_vlm_proto_quiesce /
+ * @c rac_stt_proto_quiesce. Already called internally from
+ * @c rac_tool_calling_session_destroy_proto. Exposed publicly so SDK bridges
+ * tearing down on their own (e.g. SDK-level shutdown that races a still-active
+ * event dispatcher) can coordinate user_data lifetime without re-entering the
+ * destroy path. Safe to call from any thread.
+ */
+RAC_API void rac_tool_calling_session_proto_quiesce(void);
+
 // =============================================================================
 // TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
 // =============================================================================
