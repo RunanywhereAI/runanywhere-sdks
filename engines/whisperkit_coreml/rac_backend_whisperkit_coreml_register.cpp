@@ -18,6 +18,7 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_whisperkit_coreml.h"
+#include "whisperkit_callbacks_internal.h"
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -40,14 +41,18 @@ static rac_result_t whisperkit_coreml_stt_vtable_transcribe(
   if (!impl || !audio_data || !out_result)
     return RAC_ERROR_NULL_POINTER;
 
-  const auto *callbacks = rac_whisperkit_coreml_stt_get_callbacks();
-  if (!callbacks || !callbacks->transcribe) {
+  // engines-other-007: snapshot the callback struct under the registration
+  // lock to avoid dereferencing a pointer whose target may be racing with
+  // rac_whisperkit_coreml_stt_set_callbacks on another thread.
+  rac_whisperkit_coreml_stt_callbacks_t cbs{};
+  if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
+      cbs.transcribe == nullptr) {
     RAC_LOG_ERROR(LOG_CAT, "Swift transcribe callback not registered");
     return RAC_ERROR_NOT_SUPPORTED;
   }
 
-  return callbacks->transcribe(impl, audio_data, audio_size, options,
-                               out_result, callbacks->user_data);
+  return cbs.transcribe(impl, audio_data, audio_size, options, out_result,
+                        cbs.user_data);
 }
 
 static rac_result_t whisperkit_coreml_stt_vtable_transcribe_stream(
@@ -86,10 +91,32 @@ static void whisperkit_coreml_stt_vtable_destroy(void *impl) {
   if (!impl)
     return;
 
-  const auto *callbacks = rac_whisperkit_coreml_stt_get_callbacks();
-  if (callbacks && callbacks->destroy) {
-    callbacks->destroy(impl, callbacks->user_data);
+  // engines-other-006: prefer the live registration (consistent with the
+  // active callbacks the impl was created against). If callbacks were
+  // unset/zeroed before destroy fires, fall back to the cached destroy fn
+  // captured at the first set_callbacks() so we don't silently leak the
+  // Swift backend handle.
+  rac_whisperkit_coreml_stt_callbacks_t cbs{};
+  if (runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) &&
+      cbs.destroy != nullptr) {
+    cbs.destroy(impl, cbs.user_data);
+    return;
   }
+
+  rac_whisperkit_coreml_stt_destroy_fn cached_destroy = nullptr;
+  void *cached_user_data = nullptr;
+  if (runanywhere::engines::whisperkit_coreml::snapshot_cached_destroy(
+          &cached_destroy, &cached_user_data) &&
+      cached_destroy != nullptr) {
+    RAC_LOG_WARNING(LOG_CAT,
+                    "destroy: live callbacks unset; using cached destroy fn");
+    cached_destroy(impl, cached_user_data);
+    return;
+  }
+
+  RAC_LOG_ERROR(LOG_CAT,
+                "destroy: no Swift destroy callback available; leaking impl=%p",
+                impl);
 }
 
 // v3 Phase B5: WhisperKit CoreML `create` adapter. Delegates to the
@@ -106,8 +133,12 @@ static rac_result_t whisperkit_coreml_stt_create_impl(
     return RAC_ERROR_NULL_POINTER;
   *out_impl = nullptr;
 
-  const auto *callbacks = rac_whisperkit_coreml_stt_get_callbacks();
-  if (!callbacks || !callbacks->create) {
+  // engines-other-007: snapshot the callback struct under the registration
+  // lock so the create + user_data we pass to Swift cannot be torn out by
+  // a parallel rac_whisperkit_coreml_stt_set_callbacks.
+  rac_whisperkit_coreml_stt_callbacks_t cbs{};
+  if (!runanywhere::engines::whisperkit_coreml::snapshot_callbacks(&cbs) ||
+      cbs.create == nullptr) {
     RAC_LOG_ERROR(LOG_CAT, "create: Swift callbacks not registered");
     return RAC_ERROR_NOT_SUPPORTED;
   }
@@ -116,7 +147,7 @@ static rac_result_t whisperkit_coreml_stt_create_impl(
                model_id ? model_id : "(default)");
 
   rac_handle_t backend_handle =
-      callbacks->create(model_id, model_id, callbacks->user_data);
+      cbs.create(model_id, model_id, cbs.user_data);
   if (!backend_handle) {
     RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
     return RAC_ERROR_UNKNOWN;

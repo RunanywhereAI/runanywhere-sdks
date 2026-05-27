@@ -29,5 +29,34 @@
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
-RAC_STATIC_PLUGIN_REGISTER(sherpa);
+// engines-sherpa-005: route through rac_backend_sherpa_register() instead of
+// the plain RAC_STATIC_PLUGIN_REGISTER(sherpa) macro so the static-linkage
+// path populates both the module record (rac_module_register, which backs
+// rac_module_get_info("sherpa", ...)) and the unified plugin registry
+// (rac_plugin_register). The macro alone only performed the plugin half, so
+// iOS/WASM hosts reported the sherpa module as not-found via the module
+// registry surface even though primitives routed correctly. The explicit
+// register fn is idempotent (returns MODULE_ALREADY_REGISTERED on repeat),
+// matches the header doc that promises "static-link hosts also route
+// through this function", and keeps the dynamic-link path (SDK bridge
+// calls rac_backend_sherpa_register() directly) symmetric.
+namespace rac_static_sherpa {
+struct Registrar {
+    Registrar() noexcept { (void)::rac_backend_sherpa_register(); }
+};
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((used))
+#endif
+static Registrar g_registrar;
+}
+
+// Keep the per-plugin externally visible marker symbol the linker uses to
+// retain the TU when the host invokes `-force_load` by file rather than
+// `--whole-archive`. Mirrors the marker that RAC_STATIC_PLUGIN_REGISTER
+// would have emitted (`rac_plugin_static_marker_sherpa`).
+extern "C"
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__((used))
+#endif
+        const char *const rac_plugin_static_marker_sherpa = "sherpa";
 #endif
