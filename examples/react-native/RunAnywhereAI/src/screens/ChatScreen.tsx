@@ -217,36 +217,6 @@ const registerChatTools = async () => {
   );
 };
 
-/**
- * Detect tool call format based on model ID and name
- * LFM2-Tool models use Pythonic format, others use JSON format
- * * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
- * Checks both ID and name since model might be identified by either
- */
-const detectToolCallFormat = (
-  modelId: string | undefined,
-  modelName: string | undefined
-): string => {
-  // Check model ID first (more reliable - e.g., "lfm2-1.2b-tool-q4_k_m")
-  if (modelId) {
-    const id = modelId.toLowerCase();
-    if (id.includes('lfm2') && id.includes('tool')) {
-      return 'lfm2';
-    }
-  }
-
-  // Also check model name (e.g., "LiquidAI LFM2 1.2B Tool Q4_K_M")
-  if (modelName) {
-    const name = modelName.toLowerCase();
-    if (name.includes('lfm2') && name.includes('tool')) {
-      return 'lfm2';
-    }
-  }
-
-  // Default JSON format for general-purpose models
-  return 'default';
-};
-
 export const ChatScreen: React.FC = () => {
   // Conversation store
   const {
@@ -449,12 +419,6 @@ export const ChatScreen: React.FC = () => {
           supportsThinking: model.supportsThinking ?? false,
         };
         setCurrentModel(modelInfo);
-
-        // Log model info for format detection debugging
-        const format = detectToolCallFormat(model.id, model.name);
-        logDiagnostic(
-          `[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`
-        );
 
         // Register tools when model loads
         await registerChatTools();

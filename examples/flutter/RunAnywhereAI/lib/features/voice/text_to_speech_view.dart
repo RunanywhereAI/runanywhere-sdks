@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -78,9 +77,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   void initState() {
     super.initState();
     unawaited(_initializeAudioPlayer());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_autoLoadSystemTtsForE2E());
-    });
   }
 
   @override
@@ -114,25 +110,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
   }
 
-
-  Future<void> _autoLoadSystemTtsForE2E() async {
-    if (!Platform.isIOS || _hasModelSelected) return;
-    try {
-      final models = await sdk.RunAnywhere.models.available();
-      final system = models.cast<sdk.ModelInfo?>().firstWhere(
-            (m) => m?.id == 'system-tts',
-            orElse: () => null,
-          );
-      if (system == null) return;
-      await _loadModel(system);
-      if (_textController.text.isEmpty) {
-        _textController.text = 'Hello from Flutter E2E harness';
-      }
-      if (mounted && _hasModelSelected) {
-        await _generateSpeech();
-      }
-    } catch (_) {}
-  }
 
   void _showModelSelectionSheet() {
     unawaited(showModalBottomSheet<void>(

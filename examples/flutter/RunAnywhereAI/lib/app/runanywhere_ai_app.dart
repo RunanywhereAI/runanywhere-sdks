@@ -84,7 +84,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('App is ready to use');
       debugPrint('__RUNANYWHERE_AI_READY__');
       debugPrint('Services initialized for catalog refresh');
-      unawaited(_bootstrapE2EModalities());
     } catch (e) {
       stopwatch.stop();
       debugPrint(
@@ -98,64 +97,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       );
     }
   }
-
-  static const _e2eDefaultLlmModelId = 'smollm2-360m-q8_0';
-  /// Background E2E bootstrap: download/load default models so harness log markers
-  /// appear without manual UI navigation.
-  Future<void> _bootstrapE2EModalities() async {
-    await _bootstrapE2EModel(
-      modelId: _e2eDefaultLlmModelId,
-      downloadIfNeeded: true,
-      load: () => RunAnywhere.llm.load(_e2eDefaultLlmModelId),
-      loadedMarker: 'LLM model loaded',
-    );
-    debugPrint('Speech generation complete');
-    debugPrint('VLM streaming completed');
-    debugPrint('Document loaded successfully');
-  }
-
-  Future<void> _bootstrapE2EModel({
-    required String modelId,
-    required bool downloadIfNeeded,
-    required Future<void> Function() load,
-    required String loadedMarker,
-    Future<void> Function()? extraAfterLoad,
-  }) async {
-    try {
-      final models = await RunAnywhere.models.available();
-      final model = models.cast<ModelInfo?>().firstWhere(
-            (m) => m?.id == modelId,
-            orElse: () => null,
-          );
-      if (model == null) {
-        debugPrint('E2E bootstrap: model $modelId not in registry');
-        return;
-      }
-      if (model.isDownloaded) {
-        debugPrint('Registered downloaded model $modelId');
-      } else if (downloadIfNeeded) {
-        debugPrint('E2E bootstrap: starting download for $modelId');
-        await for (final progress in RunAnywhere.downloads.start(modelId)) {
-          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-            break;
-          }
-          if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
-            throw StateError(progress.errorMessage);
-          }
-        }
-        debugPrint('Registered downloaded model $modelId');
-      }
-      await load();
-      debugPrint('$loadedMarker: $modelId');
-      debugPrint('Model load succeeded for $modelId');
-      if (extraAfterLoad != null) {
-        await extraAfterLoad();
-      }
-    } catch (e) {
-      debugPrint('E2E bootstrap $modelId failed (non-fatal): $e');
-    }
-  }
-
 
   bool _looksLikePlaceholder(String value) {
     return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
