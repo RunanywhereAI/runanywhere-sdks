@@ -623,10 +623,9 @@ rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle, const void* 
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
-rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, const void* audio_data,
-                               size_t audio_size, rac_voice_agent_event_callback_fn callback,
-                               void* user_data);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_process_stream(
+    rac_voice_agent_handle_t handle, const void* audio_data, size_t audio_size,
+    rac_voice_agent_event_callback_fn callback, void* user_data);
 
 // =============================================================================
 // INDIVIDUAL COMPONENT ACCESS API
@@ -657,9 +656,8 @@ rac_voice_agent_transcribe(rac_voice_agent_handle_t handle, const void* audio_da
  * @param out_response Output: Generated response (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
-rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, const char* prompt,
-                                  char** out_response);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_generate_response(
+    rac_voice_agent_handle_t handle, const char* prompt, char** out_response);
 
 /**
  * @brief Synthesize speech only.
@@ -672,9 +670,8 @@ rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, const char* p
  * @param out_audio_size Output: Size of audio data in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
-rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, const char* text,
-                                  void** out_audio, size_t* out_audio_size);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_synthesize_speech(
+    rac_voice_agent_handle_t handle, const char* text, void** out_audio, size_t* out_audio_size);
 
 /**
  * @brief Check if VAD detects speech.

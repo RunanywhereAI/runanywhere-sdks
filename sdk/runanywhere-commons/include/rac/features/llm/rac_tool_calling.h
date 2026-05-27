@@ -798,11 +798,10 @@ typedef void (*rac_tool_calling_run_loop_on_handle_published_cb_t)(uint64_t run_
  * @return RAC_SUCCESS when out_result carries a serialized result.
  */
 RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
-    const uint8_t* in_request_bytes, size_t in_size,
-    rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* on_execute_user_data,
     rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
-    void* on_handle_user_data, uint64_t* out_run_loop_handle,
-    rac_proto_buffer_t* out_result);
+    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result);
 
 /**
  * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).
