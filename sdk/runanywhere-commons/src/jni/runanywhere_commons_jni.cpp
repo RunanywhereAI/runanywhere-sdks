@@ -1253,6 +1253,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh
 }
 
 JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterModelFromUrlProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    return callProtoBufferFn(env, requestBytes, rac_register_model_from_url_proto,
+                             "racRegisterModelFromUrlProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelFormatFromUrlProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_model_format_from_url_proto,
