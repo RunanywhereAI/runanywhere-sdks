@@ -25,11 +25,6 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_MLMODEL,
     RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
-const rac_primitive_t k_supported_primitives[] = {
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_DIFFUSION,
-    RAC_PRIMITIVE_EMBED,
-};
 
 struct CoreMLSession {
     MLModel* model = nil;
