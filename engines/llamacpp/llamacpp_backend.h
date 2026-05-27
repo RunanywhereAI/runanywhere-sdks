@@ -190,6 +190,12 @@ public:
   nlohmann::json get_lora_info() const;
 
 private:
+  // Read model_loaded_/model_/context_ without locking; caller MUST already
+  // hold mutex_. Used by internal paths (generate_stream, inject_system_prompt,
+  // append_context, generate_from_context) that already lock for the
+  // surrounding operation. Public is_ready() / is_model_loaded() acquire the
+  // lock themselves.
+  bool is_ready_locked() const;
   bool unload_model_internal();
   bool recreate_context();
   bool apply_lora_adapters();

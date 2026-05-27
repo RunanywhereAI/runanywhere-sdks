@@ -257,6 +257,11 @@ LlamaCppTextGeneration::~LlamaCppTextGeneration() {
 }
 
 bool LlamaCppTextGeneration::is_ready() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return is_ready_locked();
+}
+
+bool LlamaCppTextGeneration::is_ready_locked() const {
   return model_loaded_ && model_ != nullptr && context_ != nullptr;
 }
 
@@ -567,7 +572,10 @@ bool LlamaCppTextGeneration::load_model(const std::string &model_path,
   return true;
 }
 
-bool LlamaCppTextGeneration::is_model_loaded() const { return model_loaded_; }
+bool LlamaCppTextGeneration::is_model_loaded() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return model_loaded_;
+}
 
 bool LlamaCppTextGeneration::unload_model_internal() {
   if (!model_loaded_) {
@@ -802,7 +810,7 @@ bool LlamaCppTextGeneration::generate_stream(
     int *out_prompt_tokens, rac_benchmark_timing_t *timing_out) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  if (!is_ready()) {
+  if (!is_ready_locked()) {
     RAC_LOG_ERROR("LLM.LlamaCpp", "Model not ready for generation");
     return false;
   }
@@ -1137,7 +1145,7 @@ void LlamaCppTextGeneration::cancel() {
 bool LlamaCppTextGeneration::inject_system_prompt(const std::string &prompt) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  if (!is_ready()) {
+  if (!is_ready_locked()) {
     RAC_LOG_ERROR("LLM.LlamaCpp", "inject_system_prompt: model not ready");
     return false;
   }
@@ -1196,7 +1204,7 @@ bool LlamaCppTextGeneration::inject_system_prompt(const std::string &prompt) {
 bool LlamaCppTextGeneration::append_context(const std::string &text) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  if (!is_ready()) {
+  if (!is_ready_locked()) {
     RAC_LOG_ERROR("LLM.LlamaCpp", "append_context: model not ready");
     return false;
   }
@@ -1253,7 +1261,7 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(
   TextGenerationResult result;
   result.finish_reason = "error";
 
-  if (!is_ready()) {
+  if (!is_ready_locked()) {
     RAC_LOG_ERROR("LLM.LlamaCpp", "generate_from_context: model not ready");
     return result;
   }
