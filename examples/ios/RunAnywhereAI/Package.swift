@@ -46,11 +46,11 @@ let package = Package(
             name: "RunAnywhereAI",
             dependencies: [
                 // Core SDK (always needed)
-                .product(name: "RunAnywhere", package: "runanywhere-sdks-main"),
+                .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks-main"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
-                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks-main"),     // LLM
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),     // LLM
             ],
             path: "RunAnywhereAI",
             exclude: [
