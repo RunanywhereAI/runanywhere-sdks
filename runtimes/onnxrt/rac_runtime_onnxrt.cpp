@@ -513,9 +513,25 @@ rac_result_t Session::run(const TensorInput *inputs, size_t input_count,
     return RAC_ERROR_INFERENCE_FAILED;
   }
 
+  /* runtimes-001: every partial-failure path through the per-output marshal
+   * loop previously released only the OrtValue at the current index, leaking
+   * the remaining N-i-1 ORT-owned outputs (each holds a heap tensor buffer
+   * sized to the model's output). Drive all releases through one helper that
+   * walks `[i .. output_count)` so a mid-loop bail-out frees every output the
+   * `Run` call produced. */
+  auto release_outputs_from = [&](size_t start) {
+    for (size_t k = start; k < output_values.size(); ++k) {
+      if (output_values[k]) {
+        api->ReleaseValue(output_values[k]);
+        output_values[k] = nullptr;
+      }
+    }
+  };
+
   outputs.clear();
   outputs.reserve(output_count);
-  for (OrtValue *value : output_values) {
+  for (size_t i = 0; i < output_values.size(); ++i) {
+    OrtValue *value = output_values[i];
     TensorOutput out;
 
     /* RT-ONNX-02: consult the actual ORT tensor dtype and element count
@@ -528,7 +544,7 @@ rac_result_t Session::run(const TensorInput *inputs, size_t input_count,
     if (status != nullptr || shape_info == nullptr) {
       if (status != nullptr && out_error)
         *out_error = status_message(api, status);
-      api->ReleaseValue(value);
+      release_outputs_from(i);
       cleanup_inputs();
       return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -554,7 +570,7 @@ rac_result_t Session::run(const TensorInput *inputs, size_t input_count,
     if (elem_size == 0) {
       if (out_error)
         *out_error = "onnxrt: unsupported output tensor dtype";
-      api->ReleaseValue(value);
+      release_outputs_from(i);
       cleanup_inputs();
       return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -564,7 +580,7 @@ rac_result_t Session::run(const TensorInput *inputs, size_t input_count,
     if (status != nullptr || data == nullptr) {
       if (status != nullptr && out_error)
         *out_error = status_message(api, status);
-      api->ReleaseValue(value);
+      release_outputs_from(i);
       cleanup_inputs();
       return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -576,6 +592,7 @@ rac_result_t Session::run(const TensorInput *inputs, size_t input_count,
     }
     outputs.push_back(std::move(out));
     api->ReleaseValue(value);
+    output_values[i] = nullptr;
   }
 
   cleanup_inputs();
