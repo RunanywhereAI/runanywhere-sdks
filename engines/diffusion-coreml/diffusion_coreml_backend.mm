@@ -8,14 +8,15 @@
 
 #include "diffusion_coreml_backend.h"
 
+#include "rac_runtime_coreml.h"
+
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
-
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
-#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -27,22 +28,21 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
-#include "rac_runtime_coreml.h"
 
 namespace {
 constexpr const char* kLogCat = "Diffusion.CoreML";
 
 char* dup_error_message(const char* msg) {
-    if (!msg) return nullptr;
+    if (!msg)
+        return nullptr;
     const size_t n = std::strlen(msg) + 1;
     char* out = static_cast<char*>(std::malloc(n));
-    if (out) std::memcpy(out, msg, n);
+    if (out)
+        std::memcpy(out, msg, n);
     return out;
 }
 
-rac_result_t set_error(rac_diffusion_result_t* out_result,
-                       rac_result_t code,
-                       const char* message) {
+rac_result_t set_error(rac_diffusion_result_t* out_result, rac_result_t code, const char* message) {
     if (out_result) {
         out_result->error_code = code;
         out_result->error_message = dup_error_message(message);
@@ -71,8 +71,8 @@ struct rac_diffusion_coreml_impl {
     /// NSObject* instead of MLModel* so the struct header can be used
     /// from plain C++ via the .h — actual typing lives in this .mm.
     MLModel* text_encoder = nil;
-    MLModel* unet         = nil;
-    MLModel* vae_decoder  = nil;
+    MLModel* unet = nil;
+    MLModel* vae_decoder = nil;
     MLModel* safety_checker = nil;  // Optional.
 
     std::string model_path;
@@ -120,9 +120,9 @@ void load_config_dict(CoreMLSDIOConfig& config, NSDictionary* dict, NSString* pr
         if (![raw_key isKindOfClass:[NSString class]]) {
             continue;
         }
-        NSString* key = prefix
-            ? [NSString stringWithFormat:@"%@.%@", prefix, static_cast<NSString*>(raw_key)]
-            : static_cast<NSString*>(raw_key);
+        NSString* key =
+            prefix ? [NSString stringWithFormat:@"%@.%@", prefix, static_cast<NSString*>(raw_key)]
+                   : static_cast<NSString*>(raw_key);
         if ([value isKindOfClass:[NSDictionary class]]) {
             load_config_dict(config, static_cast<NSDictionary*>(value), key);
         } else {
@@ -132,11 +132,8 @@ void load_config_dict(CoreMLSDIOConfig& config, NSDictionary* dict, NSString* pr
 }
 
 void load_json_config(CoreMLSDIOConfig& config, NSString* model_dir) {
-    NSArray<NSString*>* candidates = @[
-        @"diffusion_coreml_config.json",
-        @"coreml_config.json",
-        @"model_config.json"
-    ];
+    NSArray<NSString*>* candidates =
+        @[ @"diffusion_coreml_config.json", @"coreml_config.json", @"model_config.json" ];
     for (NSString* filename in candidates) {
         NSString* path = [model_dir stringByAppendingPathComponent:filename];
         NSData* data = [NSData dataWithContentsOfFile:path];
@@ -146,8 +143,7 @@ void load_json_config(CoreMLSDIOConfig& config, NSString* model_dir) {
         id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         if ([json isKindOfClass:[NSDictionary class]]) {
             load_config_dict(config, static_cast<NSDictionary*>(json));
-            RAC_LOG_INFO(kLogCat, "Loaded CoreML diffusion IO config: %s",
-                         [path UTF8String]);
+            RAC_LOG_INFO(kLogCat, "Loaded CoreML diffusion IO config: %s", [path UTF8String]);
         }
     }
 }
@@ -182,13 +178,10 @@ MLFeatureDescription* feature_desc(MLModel* model, bool input, NSString* name) {
     return [descriptions(model, input) objectForKey:name];
 }
 
-NSString* resolve_feature_name(MLModel* model,
-                               bool input,
-                               const CoreMLSDIOConfig& config,
+NSString* resolve_feature_name(MLModel* model, bool input, const CoreMLSDIOConfig& config,
                                const std::vector<std::string>& config_keys,
                                const std::vector<std::string>& candidates,
-                               MLFeatureType expected_type,
-                               NSUInteger fallback_index = 0) {
+                               MLFeatureType expected_type, NSUInteger fallback_index = 0) {
     NSDictionary<NSString*, MLFeatureDescription*>* descs = descriptions(model, input);
     for (const std::string& key : config_keys) {
         std::string configured = config.get(key, "");
@@ -271,8 +264,7 @@ size_t shape_count(const std::vector<NSInteger>& shape) {
     return count;
 }
 
-MLMultiArray* make_multiarray(const std::vector<NSInteger>& shape,
-                              MLMultiArrayDataType data_type) {
+MLMultiArray* make_multiarray(const std::vector<NSInteger>& shape, MLMultiArrayDataType data_type) {
     NSError* err = nil;
     MLMultiArray* array = [[[MLMultiArray alloc] initWithShape:make_shape(shape)
                                                       dataType:data_type
@@ -305,10 +297,8 @@ void array_set_int(MLMultiArray* array, size_t index, int32_t value) {
     [array setObject:@(value) atIndexedSubscript:index];
 }
 
-bool run_prediction(MLModel* model,
-                    NSDictionary<NSString*, MLFeatureValue*>* features,
-                    id<MLFeatureProvider>* out_provider,
-                    std::string* out_error) {
+bool run_prediction(MLModel* model, NSDictionary<NSString*, MLFeatureValue*>* features,
+                    id<MLFeatureProvider>* out_provider, std::string* out_error) {
     if (!features) {
         if (out_error) {
             *out_error = "CoreML prediction failed: features dictionary is nil";
@@ -320,8 +310,8 @@ bool run_prediction(MLModel* model,
         [[[MLDictionaryFeatureProvider alloc] initWithDictionary:features error:&err] autorelease];
     if (!provider) {
         if (out_error) {
-            *out_error = err ? [[err localizedDescription] UTF8String]
-                             : "failed to create feature provider";
+            *out_error =
+                err ? [[err localizedDescription] UTF8String] : "failed to create feature provider";
         }
         return false;
     }
@@ -335,8 +325,7 @@ bool run_prediction(MLModel* model,
     id<MLFeatureProvider> prediction = [model predictionFromFeatures:provider error:&err];
     if (!prediction) {
         if (out_error) {
-            *out_error = err ? [[err localizedDescription] UTF8String]
-                             : "CoreML prediction failed";
+            *out_error = err ? [[err localizedDescription] UTF8String] : "CoreML prediction failed";
         }
         return false;
     }
@@ -344,13 +333,12 @@ bool run_prediction(MLModel* model,
     return true;
 }
 
-MLMultiArray* output_multiarray(id<MLFeatureProvider> provider,
-                               MLModel* model,
-                               const CoreMLSDIOConfig& config,
-                               const std::vector<std::string>& config_keys,
-                               const std::vector<std::string>& candidates) {
-    NSString* name = resolve_feature_name(model, /*input=*/false, config, config_keys,
-                                          candidates, MLFeatureTypeMultiArray);
+MLMultiArray* output_multiarray(id<MLFeatureProvider> provider, MLModel* model,
+                                const CoreMLSDIOConfig& config,
+                                const std::vector<std::string>& config_keys,
+                                const std::vector<std::string>& candidates) {
+    NSString* name = resolve_feature_name(model, /*input=*/false, config, config_keys, candidates,
+                                          MLFeatureTypeMultiArray);
     if (!name) {
         return nil;
     }
@@ -359,9 +347,8 @@ MLMultiArray* output_multiarray(id<MLFeatureProvider> provider,
 }
 
 std::string lowercase(std::string text) {
-    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return text;
 }
 
@@ -403,7 +390,8 @@ void load_vocab(rac_diffusion_coreml_impl* impl, NSString* model_dir) {
     NSDictionary* dict = static_cast<NSDictionary*>(json);
     for (id raw_key in dict) {
         id raw_value = [dict objectForKey:raw_key];
-        if (![raw_key isKindOfClass:[NSString class]] || ![raw_value isKindOfClass:[NSNumber class]]) {
+        if (![raw_key isKindOfClass:[NSString class]] ||
+            ![raw_value isKindOfClass:[NSNumber class]]) {
             continue;
         }
         int32_t token_id = [static_cast<NSNumber*>(raw_value) intValue];
@@ -420,7 +408,7 @@ void load_vocab(rac_diffusion_coreml_impl* impl, NSString* model_dir) {
     impl->pad_token_id = impl->eos_token_id;
     impl->vocab_loaded = !impl->vocab.empty();
     RAC_LOG_INFO(kLogCat, "Loaded diffusion tokenizer vocab: %s (%zu tokens)",
-                 [vocab_path UTF8String], impl->vocab.size());
+                 [vocab_path UTF8String], impl -> vocab.size());
 }
 
 std::vector<std::string> split_prompt_words(const char* prompt) {
@@ -446,8 +434,7 @@ std::vector<std::string> split_prompt_words(const char* prompt) {
     return words;
 }
 
-int32_t lookup_token(const rac_diffusion_coreml_impl* impl,
-                     const std::string& token,
+int32_t lookup_token(const rac_diffusion_coreml_impl* impl, const std::string& token,
                      bool end_of_word) {
     if (impl->vocab_loaded) {
         const std::string lower = lowercase(token);
@@ -466,8 +453,7 @@ int32_t lookup_token(const rac_diffusion_coreml_impl* impl,
     return 2 + static_cast<int32_t>(fnv1a(token) % span);
 }
 
-std::vector<int32_t> encode_prompt_tokens(const rac_diffusion_coreml_impl* impl,
-                                          const char* prompt,
+std::vector<int32_t> encode_prompt_tokens(const rac_diffusion_coreml_impl* impl, const char* prompt,
                                           size_t token_count) {
     std::vector<int32_t> ids(token_count, impl->pad_token_id);
     if (token_count == 0) {
@@ -487,14 +473,11 @@ std::vector<int32_t> encode_prompt_tokens(const rac_diffusion_coreml_impl* impl,
     return ids;
 }
 
-rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
-                         const char* prompt,
-                         MLMultiArray** out_embeddings,
-                         rac_diffusion_result_t* out_result) {
+rac_result_t encode_text(rac_diffusion_coreml_impl* impl, const char* prompt,
+                         MLMultiArray** out_embeddings, rac_diffusion_result_t* out_result) {
     NSString* string_input = resolve_feature_name(
         impl->text_encoder, /*input=*/true, impl->io_config,
-        {"text_encoder.prompt", "text.prompt", "prompt"},
-        {"prompt", "text"}, MLFeatureTypeString);
+        {"text_encoder.prompt", "text.prompt", "prompt"}, {"prompt", "text"}, MLFeatureTypeString);
 
     NSMutableDictionary<NSString*, MLFeatureValue*>* features = [NSMutableDictionary dictionary];
     if (string_input) {
@@ -505,10 +488,10 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
         [features setObject:[MLFeatureValue featureValueWithString:prompt_string]
                      forKey:string_input];
     } else {
-        NSString* ids_name = resolve_feature_name(
-            impl->text_encoder, /*input=*/true, impl->io_config,
-            {"text_encoder.input_ids", "text.input_ids", "input_ids"},
-            {"input_ids"}, MLFeatureTypeMultiArray);
+        NSString* ids_name =
+            resolve_feature_name(impl->text_encoder, /*input=*/true, impl->io_config,
+                                 {"text_encoder.input_ids", "text.input_ids", "input_ids"},
+                                 {"input_ids"}, MLFeatureTypeMultiArray);
         if (!ids_name) {
             return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
                              "Unsupported TextEncoder layout: no prompt string or input_ids input");
@@ -516,7 +499,8 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
         MLFeatureDescription* ids_desc = feature_desc(impl->text_encoder, true, ids_name);
         std::vector<NSInteger> ids_shape = multiarray_shape(ids_desc, {1, 77});
         const size_t ids_count = shape_count(ids_shape);
-        const size_t seq_len = ids_shape.empty() ? ids_count : static_cast<size_t>(ids_shape.back());
+        const size_t seq_len =
+            ids_shape.empty() ? ids_count : static_cast<size_t>(ids_shape.back());
         // A malformed CoreML bundle could publish an input_ids shape whose
         // sequence dimension is 0; encode_prompt_tokens(prompt, 0) returns
         // an empty vector and the attention-mask `i % seq_len` modulo below
@@ -548,8 +532,8 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
         if (mask_name) {
             MLFeatureDescription* mask_desc = feature_desc(impl->text_encoder, true, mask_name);
             std::vector<NSInteger> mask_shape = multiarray_shape(mask_desc, ids_shape);
-            MLMultiArray* mask_array =
-                make_multiarray(mask_shape, multiarray_data_type(mask_desc, MLMultiArrayDataTypeInt32));
+            MLMultiArray* mask_array = make_multiarray(
+                mask_shape, multiarray_data_type(mask_desc, MLMultiArrayDataTypeInt32));
             if (!mask_array) {
                 return set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
                                  "Could not allocate TextEncoder attention_mask");
@@ -569,8 +553,7 @@ rac_result_t encode_text(rac_diffusion_coreml_impl* impl,
                          ("TextEncoder prediction failed: " + error).c_str());
     }
     MLMultiArray* embeddings = output_multiarray(
-        prediction, impl->text_encoder, impl->io_config,
-        {"text_encoder.output", "text.output"},
+        prediction, impl->text_encoder, impl->io_config, {"text_encoder.output", "text.output"},
         {"last_hidden_state", "hidden_states", "encoder_hidden_states", "text_embeddings"});
     if (!embeddings) {
         return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
@@ -587,12 +570,11 @@ struct LatentShape {
     NSInteger width = 64;
 };
 
-LatentShape resolve_latent_shape(MLFeatureDescription* sample_desc,
-                                 int32_t image_width,
+LatentShape resolve_latent_shape(MLFeatureDescription* sample_desc, int32_t image_width,
                                  int32_t image_height) {
-    std::vector<NSInteger> shape =
-        multiarray_shape(sample_desc, {1, 4, std::max<int32_t>(1, image_height / 8),
-                                       std::max<int32_t>(1, image_width / 8)});
+    std::vector<NSInteger> shape = multiarray_shape(
+        sample_desc,
+        {1, 4, std::max<int32_t>(1, image_height / 8), std::max<int32_t>(1, image_width / 8)});
     LatentShape out;
     if (shape.size() >= 4) {
         out.batch = shape[shape.size() - 4];
@@ -600,10 +582,14 @@ LatentShape resolve_latent_shape(MLFeatureDescription* sample_desc,
         out.height = shape[shape.size() - 2];
         out.width = shape[shape.size() - 1];
     }
-    if (out.batch <= 0) out.batch = 1;
-    if (out.channels <= 0) out.channels = 4;
-    if (out.height <= 0) out.height = std::max<int32_t>(1, image_height / 8);
-    if (out.width <= 0) out.width = std::max<int32_t>(1, image_width / 8);
+    if (out.batch <= 0)
+        out.batch = 1;
+    if (out.channels <= 0)
+        out.channels = 4;
+    if (out.height <= 0)
+        out.height = std::max<int32_t>(1, image_height / 8);
+    if (out.width <= 0)
+        out.width = std::max<int32_t>(1, image_width / 8);
     return out;
 }
 
@@ -640,8 +626,8 @@ std::vector<double> build_alpha_cumprod() {
     const double beta_end = 0.012;
     for (size_t i = 0; i < alpha.size(); ++i) {
         const double t = static_cast<double>(i) / static_cast<double>(alpha.size() - 1);
-        const double beta = std::pow(std::sqrt(beta_start) +
-                                     t * (std::sqrt(beta_end) - std::sqrt(beta_start)), 2.0);
+        const double beta = std::pow(
+            std::sqrt(beta_start) + t * (std::sqrt(beta_end) - std::sqrt(beta_start)), 2.0);
         product *= (1.0 - beta);
         alpha[i] = product;
     }
@@ -657,7 +643,8 @@ MLFeatureValue* timestep_feature(MLFeatureDescription* desc, int32_t timestep) {
     }
 
     std::vector<NSInteger> shape = multiarray_shape(desc, {1});
-    MLMultiArray* array = make_multiarray(shape, multiarray_data_type(desc, MLMultiArrayDataTypeInt32));
+    MLMultiArray* array =
+        make_multiarray(shape, multiarray_data_type(desc, MLMultiArrayDataTypeInt32));
     if (!array) {
         return nil;
     }
@@ -668,19 +655,18 @@ MLFeatureValue* timestep_feature(MLFeatureDescription* desc, int32_t timestep) {
 }
 
 MLMultiArray* make_batched_latents(const std::vector<float>& latents,
-                                   const LatentShape& latent_shape,
-                                   NSInteger batch,
+                                   const LatentShape& latent_shape, NSInteger batch,
                                    MLFeatureDescription* sample_desc) {
-    std::vector<NSInteger> shape = multiarray_shape(sample_desc, {
-        batch, latent_shape.channels, latent_shape.height, latent_shape.width
-    });
+    std::vector<NSInteger> shape = multiarray_shape(
+        sample_desc, {batch, latent_shape.channels, latent_shape.height, latent_shape.width});
     if (shape.size() >= 4) {
         shape[shape.size() - 4] = batch;
         shape[shape.size() - 3] = latent_shape.channels;
         shape[shape.size() - 2] = latent_shape.height;
         shape[shape.size() - 1] = latent_shape.width;
     }
-    MLMultiArray* array = make_multiarray(shape, multiarray_data_type(sample_desc, MLMultiArrayDataTypeFloat32));
+    MLMultiArray* array =
+        make_multiarray(shape, multiarray_data_type(sample_desc, MLMultiArrayDataTypeFloat32));
     if (!array) {
         return nil;
     }
@@ -693,10 +679,8 @@ MLMultiArray* make_batched_latents(const std::vector<float>& latents,
     return array;
 }
 
-MLMultiArray* make_batched_embeddings(MLMultiArray* negative,
-                                      MLMultiArray* positive,
-                                      NSInteger batch,
-                                      MLFeatureDescription* hidden_desc) {
+MLMultiArray* make_batched_embeddings(MLMultiArray* negative, MLMultiArray* positive,
+                                      NSInteger batch, MLFeatureDescription* hidden_desc) {
     if (batch <= 1) {
         return positive;
     }
@@ -705,8 +689,8 @@ MLMultiArray* make_batched_embeddings(MLMultiArray* negative,
     if (!base_shape.empty()) {
         base_shape[0] = batch;
     }
-    MLMultiArray* out = make_multiarray(base_shape,
-        multiarray_data_type(hidden_desc, positive.dataType));
+    MLMultiArray* out =
+        make_multiarray(base_shape, multiarray_data_type(hidden_desc, positive.dataType));
     if (!out) {
         return nil;
     }
@@ -723,18 +707,11 @@ MLMultiArray* make_batched_embeddings(MLMultiArray* negative,
     return out;
 }
 
-rac_result_t predict_noise(rac_diffusion_coreml_impl* impl,
-                           const std::vector<float>& latents,
-                           const LatentShape& latent_shape,
-                           int32_t timestep,
-                           float guidance_scale,
-                           MLMultiArray* prompt_embeddings,
-                           MLMultiArray* negative_embeddings,
-                           NSString* sample_name,
-                           NSString* timestep_name,
-                           NSString* hidden_name,
-                           NSString* output_name,
-                           std::vector<float>& out_noise,
+rac_result_t predict_noise(rac_diffusion_coreml_impl* impl, const std::vector<float>& latents,
+                           const LatentShape& latent_shape, int32_t timestep, float guidance_scale,
+                           MLMultiArray* prompt_embeddings, MLMultiArray* negative_embeddings,
+                           NSString* sample_name, NSString* timestep_name, NSString* hidden_name,
+                           NSString* output_name, std::vector<float>& out_noise,
                            rac_diffusion_result_t* out_result) {
     MLFeatureDescription* sample_desc = feature_desc(impl->unet, true, sample_name);
     MLFeatureDescription* timestep_desc = feature_desc(impl->unet, true, timestep_name);
@@ -751,13 +728,12 @@ rac_result_t predict_noise(rac_diffusion_coreml_impl* impl,
         MLMultiArray* hidden_array = make_batched_embeddings(nil, embeddings, 1, hidden_desc);
         MLFeatureValue* timestep_value = timestep_feature(timestep_desc, timestep);
         if (!sample_array || !hidden_array || !timestep_value) {
-            return set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
-                             "Could not allocate Unet inputs");
+            return set_error(out_result, RAC_ERROR_OUT_OF_MEMORY, "Could not allocate Unet inputs");
         }
         NSDictionary<NSString*, MLFeatureValue*>* features = @{
-            sample_name: [MLFeatureValue featureValueWithMultiArray:sample_array],
-            timestep_name: timestep_value,
-            hidden_name: [MLFeatureValue featureValueWithMultiArray:hidden_array],
+            sample_name : [MLFeatureValue featureValueWithMultiArray:sample_array],
+            timestep_name : timestep_value,
+            hidden_name : [MLFeatureValue featureValueWithMultiArray:hidden_array],
         };
         id<MLFeatureProvider> prediction = nil;
         std::string error;
@@ -806,9 +782,9 @@ rac_result_t predict_noise(rac_diffusion_coreml_impl* impl,
                          "Could not allocate batched Unet inputs");
     }
     NSDictionary<NSString*, MLFeatureValue*>* features = @{
-        sample_name: [MLFeatureValue featureValueWithMultiArray:sample_array],
-        timestep_name: timestep_value,
-        hidden_name: [MLFeatureValue featureValueWithMultiArray:hidden_array],
+        sample_name : [MLFeatureValue featureValueWithMultiArray:sample_array],
+        timestep_name : timestep_value,
+        hidden_name : [MLFeatureValue featureValueWithMultiArray:hidden_array],
     };
     id<MLFeatureProvider> prediction = nil;
     std::string error;
@@ -832,15 +808,11 @@ rac_result_t predict_noise(rac_diffusion_coreml_impl* impl,
     return RAC_SUCCESS;
 }
 
-void ddim_step(std::vector<float>& latents,
-               const std::vector<float>& noise,
-               int32_t timestep,
-               int32_t previous_timestep,
-               const std::vector<double>& alpha_cumprod) {
+void ddim_step(std::vector<float>& latents, const std::vector<float>& noise, int32_t timestep,
+               int32_t previous_timestep, const std::vector<double>& alpha_cumprod) {
     const double alpha_t = alpha_cumprod[std::clamp(timestep, 0, 999)];
-    const double alpha_prev = previous_timestep >= 0
-        ? alpha_cumprod[std::clamp(previous_timestep, 0, 999)]
-        : 1.0;
+    const double alpha_prev =
+        previous_timestep >= 0 ? alpha_cumprod[std::clamp(previous_timestep, 0, 999)] : 1.0;
     const double sqrt_alpha_t = std::sqrt(alpha_t);
     const double sqrt_one_minus_alpha_t = std::sqrt(1.0 - alpha_t);
     const double sqrt_alpha_prev = std::sqrt(alpha_prev);
@@ -850,24 +822,23 @@ void ddim_step(std::vector<float>& latents,
         const double predicted_original =
             (static_cast<double>(latents[i]) - sqrt_one_minus_alpha_t * noise[i]) /
             std::max(1e-8, sqrt_alpha_t);
-        latents[i] = static_cast<float>(
-            sqrt_alpha_prev * predicted_original + sqrt_one_minus_alpha_prev * noise[i]);
+        latents[i] = static_cast<float>(sqrt_alpha_prev * predicted_original +
+                                        sqrt_one_minus_alpha_prev * noise[i]);
     }
 }
 
-MLMultiArray* make_vae_latents(const std::vector<float>& latents,
-                               const LatentShape& latent_shape,
+MLMultiArray* make_vae_latents(const std::vector<float>& latents, const LatentShape& latent_shape,
                                MLFeatureDescription* latent_desc) {
-    std::vector<NSInteger> shape = multiarray_shape(latent_desc, {
-        1, latent_shape.channels, latent_shape.height, latent_shape.width
-    });
+    std::vector<NSInteger> shape = multiarray_shape(
+        latent_desc, {1, latent_shape.channels, latent_shape.height, latent_shape.width});
     if (shape.size() >= 4) {
         shape[shape.size() - 4] = 1;
         shape[shape.size() - 3] = latent_shape.channels;
         shape[shape.size() - 2] = latent_shape.height;
         shape[shape.size() - 1] = latent_shape.width;
     }
-    MLMultiArray* array = make_multiarray(shape, multiarray_data_type(latent_desc, MLMultiArrayDataTypeFloat32));
+    MLMultiArray* array =
+        make_multiarray(shape, multiarray_data_type(latent_desc, MLMultiArrayDataTypeFloat32));
     if (!array) {
         return nil;
     }
@@ -877,11 +848,8 @@ MLMultiArray* make_vae_latents(const std::vector<float>& latents,
     return array;
 }
 
-bool convert_decoded_image(MLMultiArray* image,
-                           uint8_t** out_rgba,
-                           size_t* out_size,
-                           int32_t* out_width,
-                           int32_t* out_height) {
+bool convert_decoded_image(MLMultiArray* image, uint8_t** out_rgba, size_t* out_size,
+                           int32_t* out_width, int32_t* out_height) {
     if (!image || !out_rgba || !out_size || !out_width || !out_height) {
         return false;
     }
@@ -927,13 +895,11 @@ bool convert_decoded_image(MLMultiArray* image,
     auto read_pixel = [&](NSInteger y, NSInteger x, NSInteger c) {
         size_t idx = 0;
         if (shape.size() == 4) {
-            idx = nchw
-                ? static_cast<size_t>((c * height + y) * width + x)
-                : static_cast<size_t>((y * width + x) * channels + c);
+            idx = nchw ? static_cast<size_t>((c * height + y) * width + x)
+                       : static_cast<size_t>((y * width + x) * channels + c);
         } else {
-            idx = nchw
-                ? static_cast<size_t>((c * height + y) * width + x)
-                : static_cast<size_t>((y * width + x) * channels + c);
+            idx = nchw ? static_cast<size_t>((c * height + y) * width + x)
+                       : static_cast<size_t>((y * width + x) * channels + c);
         }
         return array_get(image, idx);
     };
@@ -961,22 +927,19 @@ bool convert_decoded_image(MLMultiArray* image,
     return true;
 }
 
-rac_result_t decode_latents(rac_diffusion_coreml_impl* impl,
-                            const std::vector<float>& latents,
-                            const LatentShape& latent_shape,
-                            MLMultiArray** out_decoded,
+rac_result_t decode_latents(rac_diffusion_coreml_impl* impl, const std::vector<float>& latents,
+                            const LatentShape& latent_shape, MLMultiArray** out_decoded,
                             rac_diffusion_result_t* out_result) {
-    NSString* latent_name = resolve_feature_name(
-        impl->vae_decoder, true, impl->io_config,
-        {"vae_decoder.latent", "vae.latent", "vae_decoder.input", "vae.input"},
-        {"z", "latent", "latents", "sample"}, MLFeatureTypeMultiArray);
-    NSString* image_name = resolve_feature_name(
-        impl->vae_decoder, false, impl->io_config,
-        {"vae_decoder.output", "vae.output", "vae_decoder.image", "vae.image"},
-        {"image", "images", "decoded", "sample"}, MLFeatureTypeMultiArray);
+    NSString* latent_name =
+        resolve_feature_name(impl->vae_decoder, true, impl->io_config,
+                             {"vae_decoder.latent", "vae.latent", "vae_decoder.input", "vae.input"},
+                             {"z", "latent", "latents", "sample"}, MLFeatureTypeMultiArray);
+    NSString* image_name =
+        resolve_feature_name(impl->vae_decoder, false, impl->io_config,
+                             {"vae_decoder.output", "vae.output", "vae_decoder.image", "vae.image"},
+                             {"image", "images", "decoded", "sample"}, MLFeatureTypeMultiArray);
     if (!latent_name || !image_name) {
-        return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
-                         "Unsupported VAEDecoder layout");
+        return set_error(out_result, RAC_ERROR_NOT_SUPPORTED, "Unsupported VAEDecoder layout");
     }
 
     MLFeatureDescription* latent_desc = feature_desc(impl->vae_decoder, true, latent_name);
@@ -985,9 +948,8 @@ rac_result_t decode_latents(rac_diffusion_coreml_impl* impl,
         return set_error(out_result, RAC_ERROR_OUT_OF_MEMORY,
                          "Could not allocate VAEDecoder latent input");
     }
-    NSDictionary<NSString*, MLFeatureValue*>* features = @{
-        latent_name: [MLFeatureValue featureValueWithMultiArray:latent_array]
-    };
+    NSDictionary<NSString*, MLFeatureValue*>* features =
+        @{latent_name : [MLFeatureValue featureValueWithMultiArray:latent_array]};
     id<MLFeatureProvider> prediction = nil;
     std::string error;
     if (!run_prediction(impl->vae_decoder, features, &prediction, &error)) {
@@ -1005,8 +967,7 @@ rac_result_t decode_latents(rac_diffusion_coreml_impl* impl,
 }
 
 bool run_safety_checker(rac_diffusion_coreml_impl* impl, MLMultiArray* decoded_image) {
-    if (!impl->safety_checker || !decoded_image ||
-        impl->config.enable_safety_checker != RAC_TRUE) {
+    if (!impl->safety_checker || !decoded_image || impl->config.enable_safety_checker != RAC_TRUE) {
         return false;
     }
 
@@ -1016,8 +977,7 @@ bool run_safety_checker(rac_diffusion_coreml_impl* impl, MLMultiArray* decoded_i
     for (NSString* input_name in input_descs) {
         MLFeatureDescription* desc = [input_descs objectForKey:input_name];
         if (desc.type == MLFeatureTypeMultiArray &&
-            ([[input_name lowercaseString] containsString:@"image"] ||
-             input_descs.count == 1)) {
+            ([[input_name lowercaseString] containsString:@"image"] || input_descs.count == 1)) {
             [features setObject:[MLFeatureValue featureValueWithMultiArray:decoded_image]
                          forKey:input_name];
         }
@@ -1056,18 +1016,17 @@ bool run_safety_checker(rac_diffusion_coreml_impl* impl, MLMultiArray* decoded_i
 
 rac_result_t generate_internal(rac_diffusion_coreml_impl_t* impl,
                                const rac_diffusion_options_t* options,
-                               rac_diffusion_progress_callback_fn progress_cb,
-                               void* user_data,
+                               rac_diffusion_progress_callback_fn progress_cb, void* user_data,
                                rac_diffusion_result_t* out_result) {
-    if (!impl || !options || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !options || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     if (!impl->initialized.load(std::memory_order_acquire)) {
         return RAC_ERROR_BACKEND_NOT_READY;
     }
 
     std::memset(out_result, 0, sizeof(*out_result));
     if (!options->prompt || options->prompt[0] == '\0') {
-        return set_error(out_result, RAC_ERROR_EMPTY_INPUT,
-                         "Diffusion prompt is required");
+        return set_error(out_result, RAC_ERROR_EMPTY_INPUT, "Diffusion prompt is required");
     }
     if (options->mode != RAC_DIFFUSION_MODE_TEXT_TO_IMAGE) {
         return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
@@ -1098,34 +1057,27 @@ rac_result_t generate_internal(rac_diffusion_coreml_impl_t* impl,
         }
 
         NSString* sample_name = resolve_feature_name(
-            impl->unet, true, impl->io_config,
-            {"unet.sample", "unet.input_sample", "unet.latent"},
+            impl->unet, true, impl->io_config, {"unet.sample", "unet.input_sample", "unet.latent"},
             {"sample", "latent_model_input", "latents"}, MLFeatureTypeMultiArray);
-        NSString* timestep_name = resolve_feature_name(
-            impl->unet, true, impl->io_config,
-            {"unet.timestep", "unet.time"},
-            {"timestep", "t", "time_step"},
-            MLFeatureTypeInvalid);
+        NSString* timestep_name =
+            resolve_feature_name(impl->unet, true, impl->io_config, {"unet.timestep", "unet.time"},
+                                 {"timestep", "t", "time_step"}, MLFeatureTypeInvalid);
         NSString* hidden_name = resolve_feature_name(
             impl->unet, true, impl->io_config,
             {"unet.encoder_hidden_states", "unet.hidden", "unet.text_embeddings"},
-            {"encoder_hidden_states", "hidden_states", "text_embeds"},
-            MLFeatureTypeMultiArray);
+            {"encoder_hidden_states", "hidden_states", "text_embeds"}, MLFeatureTypeMultiArray);
         NSString* output_name = resolve_feature_name(
-            impl->unet, false, impl->io_config,
-            {"unet.output", "unet.noise_pred"},
+            impl->unet, false, impl->io_config, {"unet.output", "unet.noise_pred"},
             {"noise_pred", "out_sample", "sample"}, MLFeatureTypeMultiArray);
         if (!sample_name || !timestep_name || !hidden_name || !output_name) {
-            return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
-                             "Unsupported Unet layout");
+            return set_error(out_result, RAC_ERROR_NOT_SUPPORTED, "Unsupported Unet layout");
         }
 
         MLFeatureDescription* sample_desc = feature_desc(impl->unet, true, sample_name);
         LatentShape latent_shape = resolve_latent_shape(sample_desc, width, height);
-        const size_t latent_count =
-            static_cast<size_t>(latent_shape.channels) *
-            static_cast<size_t>(latent_shape.height) *
-            static_cast<size_t>(latent_shape.width);
+        const size_t latent_count = static_cast<size_t>(latent_shape.channels) *
+                                    static_cast<size_t>(latent_shape.height) *
+                                    static_cast<size_t>(latent_shape.width);
         std::vector<float> latents = initial_latents(latent_count, seed);
         const std::vector<double> alpha_cumprod = build_alpha_cumprod();
 
@@ -1134,17 +1086,19 @@ rac_result_t generate_internal(rac_diffusion_coreml_impl_t* impl,
                 return set_error(out_result, RAC_ERROR_CANCELLED,
                                  "CoreML diffusion generation cancelled");
             }
-            const int32_t timestep = steps == 1
-                ? 999
-                : static_cast<int32_t>(std::lround(999.0 - (999.0 * step) / (steps - 1)));
-            const int32_t previous_timestep = (step + 1 < steps)
-                ? static_cast<int32_t>(std::lround(999.0 - (999.0 * (step + 1)) / (steps - 1)))
-                : -1;
+            const int32_t timestep =
+                steps == 1
+                    ? 999
+                    : static_cast<int32_t>(std::lround(999.0 - (999.0 * step) / (steps - 1)));
+            const int32_t previous_timestep =
+                (step + 1 < steps)
+                    ? static_cast<int32_t>(std::lround(999.0 - (999.0 * (step + 1)) / (steps - 1)))
+                    : -1;
 
             std::vector<float> noise;
-            rc = predict_noise(impl, latents, latent_shape, timestep, guidance,
-                               prompt_embeddings, negative_embeddings, sample_name,
-                               timestep_name, hidden_name, output_name, noise, out_result);
+            rc = predict_noise(impl, latents, latent_shape, timestep, guidance, prompt_embeddings,
+                               negative_embeddings, sample_name, timestep_name, hidden_name,
+                               output_name, noise, out_result);
             if (rc != RAC_SUCCESS) {
                 return rc;
             }
@@ -1184,8 +1138,7 @@ rac_result_t generate_internal(rac_diffusion_coreml_impl_t* impl,
         out_result->height = image_height;
         out_result->seed_used = seed;
         out_result->generation_time_ms = now_ms() - started;
-        out_result->safety_flagged =
-            run_safety_checker(impl, decoded) ? RAC_TRUE : RAC_FALSE;
+        out_result->safety_flagged = run_safety_checker(impl, decoded) ? RAC_TRUE : RAC_FALSE;
         out_result->error_code = RAC_SUCCESS;
         out_result->error_message = nullptr;
         return RAC_SUCCESS;
@@ -1200,16 +1153,18 @@ extern "C" {
 // Lifecycle
 // -----------------------------------------------------------------------------
 
-rac_result_t rac_diffusion_coreml_create(const char* model_id,
-                                         const char* /*config_json*/,
+rac_result_t rac_diffusion_coreml_create(const char* model_id, const char* /*config_json*/,
                                          rac_diffusion_coreml_impl_t** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    if (!out_impl)
+        return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 
     auto* impl = new (std::nothrow) rac_diffusion_coreml_impl();
-    if (!impl) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!impl)
+        return RAC_ERROR_OUT_OF_MEMORY;
 
-    if (model_id) impl->model_id = model_id;
+    if (model_id)
+        impl->model_id = model_id;
     impl->config = RAC_DIFFUSION_CONFIG_DEFAULT;
 
     *out_impl = impl;
@@ -1221,10 +1176,13 @@ rac_result_t rac_diffusion_coreml_create(const char* model_id,
 rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
                                              const char* model_path,
                                              const rac_diffusion_config_t* config) {
-    if (!impl) return RAC_ERROR_NULL_POINTER;
-    if (!model_path) return RAC_ERROR_INVALID_ARGUMENT;
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
+    if (!model_path)
+        return RAC_ERROR_INVALID_ARGUMENT;
     rac_result_t runtime_rc = rac_coreml_runtime_require_available();
-    if (runtime_rc != RAC_SUCCESS) return runtime_rc;
+    if (runtime_rc != RAC_SUCCESS)
+        return runtime_rc;
 
     std::lock_guard<std::mutex> lock(impl->mtx);
 
@@ -1236,12 +1194,9 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
         }
         NSString* dir = rac_coreml_find_resource_dir(model_path_str, @"Unet");
         BOOL is_dir = NO;
-        if (!dir
-            || ![[NSFileManager defaultManager] fileExistsAtPath:dir
-                                                    isDirectory:&is_dir]
-            || !is_dir) {
-            RAC_LOG_ERROR(kLogCat, "Model path missing / not a directory: %s",
-                          model_path);
+        if (!dir || ![[NSFileManager defaultManager] fileExistsAtPath:dir isDirectory:&is_dir] ||
+            !is_dir) {
+            RAC_LOG_ERROR(kLogCat, "Model path missing / not a directory: %s", model_path);
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
 
@@ -1261,17 +1216,15 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
 
         impl->text_encoder =
             rac_coreml_load_model_in_dir(dir, @"TextEncoder", /*required=*/true, kLogCat);
-        impl->unet =
-            rac_coreml_load_model_in_dir(dir, @"Unet", /*required=*/true, kLogCat);
+        impl->unet = rac_coreml_load_model_in_dir(dir, @"Unet", /*required=*/true, kLogCat);
         impl->vae_decoder =
             rac_coreml_load_model_in_dir(dir, @"VAEDecoder", /*required=*/true, kLogCat);
         impl->safety_checker =
             rac_coreml_load_model_in_dir(dir, @"SafetyChecker", /*required=*/false, kLogCat);
 
         if (!impl->text_encoder || !impl->unet || !impl->vae_decoder) {
-            RAC_LOG_ERROR(kLogCat,
-                          "CoreML diffusion initialize failed — missing one of "
-                          "TextEncoder.mlmodelc / Unet.mlmodelc / VAEDecoder.mlmodelc");
+            RAC_LOG_ERROR(kLogCat, "CoreML diffusion initialize failed — missing one of "
+                                   "TextEncoder.mlmodelc / Unet.mlmodelc / VAEDecoder.mlmodelc");
             // rac_coreml_load_model_in_dir returns a retained MLModel
             // (NS_RETURNS_RETAINED). Release any partially loaded models on
             // the error path so we don't leak a strong ref per failed init.
@@ -1287,7 +1240,8 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
         }
 
         impl->model_path = [dir UTF8String];
-        if (config) impl->config = *config;
+        if (config)
+            impl->config = *config;
         impl->io_config = CoreMLSDIOConfig{};
         load_json_config(impl->io_config, dir);
         load_model_metadata_config(impl->io_config, impl->text_encoder);
@@ -1308,8 +1262,7 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
         RAC_LOG_INFO(kLogCat,
                      "Initialized CoreML diffusion at %s "
                      "(safety_checker=%s)",
-                     [dir UTF8String],
-                     impl->safety_checker ? "present" : "absent");
+                     [dir UTF8String], impl -> safety_checker ? "present" : "absent");
     }
     return RAC_SUCCESS;
 }
@@ -1325,10 +1278,8 @@ rac_result_t rac_diffusion_coreml_generate(rac_diffusion_coreml_impl_t* impl,
 }
 
 rac_result_t rac_diffusion_coreml_generate_with_progress(
-    rac_diffusion_coreml_impl_t* impl,
-    const rac_diffusion_options_t* options,
-    rac_diffusion_progress_callback_fn progress_cb,
-    void* user_data,
+    rac_diffusion_coreml_impl_t* impl, const rac_diffusion_options_t* options,
+    rac_diffusion_progress_callback_fn progress_cb, void* user_data,
     rac_diffusion_result_t* out_result) {
     return generate_internal(impl, options, progress_cb, user_data, out_result);
 }
@@ -1339,21 +1290,20 @@ rac_result_t rac_diffusion_coreml_generate_with_progress(
 
 rac_result_t rac_diffusion_coreml_get_info(const rac_diffusion_coreml_impl_t* impl,
                                            rac_diffusion_info_t* out_info) {
-    if (!impl || !out_info) return RAC_ERROR_NULL_POINTER;
+    if (!impl || !out_info)
+        return RAC_ERROR_NULL_POINTER;
     std::memset(out_info, 0, sizeof(*out_info));
 
     const bool ready = impl->initialized.load(std::memory_order_acquire);
-    out_info->is_ready                = ready ? RAC_TRUE : RAC_FALSE;
-    out_info->current_model           = impl->model_id.empty()
-                                            ? nullptr
-                                            : impl->model_id.c_str();
-    out_info->model_variant           = impl->config.model_variant;
-    out_info->supports_text_to_image  = RAC_TRUE;
+    out_info->is_ready = ready ? RAC_TRUE : RAC_FALSE;
+    out_info->current_model = impl->model_id.empty() ? nullptr : impl->model_id.c_str();
+    out_info->model_variant = impl->config.model_variant;
+    out_info->supports_text_to_image = RAC_TRUE;
     out_info->supports_image_to_image = RAC_FALSE;
-    out_info->supports_inpainting     = RAC_FALSE;
-    out_info->safety_checker_enabled  = impl->safety_checker ? RAC_TRUE : RAC_FALSE;
-    out_info->max_width               = 1024;
-    out_info->max_height              = 1024;
+    out_info->supports_inpainting = RAC_FALSE;
+    out_info->safety_checker_enabled = impl->safety_checker ? RAC_TRUE : RAC_FALSE;
+    out_info->max_width = 1024;
+    out_info->max_height = 1024;
     return RAC_SUCCESS;
 }
 
@@ -1366,13 +1316,15 @@ uint32_t rac_diffusion_coreml_get_capabilities(const rac_diffusion_coreml_impl_t
 }
 
 rac_result_t rac_diffusion_coreml_cancel(rac_diffusion_coreml_impl_t* impl) {
-    if (!impl) return RAC_ERROR_NULL_POINTER;
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
     impl->cancel_requested.store(true, std::memory_order_release);
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t* impl) {
-    if (!impl) return RAC_ERROR_NULL_POINTER;
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
     std::lock_guard<std::mutex> lock(impl->mtx);
     // Pair the retain that rac_coreml_load_model_in_dir performed during
     // initialize. Without these -release calls the MLModel instances would
@@ -1391,7 +1343,8 @@ rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t* impl) {
 }
 
 void rac_diffusion_coreml_destroy(rac_diffusion_coreml_impl_t* impl) {
-    if (!impl) return;
+    if (!impl)
+        return;
     rac_diffusion_coreml_cleanup(impl);
     delete impl;
 }
