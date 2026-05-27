@@ -359,6 +359,53 @@ struct Session::Impl {
 Session::Session(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
 Session::~Session() = default;
 
+namespace {
+
+/* Build an OrtSessionOptions configured per SessionOptions, with the active
+ * EP applied. On failure returns nullptr and writes the message into
+ * out_error; on success the caller owns the returned options and must
+ * ReleaseSessionOptions when done. */
+OrtSessionOptions *prepare_session_options(const SharedOrt &ort,
+                                           const SessionOptions &options,
+                                           std::string *out_error) {
+  OrtSessionOptions *session_options = nullptr;
+  OrtStatus *status = ort.api->CreateSessionOptions(&session_options);
+  if (status != nullptr) {
+    if (out_error)
+      *out_error = status_message(ort.api, status);
+    return nullptr;
+  }
+
+  status =
+      ort.api->SetIntraOpNumThreads(session_options, options.intra_op_threads);
+  if (status != nullptr) {
+    if (out_error)
+      *out_error = status_message(ort.api, status);
+    ort.api->ReleaseSessionOptions(session_options);
+    return nullptr;
+  }
+
+  if (options.enable_all_optimizations) {
+    status = ort.api->SetSessionGraphOptimizationLevel(session_options,
+                                                       ORT_ENABLE_ALL);
+    if (status != nullptr) {
+      if (out_error)
+        *out_error = status_message(ort.api, status);
+      ort.api->ReleaseSessionOptions(session_options);
+      return nullptr;
+    }
+  }
+
+  /* RT-ONNX-04: append the currently-active execution provider, if any.
+   * `apply_active_ep` is advisory -- CoreML is the only real wiring today;
+   * CUDA / DirectML / NNAPI / QNN / WebGPU accept activation but degrade
+   * gracefully to CPU-only execution until their linker paths land. */
+  (void)apply_active_ep(ort.api, session_options);
+  return session_options;
+}
+
+} // namespace
+
 std::unique_ptr<Session> Session::create(const std::string &model_path,
                                          const SessionOptions &options,
                                          std::string *out_error) {
@@ -369,46 +416,10 @@ std::unique_ptr<Session> Session::create(const std::string &model_path,
     return nullptr;
   }
 
-  OrtSessionOptions *session_options = nullptr;
-  OrtStatus *status = ort.api->CreateSessionOptions(&session_options);
-  if (status != nullptr) {
-    if (out_error)
-      *out_error = status_message(ort.api, status);
+  OrtSessionOptions *session_options =
+      prepare_session_options(ort, options, out_error);
+  if (!session_options)
     return nullptr;
-  }
-
-  auto release_options = [&]() {
-    if (session_options) {
-      ort.api->ReleaseSessionOptions(session_options);
-      session_options = nullptr;
-    }
-  };
-
-  status =
-      ort.api->SetIntraOpNumThreads(session_options, options.intra_op_threads);
-  if (status != nullptr) {
-    if (out_error)
-      *out_error = status_message(ort.api, status);
-    release_options();
-    return nullptr;
-  }
-
-  if (options.enable_all_optimizations) {
-    status = ort.api->SetSessionGraphOptimizationLevel(session_options,
-                                                       ORT_ENABLE_ALL);
-    if (status != nullptr) {
-      if (out_error)
-        *out_error = status_message(ort.api, status);
-      release_options();
-      return nullptr;
-    }
-  }
-
-  /* RT-ONNX-04: append the currently-active execution provider, if any.
-   * `apply_active_ep` is advisory — CoreML is the only real wiring today;
-   * CUDA / DirectML / NNAPI / QNN / WebGPU accept activation but degrade
-   * gracefully to CPU-only execution until their linker paths land. */
-  (void)apply_active_ep(ort.api, session_options);
 
   /* RT-ONNX-07: `CreateSession` is called without any global lock. ORT's
    * contract is that `CreateSession` may run concurrently from multiple
@@ -419,13 +430,59 @@ std::unique_ptr<Session> Session::create(const std::string &model_path,
   OrtSession *raw_session = nullptr;
 #ifdef _WIN32
   std::wstring wpath = rac_to_wstring(model_path);
-  status = ort.api->CreateSession(ort.env, wpath.c_str(), session_options,
-                                  &raw_session);
+  OrtStatus *status = ort.api->CreateSession(
+      ort.env, wpath.c_str(), session_options, &raw_session);
 #else
-  status = ort.api->CreateSession(ort.env, model_path.c_str(), session_options,
-                                  &raw_session);
+  OrtStatus *status = ort.api->CreateSession(
+      ort.env, model_path.c_str(), session_options, &raw_session);
 #endif
-  release_options();
+  ort.api->ReleaseSessionOptions(session_options);
+
+  if (status != nullptr) {
+    if (out_error)
+      *out_error = status_message(ort.api, status);
+    return nullptr;
+  }
+
+  auto impl = std::unique_ptr<Impl>(new (std::nothrow) Impl());
+  if (!impl) {
+    ort.api->ReleaseSession(raw_session);
+    if (out_error)
+      *out_error = "out of memory";
+    return nullptr;
+  }
+  impl->api = ort.api;
+  impl->session = raw_session;
+  (void)options.log_id;
+  return std::unique_ptr<Session>(new (std::nothrow) Session(std::move(impl)));
+}
+
+std::unique_ptr<Session>
+Session::create_from_blob(const void *model_data, size_t model_data_bytes,
+                          const SessionOptions &options,
+                          std::string *out_error) {
+  if (!model_data || model_data_bytes == 0) {
+    if (out_error)
+      *out_error = "onnxrt: empty model_blob";
+    return nullptr;
+  }
+
+  SharedOrt &ort = shared_ort();
+  if (!ort.ready()) {
+    if (out_error)
+      *out_error = ort.init_error;
+    return nullptr;
+  }
+
+  OrtSessionOptions *session_options =
+      prepare_session_options(ort, options, out_error);
+  if (!session_options)
+    return nullptr;
+
+  OrtSession *raw_session = nullptr;
+  OrtStatus *status = ort.api->CreateSessionFromArray(
+      ort.env, model_data, model_data_bytes, session_options, &raw_session);
+  ort.api->ReleaseSessionOptions(session_options);
 
   if (status != nullptr) {
     if (out_error)
@@ -687,7 +744,14 @@ rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t *desc,
                                    rac_runtime_session_t **out) {
   if (!desc || !out)
     return RAC_ERROR_NULL_POINTER;
-  if (!desc->model_path)
+  /* runtimes-004: rac_runtime_session_desc_t allows either a model_path on
+   * disk OR an in-memory model_blob (vtable header line 308-312). Reject only
+   * the truly-empty case where neither input is provided. The path vs. blob
+   * branch is selected below; provider sessions take desc as-is and may use
+   * either field. */
+  const bool has_path = desc->model_path && desc->model_path[0] != '\0';
+  const bool has_blob = desc->model_blob != nullptr && desc->model_blob_bytes > 0;
+  if (!has_path && !has_blob)
     return RAC_ERROR_INVALID_PARAMETER;
   *out = nullptr;
 
@@ -722,8 +786,16 @@ rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t *desc,
 
   std::string error;
   runanywhere::runtime::onnxrt::SessionOptions options{};
-  auto session = runanywhere::runtime::onnxrt::Session::create(desc->model_path,
-                                                               options, &error);
+  std::unique_ptr<runanywhere::runtime::onnxrt::Session> session;
+  if (has_path) {
+    session = runanywhere::runtime::onnxrt::Session::create(desc->model_path,
+                                                            options, &error);
+  } else {
+    /* runtimes-004: in-memory blob path. ORT's CreateSessionFromArray
+     * (via Session::create_from_blob) is the canonical no-disk-read route. */
+    session = runanywhere::runtime::onnxrt::Session::create_from_blob(
+        desc->model_blob, desc->model_blob_bytes, options, &error);
+  }
   if (!session) {
     RAC_LOG_ERROR("Runtime.ONNXRT", "create_session failed: %s", error.c_str());
     return RAC_ERROR_MODEL_LOAD_FAILED;

@@ -76,6 +76,15 @@ public:
                                          const SessionOptions &options,
                                          std::string *out_error);
 
+  /** runtimes-004: in-memory model bytes path. The vtable contract for
+   *  `rac_runtime_session_desc_t` (rac_runtime_vtable.h:303-315) declares
+   *  model_blob/model_blob_bytes as a peer to model_path -- both must be
+   *  honored. ORT routes blobs through CreateSessionFromArray. */
+  static std::unique_ptr<Session> create_from_blob(const void *model_data,
+                                                   size_t model_data_bytes,
+                                                   const SessionOptions &options,
+                                                   std::string *out_error);
+
   rac_result_t run(const TensorInput *inputs, size_t input_count,
                    const char *const *output_names, size_t output_count,
                    std::vector<TensorOutput> &outputs, std::string *out_error);
