@@ -62,10 +62,6 @@ DeviceType SherpaBackend::get_device_type() const { return DeviceType::CPU; }
 
 size_t SherpaBackend::get_memory_usage() const { return 0; }
 
-void SherpaBackend::set_telemetry_callback(TelemetryCallback callback) {
-  telemetry_.set_callback(callback);
-}
-
 void SherpaBackend::create_capabilities() {
   stt_ = std::make_unique<SherpaSTT>(this);
 

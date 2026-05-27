@@ -9,10 +9,8 @@
  */
 
 #include <atomic>
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
@@ -173,31 +171,6 @@ struct VADResult {
 };
 
 // =============================================================================
-// TELEMETRY (simple inline implementation)
-// =============================================================================
-
-using TelemetryCallback = std::function<void(const std::string &event_json)>;
-
-class TelemetryCollector {
-public:
-  void set_callback(TelemetryCallback callback) { callback_ = callback; }
-
-  void emit(const std::string &event_type, const nlohmann::json &data = {}) {
-    if (callback_) {
-      nlohmann::json event = {
-          {"type", event_type},
-          {"data", data},
-          {"timestamp",
-           std::chrono::system_clock::now().time_since_epoch().count()}};
-      callback_(event.dump());
-    }
-  }
-
-private:
-  TelemetryCallback callback_;
-};
-
-// =============================================================================
 // FORWARD DECLARATIONS
 // =============================================================================
 
@@ -223,8 +196,6 @@ public:
 
   const DeviceInfo &get_device_info() const { return device_info_; }
 
-  void set_telemetry_callback(TelemetryCallback callback);
-
   // Get capability implementations
   SherpaSTT *get_stt() { return stt_.get(); }
   SherpaTTS *get_tts() { return tts_.get(); }
@@ -236,7 +207,6 @@ private:
   std::atomic<bool> initialized_{false};
   nlohmann::json config_;
   DeviceInfo device_info_;
-  TelemetryCollector telemetry_;
 
   std::unique_ptr<SherpaSTT> stt_;
   std::unique_ptr<SherpaTTS> tts_;
