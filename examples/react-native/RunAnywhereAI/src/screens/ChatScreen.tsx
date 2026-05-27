@@ -609,9 +609,10 @@ export const ChatScreen: React.FC = () => {
   // Expose test helpers for E2E automation via Hermes debugger
   useEffect(() => {
     if (__DEV__) {
-      (globalThis as any).__testNewChat = handleNewChat;
-      (globalThis as any).__testSend = handleSend;
-      (globalThis as any).__testSetInput = setInputText;
+      const g = globalThis as unknown as Record<string, unknown>;
+      g.__testNewChat = handleNewChat;
+      g.__testSend = handleSend;
+      g.__testSetInput = setInputText;
     }
   }, [handleNewChat, handleSend]);
 

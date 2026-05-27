@@ -13,10 +13,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, Button, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
-import {
-  VOICE_AGENT_YAML,
-  RAG_YAML,
-} from '../generated/solutionsYaml';
+import { VOICE_AGENT_YAML, RAG_YAML } from '../generated/solutionsYaml';
 
 export const SolutionsScreen: React.FC = () => {
   const [log, setLog] = useState<string[]>([]);

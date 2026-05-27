@@ -71,7 +71,6 @@ function hasUsableBackendConfig(options: {
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP as OptionalBackend;
 } catch {
   logDiagnostic(
@@ -82,7 +81,6 @@ try {
 // Make Genie optional (Android/Snapdragon only)
 let Genie: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   Genie = require('@runanywhere/genie').Genie as OptionalBackend;
 } catch {
   logDiagnostic('[App] Genie NPU backend not available');
@@ -90,7 +88,6 @@ try {
 
 let ONNX: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   ONNX = require('@runanywhere/onnx').ONNX as OptionalBackend;
 } catch {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
@@ -347,13 +344,13 @@ async function registerModulesAndModels(): Promise<void> {
     const npuChip = await RunAnywhere.hardware.getNPUChip();
     if (npuChip === NPUChip.NPU_CHIP_QUALCOMM_HEXAGON) {
       const rawChip = (await RunAnywhere.hardware.getChip()).toLowerCase();
-      const isGen5 = rawChip.includes('gen 5') || rawChip.includes('8 elite gen 5');
+      const isGen5 =
+        rawChip.includes('gen 5') || rawChip.includes('8 elite gen 5');
       const isElite =
         rawChip.includes('8 elite') || rawChip.includes('snapdragon 8 elite');
       const chipSlug = isGen5 ? '8elite-gen5' : isElite ? '8elite' : null;
       if (chipSlug) {
-        const baseUrl =
-          `https://github.com/RunanywhereAI/runanywhere-genie-models/releases/download/v1`;
+        const baseUrl = `https://github.com/RunanywhereAI/runanywhere-genie-models/releases/download/v1`;
         const genieModels = [
           {
             slug: 'qwen3-4b',

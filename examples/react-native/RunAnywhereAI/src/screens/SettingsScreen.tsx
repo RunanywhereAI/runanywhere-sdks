@@ -319,6 +319,8 @@ export const SettingsScreen: React.FC = () => {
         STORAGE_KEYS.TOOL_CALLING_ENABLED
       );
       setToolCallingEnabled(enabled === 'true');
+      // void: deliberate fire-and-forget refresh; we don't block load on it.
+      // eslint-disable-next-line no-void
       void refreshRegisteredTools();
     } catch (error) {
       console.error('[Settings] Failed to load tool calling settings:', error);
@@ -462,6 +464,8 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear',
           style: 'destructive',
           onPress: () => {
+            // void: Alert.onPress is sync; wrap async work in fire-and-forget IIFE.
+            // eslint-disable-next-line no-void
             void (async () => {
               await RunAnywhere.clearTools();
               await refreshRegisteredTools();

@@ -321,7 +321,6 @@ export interface LoRAAttachAdapterResult {
 const SANDBOX_LORA_DIR = 'lora';
 
 function resolveAdapterPath(filename: string): string {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const RNFS = require('react-native-fs');
   return `${RNFS.DocumentDirectoryPath}/${SANDBOX_LORA_DIR}/${filename}`;
 }

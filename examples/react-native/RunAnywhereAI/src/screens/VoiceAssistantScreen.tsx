@@ -118,21 +118,19 @@ export const VoiceAssistantScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const [sttModel, llmModel, ttsModel] = await Promise.all([
+      const [loadedSTT, loadedLLM, loadedTTS] = await Promise.all([
         RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
         ),
-        RunAnywhere.modelInfoForCategory(
-          ModelCategory.MODEL_CATEGORY_LANGUAGE
-        ),
+        RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE),
         RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
         ),
       ]);
 
-      if (sttModel) setSTTModel(sttModel);
-      if (llmModel) setLLMModel(llmModel);
-      if (ttsModel) setTTSModel(ttsModel);
+      if (loadedSTT) setSTTModel(loadedSTT);
+      if (loadedLLM) setLLMModel(loadedLLM);
+      if (loadedTTS) setTTSModel(loadedTTS);
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
     }
@@ -288,6 +286,8 @@ export const VoiceAssistantScreen: React.FC = () => {
         })();
 
         unsubscribeRef.current = () => {
+          // void: cleanup is intentionally fire-and-forget.
+          // eslint-disable-next-line no-void
           void eventIterator.return?.();
         };
 

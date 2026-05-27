@@ -51,9 +51,8 @@ function getTts() {
   }
   if (!Tts) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       Tts = require('react-native-tts').default;
-    } catch (e) {
+    } catch {
       console.warn('[TTSScreen] react-native-tts not available');
       return null;
     }
@@ -248,10 +247,12 @@ export const TTSScreen: React.FC = () => {
         const loaded = await RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
         );
-        setCurrentModel(loaded ?? {
-          ...model,
-          preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-        });
+        setCurrentModel(
+          loaded ?? {
+            ...model,
+            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          }
+        );
       } else {
         const error =
           result.errorMessage ||
@@ -540,7 +541,7 @@ export const TTSScreen: React.FC = () => {
         <TouchableOpacity
           style={[
             styles.generateButton,
-            (!text.trim() && !isSpeaking) && styles.generateButtonDisabled,
+            !text.trim() && !isSpeaking && styles.generateButtonDisabled,
           ]}
           onPress={isSpeaking ? handleStop : handleSpeak}
           disabled={!text.trim() && !isSpeaking}

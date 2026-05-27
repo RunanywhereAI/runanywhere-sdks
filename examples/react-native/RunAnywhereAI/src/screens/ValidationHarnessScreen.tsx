@@ -128,7 +128,6 @@ const createStructuredSchema = (): JSONSchema =>
     },
   });
 
-
 const createSyntheticAudio = (kind: 'silence' | 'tone'): Float32Array => {
   const sampleRate = 16000;
   const audio = new Float32Array(sampleRate);
@@ -197,6 +196,8 @@ export const ValidationHarnessScreen: React.FC = () => {
         setVadError(getErrorMessage(error));
       }
     };
+    // void: deliberate fire-and-forget; setVadReadiness handles outcome.
+    // eslint-disable-next-line no-void
     void ensureVadLoaded();
     return () => {
       cancelled = true;
@@ -484,6 +485,8 @@ export const ValidationHarnessScreen: React.FC = () => {
                 accessibilityRole="button"
                 accessibilityLabel={action.title}
                 disabled={disabled}
+                // void: TouchableOpacity onPress is sync; intentional fire-and-forget.
+                // eslint-disable-next-line no-void
                 onPress={() => void runHarnessAction(action)}
                 style={[
                   styles.actionButton,
