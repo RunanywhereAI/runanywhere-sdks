@@ -633,15 +633,14 @@ const char descriptor_table_protodef_sdk_5finit_2eproto[] ABSL_ATTRIBUTE_SECTION
     "s_completed_http_setup\030\n \001(\010*}\n\014SdkInitP"
     "hase\022\036\n\032SDK_INIT_PHASE_UNSPECIFIED\020\000\022\026\n\022"
     "SDK_INIT_PHASE_ONE\020\001\022\026\n\022SDK_INIT_PHASE_T"
-    "WO\020\002\022\035\n\031SDK_INIT_PHASE_RETRY_HTTP\020\003*\247\001\n\022"
+    "WO\020\002\022\035\n\031SDK_INIT_PHASE_RETRY_HTTP\020\003*\201\001\n\022"
     "SdkInitEnvironment\022$\n SDK_INIT_ENVIRONME"
-    "NT_UNSPECIFIED\020\000\022$\n SDK_INIT_ENVIRONMENT"
-    "_DEVELOPMENT\020\001\022 \n\034SDK_INIT_ENVIRONMENT_S"
-    "TAGING\020\002\022#\n\037SDK_INIT_ENVIRONMENT_PRODUCT"
-    "ION\020\003B\207\001\n\027ai.runanywhere.proto.v1B\014SdkIn"
-    "itProtoP\001Z<github.com/runanywhere/runany"
-    "where-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV"
-    "1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "NT_DEVELOPMENT\020\000\022 \n\034SDK_INIT_ENVIRONMENT"
+    "_STAGING\020\001\022#\n\037SDK_INIT_ENVIRONMENT_PRODU"
+    "CTION\020\002B\207\001\n\027ai.runanywhere.proto.v1B\014Sdk"
+    "InitProtoP\001Z<github.com/runanywhere/runa"
+    "nywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004R"
+    "AV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5finit_2eproto_deps[1] = {
@@ -651,7 +650,7 @@ static ::absl::once_flag descriptor_table_sdk_5finit_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2eproto = {
     false,
     false,
-    951,
+    913,
     descriptor_table_protodef_sdk_5finit_2eproto,
     "sdk_init.proto",
     &descriptor_table_sdk_5finit_2eproto_once,
@@ -679,7 +678,7 @@ SdkInitEnvironment_descriptor() {
   return file_level_enum_descriptors_sdk_5finit_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t SdkInitEnvironment_internal_data_[] = {
-    262144u, 0u, };
+    196608u, 0u, };
 // ===================================================================
 
 SdkInitPhase1Request::SdkInitPhase1Request(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)

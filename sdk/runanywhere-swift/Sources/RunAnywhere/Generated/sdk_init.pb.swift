@@ -98,54 +98,55 @@ public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Environment values — must align with RAC_ENV_* in
+/// Environment values — must match RAC_ENV_* in
 /// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-/// (development=0, staging=1, production=2). Per proto3 convention the zero
-/// value is reserved as UNSPECIFIED; SDKs that omit the field default to
-/// DEVELOPMENT inside to_rac_environment() (sdk_init.cpp). The wire-format
-/// numeric values are part of the protocol contract; do not reorder.
+/// (development=0, staging=1, production=2). Numeric values are part of the
+/// wire format; do not reorder.
 ///
-/// idl-002: semantically duplicates model_types.proto::SDKEnvironment (same
-/// development/staging/production tristate), but is kept as a separate enum
-/// to avoid pulling model_types.proto into the SDK init dependency graph.
-/// Callers crossing the boundary (e.g. RunAnywhere.ts mapSdkInitEnvironment,
-/// CppBridge+SdkInit.swift mapEnvironment) translate between the two.
+/// idl-002 (PHASE8-RETRY 20260526-121300): the prior FIXLOOP-iter1 attempt to
+/// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
+/// Swift iOS at runtime — the shipped librac_commons.a in
+/// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
+/// original 0/1/2 layout, so Swift sending the regenerated enum value 1
+/// (DEVELOPMENT) was decoded as STAGING by the old C++ side, which then failed
+/// validation with RAC_ERROR_INVALID_ARGUMENT ("API key required"). The other
+/// SDKs (Kotlin / Flutter / RN / Web) were never regenerated for the bumped
+/// layout either, so reverting to the original 0/1/2 wire-format restores
+/// cross-SDK consistency without requiring a coordinated xcframework rebuild.
+/// Re-introducing UNSPECIFIED=0 must be paired with a synchronized rebuild of
+/// every prebuilt commons binary AND regeneration of all five SDK bindings.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
-  case unspecified // = 0
-  case development // = 1
-  case staging // = 2
-  case production // = 3
+  case development // = 0
+  case staging // = 1
+  case production // = 2
   case UNRECOGNIZED(Int)
 
   public init() {
-    self = .unspecified
+    self = .development
   }
 
   public init?(rawValue: Int) {
     switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .development
-    case 2: self = .staging
-    case 3: self = .production
+    case 0: self = .development
+    case 1: self = .staging
+    case 2: self = .production
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
 
   public var rawValue: Int {
     switch self {
-    case .unspecified: return 0
-    case .development: return 1
-    case .staging: return 2
-    case .production: return 3
+    case .development: return 0
+    case .staging: return 1
+    case .production: return 2
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
   public static let allCases: [RASdkInitEnvironment] = [
-    .unspecified,
     .development,
     .staging,
     .production,
@@ -167,7 +168,7 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var environment: RASdkInitEnvironment = .unspecified
+  public var environment: RASdkInitEnvironment = .development
 
   /// May be empty in development mode.
   public var apiKey: String = String()
@@ -307,7 +308,7 @@ nonisolated extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_UNSPECIFIED\0\u{1}SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
 }
 
 nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -330,7 +331,7 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.environment != .unspecified {
+    if self.environment != .development {
       try visitor.visitSingularEnumField(value: self.environment, fieldNumber: 1)
     }
     if !self.apiKey.isEmpty {

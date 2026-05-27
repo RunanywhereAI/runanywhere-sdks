@@ -144,10 +144,9 @@ template <>
                                            value);
 }
 enum SdkInitEnvironment : int {
-  SDK_INIT_ENVIRONMENT_UNSPECIFIED = 0,
-  SDK_INIT_ENVIRONMENT_DEVELOPMENT = 1,
-  SDK_INIT_ENVIRONMENT_STAGING = 2,
-  SDK_INIT_ENVIRONMENT_PRODUCTION = 3,
+  SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0,
+  SDK_INIT_ENVIRONMENT_STAGING = 1,
+  SDK_INIT_ENVIRONMENT_PRODUCTION = 2,
   SdkInitEnvironment_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   SdkInitEnvironment_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -158,11 +157,11 @@ extern const uint32_t SdkInitEnvironment_internal_data_[];
 inline constexpr SdkInitEnvironment SdkInitEnvironment_MIN =
     static_cast<SdkInitEnvironment>(0);
 inline constexpr SdkInitEnvironment SdkInitEnvironment_MAX =
-    static_cast<SdkInitEnvironment>(3);
+    static_cast<SdkInitEnvironment>(2);
 [[nodiscard]] inline bool SdkInitEnvironment_IsValid(int value) {
-  return 0 <= value && value <= 3;
+  return 0 <= value && value <= 2;
 }
-inline constexpr int SdkInitEnvironment_ARRAYSIZE = 3 + 1;
+inline constexpr int SdkInitEnvironment_ARRAYSIZE = 2 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 SdkInitEnvironment_descriptor();
 [[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(SdkInitEnvironment) {
@@ -177,7 +176,7 @@ template <typename T>
 }
 template <>
 [[nodiscard]] inline const ::std::string& SdkInitEnvironment_Name(SdkInitEnvironment value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<SdkInitEnvironment_descriptor, 0, 3>(
+  return ::google::protobuf::internal::NameOfDenseEnum<SdkInitEnvironment_descriptor, 0, 2>(
       static_cast<int>(value));
 }
 [[nodiscard]] inline bool SdkInitEnvironment_Parse(
