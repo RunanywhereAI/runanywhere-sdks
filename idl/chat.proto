@@ -3,7 +3,7 @@
 // Phase 3 of v2 IDL Exhaustiveness migration. ChatMessage + MessageRole were
 // duplicated across:
 //   - Swift  ChatMessage.swift / MessageRole.swift (TBD location)
-//   - Kotlin commonMain/.../ChatMessage.kt
+//   - Kotlin main/kotlin/.../ChatMessage.kt
 //   - Dart   lib/public/types/message_types.dart (MessageRole)
 //   - RN     core/src/types/chat.ts
 //   - Web    packages/core/src/chat/types.ts
