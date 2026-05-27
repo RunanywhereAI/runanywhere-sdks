@@ -77,12 +77,12 @@ rac_voice_agent_handle_t fake_handle() {
         }                                                                                   \
     } while (0)
 
-#define ASSERT_FALSE(cond)                                                                          \
-    do {                                                                                            \
-        if ((cond)) {                                                                               \
-            std::fprintf(stderr, "ASSERT FAILED: !(%s) @ %s:%d\n", #cond, __FILE__, __LINE__);      \
-            return 1;                                                                               \
-        }                                                                                           \
+#define ASSERT_FALSE(cond)                                                                     \
+    do {                                                                                       \
+        if ((cond)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: !(%s) @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                          \
+        }                                                                                      \
     } while (0)
 
 #define ASSERT_EQ(a, b)                                                                            \

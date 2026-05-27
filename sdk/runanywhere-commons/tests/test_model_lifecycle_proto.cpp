@@ -593,8 +593,7 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
           "replacing load returns parsable ModelLoadResult");
     CHECK(second_result.success() && second_result.model_id() == "lifecycle.llm.alt",
           "replacing load swaps to the alternate model");
-    CHECK(g_destroy_count == 1,
-          "replacing load destroys exactly one previously-loaded impl");
+    CHECK(g_destroy_count == 1, "replacing load destroys exactly one previously-loaded impl");
     CHECK(g_cleanup_count == 1, "replacing load cleans up previously-loaded impl");
     CHECK(g_create_count == 2 && g_initialize_count == 2,
           "replacing load creates+initializes the new impl");
@@ -605,8 +604,7 @@ int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
     rc = rac_component_lifecycle_snapshot_proto(
         static_cast<uint32_t>(runanywhere::v1::SDK_COMPONENT_LLM), &out);
     runanywhere::v1::ComponentLifecycleSnapshot snapshot;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot),
-          "post-replace snapshot parses");
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot), "post-replace snapshot parses");
     CHECK(snapshot.state() == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
           "post-replace snapshot still reports ready state");
     CHECK(snapshot.model_id() == "lifecycle.llm.alt",

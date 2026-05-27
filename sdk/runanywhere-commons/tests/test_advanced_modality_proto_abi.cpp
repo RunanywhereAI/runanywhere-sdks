@@ -792,10 +792,8 @@ bool lifecycle_load_lora_model(rac_model_registry_handle_t registry, const std::
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS &&
-                    out.status == RAC_SUCCESS &&
-                    result.ParseFromArray(out.data, static_cast<int>(out.size)) &&
-                    result.success();
+    const bool ok = rc == RAC_SUCCESS && out.status == RAC_SUCCESS &&
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -845,8 +843,7 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "LoRA-capable plugin registers");
     CHECK(register_lora_test_model(model_registry, build_lora_test_model("mock-llm", "Mock LLM")),
           "mock-llm registers in model registry");
-    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"),
-          "lifecycle loads mock LLM model");
+    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"), "lifecycle loads mock LLM model");
 
     runanywhere::v1::LoRAAdapterConfig config;
     config.set_adapter_path(adapter_path.string());

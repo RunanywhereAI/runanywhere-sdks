@@ -46,8 +46,7 @@ int test_vlm_generated_service_contract() {
               "Generate accepts VLMGenerationRequest");
         CHECK(generate->output_type()->full_name() == "runanywhere.v1.VLMResult",
               "Generate returns VLMResult");
-        CHECK(!(generate->client_streaming() || generate->server_streaming()),
-              "Generate is unary");
+        CHECK(!(generate->client_streaming() || generate->server_streaming()), "Generate is unary");
     }
 
     const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");

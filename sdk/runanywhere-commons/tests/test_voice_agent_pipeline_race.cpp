@@ -204,9 +204,8 @@ TEST(process_stream_vs_destroy_snapshot_race) {
         workers.emplace_back([&] {
             const std::vector<int16_t> buf(160, 0);  // 10ms silence @ 16kHz
             while (!stop.load(std::memory_order_acquire)) {
-                auto pipeline =
-                    std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
-                        &agent, noop_callback, nullptr);
+                auto pipeline = std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
+                    &agent, noop_callback, nullptr);
                 {
                     std::lock_guard<std::mutex> lock(agent.pipeline_mutex);
                     agent.pipeline = pipeline;

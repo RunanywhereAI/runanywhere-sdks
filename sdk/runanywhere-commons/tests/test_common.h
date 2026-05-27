@@ -425,17 +425,17 @@ inline int parse_test_args(int argc, char** argv,
         }                                                \
     } while (0)
 
-#define ASSERT_TRUE(_cond, _m)                                       \
-    do {                                                             \
-        const bool _assert_result = static_cast<bool>(_cond);        \
-        if (_assert_result) {                                        \
-            /* passed */                                             \
-        } else {                                                     \
-            TestResult _fail_result;                                 \
-            _fail_result.passed = false;                             \
-            _fail_result.details = (_m);                             \
-            return _fail_result;                                     \
-        }                                                            \
+#define ASSERT_TRUE(_cond, _m)                                \
+    do {                                                      \
+        const bool _assert_result = static_cast<bool>(_cond); \
+        if (_assert_result) {                                 \
+            /* passed */                                      \
+        } else {                                              \
+            TestResult _fail_result;                          \
+            _fail_result.passed = false;                      \
+            _fail_result.details = (_m);                      \
+            return _fail_result;                              \
+        }                                                     \
     } while (0)
 
 inline TestResult make_pass_result() {

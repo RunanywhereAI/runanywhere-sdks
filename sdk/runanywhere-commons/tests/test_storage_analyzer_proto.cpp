@@ -589,16 +589,16 @@ int main() {
 #else
         int failures = 0;
 
-#define RUN(name)                                    \
-    do {                                             \
-        std::printf("[ RUN  ] %s\n", #name);         \
-        int rc = name();                             \
-        if (rc == 0)                                 \
-            std::printf("[  OK  ] %s\n", #name);     \
-        else {                                       \
-            std::printf("[ FAIL ] %s\n", #name);     \
-            ++failures;                              \
-        }                                            \
+#define RUN(name)                                \
+    do {                                         \
+        std::printf("[ RUN  ] %s\n", #name);     \
+        int rc = name();                         \
+        if (rc == 0)                             \
+            std::printf("[  OK  ] %s\n", #name); \
+        else {                                   \
+            std::printf("[ FAIL ] %s\n", #name); \
+            ++failures;                          \
+        }                                        \
     } while (0)
 
         RUN(test_info_aggregation_and_model_breakdown);

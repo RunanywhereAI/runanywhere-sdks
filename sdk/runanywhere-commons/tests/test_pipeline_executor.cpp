@@ -4,8 +4,8 @@
 // GraphScheduler compiler. Protobuf-gated.
 
 #include <atomic>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <limits>
@@ -19,6 +19,7 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "pipeline.pb.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/solutions/config_loader.hpp"
@@ -30,26 +31,26 @@ namespace {
 int g_failed = 0;
 int g_passed = 0;
 
-#define CHECK(cond)                                                            \
-    do {                                                                       \
-        if (!(cond)) {                                                         \
+#define CHECK(cond)                                                               \
+    do {                                                                          \
+        if (!(cond)) {                                                            \
             std::fprintf(stderr, "[FAIL] %s:%d %s\n", __FILE__, __LINE__, #cond); \
-            g_failed++;                                                        \
-            return;                                                            \
-        }                                                                      \
+            g_failed++;                                                           \
+            return;                                                               \
+        }                                                                         \
     } while (0)
 
-#define TEST(name)                                                             \
-    static void test_##name();                                                 \
-    static void run_test_##name() {                                            \
-        std::fprintf(stderr, "[RUN ] %s\n", #name);                            \
-        int before_failed = g_failed;                                          \
-        test_##name();                                                         \
-        if (g_failed == before_failed) {                                       \
-            std::fprintf(stderr, "[  OK] %s\n", #name);                        \
-            g_passed++;                                                        \
-        }                                                                      \
-    }                                                                          \
+#define TEST(name)                                      \
+    static void test_##name();                          \
+    static void run_test_##name() {                     \
+        std::fprintf(stderr, "[RUN ] %s\n", #name);     \
+        int before_failed = g_failed;                   \
+        test_##name();                                  \
+        if (g_failed == before_failed) {                \
+            std::fprintf(stderr, "[  OK] %s\n", #name); \
+            g_passed++;                                 \
+        }                                               \
+    }                                                   \
     static void test_##name()
 
 using rac::solutions::Item;
@@ -67,15 +68,14 @@ using runanywhere::v1::PipelineSpec;
 
 bool last_error_detail_contains(const std::string& needle) {
     const char* details = rac_error_get_details();
-    return details != nullptr &&
-           std::string(details).find(needle) != std::string::npos;
+    return details != nullptr && std::string(details).find(needle) != std::string::npos;
 }
 
-bool wait_until_true(const std::atomic<bool>& flag,
-                     std::chrono::milliseconds timeout) {
+bool wait_until_true(const std::atomic<bool>& flag, std::chrono::milliseconds timeout) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
-        if (flag.load(std::memory_order_acquire)) return true;
+        if (flag.load(std::memory_order_acquire))
+            return true;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return flag.load(std::memory_order_acquire);
@@ -101,12 +101,10 @@ OperatorPortSchema make_audio_schema(std::vector<std::string> inputs,
     schema.input_ports = std::move(inputs);
     schema.output_ports = std::move(outputs);
     for (const auto& port : schema.input_ports) {
-        schema.input_port_types.emplace(
-            port, rac::solutions::kPayloadAudioPcmS16Le);
+        schema.input_port_types.emplace(port, rac::solutions::kPayloadAudioPcmS16Le);
     }
     for (const auto& port : schema.output_ports) {
-        schema.output_port_types.emplace(
-            port, rac::solutions::kPayloadAudioPcmS16Le);
+        schema.output_port_types.emplace(port, rac::solutions::kPayloadAudioPcmS16Le);
     }
     return schema;
 }
@@ -131,12 +129,10 @@ OperatorPortSchema make_embedding_schema(std::vector<std::string> inputs,
     schema.input_ports = std::move(inputs);
     schema.output_ports = std::move(outputs);
     for (const auto& port : schema.input_ports) {
-        schema.input_port_types.emplace(
-            port, rac::solutions::kPayloadEmbeddingVectorFloat32);
+        schema.input_port_types.emplace(port, rac::solutions::kPayloadEmbeddingVectorFloat32);
     }
     for (const auto& port : schema.output_ports) {
-        schema.output_port_types.emplace(
-            port, rac::solutions::kPayloadEmbeddingVectorFloat32);
+        schema.output_port_types.emplace(port, rac::solutions::kPayloadEmbeddingVectorFloat32);
     }
     return schema;
 }
@@ -149,61 +145,49 @@ std::string make_pcm_s16le_frame() {
 
 std::string make_png_image_bytes() {
     const unsigned char bytes[] = {
-        0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au,
-        0x00u, 0x00u, 0x00u, 0x0Du, 0x49u, 0x48u, 0x44u, 0x52u,
-        0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u,
-        0x08u, 0x06u, 0x00u, 0x00u, 0x00u, 0x1Fu, 0x15u, 0xC4u,
-        0x89u, 0x00u, 0x00u, 0x00u, 0x0Au, 0x49u, 0x44u, 0x41u,
-        0x54u, 0x78u, 0x9Cu, 0x63u, 0x00u, 0x01u, 0x00u, 0x00u,
-        0x05u, 0x00u, 0x01u, 0x0Du, 0x0Au, 0x2Du, 0xB4u, 0x00u,
-        0x00u, 0x00u, 0x00u, 0x49u, 0x45u, 0x4Eu, 0x44u, 0xAEu,
-        0x42u, 0x60u, 0x82u,
+        0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au, 0x00u, 0x00u, 0x00u, 0x0Du,
+        0x49u, 0x48u, 0x44u, 0x52u, 0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x01u,
+        0x08u, 0x06u, 0x00u, 0x00u, 0x00u, 0x1Fu, 0x15u, 0xC4u, 0x89u, 0x00u, 0x00u, 0x00u,
+        0x0Au, 0x49u, 0x44u, 0x41u, 0x54u, 0x78u, 0x9Cu, 0x63u, 0x00u, 0x01u, 0x00u, 0x00u,
+        0x05u, 0x00u, 0x01u, 0x0Du, 0x0Au, 0x2Du, 0xB4u, 0x00u, 0x00u, 0x00u, 0x00u, 0x49u,
+        0x45u, 0x4Eu, 0x44u, 0xAEu, 0x42u, 0x60u, 0x82u,
     };
     return std::string(reinterpret_cast<const char*>(bytes), sizeof(bytes));
 }
 
 class ScopedFactory {
-public:
-    ScopedFactory(std::string type,
-                  OperatorFactory factory,
-                  OperatorPortSchema ports)
+   public:
+    ScopedFactory(std::string type, OperatorFactory factory, OperatorPortSchema ports)
         : type_(std::move(type)) {
         auto& registry = OperatorRegistry::instance();
         registry.unregister_factory(type_);
         registry.register_factory(type_, std::move(factory), std::move(ports));
     }
 
-    ~ScopedFactory() {
-        OperatorRegistry::instance().unregister_factory(type_);
-    }
+    ~ScopedFactory() { OperatorRegistry::instance().unregister_factory(type_); }
 
-    ScopedFactory(const ScopedFactory&)            = delete;
+    ScopedFactory(const ScopedFactory&) = delete;
     ScopedFactory& operator=(const ScopedFactory&) = delete;
 
-private:
+   private:
     std::string type_;
 };
 
 class ScopedAdapterFactory {
-public:
-    ScopedAdapterFactory(std::string type,
-                         OperatorAdapterFactory factory,
-                         OperatorPortSchema ports)
+   public:
+    ScopedAdapterFactory(std::string type, OperatorAdapterFactory factory, OperatorPortSchema ports)
         : type_(std::move(type)) {
         auto& registry = OperatorRegistry::instance();
         registry.unregister_factory(type_);
-        registry.register_adapter_factory(type_, std::move(factory),
-                                          std::move(ports));
+        registry.register_adapter_factory(type_, std::move(factory), std::move(ports));
     }
 
-    ~ScopedAdapterFactory() {
-        OperatorRegistry::instance().unregister_factory(type_);
-    }
+    ~ScopedAdapterFactory() { OperatorRegistry::instance().unregister_factory(type_); }
 
-    ScopedAdapterFactory(const ScopedAdapterFactory&)            = delete;
+    ScopedAdapterFactory(const ScopedAdapterFactory&) = delete;
     ScopedAdapterFactory& operator=(const ScopedAdapterFactory&) = delete;
 
-private:
+   private:
     std::string type_;
 };
 
@@ -235,8 +219,7 @@ PipelineSpec make_linear_spec(const std::string& mid_type = "echo") {
     return spec;
 }
 
-PipelineSpec make_source_window_spec(const std::string& size = {},
-                                     const std::string& stride = {}) {
+PipelineSpec make_source_window_spec(const std::string& size = {}, const std::string& stride = {}) {
     PipelineSpec spec;
     spec.set_name("window");
 
@@ -272,7 +255,7 @@ TEST(linear_pipeline_drains) {
     CHECK(scheduler != nullptr);
     CHECK(scheduler->node_count() == 5);
 
-    auto input  = exec.root_input_edge();
+    auto input = exec.root_input_edge();
     CHECK(input != nullptr);
 
     scheduler->start();
@@ -326,10 +309,10 @@ TEST(dangling_edge_is_rejected) {
 // 4. Custom operator factory registration drives payload transformation.
 // ---------------------------------------------------------------------------
 class UpperCaseNode : public OperatorNode {
-public:
+   public:
     explicit UpperCaseNode(std::string n) : PipelineNode(std::move(n)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& out) override {
         auto text = item.text();
         for (auto& c : text) {
@@ -340,100 +323,91 @@ protected:
 };
 
 class CountingSinkNode : public OperatorNode {
-public:
+   public:
     CountingSinkNode(std::string n, std::shared_ptr<std::atomic<int>> count)
         : PipelineNode(std::move(n)), count_(std::move(count)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& /*out*/) override {
         count_->fetch_add(1, std::memory_order_acq_rel);
     }
 
-private:
+   private:
     std::shared_ptr<std::atomic<int>> count_;
 };
 
 struct CollectedItems {
-    std::mutex              mu;
+    std::mutex mu;
     std::vector<std::string> items;
 };
 
-std::vector<std::string> snapshot_items(
-    const std::shared_ptr<CollectedItems>& state) {
+std::vector<std::string> snapshot_items(const std::shared_ptr<CollectedItems>& state) {
     std::lock_guard<std::mutex> lock(state->mu);
     return state->items;
 }
 
 class CollectingSinkNode : public OperatorNode {
-public:
-    CollectingSinkNode(std::string n,
-                       std::shared_ptr<CollectedItems> state)
+   public:
+    CollectingSinkNode(std::string n, std::shared_ptr<CollectedItems> state)
         : PipelineNode(std::move(n)), state_(std::move(state)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& /*out*/) override {
         std::lock_guard<std::mutex> lock(state_->mu);
         state_->items.push_back(item.text());
     }
 
-private:
+   private:
     std::shared_ptr<CollectedItems> state_;
 };
 
 class WrongPayloadTypeNode : public OperatorNode {
-public:
+   public:
     explicit WrongPayloadTypeNode(std::string n) : PipelineNode(std::move(n)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& out) override {
         (void)item;
-        out.push(Item::audio_pcm_s16le(make_pcm_s16le_frame()),
-                 this->cancel_token());
+        out.push(Item::audio_pcm_s16le(make_pcm_s16le_frame()), this->cancel_token());
     }
 };
 
 class RawBytesAudioEmitterNode : public OperatorNode {
-public:
-    explicit RawBytesAudioEmitterNode(std::string n)
-        : PipelineNode(std::move(n)) {}
+   public:
+    explicit RawBytesAudioEmitterNode(std::string n) : PipelineNode(std::move(n)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadAudioPcmS16Le,
-                                   make_pcm_s16le_frame()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadAudioPcmS16Le, make_pcm_s16le_frame()),
                  this->cancel_token());
     }
 };
 
 class RawBytesImageEmitterNode : public OperatorNode {
-public:
-    explicit RawBytesImageEmitterNode(std::string n)
-        : PipelineNode(std::move(n)) {}
+   public:
+    explicit RawBytesImageEmitterNode(std::string n) : PipelineNode(std::move(n)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(rac::solutions::kPayloadImagePng,
-                                   make_png_image_bytes()),
+        out.push(Item::typed_bytes(rac::solutions::kPayloadImagePng, make_png_image_bytes()),
                  this->cancel_token());
     }
 };
 
 class RawBytesEmbeddingEmitterNode : public OperatorNode {
-public:
-    explicit RawBytesEmbeddingEmitterNode(std::string n)
-        : PipelineNode(std::move(n)) {}
+   public:
+    explicit RawBytesEmbeddingEmitterNode(std::string n) : PipelineNode(std::move(n)) {}
 
-protected:
+   protected:
     void process(Item /*item*/, OutputEdge& out) override {
-        out.push(Item::typed_bytes(
-                     rac::solutions::kPayloadEmbeddingVectorFloat32,
-                     "raw-float32-bytes"),
-                 this->cancel_token());
+        out.push(
+            Item::typed_bytes(rac::solutions::kPayloadEmbeddingVectorFloat32, "raw-float32-bytes"),
+            this->cancel_token());
     }
 };
 
 class TextAudioJoinNode final : public OperatorAdapter {
-public:
+   public:
     explicit TextAudioJoinNode(std::string name)
         : name_(std::move(name)),
           text_(std::make_shared<OperatorEdge>(8)),
@@ -442,39 +416,41 @@ public:
 
     void start(std::shared_ptr<rac::graph::CancelToken> parent_cancel) override {
         bool expected = false;
-        if (!started_.compare_exchange_strong(expected, true)) return;
+        if (!started_.compare_exchange_strong(expected, true))
+            return;
         cancel_ = parent_cancel ? parent_cancel->create_child()
                                 : std::make_shared<rac::graph::CancelToken>();
         worker_ = std::thread([this] { run(); });
     }
 
     void stop() override {
-        if (cancel_) cancel_->cancel();
+        if (cancel_)
+            cancel_->cancel();
         text_->close();
         audio_->close();
     }
 
     void join() override {
-        if (worker_.joinable()) worker_.join();
+        if (worker_.joinable())
+            worker_.join();
         out_->close();
     }
 
     const char* name() const noexcept override { return name_.c_str(); }
 
-    std::shared_ptr<OperatorEdge> input(
-        const std::string& port) const noexcept override {
-        if (port == "text") return text_;
-        if (port == "audio") return audio_;
+    std::shared_ptr<OperatorEdge> input(const std::string& port) const noexcept override {
+        if (port == "text")
+            return text_;
+        if (port == "audio")
+            return audio_;
         return nullptr;
     }
 
-    std::shared_ptr<OperatorEdge> output(
-        const std::string& port) const noexcept override {
+    std::shared_ptr<OperatorEdge> output(const std::string& port) const noexcept override {
         return port == "out" ? out_ : nullptr;
     }
 
-    bool set_input(const std::string& port,
-                   std::shared_ptr<OperatorEdge> edge) noexcept override {
+    bool set_input(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
         if (port == "text") {
             text_ = std::move(edge);
             return true;
@@ -486,38 +462,39 @@ public:
         return false;
     }
 
-    bool set_output(const std::string& port,
-                    std::shared_ptr<OperatorEdge> edge) noexcept override {
-        if (port != "out") return false;
+    bool set_output(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
+        if (port != "out")
+            return false;
         out_ = std::move(edge);
         return true;
     }
 
-private:
+   private:
     void run() {
         while (cancel_ && !cancel_->is_cancelled()) {
             auto text = text_->pop(cancel_.get());
-            if (!text) break;
+            if (!text)
+                break;
             auto audio = audio_->pop(cancel_.get());
-            if (!audio) break;
-            out_->push(Item::text("text=" + text->text() +
-                                  ";audio=" + audio->text()),
+            if (!audio)
+                break;
+            out_->push(Item::text("text=" + text->text() + ";audio=" + audio->text()),
                        cancel_.get());
         }
         out_->close();
     }
 
-    std::string                  name_;
+    std::string name_;
     std::shared_ptr<OperatorEdge> text_;
     std::shared_ptr<OperatorEdge> audio_;
     std::shared_ptr<OperatorEdge> out_;
     std::shared_ptr<rac::graph::CancelToken> cancel_;
-    std::thread                  worker_;
-    std::atomic<bool>            started_{false};
+    std::thread worker_;
+    std::atomic<bool> started_{false};
 };
 
 class TokenMetricsNode final : public OperatorAdapter {
-public:
+   public:
     explicit TokenMetricsNode(std::string name)
         : name_(std::move(name)),
           in_(std::make_shared<OperatorEdge>(8)),
@@ -526,46 +503,48 @@ public:
 
     void start(std::shared_ptr<rac::graph::CancelToken> parent_cancel) override {
         bool expected = false;
-        if (!started_.compare_exchange_strong(expected, true)) return;
+        if (!started_.compare_exchange_strong(expected, true))
+            return;
         cancel_ = parent_cancel ? parent_cancel->create_child()
                                 : std::make_shared<rac::graph::CancelToken>();
         worker_ = std::thread([this] { run(); });
     }
 
     void stop() override {
-        if (cancel_) cancel_->cancel();
+        if (cancel_)
+            cancel_->cancel();
         in_->close();
     }
 
     void join() override {
-        if (worker_.joinable()) worker_.join();
+        if (worker_.joinable())
+            worker_.join();
         tokens_->close();
         metrics_->close();
     }
 
     const char* name() const noexcept override { return name_.c_str(); }
 
-    std::shared_ptr<OperatorEdge> input(
-        const std::string& port) const noexcept override {
+    std::shared_ptr<OperatorEdge> input(const std::string& port) const noexcept override {
         return port == "in" ? in_ : nullptr;
     }
 
-    std::shared_ptr<OperatorEdge> output(
-        const std::string& port) const noexcept override {
-        if (port == "tokens") return tokens_;
-        if (port == "metrics") return metrics_;
+    std::shared_ptr<OperatorEdge> output(const std::string& port) const noexcept override {
+        if (port == "tokens")
+            return tokens_;
+        if (port == "metrics")
+            return metrics_;
         return nullptr;
     }
 
-    bool set_input(const std::string& port,
-                   std::shared_ptr<OperatorEdge> edge) noexcept override {
-        if (port != "in") return false;
+    bool set_input(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
+        if (port != "in")
+            return false;
         in_ = std::move(edge);
         return true;
     }
 
-    bool set_output(const std::string& port,
-                    std::shared_ptr<OperatorEdge> edge) noexcept override {
+    bool set_output(const std::string& port, std::shared_ptr<OperatorEdge> edge) noexcept override {
         if (port == "tokens") {
             tokens_ = std::move(edge);
             return true;
@@ -577,26 +556,26 @@ public:
         return false;
     }
 
-private:
+   private:
     void run() {
         while (cancel_ && !cancel_->is_cancelled()) {
             auto item = in_->pop(cancel_.get());
-            if (!item) break;
+            if (!item)
+                break;
             tokens_->push(Item::text("token:" + item->text()), cancel_.get());
-            metrics_->push(Item::text("metric:" + std::to_string(item->size())),
-                           cancel_.get());
+            metrics_->push(Item::text("metric:" + std::to_string(item->size())), cancel_.get());
         }
         tokens_->close();
         metrics_->close();
     }
 
-    std::string                  name_;
+    std::string name_;
     std::shared_ptr<OperatorEdge> in_;
     std::shared_ptr<OperatorEdge> tokens_;
     std::shared_ptr<OperatorEdge> metrics_;
     std::shared_ptr<rac::graph::CancelToken> cancel_;
-    std::thread                  worker_;
-    std::atomic<bool>            started_{false};
+    std::thread worker_;
+    std::atomic<bool> started_{false};
 };
 
 struct BlockingUntilCancelState {
@@ -605,35 +584,30 @@ struct BlockingUntilCancelState {
 };
 
 class BlockingUntilCancelNode : public OperatorNode {
-public:
-    BlockingUntilCancelNode(std::string n,
-                            std::shared_ptr<BlockingUntilCancelState> state)
-        : PipelineNode(std::move(n), /*input*/ 1, /*output*/ 1),
-          state_(std::move(state)) {}
+   public:
+    BlockingUntilCancelNode(std::string n, std::shared_ptr<BlockingUntilCancelState> state)
+        : PipelineNode(std::move(n), /*input*/ 1, /*output*/ 1), state_(std::move(state)) {}
 
-protected:
+   protected:
     void process(Item item, OutputEdge& out) override {
         state_->entered.store(true, std::memory_order_release);
-        while (this->cancel_token() &&
-               !this->cancel_token()->is_cancelled()) {
+        while (this->cancel_token() && !this->cancel_token()->is_cancelled()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        state_->observed_cancel.store(
-            this->cancel_token() && this->cancel_token()->is_cancelled(),
-            std::memory_order_release);
+        state_->observed_cancel.store(this->cancel_token() && this->cancel_token()->is_cancelled(),
+                                      std::memory_order_release);
         out.push(std::move(item), this->cancel_token());
     }
 
-private:
+   private:
     std::shared_ptr<BlockingUntilCancelState> state_;
 };
 
 TEST(registered_factory_transforms_payload) {
     auto& registry = OperatorRegistry::instance();
-    const bool first_time = registry.register_factory(
-        "upper", [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        });
+    const bool first_time = registry.register_factory("upper", [](const OperatorSpec& spec) {
+        return std::make_shared<UpperCaseNode>(spec.name());
+    });
     (void)first_time;  // registry is process-wide; replacement is fine
 
     PipelineSpec spec = make_linear_spec("upper");
@@ -642,7 +616,7 @@ TEST(registered_factory_transforms_payload) {
     auto scheduler = exec.build(&st);
     CHECK(st == RAC_SUCCESS);
 
-    auto input  = exec.root_input_edge();
+    auto input = exec.root_input_edge();
     auto output = exec.root_output_edge();
     CHECK(input != nullptr);
     CHECK(output == nullptr);
@@ -769,12 +743,12 @@ options:
 // ---------------------------------------------------------------------------
 TEST(proto_bytes_roundtrip_compiles) {
     PipelineSpec original = make_linear_spec();
-    std::string  bytes;
+    std::string bytes;
     CHECK(original.SerializeToString(&bytes));
 
     runanywhere::v1::PipelineSpec parsed;
-    rac_result_t st = rac::solutions::load_pipeline_from_proto_bytes(
-        bytes.data(), bytes.size(), &parsed);
+    rac_result_t st =
+        rac::solutions::load_pipeline_from_proto_bytes(bytes.data(), bytes.size(), &parsed);
     CHECK(st == RAC_SUCCESS);
     CHECK(parsed.operators_size() == original.operators_size());
     CHECK(parsed.edges_size() == original.edges_size());
@@ -864,8 +838,7 @@ TEST(duplicate_edge_is_rejected) {
 // ---------------------------------------------------------------------------
 TEST(edge_capacity_limit_is_enforced) {
     PipelineSpec spec = make_linear_spec();
-    spec.mutable_edges(0)->set_capacity(
-        std::numeric_limits<std::uint32_t>::max());
+    spec.mutable_edges(0)->set_capacity(std::numeric_limits<std::uint32_t>::max());
 
     PipelineExecutor exec(spec);
     rac_result_t st = RAC_SUCCESS;
@@ -905,9 +878,7 @@ TEST(real_primitive_without_factory_is_rejected) {
 TEST(real_primitive_with_explicit_factory_compiles) {
     ScopedFactory standin(
         "generate_text",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         make_text_schema({"in"}, {"token"}));
 
     PipelineSpec spec = make_linear_spec("generate_text");
@@ -926,25 +897,19 @@ TEST(real_primitive_with_explicit_factory_compiles) {
 TEST(typed_port_payload_match_compiles) {
     OperatorPortSchema producer_ports;
     producer_ports.output_ports = {"audio"};
-    producer_ports.output_port_types.emplace(
-        "audio", rac::solutions::kPayloadAudioPcmS16Le);
+    producer_ports.output_port_types.emplace("audio", rac::solutions::kPayloadAudioPcmS16Le);
 
     OperatorPortSchema consumer_ports;
     consumer_ports.input_ports = {"audio"};
-    consumer_ports.input_port_types.emplace(
-        "audio", rac::solutions::kPayloadAudioPcmS16Le);
+    consumer_ports.input_port_types.emplace("audio", rac::solutions::kPayloadAudioPcmS16Le);
 
     ScopedFactory producer(
         "cpp_graph_01b_audio_source",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(producer_ports));
     ScopedFactory consumer(
         "cpp_graph_01b_audio_sink",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(consumer_ports));
 
     PipelineSpec spec;
@@ -973,8 +938,7 @@ TEST(typed_port_payload_match_compiles) {
 TEST(typed_port_payload_mismatch_is_rejected) {
     OperatorPortSchema producer_ports;
     producer_ports.output_ports = {"audio"};
-    producer_ports.output_port_types.emplace(
-        "audio", rac::solutions::kPayloadAudioPcmS16Le);
+    producer_ports.output_port_types.emplace("audio", rac::solutions::kPayloadAudioPcmS16Le);
 
     OperatorPortSchema consumer_ports;
     consumer_ports.input_ports = {"text"};
@@ -982,15 +946,11 @@ TEST(typed_port_payload_mismatch_is_rejected) {
 
     ScopedFactory producer(
         "cpp_graph_01b_bad_audio_source",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(producer_ports));
     ScopedFactory consumer(
         "cpp_graph_01b_text_sink",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(consumer_ports));
 
     PipelineSpec spec;
@@ -1030,15 +990,11 @@ TEST(legacy_opaque_payload_metadata_is_rejected) {
 
     ScopedFactory producer(
         "cpp_graph_02a_opaque_source",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(producer_ports));
     ScopedFactory consumer(
         "cpp_graph_02a_opaque_sink",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(consumer_ports));
 
     PipelineSpec spec;
@@ -1067,15 +1023,13 @@ TEST(missing_port_payload_metadata_is_rejected) {
 
     ScopedFactory producer(
         "cpp_graph_02b_missing_type_source",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         std::move(producer_ports));
     ScopedFactory consumer(
         "cpp_graph_02b_missing_type_sink",
         [](const OperatorSpec& spec) {
-            return std::make_shared<CountingSinkNode>(
-                spec.name(), std::make_shared<std::atomic<int>>(0));
+            return std::make_shared<CountingSinkNode>(spec.name(),
+                                                      std::make_shared<std::atomic<int>>(0));
         },
         make_text_schema({"in"}, {}));
 
@@ -1391,9 +1345,7 @@ TEST(fanout_and_fanin_same_ports_use_split_merge_nodes) {
 TEST(two_input_operator_wires_distinct_named_inputs) {
     ScopedAdapterFactory join_factory(
         "cpp_graph_01e_join_text_audio",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<TextAudioJoinNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<TextAudioJoinNode>(spec.name()); },
         make_text_schema({"text", "audio"}, {"out"}));
 
     PipelineSpec spec;
@@ -1447,22 +1399,18 @@ TEST(two_output_operator_wires_distinct_named_outputs) {
 
     ScopedAdapterFactory tee_factory(
         "cpp_graph_01e_token_metrics",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<TokenMetricsNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<TokenMetricsNode>(spec.name()); },
         make_text_schema({"in"}, {"tokens", "metrics"}));
     ScopedFactory token_sink(
         "cpp_graph_01e_token_sink",
         [token_items](const OperatorSpec& spec) {
-            return std::make_shared<CollectingSinkNode>(spec.name(),
-                                                        token_items);
+            return std::make_shared<CollectingSinkNode>(spec.name(), token_items);
         },
         make_text_schema({"in"}, {}));
     ScopedFactory metric_sink(
         "cpp_graph_01e_metric_sink",
         [metric_items](const OperatorSpec& spec) {
-            return std::make_shared<CollectingSinkNode>(spec.name(),
-                                                        metric_items);
+            return std::make_shared<CollectingSinkNode>(spec.name(), metric_items);
         },
         make_text_schema({"in"}, {}));
 
@@ -1521,22 +1469,20 @@ TEST(two_output_operator_wires_distinct_named_outputs) {
 TEST(single_port_factory_with_multi_output_wiring_is_rejected) {
     ScopedFactory multi_out(
         "cpp_graph_01e_single_multi_out",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         make_text_schema({"in"}, {"tokens", "metrics"}));
     ScopedFactory token_sink(
         "cpp_graph_01e_single_multi_out_token_sink",
         [](const OperatorSpec& spec) {
-            return std::make_shared<CountingSinkNode>(
-                spec.name(), std::make_shared<std::atomic<int>>(0));
+            return std::make_shared<CountingSinkNode>(spec.name(),
+                                                      std::make_shared<std::atomic<int>>(0));
         },
         make_text_schema({"in"}, {}));
     ScopedFactory metric_sink(
         "cpp_graph_01e_single_multi_out_metric_sink",
         [](const OperatorSpec& spec) {
-            return std::make_shared<CountingSinkNode>(
-                spec.name(), std::make_shared<std::atomic<int>>(0));
+            return std::make_shared<CountingSinkNode>(spec.name(),
+                                                      std::make_shared<std::atomic<int>>(0));
         },
         make_text_schema({"in"}, {}));
 
@@ -1578,9 +1524,7 @@ TEST(single_port_factory_with_multi_output_wiring_is_rejected) {
 TEST(single_port_factory_with_multi_input_wiring_is_rejected) {
     ScopedFactory multi_in(
         "cpp_graph_01e_single_multi_in",
-        [](const OperatorSpec& spec) {
-            return std::make_shared<UpperCaseNode>(spec.name());
-        },
+        [](const OperatorSpec& spec) { return std::make_shared<UpperCaseNode>(spec.name()); },
         make_text_schema({"text", "audio"}, {"out"}));
 
     PipelineSpec spec;
@@ -1654,8 +1598,7 @@ TEST(executor_built_graph_root_cancel_stops_blocking_operator) {
     ScopedFactory blocking(
         "cpp_graph_01c_block_until_cancel",
         [state](const OperatorSpec& spec) {
-            return std::make_shared<BlockingUntilCancelNode>(
-                spec.name(), state);
+            return std::make_shared<BlockingUntilCancelNode>(spec.name(), state);
         },
         make_text_schema({"in"}, {"out"}));
 
@@ -1686,8 +1629,7 @@ TEST(executor_built_graph_root_cancel_stops_blocking_operator) {
     auto root = scheduler->root_cancel_token();
     CHECK(input->push(Item::text("go"), root.get()));
 
-    const bool entered =
-        wait_until_true(state->entered, std::chrono::milliseconds(1000));
+    const bool entered = wait_until_true(state->entered, std::chrono::milliseconds(1000));
     if (!entered) {
         scheduler->cancel_all();
         scheduler->wait();

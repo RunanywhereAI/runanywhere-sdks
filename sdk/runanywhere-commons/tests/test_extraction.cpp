@@ -558,7 +558,8 @@ static TestResult test_progress_callback_invoked() {
     std::string archive_path = create_test_tar_gz(archive_dir);
     ASSERT_TRUE(!archive_path.empty(), "Should create archive");
 
-    ProgressData progress = {.callback_count = 0, .last_files_extracted = 0, .last_bytes_extracted = 0};
+    ProgressData progress = {
+        .callback_count = 0, .last_files_extracted = 0, .last_bytes_extracted = 0};
     rac_result_t rc = rac_extract_archive_native(archive_path.c_str(), dest_dir.c_str(), nullptr,
                                                  test_progress_callback, &progress, nullptr);
     ASSERT_EQ(rc, RAC_SUCCESS, "Extraction with progress should succeed");

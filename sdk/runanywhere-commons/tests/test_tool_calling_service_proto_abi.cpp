@@ -38,8 +38,7 @@ void check_unary_rpc(const google::protobuf::ServiceDescriptor* service, const c
 
     CHECK(method->input_type()->full_name() == input_type, "ToolCalling RPC input type");
     CHECK(method->output_type()->full_name() == output_type, "ToolCalling RPC output type");
-    CHECK(!(method->client_streaming() || method->server_streaming()),
-          "ToolCalling RPC is unary");
+    CHECK(!(method->client_streaming() || method->server_streaming()), "ToolCalling RPC is unary");
 }
 
 int test_tool_calling_generated_service_contract() {

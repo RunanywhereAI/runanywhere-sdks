@@ -68,8 +68,8 @@ int test_extract_object_from_mixed_text() {
 
 int test_extract_array_with_braces_in_string() {
     char* json = nullptr;
-    const rac_result_t rc = rac_structured_output_extract_json(
-        R"(answer [{"text":"brace } inside"}])", &json, nullptr);
+    const rac_result_t rc =
+        rac_structured_output_extract_json(R"(answer [{"text":"brace } inside"}])", &json, nullptr);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_TRUE(json != nullptr);
     ASSERT_EQ_STR(json, "[{\"text\":\"brace } inside\"}]");

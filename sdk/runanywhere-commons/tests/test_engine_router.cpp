@@ -600,8 +600,7 @@ int main() {
         hints.preferred_engine_name = "cuda_pinned_engine";
         hints.no_fallback = 1;
         const rac_engine_vtable_t* out = nullptr;
-        rac_result_t rc =
-            rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out);
+        rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out);
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
               "(CPP-05.7) C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE for pinned "
               "engine when its declared runtime is unregistered");

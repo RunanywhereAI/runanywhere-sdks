@@ -166,8 +166,7 @@ int test_format_prompt_json_lfm2() {
 // 5. build_initial_prompt end-to-end
 // ---------------------------------------------------------------------------
 int test_build_initial_prompt_end_to_end() {
-    const char* tools_json =
-        R"([{"name":"get_weather","description":"Weather","parameters":[]}])";
+    const char* tools_json = R"([{"name":"get_weather","description":"Weather","parameters":[]}])";
     rac_tool_calling_options_t options = RAC_TOOL_CALLING_OPTIONS_DEFAULT;
     options.format = RAC_TOOL_FORMAT_DEFAULT;
 
@@ -341,8 +340,7 @@ int test_validate_tool_call_definitions() {
     rac_tool_call_free(&parsed);
 
     rc = rac_tool_call_parse(
-        R"(<tool_call>{"tool":"get_weather","arguments":{"unit":"kelvin"}}</tool_call>)",
-        &parsed);
+        R"(<tool_call>{"tool":"get_weather","arguments":{"unit":"kelvin"}}</tool_call>)", &parsed);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     rc = rac_tool_call_validate(&parsed, tools, 1, &validation);
     ASSERT_EQ_INT(rc, RAC_SUCCESS);

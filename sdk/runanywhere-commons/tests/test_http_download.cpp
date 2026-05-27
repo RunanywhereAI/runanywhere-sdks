@@ -128,8 +128,8 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
         // the download attempt). The runner must reject the body write and
         // remove the destination so the next retry sees a clean slate.
         out_resp_meta->status = 416;
-        out_resp_meta->headers = static_cast<rac_http_header_kv_t*>(
-            std::calloc(1, sizeof(rac_http_header_kv_t)));
+        out_resp_meta->headers =
+            static_cast<rac_http_header_kv_t*>(std::calloc(1, sizeof(rac_http_header_kv_t)));
         if (out_resp_meta->headers) {
             out_resp_meta->headers[0].name = strdup("Content-Type");
             out_resp_meta->headers[0].value = strdup("text/html; charset=utf-8");
@@ -197,8 +197,8 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
         out_resp_meta->status = 416;
         // Synthesize a Content-Type: text/html response header. Allocated
         // via malloc/strdup so rac_http_response_free can release them.
-        out_resp_meta->headers = static_cast<rac_http_header_kv_t*>(
-            std::calloc(1, sizeof(rac_http_header_kv_t)));
+        out_resp_meta->headers =
+            static_cast<rac_http_header_kv_t*>(std::calloc(1, sizeof(rac_http_header_kv_t)));
         if (out_resp_meta->headers) {
             out_resp_meta->headers[0].name = strdup("Content-Type");
             out_resp_meta->headers[0].value = strdup("text/html; charset=utf-8");
@@ -846,7 +846,7 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     {
         std::ifstream in(dest, std::ios::binary);
         std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
-                                      std::istreambuf_iterator<char>());
+                                     std::istreambuf_iterator<char>());
         T_CHECK(on_disk.size() == after_fail);
         // Must still match the canonical payload byte-for-byte at the prefix.
         T_CHECK(std::equal(on_disk.begin(), on_disk.end(), g_payload.begin()));
@@ -871,7 +871,7 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
 
     std::ifstream in(dest, std::ios::binary);
     std::vector<uint8_t> final_bytes((std::istreambuf_iterator<char>(in)),
-                                      std::istreambuf_iterator<char>());
+                                     std::istreambuf_iterator<char>());
     T_CHECK(final_bytes == g_payload);
 
     fs::remove(dest);
@@ -934,7 +934,7 @@ void test_resume_with_416_tiny_html_body_preserves_prefix() {
     // Byte-for-byte: the prefix is still the valid model payload prefix.
     std::ifstream in(dest, std::ios::binary);
     std::vector<uint8_t> on_disk((std::istreambuf_iterator<char>(in)),
-                                  std::istreambuf_iterator<char>());
+                                 std::istreambuf_iterator<char>());
     T_CHECK(on_disk.size() == prefix_size);
     T_CHECK(std::equal(on_disk.begin(), on_disk.end(), g_payload.begin()));
 

@@ -99,8 +99,7 @@ int test_format_from_url_single_file_formats() {
          .expected = runanywhere::v1::MODEL_FORMAT_BIN},
         {.url = "/local/path/model.safetensors",
          .expected = runanywhere::v1::MODEL_FORMAT_SAFETENSORS},
-        {.url = "/local/path/model.mlmodelc",
-         .expected = runanywhere::v1::MODEL_FORMAT_COREML},
+        {.url = "/local/path/model.mlmodelc", .expected = runanywhere::v1::MODEL_FORMAT_COREML},
     };
     for (const auto& c : kCases) {
         auto req = serialize_format_request(c.url);

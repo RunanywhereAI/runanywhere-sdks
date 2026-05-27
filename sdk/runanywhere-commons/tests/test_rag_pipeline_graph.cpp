@@ -19,12 +19,11 @@
  * here instead of in production.
  */
 
-#include "features/rag/rag_pipeline_graph.h"
-
 #include <cstdio>
 #include <cstring>
 #include <string>
 
+#include "features/rag/rag_pipeline_graph.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_types.h"
 

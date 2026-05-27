@@ -345,8 +345,7 @@ int main() {
         sink->observed.fetch_add(1, std::memory_order_relaxed);
     };
 
-    const uint64_t concurrent_sub =
-        rac_sdk_event_subscribe(concurrent_callback, &concurrent);
+    const uint64_t concurrent_sub = rac_sdk_event_subscribe(concurrent_callback, &concurrent);
     CHECK(concurrent_sub != 0, "concurrent subscription succeeds");
 
     constexpr int kPerThread = 200;

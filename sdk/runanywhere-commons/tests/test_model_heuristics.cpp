@@ -58,17 +58,17 @@ namespace {
         }                                                                               \
     } while (0)
 
-#define ASSERT_NEAR(actual, expected, tol)                                                 \
-    do {                                                                                   \
-        const float __a = (actual);                                                        \
-        const float __e = (expected);                                                      \
-        const float __d = __a - __e;                                                       \
-        const float __abs = __d < 0.0f ? -__d : __d;                                       \
-        if (__abs > (tol)) {                                                               \
-            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: |%f - %f| > %f\n", __FILE__,        \
-                         __LINE__, __a, __e, (tol));                                       \
-            return 1;                                                                      \
-        }                                                                                  \
+#define ASSERT_NEAR(actual, expected, tol)                                                         \
+    do {                                                                                           \
+        const float __a = (actual);                                                                \
+        const float __e = (expected);                                                              \
+        const float __d = __a - __e;                                                               \
+        const float __abs = __d < 0.0f ? -__d : __d;                                               \
+        if (__abs > (tol)) {                                                                       \
+            std::fprintf(stderr, "ASSERT FAIL @ %s:%d: |%f - %f| > %f\n", __FILE__, __LINE__, __a, \
+                         __e, (tol));                                                              \
+            return 1;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #ifdef RAC_HAVE_PROTOBUF
@@ -96,8 +96,8 @@ int test_tool_call_format_lfm2_tool_variants() {
     for (const char* name : lfm2_names) {
         const auto bytes = serialize_model_info("test-id", name);
         rac_tool_call_format_t f = RAC_TOOL_FORMAT_DEFAULT;
-        rac_result_t rc = rac_tool_call_format_from_model_info_proto(
-            bytes.data(), bytes.size(), &f);
+        rac_result_t rc =
+            rac_tool_call_format_from_model_info_proto(bytes.data(), bytes.size(), &f);
         if (rc != RAC_SUCCESS) {
             std::fprintf(stderr, "rc != SUCCESS for name=%s rc=%d\n", name, (int)rc);
             return 1;
@@ -114,15 +114,15 @@ int test_tool_call_format_non_lfm2_defaults_to_json() {
     const char* default_names[] = {
         "Qwen2.5-0.5B-Instruct",
         "Llama-3.2-3B-Instruct",
-        "LFM2-1.2B",   // LFM2 base (no Tool variant) stays on default JSON.
-        "tool-router", // contains "tool" but no "lfm2".
-        "",            // empty name → default.
+        "LFM2-1.2B",    // LFM2 base (no Tool variant) stays on default JSON.
+        "tool-router",  // contains "tool" but no "lfm2".
+        "",             // empty name → default.
     };
     for (const char* name : default_names) {
         const auto bytes = serialize_model_info("test-id", name);
         rac_tool_call_format_t f = RAC_TOOL_FORMAT_LFM2;  // intentional non-default sentinel.
-        rac_result_t rc = rac_tool_call_format_from_model_info_proto(
-            bytes.data(), bytes.size(), &f);
+        rac_result_t rc =
+            rac_tool_call_format_from_model_info_proto(bytes.data(), bytes.size(), &f);
         if (rc != RAC_SUCCESS) {
             std::fprintf(stderr, "rc != SUCCESS for name=%s rc=%d\n", name, (int)rc);
             return 1;
@@ -147,8 +147,7 @@ int test_tool_call_format_uses_id_and_description() {
         ASSERT_EQ_INT(f, RAC_TOOL_FORMAT_LFM2);
     }
     {
-        const auto bytes =
-            serialize_model_info("", "", "Liquid AI LFM2 Tool-calling preview");
+        const auto bytes = serialize_model_info("", "", "Liquid AI LFM2 Tool-calling preview");
         rac_tool_call_format_t f = RAC_TOOL_FORMAT_DEFAULT;
         ASSERT_EQ_INT(rac_tool_call_format_from_model_info_proto(bytes.data(), bytes.size(), &f),
                       RAC_SUCCESS);
@@ -187,18 +186,13 @@ int test_parameter_count_b_canonical_tokens() {
         float expected;
     };
     const Sample samples[] = {
-        {"Qwen2.5-0.5B-Instruct", 0.5f},
-        {"Llama 3.2 3B Instruct", 3.0f},
-        {"LFM2-1.2B-Tool", 1.2f},
-        {"SmolLM2-360M", 0.36f},
-        {"phi-mini-3.5b-q4", 3.5f},
-        {"some-7b-model", 7.0f},
+        {"Qwen2.5-0.5B-Instruct", 0.5f}, {"Llama 3.2 3B Instruct", 3.0f}, {"LFM2-1.2B-Tool", 1.2f},
+        {"SmolLM2-360M", 0.36f},         {"phi-mini-3.5b-q4", 3.5f},      {"some-7b-model", 7.0f},
     };
     for (const auto& s : samples) {
         const auto bytes = serialize_model_info("id", s.name);
         float v = -2.0f;
-        rac_result_t rc =
-            rac_model_info_parameter_count_b_proto(bytes.data(), bytes.size(), &v);
+        rac_result_t rc = rac_model_info_parameter_count_b_proto(bytes.data(), bytes.size(), &v);
         if (rc != RAC_SUCCESS) {
             std::fprintf(stderr, "rc != SUCCESS for name=%s rc=%d\n", s.name, (int)rc);
             return 1;
@@ -239,9 +233,8 @@ int test_is_small_model_below_threshold() {
     for (const char* name : small_names) {
         const auto bytes = serialize_model_info("id", name);
         rac_bool_t is_small = RAC_FALSE;
-        ASSERT_EQ_INT(
-            rac_model_info_is_small_model_proto(bytes.data(), bytes.size(), &is_small),
-            RAC_SUCCESS);
+        ASSERT_EQ_INT(rac_model_info_is_small_model_proto(bytes.data(), bytes.size(), &is_small),
+                      RAC_SUCCESS);
         if (is_small != RAC_TRUE) {
             std::fprintf(stderr, "expected RAC_TRUE for name=%s\n", name);
             return 1;
@@ -252,17 +245,14 @@ int test_is_small_model_below_threshold() {
 
 int test_is_small_model_above_threshold() {
     const char* large_names[] = {
-        "LFM2-1.2B-Tool",
-        "Llama-3.2-3B-Instruct",
-        "Mistral-7B",
+        "LFM2-1.2B-Tool", "Llama-3.2-3B-Instruct", "Mistral-7B",
         "GenericModel-v1",  // unknown → RAC_FALSE.
     };
     for (const char* name : large_names) {
         const auto bytes = serialize_model_info("id", name);
         rac_bool_t is_small = RAC_TRUE;
-        ASSERT_EQ_INT(
-            rac_model_info_is_small_model_proto(bytes.data(), bytes.size(), &is_small),
-            RAC_SUCCESS);
+        ASSERT_EQ_INT(rac_model_info_is_small_model_proto(bytes.data(), bytes.size(), &is_small),
+                      RAC_SUCCESS);
         if (is_small != RAC_FALSE) {
             std::fprintf(stderr, "expected RAC_FALSE for name=%s\n", name);
             return 1;
@@ -272,8 +262,7 @@ int test_is_small_model_above_threshold() {
 }
 
 int test_is_small_model_null_output_returns_error() {
-    ASSERT_EQ_INT(rac_model_info_is_small_model_proto(nullptr, 0, nullptr),
-                  RAC_ERROR_NULL_POINTER);
+    ASSERT_EQ_INT(rac_model_info_is_small_model_proto(nullptr, 0, nullptr), RAC_ERROR_NULL_POINTER);
     return 0;
 }
 
