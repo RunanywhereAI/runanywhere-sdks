@@ -317,12 +317,65 @@ int _platformServiceAvailabilityCallback(int service, Pointer<Void> userData) {
 // C Callback Functions (must be static top-level functions)
 // =============================================================================
 
-/// Logging callback - routes C++ logs to Dart logger
+/// Maximum byte length to read from a C-owned log buffer.
+/// Matches `thread_local char formatted[2048]` in commons/src/core/rac_logger.cpp.
+/// Bounding the read prevents `toDartString()` from walking off the end of a
+/// freed/unmapped buffer (SIGSEGV) if commons ever stops using the thread_local
+/// buffer or if a non-rac_logger_log call site passes a temporary string.
+const int _maxLogStringBytes = 2048;
+
+/// Running count of log lines that could not be decoded — typically the
+/// signature of a buffer-lifetime race between commons and the async Dart
+/// listener trampoline (commons-067). Surfaced through a periodic warning so
+/// operators can detect log loss instead of silently dropping it.
+int _droppedLogCount = 0;
+
+/// Emit a visibility warning every Nth drop to keep noise bounded.
+const int _droppedLogWarnEvery = 32;
+
+/// Read up to [_maxLogStringBytes] bytes from a NUL-terminated C string into a
+/// Dart String, returning null on any decoding failure. Bounded so that a
+/// freed buffer cannot trigger an arbitrarily long memory walk.
+String? _safeReadCString(Pointer<Utf8> ptr) {
+  if (ptr == nullptr) return null;
+  try {
+    final bytes = ptr.cast<Uint8>().asTypedList(_maxLogStringBytes);
+    var len = 0;
+    while (len < _maxLogStringBytes && bytes[len] != 0) {
+      len++;
+    }
+    if (len == 0) return '';
+    // `length:` avoids re-walking the buffer (strlen) inside toDartString.
+    return ptr.toDartString(length: len);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Logging callback - routes C++ logs to Dart logger.
 ///
-/// NOTE: This callback is registered with NativeCallable.listener for thread safety.
-/// It runs asynchronously on the main isolate's event loop, which means by the time
-/// it executes, the C++ log message memory may have been freed. We handle this by
-/// catching any UTF-8 decoding errors gracefully.
+/// Registered as a `NativeCallable.listener` so commons may invoke it from any
+/// C++ worker thread (download orchestrator, plugin loader, engine workers)
+/// without violating Dart's isolate affinity contract (`Pointer.fromFunction`
+/// and `NativeCallable.isolateLocal` both SIGABRT when invoked from a
+/// non-Dart-owned thread, see comments on `nowMs` / `httpDownload` above).
+///
+/// Lifetime contract (commons-067 mitigation):
+///   - `message` is normally backed by `thread_local char formatted[2048]` in
+///     `rac_logger.cpp::rac_logger_log`, so the pointer stays valid across the
+///     listener's async hop on the same C thread.
+///   - `category` is passed as a string literal at every commons call site
+///     (`RAC_LOG_INFO("LLM", ...)`), so it lives for the binary's lifetime.
+///   - The narrow remaining race is the same C thread logging twice before
+///     the Dart isolate drains the queued listener invocation; the second log
+///     overwrites the thread_local buffer. We bound the read to
+///     `_maxLogStringBytes` so we never walk off a freed/unmapped page, and
+///     when decode fails we surface a periodic synthetic warning so log loss
+///     is observable instead of silent.
+///
+/// A full ABI-level fix (e.g. requiring commons to copy strings before
+/// invoking `adapter->log`, or shipping owned `rac_proto_buffer_t`-style
+/// log payloads) is tracked separately — that change touches every SDK.
 void _platformLogCallback(
   int level,
   Pointer<Utf8> category,
@@ -331,35 +384,40 @@ void _platformLogCallback(
 ) {
   if (message == nullptr) return;
 
-  try {
-    // Try to decode the message - may fail if memory was freed
-    final msgString = message.toDartString();
-    if (msgString.isEmpty) return;
-
-    final categoryString =
-        category != nullptr ? category.toDartString() : 'RAC';
-
-    final logger = SDKLogger(categoryString);
-
-    switch (level) {
-      case RacLogLevel.error:
-      case RacLogLevel.fatal:
-        logger.error(msgString);
-      case RacLogLevel.warning:
-        logger.warning(msgString);
-      case RacLogLevel.info:
-        logger.info(msgString);
-      case RacLogLevel.debug:
-        logger.debug(msgString);
-      case RacLogLevel.trace:
-        logger.debug('[TRACE] $msgString');
-      default:
-        logger.info(msgString);
+  final msgString = _safeReadCString(message);
+  if (msgString == null) {
+    _droppedLogCount++;
+    if (_droppedLogCount % _droppedLogWarnEvery == 1) {
+      // Surface via a sentinel logger so operators can grep for it. Using
+      // SDKLogger here is safe because we are already on the isolate's
+      // event loop (listener callbacks run there) and SDKLogger never re-
+      // enters the C platform-adapter log slot.
+      SDKLogger('DartBridge.Platform').warning(
+        'Dropped C++ log line: buffer-lifetime race with NativeCallable '
+        '(total dropped: $_droppedLogCount). See commons-067.',
+      );
     }
-  } catch (e) {
-    // Silently ignore invalid UTF-8 or freed memory errors
-    // This can happen because NativeCallable.listener runs asynchronously
-    // and the C++ log message buffer may have been freed by then
+    return;
+  }
+  if (msgString.isEmpty) return;
+
+  final categoryString = _safeReadCString(category) ?? 'RAC';
+  final logger = SDKLogger(categoryString.isEmpty ? 'RAC' : categoryString);
+
+  switch (level) {
+    case RacLogLevel.error:
+    case RacLogLevel.fatal:
+      logger.error(msgString);
+    case RacLogLevel.warning:
+      logger.warning(msgString);
+    case RacLogLevel.info:
+      logger.info(msgString);
+    case RacLogLevel.debug:
+      logger.debug(msgString);
+    case RacLogLevel.trace:
+      logger.debug('[TRACE] $msgString');
+    default:
+      logger.info(msgString);
   }
 }
 
