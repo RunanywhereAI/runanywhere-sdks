@@ -47,6 +47,25 @@ RAC_API uint64_t rac_sdk_event_subscribe(rac_sdk_event_callback_fn callback, voi
 RAC_API void rac_sdk_event_unsubscribe(uint64_t subscription_id);
 
 /**
+ * @brief Spin-wait until all in-flight rac_sdk_event_publish_proto callbacks
+ *        have returned. Mirrors rac_vad_proto_quiesce / rac_llm_proto_quiesce.
+ *
+ * @details rac_sdk_event_publish_proto snapshots the subscription list under
+ *          its internal mutex, releases the mutex, then invokes each
+ *          subscriber callback. rac_sdk_event_unsubscribe flips the
+ *          subscription's alive flag, but the publisher may already have
+ *          passed that check and be about to dereference the callback. SDKs
+ *          that free the host object backing @p user_data on unsubscribe
+ *          (Swift Unmanaged.release, Kotlin DeleteGlobalRef, Flutter/RN
+ *          equivalents) MUST quiesce to avoid a use-after-free:
+ *            (a) rac_sdk_event_unsubscribe(id) — no NEW dispatch sees alive;
+ *            (b) rac_sdk_event_quiesce()        — wait out in-flight callbacks;
+ *            (c) free the host object / user_data.
+ *          Safe to call from any thread.
+ */
+RAC_API void rac_sdk_event_quiesce(void);
+
+/**
  * @brief Publish serialized runanywhere.v1.SDKEvent bytes.
  *
  * The bytes are copied into the internal poll queue before callbacks run.

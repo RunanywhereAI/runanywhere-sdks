@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -61,6 +62,24 @@ std::vector<Subscription> g_all_subscriptions;
 
 std::mutex g_sdk_event_mutex;
 std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
+
+// commons-162: in-flight guard for the synchronous SDK-event callback
+// dispatch. rac_sdk_event_publish_proto snapshots the subscription list
+// under g_sdk_event_mutex, releases the lock, then invokes each
+// sub.callback. An SDK's unsubscribe sets sub.alive=false AND immediately
+// releases the host box (Swift Unmanaged.release, Kotlin DeleteGlobalRef),
+// so the alive-check-then-call window is a use-after-free. The guard is
+// held across the whole dispatch loop so rac_sdk_event_quiesce() can
+// spin-wait until every in-flight callback has returned before the host
+// frees user_data. Mirrors rac_vad_proto_quiesce.
+std::atomic<int> g_sdk_event_in_flight{0};
+
+struct SDKEventInFlightGuard {
+    SDKEventInFlightGuard() { g_sdk_event_in_flight.fetch_add(1, std::memory_order_acq_rel); }
+    ~SDKEventInFlightGuard() { g_sdk_event_in_flight.fetch_sub(1, std::memory_order_acq_rel); }
+    SDKEventInFlightGuard(const SDKEventInFlightGuard&) = delete;
+    SDKEventInFlightGuard& operator=(const SDKEventInFlightGuard&) = delete;
+};
 
 // commons-core-infra-005 / -014: each publish allocates an owned byte
 // buffer wrapped in a shared_ptr. The same shared_ptr is enqueued for
@@ -517,6 +536,10 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
     // documented on rac_sdk_event_publish_proto: subscribers MUST NOT block.
     const uint8_t* callback_data = buffer->empty() ? nullptr : buffer->data();
     const size_t callback_size = buffer->size();
+    // commons-162: hold the in-flight guard across the whole dispatch loop so
+    // rac_sdk_event_quiesce() can spin-wait on the counter before a concurrent
+    // rac_sdk_event_unsubscribe lets its caller free the box backing user_data.
+    SDKEventInFlightGuard in_flight_guard;
     for (const auto& sub : subscriptions) {
         if (sub.alive->load()) {
             sub.callback(callback_data, callback_size, sub.user_data);
@@ -524,6 +547,12 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
     }
 
     return RAC_SUCCESS;
+}
+
+void rac_sdk_event_quiesce(void) {
+    while (g_sdk_event_in_flight.load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
 }
 
 rac_result_t rac_sdk_event_poll(rac_proto_buffer_t* out_event) {
