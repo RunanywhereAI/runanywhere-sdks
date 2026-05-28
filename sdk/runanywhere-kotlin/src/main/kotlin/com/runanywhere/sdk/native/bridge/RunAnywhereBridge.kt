@@ -14,6 +14,7 @@
 
 package com.runanywhere.sdk.native.bridge
 
+import ai.runanywhere.proto.v1.ErrorCode
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
@@ -1093,6 +1094,8 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
+    @JvmStatic external fun racEmbeddingsEmbedBatchLifecycleProto(requestProto: ByteArray): ByteArray?
+
     // ========================================================================
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
     // ========================================================================
@@ -1668,23 +1671,31 @@ object RunAnywhereBridge {
     // CONSTANTS
     // ========================================================================
 
-    // Result codes
+    // Result codes.
+    //
+    // `rac_result_t` is a signed C ABI int: 0 = success, negative = the
+    // canonical commons error code (range -100..-999, see rac_error.h). The
+    // proto `ErrorCode` enum holds the POSITIVE magnitude of each code, so the
+    // signed C ABI value is `-ErrorCode.<X>.value`. These are derived from the
+    // proto enum rather than hand-written to stay in lock-step with the C ABI
+    // (every other SDK uses the same negate-the-proto-magnitude convention).
     const val RAC_SUCCESS = 0
-    const val RAC_ERROR_INVALID_PARAMS = -1
-    const val RAC_ERROR_INVALID_HANDLE = -2
-    const val RAC_ERROR_NOT_INITIALIZED = -3
-    const val RAC_ERROR_ALREADY_INITIALIZED = -4
-    const val RAC_ERROR_OPERATION_FAILED = -5
-    const val RAC_ERROR_NOT_SUPPORTED = -6
-    const val RAC_ERROR_MODEL_NOT_LOADED = -7
-    const val RAC_ERROR_OUT_OF_MEMORY = -8
-    const val RAC_ERROR_IO = -9
-    const val RAC_ERROR_CANCELLED = -10
-    const val RAC_ERROR_MODULE_ALREADY_REGISTERED = -20
-    const val RAC_ERROR_MODULE_NOT_FOUND = -21
-    const val RAC_ERROR_SERVICE_NOT_FOUND = -22
-    const val RAC_ERROR_NOT_FOUND = -423
-    const val RAC_ERROR_FEATURE_NOT_AVAILABLE = -801
+    val RAC_ERROR_INVALID_PARAMETER = -ErrorCode.ERROR_CODE_INVALID_PARAMETER.value
+    val RAC_ERROR_INVALID_HANDLE = -ErrorCode.ERROR_CODE_INVALID_HANDLE.value
+    val RAC_ERROR_NOT_INITIALIZED = -ErrorCode.ERROR_CODE_NOT_INITIALIZED.value
+    val RAC_ERROR_ALREADY_INITIALIZED = -ErrorCode.ERROR_CODE_ALREADY_INITIALIZED.value
+
+    /** Returned by [ComponentVTable] load slots when the lifecycle load fails. */
+    val RAC_ERROR_MODEL_LOAD_FAILED = -ErrorCode.ERROR_CODE_MODEL_LOAD_FAILED.value
+    val RAC_ERROR_NOT_SUPPORTED = -ErrorCode.ERROR_CODE_NOT_SUPPORTED.value
+    val RAC_ERROR_MODEL_NOT_LOADED = -ErrorCode.ERROR_CODE_MODEL_NOT_LOADED.value
+    val RAC_ERROR_OUT_OF_MEMORY = -ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY.value
+    val RAC_ERROR_CANCELLED = -ErrorCode.ERROR_CODE_CANCELLED.value
+    val RAC_ERROR_MODULE_ALREADY_REGISTERED = -ErrorCode.ERROR_CODE_MODULE_ALREADY_REGISTERED.value
+    val RAC_ERROR_MODULE_NOT_FOUND = -ErrorCode.ERROR_CODE_MODULE_NOT_FOUND.value
+    val RAC_ERROR_SERVICE_NOT_FOUND = -ErrorCode.ERROR_CODE_SERVICE_NOT_FOUND.value
+    val RAC_ERROR_NOT_FOUND = -ErrorCode.ERROR_CODE_NOT_FOUND.value
+    val RAC_ERROR_FEATURE_NOT_AVAILABLE = -ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE.value
 
     // Lifecycle states
     const val RAC_LIFECYCLE_IDLE = 0

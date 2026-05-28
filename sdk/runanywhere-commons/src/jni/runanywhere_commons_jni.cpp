@@ -4405,6 +4405,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatch
     return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchProto");
 }
 
+// Swift-aligned: mirror iOS Swift / Flutter which use
+// rac_embeddings_embed_batch_lifecycle_proto (no handle, lifecycle-only).
+// Resolves the lifecycle-loaded embeddings model internally so embed calls
+// share the same model-load/registry state as LLM/STT/TTS.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatchLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_embeddings_embed_batch_lifecycle_proto(request.u8(), request.size(),
+                                                                 &result);
+    return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchLifecycleProto");
+}
+
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsDestroy(JNIEnv* env,
                                                                               jclass clazz,
