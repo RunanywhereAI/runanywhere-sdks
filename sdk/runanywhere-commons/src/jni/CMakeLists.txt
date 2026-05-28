@@ -16,7 +16,7 @@
 # This mirrors the Swift SDK architecture where each backend has its own
 # XCFramework (RABackendLlamaCPP, RABackendONNX).
 
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 project(runanywhere_commons_jni)
 
