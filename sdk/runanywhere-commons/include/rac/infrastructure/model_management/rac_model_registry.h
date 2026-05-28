@@ -447,21 +447,10 @@ RAC_API rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_
  */
 RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
 
-/**
- * @brief Check if model category requires context length.
- *
- * @param category Model category
- * @return RAC_TRUE if requires context length
- */
-RAC_API rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category);
-
-/**
- * @brief Check if model category supports thinking.
- *
- * @param category Model category
- * @return RAC_TRUE if supports thinking
- */
-RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t category);
+// NOTE: rac_model_category_requires_context_length() and
+// rac_model_category_supports_thinking() are declared in rac_model_types.h
+// (the canonical home for rac_model_category_t helpers) and intentionally
+// not re-declared here to avoid double-declaration drift.
 
 /**
  * @brief Infer artifact type from URL and format.
