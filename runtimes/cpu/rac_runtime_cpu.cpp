@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <vector>
 
@@ -82,6 +83,12 @@ struct CpuRuntimeBuffer {
     uint32_t device_index = 0;
     uint32_t alignment = 0;
     uint64_t usage_flags = 0;
+};
+
+struct FreeDeleter {
+    void operator()(void* ptr) const {
+        std::free(ptr);
+    }
 };
 
 /* RT-CPU-03: provider bookkeeping (mutex + vector + register/unregister/find)
@@ -406,22 +413,23 @@ rac_result_t cpu_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    auto* buffer = new (std::nothrow) CpuRuntimeBuffer();
+    auto buffer = std::unique_ptr<CpuRuntimeBuffer>(new (std::nothrow) CpuRuntimeBuffer());
     if (buffer == nullptr)
         return RAC_ERROR_OUT_OF_MEMORY;
 
-    buffer->data = std::malloc(desc->bytes);
-    if (buffer->data == nullptr) {
-        delete buffer;
+    std::unique_ptr<void, FreeDeleter> data(std::malloc(desc->bytes));
+    if (data == nullptr) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    buffer->data = data.get();
     buffer->bytes = desc->bytes;
     buffer->memory_space = space;
     buffer->device_class = RAC_DEVICE_CLASS_CPU;
     buffer->device_index = desc->device_index;
     buffer->alignment = desc->alignment == 0 ? default_alignment : desc->alignment;
     buffer->usage_flags = desc->usage_flags;
-    *out = reinterpret_cast<rac_runtime_buffer_t*>(buffer);
+    *out = reinterpret_cast<rac_runtime_buffer_t*>(buffer.release());
+    data.release();
     return RAC_SUCCESS;
 }
 
