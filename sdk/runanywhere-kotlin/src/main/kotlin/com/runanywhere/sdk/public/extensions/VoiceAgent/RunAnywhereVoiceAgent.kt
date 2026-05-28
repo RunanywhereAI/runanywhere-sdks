@@ -11,6 +11,9 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
@@ -61,6 +64,67 @@ private fun getMissingComponents(): List<String> {
     return missing
 }
 
+/**
+ * Default Silero VAD model id seeded by every example app's catalog.
+ * Exposed so callers do not hard-code the string when invoking
+ * [ensureDefaultVAD]. Mirrors Swift `RunAnywhere.defaultVADModelID`.
+ */
+val RunAnywhere.defaultVADModelID: String
+    get() = "silero-vad"
+
+/**
+ * Ensure a VAD model is loaded in the canonical lifecycle before a voice
+ * agent session starts. When no VAD model is currently registered for
+ * [ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION], attempts to
+ * load the catalogued default ([defaultVADModelID], Silero) so the voice
+ * agent's speech-start / speech-end events fire. The energy-based
+ * fallback does not produce the lifecycle events the voice-agent
+ * orchestrator listens for, so without a VAD lifecycle load the session
+ * stays silent after init.
+ *
+ * Idempotent: returns `true` immediately when a VAD model is already
+ * loaded. Logs (but does not throw) when the optional auto-load fails;
+ * callers may inspect the return value to decide whether to surface a
+ * warning. Mirrors Swift `ensureDefaultVAD(modelID:)`.
+ *
+ * @param modelID VAD model id to auto-load when none is current. When
+ *   `null`, falls back to [defaultVADModelID].
+ * @return `true` when a VAD model is loaded after the call; `false`
+ *   when no VAD model is loaded (auto-load failed or skipped).
+ */
+suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
+    if (!isInitialized) return false
+
+    val currentRequest =
+        CurrentModelRequest(
+            category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        )
+    val snapshot = CppBridgeModelLifecycle.currentModel(currentRequest)
+    if (snapshot != null && snapshot.found && snapshot.model_id.isNotEmpty()) {
+        return true
+    }
+
+    val targetID = modelID ?: defaultVADModelID
+    if (targetID.isEmpty()) return false
+
+    voiceAgentLogger.info("Auto-loading default VAD '$targetID' for voice-agent session")
+
+    val loadRequest =
+        ModelLoadRequest(
+            model_id = targetID,
+            category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        )
+    val result = CppBridgeModelLifecycle.load(loadRequest)
+    if (result == null || !result.success) {
+        val errorMessage = result?.error_message.orEmpty()
+        voiceAgentLogger.warning(
+            "Default VAD '$targetID' auto-load failed: $errorMessage — voice agent will use energy fallback",
+        )
+        return false
+    }
+    return true
+}
+
 suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
@@ -83,18 +147,32 @@ suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentSta
  *
  * Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
  *
- * The `ttsVoiceId` parameter is the voice id **within** the loaded TTS model,
- * NOT the model id. For single-voice engines, leaving it `null` (the default)
- * lets the engine pick its default voice. For multi-voice engines (Piper,
- * eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller must supply the desired
- * voice id explicitly; reusing the TTS model id here produces invalid voice
- * selection for multi-voice models (see Swift comment at
- * `RunAnywhere+VoiceAgent.swift:162-171`).
+ * When [ensureVAD] is `true` (default), the SDK guarantees that a VAD
+ * model is loaded into the canonical lifecycle before initialization
+ * runs via [ensureDefaultVAD]. Without this the session would silently
+ * fall back to the energy-based detector and the C++ voice agent's
+ * speech-start / speech-end lifecycle events would not fire. Set to
+ * `false` only if the caller has already loaded an explicit VAD model
+ * (or knows the energy fallback is acceptable for the deployment).
+ *
+ * The [ttsVoiceId] parameter is the voice id **within** the loaded TTS
+ * model, NOT the model id. For single-voice engines, leaving it `null`
+ * (the default) lets the engine pick its default voice. For multi-voice
+ * engines (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller
+ * must supply the desired voice id explicitly; reusing the TTS model id
+ * here produces invalid voice selection for multi-voice models (see
+ * Swift comment at `RunAnywhere+VoiceAgent.swift:162-171`).
  */
 suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
     ttsVoiceId: String? = null,
+    ensureVAD: Boolean = true,
 ) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+
+    if (ensureVAD) {
+        ensureDefaultVAD()
+    }
+
     if (voiceAgentInitialized && areAllComponentsLoaded()) return
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
