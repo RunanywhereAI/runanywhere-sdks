@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -39,6 +40,58 @@ struct rac_llm_llamacpp_handle_impl {
 };
 
 // =============================================================================
+// CALLER STOP SEQUENCE HELPERS
+// =============================================================================
+//
+// Mirrors the VLM helpers in engines/llamacpp/rac_vlm_llamacpp.cpp:797-841
+// (collect_stop_sequences / find_first_stop_sequence / max_stop_length). The
+// inner llama.cpp text-generation loop only honours a built-in static stop list
+// (engines/llamacpp/llamacpp_backend.cpp:931, :1275), so caller-supplied stops
+// passed via rac_llm_options_t::stop_sequences are enforced here at the C-API
+// boundary.
+namespace {
+
+std::vector<std::string> collect_user_stop_sequences(const rac_llm_options_t* options) {
+    std::vector<std::string> result;
+    if (options == nullptr || options->stop_sequences == nullptr ||
+        options->num_stop_sequences == 0) {
+        return result;
+    }
+    result.reserve(options->num_stop_sequences);
+    for (size_t i = 0; i < options->num_stop_sequences; ++i) {
+        const char* seq = options->stop_sequences[i];
+        if (seq != nullptr && seq[0] != '\0') {
+            result.emplace_back(seq);
+        }
+    }
+    return result;
+}
+
+size_t find_first_stop_sequence(const std::string& window,
+                                const std::vector<std::string>& stops) {
+    size_t earliest = std::string::npos;
+    for (const auto& stop_seq : stops) {
+        const size_t pos = window.find(stop_seq);
+        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
+            earliest = pos;
+        }
+    }
+    return earliest;
+}
+
+size_t max_stop_length(const std::vector<std::string>& stops) {
+    size_t m = 0;
+    for (const auto& s : stops) {
+        if (s.size() > m) {
+            m = s.size();
+        }
+    }
+    return m;
+}
+
+}  // namespace
+
+// =============================================================================
 // LLAMACPP API IMPLEMENTATION
 // =============================================================================
 
@@ -47,7 +100,11 @@ extern "C" {
 rac_result_t rac_llm_llamacpp_create(const char* model_path,
                                      const rac_llm_llamacpp_config_t* config,
                                      rac_handle_t* out_handle) {
-    if (out_handle == nullptr) {
+    if (out_handle == nullptr || model_path == nullptr) {
+        // Matches the sherpa STT/TTS/VAD wrappers (e.g.
+        // engines/sherpa/rac_stt_sherpa.cpp:67) — refuse a NULL path instead of
+        // letting std::string construction at engines/llamacpp/llamacpp_backend.cpp:267
+        // hit undefined behaviour.
         return RAC_ERROR_NULL_POINTER;
     }
 
@@ -227,6 +284,18 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
         return RAC_ERROR_GENERATION_FAILED;
     }
 
+    // Caller-supplied stop sequences are collected into request.stop_sequences
+    // above but the inner generate loop (engines/llamacpp/llamacpp_backend.cpp)
+    // only honours a built-in static list. Truncate the buffered text at the
+    // first caller stop so non-streaming callers see consistent semantics.
+    const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
+    if (!user_stops.empty() && !result.text.empty()) {
+        const size_t cut = find_first_stop_sequence(result.text, user_stops);
+        if (cut != std::string::npos) {
+            result.text.resize(cut);
+        }
+    }
+
     // Fill RAC result struct
     if (!result.text.empty()) {
         out_result->text = strdup(result.text.c_str());
@@ -296,12 +365,47 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                      request.max_tokens, request.temperature, request.top_p);
     }
 
-    // Stream using C++ class (see generate for rationale on try-catch)
+    // Stream using C++ class (see generate for rationale on try-catch).
+    //
+    // Caller-supplied stop sequences are not honoured by the inner backend
+    // loop, so we wrap the per-token callback with the same rolling stop_window
+    // pattern used by the VLM streaming path
+    // (engines/llamacpp/rac_vlm_llamacpp.cpp:1390-1444): emit only bytes that
+    // cannot still form part of a pending stop match, halt as soon as a stop is
+    // matched, and never leak the stop prefix through.
+    const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
+    const size_t user_stop_max_len = max_stop_length(user_stops);
+    std::string stop_window;
+    if (user_stop_max_len > 0) {
+        stop_window.reserve(user_stop_max_len * 2);
+    }
+    bool stop_hit = false;
+
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
-            request, [callback, user_data](const std::string& token) -> bool {
-                return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+            request, [&](const std::string& token) -> bool {
+                if (user_stops.empty()) {
+                    return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                }
+                stop_window.append(token);
+                const size_t found_pos = find_first_stop_sequence(stop_window, user_stops);
+                if (found_pos != std::string::npos) {
+                    if (found_pos > 0) {
+                        const std::string prefix = stop_window.substr(0, found_pos);
+                        callback(prefix.c_str(), RAC_FALSE, user_data);
+                    }
+                    stop_window.clear();
+                    stop_hit = true;
+                    return false;  // Cancels the backend generation loop.
+                }
+                if (stop_window.size() > user_stop_max_len) {
+                    const size_t safe_len = stop_window.size() - user_stop_max_len;
+                    const std::string safe_chunk = stop_window.substr(0, safe_len);
+                    stop_window.erase(0, safe_len);
+                    return callback(safe_chunk.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                }
+                return true;
             });
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
@@ -311,11 +415,21 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
-    if (success) {
+    // Treat a caller-stop hit as a successful terminal exit so the final marker
+    // is still emitted to the caller's accumulator. Without this, an early
+    // backend cancel from our wrapper would surface as RAC_ERROR_INFERENCE_FAILED
+    // and the stream would never see is_final=true.
+    if (stop_hit || success) {
+        if (!stop_hit && !stop_window.empty()) {
+            // Flush any tail bytes held back as potential stop prefix.
+            callback(stop_window.c_str(), RAC_FALSE, user_data);
+            stop_window.clear();
+        }
         callback("", RAC_TRUE, user_data);  // Final token
+        return RAC_SUCCESS;
     }
 
-    return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+    return RAC_ERROR_INFERENCE_FAILED;
 }
 
 rac_result_t
@@ -351,14 +465,43 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
     }
 
     // Stream using C++ class with timing (see generate for rationale on
-    // try-catch)
+    // try-catch). Caller stop-sequence handling mirrors
+    // rac_llm_llamacpp_generate_stream above.
+    const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
+    const size_t user_stop_max_len = max_stop_length(user_stops);
+    std::string stop_window;
+    if (user_stop_max_len > 0) {
+        stop_window.reserve(user_stop_max_len * 2);
+    }
+    bool stop_hit = false;
+
     int prompt_tokens = 0;
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
             request,
-            [callback, user_data](const std::string& token) -> bool {
-                return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+            [&](const std::string& token) -> bool {
+                if (user_stops.empty()) {
+                    return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                }
+                stop_window.append(token);
+                const size_t found_pos = find_first_stop_sequence(stop_window, user_stops);
+                if (found_pos != std::string::npos) {
+                    if (found_pos > 0) {
+                        const std::string prefix = stop_window.substr(0, found_pos);
+                        callback(prefix.c_str(), RAC_FALSE, user_data);
+                    }
+                    stop_window.clear();
+                    stop_hit = true;
+                    return false;
+                }
+                if (stop_window.size() > user_stop_max_len) {
+                    const size_t safe_len = stop_window.size() - user_stop_max_len;
+                    const std::string safe_chunk = stop_window.substr(0, safe_len);
+                    stop_window.erase(0, safe_len);
+                    return callback(safe_chunk.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+                }
+                return true;
             },
             &prompt_tokens, timing_out);
     } catch (const std::exception& e) {
@@ -374,14 +517,29 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
         timing_out->prompt_tokens = static_cast<int32_t>(prompt_tokens);
     }
 
-    if (success) {
+    if (stop_hit || success) {
+        if (!stop_hit && !stop_window.empty()) {
+            callback(stop_window.c_str(), RAC_FALSE, user_data);
+            stop_window.clear();
+        }
         callback("", RAC_TRUE, user_data);  // Final token
+        return RAC_SUCCESS;
     }
 
-    return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+    return RAC_ERROR_INFERENCE_FAILED;
 }
 
 void rac_llm_llamacpp_cancel(rac_handle_t handle) {
+    // Cancel is intentionally lock-free: LlamaCppTextGeneration::cancel() only
+    // stores an atomic flag (engines/llamacpp/llamacpp_backend.cpp:1079).
+    //
+    // PRECONDITION: callers MUST guarantee `handle` is not concurrently being
+    // destroyed via rac_llm_llamacpp_destroy(). Commons-routed callers are
+    // protected by the lifecycle service refcount
+    // (rac_lifecycle_acquire_service / release_service); direct C-API
+    // consumers (benchmarks, tests) own the same invariant. Racing cancel
+    // against destroy is undefined behaviour and is the caller's
+    // responsibility to prevent.
     if (handle == nullptr) {
         return;
     }
@@ -570,6 +728,18 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
         if (result.finish_reason == "error") {
             rac_error_set_details("generate_from_context failed");
             return RAC_ERROR_GENERATION_FAILED;
+        }
+
+        // Same caller-stop truncation as rac_llm_llamacpp_generate above —
+        // the inner generate_from_context loop in
+        // engines/llamacpp/llamacpp_backend.cpp:1275 only honours its built-in
+        // static stop list.
+        const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
+        if (!user_stops.empty() && !result.text.empty()) {
+            const size_t cut = find_first_stop_sequence(result.text, user_stops);
+            if (cut != std::string::npos) {
+                result.text.resize(cut);
+            }
         }
 
         out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
