@@ -284,15 +284,28 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             // the state under the lock, release it, then make the C
             // call. This matches the install() invariant at lines
             // 129-132 above.
-            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { lockedState in
-                guard lockedState.installation == .installed else { return nil }
-                lockedState.installation = .notInstalled
-                let ptr = lockedState.userPtr
-                lockedState.userPtr = nil
-                return ptr
-            }
+            //
+            // Snapshot AND clear the continuations under the same lock so
+            // the public `tearDown()` honours its "subscribers' streams
+            // will finish" contract: a force-teardown (e.g. component
+            // destruction) removes the C callback, so no terminal event
+            // will ever arrive to finish a consumer's `for await`. We
+            // finish them explicitly below. This mirrors Kotlin
+            // `forceTearDown`, which closes every snapshotted collector.
+            let teardown: (ptr: UnsafeMutableRawPointer?, continuations: [AsyncStream<Event>.Continuation]) =
+                state.withLock { lockedState in
+                    let continuations = Array(lockedState.continuations.values)
+                    lockedState.continuations.removeAll()
+                    guard lockedState.installation == .installed else {
+                        return (nil, continuations)
+                    }
+                    lockedState.installation = .notInstalled
+                    let ptr = lockedState.userPtr
+                    lockedState.userPtr = nil
+                    return (ptr, continuations)
+                }
 
-            if let ptrToRelease {
+            if let ptrToRelease = teardown.ptr {
                 // Commons teardown contract (see rac_voice_event_abi.h /
                 // rac_llm_stream.h): (a) unregister stops NEW dispatches,
                 // (b) quiesce spin-waits until every in-flight trampoline
@@ -308,6 +321,12 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
             }
             HandleStreamAdapter.removeFanOut(for: storeKey)
+
+            // Finish AFTER unregister/quiesce/release so a consumer that
+            // reacts to `.finished` cannot race the C teardown.
+            for continuation in teardown.continuations {
+                continuation.finish()
+            }
         }
     }
 
