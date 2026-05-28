@@ -2,13 +2,14 @@
  * @file rac_error.h
  * @brief RunAnywhere Commons - Error Codes and Error Handling
  *
- * C port of Swift's ErrorCode enum from Foundation/Errors/ErrorCode.swift.
+ * Canonical C ABI error codes. The cross-SDK proto `ErrorCode` enum
+ * (`idl/errors.proto`, generated as `errors.pb.swift` / Kotlin / Dart / TS)
+ * mirrors the absolute magnitude of each code defined here; every new code
+ * added must also appear in that proto enum and in `rac_error_message()`
+ * inside `src/core/rac_error.cpp`.
  *
  * Error codes for runanywhere-commons use the range -100 to -999 to avoid
  * collision with runanywhere-core error codes (0 to -99).
- *
- * IMPORTANT: This is a direct translation of the Swift implementation.
- * Do NOT add error codes not present in the Swift code.
  */
 
 #ifndef RAC_ERROR_H
@@ -44,8 +45,10 @@ extern "C" {
 //   - Platform adapter errors:  -500 to -599
 //   - Backend errors:           -600 to -699
 //   - Event errors:             -700 to -799
-//   - Other errors:             -800 to -899
-//   - Reserved:                 -900 to -999
+//   - Other errors:             -800 to -809
+//   - Engine plugin errors:     -810 to -829
+//   - Reserved:                 -830 to -899
+//   - Reserved (future):        -900 to -999
 
 // =============================================================================
 // INITIALIZATION ERRORS (-100 to -109)
@@ -409,6 +412,15 @@ extern "C" {
 #define RAC_ERROR_UNKNOWN ((rac_result_t) - 804)
 /** Internal error */
 #define RAC_ERROR_INTERNAL ((rac_result_t) - 805)
+
+// =============================================================================
+// ENGINE PLUGIN ERRORS (-810 to -829)
+// Mirrors generated proto `ErrorCode` enum cases `abiVersionMismatch`,
+// `capabilityUnsupported`, `pluginDuplicate`, `pluginLoadFailed`, `pluginBusy`
+// (see `idl/errors.proto` and `errors.pb.swift`). The Swift / Kotlin / Dart /
+// Web SDKs surface these via the generated enum; `rac_error_message()` in
+// `src/core/rac_error.cpp` provides the human-readable strings.
+// =============================================================================
 
 /* ─────────── GAP 02: engine plugin errors ─────────── */
 /** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
