@@ -53,7 +53,7 @@ struct rac_stt_service_ops;        /* rac/features/stt/rac_stt_service.h */
 struct rac_tts_service_ops;        /* rac/features/tts/rac_tts_service.h */
 struct rac_vad_service_ops;        /* rac/features/vad/rac_vad_service.h */
 struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_service.h */
-struct rac_rerank_service_ops;     /* rac/features/rerank/rac_rerank_service.h (future) */
+struct rac_rerank_service_ops;     /* dormant ABI slot — never defined; see rerank_ops below */
 struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 
@@ -164,7 +164,14 @@ typedef struct rac_engine_vtable {
     /** Text / multimodal embeddings (`RAC_PRIMITIVE_EMBED`). */
     const struct rac_embeddings_service_ops* embedding_ops;
 
-    /** Cross-encoder reranking (`RAC_PRIMITIVE_RERANK`). */
+    /** Dormant ABI slot — reserved wire layout for cross-encoder reranking
+     * (`RAC_PRIMITIVE_RERANK` == 6). NOT a routable primitive: no engine serves
+     * it, `rac_engine_vtable_slot()` always returns NULL for it, and the
+     * registry rejects any manifest that declares it. Leave NULL; populating it
+     * has no effect. Promoting it to a live primitive (defining
+     * `rac_rerank_service.h`, wiring routing) requires bumping
+     * `RAC_PLUGIN_API_VERSION`. The field is kept in place to preserve the
+     * binary layout of the eight numbered slots. */
     const struct rac_rerank_service_ops* rerank_ops;
 
     /** Vision-Language Model (`RAC_PRIMITIVE_VLM`). */
