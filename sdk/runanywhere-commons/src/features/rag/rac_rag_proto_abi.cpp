@@ -170,6 +170,13 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // to a Session struct which owns the underlying RAGBackend (which owns the
 // LLM + Embeddings service handles). The Session is created by
 // rac_rag_session_create_proto and freed by rac_rag_session_destroy_proto.
+//
+// Multi-session is the deliberate contract here: each handle is a fully
+// independent Session with its own RAGBackend (its own vector store + BM25
+// index + service handles) and no shared global state, so an app can keep
+// several RAG indexes live at once. Mobile SDK bridges currently expose only
+// one session for convenience, but that is a frontend choice, not an ABI
+// limitation -- the commons layer imposes no single-session restriction.
 // ---------------------------------------------------------------------------
 struct Session {
     std::unique_ptr<RAGBackend> backend;
