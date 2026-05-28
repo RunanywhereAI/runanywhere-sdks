@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <climits>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -36,12 +37,57 @@ static std::vector<uint8_t> rgb_to_rgba(const uint8_t* rgb, uint32_t w, uint32_t
     return rgba;
 }
 
-// engines-other-008: see rac_llm_metalrt.cpp for the ADR; mirror pattern.
+// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// acquire/release pin pattern: destroy waits on cv_ for in-flight
+// process / process_stream pins to drain before tearing down the vision
+// handle and freeing impl. Mirrors the pass3-syn UAF callout in
+// voice_agent.cpp — we fix it at the engine wrapper here.
 struct rac_vlm_metalrt_impl {
     void* handle = nullptr;  // metalrt_vision_create() handle
     std::atomic<bool> loaded{false};
     mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    int refcount_ = 0;  // guarded by mutex_
 };
+
+namespace {
+
+class MetalRTVLMPin {
+   public:
+    explicit MetalRTVLMPin(rac_vlm_metalrt_impl* impl) : impl_(impl) {
+        if (impl_ == nullptr)
+            return;
+        std::lock_guard<std::mutex> lock(impl_->mutex_);
+        if (!impl_->loaded.load(std::memory_order_acquire) || impl_->handle == nullptr)
+            return;
+        handle_ = impl_->handle;
+        impl_->refcount_++;
+        pinned_ = true;
+    }
+    MetalRTVLMPin(const MetalRTVLMPin&) = delete;
+    MetalRTVLMPin& operator=(const MetalRTVLMPin&) = delete;
+    ~MetalRTVLMPin() {
+        if (!pinned_)
+            return;
+        bool notify = false;
+        {
+            std::lock_guard<std::mutex> lock(impl_->mutex_);
+            impl_->refcount_--;
+            notify = (impl_->refcount_ == 0);
+        }
+        if (notify)
+            impl_->cv_.notify_all();
+    }
+    bool pinned() const { return pinned_; }
+    void* handle() const { return handle_; }
+
+   private:
+    rac_vlm_metalrt_impl* impl_ = nullptr;
+    void* handle_ = nullptr;
+    bool pinned_ = false;
+};
+
+}  // namespace
 
 extern "C" {
 
@@ -84,12 +130,13 @@ void rac_vlm_metalrt_destroy(rac_handle_t handle) {
         return;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
     {
-        std::lock_guard<std::mutex> lock(impl->mutex_);
+        std::unique_lock<std::mutex> lock(impl->mutex_);
+        impl->loaded.store(false, std::memory_order_release);
+        impl->cv_.wait(lock, [impl] { return impl->refcount_ == 0; });
         if (impl->handle) {
             metalrt_vision_destroy(impl->handle);
             impl->handle = nullptr;
         }
-        impl->loaded.store(false, std::memory_order_release);
     }
     delete impl;
 }
@@ -107,7 +154,8 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     if (!handle || !image || !prompt || !out_result)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTVLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
@@ -119,7 +167,7 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     struct MetalRTVisionResult result = {};
 
     if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
-        result = metalrt_vision_analyze(impl->handle, image->file_path, prompt, &vopts);
+        result = metalrt_vision_analyze(pin.handle(), image->file_path, prompt, &vopts);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
         if (image->width == 0 || image->height == 0 ||
             image->width > static_cast<uint32_t>(INT_MAX) ||
@@ -128,7 +176,7 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
             return RAC_ERROR_VALIDATION_FAILED;
         }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
-        result = metalrt_vision_analyze_pixels(impl->handle, rgba.data(), (int)image->width,
+        result = metalrt_vision_analyze_pixels(pin.handle(), rgba.data(), (int)image->width,
                                                (int)image->height, prompt, &vopts);
     } else {
         RAC_LOG_ERROR(LOG_CAT, "Unsupported image format: %d", image->format);
@@ -182,7 +230,8 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
     if (!handle || !image || !prompt || !callback)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTVLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
@@ -195,7 +244,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
     struct MetalRTVisionResult result = {};
 
     if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
-        result = metalrt_vision_analyze_stream(impl->handle, image->file_path, prompt,
+        result = metalrt_vision_analyze_stream(pin.handle(), image->file_path, prompt,
                                                vlm_stream_bridge, &ctx, &vopts);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
         if (image->width == 0 || image->height == 0 ||
@@ -206,7 +255,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
             return RAC_ERROR_VALIDATION_FAILED;
         }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
-        result = metalrt_vision_analyze_pixels_stream(impl->handle, rgba.data(), (int)image->width,
+        result = metalrt_vision_analyze_pixels_stream(pin.handle(), rgba.data(), (int)image->width,
                                                       (int)image->height, prompt, vlm_stream_bridge,
                                                       &ctx, &vopts);
     } else {
@@ -222,9 +271,10 @@ void rac_vlm_metalrt_reset(rac_handle_t handle) {
     if (!handle)
         return;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
-    if (impl->handle) {
-        metalrt_vision_reset(impl->handle);
-    }
+    MetalRTVLMPin pin(impl);
+    if (!pin.pinned())
+        return;
+    metalrt_vision_reset(pin.handle());
 }
 
 }  // extern "C"

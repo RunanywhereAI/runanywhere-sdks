@@ -40,8 +40,8 @@ class RunAnywhereCorePackage : BaseReactPackage() {
                     Log.w(TAG, "OkHttp HTTP transport registration returned rc=$rc")
                 }
             } catch (t: Throwable) {
-                // Link errors here indicate the bundled librac_commons.so
-                // predates the rac_http_transport_register symbol (commons
+                // Link errors here indicate the bundled librunanywhere_jni.so
+                // predates the racHttpTransportRegisterOkHttp symbol (commons
                 // versions below 0.2.0). Falls back to libcurl.
                 Log.w(TAG, "OkHttp HTTP transport unavailable: ${t.message}")
             }

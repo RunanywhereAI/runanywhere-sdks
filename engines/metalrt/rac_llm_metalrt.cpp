@@ -9,6 +9,7 @@
 #include "rac_runtime_metal.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -21,21 +22,71 @@ static const char* LOG_CAT = "LLM.MetalRT";
 // INTERNAL HANDLE
 // =============================================================================
 
-// engines-other-008: MetalRT's underlying engine is a closed-source vendor
-// library with no documented thread-safety guarantee. To make the wrapper's
-// bookkeeping safe under concurrent lifecycle calls (create / destroy /
-// load racing with an in-flight generate), we guard the impl's mutable
-// fields with `mutex_` and keep the actual generate / generate_stream paths
-// lock-free — cancellation is driven by the streaming-callback return
-// value, not a side-channel call. Callers must still externally serialize
-// their own state machine if they want to teardown the impl from a
-// different thread than the active generate; the mutex protects the
-// wrapper from torn reads, not the engine from concurrent inference.
+// engines-003 (CLUSTER-211): MetalRT's underlying engine is a closed-source
+// vendor library with no documented thread-safety guarantee, and the public
+// `destroy` entrypoint races any in-flight `generate` / `generate_stream`.
+// The previous design guarded only `handle` / `loaded` with `mutex_` + an
+// atomic but ran inference lock-free, which left `impl->handle` and the
+// `impl` allocation itself unprotected once destroy fell through the lock
+// and called `delete impl;` — a textbook UAF. We adopt the lifecycle
+// layer's acquire/release pin pattern (see
+// `sdk/runanywhere-commons/src/core/capabilities/lifecycle_manager.cpp`
+// `rac_lifecycle_acquire_service` / `rac_lifecycle_release_service`):
+// every public op pins the impl for the duration of the metalrt call, and
+// destroy parks on a condvar until the refcount drains. Concurrent token-
+// by-token streaming therefore stays lock-free during a single call but
+// teardown is fenced.
 struct rac_llm_metalrt_impl {
     void* handle = nullptr;  // metalrt_create() handle
     std::atomic<bool> loaded{false};
     mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    int refcount_ = 0;  // guarded by mutex_
 };
+
+namespace {
+
+// RAII pin: bumps refcount under the impl mutex if `loaded`, captures the
+// engine handle, and releases (with notify) on destruction. The captured
+// handle stays valid for the pin's lifetime — destroy waits on cv_ for
+// refcount to drain before tearing the engine handle down and deleting
+// the impl.
+class MetalRTLLMPin {
+   public:
+    explicit MetalRTLLMPin(rac_llm_metalrt_impl* impl) : impl_(impl) {
+        if (impl_ == nullptr)
+            return;
+        std::lock_guard<std::mutex> lock(impl_->mutex_);
+        if (!impl_->loaded.load(std::memory_order_acquire) || impl_->handle == nullptr)
+            return;
+        handle_ = impl_->handle;
+        impl_->refcount_++;
+        pinned_ = true;
+    }
+    MetalRTLLMPin(const MetalRTLLMPin&) = delete;
+    MetalRTLLMPin& operator=(const MetalRTLLMPin&) = delete;
+    ~MetalRTLLMPin() {
+        if (!pinned_)
+            return;
+        bool notify = false;
+        {
+            std::lock_guard<std::mutex> lock(impl_->mutex_);
+            impl_->refcount_--;
+            notify = (impl_->refcount_ == 0);
+        }
+        if (notify)
+            impl_->cv_.notify_all();
+    }
+    bool pinned() const { return pinned_; }
+    void* handle() const { return handle_; }
+
+   private:
+    rac_llm_metalrt_impl* impl_ = nullptr;
+    void* handle_ = nullptr;
+    bool pinned_ = false;
+};
+
+}  // namespace
 
 // =============================================================================
 // API IMPLEMENTATION
@@ -83,12 +134,16 @@ void rac_llm_metalrt_destroy(rac_handle_t handle) {
         return;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
     {
-        std::lock_guard<std::mutex> lock(impl->mutex_);
+        std::unique_lock<std::mutex> lock(impl->mutex_);
+        // Flip loaded first so any new entrant fails fast (see pin ctor).
+        impl->loaded.store(false, std::memory_order_release);
+        // Wait until every in-flight pin releases before touching the
+        // engine handle or freeing the impl.
+        impl->cv_.wait(lock, [impl] { return impl->refcount_ == 0; });
         if (impl->handle) {
             metalrt_destroy(impl->handle);
             impl->handle = nullptr;
         }
-        impl->loaded.store(false, std::memory_order_release);
     }
     delete impl;
 }
@@ -106,7 +161,8 @@ rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char* prompt,
     if (!handle || !prompt || !out_result)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTOptions opts = {};
@@ -117,7 +173,7 @@ rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char* prompt,
     opts.reset_cache = true;
     opts.ignore_eos = false;
 
-    struct MetalRTResult result = metalrt_generate(impl->handle, prompt, &opts);
+    struct MetalRTResult result = metalrt_generate(pin.handle(), prompt, &opts);
 
     out_result->text = result.text ? strdup(result.text) : nullptr;
     out_result->prompt_tokens = result.prompt_tokens;
@@ -162,7 +218,8 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
     if (!handle || !prompt || !callback)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     int32_t max_tok = options ? options->max_tokens : 100;
@@ -177,7 +234,7 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
 
     MetalRTStreamCtx ctx = {callback, user_data, max_tok, 0, false};
     struct MetalRTResult result =
-        metalrt_generate_stream(impl->handle, prompt, metalrt_stream_bridge, &ctx, &opts);
+        metalrt_generate_stream(pin.handle(), prompt, metalrt_stream_bridge, &ctx, &opts);
 
     // Send final token only if client did not cancel.
     if (!ctx.client_cancelled) {
@@ -192,9 +249,10 @@ rac_result_t rac_llm_metalrt_inject_system_prompt(rac_handle_t handle, const cha
     if (!handle || !prompt)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
-    metalrt_set_system_prompt(impl->handle, prompt);
+    metalrt_set_system_prompt(pin.handle(), prompt);
     return RAC_SUCCESS;
 }
 
@@ -202,9 +260,10 @@ rac_result_t rac_llm_metalrt_append_context(rac_handle_t handle, const char* tex
     if (!handle || !text)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
-    metalrt_cache_prompt(impl->handle, text);
+    metalrt_cache_prompt(pin.handle(), text);
     return RAC_SUCCESS;
 }
 
@@ -214,7 +273,8 @@ rac_result_t rac_llm_metalrt_generate_from_context(rac_handle_t handle, const ch
     if (!handle || !query || !out_result)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTOptions opts = {};
@@ -225,7 +285,7 @@ rac_result_t rac_llm_metalrt_generate_from_context(rac_handle_t handle, const ch
     opts.reset_cache = false;
     opts.ignore_eos = false;
 
-    struct MetalRTResult result = metalrt_generate_raw_continue(impl->handle, query, &opts);
+    struct MetalRTResult result = metalrt_generate_raw_continue(pin.handle(), query, &opts);
 
     out_result->text = result.text ? strdup(result.text) : nullptr;
     out_result->prompt_tokens = result.prompt_tokens;
@@ -243,9 +303,10 @@ rac_result_t rac_llm_metalrt_clear_context(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
-    metalrt_clear_kv(impl->handle);
+    metalrt_clear_kv(pin.handle());
     return RAC_SUCCESS;
 }
 
@@ -253,27 +314,30 @@ void rac_llm_metalrt_reset(rac_handle_t handle) {
     if (!handle)
         return;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (impl->handle) {
-        metalrt_reset(impl->handle);
-    }
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
+        return;
+    metalrt_reset(pin.handle());
 }
 
 int rac_llm_metalrt_context_size(rac_handle_t handle) {
     if (!handle)
         return 0;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->handle)
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return 0;
-    return metalrt_context_size(impl->handle);
+    return metalrt_context_size(pin.handle());
 }
 
 const char* rac_llm_metalrt_model_name(rac_handle_t handle) {
     if (!handle)
         return nullptr;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->handle)
+    MetalRTLLMPin pin(impl);
+    if (!pin.pinned())
         return nullptr;
-    return metalrt_model_name(impl->handle);
+    return metalrt_model_name(pin.handle());
 }
 
 }  // extern "C"

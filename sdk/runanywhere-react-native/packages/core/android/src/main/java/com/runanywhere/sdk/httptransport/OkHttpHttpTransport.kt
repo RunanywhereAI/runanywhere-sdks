@@ -2,43 +2,22 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Platform HTTP transport adapter — React Native copy (v2 close-out Phase H6 + R3).
+ * Platform HTTP transport adapter — React Native Android.
  *
- * This is a NEAR-DUPLICATE of the Kotlin SDK's file at
- *   sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/http/OkHttpTransport.kt
+ * The C++ JNI bridge (commons' okhttp_transport_adapter.cpp, compiled into
+ * librunanywhere_jni.so) does FindClass on
+ * `com/runanywhere/sdk/httptransport/OkHttpHttpTransport` and dispatches
+ * `executeRequest` / `executeStreamingRequest` / `executeResumeRequest`
+ * through the resolved methods. Keeping the package + class + method
+ * signatures aligned with the Kotlin SDK lets RN reuse the same native
+ * adapter symbols instead of forking the source file.
  *
- * Why duplicate? React Native Android does NOT depend on the Kotlin SDK —
- * it loads `librac_commons.so` directly via its own `librunanywherecore.so`
- * shim. Therefore the JNI adapter (okhttp_transport_adapter.cpp) compiled
- * into `librunanywherecore.so` needs to find a Kotlin class at the SAME
- * package + class name the adapter greps for via FindClass. The simplest
- * way to keep both SDKs working in the same app is to keep the package
- * path identical on both sides.
- *
- * If both packages appear on the same classpath (e.g. an Android app that
- * imports BOTH runanywhere-kotlin and the RN core), Gradle will reject the
- * duplicate. Consumers are expected to pick one integration path.
- *
- * The C++ core holds a `rac_http_transport_ops` vtable registered via
- * `rac_http_transport_register`. When that vtable is non-null, every
- * `rac_http_request_*` call is routed to the adapter instead of libcurl.
- *
- * Why OkHttp? The libcurl default is portable but uses its own TLS /
- * CA-bundle story. On Android, routing through OkHttp gives us the
- * system trust store + user-CAs + NetworkSecurityConfig + proxy + HTTP/2
- * + cert pinning for free, which in turn fixes the rc=77 SSL failure
- * seen on ~5% of corporate / user-rooted devices.
- *
- * Threading: OkHttp is thread-safe; the singleton client is reused.
- * Each execute* call blocks the caller thread — native JNI code
- * is expected to run these off the main thread.
- *
- * R3 additions:
- *   - Real streaming via ResponseBody.source(), chunked delivery
- *   - Cancellation via Call.cancel() when onChunk returns false
+ * If both the Kotlin SDK and the RN core appear on the same classpath,
+ * Gradle's duplicate-class detector flags this file — consumers are
+ * expected to pick a single integration path.
  */
 
-package com.runanywhere.sdk.foundation.http
+package com.runanywhere.sdk.httptransport
 
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -52,8 +31,12 @@ import java.util.concurrent.TimeUnit
  * Platform HTTP transport adapter. C++ core calls into this class via JNI when
  * the OkHttp transport is registered. OkHttp gives us the system CA store,
  * proxies, NetworkSecurityConfig, HTTP/2, cert pinning, user-CAs for free.
+ *
+ * Layout — fields, methods, and nested DTO names — must stay in sync with
+ * the JNI FindClass/GetMethodID/GetFieldID calls in
+ * `sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp`.
  */
-object OkHttpTransport {
+object OkHttpHttpTransport {
     private const val STREAM_CHUNK_SIZE = 32 * 1024
 
     private val client: OkHttpClient by lazy {
@@ -123,8 +106,7 @@ object OkHttpTransport {
     /**
      * `request_resume` vtable slot — identical to [executeStreamingRequest]
      * but attaches a `Range: bytes=N-` header before dispatching, mirroring
-     * the iOS [URLSessionHttpTransport] implementation and the Kotlin SDK's
-     * `OkHttpHttpTransport.executeResumeRequest`.
+     * the iOS [URLSessionHttpTransport] implementation.
      *
      * Range-honored disclosure: when the caller asked for a partial
      * (`resumeFromByte > 0`) but the server answered with 200 (full file)

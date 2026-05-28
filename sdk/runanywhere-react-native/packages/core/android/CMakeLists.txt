@@ -58,9 +58,9 @@ set_target_properties(rac_commons PROPERTIES
 message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 
 # =============================================================================
-# HTTP transport vtable: bundled librac_commons.so (post-Stage-5) always
-# exports rac_http_transport_register, so the OkHttp adapter is wired in
-# unconditionally. No auto-detect fallback — commons v0.2.0+ is required.
+# HTTP transport vtable: the OkHttp JNI adapter ships with librunanywhere_jni.so
+# (built from sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp).
+# RN loads that lib at runtime in RunAnywhereCorePackage; no fork compiled here.
 # =============================================================================
 set(RAC_HAS_HTTP_TRANSPORT ON)
 message(STATUS "[RunAnywhereCore] OkHttp HTTP transport adapter ENABLED (RAC_HAS_HTTP_TRANSPORT=1)")
@@ -74,12 +74,6 @@ file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
-    # OkHttp platform HTTP transport JNI bridge (v2 close-out Phase H6).
-    # Registers a rac_http_transport_ops vtable that routes HTTP through
-    # the duplicated Kotlin `com.runanywhere.sdk.foundation.http.OkHttpTransport`
-    # so Android consumers get the system CA store + HTTP/2 + proxies via OkHttp
-    # instead of libcurl. Copy of commons' src/jni/okhttp_transport_adapter.cpp.
-    src/main/cpp/okhttp_transport_adapter.cpp
     ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
     ${HYBRID_CORE_DOMAIN_SOURCES}
