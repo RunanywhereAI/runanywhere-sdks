@@ -16,6 +16,7 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "common/rac_engine_device_type.h"
@@ -105,11 +106,20 @@ class LlamaCppBackend {
 // =============================================================================
 
 struct LoraAdapterEntry {
+    LoraAdapterEntry() = default;
+    LoraAdapterEntry(const LoraAdapterEntry&) = delete;
+    LoraAdapterEntry& operator=(const LoraAdapterEntry&) = delete;
+    LoraAdapterEntry(LoraAdapterEntry&&) noexcept = default;
+    LoraAdapterEntry& operator=(LoraAdapterEntry&&) noexcept = default;
+
     llama_adapter_lora* adapter = nullptr;
     std::string path;
     float scale = 1.0f;
     bool applied = false;
 };
+
+static_assert(!std::is_copy_constructible_v<LoraAdapterEntry>);
+static_assert(std::is_move_constructible_v<LoraAdapterEntry>);
 
 // =============================================================================
 // TEXT GENERATION IMPLEMENTATION
