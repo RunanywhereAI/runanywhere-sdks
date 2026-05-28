@@ -498,6 +498,64 @@ structured_output_config_from_options(const runanywhere::v1::StructuredOutputOpt
     return converted;
 }
 
+// commons-103: StructuredOutputOptions advertises modes/fields the C ABI does
+// not yet implement (REGEX/GRAMMAR-constrained decoding, post-generation JSON
+// repair, retry budget). Until those are plumbed through rac_llm_options_t and
+// the engine sampler hooks, surface a typed RAC_ERROR_FEATURE_NOT_AVAILABLE
+// via the proto envelope instead of silently downgrading to plain JSON-schema
+// generation — silent downgrade caused SDKs requesting GRAMMAR mode to accept
+// non-conforming output as if the constraint had been applied. Mirrors the
+// short-term path documented in the cluster-13 finding synthesis.
+static rac_result_t
+unsupported_structured_options_message(const runanywhere::v1::StructuredOutputOptions& options,
+                                       std::string* out_message) {
+    const auto mode = options.mode();
+    if (mode == runanywhere::v1::STRUCTURED_OUTPUT_MODE_REGEX) {
+        *out_message =
+            "regex-constrained structured output is not supported by the C ABI engine yet";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (mode == runanywhere::v1::STRUCTURED_OUTPUT_MODE_GRAMMAR) {
+        *out_message =
+            "grammar-constrained structured output is not supported by the C ABI engine yet";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (options.has_regex_pattern() && !options.regex_pattern().empty()) {
+        *out_message =
+            "StructuredOutputOptions.regex_pattern is not consumed by the C ABI engine yet";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (options.has_grammar() && !options.grammar().empty()) {
+        *out_message = "StructuredOutputOptions.grammar is not consumed by the C ABI engine yet";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (options.repair_json()) {
+        *out_message =
+            "StructuredOutputOptions.repair_json is not implemented by commons (post-generation "
+            "repair must happen in the SDK)";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    if (options.max_retries() > 0) {
+        *out_message =
+            "StructuredOutputOptions.max_retries is not implemented by commons (retry budget must "
+            "happen in the SDK)";
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    return RAC_SUCCESS;
+}
+
+// commons-031: StructuredOutputRequest currently has no LLMGenerationOptions
+// field, so the per-call sampling knobs (max_tokens, temperature, top_p,
+// stop_sequences, system_prompt overrides) reach the engine only as the
+// rac_llm_options_t defaults below. Callers that need sampling control must
+// route through rac_llm_generate_proto / rac_llm_generate_stream_proto with
+// LLMGenerationOptions.structured_output set instead (Swift's
+// generateStructured wrapper takes that path — see
+// sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
+// RunAnywhere+StructuredOutput.swift). Embedding LLMGenerationOptions into
+// StructuredOutputRequest would close this gap but requires an IDL change +
+// proto regeneration across all SDKs and is tracked outside this cluster.
+
 static void add_structured_validation_errors_from_json(
     const char* validation_errors_json, runanywhere::v1::StructuredOutputValidation* validation) {
     if (!validation_errors_json || !validation) {
@@ -630,6 +688,11 @@ struct StructuredStreamContext {
     std::string request_id;
     std::string raw_text;
     std::string last_partial_json;
+    // commons-104: track tokens so terminal events can report finish_reason
+    // "length" when the engine stopped because options.max_tokens was reached,
+    // mirroring rac_llm_proto_service.cpp generate_stream and llm_component.
+    uint64_t token_count = 0;
+    int32_t max_tokens = 0;
 };
 
 static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
@@ -714,6 +777,9 @@ static rac_bool_t structured_stream_token_callback(const char* token, void* user
 
     const char* safe_token = token ? token : "";
     ctx->raw_text += safe_token;
+    if (safe_token[0] != '\0') {
+        ctx->token_count++;
+    }
     dispatch_structured_stream_event(ctx,
                                      runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
                                      safe_token, nullptr, nullptr, nullptr, RAC_SUCCESS);
@@ -1301,6 +1367,27 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
                                           "StructuredOutputRequest.prompt is required");
     }
 
+    // commons-103: reject unsupported StructuredOutputOptions modes/fields with
+    // a typed StructuredOutputResult envelope so SDKs that request
+    // grammar/regex/repair/retries see a clear error instead of silent
+    // downgrade to plain JSON-schema generation.
+    if (request.has_options()) {
+        std::string unsupported_message;
+        const rac_result_t unsupported =
+            unsupported_structured_options_message(request.options(), &unsupported_message);
+        if (unsupported != RAC_SUCCESS) {
+            runanywhere::v1::StructuredOutputResult typed_result;
+            typed_result.set_error_message(unsupported_message);
+            typed_result.set_error_code(static_cast<int32_t>(unsupported));
+            auto* result_validation = typed_result.mutable_validation();
+            result_validation->set_is_valid(false);
+            result_validation->set_contains_json(false);
+            result_validation->set_error_message(unsupported_message);
+            result_validation->add_validation_errors(unsupported_message);
+            return copy_serialized_proto(typed_result, out_result, "StructuredOutputResult");
+        }
+    }
+
     ProtoStructuredOutputConfig converted;
     bool has_options = false;
     std::string prepared_prompt;
@@ -1390,6 +1477,26 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // commons-103: emit a terminal ERROR event when the request asks for an
+    // unsupported mode/field so the stream surfaces the typed reason instead
+    // of silently downgrading. The stream proto returns rac_result_t and has
+    // no separate result buffer, so the ERROR event carries the message.
+    if (request.has_options()) {
+        std::string unsupported_message;
+        const rac_result_t unsupported =
+            unsupported_structured_options_message(request.options(), &unsupported_message);
+        if (unsupported != RAC_SUCCESS) {
+            StructuredStreamContext err_ctx;
+            err_ctx.callback = callback;
+            err_ctx.user_data = user_data;
+            err_ctx.request_id = request.request_id();
+            dispatch_structured_stream_event(
+                &err_ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR, nullptr,
+                nullptr, nullptr, unsupported_message.c_str(), unsupported);
+            return unsupported;
+        }
+    }
+
     ProtoStructuredOutputConfig converted;
     bool has_options = false;
     std::string prepared_prompt;
@@ -1421,6 +1528,7 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.ref = &ref;
     ctx.config = has_options ? &converted.config : nullptr;
     ctx.request_id = request.request_id();
+    ctx.max_tokens = options.max_tokens;
 
     // Defensive: catch any C++ exception that escapes the engine vtable so it
     // cannot propagate across the extern "C" boundary. See parallel guard in
@@ -1441,9 +1549,19 @@ rac_structured_output_generate_stream_proto(const uint8_t* request_proto_bytes,
     if (cancelled) {
         dispatch_structured_terminal_once(&ctx, "cancelled", RAC_ERROR_CANCELLED);
         rc = RAC_SUCCESS;
+    } else if (rc == RAC_SUCCESS) {
+        // commons-104: mirror the OpenAI-style finish_reason contract from
+        // rac_llm_proto_service.cpp:778-779 / llm_component.cpp:1003-1006 —
+        // when the backend stopped because it generated max_tokens, report
+        // "length" instead of "stop" so agent retry/recovery loops can
+        // distinguish truncation from a natural stop.
+        const char* finish_reason =
+            (ctx.max_tokens > 0 && ctx.token_count >= static_cast<uint64_t>(ctx.max_tokens))
+                ? "length"
+                : "stop";
+        dispatch_structured_terminal_once(&ctx, finish_reason, rc);
     } else {
-        dispatch_structured_terminal_once(&ctx, rc == RAC_SUCCESS ? "stop" : rac_error_message(rc),
-                                          rc);
+        dispatch_structured_terminal_once(&ctx, rac_error_message(rc), rc);
     }
 
     rac::llm::release_lifecycle_llm(&ref);
