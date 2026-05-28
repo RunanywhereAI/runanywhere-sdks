@@ -29,8 +29,15 @@
 
 static std::atomic<bool> s_initialized{false};
 static std::mutex s_init_mutex;
-static const rac_platform_adapter_t* s_platform_adapter = nullptr;
-static rac_log_level_t s_log_level = RAC_LOG_INFO;
+// Atomic so concurrent rac_get_platform_adapter() / rac_log() / convenience
+// helpers do not race with rac_init / rac_shutdown / rac_set_platform_adapter.
+// Readers snapshot the pointer into a local before dereferencing any field,
+// so a concurrent shutdown that stores nullptr cannot produce a torn or
+// use-after-free read on the adapter struct itself (which is owned by the
+// platform SDK and must outlive any in-flight call by contract).
+static std::atomic<const rac_platform_adapter_t*> s_platform_adapter{nullptr};
+static std::atomic<rac_log_level_t> s_log_level{RAC_LOG_INFO};
+static std::mutex s_log_tag_mutex;
 static std::string s_log_tag = "RAC";
 
 // Global model registry
@@ -51,12 +58,18 @@ static const rac_version_t s_version = {
 // =============================================================================
 
 static void internal_log(rac_log_level_t level, const char* message) {
-    if (level < s_log_level) {
+    if (level < s_log_level.load(std::memory_order_acquire)) {
         return;
     }
 
-    if (s_platform_adapter != nullptr && s_platform_adapter->log != nullptr) {
-        s_platform_adapter->log(level, s_log_tag.c_str(), message, s_platform_adapter->user_data);
+    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
+    if (adapter != nullptr && adapter->log != nullptr) {
+        std::string tag;
+        {
+            std::lock_guard<std::mutex> lock(s_log_tag_mutex);
+            tag = s_log_tag;
+        }
+        adapter->log(level, tag.c_str(), message, adapter->user_data);
     }
 }
 
@@ -70,17 +83,18 @@ rac_result_t rac_set_platform_adapter(const rac_platform_adapter_t* adapter) {
     if (adapter == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
-    s_platform_adapter = adapter;
+    s_platform_adapter.store(adapter, std::memory_order_release);
     return RAC_SUCCESS;
 }
 
 const rac_platform_adapter_t* rac_get_platform_adapter(void) {
-    return s_platform_adapter;
+    return s_platform_adapter.load(std::memory_order_acquire);
 }
 
 void rac_log(rac_log_level_t level, const char* category, const char* message) {
-    if (s_platform_adapter != nullptr && s_platform_adapter->log != nullptr) {
-        s_platform_adapter->log(level, category, message, s_platform_adapter->user_data);
+    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
+    if (adapter != nullptr && adapter->log != nullptr) {
+        adapter->log(level, category, message, adapter->user_data);
     }
 }
 
@@ -110,12 +124,17 @@ rac_result_t rac_init(const rac_config_t* config) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    // Store configuration
-    s_platform_adapter = config->platform_adapter;
-    s_log_level = config->log_level;
-    if (config->log_tag != nullptr) {
-        s_log_tag = config->log_tag;
+    // Store configuration. Release-stores so concurrent acquire-loads from
+    // worker threads (download orchestrator, voice agent, etc.) see a
+    // fully published adapter struct before they observe the new pointer.
+    {
+        std::lock_guard<std::mutex> tag_lock(s_log_tag_mutex);
+        if (config->log_tag != nullptr) {
+            s_log_tag = config->log_tag;
+        }
     }
+    s_log_level.store(config->log_level, std::memory_order_release);
+    s_platform_adapter.store(config->platform_adapter, std::memory_order_release);
 
     s_initialized.store(true);
 
@@ -145,10 +164,15 @@ void rac_shutdown(void) {
     rac_diffusion_model_registry_cleanup();
 #endif
 
-    // Clear state
-    s_platform_adapter = nullptr;
-    s_log_level = RAC_LOG_INFO;
-    s_log_tag = "RAC";
+    // Clear state. Release-store so a concurrent acquire-load on a worker
+    // thread observes nullptr (and bails) before this function returns and
+    // the platform SDK proceeds to free the adapter struct.
+    s_platform_adapter.store(nullptr, std::memory_order_release);
+    s_log_level.store(RAC_LOG_INFO, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> tag_lock(s_log_tag_mutex);
+        s_log_tag = "RAC";
+    }
     s_initialized.store(false);
 }
 
@@ -207,17 +231,17 @@ rac_result_t rac_http_download(const char* url, const char* destination_path,
         return RAC_ERROR_NULL_POINTER;
     }
 
-    if (s_platform_adapter == nullptr) {
+    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
+    if (adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    if (s_platform_adapter->http_download == nullptr) {
+    if (adapter->http_download == nullptr) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    return s_platform_adapter->http_download(url, destination_path, progress_callback,
-                                             complete_callback, callback_user_data, out_task_id,
-                                             s_platform_adapter->user_data);
+    return adapter->http_download(url, destination_path, progress_callback, complete_callback,
+                                  callback_user_data, out_task_id, adapter->user_data);
 }
 
 rac_result_t rac_http_download_cancel(const char* task_id) {
@@ -225,15 +249,16 @@ rac_result_t rac_http_download_cancel(const char* task_id) {
         return RAC_ERROR_NULL_POINTER;
     }
 
-    if (s_platform_adapter == nullptr) {
+    const rac_platform_adapter_t* adapter = s_platform_adapter.load(std::memory_order_acquire);
+    if (adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    if (s_platform_adapter->http_download_cancel == nullptr) {
+    if (adapter->http_download_cancel == nullptr) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    return s_platform_adapter->http_download_cancel(task_id, s_platform_adapter->user_data);
+    return adapter->http_download_cancel(task_id, adapter->user_data);
 }
 
 // =============================================================================
@@ -279,6 +304,19 @@ rac_result_t rac_extract_archive(const char* archive_path, const char* destinati
 // GLOBAL MODEL REGISTRY
 // =============================================================================
 
+// Persistence contract: the global model registry is IN-MEMORY ONLY. It is
+// not written to disk by commons and does not survive a process restart.
+// Every SDK is responsible for re-seeding the registry on every cold start
+// via one of:
+//   (a) re-calling rac_register_model() for any locally-defined catalog
+//       entries that are not produced by remote model-assignment fetch
+//       (Web example app's registerModelCatalog() is the canonical example);
+//   (b) calling the remote model-assignment fetch (Swift / Kotlin / Flutter
+//       / RN — repopulates via the backend API);
+//   (c) discoverDownloadedModels() to relink already-downloaded folders to
+//       registered entries (self-heal — Swift RunAnywhere.swift:308-313).
+// Entries that exist only via (a) without (b) or (c) DISAPPEAR after restart
+// and must be re-registered.
 rac_model_registry_handle_t rac_get_model_registry(void) {
     std::lock_guard<std::mutex> lock(s_model_registry_mutex);
 
