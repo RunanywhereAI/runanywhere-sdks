@@ -873,7 +873,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentConfig final : public ::g
   void _internal_set_max_context_tokens(::int32_t value);
 
   public:
-  // bool enable_barge_in = 8;
+  // optional bool enable_barge_in = 8;
+  [[nodiscard]] bool has_enable_barge_in()
+      const;
   void clear_enable_barge_in() ;
   [[nodiscard]] bool enable_barge_in() const;
   void set_enable_barge_in(bool value);
@@ -3831,7 +3833,11 @@ inline void VoiceAgentConfig::set_allocated_audio_file_path(::std::string* PROTO
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentConfig.audio_file_path)
 }
 
-// bool enable_barge_in = 8;
+// optional bool enable_barge_in = 8;
+inline bool VoiceAgentConfig::has_enable_barge_in() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  return value;
+}
 inline void VoiceAgentConfig::clear_enable_barge_in() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_barge_in_ = false;

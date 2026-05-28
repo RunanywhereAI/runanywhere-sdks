@@ -291,7 +291,7 @@ constexpr VoiceAgentConfig::ParseTableT_ VoiceAgentConfig::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentConfig, _impl_.audio_source_), 9>(),
        {56, 9, 0,
         PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.audio_source_)}},
-      // bool enable_barge_in = 8;
+      // optional bool enable_barge_in = 8;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentConfig, _impl_.enable_barge_in_), 12>(),
        {64, 12, 0,
         PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.enable_barge_in_)}},
@@ -362,7 +362,7 @@ constexpr VoiceAgentConfig::ParseTableT_ VoiceAgentConfig::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.chunk_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // .runanywhere.v1.AudioSource audio_source = 7;
       {PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.audio_source_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // bool enable_barge_in = 8;
+      // optional bool enable_barge_in = 8;
       {PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.enable_barge_in_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int32 barge_in_threshold_ms = 9;
       {PROTOBUF_FIELD_OFFSET(VoiceAgentConfig, _impl_.barge_in_threshold_ms_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -1844,72 +1844,73 @@ const char descriptor_table_protodef_solutions_2eproto[] ABSL_ATTRIBUTE_SECTION_
     "config\"o\n\016SolutionHandle\022\021\n\thandle_id\030\001 "
     "\001(\t\022\025\n\rsolution_type\030\002 \001(\t\022\025\n\rcreated_at"
     "_ms\030\003 \001(\003\022\022\n\005state\030\004 \001(\tH\000\210\001\001B\010\n\006_state\""
-    "\350\003\n\020VoiceAgentConfig\022\024\n\014llm_model_id\030\001 \001"
+    "\201\004\n\020VoiceAgentConfig\022\024\n\014llm_model_id\030\001 \001"
     "(\t\022\024\n\014stt_model_id\030\002 \001(\t\022\024\n\014tts_model_id"
     "\030\003 \001(\t\022\024\n\014vad_model_id\030\004 \001(\t\022\024\n\014tts_voic"
     "e_id\030\021 \001(\t\022\026\n\016sample_rate_hz\030\005 \001(\005\022\020\n\010ch"
     "unk_ms\030\006 \001(\005\0221\n\014audio_source\030\007 \001(\0162\033.run"
     "anywhere.v1.AudioSource\022\027\n\017audio_file_pa"
-    "th\030\017 \001(\t\022\027\n\017enable_barge_in\030\010 \001(\010\022\035\n\025bar"
-    "ge_in_threshold_ms\030\t \001(\005\022\025\n\rsystem_promp"
-    "t\030\n \001(\t\022\032\n\022max_context_tokens\030\013 \001(\005\022\023\n\013t"
-    "emperature\030\014 \001(\002\022\025\n\remit_partials\030\r \001(\010\022"
-    "\025\n\remit_thoughts\030\016 \001(\010\0224\n\ttype_kind\030\020 \001("
-    "\0162\034.runanywhere.v1.SolutionTypeH\000\210\001\001B\014\n\n"
-    "_type_kind\"\325\002\n\tRAGConfig\022\026\n\016embed_model_"
-    "id\030\001 \001(\t\022\027\n\017rerank_model_id\030\002 \001(\t\022\024\n\014llm"
-    "_model_id\030\003 \001(\t\0221\n\014vector_store\030\004 \001(\0162\033."
-    "runanywhere.v1.VectorStore\022\031\n\021vector_sto"
-    "re_path\030\005 \001(\t\022\022\n\nretrieve_k\030\006 \001(\005\022\022\n\nrer"
-    "ank_top\030\007 \001(\005\022\017\n\007bm25_k1\030\010 \001(\002\022\016\n\006bm25_b"
-    "\030\t \001(\002\022\r\n\005rrf_k\030\n \001(\005\022\027\n\017prompt_template"
-    "\030\013 \001(\t\0224\n\ttype_kind\030\014 \001(\0162\034.runanywhere."
-    "v1.SolutionTypeH\000\210\001\001B\014\n\n_type_kind\"\267\001\n\016W"
-    "akeWordConfig\022\020\n\010model_id\030\001 \001(\t\022\017\n\007keywo"
-    "rd\030\002 \001(\t\022\021\n\tthreshold\030\003 \001(\002\022\023\n\013pre_roll_"
-    "ms\030\004 \001(\005\022\026\n\016sample_rate_hz\030\005 \001(\005\0224\n\ttype"
+    "th\030\017 \001(\t\022\034\n\017enable_barge_in\030\010 \001(\010H\000\210\001\001\022\035"
+    "\n\025barge_in_threshold_ms\030\t \001(\005\022\025\n\rsystem_"
+    "prompt\030\n \001(\t\022\032\n\022max_context_tokens\030\013 \001(\005"
+    "\022\023\n\013temperature\030\014 \001(\002\022\025\n\remit_partials\030\r"
+    " \001(\010\022\025\n\remit_thoughts\030\016 \001(\010\0224\n\ttype_kind"
+    "\030\020 \001(\0162\034.runanywhere.v1.SolutionTypeH\001\210\001"
+    "\001B\022\n\020_enable_barge_inB\014\n\n_type_kind\"\325\002\n\t"
+    "RAGConfig\022\026\n\016embed_model_id\030\001 \001(\t\022\027\n\017rer"
+    "ank_model_id\030\002 \001(\t\022\024\n\014llm_model_id\030\003 \001(\t"
+    "\0221\n\014vector_store\030\004 \001(\0162\033.runanywhere.v1."
+    "VectorStore\022\031\n\021vector_store_path\030\005 \001(\t\022\022"
+    "\n\nretrieve_k\030\006 \001(\005\022\022\n\nrerank_top\030\007 \001(\005\022\017"
+    "\n\007bm25_k1\030\010 \001(\002\022\016\n\006bm25_b\030\t \001(\002\022\r\n\005rrf_k"
+    "\030\n \001(\005\022\027\n\017prompt_template\030\013 \001(\t\0224\n\ttype_"
+    "kind\030\014 \001(\0162\034.runanywhere.v1.SolutionType"
+    "H\000\210\001\001B\014\n\n_type_kind\"\267\001\n\016WakeWordConfig\022\020"
+    "\n\010model_id\030\001 \001(\t\022\017\n\007keyword\030\002 \001(\t\022\021\n\tthr"
+    "eshold\030\003 \001(\002\022\023\n\013pre_roll_ms\030\004 \001(\005\022\026\n\016sam"
+    "ple_rate_hz\030\005 \001(\005\0224\n\ttype_kind\030\006 \001(\0162\034.r"
+    "unanywhere.v1.SolutionTypeH\000\210\001\001B\014\n\n_type"
+    "_kind\"\337\001\n\017AgentLoopConfig\022\024\n\014llm_model_i"
+    "d\030\001 \001(\t\022\025\n\rsystem_prompt\030\002 \001(\t\022\'\n\005tools\030"
+    "\003 \003(\0132\030.runanywhere.v1.ToolSpec\022\026\n\016max_i"
+    "terations\030\004 \001(\005\022\032\n\022max_context_tokens\030\005 "
+    "\001(\005\0224\n\ttype_kind\030\006 \001(\0162\034.runanywhere.v1."
+    "SolutionTypeH\000\210\001\001B\014\n\n_type_kind\"B\n\010ToolS"
+    "pec\022\014\n\004name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t\022\023"
+    "\n\013json_schema\030\003 \001(\t\"\306\001\n\020TimeSeriesConfig"
+    "\022\030\n\020anomaly_model_id\030\001 \001(\t\022\024\n\014llm_model_"
+    "id\030\002 \001(\t\022\023\n\013window_size\030\003 \001(\005\022\016\n\006stride\030"
+    "\004 \001(\005\022\031\n\021anomaly_threshold\030\005 \001(\002\0224\n\ttype"
     "_kind\030\006 \001(\0162\034.runanywhere.v1.SolutionTyp"
-    "eH\000\210\001\001B\014\n\n_type_kind\"\337\001\n\017AgentLoopConfig"
-    "\022\024\n\014llm_model_id\030\001 \001(\t\022\025\n\rsystem_prompt\030"
-    "\002 \001(\t\022\'\n\005tools\030\003 \003(\0132\030.runanywhere.v1.To"
-    "olSpec\022\026\n\016max_iterations\030\004 \001(\005\022\032\n\022max_co"
-    "ntext_tokens\030\005 \001(\005\0224\n\ttype_kind\030\006 \001(\0162\034."
-    "runanywhere.v1.SolutionTypeH\000\210\001\001B\014\n\n_typ"
-    "e_kind\"B\n\010ToolSpec\022\014\n\004name\030\001 \001(\t\022\023\n\013desc"
-    "ription\030\002 \001(\t\022\023\n\013json_schema\030\003 \001(\t\"\306\001\n\020T"
-    "imeSeriesConfig\022\030\n\020anomaly_model_id\030\001 \001("
-    "\t\022\024\n\014llm_model_id\030\002 \001(\t\022\023\n\013window_size\030\003"
-    " \001(\005\022\016\n\006stride\030\004 \001(\005\022\031\n\021anomaly_threshol"
-    "d\030\005 \001(\002\0224\n\ttype_kind\030\006 \001(\0162\034.runanywhere"
-    ".v1.SolutionTypeH\000\210\001\001B\014\n\n_type_kind*\274\001\n\014"
-    "SolutionType\022\035\n\031SOLUTION_TYPE_UNSPECIFIE"
-    "D\020\000\022\035\n\031SOLUTION_TYPE_VOICE_AGENT\020\001\022\025\n\021SO"
-    "LUTION_TYPE_RAG\020\002\022\032\n\026SOLUTION_TYPE_WAKEW"
-    "ORD\020\003\022\035\n\031SOLUTION_TYPE_TIME_SERIES\020\004\022\034\n\030"
-    "SOLUTION_TYPE_AGENT_LOOP\020\005*z\n\013AudioSourc"
-    "e\022\034\n\030AUDIO_SOURCE_UNSPECIFIED\020\000\022\033\n\027AUDIO"
-    "_SOURCE_MICROPHONE\020\001\022\025\n\021AUDIO_SOURCE_FIL"
-    "E\020\002\022\031\n\025AUDIO_SOURCE_CALLBACK\020\003*`\n\013Vector"
-    "Store\022\034\n\030VECTOR_STORE_UNSPECIFIED\020\000\022\030\n\024V"
-    "ECTOR_STORE_USEARCH\020\001\022\031\n\025VECTOR_STORE_PG"
-    "VECTOR\020\0022\261\002\n\tSolutions\022H\n\006Create\022\036.runan"
-    "ywhere.v1.SolutionConfig\032\036.runanywhere.v"
-    "1.SolutionHandle\022G\n\005Start\022\036.runanywhere."
-    "v1.SolutionHandle\032\036.runanywhere.v1.Solut"
-    "ionHandle\022F\n\004Stop\022\036.runanywhere.v1.Solut"
-    "ionHandle\032\036.runanywhere.v1.SolutionHandl"
-    "e\022I\n\007Destroy\022\036.runanywhere.v1.SolutionHa"
-    "ndle\032\036.runanywhere.v1.SolutionHandleB\211\001\n"
-    "\027ai.runanywhere.proto.v1B\016SolutionsProto"
-    "P\001Z<github.com/runanywhere/runanywhere-s"
-    "dks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Run"
-    "anywhere.V1\272\002\002RAb\006proto3"
+    "eH\000\210\001\001B\014\n\n_type_kind*\274\001\n\014SolutionType\022\035\n"
+    "\031SOLUTION_TYPE_UNSPECIFIED\020\000\022\035\n\031SOLUTION"
+    "_TYPE_VOICE_AGENT\020\001\022\025\n\021SOLUTION_TYPE_RAG"
+    "\020\002\022\032\n\026SOLUTION_TYPE_WAKEWORD\020\003\022\035\n\031SOLUTI"
+    "ON_TYPE_TIME_SERIES\020\004\022\034\n\030SOLUTION_TYPE_A"
+    "GENT_LOOP\020\005*z\n\013AudioSource\022\034\n\030AUDIO_SOUR"
+    "CE_UNSPECIFIED\020\000\022\033\n\027AUDIO_SOURCE_MICROPH"
+    "ONE\020\001\022\025\n\021AUDIO_SOURCE_FILE\020\002\022\031\n\025AUDIO_SO"
+    "URCE_CALLBACK\020\003*`\n\013VectorStore\022\034\n\030VECTOR"
+    "_STORE_UNSPECIFIED\020\000\022\030\n\024VECTOR_STORE_USE"
+    "ARCH\020\001\022\031\n\025VECTOR_STORE_PGVECTOR\020\0022\261\002\n\tSo"
+    "lutions\022H\n\006Create\022\036.runanywhere.v1.Solut"
+    "ionConfig\032\036.runanywhere.v1.SolutionHandl"
+    "e\022G\n\005Start\022\036.runanywhere.v1.SolutionHand"
+    "le\032\036.runanywhere.v1.SolutionHandle\022F\n\004St"
+    "op\022\036.runanywhere.v1.SolutionHandle\032\036.run"
+    "anywhere.v1.SolutionHandle\022I\n\007Destroy\022\036."
+    "runanywhere.v1.SolutionHandle\032\036.runanywh"
+    "ere.v1.SolutionHandleB\211\001\n\027ai.runanywhere"
+    ".proto.v1B\016SolutionsProtoP\001Z<github.com/"
+    "runanywhere/runanywhere-sdks/idl/v1;runa"
+    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
+    "Ab\006proto3"
 };
 static ::absl::once_flag descriptor_table_solutions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_solutions_2eproto = {
     false,
     false,
-    2824,
+    2849,
     descriptor_table_protodef_solutions_2eproto,
     "solutions.proto",
     &descriptor_table_solutions_2eproto_once,
@@ -2931,13 +2932,11 @@ PROTOBUF_NOINLINE void VoiceAgentConfig::Clear() {
     }
   }
 
-  // bool enable_barge_in = 8;
+  // optional bool enable_barge_in = 8;
   if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_enable_barge_in() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          8, this_._internal_enable_barge_in(), target);
-    }
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(
+        8, this_._internal_enable_barge_in(), target);
   }
 
   // int32 barge_in_threshold_ms = 9;
@@ -3047,6 +3046,7 @@ PROTOBUF_NOINLINE void VoiceAgentConfig::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
+  total_size += static_cast<bool>(0x00001000U & cached_has_bits) * 2;
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string llm_model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -3105,7 +3105,7 @@ PROTOBUF_NOINLINE void VoiceAgentConfig::Clear() {
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000ef00U)) {
     // int32 chunk_ms = 6;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_chunk_ms() != 0) {
@@ -3132,12 +3132,6 @@ PROTOBUF_NOINLINE void VoiceAgentConfig::Clear() {
       if (this_._internal_max_context_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_context_tokens());
-      }
-    }
-    // bool enable_barge_in = 8;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_enable_barge_in() != 0) {
-        total_size += 2;
       }
     }
     // bool emit_partials = 13;
@@ -3275,9 +3269,7 @@ void VoiceAgentConfig::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_enable_barge_in() != 0) {
-        _this->_impl_.enable_barge_in_ = from._impl_.enable_barge_in_;
-      }
+      _this->_impl_.enable_barge_in_ = from._impl_.enable_barge_in_;
     }
     if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (from._internal_emit_partials() != 0) {

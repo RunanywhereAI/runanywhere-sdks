@@ -349,9 +349,13 @@ public nonisolated struct RAVoiceAgentConfig: @unchecked Sendable {
 
   /// Barge-in behavior.
   public var enableBargeIn: Bool {
-    get {_storage._enableBargeIn}
+    get {_storage._enableBargeIn ?? false}
     set {_uniqueStorage()._enableBargeIn = newValue}
   }
+  /// Returns true if `enableBargeIn` has been explicitly set.
+  public var hasEnableBargeIn: Bool {_storage._enableBargeIn != nil}
+  /// Clears the value of `enableBargeIn`. Subsequent reads from it will return its default value.
+  public mutating func clearEnableBargeIn() {_uniqueStorage()._enableBargeIn = nil}
 
   /// default 200
   public var bargeInThresholdMs: Int32 {
@@ -789,7 +793,7 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
     var _chunkMs: Int32 = 0
     var _audioSource: RAAudioSource = .unspecified
     var _audioFilePath: String = String()
-    var _enableBargeIn: Bool = false
+    var _enableBargeIn: Bool? = nil
     var _bargeInThresholdMs: Int32 = 0
     var _systemPrompt: String = String()
     var _maxContextTokens: Int32 = 0
@@ -892,9 +896,9 @@ nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._
       if _storage._audioSource != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._audioSource, fieldNumber: 7)
       }
-      if _storage._enableBargeIn != false {
-        try visitor.visitSingularBoolField(value: _storage._enableBargeIn, fieldNumber: 8)
-      }
+      try { if let v = _storage._enableBargeIn {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+      } }()
       if _storage._bargeInThresholdMs != 0 {
         try visitor.visitSingularInt32Field(value: _storage._bargeInThresholdMs, fieldNumber: 9)
       }
