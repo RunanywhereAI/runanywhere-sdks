@@ -998,7 +998,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str = "stop";
-    if (component->cancel_requested.load()) {
+    if (component->cancel_requested.load(std::memory_order_relaxed)) {
         finish_reason_str = "cancelled";
     } else if (effective_options->max_tokens > 0 &&
                ctx.token_count >= effective_options->max_tokens) {
@@ -1284,7 +1284,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str_t = "stop";
-    if (component->cancel_requested.load()) {
+    if (component->cancel_requested.load(std::memory_order_relaxed)) {
         finish_reason_str_t = "cancelled";
     } else if (effective_options->max_tokens > 0 &&
                ctx.token_count >= effective_options->max_tokens) {
