@@ -9,6 +9,7 @@
 #include "rac_runtime_metal.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -20,14 +21,57 @@
 
 static const char* LOG_CAT = "STT.MetalRT";
 
-// engines-other-008: see rac_llm_metalrt.cpp for the ADR. Same pattern:
-// guard handle / loaded with mutex_ + atomic on lifecycle paths; transcribe
-// reads loaded with acquire ordering and runs lock-free.
+// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// acquire/release pin pattern: destroy waits on cv_ for in-flight transcribe
+// pins to drain before tearing down the whisper handle and freeing impl.
+// Prevents the UAF where destroy could free impl while a concurrent
+// transcribe was still dereferencing impl->handle.
 struct rac_stt_metalrt_impl {
     void* handle = nullptr;  // metalrt_whisper_create() handle
     std::atomic<bool> loaded{false};
     mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    int refcount_ = 0;  // guarded by mutex_
 };
+
+namespace {
+
+class MetalRTSTTPin {
+   public:
+    explicit MetalRTSTTPin(rac_stt_metalrt_impl* impl) : impl_(impl) {
+        if (impl_ == nullptr)
+            return;
+        std::lock_guard<std::mutex> lock(impl_->mutex_);
+        if (!impl_->loaded.load(std::memory_order_acquire) || impl_->handle == nullptr)
+            return;
+        handle_ = impl_->handle;
+        impl_->refcount_++;
+        pinned_ = true;
+    }
+    MetalRTSTTPin(const MetalRTSTTPin&) = delete;
+    MetalRTSTTPin& operator=(const MetalRTSTTPin&) = delete;
+    ~MetalRTSTTPin() {
+        if (!pinned_)
+            return;
+        bool notify = false;
+        {
+            std::lock_guard<std::mutex> lock(impl_->mutex_);
+            impl_->refcount_--;
+            notify = (impl_->refcount_ == 0);
+        }
+        if (notify)
+            impl_->cv_.notify_all();
+    }
+    bool pinned() const { return pinned_; }
+    void* handle() const { return handle_; }
+
+   private:
+    rac_stt_metalrt_impl* impl_ = nullptr;
+    void* handle_ = nullptr;
+    bool pinned_ = false;
+};
+
+}  // namespace
 
 extern "C" {
 
@@ -68,14 +112,25 @@ void rac_stt_metalrt_destroy(rac_handle_t handle) {
         return;
     auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
     {
-        std::lock_guard<std::mutex> lock(impl->mutex_);
+        std::unique_lock<std::mutex> lock(impl->mutex_);
+        // Flip loaded first so any new entrant fails fast (see pin ctor).
+        impl->loaded.store(false, std::memory_order_release);
+        // Wait until every in-flight pin releases before touching the
+        // engine handle or freeing the impl.
+        impl->cv_.wait(lock, [impl] { return impl->refcount_ == 0; });
         if (impl->handle) {
             metalrt_whisper_destroy(impl->handle);
             impl->handle = nullptr;
         }
-        impl->loaded.store(false, std::memory_order_release);
     }
     delete impl;
+}
+
+rac_bool_t rac_stt_metalrt_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+    auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
+    return impl->loaded.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_data,
@@ -85,7 +140,8 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
     if (!handle || !audio_data || !out_result)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTSTTPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     // SDK audio capture sends Int16 PCM at 16 kHz.
@@ -102,7 +158,7 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
                  static_cast<float>(n_samples) / sample_rate, sample_rate);
 
     const char* text =
-        metalrt_whisper_transcribe(impl->handle, float_samples.data(), n_samples, sample_rate);
+        metalrt_whisper_transcribe(pin.handle(), float_samples.data(), n_samples, sample_rate);
     if (!text) {
         rac_error_set_details("metalrt_whisper_transcribe returned null");
         return RAC_ERROR_INFERENCE_FAILED;
@@ -118,8 +174,8 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
     out_result->num_words = 0;
     out_result->confidence = 1.0f;
     out_result->processing_time_ms =
-        static_cast<int64_t>(metalrt_whisper_last_encode_ms(impl->handle) +
-                             metalrt_whisper_last_decode_ms(impl->handle));
+        static_cast<int64_t>(metalrt_whisper_last_encode_ms(pin.handle()) +
+                             metalrt_whisper_last_decode_ms(pin.handle()));
 
     metalrt_whisper_free_text(text);
     return RAC_SUCCESS;

@@ -9,6 +9,7 @@
 #include "rac_runtime_metal.h"
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -17,12 +18,55 @@
 
 static const char* LOG_CAT = "TTS.MetalRT";
 
-// engines-other-008: see rac_llm_metalrt.cpp for the ADR; mirror pattern.
+// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// acquire/release pin pattern: destroy waits on cv_ for in-flight synthesize
+// pins to drain before tearing down the TTS handle and freeing impl.
 struct rac_tts_metalrt_impl {
     void* handle = nullptr;  // metalrt_tts_create() handle
     std::atomic<bool> loaded{false};
     mutable std::mutex mutex_;
+    std::condition_variable cv_;
+    int refcount_ = 0;  // guarded by mutex_
 };
+
+namespace {
+
+class MetalRTTTSPin {
+   public:
+    explicit MetalRTTTSPin(rac_tts_metalrt_impl* impl) : impl_(impl) {
+        if (impl_ == nullptr)
+            return;
+        std::lock_guard<std::mutex> lock(impl_->mutex_);
+        if (!impl_->loaded.load(std::memory_order_acquire) || impl_->handle == nullptr)
+            return;
+        handle_ = impl_->handle;
+        impl_->refcount_++;
+        pinned_ = true;
+    }
+    MetalRTTTSPin(const MetalRTTTSPin&) = delete;
+    MetalRTTTSPin& operator=(const MetalRTTTSPin&) = delete;
+    ~MetalRTTTSPin() {
+        if (!pinned_)
+            return;
+        bool notify = false;
+        {
+            std::lock_guard<std::mutex> lock(impl_->mutex_);
+            impl_->refcount_--;
+            notify = (impl_->refcount_ == 0);
+        }
+        if (notify)
+            impl_->cv_.notify_all();
+    }
+    bool pinned() const { return pinned_; }
+    void* handle() const { return handle_; }
+
+   private:
+    rac_tts_metalrt_impl* impl_ = nullptr;
+    void* handle_ = nullptr;
+    bool pinned_ = false;
+};
+
+}  // namespace
 
 extern "C" {
 
@@ -63,14 +107,22 @@ void rac_tts_metalrt_destroy(rac_handle_t handle) {
         return;
     auto* impl = static_cast<rac_tts_metalrt_impl*>(handle);
     {
-        std::lock_guard<std::mutex> lock(impl->mutex_);
+        std::unique_lock<std::mutex> lock(impl->mutex_);
+        impl->loaded.store(false, std::memory_order_release);
+        impl->cv_.wait(lock, [impl] { return impl->refcount_ == 0; });
         if (impl->handle) {
             metalrt_tts_destroy(impl->handle);
             impl->handle = nullptr;
         }
-        impl->loaded.store(false, std::memory_order_release);
     }
     delete impl;
+}
+
+rac_bool_t rac_tts_metalrt_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+    auto* impl = static_cast<rac_tts_metalrt_impl*>(handle);
+    return impl->loaded.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char* text,
@@ -79,7 +131,8 @@ rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char* text,
     if (!handle || !text || !out_result)
         return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_tts_metalrt_impl*>(handle);
-    if (!impl->loaded.load(std::memory_order_acquire))
+    MetalRTTTSPin pin(impl);
+    if (!pin.pinned())
         return RAC_ERROR_BACKEND_NOT_READY;
 
     const char* voice = "af_heart";  // default voice
@@ -94,7 +147,7 @@ rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char* text,
         }
     }
 
-    struct MetalRTAudio audio = metalrt_tts_synthesize(impl->handle, text, voice, speed);
+    struct MetalRTAudio audio = metalrt_tts_synthesize(pin.handle(), text, voice, speed);
 
     if (!audio.samples || audio.num_samples <= 0) {
         rac_error_set_details("metalrt_tts_synthesize returned no audio");

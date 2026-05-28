@@ -16,6 +16,7 @@ extern "C" {
 
 rac_result_t rac_stt_metalrt_create(const char* model_path, rac_handle_t* out_handle);
 void rac_stt_metalrt_destroy(rac_handle_t handle);
+rac_bool_t rac_stt_metalrt_is_loaded(rac_handle_t handle);
 
 rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_data,
                                         size_t audio_size, const rac_stt_options_t* options,

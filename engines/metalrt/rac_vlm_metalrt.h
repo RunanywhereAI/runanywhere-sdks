@@ -16,6 +16,7 @@ extern "C" {
 
 rac_result_t rac_vlm_metalrt_create(const char* model_path, rac_handle_t* out_handle);
 void rac_vlm_metalrt_destroy(rac_handle_t handle);
+rac_bool_t rac_vlm_metalrt_is_loaded(rac_handle_t handle);
 
 rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t* image,
                                      const char* prompt, const rac_vlm_options_t* options,

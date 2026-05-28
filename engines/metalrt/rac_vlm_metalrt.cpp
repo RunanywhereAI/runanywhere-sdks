@@ -94,6 +94,13 @@ void rac_vlm_metalrt_destroy(rac_handle_t handle) {
     delete impl;
 }
 
+rac_bool_t rac_vlm_metalrt_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+    auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
+    return impl->loaded.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
+}
+
 rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t* image,
                                      const char* prompt, const rac_vlm_options_t* options,
                                      rac_vlm_result_t* out_result) {

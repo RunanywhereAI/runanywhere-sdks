@@ -180,7 +180,15 @@ static rac_result_t metalrt_llm_create_impl(const char* model_id, const char* /*
 #endif
 }
 
-const rac_llm_service_ops_t g_metalrt_llm_ops = {
+}  // namespace
+
+// MF-02: keep external C linkage so rac_plugin_entry_metalrt.cpp's
+// `extern const rac_llm_service_ops_t g_metalrt_llm_ops` declaration is
+// satisfied by a matching external-linkage definition. Defining this struct
+// inside the anonymous namespace gave it internal linkage, contradicting the
+// `extern` declaration in the plugin-entry TU. Match the pattern used by
+// whisperkit_coreml (see rac_backend_whisperkit_coreml_register.cpp:194-200).
+extern "C" const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .initialize = llm_vtable_initialize,
     .generate = llm_vtable_generate,
     .generate_stream = llm_vtable_generate_stream,
@@ -199,6 +207,8 @@ const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .create = metalrt_llm_create_impl,
 };
 
+namespace {
+
 // =============================================================================
 // STT VTABLE
 // =============================================================================
@@ -215,10 +225,10 @@ static rac_result_t stt_vtable_transcribe(void* impl, const void* audio_data, si
     return rac_stt_metalrt_transcribe(impl, audio_data, audio_size, options, out_result);
 }
 
-static rac_result_t stt_vtable_get_info(void* /*impl*/, rac_stt_info_t* out_info) {
+static rac_result_t stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
     if (!out_info)
         return RAC_ERROR_NULL_POINTER;
-    out_info->is_ready = RAC_TRUE;
+    out_info->is_ready = rac_stt_metalrt_is_loaded(impl);
     out_info->supports_streaming = RAC_FALSE;
     return RAC_SUCCESS;
 }
@@ -251,7 +261,10 @@ static rac_result_t metalrt_stt_create_impl(const char* model_id, const char* /*
 #endif
 }
 
-const rac_stt_service_ops_t g_metalrt_stt_ops = {
+}  // namespace
+
+// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+extern "C" const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .initialize = stt_vtable_initialize,
     .transcribe = stt_vtable_transcribe,
     .transcribe_stream = nullptr,
@@ -260,6 +273,8 @@ const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .destroy = stt_vtable_destroy,
     .create = metalrt_stt_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // TTS VTABLE
@@ -279,10 +294,10 @@ static rac_result_t tts_vtable_stop(void* /*impl*/) {
     return RAC_ERROR_NOT_SUPPORTED;
 }
 
-static rac_result_t tts_vtable_get_info(void* /*impl*/, rac_tts_info_t* out_info) {
+static rac_result_t tts_vtable_get_info(void* impl, rac_tts_info_t* out_info) {
     if (!out_info)
         return RAC_ERROR_NULL_POINTER;
-    out_info->is_ready = RAC_TRUE;
+    out_info->is_ready = rac_tts_metalrt_is_loaded(impl);
     out_info->is_synthesizing = RAC_FALSE;
     out_info->available_voices = nullptr;
     out_info->num_voices = 0;
@@ -317,7 +332,10 @@ static rac_result_t metalrt_tts_create_impl(const char* model_id, const char* /*
 #endif
 }
 
-const rac_tts_service_ops_t g_metalrt_tts_ops = {
+}  // namespace
+
+// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+extern "C" const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .initialize = tts_vtable_initialize,
     .synthesize = tts_vtable_synthesize,
     .synthesize_stream = nullptr,
@@ -327,6 +345,8 @@ const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .destroy = tts_vtable_destroy,
     .create = metalrt_tts_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // VLM VTABLE
@@ -353,10 +373,10 @@ static rac_result_t vlm_vtable_process_stream(void* impl, const rac_vlm_image_t*
     return rac_vlm_metalrt_process_stream(impl, image, prompt, options, callback, user_data);
 }
 
-static rac_result_t vlm_vtable_get_info(void* /*impl*/, rac_vlm_info_t* out_info) {
+static rac_result_t vlm_vtable_get_info(void* impl, rac_vlm_info_t* out_info) {
     if (!out_info)
         return RAC_ERROR_NULL_POINTER;
-    out_info->is_ready = RAC_TRUE;
+    out_info->is_ready = rac_vlm_metalrt_is_loaded(impl);
     out_info->supports_streaming = RAC_TRUE;
     out_info->supports_multiple_images = RAC_FALSE;
     out_info->current_model = nullptr;
@@ -401,7 +421,10 @@ static rac_result_t metalrt_vlm_create_impl(const char* model_id, const char* /*
 #endif
 }
 
-const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
+}  // namespace
+
+// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+extern "C" const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .initialize = vlm_vtable_initialize,
     .process = vlm_vtable_process,
     .process_stream = vlm_vtable_process_stream,
@@ -411,6 +434,8 @@ const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .destroy = vlm_vtable_destroy,
     .create = metalrt_vlm_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // REGISTRY STATE
