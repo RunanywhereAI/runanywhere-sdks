@@ -56,6 +56,7 @@
  *     `..._get_response_headers`.
  */
 
+#include "rac_http_transport_ref.h"
 #include "rac_http_upsert_mode.h"
 
 #include <chrono>
@@ -499,13 +500,6 @@ struct rac_http_client {
 // with RAC_ERROR_FEATURE_NOT_AVAILABLE.
 // =============================================================================
 
-namespace rac_internal {
-bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
-// commons-core-infra-006: paired release for `get_http_transport`.
-// Must be called exactly once after every successful `get_*`.
-void put_http_transport(void);
-}  // namespace rac_internal
-
 namespace {
 
 /// Mirror of `PreparedRequest` in `rac_http_client_default.cpp` — see
@@ -548,62 +542,39 @@ PreparedRequest prepare_request(const rac_http_request_t* req) {
 }
 
 rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud)) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_send == nullptr) {
         return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
                                        out_resp);
     }
-    if (ops == nullptr || ops->request_send == nullptr) {
-        rac_internal::put_http_transport();
-        return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
-                                       out_resp);
-    }
-    rac_result_t rc = ops->request_send(ud, &prepared.effective_request, out_resp);
-    rac_internal::put_http_transport();
-    return rc;
+    return transport.ops()->request_send(transport.user_data(), &prepared.effective_request,
+                                         out_resp);
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
                              void* user_data, rac_http_response_t* out_resp_meta) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud)) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_stream == nullptr) {
         return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
                                          user_data, out_resp_meta);
     }
-    if (ops == nullptr || ops->request_stream == nullptr) {
-        rac_internal::put_http_transport();
-        return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
-                                         user_data, out_resp_meta);
-    }
-    rac_result_t rc =
-        ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
-    rac_internal::put_http_transport();
-    return rc;
+    return transport.ops()->request_stream(transport.user_data(), &prepared.effective_request, cb,
+                                           user_data, out_resp_meta);
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
                              rac_http_body_chunk_fn cb, void* user_data,
                              rac_http_response_t* out_resp_meta) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud)) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_resume == nullptr) {
         return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
                                          resume_from_byte, cb, user_data, out_resp_meta);
     }
-    if (ops == nullptr || ops->request_resume == nullptr) {
-        rac_internal::put_http_transport();
-        return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
-                                         resume_from_byte, cb, user_data, out_resp_meta);
-    }
-    rac_result_t rc = ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb,
-                                          user_data, out_resp_meta);
-    rac_internal::put_http_transport();
-    return rc;
+    return transport.ops()->request_resume(transport.user_data(), &prepared.effective_request,
+                                           resume_from_byte, cb, user_data, out_resp_meta);
 }
 
 }  // namespace

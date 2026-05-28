@@ -36,6 +36,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac_http_transport_ref.h"
 
 namespace {
 
@@ -173,7 +174,10 @@ extern "C" rac_bool_t rac_http_transport_is_registered(void) {
 // rac_http_client_default.cpp / rac_http_client_emscripten.cpp to
 // dispatch a single HTTP operation while keeping the adapter's
 // user_data alive for the call's full duration. Every successful
-// `get_http_transport` must be paired with `put_http_transport`.
+// `get_http_transport` must be paired with `put_http_transport`;
+// dispatch sites acquire the pair through the `rac_internal::TransportRef`
+// RAII guard (rac_http_transport_ref.h) so the contract holds on every
+// exit path.
 // =============================================================================
 
 namespace rac_internal {
