@@ -215,6 +215,23 @@ RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_outpu
  */
 RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 
+/**
+ * @brief Map a runanywhere.v1.ToolCallFormatName proto enum value to its
+ *        canonical runtime hint string.
+ *
+ * *** SINGLE SOURCE OF TRUTH for the proto-enum -> hint-string mapping. ***
+ *
+ * SDKs pass their generated `ToolCallFormatName` enum's integer value here and
+ * forward the result as `format_hint`, instead of hand-rolling the table. The
+ * returned string is always a value rac_tool_call_format_from_name() accepts
+ * ("default" or "lfm2"): PYTHONIC (4) / HERMES (6) -> "lfm2"; everything else
+ * -> "default".
+ *
+ * @param format_name runanywhere.v1.ToolCallFormatName enum value as an int32.
+ * @return Static lowercase hint string (do not free).
+ */
+RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_name);
+
 // =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
 // =============================================================================

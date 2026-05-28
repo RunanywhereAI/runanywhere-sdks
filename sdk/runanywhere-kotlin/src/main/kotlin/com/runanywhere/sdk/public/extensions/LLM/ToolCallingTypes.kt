@@ -160,14 +160,29 @@ internal fun ToolCallingResult.toLLMGenerationResult(modelUsed: String = ""): LL
         tool_results = tool_results,
     )
 
+/**
+ * Map the generated [ToolCallFormatName] proto enum to its canonical runtime
+ * hint string.
+ *
+ * This mirrors commons' single source of truth
+ * `rac_tool_call_format_hint_from_format_name` (sdk/runanywhere-commons/
+ * src/features/llm/tool_calling.cpp) exactly: PYTHONIC/HERMES -> "lfm2",
+ * everything else -> "default". The previous table emitted "pythonic" /
+ * "hermes" / "xml" / "native" / "openai", which the commons accept-list
+ * (rac_tool_call_format_from_name) does not recognize and silently downgrades —
+ * a per-SDK divergence from iOS. Returns only values commons accepts so the
+ * Kotlin and Swift SDKs resolve identical format routes.
+ */
 private fun ToolCallFormatName?.toToolFormatHint(): String =
     when (this) {
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON -> "default"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML -> "xml"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE -> "native"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC -> "pythonic"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS -> "openai"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES -> "hermes"
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES,
+        -> "lfm2"
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS,
+        -> "default"
         else -> ""
     }
 

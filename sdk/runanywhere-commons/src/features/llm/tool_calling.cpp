@@ -73,6 +73,29 @@ extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) 
     return "Unknown";
 }
 
+extern "C" const char* rac_tool_call_format_hint_from_format_name(int32_t format_name) {
+    // SINGLE SOURCE OF TRUTH for the runanywhere.v1.ToolCallFormatName proto
+    // enum -> runtime hint-string mapping. The returned string is one of the
+    // canonical values rac_tool_call_format_from_name() accepts ("default" or
+    // "lfm2"), so every SDK (Swift resolvedFormatName, Kotlin toToolFormatHint,
+    // Flutter/RN/Web) can delegate here instead of hand-rolling a divergent
+    // table. PYTHONIC and HERMES route to the LFM2 Pythonic format; everything
+    // else (JSON, XML, NATIVE, OPENAI_FUNCTIONS, UNSPECIFIED, and any future or
+    // unrecognized value) falls back to the JSON-tagged default.
+    switch (format_name) {
+        case 4 /* TOOL_CALL_FORMAT_NAME_PYTHONIC */:
+        case 6 /* TOOL_CALL_FORMAT_NAME_HERMES */:
+            return "lfm2";
+        case 0 /* TOOL_CALL_FORMAT_NAME_UNSPECIFIED */:
+        case 1 /* TOOL_CALL_FORMAT_NAME_JSON */:
+        case 2 /* TOOL_CALL_FORMAT_NAME_XML */:
+        case 3 /* TOOL_CALL_FORMAT_NAME_NATIVE */:
+        case 5 /* TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS */:
+        default:
+            return "default";
+    }
+}
+
 extern "C" rac_tool_call_format_t rac_tool_call_format_from_name(const char* name) {
     if (!name) {
         return RAC_TOOL_FORMAT_DEFAULT;
@@ -1450,18 +1473,9 @@ static std::string normalize_tool_format_hint(std::string value) {
 }
 
 static std::string tool_format_hint_from_proto(runanywhere::v1::ToolCallFormatName format) {
-    switch (format) {
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC:
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_HERMES:
-            return "lfm2";
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON:
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_XML:
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_NATIVE:
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS:
-        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED:
-        default:
-            return "default";
-    }
+    // Delegate to the exported single-source-of-truth mapping so the proto path
+    // and the SDK-facing rac_tool_call_format_hint_from_format_name() never drift.
+    return rac_tool_call_format_hint_from_format_name(static_cast<int32_t>(format));
 }
 
 static runanywhere::v1::ToolCallFormatName

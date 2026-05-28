@@ -10,6 +10,7 @@
 //  no longer hand-rolls it. Public API shape is preserved.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Tool Executor Types
@@ -153,14 +154,10 @@ extension RAToolCallingOptions {
     }
 
     var resolvedFormatName: String {
+        // Delegate the proto-enum -> hint-string mapping to commons so every SDK
+        // shares one source of truth (rac_tool_call_format_hint_from_format_name).
         if hasFormat {
-            switch format {
-            case .json: return "default"
-            case .openaiFunctions: return "openai"
-            case .hermes: return "hermes"
-            case .pythonic: return "lfm2"
-            default: break
-            }
+            return String(cString: rac_tool_call_format_hint_from_format_name(Int32(format.rawValue)))
         }
         return formatHint.isEmpty ? "default" : formatHint
     }

@@ -69,11 +69,19 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
     }
 
     func testToolCallingOptionsPreferGeneratedFormatEnum() {
+        // resolvedFormatName delegates the proto-enum -> hint-string mapping to
+        // commons (rac_tool_call_format_hint_from_format_name), the single
+        // source of truth. .openaiFunctions has no distinct runtime route, so
+        // it folds to the JSON-tagged "default" (the prior hand-rolled Swift
+        // table emitted "openai", a string commons never recognized).
         var options = RAToolCallingOptions.defaults()
         options.formatHint = "lfm2"
         options.format = .openaiFunctions
+        XCTAssertEqual(options.resolvedFormatName, "default")
 
-        XCTAssertEqual(options.resolvedFormatName, "openai")
+        // .pythonic routes to the LFM2 Pythonic format.
+        options.format = .pythonic
+        XCTAssertEqual(options.resolvedFormatName, "lfm2")
     }
 
     func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {

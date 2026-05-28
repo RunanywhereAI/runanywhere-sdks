@@ -318,6 +318,33 @@ RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_outpu
 RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 
 /**
+ * @brief Map a runanywhere.v1.ToolCallFormatName proto enum value to its
+ *        canonical runtime hint string.
+ *
+ * *** SINGLE SOURCE OF TRUTH for the proto-enum -> hint-string mapping. ***
+ *
+ * Every SDK previously hand-rolled this table (Swift's
+ * `RAToolCallingOptions.resolvedFormatName`, Kotlin's `toToolFormatHint`,
+ * etc.), and the tables diverged (e.g. Kotlin emitted "pythonic", which
+ * rac_tool_call_format_from_name does not recognize and silently downgrades).
+ * SDKs must instead pass their generated `ToolCallFormatName` enum's integer
+ * value here and forward the result as `format_hint`. The returned string is
+ * always one of the values rac_tool_call_format_from_name() accepts ("default"
+ * or "lfm2"):
+ *   - TOOL_CALL_FORMAT_NAME_PYTHONIC (4) / TOOL_CALL_FORMAT_NAME_HERMES (6) -> "lfm2"
+ *   - everything else (JSON, XML, NATIVE, OPENAI_FUNCTIONS, UNSPECIFIED, and any
+ *     unknown/future value) -> "default"
+ *
+ * Takes the proto enum as an int32 (not rac_tool_call_format_t) because the C
+ * format enum only models two runtime routes while the proto enum carries
+ * seven naming variants; this keeps the proto enum the canonical input.
+ *
+ * @param format_name runanywhere.v1.ToolCallFormatName enum value as an int32.
+ * @return Static lowercase hint string (do not free).
+ */
+RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_name);
+
+/**
  * @brief Derive the tool-call format from a serialized RAModelInfo.
  *
  * CONSOLIDATE-A canonical replacement for per-example heuristics like Swift's
