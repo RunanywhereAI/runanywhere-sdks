@@ -187,6 +187,14 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 // is released when the JVM unloads the native library (commons-154).
 namespace {
 void rac_jni_release_all_listener_global_refs(JNIEnv* env);
+// commons-057: release the single per-handle GlobalRef this TU caches for an
+// LLM / VAD handle. racLlm/VadComponentDestroy call these so a
+// load->stream->destroy cycle that never hits the explicit unset-callback path
+// does not leak one GlobalRef per cycle (which eventually overflows the JVM
+// global reference table). Defined near the listener maps at the bottom of the
+// TU where the maps are in scope.
+void rac_jni_erase_llm_stream_listener(JNIEnv* env, uintptr_t handle_key);
+void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key);
 }  // namespace
 
 // NOLINTNEXTLINE(misc-unused-parameters): `vm`/`reserved` are part of the JNI ABI.
@@ -548,6 +556,21 @@ struct JByteArrayView {
     size_t size() const { return static_cast<size_t>(length); }
 };
 
+// commons-089: callback user-data for the proto-byte stream thunks.
+//
+// Lifetime contract: the streaming `rac_*_stream_proto` /
+// `rac_*_process_turn_proto` C entry points are SYNCHRONOUS — they run the full
+// inference inline and fire `callback` zero or more times BEFORE returning (no
+// `src/features` proto path spawns a worker thread). That makes it safe for
+// racLlmGenerateStreamProto / racSttTranscribeStreamLifecycleProto /
+// racTtsSynthesizeStreamLifecycleProto / racVlmProcessStreamProto /
+// racDiffusionGenerateWithProgressProto / racStructuredOutputGenerateStreamProto
+// / racVoiceAgentProcessTurnProto to stack-allocate this ctx and DeleteGlobalRef
+// the listener immediately after the call returns.
+//
+// The ONLY async case is racToolCallingSessionCreateProto, whose callback fires
+// across later step() calls — it heap-allocates this struct and tracks it in
+// toolCallingCtxMap() until racToolCallingSessionDestroyProto frees it.
 struct ProtoListenerUserData {
     jobject listener;
     const char* operation;
@@ -600,6 +623,19 @@ static jbyteArray makeFeatureUnavailableResult(JNIEnv* env, const char* operatio
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     return makeProtoCallResult(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, &result, operation);
+}
+
+// commons-156: a NewStringUTF / NewByteArray failure inside a callback that C++
+// invokes leaves a pending OutOfMemoryError. If it is not cleared before the
+// next JNI call on this thread, ART aborts the subsequent call with a
+// misleading "JNI called with pending exception" error. Callbacks call this
+// right after a `New*` that returned NULL, then bail with their own error code.
+static bool jniClearPendingException(JNIEnv* env) {
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return true;
+    }
+    return false;
 }
 
 // =============================================================================
@@ -655,6 +691,10 @@ static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_FALSE;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_exists, jPath);
     env->DeleteLocalRef(jPath);
 
@@ -670,6 +710,12 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        *out_data = nullptr;
+        *out_size = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jbyteArray result = static_cast<jbyteArray>(
         env->CallObjectMethod(g_platform_adapter, g_method_file_read, jPath));
     env->DeleteLocalRef(jPath);
@@ -681,14 +727,18 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
     }
 
     jsize len = env->GetArrayLength(result);
-    *out_data = malloc(len);
-    if (*out_data == nullptr) {
+    // commons-156: malloc(0) is implementation-defined; treat a zero-byte file
+    // as a clean empty read instead of a spurious OOM.
+    *out_data = len > 0 ? malloc(static_cast<size_t>(len)) : nullptr;
+    if (len > 0 && *out_data == nullptr) {
         *out_size = 0;
         env->DeleteLocalRef(result);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     *out_size = static_cast<size_t>(len);
-    env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
+    if (len > 0) {
+        env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
+    }
 
     env->DeleteLocalRef(result);
     return RAC_SUCCESS;
@@ -703,9 +753,23 @@ static rac_result_t jni_file_write_callback(const char* path, const void* data, 
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jbyteArray jData = env->NewByteArray(static_cast<jsize>(size));
-    env->SetByteArrayRegion(jData, 0, static_cast<jsize>(size),
-                            reinterpret_cast<const jbyte*>(data));
+    if (jData == nullptr) {
+        // commons-156: NewByteArray returns NULL on OOM; without this guard the
+        // following SetByteArrayRegion dereferences NULL / raises and leaves a
+        // pending exception for the next JNI call.
+        jniClearPendingException(env);
+        env->DeleteLocalRef(jPath);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    if (size > 0) {
+        env->SetByteArrayRegion(jData, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(data));
+    }
 
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_write, jPath, jData);
 
@@ -723,6 +787,10 @@ static rac_result_t jni_file_delete_callback(const char* path, void* user_data) 
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_delete, jPath);
     env->DeleteLocalRef(jPath);
 
@@ -1242,6 +1310,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentDestroy(
                                                                                 jclass clazz,
                                                                                 jlong handle) {
     if (handle != 0) {
+        // commons-057: drop the cached stream-listener GlobalRef before
+        // destroying the component so an unbalanced setStreamProtoCallback (no
+        // matching unset) cannot leak it past the handle's lifetime.
+        rac_jni_erase_llm_stream_listener(env, static_cast<uintptr_t>(handle));
         rac_llm_component_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
 }
@@ -1284,10 +1356,14 @@ JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentCancel(JNIEnv* env,
                                                                                jclass clazz,
                                                                                jlong handle) {
-    // STT component doesn't have a cancel method, just unload
-    if (handle != 0) {
-        rac_stt_component_unload(reinterpret_cast<rac_handle_t>(handle));
-    }
+    // commons-058: intentional no-op. STT exposes no non-destructive stop/cancel
+    // in the C ABI, and component-handle transcription is synchronous and
+    // lifecycle-owned (rac_stt_transcribe[_stream]_lifecycle_proto), so there is
+    // no in-flight work to interrupt at this layer. The previous
+    // rac_stt_component_unload aliasing destructively evicted the loaded model on
+    // cancel, forcing a full reload on the next transcribe. iOS Swift exposes no
+    // STT cancel at all (CppBridge+STT has only load/unload/destroy).
+    (void)handle;
 }
 
 // =============================================================================
@@ -1319,9 +1395,12 @@ JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentCancel(JNIEnv* env,
                                                                                jclass clazz,
                                                                                jlong handle) {
-    // TTS component doesn't have a cancel method, just unload
+    // commons-058: stop the in-flight synthesis without evicting the loaded
+    // voice. The previous rac_tts_component_unload aliasing destroyed the model
+    // on cancel, forcing a multi-hundred-MB reload on the next synthesize. This
+    // mirrors racVadComponentCancel -> rac_vad_component_stop.
     if (handle != 0) {
-        rac_tts_component_unload(reinterpret_cast<rac_handle_t>(handle));
+        rac_tts_component_stop(reinterpret_cast<rac_handle_t>(handle));
     }
 }
 
@@ -1346,6 +1425,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentDestroy(
                                                                                 jclass clazz,
                                                                                 jlong handle) {
     if (handle != 0) {
+        // commons-057: release both VAD listener GlobalRefs (activity + stream)
+        // for this handle before destroy. Reset intentionally keeps them since
+        // the component is reused after a reset.
+        rac_jni_erase_vad_listeners(env, static_cast<uintptr_t>(handle));
         rac_vad_component_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
 }
@@ -3442,12 +3525,30 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(JN
     if (rc < 0)
         return nullptr;
 
+    // commons-122: guard the JNI allocations and release every local ref so the
+    // hot auth-refresh path cannot exhaust the per-frame local-ref budget or
+    // dereference a NULL class/array if FindClass / NewObjectArray fail.
     jclass strCls = env->FindClass("java/lang/String");
-    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
-    if (token) {
-        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(token));
+    if (strCls == nullptr) {
+        return nullptr;
     }
-    env->SetObjectArrayElement(arr, 1, env->NewStringUTF(needsRefresh ? "true" : "false"));
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+    env->DeleteLocalRef(strCls);
+    if (arr == nullptr) {
+        return nullptr;
+    }
+    if (token != nullptr) {
+        jstring jToken = env->NewStringUTF(token);
+        if (jToken != nullptr) {
+            env->SetObjectArrayElement(arr, 0, jToken);
+            env->DeleteLocalRef(jToken);
+        }
+    }
+    jstring jNeedsRefresh = env->NewStringUTF(needsRefresh ? "true" : "false");
+    if (jNeedsRefresh != nullptr) {
+        env->SetObjectArrayElement(arr, 1, jNeedsRefresh);
+        env->DeleteLocalRef(jNeedsRefresh);
+    }
     return arr;
 }
 
@@ -6356,6 +6457,46 @@ void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
     if (g_file_callbacks_obj != nullptr) {
         env->DeleteGlobalRef(g_file_callbacks_obj);
         g_file_callbacks_obj = nullptr;
+    }
+}
+
+void rac_jni_erase_llm_stream_listener(JNIEnv* env, uintptr_t handle_key) {
+    if (env == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+    auto it = g_llm_stream_proto_listeners.find(handle_key);
+    if (it != g_llm_stream_proto_listeners.end()) {
+        if (it->second != nullptr) {
+            env->DeleteGlobalRef(it->second);
+        }
+        g_llm_stream_proto_listeners.erase(it);
+    }
+}
+
+void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
+    if (env == nullptr) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        auto it = g_vad_proto_listeners.find(handle_key);
+        if (it != g_vad_proto_listeners.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            g_vad_proto_listeners.erase(it);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        auto it = g_vad_stream_listeners.find(handle_key);
+        if (it != g_vad_stream_listeners.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            g_vad_stream_listeners.erase(it);
+        }
     }
 }
 }  // namespace
