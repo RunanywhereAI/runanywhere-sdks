@@ -368,6 +368,24 @@ rac_result_t cpu_run_session_v2(rac_runtime_session_t* session, const rac_runtim
     if (rc != RAC_SUCCESS)
         return rc;
 
+    /* First pass: honor the V2 truncation contract the same way the onnxrt
+     * V2-native path does (see runtimes/onnxrt/rac_runtime_onnxrt.cpp). The
+     * legacy provider wrote the actual payload size into `data_bytes`; when the
+     * caller pre-allocated storage with a smaller `data_capacity_bytes` the
+     * write overran it, so publish the required size and report truncation
+     * instead of silently returning RAC_SUCCESS with the post-write size. */
+    bool truncated = false;
+    for (size_t i = 0; i < n_out; ++i) {
+        if (outputs[i].data_capacity_bytes > 0 &&
+            outputs[i].data_capacity_bytes < legacy_outputs[i].data_bytes) {
+            outputs[i].data_bytes = legacy_outputs[i].data_bytes;
+            truncated = true;
+        }
+    }
+    if (truncated) {
+        return RAC_ERROR_OUTPUT_TRUNCATED;
+    }
+
     for (size_t i = 0; i < n_out; ++i) {
         outputs[i].data_bytes = legacy_outputs[i].data_bytes;
         outputs[i].dtype = static_cast<rac_runtime_dtype_t>(legacy_outputs[i].dtype);
