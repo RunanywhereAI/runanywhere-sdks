@@ -8,6 +8,8 @@
 
 #include "rac/features/platform/rac_llm_platform.h"
 
+#include "platform_llm_callbacks_internal.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -30,6 +32,30 @@ bool g_callbacks_set = false;
 }  // namespace
 
 // =============================================================================
+// INTERNAL SNAPSHOT HELPER
+// =============================================================================
+
+namespace runanywhere::commons::platform_llm {
+
+// commons-032: take a value snapshot under the registration lock so callers
+// don't dereference the global struct after another thread may have written
+// it (mirrors engines/whisperkit_coreml::snapshot_callbacks). Returns true
+// iff a valid snapshot was produced.
+bool snapshot_callbacks(rac_platform_llm_callbacks_t* out) {
+    if (!out) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
+    if (!g_callbacks_set) {
+        return false;
+    }
+    *out = g_callbacks;
+    return true;
+}
+
+}  // namespace runanywhere::commons::platform_llm
+
+// =============================================================================
 // CALLBACK REGISTRATION
 // =============================================================================
 
@@ -48,6 +74,10 @@ rac_result_t rac_platform_llm_set_callbacks(const rac_platform_llm_callbacks_t* 
     return RAC_SUCCESS;
 }
 
+// commons-032: the returned pointer aliases the global g_callbacks and the
+// mutex is dropped at function exit. Consumers that need a torn-read-free
+// view across multiple field loads MUST use
+// runanywhere::commons::platform_llm::snapshot_callbacks() instead.
 const rac_platform_llm_callbacks_t* rac_platform_llm_get_callbacks(void) {
     std::lock_guard<std::mutex> lock(g_callbacks_mutex);
     if (!g_callbacks_set) {
