@@ -317,8 +317,43 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_IDLE,
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
-    d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-                /*is_speech=*/true, session_id, turn_id, request_id, event_callback, user_data);
+
+    // commons-043-A: surface a real VAD verdict for the turn instead of
+    // emitting a hard-coded SPEECH_STARTED/SPEECH_ENDED pair around STT.
+    // The per-turn d7 path receives a pre-framed audio buffer, so we run
+    // the VAD component once over the whole buffer and emit a single
+    // SPEECH_ACTIVITY event reflecting the real verdict. Frontends that
+    // need per-frame VAD edges should use the streaming pipeline (which
+    // runs VADGateNode per frame); the d7 turn ABI only owes them an
+    // honest "did this turn contain speech?" signal.
+    auto run_turn_vad = [&]() -> bool {
+        const size_t bytes = audio.size();
+        if (bytes < sizeof(int16_t) || (bytes % sizeof(int16_t)) != 0)
+            return false;
+        const int16_t* pcm = reinterpret_cast<const int16_t*>(audio.data());
+        const size_t count = bytes / sizeof(int16_t);
+        std::vector<float> floats(count);
+        constexpr float kInv = 1.0f / 32768.0f;
+        for (size_t i = 0; i < count; ++i) {
+            floats[i] = static_cast<float>(pcm[i]) * kInv;
+        }
+        rac::lifecycle::LifecycleVadRef vad_ref{};
+        const bool have_lifecycle_vad =
+            rac::lifecycle::acquire_lifecycle_vad(&vad_ref) == RAC_SUCCESS;
+        rac_bool_t is_speech = RAC_FALSE;
+        if (have_lifecycle_vad && vad_ref.ops && vad_ref.ops->process) {
+            (void)vad_ref.ops->process(vad_ref.impl, floats.data(), count, &is_speech);
+            rac::lifecycle::release_lifecycle_vad(&vad_ref);
+        } else if (handle->vad_handle) {
+            (void)rac_vad_component_process(handle->vad_handle, floats.data(), count, &is_speech);
+        }
+        return is_speech == RAC_TRUE;
+    };
+    const bool turn_has_speech = run_turn_vad();
+    if (turn_has_speech) {
+        d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                    /*is_speech=*/true, session_id, turn_id, request_id, event_callback, user_data);
+    }
 
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_LISTENING,
                   runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH, session_id, turn_id,
@@ -359,8 +394,15 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                                "STT transcription was empty");
         return RAC_ERROR_INVALID_STATE;
     }
-    d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
-                /*is_speech=*/false, session_id, turn_id, request_id, event_callback, user_data);
+    // commons-043-A: only emit the matching "speech ended" event if we
+    // previously emitted "speech started" for this turn. Emitting
+    // SPEECH_ENDED unconditionally would still desynchronize frontends
+    // tracking VAD state when the turn contained no detected speech.
+    if (turn_has_speech) {
+        d7_emit_vad(handle, runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+                    /*is_speech=*/false, session_id, turn_id, request_id, event_callback,
+                    user_data);
+    }
     d7_emit_user_said(handle, stt.text,
                       request.session_config().has_language_code()
                           ? request.session_config().language_code()

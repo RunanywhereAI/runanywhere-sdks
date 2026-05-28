@@ -806,7 +806,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
 
     bool saw_state_listening = false;
     bool saw_state_idle = false;
-    bool saw_vad_start = false;
+    int vad_speech_start_count = 0;
+    int vad_speech_end_count = 0;
     bool saw_user_said = false;
     bool saw_assistant_token = false;
     bool saw_audio = false;
@@ -822,9 +823,12 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
             saw_state_idle = true;
         }
         if (event.has_vad() &&
-            event.vad().type() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY &&
-            event.vad().is_speech()) {
-            saw_vad_start = true;
+            event.vad().type() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
+            if (event.vad().is_speech()) {
+                ++vad_speech_start_count;
+            } else {
+                ++vad_speech_end_count;
+            }
         }
         if (event.has_user_said() && event.user_said().is_final()) {
             saw_user_said = true;
@@ -839,7 +843,16 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
     CHECK(envelope_valid, "D-7 every event carries session_id + request_id");
     CHECK(saw_state_listening, "D-7 emits state=LISTENING");
     CHECK(saw_state_idle, "D-7 emits state=IDLE at end");
-    CHECK(saw_vad_start, "D-7 emits VAD speech-start");
+    // commons-043-A: D-7 must run real VAD over the turn audio and only
+    // emit SPEECH_ACTIVITY events when speech is genuinely detected.
+    // The fixture audio `{0,1,2,3}` (int16, near-zero) is silent under the
+    // default energy VAD, so the turn produces zero VAD events. Frontends
+    // exercising the real-speech path should see SPEECH_ACTIVITY pairs
+    // mirroring the underlying detector. Either way speech-start/end must
+    // be balanced (no orphan end without a start).
+    CHECK(vad_speech_start_count == 0, "D-7 does not fabricate VAD speech-start for silent audio");
+    CHECK(vad_speech_end_count == vad_speech_start_count,
+          "D-7 SPEECH_ENDED count matches SPEECH_STARTED count");
     CHECK(saw_user_said, "D-7 emits userSaid");
     CHECK(saw_assistant_token, "D-7 emits assistant_token");
     CHECK(saw_audio, "D-7 emits audio frame with is_final");
