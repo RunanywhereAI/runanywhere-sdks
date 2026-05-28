@@ -564,7 +564,7 @@ rac_wasm_offsetof_diffusion_options_denoise_strength(void) {
   return (int)offsetof(rac_diffusion_options_t, denoise_strength);
 }
 EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_diffusion_options_report_intermediate(void) {
+rac_wasm_offsetof_diffusion_options_report_intermediate_images(void) {
   return (int)offsetof(rac_diffusion_options_t, report_intermediate_images);
 }
 EMSCRIPTEN_KEEPALIVE int
