@@ -381,6 +381,16 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     }
     bool stop_hit = false;
 
+    // Mirrors the terminal_emitted guard in
+    // engines/llamacpp/rac_vlm_llamacpp.cpp:1445-1583: the documented streaming
+    // contract is that callers ALWAYS receive exactly one callback with
+    // is_final=RAC_TRUE before this function returns. Without this guard,
+    // exception paths and the prompt-too-long / decode-failure backend paths
+    // would surface as RAC_ERROR_INFERENCE_FAILED with no terminal marker and
+    // wedge the per-stream synthesizer (Swift AsyncStream, Kotlin Flow, Dart
+    // StreamController, TS AsyncIterable) that the SDKs build on top.
+    bool terminal_emitted = false;
+
     bool success = false;
     try {
         success = h->text_gen->generate_stream(
@@ -409,9 +419,17 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
             });
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
+        if (!terminal_emitted) {
+            callback("", RAC_TRUE, user_data);
+            terminal_emitted = true;
+        }
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
         rac_error_set_details("Unknown C++ exception during streaming LLM generation");
+        if (!terminal_emitted) {
+            callback("", RAC_TRUE, user_data);
+            terminal_emitted = true;
+        }
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
@@ -426,9 +444,19 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
             stop_window.clear();
         }
         callback("", RAC_TRUE, user_data);  // Final token
+        terminal_emitted = true;
         return RAC_SUCCESS;
     }
 
+    // generate_stream returned false on a non-stop-hit path (prompt-too-long at
+    // engines/llamacpp/llamacpp_backend.cpp:824-834, prefill decode failure at
+    // :861-871, or mid-generation decode failure at :1034-1038). Emit the
+    // terminal marker so direct C-API consumers can close their iterators
+    // before we surface the inference error.
+    if (!terminal_emitted) {
+        callback("", RAC_TRUE, user_data);
+        terminal_emitted = true;
+    }
     return RAC_ERROR_INFERENCE_FAILED;
 }
 
@@ -474,6 +502,9 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
         stop_window.reserve(user_stop_max_len * 2);
     }
     bool stop_hit = false;
+    // See is_final-terminal-marker rationale on rac_llm_llamacpp_generate_stream
+    // above; the timed variant has the exact same streaming contract.
+    bool terminal_emitted = false;
 
     int prompt_tokens = 0;
     bool success = false;
@@ -506,9 +537,17 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
             &prompt_tokens, timing_out);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
+        if (!terminal_emitted) {
+            callback("", RAC_TRUE, user_data);
+            terminal_emitted = true;
+        }
         return RAC_ERROR_INFERENCE_FAILED;
     } catch (...) {
         rac_error_set_details("Unknown C++ exception during timed streaming LLM generation");
+        if (!terminal_emitted) {
+            callback("", RAC_TRUE, user_data);
+            terminal_emitted = true;
+        }
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
@@ -523,9 +562,14 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
             stop_window.clear();
         }
         callback("", RAC_TRUE, user_data);  // Final token
+        terminal_emitted = true;
         return RAC_SUCCESS;
     }
 
+    if (!terminal_emitted) {
+        callback("", RAC_TRUE, user_data);
+        terminal_emitted = true;
+    }
     return RAC_ERROR_INFERENCE_FAILED;
 }
 
