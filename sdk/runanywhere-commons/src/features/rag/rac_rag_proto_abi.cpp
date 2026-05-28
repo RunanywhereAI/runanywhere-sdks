@@ -272,13 +272,28 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // handing them to rac_embeddings_create_with_config / rac_llm_create.
     const std::string embedding_model_id = proto.embedding_model_id();
     const std::string llm_model_id = proto.llm_model_id();
-    const std::string reranker_model_id =
-        proto.has_reranker_model_id() ? proto.reranker_model_id() : std::string();
 
     if (embedding_model_id.empty()) {
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
                         "RAGConfiguration.embedding_model_id is required");
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Reranking is part of the public RAGConfiguration surface (rag.proto:128,
+    // rag.proto:130) but no rerank backend is wired up: rag_pipeline_graph
+    // skips the rerank step (rag_pipeline_graph.h:20-25) and every engine sets
+    // rac_engine_vtable_t::rerank_ops = nullptr. Silently honoring the request
+    // would let callers ship "reranked" RAG that is plain RRF fusion. Fail
+    // fast until the rerank vtable lands so misconfiguration surfaces at
+    // session-create instead of looking exactly like a working baseline.
+    const bool rerank_requested =
+        proto.rerank_results() ||
+        (proto.has_reranker_model_id() && !proto.reranker_model_id().empty());
+    if (rerank_requested) {
+        const char* msg =
+            "reranking is not yet implemented; unset rerank_results and reranker_model_id";
+        publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
     std::string err_message;
@@ -292,18 +307,6 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     if (!llm_model_id.empty()) {
         llm_path = resolve_rag_model_id_to_path(llm_model_id, &err_message);
         if (llm_path.empty()) {
-            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
-            return RAC_ERROR_MODEL_NOT_FOUND;
-        }
-    }
-
-    // Reranker is optional. When set but not resolvable, we fail the same way
-    // as missing LLM/embedding ids. RAGBackend does not consume the reranker
-    // path yet (see the separate reranker-wiring task), so we validate and
-    // discard.
-    if (!reranker_model_id.empty()) {
-        std::string reranker_path = resolve_rag_model_id_to_path(reranker_model_id, &err_message);
-        if (reranker_path.empty()) {
             publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
