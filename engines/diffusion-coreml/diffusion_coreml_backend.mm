@@ -1042,106 +1042,119 @@ rac_result_t generate_internal(rac_diffusion_coreml_impl_t* impl,
     const float guidance = options->guidance_scale > 0.0f ? options->guidance_scale : 7.5f;
     const int64_t seed = options->seed >= 0 ? options->seed : 0;
 
-    @autoreleasepool {
-        MLMultiArray* prompt_embeddings = nil;
-        rac_result_t rc = encode_text(impl, options->prompt, &prompt_embeddings, out_result);
-        if (rc != RAC_SUCCESS) {
-            return rc;
-        }
-
-        MLMultiArray* negative_embeddings = nil;
-        const char* negative_prompt = options->negative_prompt ? options->negative_prompt : "";
-        rc = encode_text(impl, negative_prompt, &negative_embeddings, out_result);
-        if (rc != RAC_SUCCESS) {
-            return rc;
-        }
-
-        NSString* sample_name = resolve_feature_name(
-            impl->unet, true, impl->io_config, {"unet.sample", "unet.input_sample", "unet.latent"},
-            {"sample", "latent_model_input", "latents"}, MLFeatureTypeMultiArray);
-        NSString* timestep_name =
-            resolve_feature_name(impl->unet, true, impl->io_config, {"unet.timestep", "unet.time"},
-                                 {"timestep", "t", "time_step"}, MLFeatureTypeInvalid);
-        NSString* hidden_name = resolve_feature_name(
-            impl->unet, true, impl->io_config,
-            {"unet.encoder_hidden_states", "unet.hidden", "unet.text_embeddings"},
-            {"encoder_hidden_states", "hidden_states", "text_embeds"}, MLFeatureTypeMultiArray);
-        NSString* output_name = resolve_feature_name(
-            impl->unet, false, impl->io_config, {"unet.output", "unet.noise_pred"},
-            {"noise_pred", "out_sample", "sample"}, MLFeatureTypeMultiArray);
-        if (!sample_name || !timestep_name || !hidden_name || !output_name) {
-            return set_error(out_result, RAC_ERROR_NOT_SUPPORTED, "Unsupported Unet layout");
-        }
-
-        MLFeatureDescription* sample_desc = feature_desc(impl->unet, true, sample_name);
-        LatentShape latent_shape = resolve_latent_shape(sample_desc, width, height);
-        const size_t latent_count = static_cast<size_t>(latent_shape.channels) *
-                                    static_cast<size_t>(latent_shape.height) *
-                                    static_cast<size_t>(latent_shape.width);
-        std::vector<float> latents = initial_latents(latent_count, seed);
-        const std::vector<double> alpha_cumprod = build_alpha_cumprod();
-
-        for (int32_t step = 0; step < steps; ++step) {
-            if (impl->cancel_requested.load(std::memory_order_acquire)) {
-                return set_error(out_result, RAC_ERROR_CANCELLED,
-                                 "CoreML diffusion generation cancelled");
-            }
-            const int32_t timestep =
-                steps == 1
-                    ? 999
-                    : static_cast<int32_t>(std::lround(999.0 - (999.0 * step) / (steps - 1)));
-            const int32_t previous_timestep =
-                (step + 1 < steps)
-                    ? static_cast<int32_t>(std::lround(999.0 - (999.0 * (step + 1)) / (steps - 1)))
-                    : -1;
-
-            std::vector<float> noise;
-            rc = predict_noise(impl, latents, latent_shape, timestep, guidance, prompt_embeddings,
-                               negative_embeddings, sample_name, timestep_name, hidden_name,
-                               output_name, noise, out_result);
+    // Convert any NSException escaping CoreML/Foundation APIs into a structured
+    // rac_result_t so the C ABI consumer never sees a thrown Obj-C exception,
+    // which would be undefined behavior across the extern "C" boundary.
+    @try {
+        @autoreleasepool {
+            MLMultiArray* prompt_embeddings = nil;
+            rac_result_t rc = encode_text(impl, options->prompt, &prompt_embeddings, out_result);
             if (rc != RAC_SUCCESS) {
                 return rc;
             }
-            ddim_step(latents, noise, timestep, previous_timestep, alpha_cumprod);
 
-            if (progress_cb) {
-                rac_diffusion_progress_t progress{};
-                progress.progress = static_cast<float>(step + 1) / static_cast<float>(steps);
-                progress.current_step = step + 1;
-                progress.total_steps = steps;
-                progress.stage = "Denoising";
-                if (progress_cb(&progress, user_data) != RAC_TRUE) {
+            MLMultiArray* negative_embeddings = nil;
+            const char* negative_prompt = options->negative_prompt ? options->negative_prompt : "";
+            rc = encode_text(impl, negative_prompt, &negative_embeddings, out_result);
+            if (rc != RAC_SUCCESS) {
+                return rc;
+            }
+
+            NSString* sample_name = resolve_feature_name(
+                impl->unet, true, impl->io_config,
+                {"unet.sample", "unet.input_sample", "unet.latent"},
+                {"sample", "latent_model_input", "latents"}, MLFeatureTypeMultiArray);
+            NSString* timestep_name = resolve_feature_name(
+                impl->unet, true, impl->io_config, {"unet.timestep", "unet.time"},
+                {"timestep", "t", "time_step"}, MLFeatureTypeInvalid);
+            NSString* hidden_name = resolve_feature_name(
+                impl->unet, true, impl->io_config,
+                {"unet.encoder_hidden_states", "unet.hidden", "unet.text_embeddings"},
+                {"encoder_hidden_states", "hidden_states", "text_embeds"},
+                MLFeatureTypeMultiArray);
+            NSString* output_name = resolve_feature_name(
+                impl->unet, false, impl->io_config, {"unet.output", "unet.noise_pred"},
+                {"noise_pred", "out_sample", "sample"}, MLFeatureTypeMultiArray);
+            if (!sample_name || !timestep_name || !hidden_name || !output_name) {
+                return set_error(out_result, RAC_ERROR_NOT_SUPPORTED, "Unsupported Unet layout");
+            }
+
+            MLFeatureDescription* sample_desc = feature_desc(impl->unet, true, sample_name);
+            LatentShape latent_shape = resolve_latent_shape(sample_desc, width, height);
+            const size_t latent_count = static_cast<size_t>(latent_shape.channels) *
+                                        static_cast<size_t>(latent_shape.height) *
+                                        static_cast<size_t>(latent_shape.width);
+            std::vector<float> latents = initial_latents(latent_count, seed);
+            const std::vector<double> alpha_cumprod = build_alpha_cumprod();
+
+            for (int32_t step = 0; step < steps; ++step) {
+                if (impl->cancel_requested.load(std::memory_order_acquire)) {
                     return set_error(out_result, RAC_ERROR_CANCELLED,
-                                     "CoreML diffusion generation cancelled by progress callback");
+                                     "CoreML diffusion generation cancelled");
+                }
+                const int32_t timestep =
+                    steps == 1
+                        ? 999
+                        : static_cast<int32_t>(std::lround(999.0 - (999.0 * step) / (steps - 1)));
+                const int32_t previous_timestep =
+                    (step + 1 < steps) ? static_cast<int32_t>(
+                                             std::lround(999.0 - (999.0 * (step + 1)) / (steps - 1)))
+                                       : -1;
+
+                std::vector<float> noise;
+                rc = predict_noise(impl, latents, latent_shape, timestep, guidance,
+                                   prompt_embeddings, negative_embeddings, sample_name,
+                                   timestep_name, hidden_name, output_name, noise, out_result);
+                if (rc != RAC_SUCCESS) {
+                    return rc;
+                }
+                ddim_step(latents, noise, timestep, previous_timestep, alpha_cumprod);
+
+                if (progress_cb) {
+                    rac_diffusion_progress_t progress{};
+                    progress.progress = static_cast<float>(step + 1) / static_cast<float>(steps);
+                    progress.current_step = step + 1;
+                    progress.total_steps = steps;
+                    progress.stage = "Denoising";
+                    if (progress_cb(&progress, user_data) != RAC_TRUE) {
+                        return set_error(
+                            out_result, RAC_ERROR_CANCELLED,
+                            "CoreML diffusion generation cancelled by progress callback");
+                    }
                 }
             }
-        }
 
-        MLMultiArray* decoded = nil;
-        rc = decode_latents(impl, latents, latent_shape, &decoded, out_result);
-        if (rc != RAC_SUCCESS) {
-            return rc;
-        }
+            MLMultiArray* decoded = nil;
+            rc = decode_latents(impl, latents, latent_shape, &decoded, out_result);
+            if (rc != RAC_SUCCESS) {
+                return rc;
+            }
 
-        uint8_t* rgba = nullptr;
-        size_t rgba_size = 0;
-        int32_t image_width = 0;
-        int32_t image_height = 0;
-        if (!convert_decoded_image(decoded, &rgba, &rgba_size, &image_width, &image_height)) {
-            return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
-                             "Unsupported VAEDecoder image output layout");
-        }
+            uint8_t* rgba = nullptr;
+            size_t rgba_size = 0;
+            int32_t image_width = 0;
+            int32_t image_height = 0;
+            if (!convert_decoded_image(decoded, &rgba, &rgba_size, &image_width, &image_height)) {
+                return set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                 "Unsupported VAEDecoder image output layout");
+            }
 
-        out_result->image_data = rgba;
-        out_result->image_size = rgba_size;
-        out_result->width = image_width;
-        out_result->height = image_height;
-        out_result->seed_used = seed;
-        out_result->generation_time_ms = now_ms() - started;
-        out_result->safety_flagged = run_safety_checker(impl, decoded) ? RAC_TRUE : RAC_FALSE;
-        out_result->error_code = RAC_SUCCESS;
-        out_result->error_message = nullptr;
-        return RAC_SUCCESS;
+            out_result->image_data = rgba;
+            out_result->image_size = rgba_size;
+            out_result->width = image_width;
+            out_result->height = image_height;
+            out_result->seed_used = seed;
+            out_result->generation_time_ms = now_ms() - started;
+            out_result->safety_flagged = run_safety_checker(impl, decoded) ? RAC_TRUE : RAC_FALSE;
+            out_result->error_code = RAC_SUCCESS;
+            out_result->error_message = nullptr;
+            return RAC_SUCCESS;
+        }
+    } @catch (NSException* exn) {
+        NSString* reason = [exn reason] ?: [exn name] ?: @"unknown NSException";
+        std::string message = std::string("CoreML diffusion generate raised NSException: ") +
+                              ([reason UTF8String] ?: "unknown");
+        return set_error(out_result, RAC_ERROR_INFERENCE_FAILED, message.c_str());
     }
 }
 
@@ -1186,48 +1199,30 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
 
     std::lock_guard<std::mutex> lock(impl->mtx);
 
-    @autoreleasepool {
-        NSString* model_path_str = [NSString stringWithUTF8String:model_path];
-        if (!model_path_str) {
-            RAC_LOG_ERROR(kLogCat, "Invalid model_path encoding: %s", model_path);
-            return RAC_ERROR_INVALID_ARGUMENT;
-        }
-        NSString* dir = rac_coreml_find_resource_dir(model_path_str, @"Unet");
-        BOOL is_dir = NO;
-        if (!dir || ![[NSFileManager defaultManager] fileExistsAtPath:dir isDirectory:&is_dir] ||
-            !is_dir) {
-            RAC_LOG_ERROR(kLogCat, "Model path missing / not a directory: %s", model_path);
-            return RAC_ERROR_MODEL_NOT_FOUND;
-        }
+    // Convert any NSException from a malformed .mlmodelc bundle / metadata
+    // dictionary into a structured rac_result_t so we never unwind across the
+    // extern "C" boundary into the C++ commons / Swift caller.
+    @try {
+        @autoreleasepool {
+            NSString* model_path_str = [NSString stringWithUTF8String:model_path];
+            if (!model_path_str) {
+                RAC_LOG_ERROR(kLogCat, "Invalid model_path encoding: %s", model_path);
+                return RAC_ERROR_INVALID_ARGUMENT;
+            }
+            NSString* dir = rac_coreml_find_resource_dir(model_path_str, @"Unet");
+            BOOL is_dir = NO;
+            if (!dir ||
+                ![[NSFileManager defaultManager] fileExistsAtPath:dir isDirectory:&is_dir] ||
+                !is_dir) {
+                RAC_LOG_ERROR(kLogCat, "Model path missing / not a directory: %s", model_path);
+                return RAC_ERROR_MODEL_NOT_FOUND;
+            }
 
-        // rac_coreml_load_model_in_dir returns a retained MLModel
-        // (NS_RETURNS_RETAINED). Re-initializing with the same impl would
-        // overwrite the strong pointer fields and leak the prior retain on
-        // each of the four model slots; release any previously held models
-        // before reassignment to keep init idempotent.
-        [impl->text_encoder release];
-        [impl->unet release];
-        [impl->vae_decoder release];
-        [impl->safety_checker release];
-        impl->text_encoder = nil;
-        impl->unet = nil;
-        impl->vae_decoder = nil;
-        impl->safety_checker = nil;
-
-        impl->text_encoder =
-            rac_coreml_load_model_in_dir(dir, @"TextEncoder", /*required=*/true, kLogCat);
-        impl->unet = rac_coreml_load_model_in_dir(dir, @"Unet", /*required=*/true, kLogCat);
-        impl->vae_decoder =
-            rac_coreml_load_model_in_dir(dir, @"VAEDecoder", /*required=*/true, kLogCat);
-        impl->safety_checker =
-            rac_coreml_load_model_in_dir(dir, @"SafetyChecker", /*required=*/false, kLogCat);
-
-        if (!impl->text_encoder || !impl->unet || !impl->vae_decoder) {
-            RAC_LOG_ERROR(kLogCat, "CoreML diffusion initialize failed — missing one of "
-                                   "TextEncoder.mlmodelc / Unet.mlmodelc / VAEDecoder.mlmodelc");
             // rac_coreml_load_model_in_dir returns a retained MLModel
-            // (NS_RETURNS_RETAINED). Release any partially loaded models on
-            // the error path so we don't leak a strong ref per failed init.
+            // (NS_RETURNS_RETAINED). Re-initializing with the same impl would
+            // overwrite the strong pointer fields and leak the prior retain on
+            // each of the four model slots; release any previously held models
+            // before reassignment to keep init idempotent.
             [impl->text_encoder release];
             [impl->unet release];
             [impl->vae_decoder release];
@@ -1236,35 +1231,75 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
             impl->unet = nil;
             impl->vae_decoder = nil;
             impl->safety_checker = nil;
-            return RAC_ERROR_MODEL_LOAD_FAILED;
-        }
 
-        impl->model_path = [dir UTF8String];
-        if (config)
-            impl->config = *config;
-        impl->io_config = CoreMLSDIOConfig{};
-        load_json_config(impl->io_config, dir);
-        load_model_metadata_config(impl->io_config, impl->text_encoder);
-        load_model_metadata_config(impl->io_config, impl->unet);
-        load_model_metadata_config(impl->io_config, impl->vae_decoder);
-        if (impl->safety_checker) {
-            load_model_metadata_config(impl->io_config, impl->safety_checker);
-        }
-        impl->vocab.clear();
-        impl->vocab_loaded = false;
-        impl->bos_token_id = 49406;
-        impl->eos_token_id = 49407;
-        impl->pad_token_id = 49407;
-        impl->max_vocab_id = 49407;
-        load_vocab(impl, dir);
-        impl->initialized.store(true, std::memory_order_release);
+            impl->text_encoder =
+                rac_coreml_load_model_in_dir(dir, @"TextEncoder", /*required=*/true, kLogCat);
+            impl->unet = rac_coreml_load_model_in_dir(dir, @"Unet", /*required=*/true, kLogCat);
+            impl->vae_decoder =
+                rac_coreml_load_model_in_dir(dir, @"VAEDecoder", /*required=*/true, kLogCat);
+            impl->safety_checker =
+                rac_coreml_load_model_in_dir(dir, @"SafetyChecker", /*required=*/false, kLogCat);
 
-        RAC_LOG_INFO(kLogCat,
-                     "Initialized CoreML diffusion at %s "
-                     "(safety_checker=%s)",
-                     [dir UTF8String], impl -> safety_checker ? "present" : "absent");
+            if (!impl->text_encoder || !impl->unet || !impl->vae_decoder) {
+                RAC_LOG_ERROR(kLogCat,
+                              "CoreML diffusion initialize failed — missing one of "
+                              "TextEncoder.mlmodelc / Unet.mlmodelc / VAEDecoder.mlmodelc");
+                // rac_coreml_load_model_in_dir returns a retained MLModel
+                // (NS_RETURNS_RETAINED). Release any partially loaded models on
+                // the error path so we don't leak a strong ref per failed init.
+                [impl->text_encoder release];
+                [impl->unet release];
+                [impl->vae_decoder release];
+                [impl->safety_checker release];
+                impl->text_encoder = nil;
+                impl->unet = nil;
+                impl->vae_decoder = nil;
+                impl->safety_checker = nil;
+                return RAC_ERROR_MODEL_LOAD_FAILED;
+            }
+
+            impl->model_path = [dir UTF8String];
+            if (config)
+                impl->config = *config;
+            impl->io_config = CoreMLSDIOConfig{};
+            load_json_config(impl->io_config, dir);
+            load_model_metadata_config(impl->io_config, impl->text_encoder);
+            load_model_metadata_config(impl->io_config, impl->unet);
+            load_model_metadata_config(impl->io_config, impl->vae_decoder);
+            if (impl->safety_checker) {
+                load_model_metadata_config(impl->io_config, impl->safety_checker);
+            }
+            impl->vocab.clear();
+            impl->vocab_loaded = false;
+            impl->bos_token_id = 49406;
+            impl->eos_token_id = 49407;
+            impl->pad_token_id = 49407;
+            impl->max_vocab_id = 49407;
+            load_vocab(impl, dir);
+            impl->initialized.store(true, std::memory_order_release);
+
+            RAC_LOG_INFO(kLogCat,
+                         "Initialized CoreML diffusion at %s "
+                         "(safety_checker=%s)",
+                         [dir UTF8String], impl -> safety_checker ? "present" : "absent");
+        }
+        return RAC_SUCCESS;
+    } @catch (NSException* exn) {
+        // Best-effort release of any retained MLModel slots before reporting.
+        [impl->text_encoder release];
+        [impl->unet release];
+        [impl->vae_decoder release];
+        [impl->safety_checker release];
+        impl->text_encoder = nil;
+        impl->unet = nil;
+        impl->vae_decoder = nil;
+        impl->safety_checker = nil;
+        impl->initialized.store(false, std::memory_order_release);
+        NSString* reason = [exn reason] ?: [exn name] ?: @"unknown NSException";
+        RAC_LOG_ERROR(kLogCat, "CoreML diffusion initialize raised NSException: %s",
+                      [reason UTF8String] ?: "unknown");
+        return RAC_ERROR_MODEL_LOAD_FAILED;
     }
-    return RAC_SUCCESS;
 }
 
 // -----------------------------------------------------------------------------
@@ -1295,17 +1330,26 @@ rac_result_t rac_diffusion_coreml_get_info(const rac_diffusion_coreml_impl_t* im
         return RAC_ERROR_NULL_POINTER;
     std::memset(out_info, 0, sizeof(*out_info));
 
-    const bool ready = impl->initialized.load(std::memory_order_acquire);
-    out_info->is_ready = ready ? RAC_TRUE : RAC_FALSE;
-    out_info->current_model = impl->model_id.empty() ? nullptr : impl->model_id.c_str();
-    out_info->model_variant = impl->config.model_variant;
-    out_info->supports_text_to_image = RAC_TRUE;
-    out_info->supports_image_to_image = RAC_FALSE;
-    out_info->supports_inpainting = RAC_FALSE;
-    out_info->safety_checker_enabled = impl->safety_checker ? RAC_TRUE : RAC_FALSE;
-    out_info->max_width = 1024;
-    out_info->max_height = 1024;
-    return RAC_SUCCESS;
+    // Defensive @try keeps NSException unwinding out of the C ABI even if a
+    // future change adds an Obj-C call here.
+    @try {
+        const bool ready = impl->initialized.load(std::memory_order_acquire);
+        out_info->is_ready = ready ? RAC_TRUE : RAC_FALSE;
+        out_info->current_model = impl->model_id.empty() ? nullptr : impl->model_id.c_str();
+        out_info->model_variant = impl->config.model_variant;
+        out_info->supports_text_to_image = RAC_TRUE;
+        out_info->supports_image_to_image = RAC_FALSE;
+        out_info->supports_inpainting = RAC_FALSE;
+        out_info->safety_checker_enabled = impl->safety_checker ? RAC_TRUE : RAC_FALSE;
+        out_info->max_width = 1024;
+        out_info->max_height = 1024;
+        return RAC_SUCCESS;
+    } @catch (NSException* exn) {
+        NSString* reason = [exn reason] ?: [exn name] ?: @"unknown NSException";
+        RAC_LOG_ERROR(kLogCat, "CoreML diffusion get_info raised NSException: %s",
+                      [reason UTF8String] ?: "unknown");
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
 }
 
 uint32_t rac_diffusion_coreml_get_capabilities(const rac_diffusion_coreml_impl_t* impl) {
