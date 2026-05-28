@@ -227,7 +227,7 @@ STTResult WhisperCppSTT::transcribe_internal(const std::vector<float>& audio,
     wparams.print_timestamps = false;
 
     if (detect_language || language.empty()) {
-        wparams.language = nullptr;
+        wparams.language = "auto";
         wparams.detect_language = true;
     } else {
         wparams.language = language.c_str();
