@@ -71,6 +71,17 @@ extern "C" {
  *                 new `create` slot is unreachable otherwise. `rac_capability_t`
  *                 is RETAINED for `rac_module_info_t.capabilities` and
  *                 `rac_modules_for_capability`.
+ *                 NOTE: `rac_service_register_provider` /
+ *                 `rac_service_unregister_provider` remain as no-op
+ *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
+ *                 `src/plugin/rac_plugin_registry.cpp` to keep older Genie
+ *                 .so / Flutter pre-v3 plugin binaries dlopenable (see
+ *                 B-RN-Genie-002). The associated *types* / *fn typedefs /
+ *                 `rac_service_create` / `rac_service_list_providers` are
+ *                 gone for good; new code MUST use `rac_plugin_register` /
+ *                 `rac_plugin_unregister`. The shims can be deleted once
+ *                 every shipped Genie / RN / Flutter binary has been
+ *                 rebuilt against v3.
  */
 #define RAC_PLUGIN_API_VERSION 3u
 
@@ -174,6 +185,12 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
 #endif
 
+/* The `Registrar()` ctor below is marked `noexcept` because it runs during
+ * pre-main() static initialization — an escaping exception would call
+ * std::terminate before any logger / crash reporter is wired up. This is safe
+ * by construction: `rac_plugin_register` itself is declared noexcept (see
+ * RAC_PLUGIN_REGISTRY_NOEXCEPT below) and internally coerces std::bad_alloc /
+ * throwing capability_check callbacks into structured rac_result_t codes. */
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                                          \
     namespace rac_plugin_autoreg_##name {                                                         \
         struct Registrar {                                                                        \
