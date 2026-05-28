@@ -370,10 +370,13 @@ rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* pr
 }
 
 rac_result_t rac_hardware_set_accelerator_preference(int preference_enum) {
-    // Validate against `runanywhere.v1.AccelerationPreference` value range.
-    // Historic mapping documented in the header remains in range (0..3); the
-    // proto values used by tests and SDKs are CPU=2, GPU=3.
-    if (preference_enum < 0 || preference_enum > 3) {
+    // Validate against the full `runanywhere.v1.AccelerationPreference` value
+    // range (UNSPECIFIED=0 .. VULKAN=7). Must stay in sync with
+    // hardware_profile.proto — the generated header exposes
+    // AccelerationPreference_MAX=7, but we hardcode the bound here because
+    // this TU deliberately avoids depending on protoc-generated code (see
+    // file header comment).
+    if (preference_enum < 0 || preference_enum > 7) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     g_accelerator_preference.store(preference_enum, std::memory_order_relaxed);
