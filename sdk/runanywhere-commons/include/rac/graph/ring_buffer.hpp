@@ -28,7 +28,8 @@ class RingBuffer {
    public:
     /// @param capacity Must be >= 2. Power-of-2 is not required but
     ///                 encouraged (index wrap is modulo-capacity).
-    explicit RingBuffer(size_t capacity) : capacity_(capacity), buffer_(new T[capacity]) {}
+    explicit RingBuffer(size_t capacity)
+        : capacity_(capacity), buffer_(std::make_unique<T[]>(capacity)) {}
 
     RingBuffer(const RingBuffer&) = delete;
     RingBuffer& operator=(const RingBuffer&) = delete;
