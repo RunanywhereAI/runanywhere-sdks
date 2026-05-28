@@ -98,8 +98,21 @@ class PipelineNode : public IPipelineNode {
           input_(std::make_shared<InputEdge>(input_capacity, policy)),
           output_(std::make_shared<OutputEdge>(output_capacity, policy)) {}
 
+    // Rule of Five: owning a std::thread mandates a dtor that joins it, else
+    // ~thread() on a joinable thread calls std::terminate. stop()/join() are
+    // idempotent; suppress any throws because dtors must be noexcept-safe.
+    ~PipelineNode() override {
+        try {
+            stop();
+            join();
+        } catch (...) {
+        }
+    }
+
     PipelineNode(const PipelineNode&) = delete;
     PipelineNode& operator=(const PipelineNode&) = delete;
+    PipelineNode(PipelineNode&&) = delete;
+    PipelineNode& operator=(PipelineNode&&) = delete;
 
     void start(std::shared_ptr<CancelToken> parent_cancel) override {
         bool expected = false;
@@ -221,8 +234,20 @@ class SplitNode : public IPipelineNode {
         }
     }
 
+    // See PipelineNode dtor rationale — joinable std::thread at destruction
+    // calls std::terminate. stop()/join() are idempotent and safe to chain.
+    ~SplitNode() override {
+        try {
+            stop();
+            join();
+        } catch (...) {
+        }
+    }
+
     SplitNode(const SplitNode&) = delete;
     SplitNode& operator=(const SplitNode&) = delete;
+    SplitNode(SplitNode&&) = delete;
+    SplitNode& operator=(SplitNode&&) = delete;
 
     std::shared_ptr<Edge> input() { return input_; }
     void set_input(std::shared_ptr<Edge> in) { input_ = std::move(in); }
@@ -297,8 +322,20 @@ class MergeNode : public IPipelineNode {
         }
     }
 
+    // See PipelineNode dtor rationale — vector of joinable std::thread at
+    // destruction calls std::terminate. stop()/join() are idempotent.
+    ~MergeNode() override {
+        try {
+            stop();
+            join();
+        } catch (...) {
+        }
+    }
+
     MergeNode(const MergeNode&) = delete;
     MergeNode& operator=(const MergeNode&) = delete;
+    MergeNode(MergeNode&&) = delete;
+    MergeNode& operator=(MergeNode&&) = delete;
 
     std::shared_ptr<Edge> input(size_t idx) { return inputs_.at(idx); }
     void set_input(size_t idx, std::shared_ptr<Edge> in) { inputs_.at(idx) = std::move(in); }
