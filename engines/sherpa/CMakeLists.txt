@@ -7,12 +7,8 @@
 #   2. A standalone `rac_backend_sherpa` plugin artifact that exposes a
 #      `"sherpa"` engine in the GAP 02 plugin registry, distinct from
 #      `"onnx"`.
-#   3. An IMPORTED `sherpa_onnx` GLOBAL target so `engines/onnx/` (and any
-#      future consumer) can `target_link_libraries(... sherpa_onnx)` without
-#      re-implementing prebuilt discovery.
-#
-# This CMakeLists.txt MUST be added BEFORE engines/onnx so the imported
-# `sherpa_onnx` target exists when onnx's CMake runs (see engines/CMakeLists.txt).
+#   3. An IMPORTED `sherpa_onnx` GLOBAL target so this engine can link
+#      Sherpa-ONNX without re-implementing prebuilt discovery.
 #
 # The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
 # engines/onnx keeps only generic ONNX Runtime services and embeddings.
@@ -146,8 +142,8 @@ include(FetchONNXRuntime)
 # =============================================================================
 # Sherpa-ONNX prebuilt discovery (moved from engines/onnx/CMakeLists.txt)
 # =============================================================================
-# Declared GLOBAL so engines/onnx and other sibling engines can consume the
-# imported target without re-running discovery logic.
+# Declared GLOBAL so any later sibling engine can consume the imported target
+# without re-running discovery logic.
 
 set(SHERPA_ONNX_AVAILABLE OFF)
 get_filename_component(RUNANYWHERE_COMMONS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
@@ -346,14 +342,6 @@ elseif(EMSCRIPTEN)
     else()
         message(STATUS "Sherpa-ONNX WASM archives not found at ${SHERPA_ONNX_ROOT}")
     endif()
-endif()
-
-# Expose availability to sibling engines (notably engines/onnx).
-set(RAC_SHERPA_ONNX_AVAILABLE ${SHERPA_ONNX_AVAILABLE} CACHE INTERNAL
-    "Sherpa-ONNX prebuilt discovered (set by engines/sherpa)")
-if(SHERPA_ONNX_AVAILABLE)
-    set(RAC_SHERPA_ONNX_HEADER_PATH "${SHERPA_HEADER_PATH}" CACHE INTERNAL
-        "Sherpa-ONNX include directory (set by engines/sherpa)")
 endif()
 
 # =============================================================================
