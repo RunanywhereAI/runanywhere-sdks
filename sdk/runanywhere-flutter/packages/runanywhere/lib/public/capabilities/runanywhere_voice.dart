@@ -16,6 +16,7 @@ import 'dart:typed_data';
 import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/vad_options.pb.dart'
     show VADConfiguration;
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
@@ -25,6 +26,7 @@ import 'package:runanywhere/generated/voice_events.pb.dart'
     as voice_event_proto;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
@@ -56,11 +58,77 @@ class RunAnywhereVoice {
   Future<voice_event_proto.VoiceAgentComponentStates> componentStates() =>
       DartBridge.voiceAgent.componentStatesProto();
 
+  /// Default Silero VAD model id seeded by every example app's catalog.
+  /// Exposed so callers do not hard-code the string when invoking
+  /// [ensureDefaultVAD]. Mirrors Swift `RunAnywhere.defaultVADModelID`.
+  String get defaultVADModelID => 'silero-vad';
+
+  /// Ensure a VAD model is loaded in the canonical lifecycle before a voice
+  /// agent session starts. When no VAD model is currently registered for
+  /// `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION`, attempts to load the
+  /// catalogued default ([defaultVADModelID], Silero) so the voice agent's
+  /// speech-start / speech-end events fire. The energy-based fallback does
+  /// not produce the lifecycle events the voice-agent orchestrator listens
+  /// for, so without a VAD lifecycle load the session stays silent after
+  /// init.
+  ///
+  /// Idempotent: returns `true` immediately when a VAD model is already
+  /// loaded. Logs (but does not throw) when the optional auto-load fails;
+  /// callers may inspect the return value to decide whether to surface a
+  /// warning. Mirrors Swift `ensureDefaultVAD(modelID:)`.
+  Future<bool> ensureDefaultVAD({String? modelID}) async {
+    if (!DartBridge.isInitialized) return false;
+
+    final logger = SDKLogger('RunAnywhere.VoiceAgent');
+
+    final snapshot = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      ),
+    );
+    if (snapshot.found && snapshot.modelId.isNotEmpty) {
+      return true;
+    }
+
+    final targetID = modelID ?? defaultVADModelID;
+    if (targetID.isEmpty) return false;
+
+    logger.info("Auto-loading default VAD '$targetID' for voice-agent session");
+
+    final result = await RunAnywhereModelLifecycle.shared.load(
+      model_pb.ModelLoadRequest(
+        modelId: targetID,
+        category: model_pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      ),
+    );
+    if (!result.success) {
+      logger.warning(
+        "Default VAD '$targetID' auto-load failed: ${result.errorMessage} — voice agent will use energy fallback",
+      );
+      return false;
+    }
+    return true;
+  }
+
   /// Initialize the voice agent against currently-loaded STT/LLM/TTS
   /// models. Must be called before [eventStream] (or before manually
   /// constructing a `VoiceAgentStreamAdapter` for advanced use cases).
-  Future<void> initializeWithLoadedModels() async {
+  ///
+  /// When [ensureVAD] is `true` (default), the SDK guarantees that a VAD
+  /// model is loaded into the canonical lifecycle before initialization
+  /// runs via [ensureDefaultVAD]. Without this the session would silently
+  /// fall back to the energy-based detector and the C++ voice agent's
+  /// speech-start / speech-end lifecycle events would not fire. Set to
+  /// `false` only if the caller has already loaded an explicit VAD model
+  /// (or knows the energy fallback is acceptable for the deployment).
+  ///
+  /// Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
+  Future<void> initializeWithLoadedModels({bool ensureVAD = true}) async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
+
+    if (ensureVAD) {
+      await ensureDefaultVAD();
+    }
 
     if (!isReady) {
       throw SDKException.voiceAgentNotReady(
