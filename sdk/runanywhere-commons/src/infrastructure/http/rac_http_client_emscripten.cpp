@@ -224,8 +224,9 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     out->elapsed_ms = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count());
 
-    // Effective URL after redirects — not natively reported, fall back to the request URL.
-    out->redirected_url = strdup(req->url);
+    // emscripten_fetch_t does not expose the effective post-redirect URL, so
+    // redirected_url stays NULL (already zeroed by the caller) per the C ABI:
+    // it must be non-NULL only when a real 3xx hop occurred.
 
     // Headers.
     size_t hdrs_len = emscripten_fetch_get_response_headers_length(fetch);
