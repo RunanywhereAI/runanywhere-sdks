@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "plugin/plugin_registry_internal.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_runtime_registry.h"
 
@@ -130,6 +131,31 @@ std::vector<const rac_engine_vtable_t*> snapshot_for_primitive(rac_primitive_t p
         v.push_back(buf[i]);
     return v;
 }
+
+/* commons-007: RAII guard that pins every vtable currently registered against
+ * concurrent dynamic unload for the lifetime of the scoring/sorting window.
+ * Pairs with `rac_registry_unload_plugin`, which spin-waits the registry's
+ * router-inflight counter to zero AFTER `rac_plugin_unregister` (so no NEW
+ * router can pick up the about-to-be-unmapped vtable) and BEFORE `dlclose`
+ * (so any router still holding a raw vtable pointer can finish reading the
+ * plugin's `.rodata` before it is unmapped).
+ *
+ * Lifetime spans the entire snapshot/score/sort window, not just the
+ * snapshot call: once `rac_plugin_list` returns, the router holds raw
+ * vtable pointers that it will dereference during scoring and tiebreaking;
+ * the pin MUST survive those dereferences. Acquiring BEFORE snapshot also
+ * closes the race window where an unload could observe inflight=0 between
+ * snapshot-return and our first deref. Stack-only — non-copyable, non-
+ * movable, no heap allocation. */
+class RouterInflightGuard {
+   public:
+    RouterInflightGuard() { rac_plugin_registry_router_enter(); }
+    ~RouterInflightGuard() { rac_plugin_registry_router_exit(); }
+    RouterInflightGuard(const RouterInflightGuard&) = delete;
+    RouterInflightGuard& operator=(const RouterInflightGuard&) = delete;
+    RouterInflightGuard(RouterInflightGuard&&) = delete;
+    RouterInflightGuard& operator=(RouterInflightGuard&&) = delete;
+};
 
 bool declares_runtime(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
     if (runtime == RAC_RUNTIME_UNSPECIFIED || vt.metadata.runtimes == nullptr)
@@ -241,6 +267,10 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
 }
 
 RouteResult EngineRouter::route(const RouteRequest& req) const {
+    /* commons-007: pin every snapshotted vtable for the lifetime of this
+     * call. See RouterInflightGuard comment for the unload-side handshake. */
+    RouterInflightGuard inflight_guard;
+
     auto candidates = snapshot_for_primitive(req.primitive);
     if (candidates.empty()) {
         return RouteResult{
@@ -260,6 +290,16 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
      * the C ABI maps to `RAC_ERROR_RUNTIME_UNAVAILABLE`. */
     bool any_runtime_reject = false;
     bool any_other_reject = false;
+    /* commons-160: when the pinned engine itself was rejected purely because
+     * its declared runtimes are all unregistered, the user-visible failure is
+     * "runtime unavailable" even if other (non-pin) plugins serve the same
+     * primitive and were rejected for the pin mismatch. Without this, the
+     * router falls through to the generic "pinned engine '<x>' not registered;
+     * no_fallback=true" reason — wrong, because the engine IS registered; the
+     * failure is missing runtime. Callers (e.g. model_lifecycle) then
+     * misclassify and tell the user to install a framework instead of
+     * switching device. */
+    bool pinned_engine_runtime_rejected = false;
     for (auto* vt : candidates) {
         if (vt == nullptr)
             continue;
@@ -268,6 +308,10 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
             scored.push_back({s, vt});
         } else if (s == kRuntimeRejectScore) {
             any_runtime_reject = true;
+            if (!req.pinned_engine.empty() && vt->metadata.name != nullptr &&
+                req.pinned_engine == vt->metadata.name) {
+                pinned_engine_runtime_rejected = true;
+            }
         } else {
             any_other_reject = true;
         }
@@ -280,7 +324,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
          * model_lifecycle's framework-pinned loads would receive a generic
          * "pinned engine not registered" reason even though the engine is
          * registered and the real failure is missing runtime. */
-        if (any_runtime_reject && !any_other_reject) {
+        if ((any_runtime_reject && !any_other_reject) || pinned_engine_runtime_rejected) {
             return RouteResult{.vtable = nullptr,
                                .score = -1,
                                .rejection_reason =
@@ -301,13 +345,24 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
 
     /* Stable sort: score desc, priority desc (tiebreak), name asc (final tiebreak).
      * Determinism is required by the spec — same RouteRequest in same process
-     * MUST yield same winner across 1000 calls. */
+     * MUST yield same winner across 1000 calls.
+     *
+     * commons-090: defensive null-guard on `metadata.name` for the final
+     * tiebreak. The registry rejects null-name vtables at register time, so a
+     * reachable vtable can only have null name if its underlying storage was
+     * repurposed concurrently. With the RouterInflightGuard above that
+     * shouldn't happen, but a belt-and-braces guard costs nothing on the hot
+     * path and turns a hypothetical SEGV into a deterministic ordering. */
     std::ranges::sort(scored, [](const Scored& a, const Scored& b) {
         if (a.score != b.score)
             return a.score > b.score;
         if (a.vt->metadata.priority != b.vt->metadata.priority) {
             return a.vt->metadata.priority > b.vt->metadata.priority;
         }
+        if (a.vt->metadata.name == nullptr)
+            return false;
+        if (b.vt->metadata.name == nullptr)
+            return true;
         return std::strcmp(a.vt->metadata.name, b.vt->metadata.name) < 0;
     });
 
@@ -316,6 +371,10 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
 }
 
 std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const {
+    /* commons-007: same pin window as route() — every vtable observed via
+     * `snapshot_for_primitive` must outlive its dereferences in score(). */
+    RouterInflightGuard inflight_guard;
+
     auto candidates = snapshot_for_primitive(req.primitive);
     std::vector<RouteResult> out;
     out.reserve(candidates.size());

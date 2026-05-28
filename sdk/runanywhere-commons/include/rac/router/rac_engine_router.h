@@ -66,6 +66,13 @@ struct RouteResult {
  * Construct once per call site (or once per process) and re-use. Thread-safe;
  * each `route()` call snapshots the registry under its lock, then scores
  * outside the lock so concurrent registrations don't block routing.
+ *
+ * commons-007: scoring runs without holding the registry mutex, but the
+ * snapshotted vtable pointers are pinned against concurrent dynamic unload
+ * for the lifetime of the call. `rac_registry_unload_plugin` spin-waits the
+ * registry's in-flight router counter to zero AFTER `rac_plugin_unregister`
+ * (so no NEW router can pick up the about-to-be-unmapped vtable) and
+ * BEFORE `dlclose`, draining any router that already observed the vtable.
  */
 class EngineRouter {
    public:

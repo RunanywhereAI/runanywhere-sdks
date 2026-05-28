@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <thread>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -212,6 +213,17 @@ rac_result_t rac_registry_unload_plugin(const char* name) {
 
 #if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
     if (handle != nullptr) {
+        /* commons-007: drain any in-flight router that observed the about-to-
+         * be-unmapped vtable through rac_plugin_list BEFORE the unregister
+         * above hid it. By the time we reach this line no NEW router can pick
+         * the vtable up (rac_plugin_unregister removed it from every primitive
+         * bucket under the registry lock), so the counter monotonically falls
+         * to zero — yielding the thread on each iteration so we don't pin a
+         * CPU on contended hosts. The wait is bounded by the duration of a
+         * single EngineRouter::route call, which is O(plugins) and lock-free. */
+        while (rac_plugin_registry_router_inflight() > 0) {
+            std::this_thread::yield();
+        }
         rac_dl_close(static_cast<rac_lib_handle_t>(handle));
     }
 #endif

@@ -576,7 +576,17 @@ int main() {
      *            from the runtime-unavailable contract. Covers both the
      *            EngineRouter::route path and the rac_plugin_route C ABI with
      *            no_fallback=true so model_lifecycle's framework-pinned loads
-     *            cannot select a non-executable engine. */
+     *            cannot select a non-executable engine.
+     *
+     *            commons-160 extension: also register a second LLM-serving
+     *            engine that does NOT match the pin name. Pre-fix the router
+     *            would emit RAC_ERROR_NOT_FOUND because the non-pin engine's
+     *            pin-mismatch rejection set `any_other_reject=true` and the
+     *            runtime-unavailable branch only fired when EVERY rejection
+     *            was a runtime-reject. Post-fix the pinned engine's own
+     *            runtime-rejection takes precedence over the pin-mismatch
+     *            noise, so the C ABI must still surface
+     *            RAC_ERROR_RUNTIME_UNAVAILABLE. */
     {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
@@ -606,6 +616,20 @@ int main() {
               "engine when its declared runtime is unregistered");
         CHECK(out == nullptr,
               "(CPP-05.7) C ABI leaves out_vtable NULL on pinned runtime rejection");
+
+        /* commons-160: introduce a second LLM-serving engine that doesn't
+         * match the pin name. Without the fix, the pin-mismatch rejection
+         * would set `any_other_reject = true` and demote the failure to
+         * NOT_FOUND. */
+        auto v_other = make_vt("other_llm_engine", 10, nullptr, 0, nullptr, 0);
+        rac_plugin_register(&v_other);
+        const rac_engine_vtable_t* out2 = nullptr;
+        rac_result_t rc2 = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out2);
+        CHECK(rc2 == RAC_ERROR_RUNTIME_UNAVAILABLE,
+              "(CPP-05.7/commons-160) pinned engine's runtime-rejection wins over "
+              "non-pin candidates' pin-mismatch rejection");
+        CHECK(out2 == nullptr, "(CPP-05.7/commons-160) C ABI still leaves out_vtable NULL");
+        rac_plugin_unregister("other_llm_engine");
 
         rac_plugin_unregister("cuda_pinned_engine");
     }
