@@ -184,11 +184,11 @@ constexpr HardwareProfile::ParseTableT_ HardwareProfile::InternalGenerateParseTa
     {
       PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_._has_bits_),
       0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
+      10, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294966272,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      10,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -235,7 +235,10 @@ constexpr HardwareProfile::ParseTableT_ HardwareProfile::InternalGenerateParseTa
       {::_pbi::TcParser::FastUS1,
        {74, 3, 0,
         PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.platform_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.NPUChip npu_chip = 10;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HardwareProfile, _impl_.npu_chip_), 9>(),
+       {80, 9, 0,
+        PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.npu_chip_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -262,6 +265,8 @@ constexpr HardwareProfile::ParseTableT_ HardwareProfile::InternalGenerateParseTa
       {PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.architecture_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string platform = 9;
       {PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.platform_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.NPUChip npu_chip = 10;
+      {PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.npu_chip_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     }},
     // no aux_entries
     {{
@@ -296,7 +301,8 @@ inline constexpr HardwareProfile::Impl_::Impl_(
         core_count_{0u},
         total_memory_bytes_{::uint64_t{0u}},
         performance_cores_{0u},
-        efficiency_cores_{0u} {}
+        efficiency_cores_{0u},
+        npu_chip_{static_cast< ::runanywhere::v1::NPUChip >(0)} {}
 
 template <typename>
 constexpr HardwareProfile::HardwareProfile(::_pbi::ConstantInitialized,
@@ -1143,7 +1149,7 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_._has_bits_),
-        12, // hasbit index offset
+        13, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.chip_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.has_neural_engine_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.acceleration_mode_),
@@ -1153,6 +1159,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.efficiency_cores_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.architecture_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.platform_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfile, _impl_.npu_chip_),
         0,
         4,
         1,
@@ -1162,6 +1169,7 @@ const ::uint32_t
         8,
         2,
         3,
+        9,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AcceleratorInfo, _impl_._has_bits_),
         6, // hasbit index offset
@@ -1197,12 +1205,12 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::HardwareProfile)},
-        {21, sizeof(::runanywhere::v1::AcceleratorInfo)},
-        {30, sizeof(::runanywhere::v1::HardwareProfileResult)},
-        {37, sizeof(::runanywhere::v1::HardwareProfileRequest)},
-        {38, sizeof(::runanywhere::v1::HardwareAcceleratorsRequest)},
-        {39, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceRequest)},
-        {44, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceResult)},
+        {23, sizeof(::runanywhere::v1::AcceleratorInfo)},
+        {32, sizeof(::runanywhere::v1::HardwareProfileResult)},
+        {39, sizeof(::runanywhere::v1::HardwareProfileRequest)},
+        {40, sizeof(::runanywhere::v1::HardwareAcceleratorsRequest)},
+        {41, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceRequest)},
+        {46, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -1217,55 +1225,61 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_hardware_5fprofile_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\026hardware_profile.proto\022\016runanywhere.v1"
-    "\"\342\001\n\017HardwareProfile\022\014\n\004chip\030\001 \001(\t\022\031\n\021ha"
-    "s_neural_engine\030\002 \001(\010\022\031\n\021acceleration_mo"
-    "de\030\003 \001(\t\022\032\n\022total_memory_bytes\030\004 \001(\004\022\022\n\n"
-    "core_count\030\005 \001(\r\022\031\n\021performance_cores\030\006 "
-    "\001(\r\022\030\n\020efficiency_cores\030\007 \001(\r\022\024\n\014archite"
-    "cture\030\010 \001(\t\022\020\n\010platform\030\t \001(\t\"h\n\017Acceler"
-    "atorInfo\022\014\n\004name\030\001 \001(\t\0224\n\004type\030\002 \001(\0162&.r"
-    "unanywhere.v1.AccelerationPreference\022\021\n\t"
-    "available\030\003 \001(\010\"\200\001\n\025HardwareProfileResul"
-    "t\0220\n\007profile\030\001 \001(\0132\037.runanywhere.v1.Hard"
-    "wareProfile\0225\n\014accelerators\030\002 \003(\0132\037.runa"
-    "nywhere.v1.AcceleratorInfo\"\030\n\026HardwarePr"
-    "ofileRequest\"\035\n\033HardwareAcceleratorsRequ"
-    "est\"b\n$HardwareAcceleratorPreferenceRequ"
-    "est\022:\n\npreference\030\001 \001(\0162&.runanywhere.v1"
-    ".AccelerationPreference\"M\n#HardwareAccel"
-    "eratorPreferenceResult\022\017\n\007success\030\001 \001(\010\022"
-    "\025\n\rerror_message\030\002 \001(\t*\261\002\n\026AccelerationP"
-    "reference\022\'\n#ACCELERATION_PREFERENCE_UNS"
-    "PECIFIED\020\000\022 \n\034ACCELERATION_PREFERENCE_AU"
-    "TO\020\001\022\037\n\033ACCELERATION_PREFERENCE_CPU\020\002\022\037\n"
-    "\033ACCELERATION_PREFERENCE_GPU\020\003\022\037\n\033ACCELE"
-    "RATION_PREFERENCE_NPU\020\004\022\"\n\036ACCELERATION_"
-    "PREFERENCE_WEBGPU\020\005\022!\n\035ACCELERATION_PREF"
-    "ERENCE_METAL\020\006\022\"\n\036ACCELERATION_PREFERENC"
-    "E_VULKAN\020\0072\326\002\n\010Hardware\022[\n\nGetProfile\022&."
-    "runanywhere.v1.HardwareProfileRequest\032%."
-    "runanywhere.v1.HardwareProfileResult\022e\n\017"
-    "GetAccelerators\022+.runanywhere.v1.Hardwar"
-    "eAcceleratorsRequest\032%.runanywhere.v1.Ha"
-    "rdwareProfileResult\022\205\001\n\030SetAcceleratorPr"
-    "eference\0224.runanywhere.v1.HardwareAccele"
-    "ratorPreferenceRequest\0323.runanywhere.v1."
-    "HardwareAcceleratorPreferenceResultB\217\001\n\027"
-    "ai.runanywhere.proto.v1B\024HardwareProfile"
-    "ProtoP\001Z<github.com/runanywhere/runanywh"
-    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
-    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\032\023storage_types.proto\"\215\002\n\017HardwareProfil"
+    "e\022\014\n\004chip\030\001 \001(\t\022\031\n\021has_neural_engine\030\002 \001"
+    "(\010\022\031\n\021acceleration_mode\030\003 \001(\t\022\032\n\022total_m"
+    "emory_bytes\030\004 \001(\004\022\022\n\ncore_count\030\005 \001(\r\022\031\n"
+    "\021performance_cores\030\006 \001(\r\022\030\n\020efficiency_c"
+    "ores\030\007 \001(\r\022\024\n\014architecture\030\010 \001(\t\022\020\n\010plat"
+    "form\030\t \001(\t\022)\n\010npu_chip\030\n \001(\0162\027.runanywhe"
+    "re.v1.NPUChip\"h\n\017AcceleratorInfo\022\014\n\004name"
+    "\030\001 \001(\t\0224\n\004type\030\002 \001(\0162&.runanywhere.v1.Ac"
+    "celerationPreference\022\021\n\tavailable\030\003 \001(\010\""
+    "\200\001\n\025HardwareProfileResult\0220\n\007profile\030\001 \001"
+    "(\0132\037.runanywhere.v1.HardwareProfile\0225\n\014a"
+    "ccelerators\030\002 \003(\0132\037.runanywhere.v1.Accel"
+    "eratorInfo\"\030\n\026HardwareProfileRequest\"\035\n\033"
+    "HardwareAcceleratorsRequest\"b\n$HardwareA"
+    "cceleratorPreferenceRequest\022:\n\npreferenc"
+    "e\030\001 \001(\0162&.runanywhere.v1.AccelerationPre"
+    "ference\"M\n#HardwareAcceleratorPreference"
+    "Result\022\017\n\007success\030\001 \001(\010\022\025\n\rerror_message"
+    "\030\002 \001(\t*\261\002\n\026AccelerationPreference\022\'\n#ACC"
+    "ELERATION_PREFERENCE_UNSPECIFIED\020\000\022 \n\034AC"
+    "CELERATION_PREFERENCE_AUTO\020\001\022\037\n\033ACCELERA"
+    "TION_PREFERENCE_CPU\020\002\022\037\n\033ACCELERATION_PR"
+    "EFERENCE_GPU\020\003\022\037\n\033ACCELERATION_PREFERENC"
+    "E_NPU\020\004\022\"\n\036ACCELERATION_PREFERENCE_WEBGP"
+    "U\020\005\022!\n\035ACCELERATION_PREFERENCE_METAL\020\006\022\""
+    "\n\036ACCELERATION_PREFERENCE_VULKAN\020\0072\326\002\n\010H"
+    "ardware\022[\n\nGetProfile\022&.runanywhere.v1.H"
+    "ardwareProfileRequest\032%.runanywhere.v1.H"
+    "ardwareProfileResult\022e\n\017GetAccelerators\022"
+    "+.runanywhere.v1.HardwareAcceleratorsReq"
+    "uest\032%.runanywhere.v1.HardwareProfileRes"
+    "ult\022\205\001\n\030SetAcceleratorPreference\0224.runan"
+    "ywhere.v1.HardwareAcceleratorPreferenceR"
+    "equest\0323.runanywhere.v1.HardwareAccelera"
+    "torPreferenceResultB\217\001\n\027ai.runanywhere.p"
+    "roto.v1B\024HardwareProfileProtoP\001Z<github."
+    "com/runanywhere/runanywhere-sdks/idl/v1;"
+    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
+    "\272\002\002RAb\006proto3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_hardware_5fprofile_2eproto_deps[1] = {
+        &::descriptor_table_storage_5ftypes_2eproto,
 };
 static ::absl::once_flag descriptor_table_hardware_5fprofile_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hardware_5fprofile_2eproto = {
     false,
     false,
-    1549,
+    1613,
     descriptor_table_protodef_hardware_5fprofile_2eproto,
     "hardware_profile.proto",
     &descriptor_table_hardware_5fprofile_2eproto_once,
-    nullptr,
-    0,
+    descriptor_table_hardware_5fprofile_2eproto_deps,
+    1,
     7,
     schemas,
     file_message_globals,
@@ -1322,9 +1336,9 @@ HardwareProfile::HardwareProfile(
                offsetof(Impl_, has_neural_engine_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, has_neural_engine_),
-           offsetof(Impl_, efficiency_cores_) -
+           offsetof(Impl_, npu_chip_) -
                offsetof(Impl_, has_neural_engine_) +
-               sizeof(Impl_::efficiency_cores_));
+               sizeof(Impl_::npu_chip_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HardwareProfile)
 }
@@ -1342,9 +1356,9 @@ inline void HardwareProfile::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, has_neural_engine_),
            0,
-           offsetof(Impl_, efficiency_cores_) -
+           offsetof(Impl_, npu_chip_) -
                offsetof(Impl_, has_neural_engine_) +
-               sizeof(Impl_::efficiency_cores_));
+               sizeof(Impl_::npu_chip_));
 }
 HardwareProfile::~HardwareProfile() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.HardwareProfile)
@@ -1417,7 +1431,11 @@ PROTOBUF_NOINLINE void HardwareProfile::Clear() {
         reinterpret_cast<char*>(&_impl_.performance_cores_) -
         reinterpret_cast<char*>(&_impl_.has_neural_engine_)) + sizeof(_impl_.performance_cores_));
   }
-  _impl_.efficiency_cores_ = 0u;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    ::memset(&_impl_.efficiency_cores_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.npu_chip_) -
+        reinterpret_cast<char*>(&_impl_.efficiency_cores_)) + sizeof(_impl_.npu_chip_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -1526,6 +1544,15 @@ PROTOBUF_NOINLINE void HardwareProfile::Clear() {
     }
   }
 
+  // .runanywhere.v1.NPUChip npu_chip = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (this_._internal_npu_chip() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          10, this_._internal_npu_chip(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1608,12 +1635,19 @@ PROTOBUF_NOINLINE void HardwareProfile::Clear() {
       }
     }
   }
-   {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
     // uint32 efficiency_cores = 7;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_efficiency_cores() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_efficiency_cores());
+      }
+    }
+    // .runanywhere.v1.NPUChip npu_chip = 10;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (this_._internal_npu_chip() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_npu_chip());
       }
     }
   }
@@ -1692,9 +1726,16 @@ void HardwareProfile::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
   }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_efficiency_cores() != 0) {
-      _this->_impl_.efficiency_cores_ = from._impl_.efficiency_cores_;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (from._internal_efficiency_cores() != 0) {
+        _this->_impl_.efficiency_cores_ = from._impl_.efficiency_cores_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (from._internal_npu_chip() != 0) {
+        _this->_impl_.npu_chip_ = from._impl_.npu_chip_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1721,8 +1762,8 @@ void HardwareProfile::InternalSwap(HardwareProfile* PROTOBUF_RESTRICT PROTOBUF_N
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.architecture_, &other->_impl_.architecture_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.platform_, &other->_impl_.platform_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.efficiency_cores_)
-      + sizeof(HardwareProfile::_impl_.efficiency_cores_)
+      PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.npu_chip_)
+      + sizeof(HardwareProfile::_impl_.npu_chip_)
       - PROTOBUF_FIELD_OFFSET(HardwareProfile, _impl_.has_neural_engine_)>(
           reinterpret_cast<char*>(&_impl_.has_neural_engine_),
           reinterpret_cast<char*>(&other->_impl_.has_neural_engine_));

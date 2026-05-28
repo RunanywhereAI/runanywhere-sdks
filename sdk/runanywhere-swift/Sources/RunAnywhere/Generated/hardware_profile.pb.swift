@@ -116,6 +116,9 @@ public nonisolated struct RAHardwareProfile: Sendable {
   /// "ios", "android", "web", "macos", "linux", "windows"
   public var platform: String = String()
 
+  /// resolved NPU vendor family (commons-classified)
+  public var npuChip: RANPUChip = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -222,7 +225,7 @@ nonisolated extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProvidin
 
 nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfile"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0\u{3}npu_chip\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -239,6 +242,7 @@ nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._M
       case 7: try { try decoder.decodeSingularUInt32Field(value: &self.efficiencyCores) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self.architecture) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.platform) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self.npuChip) }()
       default: break
       }
     }
@@ -272,6 +276,9 @@ nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.platform.isEmpty {
       try visitor.visitSingularStringField(value: self.platform, fieldNumber: 9)
     }
+    if self.npuChip != .unspecified {
+      try visitor.visitSingularEnumField(value: self.npuChip, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -285,6 +292,7 @@ nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.efficiencyCores != rhs.efficiencyCores {return false}
     if lhs.architecture != rhs.architecture {return false}
     if lhs.platform != rhs.platform {return false}
+    if lhs.npuChip != rhs.npuChip {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

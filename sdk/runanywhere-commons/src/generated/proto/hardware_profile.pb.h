@@ -32,6 +32,7 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "storage_types.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -476,6 +477,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::go
     kTotalMemoryBytesFieldNumber = 4,
     kPerformanceCoresFieldNumber = 6,
     kEfficiencyCoresFieldNumber = 7,
+    kNpuChipFieldNumber = 10,
   };
   // string chip = 1;
   void clear_chip() ;
@@ -587,11 +589,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::go
   void _internal_set_efficiency_cores(::uint32_t value);
 
   public:
+  // .runanywhere.v1.NPUChip npu_chip = 10;
+  void clear_npu_chip() ;
+  [[nodiscard]] ::runanywhere::v1::NPUChip npu_chip() const;
+  void set_npu_chip(::runanywhere::v1::NPUChip value);
+
+  private:
+  ::runanywhere::v1::NPUChip _internal_npu_chip() const;
+  void _internal_set_npu_chip(::runanywhere::v1::NPUChip value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareProfile)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
+      ::google::protobuf::internal::TcParseTable<4, 10,
                           0, 88,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -629,6 +641,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::go
     ::uint64_t total_memory_bytes_;
     ::uint32_t performance_cores_;
     ::uint32_t efficiency_cores_;
+    int npu_chip_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2042,6 +2055,30 @@ inline void HardwareProfile::set_allocated_platform(::std::string* PROTOBUF_NULL
     _impl_.platform_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareProfile.platform)
+}
+
+// .runanywhere.v1.NPUChip npu_chip = 10;
+inline void HardwareProfile::clear_npu_chip() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.npu_chip_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline ::runanywhere::v1::NPUChip HardwareProfile::npu_chip() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareProfile.npu_chip)
+  return _internal_npu_chip();
+}
+inline void HardwareProfile::set_npu_chip(::runanywhere::v1::NPUChip value) {
+  _internal_set_npu_chip(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareProfile.npu_chip)
+}
+inline ::runanywhere::v1::NPUChip HardwareProfile::_internal_npu_chip() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::NPUChip>(_impl_.npu_chip_);
+}
+inline void HardwareProfile::_internal_set_npu_chip(::runanywhere::v1::NPUChip value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.npu_chip_ = value;
 }
 
 // -------------------------------------------------------------------

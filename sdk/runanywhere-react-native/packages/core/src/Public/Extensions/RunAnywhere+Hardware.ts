@@ -54,98 +54,15 @@ export async function getChip(): Promise<string> {
 }
 
 /**
- * Map a free-form chip / SoC name to the structured `NPUChip` vendor enum.
- *
- * Used by `getNPUChip()` to resolve the NPU family for backend URL selection
- * and runtime backend wiring. Vendor groupings mirror `idl/storage_types.proto`.
- */
-export function mapChipStringToNPUChip(chip: string): NPUChip {
-  const lower = chip.trim().toLowerCase();
-  if (lower.length === 0) return NPUChip.NPU_CHIP_UNSPECIFIED;
-
-  if (
-    lower.includes('apple') ||
-    /\ba(?:[1-9]|1[0-9])\b/.test(lower) ||
-    /\bm[1-9]\b/.test(lower)
-  ) {
-    return NPUChip.NPU_CHIP_APPLE_NEURAL_ENGINE;
-  }
-
-  if (
-    lower.includes('snapdragon') ||
-    lower.includes('qualcomm') ||
-    lower.includes('hexagon') ||
-    lower.startsWith('sdm') ||
-    lower.startsWith('sm8') ||
-    lower.startsWith('sm7') ||
-    lower.startsWith('sm6') ||
-    lower.startsWith('msm')
-  ) {
-    return NPUChip.NPU_CHIP_QUALCOMM_HEXAGON;
-  }
-
-  if (
-    lower.includes('mediatek') ||
-    lower.includes('dimensity') ||
-    lower.includes('helio') ||
-    lower.startsWith('mt6') ||
-    lower.startsWith('mt8')
-  ) {
-    return NPUChip.NPU_CHIP_MEDIATEK_APU;
-  }
-
-  if (
-    lower.includes('tensor') ||
-    lower.includes('pixel') ||
-    lower.startsWith('gs1') ||
-    lower.startsWith('gs2') ||
-    lower.startsWith('gs3')
-  ) {
-    return NPUChip.NPU_CHIP_GOOGLE_TPU;
-  }
-
-  if (
-    lower.includes('intel') ||
-    lower.includes('core ultra') ||
-    lower.includes('meteor lake') ||
-    lower.includes('lunar lake') ||
-    lower.includes('arrow lake')
-  ) {
-    return NPUChip.NPU_CHIP_INTEL_NPU;
-  }
-
-  if (
-    lower.includes('exynos') ||
-    lower.startsWith('s5e') ||
-    lower.includes('samsung') ||
-    lower.includes('kirin') ||
-    lower.includes('hisilicon')
-  ) {
-    return NPUChip.NPU_CHIP_OTHER;
-  }
-
-  return NPUChip.NPU_CHIP_UNSPECIFIED;
-}
-
-/**
  * Resolve the NPU chipset enum for the current device.
  *
- * Mirrors Swift's `NPUChipDetector` behaviour: consume the chip string from
- * `rac_hardware_profile_get`, then map to the vendor family. Falls back to
- * `NPUChip.NPU_CHIP_OTHER` when the platform reports a neural engine but the
- * chip string is unrecognised.
+ * The chip-string → vendor classification lives in commons
+ * (`rac_hardware_abi.cpp`), which encodes the resolved `NPUChip` into the
+ * serialized `HardwareProfile`. This reads that field so every SDK shares one
+ * mapping instead of re-implementing it client-side.
  */
 export async function getNPUChip(): Promise<NPUChip> {
-  const result = await getProfile();
-  const chip = result.profile?.chip ?? '';
-  const mapped = mapChipStringToNPUChip(chip);
-
-  if (mapped !== NPUChip.NPU_CHIP_UNSPECIFIED) return mapped;
-  if (result.profile?.hasNeuralEngine === true) return NPUChip.NPU_CHIP_OTHER;
-  if (result.profile && result.profile.hasNeuralEngine === false) {
-    return NPUChip.NPU_CHIP_NONE;
-  }
-  return NPUChip.NPU_CHIP_UNSPECIFIED;
+  return (await getProfile()).profile?.npuChip ?? NPUChip.NPU_CHIP_UNSPECIFIED;
 }
 
 /** Whether the current device has a dedicated neural engine / NPU. */

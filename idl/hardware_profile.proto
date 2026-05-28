@@ -1,6 +1,8 @@
 syntax = "proto3";
 package runanywhere.v1;
 
+import "storage_types.proto"; // NPUChip enum
+
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
@@ -20,6 +22,7 @@ message HardwareProfile {
   uint32 efficiency_cores = 7;
   string architecture = 8; // "arm64", "x86_64"
   string platform = 9; // "ios", "android", "web", "macos", "linux", "windows"
+  NPUChip npu_chip = 10; // resolved NPU vendor family (commons-classified)
 }
 
 // ---------------------------------------------------------------------------

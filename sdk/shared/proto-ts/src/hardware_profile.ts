@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { NPUChip, nPUChipFromJSON, nPUChipToJSON } from "./storage_types";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -105,6 +106,8 @@ export interface HardwareProfile {
   architecture: string;
   /** "ios", "android", "web", "macos", "linux", "windows" */
   platform: string;
+  /** resolved NPU vendor family (commons-classified) */
+  npuChip: NPUChip;
 }
 
 export interface AcceleratorInfo {
@@ -156,6 +159,7 @@ function createBaseHardwareProfile(): HardwareProfile {
     efficiencyCores: 0,
     architecture: "",
     platform: "",
+    npuChip: 0,
   };
 }
 
@@ -187,6 +191,9 @@ export const HardwareProfile: MessageFns<HardwareProfile> = {
     }
     if (message.platform !== "") {
       writer.uint32(74).string(message.platform);
+    }
+    if (message.npuChip !== 0) {
+      writer.uint32(80).int32(message.npuChip);
     }
     return writer;
   },
@@ -270,6 +277,14 @@ export const HardwareProfile: MessageFns<HardwareProfile> = {
           message.platform = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.npuChip = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -314,6 +329,11 @@ export const HardwareProfile: MessageFns<HardwareProfile> = {
         : 0,
       architecture: isSet(object.architecture) ? globalThis.String(object.architecture) : "",
       platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+      npuChip: isSet(object.npuChip)
+        ? nPUChipFromJSON(object.npuChip)
+        : isSet(object.npu_chip)
+        ? nPUChipFromJSON(object.npu_chip)
+        : 0,
     };
   },
 
@@ -346,6 +366,9 @@ export const HardwareProfile: MessageFns<HardwareProfile> = {
     if (message.platform !== "") {
       obj.platform = message.platform;
     }
+    if (message.npuChip !== 0) {
+      obj.npuChip = nPUChipToJSON(message.npuChip);
+    }
     return obj;
   },
 
@@ -363,6 +386,7 @@ export const HardwareProfile: MessageFns<HardwareProfile> = {
     message.efficiencyCores = object.efficiencyCores ?? 0;
     message.architecture = object.architecture ?? "";
     message.platform = object.platform ?? "";
+    message.npuChip = object.npuChip ?? 0;
     return message;
   },
 };

@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { NPUChip } from "./storage_types";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -40,6 +41,8 @@ export interface HardwareProfile {
     architecture: string;
     /** "ios", "android", "web", "macos", "linux", "windows" */
     platform: string;
+    /** resolved NPU vendor family (commons-classified) */
+    npuChip: NPUChip;
 }
 export interface AcceleratorInfo {
     name: string;

@@ -10,6 +10,7 @@ exports.accelerationPreferenceFromJSON = accelerationPreferenceFromJSON;
 exports.accelerationPreferenceToJSON = accelerationPreferenceToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const storage_types_1 = require("./storage_types");
 exports.protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -103,6 +104,7 @@ function createBaseHardwareProfile() {
         efficiencyCores: 0,
         architecture: "",
         platform: "",
+        npuChip: 0,
     };
 }
 exports.HardwareProfile = {
@@ -133,6 +135,9 @@ exports.HardwareProfile = {
         }
         if (message.platform !== "") {
             writer.uint32(74).string(message.platform);
+        }
+        if (message.npuChip !== 0) {
+            writer.uint32(80).int32(message.npuChip);
         }
         return writer;
     },
@@ -206,6 +211,13 @@ exports.HardwareProfile = {
                     message.platform = reader.string();
                     continue;
                 }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.npuChip = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -249,6 +261,11 @@ exports.HardwareProfile = {
                     : 0,
             architecture: isSet(object.architecture) ? globalThis.String(object.architecture) : "",
             platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+            npuChip: isSet(object.npuChip)
+                ? (0, storage_types_1.nPUChipFromJSON)(object.npuChip)
+                : isSet(object.npu_chip)
+                    ? (0, storage_types_1.nPUChipFromJSON)(object.npu_chip)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -280,6 +297,9 @@ exports.HardwareProfile = {
         if (message.platform !== "") {
             obj.platform = message.platform;
         }
+        if (message.npuChip !== 0) {
+            obj.npuChip = (0, storage_types_1.nPUChipToJSON)(message.npuChip);
+        }
         return obj;
     },
     create(base) {
@@ -296,6 +316,7 @@ exports.HardwareProfile = {
         message.efficiencyCores = object.efficiencyCores ?? 0;
         message.architecture = object.architecture ?? "";
         message.platform = object.platform ?? "";
+        message.npuChip = object.npuChip ?? 0;
         return message;
     },
 };

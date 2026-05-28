@@ -17,6 +17,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'hardware_profile.pbenum.dart';
+import 'storage_types.pbenum.dart' as $0;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -33,6 +34,7 @@ class HardwareProfile extends $pb.GeneratedMessage {
     $core.int? efficiencyCores,
     $core.String? architecture,
     $core.String? platform,
+    $0.NPUChip? npuChip,
   }) {
     final result = create();
     if (chip != null) result.chip = chip;
@@ -44,6 +46,7 @@ class HardwareProfile extends $pb.GeneratedMessage {
     if (efficiencyCores != null) result.efficiencyCores = efficiencyCores;
     if (architecture != null) result.architecture = architecture;
     if (platform != null) result.platform = platform;
+    if (npuChip != null) result.npuChip = npuChip;
     return result;
   }
 
@@ -73,6 +76,8 @@ class HardwareProfile extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OU3)
     ..aOS(8, _omitFieldNames ? '' : 'architecture')
     ..aOS(9, _omitFieldNames ? '' : 'platform')
+    ..aE<$0.NPUChip>(10, _omitFieldNames ? '' : 'npuChip',
+        enumValues: $0.NPUChip.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -174,6 +179,15 @@ class HardwareProfile extends $pb.GeneratedMessage {
   $core.bool hasPlatform() => $_has(8);
   @$pb.TagNumber(9)
   void clearPlatform() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $0.NPUChip get npuChip => $_getN(9);
+  @$pb.TagNumber(10)
+  set npuChip($0.NPUChip value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasNpuChip() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearNpuChip() => $_clearField(10);
 }
 
 class AcceleratorInfo extends $pb.GeneratedMessage {
