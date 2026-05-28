@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <exception>
 #include <mutex>
 #include <ranges>
 #include <string>
@@ -88,6 +89,49 @@ State& state() {
     return s;
 }
 
+/* ===========================================================================
+ * Plugin-callback exception barriers.
+ *
+ * `init`, `destroy`, and the dlsym'd `entry` symbol are all third-party
+ * callbacks supplied by a runtime plugin. RAC_RUNTIME_ENTRY_DEF documents
+ * them as noexcept-equivalent, but the registry cannot audit a dlopen'd .so
+ * (potentially compiled against a different libc++ whose exception class
+ * hierarchy doesn't round-trip) — a misbehaving plugin would otherwise abort
+ * the entire host. Coerce any throw to a structured error / no-op log, the
+ * same shape used by `rac_plugin_registry.cpp`'s capability_check guard.
+ * =========================================================================== */
+
+/** Call a plugin callback that returns `rac_result_t`. On exception logs the
+ *  failure and returns `on_throw` so the registry can map it to the caller-
+ *  appropriate code (PLUGIN_LOAD_FAILED for register-time init, etc.). */
+template <typename Fn>
+rac_result_t safe_plugin_call(const char* name, const char* op, Fn&& fn,
+                              rac_result_t on_throw) noexcept {
+    try {
+        return fn();
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR(LOG_CAT, "'%s' %s threw: %s", name == nullptr ? "?" : name, op, e.what());
+        return on_throw;
+    } catch (...) {
+        RAC_LOG_ERROR(LOG_CAT, "'%s' %s threw non-std exception", name == nullptr ? "?" : name, op);
+        return on_throw;
+    }
+}
+
+/** Call a plugin destroy()-shaped callback (no return value). Swallows any
+ *  throw because the unwind path has no plausible recovery — the entry has
+ *  already been removed from the registry. */
+template <typename Fn>
+void safe_plugin_call_void(const char* name, const char* op, Fn&& fn) noexcept {
+    try {
+        fn();
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR(LOG_CAT, "'%s' %s threw: %s", name == nullptr ? "?" : name, op, e.what());
+    } catch (...) {
+        RAC_LOG_ERROR(LOG_CAT, "'%s' %s threw non-std exception", name == nullptr ? "?" : name, op);
+    }
+}
+
 /** Gates the one-time bootstrap of built-in runtimes. We want the CPU
  *  runtime registered on first registry touch, without re-entering the
  *  public register/unregister surface (which would deadlock on our mutex).
@@ -102,14 +146,11 @@ State& state() {
  *  reports against `ensure_builtins_registered()`. */
 std::once_flag g_builtins_once;
 
-/** Insert a vtable straight into the state (no lock held by caller; we grab
- *  the registry's mutex internally). Used only by bootstrap, because bypass
- *  of the public `rac_runtime_register` skips its init()/validation — which
- *  is exactly what we want for in-process built-ins we control. */
-void insert_builtin(const rac_runtime_vtable_t* v, State& s) {
-    std::lock_guard<std::mutex> lock(s.mu);
-    /* Don't double-insert: a caller may have already registered a higher-
-     * priority CPU runtime (e.g. a plug-in test fixture). */
+/** Construct + ordered-insert an Entry into `s.entries` under `s.mu`. The
+ *  caller MUST own `s.mu`. Skips when an entry with the same id already
+ *  exists, so a higher-priority pre-registered runtime (e.g. test fixture)
+ *  wins. Pure container manipulation — never re-enters any plugin callback. */
+void insert_builtin_locked(const rac_runtime_vtable_t* v, State& s) {
     for (const Entry& e : s.entries) {
         if (e.id == v->metadata.id)
             return;
@@ -127,13 +168,25 @@ void ensure_builtins_registered() {
         if (cpu == nullptr || cpu->init == nullptr) {
             return;
         }
-        rac_result_t rc = cpu->init();
-        if (rc == RAC_SUCCESS) {
-            insert_builtin(cpu, state());
-            RAC_LOG_DEBUG(LOG_CAT, "bootstrap: built-in CPU runtime registered");
-        } else {
+        /* init() is plugin-supplied. Per commons-064 wrap it so a rogue
+         * built-in (e.g. a test fixture that subs in a misbehaving CPU
+         * runtime) cannot abort SDK bootstrap. */
+        const char* nm = cpu->metadata.name;
+        rac_result_t rc = safe_plugin_call(
+            nm, "init", [&]() -> rac_result_t { return cpu->init(); }, RAC_ERROR_PLUGIN_LOAD_FAILED);
+        if (rc != RAC_SUCCESS) {
             RAC_LOG_ERROR(LOG_CAT, "bootstrap: CPU runtime init returned %d — skipping", (int)rc);
+            return;
         }
+        /* Take the registry mutex exactly once here, NOT inside
+         * `insert_builtin_locked`. Per commons-159 this keeps the
+         * lock-acquisition surface explicit: the only path that ever
+         * acquires `state().mu` from within this lambda is this single
+         * `lock_guard` — there is no nested call back into a helper that
+         * re-takes the same mutex. */
+        std::lock_guard<std::mutex> lock(state().mu);
+        insert_builtin_locked(cpu, state());
+        RAC_LOG_DEBUG(LOG_CAT, "bootstrap: built-in CPU runtime registered");
     });
 }
 
@@ -263,9 +316,18 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
 
     /* Call init() OUTSIDE the registry lock so a slow probe never blocks
      * unrelated lookups. If init returns non-zero the runtime is silently
-     * rejected (e.g. Metal on Linux, CUDA on a CPU-only host). */
-    rc = vtable->init();
+     * rejected (e.g. Metal on Linux, CUDA on a CPU-only host).
+     *
+     * init() is plugin-supplied. A throw here from a dlopen'd runtime would
+     * cross a libc++ boundary and crash the host; wrap in safe_plugin_call
+     * so any exception is logged + coerced to PLUGIN_LOAD_FAILED. */
+    rc = safe_plugin_call(
+        vtable->metadata.name, "init", [&]() -> rac_result_t { return vtable->init(); },
+        RAC_ERROR_PLUGIN_LOAD_FAILED);
     if (rc != RAC_SUCCESS) {
+        if (rc == RAC_ERROR_PLUGIN_LOAD_FAILED) {
+            return rc;
+        }
         RAC_LOG_DEBUG(LOG_CAT, "rac_runtime_register: '%s' init rejected (%d) — not loading",
                       vtable->metadata.name, (int)rc);
         return RAC_ERROR_CAPABILITY_UNSUPPORTED;
@@ -325,13 +387,15 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
     /* Lock released. The evicted entry (if any) is now unreachable from
      * the registry; destroy + dlclose are safe to run without holding the
      * registry mutex. Likewise the rejected vtable was never installed,
-     * so its destroy() races with nothing. */
+     * so its destroy() races with nothing. Plugin-supplied destroy() is
+     * wrapped per commons-064 so a third-party throw cannot abort the host. */
     if (rejected_duplicate) {
-        vtable->destroy();
+        safe_plugin_call_void(vtable->metadata.name, "destroy", [&]() { vtable->destroy(); });
         return RAC_ERROR_PLUGIN_DUPLICATE;
     }
     if (has_evicted) {
-        evicted.vtable->destroy();
+        safe_plugin_call_void(evicted.vtable->metadata.name, "destroy",
+                              [&]() { evicted.vtable->destroy(); });
         close_dynamic_handle(evicted.dl_handle);
     }
 
@@ -349,7 +413,9 @@ rac_result_t rac_runtime_unregister(rac_runtime_id_t id) {
         return RAC_ERROR_NOT_FOUND;
     }
     lock.unlock();
-    erased.vtable->destroy();
+    /* destroy() is plugin-supplied; wrap per commons-064. */
+    safe_plugin_call_void(erased.vtable->metadata.name, "destroy",
+                          [&]() { erased.vtable->destroy(); });
     close_dynamic_handle(erased.dl_handle);
     RAC_LOG_DEBUG(LOG_CAT, "rac_runtime_unregister: id=%d ok", (int)id);
     return RAC_SUCCESS;
@@ -442,7 +508,22 @@ rac_result_t rac_runtime_load(const char* path) {
     }
 
     auto entry = reinterpret_cast<rac_runtime_entry_fn>(entry_sym);
-    const rac_runtime_vtable_t* vt = entry();
+    /* `entry` is dlsym'd from a foreign shared library. Per commons-064 the
+     * exception class hierarchy of the loaded .so may not round-trip through
+     * the host's libc++, so a throw here can crash the SDK before we even
+     * see the vtable. Wrap and coerce to PLUGIN_LOAD_FAILED. */
+    const rac_runtime_vtable_t* vt = nullptr;
+    rac_result_t entry_rc = safe_plugin_call(
+        sym.c_str(), "entry",
+        [&]() -> rac_result_t {
+            vt = entry();
+            return RAC_SUCCESS;
+        },
+        RAC_ERROR_PLUGIN_LOAD_FAILED);
+    if (entry_rc != RAC_SUCCESS) {
+        rac_runtime_dl_close(handle);
+        return entry_rc;
+    }
     if (vt == nullptr || vt->metadata.name == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_runtime_load('%s'): entry '%s' returned NULL or unnamed vtable",
                       path, sym.c_str());
