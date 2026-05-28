@@ -36,15 +36,22 @@ void rac_llamacpp_cpu_runtime_unregister(void);
 
 /* Declares which runtimes + model formats this plugin serves so the
  * EngineRouter can score it against the caller's preferred_runtime and model
- * format. Apple-only / desktop-only entries are gated at the array level. */
+ * format. Each GPU runtime is gated on the matching ggml backend macro that
+ * llama.cpp's CMake actually defines for this build — advertising a runtime
+ * the linked llama.cpp was not compiled with would turn the router into a
+ * liar (preferred_runtime=CUDA on a CPU-only Linux build would still match
+ * llamacpp and either silently fall back to CPU or fail at first decode).
+ * Cf. get_device_type() in llamacpp_backend.cpp which checks the same
+ * macros. */
 static const rac_runtime_id_t k_llamacpp_runtimes[] = {
     RAC_RUNTIME_CPU,
-#if defined(__APPLE__)
+#if defined(GGML_USE_METAL)
     RAC_RUNTIME_METAL,
 #endif
-#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-    /* Linux / Windows desktop builds may have CUDA. */
+#if defined(GGML_USE_CUDA)
     RAC_RUNTIME_CUDA,
+#endif
+#if defined(GGML_USE_VULKAN)
     RAC_RUNTIME_VULKAN,
 #endif
 };
