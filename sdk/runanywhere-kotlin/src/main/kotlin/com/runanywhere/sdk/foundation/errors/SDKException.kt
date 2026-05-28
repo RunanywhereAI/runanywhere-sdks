@@ -74,11 +74,20 @@ class SDKException(
          *
          * Mirrors Swift's `SDKException.make(code:message:category:underlying:shouldLog:)`.
          *
+         * When [cAbiCode] is `null` (the common case), the `c_abi_code` proto
+         * field is auto-computed from [code] per the round-trip contract in
+         * `errors.proto:516-518` (`cAbiCode = -code.value` for codes ≤ 899).
+         * Callers that already hold the underlying `rac_result_t` value
+         * (e.g. JNI bridge surfaces) may pass it explicitly to preserve the
+         * lossless C ABI round-trip; that value should agree with the
+         * negation of [code] per the same contract.
+         *
          * @param code     The proto error code (positive magnitude of C ABI code).
          * @param message  Human-readable, non-localized error message.
          * @param category Coarse routing bucket. Defaults to
          *                 [ProtoErrorCategory.ERROR_CATEGORY_COMPONENT].
-         * @param cAbiCode Optional negative `rac_result_t` integer from the C ABI.
+         * @param cAbiCode Optional explicit `rac_result_t` override. Null →
+         *                 auto-compute via the round-trip contract.
          * @param cause    Optional underlying [Throwable] cause.
          * @param shouldLog When true (default), routes the exception through
          *                  [Logging] unless the code is classified as expected.
@@ -91,7 +100,7 @@ class SDKException(
             cause: Throwable? = null,
             shouldLog: Boolean = true,
         ): SDKException {
-            val ex = of(code = code, category = category, message = message, cAbiCode = cAbiCode, cause = cause)
+            val ex = of(code = code, category = category, message = message, cAbiCodeOverride = cAbiCode, cause = cause)
             if (shouldLog && !code.isExpected) {
                 ex.log()
             }
@@ -105,9 +114,8 @@ class SDKException(
         fun notInitialized(component: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = "$component is not initialized",
-                cAbiCode = -100,
                 cause = cause,
             )
 
@@ -116,7 +124,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_CONFIGURATION,
                 category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
                 message = message,
-                cAbiCode = -103,
                 cause = cause,
             )
 
@@ -125,7 +132,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_API_KEY,
                 category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
                 message = "Invalid API key",
-                cAbiCode = -104,
                 cause = cause,
             )
 
@@ -134,7 +140,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
                 category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
                 message = message,
-                cAbiCode = -259,
                 cause = cause,
             )
 
@@ -143,7 +148,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
                 message = message,
-                cAbiCode = -250,
                 cause = cause,
             )
 
@@ -165,23 +169,24 @@ class SDKException(
             message: String,
             cause: Throwable? = null,
         ): SDKException {
+            val code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT
             val ex =
                 SDKException(
                     error =
                         ProtoSDKError(
-                            code = ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
+                            code = code,
                             category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
                             message = message,
                             context =
                                 ProtoErrorContext(
                                     metadata = mapOf("field_path" to fieldPath),
                                 ),
-                            c_abi_code = -259,
+                            c_abi_code = roundTripCAbiCode(code),
                             nested_message = cause?.message,
                         ),
                     cause = cause,
                 )
-            if (!ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT.isExpected) {
+            if (!code.isExpected) {
                 ex.log()
             }
             return ex
@@ -196,7 +201,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND,
                 category = ProtoErrorCategory.ERROR_CATEGORY_MODEL,
                 message = "Model not found: $modelId",
-                cAbiCode = -110,
                 cause = cause,
             )
 
@@ -205,7 +209,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_MODEL,
                 message = if (modelId != null) "Model not loaded: $modelId" else "No model is loaded",
-                cAbiCode = -116,
                 cause = cause,
             )
 
@@ -214,7 +217,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_MODEL,
                 message = if (reason != null) "Failed to load model $modelId: $reason" else "Failed to load model: $modelId",
-                cAbiCode = -111,
                 cause = cause,
             )
 
@@ -227,7 +229,15 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
                 category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
                 message = message,
-                cAbiCode = -151,
+                cause = cause,
+            )
+
+        /** Swift parity: SDKException.timeout(_:) — NETWORK-bucketed timeout. */
+        fun timeout(message: String, cause: Throwable? = null) =
+            of(
+                code = ProtoErrorCode.ERROR_CODE_TIMEOUT,
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+                message = message,
                 cause = cause,
             )
 
@@ -240,7 +250,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_INVALID_STATE,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
-                cAbiCode = -231,
                 cause = cause,
             )
 
@@ -249,7 +258,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_AUTHENTICATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
                 message = if (reason != null) "Authentication failed: $reason" else "Authentication failed",
-                cAbiCode = -320,
                 cause = cause,
             )
 
@@ -258,7 +266,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_UNAUTHORIZED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
                 message = if (resource != null) "Unauthorized access to: $resource" else "Unauthorized access",
-                cAbiCode = -321,
                 cause = cause,
             )
 
@@ -267,15 +274,30 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_NOT_IMPLEMENTED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
                 message = "Not implemented: $feature",
-                cAbiCode = -800,
+                cause = cause,
+            )
+
+        /**
+         * Swift parity: `SDKException.cancelled(_:)` — INTERNAL-bucketed
+         * user-initiated cancellation. `shouldLog=false` because
+         * `ERROR_CODE_CANCELLED` is classified as expected
+         * (see [ProtoErrorCode.isExpected]).
+         */
+        fun cancelled(message: String = "Operation cancelled", cause: Throwable? = null) =
+            of(
+                code = ProtoErrorCode.ERROR_CODE_CANCELLED,
+                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+                message = message,
                 cause = cause,
             )
 
         // ====================================================================
         // MODALITY FACTORIES (STT/TTS/LLM/VAD/VLM/VoiceAgent)
         //
-        // Per errors.proto, modality codes are folded into ERROR_CATEGORY_COMPONENT;
-        // modality is recovered downstream from the c_abi_code numeric range.
+        // Per errors.proto:516-518, `c_abi_code` MUST equal `-int32(code)` for
+        // codes ≤ 899. The chosen ProtoErrorCode determines the cAbiCode via
+        // the of() helper's automatic round-trip computation — no hand-written
+        // cAbiCode literals.
         // ====================================================================
 
         fun tts(message: String, cause: Throwable? = null) =
@@ -283,16 +305,14 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
-                cAbiCode = -460,
                 cause = cause,
             )
 
         fun vlm(message: String, cause: Throwable? = null) =
             of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
+                code = ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
-                cAbiCode = -500,
                 cause = cause,
             )
 
@@ -301,7 +321,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
-                cAbiCode = -520,
                 cause = cause,
             )
 
@@ -314,16 +333,14 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_INSUFFICIENT_STORAGE,
                 category = ProtoErrorCategory.ERROR_CATEGORY_IO,
                 message = message,
-                cAbiCode = -180,
                 cause = cause,
             )
 
         fun platform(message: String, cause: Throwable? = null) =
             of(
-                code = ProtoErrorCode.ERROR_CODE_INVALID_HANDLE,
+                code = ProtoErrorCode.ERROR_CODE_ADAPTER_NOT_SET,
                 category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
                 message = message,
-                cAbiCode = -340,
                 cause = cause,
             )
 
@@ -332,7 +349,6 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_MODEL,
                 message = message,
-                cAbiCode = -116,
                 cause = cause,
             )
 
@@ -341,18 +357,96 @@ class SDKException(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
-                cAbiCode = -130,
                 cause = cause,
             )
 
+        // ====================================================================
+        // ERROR CONVERSION (Swift parity: SDKException.from / fromONNXCode)
+        // ====================================================================
+
+        /**
+         * Convert any [Throwable] into an SDKException. If [error] is already
+         * an SDKException, returns it unchanged. A null [error] becomes an
+         * `ERROR_CODE_UNKNOWN` envelope tagged with [category] and the message
+         * `"Unknown error"`. Otherwise wraps in an `ERROR_CODE_UNKNOWN`
+         * envelope tagged with [category] and the underlying throwable's
+         * message.
+         *
+         * Mirrors Swift's `SDKException.from(_:category:)` (SDKException.swift:250-270).
+         * The two Swift overloads (non-null and nullable) collapse into a
+         * single nullable Kotlin signature because they share a JVM
+         * descriptor. The Swift implementation additionally maps
+         * `NSURLErrorDomain` codes — Kotlin defers that to platform-specific
+         * HTTP adapters (e.g. [com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter]).
+         */
+        fun from(
+            error: Throwable?,
+            category: ProtoErrorCategory = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+        ): SDKException {
+            if (error == null) {
+                return make(
+                    code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                    message = "Unknown error",
+                    category = category,
+                )
+            }
+            if (error is SDKException) return error
+            return make(
+                code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                message = error.message ?: error.toString(),
+                category = category,
+                cause = error,
+            )
+        }
+
+        /**
+         * Map an ONNX Runtime C error code into an SDKException.
+         * Mirrors Swift's `SDKException.fromONNXCode(_:)` at SDKException.swift:299-341.
+         */
+        fun fromONNXCode(code: Int): SDKException {
+            val (raCode, message) =
+                when (code) {
+                    0 -> ProtoErrorCode.ERROR_CODE_UNKNOWN to "Unexpected success code passed to error handler"
+                    -1 -> ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED to "ONNX Runtime initialization failed"
+                    -2 -> ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED to "Failed to load ONNX model"
+                    -3 -> ProtoErrorCode.ERROR_CODE_GENERATION_FAILED to "ONNX inference failed"
+                    -4 -> ProtoErrorCode.ERROR_CODE_INVALID_STATE to "Invalid ONNX handle"
+                    -5 -> ProtoErrorCode.ERROR_CODE_INVALID_INPUT to "Invalid ONNX parameters"
+                    -6 -> ProtoErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY to "ONNX Runtime out of memory"
+                    -7 -> ProtoErrorCode.ERROR_CODE_NOT_IMPLEMENTED to "ONNX feature not implemented"
+                    -8 -> ProtoErrorCode.ERROR_CODE_CANCELLED to "ONNX operation cancelled"
+                    -9 -> ProtoErrorCode.ERROR_CODE_TIMEOUT to "ONNX operation timed out"
+                    -10 -> ProtoErrorCode.ERROR_CODE_STORAGE_ERROR to "ONNX IO error"
+                    else -> ProtoErrorCode.ERROR_CODE_UNKNOWN to "ONNX error code: $code"
+                }
+            return make(code = raCode, message = message, category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL)
+        }
+
+        /**
+         * Compute the round-trip `c_abi_code` for a proto [code] per the
+         * errors.proto contract (lines 516-518): for codes in `1..899`, the
+         * cAbiCode MUST equal `-code.value`; for Web-only WASM codes (≥ 900)
+         * there is no canonical C ABI value, so cAbiCode is unset.
+         *
+         * Mirrors Swift's init at SDKException.swift:48-51.
+         */
+        private fun roundTripCAbiCode(code: ProtoErrorCode): Int? {
+            val raw = code.value
+            return if (raw in 1..899) -raw else null
+        }
+
         /**
          * Internal helper to construct an SDKException with all fields set.
+         * The `c_abi_code` defaults to [roundTripCAbiCode] of [code] per the
+         * proto's round-trip contract; pass [cAbiCodeOverride] only when the
+         * caller already holds the underlying `rac_result_t` value (e.g. JNI
+         * bridge surfaces returning a concrete failure code).
          */
         private fun of(
             code: ProtoErrorCode,
             category: ProtoErrorCategory,
             message: String,
-            cAbiCode: Int? = null,
+            cAbiCodeOverride: Int? = null,
             cause: Throwable? = null,
         ): SDKException =
             SDKException(
@@ -361,7 +455,7 @@ class SDKException(
                         code = code,
                         category = category,
                         message = message,
-                        c_abi_code = cAbiCode,
+                        c_abi_code = cAbiCodeOverride ?: roundTripCAbiCode(code),
                         nested_message = cause?.message,
                     ),
                 cause = cause,
