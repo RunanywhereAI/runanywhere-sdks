@@ -56,9 +56,8 @@
 
 #import <Foundation/Foundation.h>
 
-#include <mach/clock.h>
-#include <mach/mach.h>
 #include <os/log.h>
+#include <time.h>
 
 #include <atomic>
 #include <cstdint>
@@ -123,14 +122,20 @@ static NSURLSession* sStreamingSessionOverride = nil;
 
 // -----------------------------------------------------------------------------
 // Stream registry — one entry per in-flight streaming/resume task. Keyed by
-// `URLSessionTask.taskIdentifier`. Lives only long enough to keep a strong
-// reference to the delegate (URLSession holds it weakly via the session's
-// delegate property after `finishTasksAndInvalidate`) and to back
+// a process-unique uint64 issued by `nextId` rather than
+// `URLSessionTask.taskIdentifier`: when a per-call session is constructed
+// (the default streaming path), URLSession restarts task identifiers at 1
+// per session, so two concurrent streams would collide on key=1 and the
+// second insert would silently displace the first — defeating
+// `cancelAllStreams()`. Lives only long enough to keep a strong reference
+// to the delegate (URLSession holds it weakly via the session's delegate
+// property after `finishTasksAndInvalidate`) and to back
 // `cancelAllStreams()`.
 // -----------------------------------------------------------------------------
 struct StreamRegistry {
     std::mutex mutex;
-    std::unordered_map<NSUInteger, RAC_URLS_OBJC(URLSessionStreamDelegate)*> entries;
+    std::atomic<uint64_t> nextId{1};
+    std::unordered_map<uint64_t, RAC_URLS_OBJC(URLSessionStreamDelegate)*> entries;
 };
 
 static StreamRegistry& streamRegistry() {
@@ -270,13 +275,11 @@ static void writeResponse(int32_t status,
 }
 
 static uint64_t monotonicNs() {
-    clock_serv_t clockServ;
-    mach_timespec_t ts;
-    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &clockServ);
-    clock_get_time(clockServ, &ts);
-    mach_port_deallocate(mach_task_self(), clockServ);
-    return static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
-           static_cast<uint64_t>(ts.tv_nsec);
+    // CLOCK_UPTIME_RAW matches `mach_absolute_time` / Swift's
+    // `DispatchTime.now().uptimeNanoseconds` (uptime that does not advance
+    // during sleep) without the Mach IPC round-trip and unchecked
+    // `kern_return_t` of `host_get_clock_service`.
+    return clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
 }
 
 static uint64_t elapsedMsSince(uint64_t startNs) {
@@ -360,6 +363,7 @@ static void cancelAllStreams() {
 @property(nonatomic, assign) uint64_t contentLength;
 @property(nonatomic, assign) BOOL cancelled;
 @property(nonatomic, assign) uint64_t resumeFromByte;
+@property(nonatomic, assign) uint64_t streamId;
 @property(nonatomic, weak, nullable) NSURLSessionTask* task;
 - (void)cancelFromExternal;
 @end
@@ -378,6 +382,7 @@ static void cancelAllStreams() {
         _contentLength = 0;
         _cancelled = NO;
         _resumeFromByte = resumeFromByte;
+        _streamId = 0;
     }
     return self;
 }
@@ -559,9 +564,12 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
         task.delegate = delegate;
     }
     delegate.task = task;
+    // Issue a process-unique key so concurrent per-call sessions (each of
+    // which restarts `taskIdentifier` at 1) don't displace each other.
+    delegate.streamId = streamRegistry().nextId.fetch_add(1, std::memory_order_relaxed);
     {
         std::lock_guard<std::mutex> lock(streamRegistry().mutex);
-        streamRegistry().entries[task.taskIdentifier] = delegate;
+        streamRegistry().entries[delegate.streamId] = delegate;
     }
 
     [task resume];
@@ -575,7 +583,7 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
     }
     {
         std::lock_guard<std::mutex> lock(streamRegistry().mutex);
-        streamRegistry().entries.erase(task.taskIdentifier);
+        streamRegistry().entries.erase(delegate.streamId);
     }
 
     uint64_t elapsed = elapsedMsSince(startNs);
