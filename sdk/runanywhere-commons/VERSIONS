@@ -20,7 +20,7 @@ PROJECT_VERSION=0.19.13
 # Platform Deployment Targets
 # =============================================================================
 # iOS minimum deployment target
-IOS_DEPLOYMENT_TARGET=13.0
+IOS_DEPLOYMENT_TARGET=17.0
 
 # Android minimum SDK version
 ANDROID_MIN_SDK=24
