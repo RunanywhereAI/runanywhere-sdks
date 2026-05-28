@@ -32,7 +32,19 @@ extern "C" {
 
 /**
  * @brief Download state enumeration.
- * Mirrors Swift's DownloadState enum.
+ *
+ * Mirrors the full proto `runanywhere.v1.DownloadState` state machine
+ * (`idl/download_service.proto`). The numeric values here are offset by
+ * one from the proto (no `UNSPECIFIED = 0` sentinel) because this legacy
+ * C ABI predates the proto schema and preserves binary compatibility for
+ * existing consumers; consumers crossing the proto boundary translate via
+ * `rac_download_progress_t.state` rather than by reinterpret-cast.
+ *
+ * Every proto state has a matching enumerator so that switch statements
+ * on `rac_download_progress_t.state` can observe the complete state
+ * machine — including `PAUSED` (pause requested while bytes accumulated)
+ * and `RESUMING` (resumed from a partial download), which the proto path
+ * emits via `rac_download_orchestrator`.
  */
 typedef enum rac_download_state {
     RAC_DOWNLOAD_STATE_PENDING = 0,     /**< Download is pending */
@@ -41,7 +53,9 @@ typedef enum rac_download_state {
     RAC_DOWNLOAD_STATE_RETRYING = 3,    /**< Retrying after failure */
     RAC_DOWNLOAD_STATE_COMPLETED = 4,   /**< Download completed successfully */
     RAC_DOWNLOAD_STATE_FAILED = 5,      /**< Download failed */
-    RAC_DOWNLOAD_STATE_CANCELLED = 6    /**< Download was cancelled */
+    RAC_DOWNLOAD_STATE_CANCELLED = 6,   /**< Download was cancelled */
+    RAC_DOWNLOAD_STATE_PAUSED = 7,      /**< Download paused, partial bytes retained */
+    RAC_DOWNLOAD_STATE_RESUMING = 8     /**< Resuming a previously paused/partial download */
 } rac_download_state_t;
 
 /**
@@ -156,6 +170,11 @@ typedef struct rac_download_task {
 /**
  * @brief Download configuration.
  * Mirrors Swift's DownloadConfiguration struct.
+ *
+ * Honored exclusively by the legacy `rac_download_manager_*` ABI below.
+ * The proto download path (`rac_download_orchestrator_*`) does not consume
+ * this struct; SDKs that drive downloads through the proto API enforce
+ * retry/backoff policy themselves rather than re-using these defaults.
  */
 typedef struct rac_download_config {
     /** Maximum concurrent downloads (default: 1) */
@@ -164,10 +183,18 @@ typedef struct rac_download_config {
     /** Request timeout in seconds (default: 60) */
     int32_t request_timeout_seconds;
 
-    /** Maximum retry attempts (default: 3) */
+    /**
+     * Maximum retry attempts (default: 3).
+     *
+     * Consumed by `rac_download_manager_mark_failed`: when the platform
+     * adapter reports a failure, the legacy path transitions to
+     * RETRYING until this many attempts have elapsed, then FAILED. The
+     * proto download path leaves retry to the caller and ignores this
+     * field.
+     */
     int32_t max_retry_attempts;
 
-    /** Retry delay in seconds (default: 5) */
+    /** Retry delay in seconds (default: 5). Legacy-ABI only — see `max_retry_attempts`. */
     int32_t retry_delay_seconds;
 
     /** Whether to allow cellular downloads (default: true) */
