@@ -30,7 +30,15 @@ class DartBridgeState {
   // Initialization
   // ============================================================================
 
-  /// Initialize C++ state manager.
+  /// Initialize C++ state manager with the resolved credentials.
+  ///
+  /// This deliberately re-runs `rac_state_initialize`: `DartBridge.initialize`
+  /// (Phase 1) drives `rac_sdk_init_phase1_proto` with the environment only —
+  /// the api key / base URL / device ID are not known until they are resolved
+  /// (Keychain lookup + caller params) in Phase 2. This Phase-2 call backfills
+  /// `rac_sdk_state` with those resolved credentials, so it is NOT a redundant
+  /// duplicate of the Phase-1 call. `rac_state_initialize` is idempotent on the
+  /// environment and simply overwrites the cached api_key/base_url/device_id.
   ///
   /// Auth persistence (Keychain/KeyStore vtable + stored-token load) is handled
   /// by `DartBridgeAuth.initialize` which owns the `rac_auth_manager` lifecycle.
