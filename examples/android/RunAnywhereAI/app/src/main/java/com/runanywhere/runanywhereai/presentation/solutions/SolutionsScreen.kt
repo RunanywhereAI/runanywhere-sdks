@@ -86,7 +86,7 @@ private val RAG_YAML =
       bm25_b: 0.75
       rrf_k: 60
 
-      prompt_template: "Use the context below to answer.\nContext:\n{{context}}\n\nQuestion: {{query}}"
+      prompt_template: "Use the context below to answer.\n\nContext:\n{{context}}\n\nQuestion: {{query}}"
     """.trimIndent()
 
 @Composable
