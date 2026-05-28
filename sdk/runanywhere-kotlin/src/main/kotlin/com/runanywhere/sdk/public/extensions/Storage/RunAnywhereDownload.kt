@@ -11,11 +11,14 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadPlanRequest
+import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
+import ai.runanywhere.proto.v1.ModelGetRequest
 import ai.runanywhere.proto.v1.ModelImportRequest
+import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -27,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import java.io.File
 
 private val downloadLogger = SDKLogger("RunAnywhere.Download")
 
@@ -36,27 +40,28 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
             throw SDKException.notInitialized("SDK not initialized")
         }
 
+        val resolvedModel = resolveModelForDownload(model)
         val planRequest =
             DownloadPlanRequest(
-                model_id = model.id,
-                model = model,
+                model_id = resolvedModel.id,
+                model = resolvedModel,
                 resume_existing = true,
                 validate_existing_bytes = true,
-                verify_checksums = !model.checksum_sha256.isNullOrBlank(),
+                verify_checksums = !resolvedModel.checksum_sha256.isNullOrBlank(),
             )
 
         val plan =
-            CppBridgeDownload.plan(planRequest)
-                ?: throw SDKException.operation("Unable to create a download plan for ${model.id}")
+            planDownload(planRequest)
+                ?: throw SDKException.operation("Unable to create a download plan for ${resolvedModel.id}")
         if (!plan.can_start) {
             throw SDKException.operation(
-                "Download plan rejected for ${model.id}: ${plan.error_message.ifBlank { "plan not startable" }}",
+                "Download plan rejected for ${resolvedModel.id}: ${plan.error_message.ifBlank { "plan not startable" }}",
             )
         }
 
         val startRequest =
             DownloadStartRequest(
-                model_id = model.id,
+                model_id = resolvedModel.id,
                 plan = plan,
                 resume = plan.can_resume,
                 resume_token = plan.resume_token,
@@ -68,20 +73,20 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
 
         val startResult =
             CppBridgeDownload.start(startRequest)
-                ?: throw SDKException.operation("Download start returned null for ${model.id}")
+                ?: throw SDKException.operation("Download start returned null for ${resolvedModel.id}")
         if (!startResult.accepted) {
             throw SDKException.operation(
-                "Download could not be started for ${model.id}: ${startResult.error_message.ifBlank { "rejected" }}",
+                "Download could not be started for ${resolvedModel.id}: ${startResult.error_message.ifBlank { "rejected" }}",
             )
         }
 
-        downloadLogger.info("⬇️ Download accepted for ${model.id} (task=${startResult.task_id})")
+        downloadLogger.info("⬇️ Download accepted for ${resolvedModel.id} (task=${startResult.task_id})")
 
         startResult.initial_progress?.let { initial ->
             emit(initial)
             if (isTerminal(initial)) {
                 if (initial.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
-                    persistDownloadCompletion(model, initial)
+                    persistDownloadCompletion(resolvedModel, initial)
                 }
                 return@flow
             }
@@ -89,7 +94,7 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
 
         val subscribeRequest =
             DownloadSubscribeRequest(
-                model_id = startResult.model_id.ifBlank { model.id },
+                model_id = startResult.model_id.ifBlank { resolvedModel.id },
                 task_id = startResult.task_id,
             )
 
@@ -109,14 +114,14 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
                     reachedTerminal = true
                     if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
                         throw SDKException.operation(
-                            "Download failed for ${model.id}: ${progress.error_message.ifBlank { "unknown error" }}",
+                            "Download failed for ${resolvedModel.id}: ${progress.error_message.ifBlank { "unknown error" }}",
                         )
                     }
                     if (progress.state == DownloadState.DOWNLOAD_STATE_CANCELLED) {
-                        throw SDKException.invalidArgument("Download cancelled: ${model.id}")
+                        throw SDKException.invalidArgument("Download cancelled: ${resolvedModel.id}")
                     }
                     // DOWNLOAD_STATE_COMPLETED — persist into registry.
-                    persistDownloadCompletion(model, progress)
+                    persistDownloadCompletion(resolvedModel, progress)
                     return@flow
                 }
             }
@@ -131,17 +136,17 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
                         CppBridgeDownload.cancel(
                             DownloadCancelRequest(
                                 task_id = startResult.task_id,
-                                model_id = startResult.model_id.ifBlank { model.id },
+                                model_id = startResult.model_id.ifBlank { resolvedModel.id },
                                 delete_partial_bytes = false,
                             ),
                         )
                         downloadLogger.info(
-                            "Download cancelled by collector for ${model.id} " +
+                            "Download cancelled by collector for ${resolvedModel.id} " +
                                 "(task=${startResult.task_id})",
                         )
                     } catch (e: Throwable) {
                         downloadLogger.warn(
-                            "Failed to cancel native download for ${model.id} " +
+                            "Failed to cancel native download for ${resolvedModel.id} " +
                                 "(task=${startResult.task_id}): ${e.message}",
                         )
                     }
@@ -149,6 +154,48 @@ fun RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress> =
             }
         }
     }
+
+private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAModelInfo {
+    val getResult = getModel(ModelGetRequest(model_id = model.id))
+    if (getResult.found) {
+        val registryModel = getResult.model ?: return model
+        if (!registryModel.download_url.isNullOrBlank() || model.download_url.isNullOrBlank()) {
+            return registryModel
+        }
+        return model
+    }
+
+    val listResult = listModels(ModelListRequest())
+    if (!listResult.success) return model
+    val listed = listResult.models?.models?.firstOrNull { it.id == model.id } ?: return model
+    if (!listed.download_url.isNullOrBlank() || model.download_url.isNullOrBlank()) {
+        return listed
+    }
+    return model
+}
+
+private fun planDownload(request: DownloadPlanRequest): DownloadPlanResult? {
+    val plan = CppBridgeDownload.plan(request) ?: return null
+    if (plan.can_start || !plan.error_message.contains("existing partial bytes exceed")) {
+        return plan
+    }
+
+    for (filePlan in plan.files) {
+        val destinationPath = filePlan.destination_path
+        if (destinationPath.isBlank()) continue
+
+        val partialFile = File(destinationPath)
+        if (partialFile.exists()) {
+            if (partialFile.delete()) {
+                downloadLogger.warn("Removed oversize partial download at $destinationPath for ${request.model_id}")
+            } else {
+                downloadLogger.warn("Failed to remove oversize partial download at $destinationPath for ${request.model_id}")
+            }
+        }
+    }
+
+    return CppBridgeDownload.plan(request)
+}
 
 /**
  * Mirrors Swift `RunAnywhere+Storage.swift:persistDownloadCompletion(model:progress:)`.
