@@ -37,70 +37,80 @@ extension CppBridge {
     /// This bridge provides those capabilities via C function callbacks.
     public enum PlatformAdapter {
 
-        /// Whether the adapter has been registered
-        private static var isRegistered = false
-
-        /// The adapter struct - MUST persist for C++ to call
-        private static var adapter = rac_platform_adapter_t()
+        /// Registration state guarded by a single `OSAllocatedUnfairLock`
+        /// per AGENTS.md ("Do not use NSLock as it is outdated"). The flag and
+        /// the adapter struct live together so the check-then-populate-then-set
+        /// sequence is atomic: two concurrent `register()` callers can no longer
+        /// both pass the guard and race the `rac_set_platform_adapter` write with
+        /// partially-populated function pointers.
+        private static let registration =
+            OSAllocatedUnfairLock<PlatformAdapterRegistrationState>(
+                initialState: PlatformAdapterRegistrationState()
+            )
 
         // MARK: - Registration
 
         /// Register platform adapter with C++
         /// Must be called FIRST during SDK init (before any C++ operations)
         static func register() {
-            guard !isRegistered else { return }
+            let didRegister = registration.withLock { state -> Bool in
+                guard !state.isRegistered else { return false }
 
-            // Reset adapter
-            adapter = rac_platform_adapter_t()
+                state.adapter = rac_platform_adapter_t()
 
-            // MARK: Logging Callback
-            adapter.log = platformLogCallback
+                // MARK: Logging Callback
+                state.adapter.log = platformLogCallback
 
-            // MARK: File Operations
-            adapter.file_exists = platformFileExistsCallback
-            adapter.file_read = platformFileReadCallback
-            adapter.file_write = platformFileWriteCallback
-            adapter.file_delete = platformFileDeleteCallback
+                // MARK: File Operations
+                state.adapter.file_exists = platformFileExistsCallback
+                state.adapter.file_read = platformFileReadCallback
+                state.adapter.file_write = platformFileWriteCallback
+                state.adapter.file_delete = platformFileDeleteCallback
 
-            // MARK: Secure Storage (Keychain)
-            adapter.secure_get = platformSecureGetCallback
-            adapter.secure_set = platformSecureSetCallback
-            adapter.secure_delete = platformSecureDeleteCallback
+                // MARK: Secure Storage (Keychain)
+                state.adapter.secure_get = platformSecureGetCallback
+                state.adapter.secure_set = platformSecureSetCallback
+                state.adapter.secure_delete = platformSecureDeleteCallback
 
-            // MARK: Clock
-            adapter.now_ms = platformNowMsCallback
+                // MARK: Clock
+                state.adapter.now_ms = platformNowMsCallback
 
-            // MARK: Memory Info
-            adapter.get_memory_info = platformGetMemoryInfoCallback
+                // MARK: Memory Info
+                state.adapter.get_memory_info = platformGetMemoryInfoCallback
 
-            // MARK: Error Tracking (Sentry)
-            adapter.track_error = platformTrackErrorCallback
+                // MARK: Error Tracking (Sentry)
+                state.adapter.track_error = platformTrackErrorCallback
 
-            // MARK: Optional Callbacks (handled by Swift directly)
-            adapter.http_download = platformHttpDownloadCallback
-            adapter.http_download_cancel = platformHttpDownloadCancelCallback
-            adapter.extract_archive = nil
+                // MARK: Optional Callbacks (handled by Swift directly)
+                state.adapter.http_download = platformHttpDownloadCallback
+                state.adapter.http_download_cancel = platformHttpDownloadCancelCallback
+                state.adapter.extract_archive = nil
 
-            // MARK: Vendor ID (Apple-only — used by commons device-identity chain)
-            // Commons walks: secure_get -> get_vendor_id -> generate fresh UUID.
-            // Swift only contributes the iOS-specific UIDevice.identifierForVendor;
-            // Keychain persistence happens automatically via secure_set/secure_get.
-            adapter.get_vendor_id = platformGetVendorIdCallback
+                // MARK: Vendor ID (Apple-only — used by commons device-identity chain)
+                // Commons walks: secure_get -> get_vendor_id -> generate fresh UUID.
+                // Swift only contributes the iOS-specific UIDevice.identifierForVendor;
+                // Keychain persistence happens automatically via secure_set/secure_get.
+                state.adapter.get_vendor_id = platformGetVendorIdCallback
 
-            // MARK: Directory Enumeration (model-registry rescan + is_downloaded probe)
-            // Populating these slots lets the commons rescan_local refresh path
-            // and rac_model_info_make_proto's multi-file is_downloaded gating
-            // work on Apple platforms without the warning fallback in
-            // ModelRegistryRefreshResult.warnings. Matches the Kotlin / Flutter /
-            // RN siblings of CLUSTER-280-SPLIT.
-            adapter.file_list_directory = platformFileListDirectoryCallback
-            adapter.is_non_empty_directory = platformIsNonEmptyDirectoryCallback
+                // MARK: Directory Enumeration (model-registry rescan + is_downloaded probe)
+                // Populating these slots lets the commons rescan_local refresh path
+                // and rac_model_info_make_proto's multi-file is_downloaded gating
+                // work on Apple platforms without the warning fallback in
+                // ModelRegistryRefreshResult.warnings. Matches the Kotlin / Flutter /
+                // RN siblings of CLUSTER-280-SPLIT.
+                state.adapter.file_list_directory = platformFileListDirectoryCallback
+                state.adapter.is_non_empty_directory = platformIsNonEmptyDirectoryCallback
 
-            adapter.user_data = nil
+                state.adapter.user_data = nil
 
-            // Register with C++
-            rac_set_platform_adapter(&adapter)
-            isRegistered = true
+                // Register with C++ while still holding the lock so the struct is
+                // fully populated before any concurrent reader observes it.
+                rac_set_platform_adapter(&state.adapter)
+                state.isRegistered = true
+                return true
+            }
+
+            guard didRegister else { return }
 
             // Force link device manager symbols
             _ = rac_device_manager_is_registered()
@@ -112,7 +122,61 @@ extension CppBridge {
 
 // MARK: - C Function Pointer Callbacks (must be at file scope, no captures)
 
+/// Combined adapter-registration state. Defined at file scope (not nested in
+/// `PlatformAdapter`) to satisfy SwiftLint's max-1-level nesting rule; the
+/// `OSAllocatedUnfairLock` that owns it persists for the process lifetime, so
+/// the pointer handed to `rac_set_platform_adapter` stays valid for C++.
+private struct PlatformAdapterRegistrationState {
+    var isRegistered = false
+    var adapter = rac_platform_adapter_t()
+}
+
 private let platformKeychainService = "com.runanywhere.sdk"
+
+/// Maps a Foundation file-IO error to the precise `rac_result_t` the commons
+/// file contract expects, instead of collapsing every failure to
+/// `RAC_ERROR_FILE_NOT_FOUND`. Without this, a full volume / read-only mount /
+/// revoked permission would masquerade as "not found", and upstream cleanup
+/// (model registry, extraction) would silently skip a file that is still on
+/// disk — leaving stale state. `noSuchFileError` stays FILE_NOT_FOUND;
+/// permission failures map to PERMISSION_DENIED; anything else is a real IO
+/// failure (FILE_WRITE_FAILED).
+private func platformMapFileError(_ error: Error) -> rac_result_t {
+    let nsError = error as NSError
+    if let posix = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError)?.toPOSIXError()
+        ?? nsError.toPOSIXError() {
+        switch posix.code {
+        case .ENOENT:
+            return RAC_ERROR_FILE_NOT_FOUND
+        case .EACCES, .EPERM, .EROFS:
+            return RAC_ERROR_PERMISSION_DENIED
+        default:
+            return RAC_ERROR_FILE_WRITE_FAILED
+        }
+    }
+    if nsError.domain == NSCocoaErrorDomain {
+        switch CocoaError.Code(rawValue: nsError.code) {
+        case .fileNoSuchFile, .fileReadNoSuchFile:
+            return RAC_ERROR_FILE_NOT_FOUND
+        case .fileReadNoPermission, .fileWriteNoPermission, .fileWriteVolumeReadOnly:
+            return RAC_ERROR_PERMISSION_DENIED
+        default:
+            return RAC_ERROR_FILE_WRITE_FAILED
+        }
+    }
+    return RAC_ERROR_FILE_WRITE_FAILED
+}
+
+private extension NSError {
+    /// Returns the POSIX error when this `NSError` originates from the POSIX
+    /// domain (`NSPOSIXErrorDomain`), so callers can branch on `errno` codes.
+    func toPOSIXError() -> POSIXError? {
+        guard domain == NSPOSIXErrorDomain, let code = POSIXErrorCode(rawValue: Int32(code)) else {
+            return nil
+        }
+        return POSIXError(code)
+    }
+}
 
 private func platformLogCallback(
     level: rac_log_level_t,
@@ -158,7 +222,12 @@ private func parseLogMetadata(_ message: String) -> (String, [String: Any]?) {
 
     // swiftlint:disable:next avoid_any_type prefer_concrete_types
     var metadata: [String: Any] = [:]
-    let pairs = metadataString.components(separatedBy: CharacterSet(charactersIn: ", "))
+    // Split on the canonical ", " (comma+space) separator as a string, not a
+    // CharacterSet — a CharacterSet treats ',' and ' ' as independent
+    // separators and would shred values containing either (e.g.
+    // "error=Failed, retrying") into broken key=value fragments. Values
+    // therefore may not contain a literal ", ".
+    let pairs = metadataString.components(separatedBy: ", ")
         .filter { !$0.isEmpty }
 
     for pair in pairs {
@@ -224,7 +293,7 @@ private func platformFileReadCallback(
 
         return RAC_SUCCESS
     } catch {
-        return RAC_ERROR_FILE_NOT_FOUND
+        return platformMapFileError(error)
     }
 }
 
@@ -263,7 +332,7 @@ private func platformFileDeleteCallback(
         try FileManager.default.removeItem(atPath: pathString)
         return RAC_SUCCESS
     } catch {
-        return RAC_ERROR_FILE_NOT_FOUND
+        return platformMapFileError(error)
     }
 }
 
