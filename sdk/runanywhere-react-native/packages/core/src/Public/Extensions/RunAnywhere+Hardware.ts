@@ -165,39 +165,35 @@ export async function getAccelerators(): Promise<AcceleratorInfo[]> {
 
 /**
  * Set the preferred accelerator for subsequent inference routing via
- * `rac_hardware_set_accelerator_preference`. Returns `true` on success and
- * `false` when commons rejects the request (unsupported enum, stale binary).
+ * `rac_hardware_set_accelerator_preference`. Throws `SDKException` when the
+ * native bridge or commons rejects the request.
  */
 export async function setAcceleratorPreference(
   preference: AccelerationPreference
-): Promise<boolean> {
-  if (
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_AUTO &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_NPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_GPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_CPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_METAL &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN
-  ) {
-    return false;
+): Promise<void> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  const native = requireNativeModule();
+  if (typeof native.setAcceleratorPreferenceProto !== 'function') {
+    throw SDKException.notImplemented(
+      'hardware.setAcceleratorPreference requires native setAcceleratorPreferenceProto'
+    );
   }
 
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  if (typeof native.setAcceleratorPreferenceProto !== 'function') return false;
-
-  try {
-    const responseBuffer = await native.setAcceleratorPreferenceProto(
-      encodeProtoMessage({ preference }, HardwareAcceleratorPreferenceRequest)
+  const responseBuffer = await native.setAcceleratorPreferenceProto(
+    encodeProtoMessage({ preference }, HardwareAcceleratorPreferenceRequest)
+  );
+  if (responseBuffer.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('setAcceleratorPreferenceProto');
+  }
+  const result = HardwareAcceleratorPreferenceResult.decode(
+    arrayBufferToBytes(responseBuffer)
+  );
+  if (result.success !== true) {
+    throw SDKException.unknown(
+      result.errorMessage || 'Failed to set accelerator preference'
     );
-    if (responseBuffer.byteLength === 0) return false;
-    const result = HardwareAcceleratorPreferenceResult.decode(
-      arrayBufferToBytes(responseBuffer)
-    );
-    return result.success === true;
-  } catch {
-    return false;
   }
 }
 
