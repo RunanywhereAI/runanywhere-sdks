@@ -54,10 +54,54 @@ static constexpr int kDefaultMaxTokens = 2048;
 namespace {
 
 /**
- * Internal VLM backend state.
+ * VLM model type for chat template selection.
+ *
+ * Defined before LlamaCppVLMBackend so the struct can initialise model_type
+ * with the named enumerator VLMModelType::Unknown instead of a brittle
+ * static_cast<VLMModelType>(0) that breaks if the enumerator order changes.
  */
-// Forward declaration
-enum class VLMModelType;
+enum class VLMModelType {
+    Unknown,
+    SmolVLM,  // SmolVLM uses "User:" / "Assistant:" format
+    Qwen2VL,  // Qwen2-VL uses chatml with <|im_start|>user format
+    LLaVA,    // LLaVA uses "USER:" / "ASSISTANT:" format
+    Generic   // Generic chatml fallback
+};
+
+// =============================================================================
+// RAII GUARDS FOR llama.cpp / mtmd C HANDLES
+// =============================================================================
+//
+// The mtmd and llama.cpp APIs are pure C and require manual destroy calls
+// paired with each init. Wrap them in unique_ptr-based guards so error-return
+// paths between init and free cannot leak the (MB-scale) image bitmaps,
+// tokenized chunk lists, or llama_batch tensors. Mirrors the upstream
+// mtmd::bitmap_ptr / input_chunks_ptr helpers but keeps the dependency local.
+struct MtmdBitmapDelete {
+    void operator()(mtmd_bitmap* b) const {
+        if (b)
+            mtmd_bitmap_free(b);
+    }
+};
+using MtmdBitmapPtr = std::unique_ptr<mtmd_bitmap, MtmdBitmapDelete>;
+
+struct MtmdChunksDelete {
+    void operator()(mtmd_input_chunks* c) const {
+        if (c)
+            mtmd_input_chunks_free(c);
+    }
+};
+using MtmdChunksPtr = std::unique_ptr<mtmd_input_chunks, MtmdChunksDelete>;
+
+// llama_batch is a value type (no pointer to wrap), so use a scope guard
+// that runs llama_batch_free on destruction. Caller mutates `batch` in place.
+struct LlamaBatchGuard {
+    llama_batch batch;
+    explicit LlamaBatchGuard(llama_batch b) : batch(b) {}
+    ~LlamaBatchGuard() { llama_batch_free(batch); }
+    LlamaBatchGuard(const LlamaBatchGuard&) = delete;
+    LlamaBatchGuard& operator=(const LlamaBatchGuard&) = delete;
+};
 
 struct LlamaCppVLMBackend {
     // llama.cpp model and context
@@ -75,6 +119,16 @@ struct LlamaCppVLMBackend {
     bool model_loaded = false;
     std::atomic<bool> cancel_requested{false};
 
+    // Lifecycle barrier — destroy() flips this true so future entry-point
+    // calls fail fast, then spin-waits for `in_flight` to drain before
+    // freeing the backend. Mirrors the voice_agent pattern at
+    // sdk/runanywhere-commons/src/features/voice_agent/voice_agent.cpp:179.
+    // This closes the "object with member mutex cannot be safely destroyed
+    // by itself" race window between unload_model's mutex release and the
+    // delete that follows.
+    std::atomic<bool> is_shutting_down{false};
+    std::atomic<int> in_flight{0};
+
     // Model info
     std::string model_path;
     std::string mmproj_path;
@@ -82,7 +136,7 @@ struct LlamaCppVLMBackend {
     llama_pos n_past = 0;
 
     // Detected model type for chat template
-    VLMModelType model_type = static_cast<VLMModelType>(0);  // Unknown
+    VLMModelType model_type = VLMModelType::Unknown;
 
     // Cached sampler parameters to avoid unnecessary rebuilds.
     // pass3-syn-128: extended to cover the full rac_vlm_options_t sampling
@@ -107,6 +161,26 @@ struct LlamaCppVLMBackend {
 };
 
 /**
+ * RAII guard that increments backend->in_flight on entry and decrements on
+ * scope exit. destroy() flips backend->is_shutting_down and then spins until
+ * in_flight reaches zero, so any public entry point that acquires a guard
+ * either runs to completion before destroy() can free the backend, or bails
+ * out fast when is_shutting_down is already set.
+ *
+ * Mirrors voice_agent.cpp's in_flight pattern
+ * (sdk/runanywhere-commons/src/features/voice_agent/voice_agent.cpp:216-218).
+ */
+struct InFlightGuard {
+    LlamaCppVLMBackend* backend;
+    explicit InFlightGuard(LlamaCppVLMBackend* b) : backend(b) {
+        backend->in_flight.fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~InFlightGuard() { backend->in_flight.fetch_sub(1, std::memory_order_acq_rel); }
+    InFlightGuard(const InFlightGuard&) = delete;
+    InFlightGuard& operator=(const InFlightGuard&) = delete;
+};
+
+/**
  * Get number of CPU threads to use.
  */
 int get_num_threads(const int config_threads) {
@@ -125,17 +199,6 @@ int get_num_threads(const int config_threads) {
 // =============================================================================
 // CHAT TEMPLATE HELPERS
 // =============================================================================
-
-/**
- * VLM model type for chat template selection.
- */
-enum class VLMModelType {
-    Unknown,
-    SmolVLM,  // SmolVLM uses "User:" / "Assistant:" format
-    Qwen2VL,  // Qwen2-VL uses chatml with <|im_start|>user format
-    LLaVA,    // LLaVA uses "USER:" / "ASSISTANT:" format
-    Generic   // Generic chatml fallback
-};
 
 std::string format_vlm_prompt_manual(const std::string& user_content, const char* effective_system,
                                      VLMModelType model_type) {
@@ -656,15 +719,15 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
         }
     }
 
-    mtmd_bitmap* bitmap = nullptr;
+    MtmdBitmapPtr bitmap;
 
     if (image && backend->mtmd_ctx) {
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading image from file path");
-            bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
+            bitmap.reset(mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path));
         } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
             RAC_LOG_INFO(LOG_CAT, "[v3-prep] loading raw RGB bitmap");
-            bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
+            bitmap.reset(mtmd_bitmap_init(image->width, image->height, image->pixel_data));
         } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64) {
             // Base64 decode is not wired through mtmd yet. Returning an explicit
             // error is strictly better than silently dropping the image and
@@ -697,35 +760,31 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
 
     // Tokenize and evaluate with MTMD if image present
     if (backend->mtmd_ctx && bitmap) {
-        mtmd_input_chunks* chunks = mtmd_input_chunks_init();
+        MtmdChunksPtr chunks(mtmd_input_chunks_init());
 
         mtmd_input_text text;
         text.text = full_prompt.c_str();
         text.add_special = true;
         text.parse_special = true;
 
-        const mtmd_bitmap* bitmaps[] = {bitmap};
+        const mtmd_bitmap* bitmaps[] = {bitmap.get()};
         RAC_LOG_INFO(LOG_CAT, "[v3-prep] tokenizing image/text chunks");
-        int32_t tokenize_result = mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
+        int32_t tokenize_result =
+            mtmd_tokenize(backend->mtmd_ctx, chunks.get(), &text, bitmaps, 1);
 
         if (tokenize_result != 0) {
             RAC_LOG_ERROR(LOG_CAT, "Failed to tokenize prompt with image: %d", tokenize_result);
-            mtmd_bitmap_free(bitmap);
-            mtmd_input_chunks_free(chunks);
             return RAC_ERROR_PROCESSING_FAILED;
         }
 
         llama_pos new_n_past = 0;
         RAC_LOG_INFO(LOG_CAT, "[v3-prep] evaluating image/text chunks");
         int32_t eval_result = mtmd_helper_eval_chunks(
-            backend->mtmd_ctx, backend->ctx, chunks, 0, 0,
+            backend->mtmd_ctx, backend->ctx, chunks.get(), 0, 0,
             backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize, true,
             &new_n_past);
         RAC_LOG_INFO(LOG_CAT, "[v3-prep] image/text chunks evaluated rc=%d n_past=%d", eval_result,
                      (int)new_n_past);
-
-        mtmd_bitmap_free(bitmap);
-        mtmd_input_chunks_free(chunks);
 
         if (eval_result != 0) {
             RAC_LOG_ERROR(LOG_CAT, "Failed to evaluate chunks: %d", eval_result);
@@ -756,7 +815,8 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
         }
         tokens.resize(n_tokens);
 
-        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
+        LlamaBatchGuard batch_guard(llama_batch_init(n_tokens, 0, 1));
+        llama_batch& batch = batch_guard.batch;
         for (int i = 0; i < n_tokens; i++) {
             batch.token[i] = tokens[i];
             batch.pos[i] = i;
@@ -767,7 +827,6 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
         batch.n_tokens = n_tokens;
 
         if (llama_decode(backend->ctx, batch) != 0) {
-            llama_batch_free(batch);
             RAC_LOG_ERROR(LOG_CAT, "Failed to decode prompt");
             rac_error_set_details(
                 "VLM prepare failed: llama_decode returned non-zero while "
@@ -775,7 +834,6 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
             return RAC_ERROR_PROCESSING_FAILED;
         }
 
-        llama_batch_free(batch);
         backend->n_past = n_tokens;
     }
 
@@ -884,6 +942,10 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     }
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
+    if (backend->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    InFlightGuard in_flight_guard(backend);
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     // Update config if provided
@@ -1055,14 +1117,12 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle) {
-    if (!handle) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
-    std::lock_guard<std::mutex> lock(backend->mutex);
-
+namespace {
+/// Tear down all llama.cpp / mtmd handles owned by the backend. Caller must
+/// hold backend->mutex. Extracted so destroy() can reuse the body without
+/// re-entering the public API surface (which now fails fast when
+/// is_shutting_down is set).
+void unload_model_locked(LlamaCppVLMBackend* backend) {
     if (backend->mtmd_ctx) {
         mtmd_free(backend->mtmd_ctx);
         backend->mtmd_ctx = nullptr;
@@ -1086,6 +1146,22 @@ rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle) {
     backend->model_loaded = false;
     backend->n_past = 0;
     RAC_LOG_INFO(LOG_CAT, "VLM model unloaded");
+}
+}  // namespace
+
+rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle) {
+    if (!handle) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
+    if (backend->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    InFlightGuard in_flight_guard(backend);
+    std::lock_guard<std::mutex> lock(backend->mutex);
+
+    unload_model_locked(backend);
     return RAC_SUCCESS;
 }
 
@@ -1102,8 +1178,27 @@ void rac_vlm_llamacpp_destroy(rac_handle_t handle) {
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
 
-    // Unload model first
-    rac_vlm_llamacpp_unload_model(handle);
+    // Signal shutdown and cancel any in-flight inference so streaming loops
+    // wake up. Future public-API entries on this handle fail fast on the
+    // is_shutting_down check (mirrors voice_agent.cpp:179).
+    backend->is_shutting_down.store(true, std::memory_order_release);
+    backend->cancel_requested.store(true, std::memory_order_release);
+
+    // Spin-wait for any in-flight op (process / process_stream / load /
+    // unload / get_model_info) to drain before freeing. Sleep 1ms between
+    // polls rather than yield-spinning so a multi-second LLM call holding
+    // the counter doesn't burn 100% CPU or starve QoS-scheduled threads.
+    while (backend->in_flight.load(std::memory_order_acquire) > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    // Tear down handles under the mutex; safe because no new public call
+    // can acquire the mutex once is_shutting_down is set and in_flight
+    // has drained.
+    {
+        std::lock_guard<std::mutex> lock(backend->mutex);
+        unload_model_locked(backend);
+    }
 
     delete backend;
     RAC_LOG_INFO(LOG_CAT, "VLM backend destroyed");
@@ -1121,6 +1216,10 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
+    if (backend->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    InFlightGuard in_flight_guard(backend);
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     if (!backend->model_loaded) {
@@ -1142,7 +1241,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     response.reserve(kDefaultMaxTokens);  // Typical VLM responses are a few hundred tokens
     int tokens_generated = 0;
 
-    llama_batch batch = llama_batch_init(1, 0, 1);
+    LlamaBatchGuard batch_guard(llama_batch_init(1, 0, 1));
+    llama_batch& batch = batch_guard.batch;
     const llama_vocab* const vocab = llama_model_get_vocab(backend->model);
 
     // Runtime repetition guard: track last token and consecutive repeat count.
@@ -1276,8 +1376,6 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
         }
     }
 
-    llama_batch_free(batch);
-
     if (decode_failed) {
         return RAC_ERROR_INFERENCE_FAILED;
     }
@@ -1305,6 +1403,10 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     }
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
+    if (backend->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    InFlightGuard in_flight_guard(backend);
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     if (!backend->model_loaded) {
@@ -1323,7 +1425,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     const int max_tokens =
         (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
 
-    llama_batch batch = llama_batch_init(1, 0, 1);
+    LlamaBatchGuard batch_guard(llama_batch_init(1, 0, 1));
+    llama_batch& batch = batch_guard.batch;
     const llama_vocab* const vocab = llama_model_get_vocab(backend->model);
 
     // Runtime repetition guard (same as non-streaming path)
@@ -1479,7 +1582,6 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         terminal_emitted = true;
     }
 
-    llama_batch_free(batch);
     return decode_failed ? RAC_ERROR_INFERENCE_FAILED : RAC_SUCCESS;
 }
 
@@ -1496,6 +1598,10 @@ rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
     }
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
+    if (backend->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    InFlightGuard in_flight_guard(backend);
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     if (!backend->model_loaded) {
