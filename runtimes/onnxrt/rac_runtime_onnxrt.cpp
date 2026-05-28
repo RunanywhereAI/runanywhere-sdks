@@ -1392,6 +1392,20 @@ const rac_runtime_vtable_t* runtime_vtable() {
 }  // namespace runtime
 }  // namespace runanywhere
 
+/* runtimes-002: linker-keep-alive anchor, symmetric to
+ * `rac_coreml_runtime_require_available` / `rac_metal_runtime_require_available`.
+ * Engines that route to onnxrt call this from their plugin entry so a real
+ * symbol reference forces the linker to retain THIS translation unit — which
+ * also carries the `RAC_STATIC_RUNTIME_REGISTER(onnxrt)` constructor below.
+ * Without it the registrar survives only coincidentally (engines/onnx pulls in
+ * the C++ `Session::create` symbol, and only under RAC_BACKEND_RAG=ON), so a
+ * RAG-off iOS/static build could strip the registrar and leave
+ * `rac_runtime_is_registered(RAC_RUNTIME_ONNXRT)` returning 0. */
+extern "C" RAC_API rac_result_t rac_onnxrt_runtime_require_available(void) {
+    return rac_runtime_get_by_id(RAC_RUNTIME_ONNXRT) != nullptr ? RAC_SUCCESS
+                                                                : RAC_ERROR_BACKEND_UNAVAILABLE;
+}
+
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
     return &k_onnxrt_vtable;
 }

@@ -101,3 +101,23 @@ const rac_runtime_vtable_t* runtime_vtable();
 }  // namespace onnxrt
 }  // namespace runtime
 }  // namespace runanywhere
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Force-keep the onnxrt runtime registrar translation unit at link time.
+ *
+ * Mirrors `rac_coreml_runtime_require_available` / `rac_metal_runtime_require_
+ * available`. Engines that declare `RAC_RUNTIME_ONNXRT` call this from their
+ * plugin entry so a real symbol reference anchors the TU carrying
+ * `RAC_STATIC_RUNTIME_REGISTER(onnxrt)`, independent of `RAC_BACKEND_RAG`.
+ * Returns `RAC_SUCCESS` when the runtime is registered, else
+ * `RAC_ERROR_BACKEND_UNAVAILABLE`.
+ */
+rac_result_t rac_onnxrt_runtime_require_available(void);
+
+#ifdef __cplusplus
+}
+#endif
