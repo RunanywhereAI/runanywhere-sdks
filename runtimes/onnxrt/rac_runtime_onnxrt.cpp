@@ -722,8 +722,26 @@ rac_result_t onnxrt_init(void) {
 
 void onnxrt_destroy(void) {}
 
-rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
-                                   rac_runtime_session_t** out) {
+/* commons-094: the vtable ops below are reached from `extern "C"` dispatch (the
+ * proto/runtime registry and the JNI thunks). They build `std::vector` /
+ * `std::string` and call into `Session::run` / `Session::create`, any of which
+ * can throw `std::bad_alloc` on the inference hot path. Letting a C++ exception
+ * cross the C ABI is undefined behavior (it aborts the whole process). Run each
+ * op through this guard so allocation failure becomes RAC_ERROR_OUT_OF_MEMORY
+ * and any other exception becomes RAC_ERROR_INTERNAL. */
+template <typename Fn>
+rac_result_t onnxrt_guard(Fn&& fn) {
+    try {
+        return fn();
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+rac_result_t onnxrt_create_session_impl(const rac_runtime_session_desc_t* desc,
+                                        rac_runtime_session_t** out) {
     if (!desc || !out)
         return RAC_ERROR_NULL_POINTER;
     /* runtimes-004: rac_runtime_session_desc_t allows either a model_path on
@@ -789,9 +807,14 @@ rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
     return RAC_SUCCESS;
 }
 
-rac_result_t onnxrt_run_session(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
-                                size_t input_count, rac_runtime_io_t* outputs,
-                                size_t output_count) {
+rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
+                                   rac_runtime_session_t** out) {
+    return onnxrt_guard([&] { return onnxrt_create_session_impl(desc, out); });
+}
+
+rac_result_t onnxrt_run_session_impl(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
+                                     size_t input_count, rac_runtime_io_t* outputs,
+                                     size_t output_count) {
     if (!session || !inputs || !outputs)
         return RAC_ERROR_NULL_POINTER;
 
@@ -867,6 +890,14 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session, const rac_runtim
     return RAC_SUCCESS;
 }
 
+rac_result_t onnxrt_run_session(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
+                                size_t input_count, rac_runtime_io_t* outputs,
+                                size_t output_count) {
+    return onnxrt_guard([&] {
+        return onnxrt_run_session_impl(session, inputs, input_count, outputs, output_count);
+    });
+}
+
 void onnxrt_destroy_session(rac_runtime_session_t* session) {
     if (!session)
         return;
@@ -905,9 +936,9 @@ void onnxrt_free_buffer(rac_runtime_buffer_t* buffer) {
  *     it through `release_tensor`. Shape is handled the same way, using
  *     `shape_capacity` for caller-supplied storage. Dtype + rank are written
  *     back unconditionally. */
-rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
-                                   const rac_runtime_tensor_t* inputs, size_t n_in,
-                                   rac_runtime_tensor_t* outputs, size_t n_out) {
+rac_result_t onnxrt_run_session_v2_impl(rac_runtime_session_t* session,
+                                        const rac_runtime_tensor_t* inputs, size_t n_in,
+                                        rac_runtime_tensor_t* outputs, size_t n_out) {
     if (!session)
         return RAC_ERROR_INVALID_HANDLE;
     if (n_in > 0 && !inputs)
@@ -1149,6 +1180,13 @@ rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
         outputs[i].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
     }
     return RAC_SUCCESS;
+}
+
+rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
+                                   const rac_runtime_tensor_t* inputs, size_t n_in,
+                                   rac_runtime_tensor_t* outputs, size_t n_out) {
+    return onnxrt_guard(
+        [&] { return onnxrt_run_session_v2_impl(session, inputs, n_in, outputs, n_out); });
 }
 
 rac_result_t onnxrt_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
