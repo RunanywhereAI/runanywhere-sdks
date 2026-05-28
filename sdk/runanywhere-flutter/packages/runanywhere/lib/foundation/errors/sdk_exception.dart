@@ -7,8 +7,10 @@
 // that mirror the legacy hand-rolled `SDKError` factories so call sites
 // can keep their familiar shape while flowing proto messages end-to-end.
 
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/generated/errors.pb.dart' as pb;
 import 'package:runanywhere/generated/errors.pbenum.dart' as pb_enum;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// Throwable wrapper around the canonical [pb.SDKError] proto.
 class SDKException implements Exception {
@@ -470,6 +472,46 @@ class SDKException implements Exception {
       message: error.toString(),
       underlyingError: error,
     );
+  }
+
+  /// Map a `rac_result_t` (signed C ABI error [code]) to an [SDKException] via
+  /// the canonical commons helper `rac_result_to_proto_error`, deserializing
+  /// the returned `SDKError` proto. Returns `null` for `RAC_SUCCESS` (0).
+  ///
+  /// Mirrors Swift's `SDKException.from(rcResult:)` so the rac_result_t → proto
+  /// translation lives in one place (commons) across every SDK instead of
+  /// being re-mapped here. Falls back to an `ERROR_CODE_UNSPECIFIED` envelope
+  /// when the native binding is unavailable (older commons binary) or
+  /// deserialization fails.
+  static SDKException? fromResult(int code) {
+    if (code == 0) return null;
+    final bind = RacNative.bindings.rac_result_to_proto_error;
+    if (bind != null) {
+      try {
+        final proto = DartBridgeProtoUtils.callOut<pb.SDKError>(
+          invoke: (out) => bind(code, out),
+          decode: pb.SDKError.fromBuffer,
+          symbol: 'rac_result_to_proto_error',
+        );
+        return SDKException(proto);
+      } catch (_) {
+        // Fall through to the generic envelope below.
+      }
+    }
+    final err = pb.SDKError(
+      code: pb_enum.ErrorCode.ERROR_CODE_UNSPECIFIED,
+      category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+      message: 'Unknown error code: $code',
+      cAbiCode: code,
+    );
+    return SDKException(err);
+  }
+
+  /// Throw an [SDKException] if [code] indicates failure (non-zero). Mirrors
+  /// Swift's `SDKException.throwIfError(_:)`.
+  static void throwIfError(int code) {
+    final ex = fromResult(code);
+    if (ex != null) throw ex;
   }
 
   static String _formatBytes(int bytes) {

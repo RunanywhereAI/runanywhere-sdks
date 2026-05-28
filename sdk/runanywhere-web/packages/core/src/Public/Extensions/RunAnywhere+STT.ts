@@ -182,6 +182,7 @@ function callCreate(module: STTComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_stt_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -223,6 +224,7 @@ function callLoadModel(
       throw SDKException.fromRACResult(
         rc,
         `rac_stt_component_load_model failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {

@@ -108,6 +108,7 @@ function callCreate(module: TTSComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_tts_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -149,6 +150,7 @@ function callLoadVoice(
       throw SDKException.fromRACResult(
         rc,
         `rac_tts_component_load_voice failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {

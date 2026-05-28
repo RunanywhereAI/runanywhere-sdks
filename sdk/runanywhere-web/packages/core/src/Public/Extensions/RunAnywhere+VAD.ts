@@ -120,6 +120,7 @@ function callCreate(module: VADComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_vad_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -162,6 +163,7 @@ function callLoadModel(
       throw SDKException.fromRACResult(
         rc,
         `rac_vad_component_load_model failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {

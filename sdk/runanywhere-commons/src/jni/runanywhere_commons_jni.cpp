@@ -62,6 +62,7 @@
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -1261,6 +1262,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLogMetadataShouldRed
         return JNI_FALSE;
     }
     return out != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
+}
+
+// Maps a `rac_result_t` to a serialized SDKError proto via the canonical
+// commons helper, so Kotlin's SDKException routes the rac_result_t -> proto
+// translation through the same single source of truth as Swift
+// (RASDKError+Helpers.swift). Returns the serialized SDKError bytes.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racResultToProtoError(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jint code) {
+    rac_proto_buffer_t buffer = {};
+    rac_proto_buffer_init(&buffer);
+    rac_result_t rc =
+        rac_result_to_proto_error(static_cast<rac_result_t>(code), &buffer);
+    return makeProtoCallResult(env, rc, &buffer, "racResultToProtoError");
 }
 
 // =============================================================================

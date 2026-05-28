@@ -384,6 +384,11 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_proto_buffer_status"
     "_rac_wasm_offsetof_proto_buffer_error_message"
 
+    # Canonical rac_result_t -> SDKError proto mapping (commons-128-E). Lets
+    # SDKException route error construction through the shared commons helper
+    # rac_result_to_proto_error instead of the local TypeScript category table.
+    "_rac_wasm_result_to_proto_error"
+
     # Module registry
     "_rac_module_register"
     "_rac_module_unregister"

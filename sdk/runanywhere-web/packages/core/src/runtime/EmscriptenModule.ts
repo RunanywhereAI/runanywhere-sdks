@@ -544,6 +544,13 @@ export interface EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_proto_buffer_status?(): number;
   _rac_wasm_offsetof_proto_buffer_error_message?(): number;
 
+  /**
+   * Canonical rac_result_t -> serialized SDKError proto mapping
+   * (commons-128-E). Lets SDKException route error construction through the
+   * shared commons helper rac_result_to_proto_error.
+   */
+  _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
+
   // -----------------------------------------------------------------------------
   // Storage analyzer proto-byte ABI
   // -----------------------------------------------------------------------------

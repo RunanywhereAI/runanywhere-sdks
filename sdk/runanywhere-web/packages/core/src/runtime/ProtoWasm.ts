@@ -29,6 +29,9 @@ export interface ProtoWasmModule {
 
   _rac_wasm_infer_model_file_role?(filenamePtr: number, modalityProto: number): number;
 
+  /** Canonical rac_result_t -> serialized SDKError proto mapping. */
+  _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
+
   _rac_proto_buffer_init?(bufferPtr: number): void;
   _rac_proto_buffer_free?(bufferPtr: number): void;
   _rac_wasm_sizeof_proto_buffer?(): number;

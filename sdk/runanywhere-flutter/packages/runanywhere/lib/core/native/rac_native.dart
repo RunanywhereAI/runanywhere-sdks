@@ -255,6 +255,18 @@ typedef RacOutOnlyProtoNative = ffi.Int32 Function(
 );
 typedef RacOutOnlyProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
+/// `rac_result_to_proto_error(rac_result_t code, rac_proto_buffer_t* out)` —
+/// canonical mapping from a signed C ABI error code to a serialized
+/// `runanywhere.v1.SDKError` proto buffer.
+typedef RacResultToProtoErrorNative = ffi.Int32 Function(
+  ffi.Int32,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacResultToProtoErrorDart = int Function(
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
 /// `void (*)(void)` quiesce ABI exposed by every modality stream header
 /// (rac_llm_stream.h, rac_stt_stream.h, rac_tts_stream.h, rac_vad_stream.h,
 /// rac_diffusion_stream.h, rac_vlm_service.h, voice_agent). Callers spin-wait
@@ -1149,6 +1161,11 @@ class RacBindings {
             RacProtoBufferInitDart>('rac_proto_buffer_init'),
         rac_proto_buffer_free = lib.lookupFunction<RacProtoBufferFreeNative,
             RacProtoBufferFreeDart>('rac_proto_buffer_free'),
+        rac_result_to_proto_error =
+            _lookupOptional<RacResultToProtoErrorDart>(
+          () => lib.lookupFunction<RacResultToProtoErrorNative,
+              RacResultToProtoErrorDart>('rac_result_to_proto_error'),
+        ),
         rac_voice_agent_set_proto_callback = lib.lookupFunction<
                 RacVoiceAgentSetProtoCallbackNative,
                 RacVoiceAgentSetProtoCallbackDart>(
@@ -1870,6 +1887,12 @@ class RacBindings {
   final RacProtoBufferInitDart rac_proto_buffer_init;
 
   final RacProtoBufferFreeDart rac_proto_buffer_free;
+
+  /// `rac_result_to_proto_error` — canonical rac_result_t → serialized
+  /// `SDKError` proto mapping. Null when the loaded commons binary predates
+  /// the export. Mirrors Swift's RASDKError+Helpers.swift path so the
+  /// translation lives in commons across every SDK.
+  final RacResultToProtoErrorDart? rac_result_to_proto_error;
 
   // Streaming callbacks ------------------------------------------------------
 

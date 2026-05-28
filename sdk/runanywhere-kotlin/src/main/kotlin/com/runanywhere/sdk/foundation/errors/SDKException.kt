@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.foundation.errors
 
 import com.runanywhere.sdk.infrastructure.logging.Logging
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.extensions.LogLevel
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
@@ -420,6 +421,49 @@ class SDKException(
                     else -> ProtoErrorCode.ERROR_CODE_UNKNOWN to "ONNX error code: $code"
                 }
             return make(code = raCode, message = message, category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL)
+        }
+
+        /**
+         * Map a `rac_result_t` (signed C ABI error [code]) to an
+         * [SDKException] via the canonical commons helper
+         * `rac_result_to_proto_error` (JNI [RunAnywhereBridge.racResultToProtoError]),
+         * deserializing the returned `SDKError` proto. Returns `null` for
+         * `RAC_SUCCESS` (0).
+         *
+         * Mirrors Swift's `SDKException.from(rcResult:)`
+         * (RASDKError+Helpers.swift) so the rac_result_t → proto translation
+         * lives in one place (commons) across every SDK instead of being
+         * re-mapped here. Falls back to an `ERROR_CODE_UNKNOWN` envelope when
+         * the bridge yields no payload (e.g. commons built without protobuf,
+         * or the native library is unavailable).
+         */
+        fun fromRACResult(code: Int): SDKException? {
+            if (code == RunAnywhereBridge.RAC_SUCCESS) return null
+            val bytes =
+                try {
+                    RunAnywhereBridge.racResultToProtoError(code)
+                } catch (_: Throwable) {
+                    null
+                }
+            val proto = bytes?.let { runCatching { ProtoSDKError.ADAPTER.decode(it) }.getOrNull() }
+            return if (proto != null) {
+                SDKException(error = proto)
+            } else {
+                make(
+                    code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                    message = "Unknown error code: $code",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+                    cAbiCode = code,
+                )
+            }
+        }
+
+        /**
+         * Throw an [SDKException] if [code] indicates failure (non-zero).
+         * Mirrors Swift's `SDKException.throwIfError(_:)`.
+         */
+        fun throwIfError(code: Int) {
+            fromRACResult(code)?.let { throw it }
         }
 
         /**

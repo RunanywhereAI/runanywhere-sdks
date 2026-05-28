@@ -122,6 +122,20 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLogMetadataShouldRedact(key: String): Boolean
 
+    /**
+     * Map a `rac_result_t` (signed C ABI error code) to a serialized
+     * `runanywhere.v1.SDKError` proto via the canonical commons helper
+     * `rac_result_to_proto_error`. Keeps the rac_result_t → proto translation
+     * in commons — the single source of truth shared with Swift
+     * (RASDKError+Helpers.swift) — instead of re-mapping per SDK.
+     *
+     * @param code Signed `rac_result_t` error code.
+     * @return Serialized `SDKError` proto bytes, or `null` if serialization
+     *         produced no payload.
+     */
+    @JvmStatic
+    external fun racResultToProtoError(code: Int): ByteArray?
+
     // ========================================================================
     // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
     // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/

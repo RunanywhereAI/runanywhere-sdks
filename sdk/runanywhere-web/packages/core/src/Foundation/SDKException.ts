@@ -15,8 +15,11 @@ import {
   ErrorCategory as ProtoErrorCategory,
   ErrorCode as ProtoErrorCode,
   ErrorSeverity as ProtoErrorSeverity,
+  SDKError as SDKErrorCodec,
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import type { SDKLogger } from './SDKLogger';
 
 /**
  * Signed-negative SDK error codes that mirror the rac_result_t C ABI ranges.
@@ -232,10 +235,54 @@ export class SDKException extends Error {
     return new SDKException(code, message, details);
   }
 
-  /** Build an SDKException from a raw `rac_result_t` result code. */
-  static fromRACResult(resultCode: number, details?: string): SDKException {
+  /**
+   * Build an SDKException from a raw `rac_result_t` result code.
+   *
+   * When a loaded WASM [wasm] module is supplied, the rac_result_t -> proto
+   * translation is routed through the canonical commons helper
+   * `rac_result_to_proto_error` (mirroring Swift's `SDKException.from(rcResult:)`)
+   * so code/category/message stay byte-identical across SDKs. Without a module
+   * (e.g. before WASM is loaded), it falls back to the local mapping table —
+   * the same behaviour as before this routing was added.
+   */
+  static fromRACResult(
+    resultCode: number,
+    details?: string,
+    wasm?: { module: ProtoWasmModule; logger: SDKLogger },
+  ): SDKException {
+    if (wasm && typeof wasm.module._rac_wasm_result_to_proto_error === 'function') {
+      const proto = SDKException.protoFromCommons(wasm.module, wasm.logger, resultCode);
+      if (proto) {
+        if (details && !proto.nestedMessage) proto.nestedMessage = details;
+        return new SDKException(proto);
+      }
+    }
     const message = `RACommons error: ${resultCode}`;
     return SDKException.fromCode(resultCode as SDKErrorCode, message, details);
+  }
+
+  /**
+   * Decode the canonical commons SDKError proto for [resultCode] via the
+   * `_rac_wasm_result_to_proto_error` WASM export. Returns `undefined` when the
+   * export is unavailable or yields no payload, letting callers fall back to
+   * the local mapping.
+   */
+  private static protoFromCommons(
+    module: ProtoWasmModule,
+    logger: SDKLogger,
+    resultCode: number,
+  ): ProtoSDKError | undefined {
+    const bridge = new ProtoWasmBridge(module, logger);
+    const bytes = bridge.readResultProto(
+      (outPtr) => module._rac_wasm_result_to_proto_error!(resultCode, outPtr),
+      'rac_wasm_result_to_proto_error',
+    );
+    if (!bytes || bytes.length === 0) return undefined;
+    try {
+      return SDKErrorCodec.decode(bytes);
+    } catch {
+      return undefined;
+    }
   }
 
   // ---------------------------------------------------------------------------
