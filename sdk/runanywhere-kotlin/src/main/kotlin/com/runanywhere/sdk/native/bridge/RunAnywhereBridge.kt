@@ -1329,6 +1329,16 @@ object RunAnywhereBridge {
     @JvmStatic external fun racStructuredOutputValidateProto(requestProto: ByteArray): ByteArray?
 
     /**
+     * Serialize a `runanywhere.v1.JSONSchema` proto into the canonical
+     * compact, key-sorted JSON Schema text used by the commons
+     * structured-output pipeline (mirrors Swift
+     * `RAJSONSchema.jsonSchemaString`). Returns the UTF-8 text bytes, or
+     * `null` on failure. Forwards to `rac_structured_output_schema_to_json_proto`.
+     */
+    @JvmStatic
+    external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
+
+    /**
      * Stream structured generation. Emits serialized `StructuredOutputStreamEvent`
      * payloads through [listener]. Returns `RAC_SUCCESS` when the generation
      * transport completed successfully.
