@@ -92,10 +92,51 @@ void d7_emit_voice_event(rac_voice_agent_handle_t handle, runanywhere::v1::Voice
                     : runanywhere::v1::ERROR_SEVERITY_INFO);
 }
 
+// Map a proto PipelineState to the C audio-pipeline-state enum used by
+// rac_audio_pipeline_is_valid_transition. Returns RAC_AUDIO_PIPELINE_ERROR
+// (the "any-target-is-valid" sink) for proto states that don't have a
+// direct counterpart in the C enum, so we never spuriously reject a
+// transition the C validator wasn't designed to cover.
+rac_audio_pipeline_state_t d7_proto_state_to_audio_state(runanywhere::v1::PipelineState state) {
+    switch (state) {
+        case runanywhere::v1::PIPELINE_STATE_IDLE:
+            return RAC_AUDIO_PIPELINE_IDLE;
+        case runanywhere::v1::PIPELINE_STATE_LISTENING:
+            return RAC_AUDIO_PIPELINE_LISTENING;
+        case runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH:
+            return RAC_AUDIO_PIPELINE_PROCESSING_SPEECH;
+        case runanywhere::v1::PIPELINE_STATE_GENERATING_RESPONSE:
+            return RAC_AUDIO_PIPELINE_GENERATING_RESPONSE;
+        case runanywhere::v1::PIPELINE_STATE_PLAYING_TTS:
+            return RAC_AUDIO_PIPELINE_PLAYING_TTS;
+        case runanywhere::v1::PIPELINE_STATE_COOLDOWN:
+            return RAC_AUDIO_PIPELINE_COOLDOWN;
+        case runanywhere::v1::PIPELINE_STATE_WAITING_WAKEWORD:
+            return RAC_AUDIO_PIPELINE_WAITING_WAKEWORD;
+        case runanywhere::v1::PIPELINE_STATE_ERROR:
+            return RAC_AUDIO_PIPELINE_ERROR;
+        default:
+            return RAC_AUDIO_PIPELINE_ERROR;
+    }
+}
+
 void d7_emit_state(rac_voice_agent_handle_t handle, runanywhere::v1::PipelineState previous,
                    runanywhere::v1::PipelineState current, const std::string& session_id,
                    const std::string& turn_id, const std::string& request_id,
                    rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
+    // commons-044: gate against the documented state machine
+    // (rac_audio_pipeline_is_valid_transition). Invalid transitions still
+    // emit so downstream subscribers see the desync, but we log a warning
+    // so frontend authors notice when the pipeline takes an unsanctioned
+    // shortcut (e.g. PLAYING_TTS -> IDLE skipping COOLDOWN).
+    const rac_audio_pipeline_state_t from = d7_proto_state_to_audio_state(previous);
+    const rac_audio_pipeline_state_t to = d7_proto_state_to_audio_state(current);
+    if (rac_audio_pipeline_is_valid_transition(from, to) != RAC_TRUE) {
+        RAC_LOG_WARN("VoiceAgent",
+                     "D-7 invalid pipeline transition %s -> %s; emitting anyway for observability",
+                     rac_audio_pipeline_state_name(from), rac_audio_pipeline_state_name(to));
+    }
+
     runanywhere::v1::VoiceEvent event;
     event.set_category(runanywhere::v1::EVENT_CATEGORY_VOICE_AGENT);
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_INFO);
@@ -390,7 +431,15 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, true,
                   session_id, turn_id, request_id, event_callback, user_data);
 
+    // commons-044: honor the documented PLAYING_TTS -> COOLDOWN -> IDLE
+    // pathway so frontends gating the microphone on
+    // rac_audio_pipeline_can_activate_microphone() get the 800ms feedback-
+    // prevention window the architecture promises. Skipping COOLDOWN here
+    // let the mic reopen instantly after TTS, capturing TTS bleed-through.
     d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_PLAYING_TTS,
+                  runanywhere::v1::PIPELINE_STATE_COOLDOWN, session_id, turn_id, request_id,
+                  event_callback, user_data);
+    d7_emit_state(handle, runanywhere::v1::PIPELINE_STATE_COOLDOWN,
                   runanywhere::v1::PIPELINE_STATE_IDLE, session_id, turn_id, request_id,
                   event_callback, user_data);
     emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED, stt.text,
