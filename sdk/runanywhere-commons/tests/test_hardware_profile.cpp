@@ -21,6 +21,23 @@
 #include "hardware_profile.pb.h"
 #endif
 
+/* setenv/unsetenv are POSIX-only; MSVC/Windows requires _putenv_s. */
+#if defined(_WIN32)
+static void set_env(const char* name, const char* value) {
+    _putenv_s(name, value);
+}
+static void unset_env(const char* name) {
+    _putenv_s(name, "");
+}
+#else
+static void set_env(const char* name, const char* value) {
+    setenv(name, value, 1);
+}
+static void unset_env(const char* name) {
+    unsetenv(name);
+}
+#endif
+
 int main() {
     using rac::router::HardwareProfile;
 
@@ -60,7 +77,7 @@ int main() {
     }
 
     /* (4) RAC_FORCE_RUNTIME=cpu zeroes every has_* flag. */
-    setenv("RAC_FORCE_RUNTIME", "cpu", 1);
+    set_env("RAC_FORCE_RUNTIME", "cpu");
     HardwareProfile::refresh();
     const HardwareProfile d = HardwareProfile::cached();
     bool any_accel = d.has_metal || d.has_ane || d.has_coreml || d.has_cuda || d.has_vulkan ||
@@ -75,7 +92,7 @@ int main() {
         std::fprintf(stderr, "  FAIL: CPU still not supported under FORCE\n");
         ++fails;
     }
-    unsetenv("RAC_FORCE_RUNTIME");
+    unset_env("RAC_FORCE_RUNTIME");
     HardwareProfile::refresh(); /* leave cache in normal state for any later tests */
 
 #ifdef RAC_HAVE_PROTOBUF
