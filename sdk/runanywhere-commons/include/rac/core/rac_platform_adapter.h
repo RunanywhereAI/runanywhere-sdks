@@ -335,10 +335,29 @@ typedef struct rac_platform_adapter {
      * Optional. When non-NULL, the C++ model registry refresh path can rescan
      * on-disk model folders without the SDK having to wire up the legacy
      * `rac_discovery_callbacks_t` struct. When NULL the rescan path falls
-     * back to a no-op + warning, preserving prior behaviour.
+     * back to a no-op + a structured warning string in
+     * `ModelRegistryRefreshResult.warnings` ("rescan_local requires platform
+     * filesystem callbacks in the C ABI refresh path"), preserving prior
+     * behaviour.
      *
      * Two-call semantics: pass NULL `out_entries` to query capacity, then
      * allocate and call again. See `rac_file_list_directory_fn` docs.
+     *
+     * Cross-SDK status (each SDK is responsible for populating this slot on
+     * every platform whose runtime exposes a directory enumeration API):
+     *   - Web:           POPULATED (registerFileListDirectory in
+     *                    PlatformAdapter.ts via OPFS).
+     *   - Swift (iOS):   SHOULD be populated via FileManager.contentsOfDirectory
+     *                    (currently NULL — refresh emits the warning above).
+     *   - Kotlin / RN Android: SHOULD be populated via java.io.File.listFiles().
+     *   - Flutter:       SHOULD be populated via Dart FFI trampoline over
+     *                    dart:io Directory.listSync().
+     *   - RN iOS:        SHOULD be populated via FileManager.contentsOfDirectory.
+     *
+     * User-visible impact when this slot is NULL: model registry refresh with
+     * `rescan_local = true` cannot link on-disk model folders to registered
+     * entries — the warning in `ModelRegistryRefreshResult.warnings` is the
+     * only signal to consuming code that the local rescan was skipped.
      */
     rac_file_list_directory_fn file_list_directory;
 
@@ -353,7 +372,23 @@ typedef struct rac_platform_adapter {
      * (rac_model_info_make_proto) to compute the `is_downloaded` field for
      * directory-based artifacts (multi-file, archive-extracted) without
      * forcing the SDK to enumerate the directory itself. When NULL, commons
-     * falls back to file_list_directory + entry-count.
+     * falls back to `file_list_directory` + entry-count; if BOTH are NULL,
+     * `rac_path_is_non_empty_directory()` returns RAC_FALSE and
+     * `is_downloaded` reports false for every directory-based artifact.
+     *
+     * Cross-SDK status (populate on every platform whose runtime exposes a
+     * cheap directory probe — falling back to file_list_directory is
+     * acceptable but pays the enumeration cost):
+     *   - Web:           POPULATED (registerIsNonEmptyDirectory).
+     *   - Swift / RN iOS / Kotlin / RN Android / Flutter: SHOULD be populated
+     *     directly when the platform exposes a non-enumerating probe, otherwise
+     *     rely on the file_list_directory fallback above.
+     *
+     * User-visible impact when BOTH slots are NULL: multi-file model artifacts
+     * (e.g. mmproj + GGUF pairs, tokenizer + ONNX bundles) always report
+     * `is_downloaded == false`, which silently disables the example-app
+     * download-button gating and ranks downloaded models below unfetched ones
+     * in registry listings.
      *
      * @param path Absolute directory path (UTF-8, NUL-terminated).
      * @param user_data Platform context.
@@ -376,6 +411,25 @@ typedef struct rac_platform_adapter {
      * a fresh UUID and persists it via secure_set.
      *
      * Buffer should be >= 37 bytes (UUID string + NUL).
+     *
+     * Cross-SDK status (Apple-only — non-Apple SDKs MUST leave this NULL,
+     * Apple-bridged SDKs SHOULD populate it so device-id is stable across
+     * keychain wipes and matches Swift/iOS behaviour):
+     *   - Web:           POPULATED (registerGetVendorId — no-op on non-Apple,
+     *                    used by Safari/WKWebView when available).
+     *   - Swift (iOS):   POPULATED (CppBridge+PlatformAdapter.swift wires
+     *                    UIDevice.identifierForVendor.uuidString).
+     *   - RN iOS:        SHOULD be populated via the same UIDevice API in the
+     *                    InitBridge platform-adapter struct.
+     *   - Flutter iOS:   SHOULD be populated via a Dart FFI trampoline that
+     *                    invokes the iOS platform channel for identifierForVendor.
+     *   - Kotlin / RN Android / Flutter Android: leave NULL (Android has no
+     *                    equivalent stable per-app vendor ID; commons
+     *                    synthesizes + persists a UUID instead).
+     *
+     * User-visible impact when this slot is NULL on Apple: every fresh
+     * install / keychain reset produces a new device ID, which breaks
+     * analytics identity continuity and forces license re-activation.
      *
      * @param out_buffer  Caller-provided buffer to receive the UUID string.
      * @param buffer_size Buffer size in bytes; MUST be >= 37 to succeed.
