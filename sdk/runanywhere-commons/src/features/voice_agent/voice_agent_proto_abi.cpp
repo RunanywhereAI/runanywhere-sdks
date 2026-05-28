@@ -10,7 +10,11 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
@@ -168,110 +172,142 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                           "VAD component is not initialized");
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    // commons-045: hold handle->mutex while the pipeline runs (serializes
+    // against load/cleanup/destroy), but defer every user-visible event
+    // dispatch to a queue and flush it AFTER the lock is released — the
+    // emit_* helpers ultimately invoke the registered proto callback
+    // synchronously, so dispatching while holding the outer mutex would
+    // self-deadlock if the callback re-enters any handle-mutex API
+    // (cleanup, destroy, load_*_model, ...).
+    std::vector<std::function<void()>> pending_emits;
+    auto flush_emits = [&pending_emits]() {
+        for (auto& emit : pending_emits) {
+            emit();
+        }
+        pending_emits.clear();
+    };
 
-    emit_component_states(handle);
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED);
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
+    runanywhere::v1::VoiceAgentResult result;
+    rac_result_t rc = RAC_SUCCESS;
+    std::string error_message;
+    rac_result_t error_code = RAC_SUCCESS;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
 
-    // SWIFT-VOICE-AGENT-001 (T16/Path X): prefer the global lifecycle
-    // (level-1 impl + ops); fall back to the per-handle component for legacy
-    // load paths.
-    rac::lifecycle::LifecycleSttRef stt_ref{};
-    const bool have_lifecycle_stt = rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+        pending_emits.emplace_back([handle]() { emit_component_states(handle); });
+        // commons-149: the synchronous one-shot path has no VAD-driven
+        // speech detection between STARTED and STT, so only STARTED →
+        // TRANSCRIPTION_FINAL → COMPLETED are meaningful here. The d7
+        // path emits USER_SPEECH_STARTED/_ENDED around the actual VAD
+        // boundary; matching that contract requires real speech timing
+        // which this synchronous one-shot does not have.
+        pending_emits.emplace_back([handle]() {
+            emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
+        });
 
-    rac_stt_result_t stt = {};
-    rac_result_t rc;
-    if (have_lifecycle_stt) {
-        rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
-        rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
-    } else {
-        rc =
-            rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr, &stt);
-    }
-    if (rc != RAC_SUCCESS) {
+        // SWIFT-VOICE-AGENT-001 (T16/Path X): prefer the global lifecycle
+        // (level-1 impl + ops); fall back to the per-handle component for legacy
+        // load paths.
+        rac::lifecycle::LifecycleSttRef stt_ref{};
+        const bool have_lifecycle_stt =
+            rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
+
+        rac_stt_result_t stt = {};
         if (have_lifecycle_stt) {
-            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
+            rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
+        } else {
+            rc = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
+                                              &stt);
         }
-        emit_component_failure(handle, "stt", rc, "STT transcription failed");
-        return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
-    }
-    if (!stt.text || stt.text[0] == '\0') {
-        rac_stt_result_free(&stt);
-        if (have_lifecycle_stt) {
-            rac::lifecycle::release_lifecycle_stt(&stt_ref);
-        }
-        emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
-                               "STT transcription was empty");
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
-                                          "STT transcription was empty");
-    }
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL,
-                        stt.text);
-
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
-                        stt.text);
-
-    rac::llm::LifecycleLlmRef llm_ref{};
-    const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
-
-    rac_llm_result_t llm = {};
-    if (have_lifecycle_llm) {
-        rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
-        rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
-    } else {
-        rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
-    }
-    if (rc != RAC_SUCCESS) {
-        if (have_lifecycle_llm) {
-            rac::llm::release_lifecycle_llm(&llm_ref);
-        }
-        rac_stt_result_free(&stt);
-        if (have_lifecycle_stt) {
-            rac::lifecycle::release_lifecycle_stt(&stt_ref);
-        }
-        emit_component_failure(handle, "llm", rc, "LLM generation failed");
-        return rac_proto_buffer_set_error(out_result, rc, "LLM generation failed");
-    }
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
-                        stt.text, llm.text);
-
-    rac::lifecycle::LifecycleTtsRef tts_ref{};
-    const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
-
-    rac_tts_result_t tts = {};
-    if (have_lifecycle_tts) {
-        rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
-        rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
-    } else {
-        rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
-    }
-    if (rc != RAC_SUCCESS) {
-        if (have_lifecycle_tts) {
-            rac::lifecycle::release_lifecycle_tts(&tts_ref);
-        }
-        rac_llm_result_free(&llm);
-        if (have_lifecycle_llm) {
-            rac::llm::release_lifecycle_llm(&llm_ref);
-        }
-        rac_stt_result_free(&stt);
-        if (have_lifecycle_stt) {
-            rac::lifecycle::release_lifecycle_stt(&stt_ref);
-        }
-        emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
-        return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
-    }
-
-    void* wav_data = nullptr;
-    size_t wav_size = 0;
-    if (tts.audio_data && tts.audio_size > 0) {
-        rc = rac_audio_float32_to_wav(tts.audio_data, tts.audio_size,
-                                      tts.sample_rate > 0 ? tts.sample_rate
-                                                          : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                      &wav_data, &wav_size);
         if (rc != RAC_SUCCESS) {
-            rac_tts_result_free(&tts);
+            if (have_lifecycle_stt) {
+                rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            }
+            const rac_result_t failure_code = rc;
+            pending_emits.emplace_back([handle, failure_code]() {
+                emit_component_failure(handle, "stt", failure_code, "STT transcription failed");
+            });
+            error_code = rc;
+            error_message = "STT transcription failed";
+            goto cleanup_and_return;
+        }
+        if (!stt.text || stt.text[0] == '\0') {
+            rac_stt_result_free(&stt);
+            if (have_lifecycle_stt) {
+                rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            }
+            pending_emits.emplace_back([handle]() {
+                emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
+                                       "STT transcription was empty");
+            });
+            error_code = RAC_ERROR_INVALID_STATE;
+            error_message = "STT transcription was empty";
+            rc = error_code;
+            goto cleanup_and_return;
+        }
+        {
+            const std::string stt_text(stt.text);
+            pending_emits.emplace_back([handle, stt_text]() {
+                emit_turn_lifecycle(handle,
+                                    runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL,
+                                    stt_text.c_str());
+            });
+            pending_emits.emplace_back([handle, stt_text]() {
+                emit_turn_lifecycle(
+                    handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
+                    stt_text.c_str());
+            });
+        }
+
+        rac::llm::LifecycleLlmRef llm_ref{};
+        const bool have_lifecycle_llm = rac::llm::acquire_lifecycle_llm(&llm_ref) == RAC_SUCCESS;
+
+        rac_llm_result_t llm = {};
+        if (have_lifecycle_llm) {
+            rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
+            rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+        } else {
+            rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+        }
+        if (rc != RAC_SUCCESS) {
+            if (have_lifecycle_llm) {
+                rac::llm::release_lifecycle_llm(&llm_ref);
+            }
+            rac_stt_result_free(&stt);
+            if (have_lifecycle_stt) {
+                rac::lifecycle::release_lifecycle_stt(&stt_ref);
+            }
+            const rac_result_t failure_code = rc;
+            pending_emits.emplace_back([handle, failure_code]() {
+                emit_component_failure(handle, "llm", failure_code, "LLM generation failed");
+            });
+            error_code = rc;
+            error_message = "LLM generation failed";
+            goto cleanup_and_return;
+        }
+        {
+            const std::string stt_text(stt.text);
+            const std::string llm_text(llm.text ? llm.text : "");
+            pending_emits.emplace_back([handle, stt_text, llm_text]() {
+                emit_turn_lifecycle(
+                    handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
+                    stt_text.c_str(), llm_text.c_str());
+            });
+        }
+
+        rac::lifecycle::LifecycleTtsRef tts_ref{};
+        const bool have_lifecycle_tts =
+            rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;
+
+        rac_tts_result_t tts = {};
+        if (have_lifecycle_tts) {
+            rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
+            rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+        } else {
+            rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+        }
+        if (rc != RAC_SUCCESS) {
             if (have_lifecycle_tts) {
                 rac::lifecycle::release_lifecycle_tts(&tts_ref);
             }
@@ -283,38 +319,85 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             if (have_lifecycle_stt) {
                 rac::lifecycle::release_lifecycle_stt(&stt_ref);
             }
-            emit_component_failure(handle, "tts", rc, "TTS audio conversion failed");
-            return rac_proto_buffer_set_error(out_result, rc, "TTS audio conversion failed");
+            const rac_result_t failure_code = rc;
+            pending_emits.emplace_back([handle, failure_code]() {
+                emit_component_failure(handle, "tts", failure_code, "TTS synthesis failed");
+            });
+            error_code = rc;
+            error_message = "TTS synthesis failed";
+            goto cleanup_and_return;
         }
-    }
 
-    runanywhere::v1::VoiceAgentResult result;
-    result.set_speech_detected(true);
-    result.set_transcription(stt.text);
-    if (llm.text) {
-        result.set_assistant_response(llm.text);
-    }
-    if (wav_data && wav_size > 0) {
-        result.set_synthesized_audio(wav_data, wav_size);
-    }
-    fill_component_states(handle, result.mutable_final_state());
+        void* wav_data = nullptr;
+        size_t wav_size = 0;
+        if (tts.audio_data && tts.audio_size > 0) {
+            rc = rac_audio_float32_to_wav(tts.audio_data, tts.audio_size,
+                                          tts.sample_rate > 0 ? tts.sample_rate
+                                                              : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                          &wav_data, &wav_size);
+            if (rc != RAC_SUCCESS) {
+                rac_tts_result_free(&tts);
+                if (have_lifecycle_tts) {
+                    rac::lifecycle::release_lifecycle_tts(&tts_ref);
+                }
+                rac_llm_result_free(&llm);
+                if (have_lifecycle_llm) {
+                    rac::llm::release_lifecycle_llm(&llm_ref);
+                }
+                rac_stt_result_free(&stt);
+                if (have_lifecycle_stt) {
+                    rac::lifecycle::release_lifecycle_stt(&stt_ref);
+                }
+                const rac_result_t failure_code = rc;
+                pending_emits.emplace_back([handle, failure_code]() {
+                    emit_component_failure(handle, "tts", failure_code,
+                                           "TTS audio conversion failed");
+                });
+                error_code = rc;
+                error_message = "TTS audio conversion failed";
+                goto cleanup_and_return;
+            }
+        }
 
-    emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED, stt.text,
-                        llm.text);
+        result.set_speech_detected(true);
+        result.set_transcription(stt.text);
+        if (llm.text) {
+            result.set_assistant_response(llm.text);
+        }
+        if (wav_data && wav_size > 0) {
+            result.set_synthesized_audio(wav_data, wav_size);
+        }
+        fill_component_states(handle, result.mutable_final_state());
 
-    std::free(wav_data);
-    rac_tts_result_free(&tts);
-    if (have_lifecycle_tts) {
-        rac::lifecycle::release_lifecycle_tts(&tts_ref);
-    }
-    rac_llm_result_free(&llm);
-    if (have_lifecycle_llm) {
-        rac::llm::release_lifecycle_llm(&llm_ref);
-    }
-    rac_stt_result_free(&stt);
-    if (have_lifecycle_stt) {
-        rac::lifecycle::release_lifecycle_stt(&stt_ref);
-    }
+        {
+            const std::string stt_text(stt.text);
+            const std::string llm_text(llm.text ? llm.text : "");
+            pending_emits.emplace_back([handle, stt_text, llm_text]() {
+                emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_COMPLETED,
+                                    stt_text.c_str(), llm_text.c_str());
+            });
+        }
+
+        std::free(wav_data);
+        rac_tts_result_free(&tts);
+        if (have_lifecycle_tts) {
+            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        }
+        rac_llm_result_free(&llm);
+        if (have_lifecycle_llm) {
+            rac::llm::release_lifecycle_llm(&llm_ref);
+        }
+        rac_stt_result_free(&stt);
+        if (have_lifecycle_stt) {
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        }
+    }  // lock released here
+
+    flush_emits();
     return copy_proto_message(result, out_result);
+
+cleanup_and_return:
+    flush_emits();
+    return rac_proto_buffer_set_error(out_result, error_code, error_message.c_str());
 #endif
 }
