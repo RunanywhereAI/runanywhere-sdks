@@ -3,8 +3,15 @@
 //  RunAnywhere SDK
 //
 //  Platform adapter bridge for fundamental C++ → Swift operations.
-//  Provides: logging, file operations, secure storage, clock.
+//  Provides: logging, file operations, secure storage, clock,
+//  directory enumeration, vendor id, and HTTP download fallback.
 //
+
+// file_length disabled: every callback must live at file scope (no captures)
+// for C interop, so splitting across files would require making them
+// `internal`. The directory + HTTP blocks push past the 800-line warning;
+// the 1500-line error threshold remains a hard limit.
+// swiftlint:disable file_length
 
 import CRACommons
 import Foundation
@@ -79,6 +86,15 @@ extension CppBridge {
             // Swift only contributes the iOS-specific UIDevice.identifierForVendor;
             // Keychain persistence happens automatically via secure_set/secure_get.
             adapter.get_vendor_id = platformGetVendorIdCallback
+
+            // MARK: Directory Enumeration (model-registry rescan + is_downloaded probe)
+            // Populating these slots lets the commons rescan_local refresh path
+            // and rac_model_info_make_proto's multi-file is_downloaded gating
+            // work on Apple platforms without the warning fallback in
+            // ModelRegistryRefreshResult.warnings. Matches the Kotlin / Flutter /
+            // RN siblings of CLUSTER-280-SPLIT.
+            adapter.file_list_directory = platformFileListDirectoryCallback
+            adapter.is_non_empty_directory = platformIsNonEmptyDirectoryCallback
 
             adapter.user_data = nil
 
@@ -249,6 +265,120 @@ private func platformFileDeleteCallback(
     } catch {
         return RAC_ERROR_FILE_NOT_FOUND
     }
+}
+
+// MARK: - Directory Enumeration Callbacks
+
+/// Enumerate a directory into a caller-provided array per the two-call contract
+/// on `rac_file_list_directory_fn`. Powers commons rescan_local + the multi-file
+/// `is_downloaded` probe (rac_path_is_non_empty_directory).
+///
+/// Truncation contract (per `rac_directory_entry_t::name`): entries whose UTF-8
+/// byte length plus the trailing NUL exceed `RAC_DIRECTORY_ENTRY_NAME_MAX` are
+/// skipped rather than truncated so the no-error path never aliases a different
+/// artifact. A single WARN log per call summarises any skipped entries.
+private func platformFileListDirectoryCallback(
+    dirPath: UnsafePointer<CChar>?,
+    outEntries: UnsafeMutablePointer<rac_directory_entry_t>?,
+    inOutCount: UnsafeMutablePointer<Int>?,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let dirPath = dirPath, let inOutCount = inOutCount else {
+        return RAC_ERROR_INVALID_ARGUMENT
+    }
+
+    let pathString = String(cString: dirPath)
+    let fileManager = FileManager.default
+    var isDirectory: ObjCBool = false
+    guard fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory),
+          isDirectory.boolValue else {
+        return RAC_ERROR_FILE_NOT_FOUND
+    }
+
+    let entries: [String]
+    do {
+        entries = try fileManager.contentsOfDirectory(atPath: pathString)
+    } catch {
+        return RAC_ERROR_INTERNAL
+    }
+
+    // Capacity-query call: report total entries without filling the buffer.
+    guard let outEntries = outEntries else {
+        inOutCount.pointee = entries.count
+        return RAC_SUCCESS
+    }
+
+    let capacity = inOutCount.pointee
+    let nameMax = Int(RAC_DIRECTORY_ENTRY_NAME_MAX)
+    var written = 0
+    var skipped = 0
+
+    for entryName in entries {
+        if written >= capacity { break }
+
+        let didWrite = entryName.withCString { src -> Bool in
+            let length = strlen(src)
+            // strlen excludes NUL — buffer must fit len + NUL.
+            if length + 1 > nameMax {
+                return false
+            }
+            let entryPtr = outEntries.advanced(by: written)
+            // Zero-fill the fixed-size name buffer, then copy bytes + NUL.
+            withUnsafeMutablePointer(to: &entryPtr.pointee.name) { tuplePtr in
+                tuplePtr.withMemoryRebound(to: CChar.self, capacity: nameMax) { nameBuf in
+                    memset(nameBuf, 0, nameMax)
+                    memcpy(nameBuf, src, length + 1)
+                }
+            }
+
+            let fullPath = (pathString as NSString).appendingPathComponent(entryName)
+            var childIsDir: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: fullPath, isDirectory: &childIsDir)
+            entryPtr.pointee.is_dir = (exists && childIsDir.boolValue) ? RAC_TRUE : RAC_FALSE
+
+            if exists && !childIsDir.boolValue {
+                let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath)
+                let size = (attrs?[.size] as? NSNumber)?.int64Value ?? 0
+                entryPtr.pointee.size_bytes = size
+            } else {
+                entryPtr.pointee.size_bytes = 0
+            }
+            return true
+        }
+
+        if didWrite {
+            written += 1
+        } else {
+            skipped += 1
+        }
+    }
+
+    if skipped > 0 {
+        let logger = SDKLogger(category: "PlatformAdapter")
+        logger.warning("file_list_directory: skipped \(skipped) oversized entry name(s) in \(pathString)")
+    }
+
+    inOutCount.pointee = written
+    return RAC_SUCCESS
+}
+
+/// Cheap "is this a non-empty directory" probe consumed by
+/// `rac_path_is_non_empty_directory()` so multi-file `is_downloaded` gating
+/// avoids the full enumeration cost when an entry is present.
+private func platformIsNonEmptyDirectoryCallback(
+    path: UnsafePointer<CChar>?,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_bool_t {
+    guard let path = path else { return RAC_FALSE }
+    let pathString = String(cString: path)
+    let fileManager = FileManager.default
+    var isDirectory: ObjCBool = false
+    guard fileManager.fileExists(atPath: pathString, isDirectory: &isDirectory),
+          isDirectory.boolValue else {
+        return RAC_FALSE
+    }
+    let entries = (try? fileManager.contentsOfDirectory(atPath: pathString)) ?? []
+    return entries.isEmpty ? RAC_FALSE : RAC_TRUE
 }
 
 private func platformSecureGetCallback(
