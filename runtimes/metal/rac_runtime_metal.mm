@@ -331,20 +331,6 @@ extern "C" rac_result_t rac_metal_runtime_require_available(void) {
                                                                : RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
-extern "C" rac_result_t rac_metal_runtime_alloc_host_buffer(size_t bytes, void** out_data) {
-    if (!out_data)
-        return RAC_ERROR_NULL_POINTER;
-    *out_data = nullptr;
-    *out_data = std::malloc(bytes);
-    if (!*out_data)
-        return RAC_ERROR_OUT_OF_MEMORY;
-    return RAC_SUCCESS;
-}
-
-extern "C" void rac_metal_runtime_free_host_buffer(void* data) {
-    std::free(data);
-}
-
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_metal(void) {
     return &k_metal_vtable;
 }
