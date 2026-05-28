@@ -318,13 +318,17 @@ using ToolRunLoopProtoFn = rac_result_t (*)(
     ToolExecuteCallbackFn,
     void*,
     rac_proto_buffer_t*);
-// pass3-syn-047: cancellation-aware variant — publishes a run-loop handle
-// before the iteration loop begins so RN AbortSignal / Swift task cancel can
-// fan into rac_tool_calling_run_loop_cancel_proto from another thread.
-using ToolRunLoopWithHandleProtoFn = rac_result_t (*)(
+// pass3-syn-028: callback variant — fires `on_handle_published(handle,
+// user_data)` SYNCHRONOUSLY before iteration so SDKs can publish the handle
+// to a thread-safe sink (JS callback, Completer, Deferred) without racing
+// the worker. Preferred over polling the out-pointer from a watcher thread.
+using ToolRunLoopOnHandlePublishedCb = void (*)(uint64_t, void*);
+using ToolRunLoopWithHandleAndCbProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     ToolExecuteCallbackFn,
+    void*,
+    ToolRunLoopOnHandlePublishedCb,
     void*,
     uint64_t*,
     rac_proto_buffer_t*);
