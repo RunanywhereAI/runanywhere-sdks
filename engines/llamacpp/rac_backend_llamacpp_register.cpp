@@ -460,7 +460,7 @@ rac_result_t rac_backend_llamacpp_register(void) {
     const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
-        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_PLUGIN_DUPLICATE) {
             RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
         } else {
             RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");
