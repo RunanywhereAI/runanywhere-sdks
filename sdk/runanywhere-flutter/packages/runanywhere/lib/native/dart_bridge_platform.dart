@@ -498,7 +498,11 @@ int _platformSecureGetCallback(
     final value = _secureStorageCache[keyString];
 
     if (value == null) {
-      return RacResultCode.errorFileNotFound; // Not found
+      // Contract: clean miss MUST return RAC_ERROR_FILE_NOT_FOUND so commons
+      // (e.g. rac_device_get_or_create_persistent_id) can distinguish a
+      // benign cache miss from a real keychain failure. See
+      // sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h.
+      return RacResultCode.errorFileNotFound;
     }
 
     // Allocate and copy string
@@ -507,7 +511,8 @@ int _platformSecureGetCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorStorageError;
+    // Contract: real failures MUST NOT collide with the not-found code.
+    return RacResultCode.errorSecureStorageFailed;
   }
 }
 
