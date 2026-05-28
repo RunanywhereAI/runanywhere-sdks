@@ -180,10 +180,28 @@ typedef struct rac_platform_adapter {
 
     /**
      * Get a value from secure storage.
+     *
+     * Not-found vs error contract (normative):
+     *   - On a clean "key does not exist" miss the implementation MUST return
+     *     RAC_ERROR_FILE_NOT_FOUND and MUST NOT set *out_value. Commons
+     *     consumers (e.g. rac_device_get_or_create_persistent_id) use this
+     *     specific code to distinguish a benign miss from a real keychain
+     *     failure and decide whether to fall back vs propagate.
+     *   - On any real failure (keychain locked, permission denied, decoding
+     *     error, etc.) the implementation MUST return
+     *     RAC_ERROR_SECURE_STORAGE_FAILED (or another non-RAC_SUCCESS,
+     *     non-RAC_ERROR_FILE_NOT_FOUND code).
+     *   - Returning RAC_ERROR_NOT_FOUND, RAC_ERROR_SECURE_STORAGE_FAILED, or
+     *     any other code for the not-found case is a contract violation —
+     *     commons will conservatively treat all non-RAC_SUCCESS results as
+     *     "miss" today, but future consumers may rely on the discrimination.
+     *
      * @param key Key name
-     * @param out_value Output value (caller must free with rac_free)
+     * @param out_value Output value (caller must free with rac_free); only
+     *                  written on RAC_SUCCESS
      * @param user_data Platform context
-     * @return RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND if not found
+     * @return RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND if not found,
+     *         RAC_ERROR_SECURE_STORAGE_FAILED (or other) on real errors
      */
     rac_result_t (*secure_get)(const char* key, char** out_value, void* user_data);
 
