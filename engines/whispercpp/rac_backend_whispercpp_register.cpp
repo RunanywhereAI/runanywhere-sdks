@@ -119,20 +119,6 @@ static rac_result_t whispercpp_stt_vtable_detect_language(void* impl, const void
     return rac_stt_whispercpp_detect_language(impl, audio_data, audio_size, options, out_language);
 }
 
-const rac_stt_service_ops_t g_whispercpp_stt_ops = {
-    .initialize = whispercpp_stt_vtable_initialize,
-    .transcribe = whispercpp_stt_vtable_transcribe,
-    // Streaming STT not supported by whisper.cpp backend; commons returns
-    // RAC_ERROR_NOT_SUPPORTED on NULL. Use sherpa-onnx for live streaming.
-    .transcribe_stream = nullptr,
-    .get_info = whispercpp_stt_vtable_get_info,
-    .cleanup = whispercpp_stt_vtable_cleanup,
-    .destroy = whispercpp_stt_vtable_destroy,
-    .create = whispercpp_stt_create_impl,
-    .get_languages = whispercpp_stt_vtable_get_languages,
-    .detect_language = whispercpp_stt_vtable_detect_language,
-};
-
 // =============================================================================
 // MODULE IDENTITY
 // =============================================================================
@@ -146,6 +132,27 @@ const char* const MODULE_ID = "whispercpp";
 bool g_registered = false;
 
 }  // namespace
+
+// MF-02: keep external C linkage so rac_plugin_entry_whispercpp.cpp's
+// `extern const rac_stt_service_ops_t g_whispercpp_stt_ops` declaration is
+// satisfied by a matching external-linkage definition. Defining this struct
+// inside the anonymous namespace gave it internal linkage, contradicting the
+// `extern` declaration in the plugin-entry TU. Match the pattern used by
+// llamacpp / sherpa / onnx / whisperkit_coreml (see
+// rac_backend_whisperkit_coreml_register.cpp:200).
+extern "C" const rac_stt_service_ops_t g_whispercpp_stt_ops = {
+    .initialize = whispercpp_stt_vtable_initialize,
+    .transcribe = whispercpp_stt_vtable_transcribe,
+    // Streaming STT not supported by whisper.cpp backend; commons returns
+    // RAC_ERROR_NOT_SUPPORTED on NULL. Use sherpa-onnx for live streaming.
+    .transcribe_stream = nullptr,
+    .get_info = whispercpp_stt_vtable_get_info,
+    .cleanup = whispercpp_stt_vtable_cleanup,
+    .destroy = whispercpp_stt_vtable_destroy,
+    .create = whispercpp_stt_create_impl,
+    .get_languages = whispercpp_stt_vtable_get_languages,
+    .detect_language = whispercpp_stt_vtable_detect_language,
+};
 
 // =============================================================================
 // REGISTRATION API
