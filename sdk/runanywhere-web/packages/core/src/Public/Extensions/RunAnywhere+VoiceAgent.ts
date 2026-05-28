@@ -8,6 +8,8 @@
 
 import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   VoiceAgentProtoAdapter,
   type ModalityProtoModule,
@@ -156,6 +158,61 @@ function requireProvider(feature: string): VoiceAgentProvider {
       ? ` Missing exports: ${availability.missingExports.join(', ')}.`
       : ''}`,
   );
+}
+
+/** Default Silero VAD model id seeded by every example app's catalog. */
+export const defaultVADModelID = 'silero-vad';
+
+/**
+ * Ensure a VAD model is loaded in the canonical lifecycle before a voice-agent
+ * session starts. When no VAD model is currently registered for
+ * `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION`, attempts to load the catalogued
+ * default (`defaultVADModelID`, Silero) so the voice agent's speech-start /
+ * speech-end events fire. The energy-based fallback does not produce the
+ * lifecycle events the voice-agent orchestrator listens for, so without a VAD
+ * lifecycle load the session stays silent after init.
+ *
+ * Idempotent: returns `true` immediately when a VAD model is already loaded.
+ * Logs (but does not throw) when the optional auto-load fails; callers may
+ * inspect the return value to decide whether to surface a warning.
+ *
+ * @param modelID VAD model id to auto-load when none is current. Defaults to
+ *   `defaultVADModelID`.
+ * @returns `true` when a VAD model is loaded after the call; `false` when no
+ *   VAD model is loaded (auto-load failed or skipped).
+ */
+export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
+  const current = WebModelLifecycle.currentModel({
+    category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+    includeModelMetadata: false,
+  });
+  if (current?.modelId) return true;
+
+  const targetID = modelID ?? defaultVADModelID;
+  if (!targetID) return false;
+
+  logger.info(`Auto-loading default VAD '${targetID}' for voice-agent session`);
+
+  try {
+    const result = await WebModelLifecycle.loadModelAsync({
+      modelId: targetID,
+      category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      forceReload: false,
+      validateAvailability: false,
+    });
+    if (!result?.success) {
+      logger.warning(
+        `Default VAD '${targetID}' auto-load failed: ${result?.errorMessage ?? 'unknown error'} — voice agent will use energy fallback`,
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.warning(
+      `Default VAD '${targetID}' auto-load threw: ${err instanceof Error ? err.message : String(err)} — voice agent will use energy fallback`,
+    );
+    return false;
+  }
 }
 
 class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
@@ -342,7 +399,25 @@ export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Pro
   logger.info('VoiceAgent initialized');
 }
 
-export async function initializeVoiceAgentWithLoadedModels(): Promise<void> {
+/**
+ * Initialize the voice agent from currently-loaded STT / LLM / TTS models.
+ *
+ * When `ensureVAD` is `true` (default), the SDK guarantees that a VAD model is
+ * loaded into the canonical lifecycle before initialization runs via
+ * `ensureDefaultVAD(...)`. Without this the session would silently fall back to
+ * the energy-based detector and the C++ voice agent's speech-start / speech-end
+ * lifecycle events would not fire. Set to `false` only if the caller has
+ * already loaded an explicit VAD model (or knows the energy fallback is
+ * acceptable for the deployment).
+ *
+ * @param ensureVAD Whether to auto-load the catalogued default VAD when no
+ *   `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION` model is loaded. Defaults to
+ *   `true`.
+ */
+export async function initializeVoiceAgentWithLoadedModels(ensureVAD = true): Promise<void> {
+  if (ensureVAD) {
+    await ensureDefaultVAD();
+  }
   await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels();
 }
 
@@ -424,6 +499,8 @@ export function streamVoiceAgent(
 }
 
 export const VoiceAgent = {
+  defaultVADModelID,
+  ensureDefaultVAD,
   availability: getVoiceAgentAvailability,
   isAvailable: isVoiceAgentAvailable,
   initialize: initializeVoiceAgent,

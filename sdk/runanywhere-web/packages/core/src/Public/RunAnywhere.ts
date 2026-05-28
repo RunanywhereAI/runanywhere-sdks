@@ -1491,8 +1491,10 @@ export const RunAnywhere = {
     return VoiceAgentCapability.initialize(...args);
   },
 
-  initializeVoiceAgentWithLoadedModels(): ReturnType<typeof VoiceAgentCapability.initializeWithLoadedModels> {
-    return VoiceAgentCapability.initializeWithLoadedModels();
+  initializeVoiceAgentWithLoadedModels(
+    ...args: Parameters<typeof VoiceAgentCapability.initializeWithLoadedModels>
+  ): ReturnType<typeof VoiceAgentCapability.initializeWithLoadedModels> {
+    return VoiceAgentCapability.initializeWithLoadedModels(...args);
   },
 
   getVoiceAgentComponentStates(): ReturnType<typeof VoiceAgentCapability.getComponentStates> {
