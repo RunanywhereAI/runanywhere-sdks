@@ -3724,6 +3724,142 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeU
 }
 
 // =============================================================================
+// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
+//
+// commons-161. Mirrors the VoiceAgentStreamAdapter thunks above so the
+// generic HandleStreamAdapter can fan one C callback slot out to N Kotlin
+// Flow collectors for LLM token streams. Same one-registration-per-handle
+// pattern: each register = one heap-allocated LlmStreamCallbackCtx holding a
+// global ref to the Kotlin Function1<ByteArray, Unit> lambda + the cached
+// Function1.invoke() method ID; the C trampoline resolves JNIEnv* on the fly
+// and forwards proto bytes back to the JVM. The matching Kotlin JniBridge
+// lives at com.runanywhere.sdk.adapters.LLMStreamAdapter$JniBridge — the
+// symbol mangling below ties these thunks to that exact class path.
+//
+// ABI limitation: rac_llm_set_stream_proto_callback has ONE callback slot per
+// LLM handle. Multiple concurrent stream() calls on the same handle REPLACE
+// each other — documented on the Kotlin companion.
+
+namespace {
+
+struct LlmStreamCallbackCtx {
+    jobject lambda_ref;    // Global ref to Kotlin Function1<ByteArray, Unit>
+    jclass function1_cls;  // Global ref to kotlin.jvm.functions.Function1
+    jmethodID invoke_mid;  // Function1.invoke(Object)
+};
+
+void llm_stream_adapter_trampoline(const uint8_t* event_bytes, size_t event_size,
+                                   void* user_data) {
+    if (!user_data || !event_bytes || !g_jvm)
+        return;
+
+    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env = nullptr;
+    bool needs_detach = false;
+    jint getEnvRc = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        // `void**` cast matches the working GetEnv pattern above and the
+        // host-JDK signature on macOS/Linux; Android NDK's `JNIEnv**` is
+        // binary-compatible.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(jbytes, 0, static_cast<jsize>(event_size),
+                                reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;  // INVALID_CALLBACK_ID on the Kotlin side
+    }
+
+    // 1. Global-ref the lambda so it survives past this thunk.
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef)
+        return 0;
+
+    // 2. Resolve + cache Function1.invoke(Object)
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx = new LlmStreamCallbackCtx{};
+    ctx->lambda_ref = lambdaRef;
+    ctx->function1_cls = function1Cls;
+    ctx->invoke_mid = invokeMid;
+
+    rac_result_t rc = rac_llm_set_stream_proto_callback(
+        handleFromJLong(handle), &llm_stream_adapter_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0)
+        return;
+
+    // commons-161 / commons-059 parity: prevent UAF between an in-flight
+    // `llm_stream_adapter_trampoline` and `delete ctx`. The unset clears the
+    // slot for FUTURE dispatches, but a concurrent dispatcher that already
+    // copied the slot can still be mid-CallObjectMethod on `ctx->lambda_ref`.
+    // Quiesce spin-waits until every in-flight invocation has returned,
+    // mirroring the teardown sequence documented at rac_llm_stream.h:88-93 and
+    // the VoiceAgent unregister thunk above.
+    rac_llm_unset_stream_proto_callback(handleFromJLong(handle));
+    rac_llm_proto_quiesce();
+
+    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)
+        env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls)
+        env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
 // Generated-proto modality ABI thunks
 // =============================================================================
 
