@@ -72,17 +72,24 @@ typedef struct rac_engine_manifest {
 
 RAC_API const char* rac_engine_availability_name(rac_engine_availability_t availability);
 
+/* These cross the C ABI (Swift / Kotlin JNI / Dart FFI / RN Nitro / WASM)
+ * — see rac_plugin_entry.h for the noexcept rationale. The
+ * RAC_PLUGIN_REGISTRY_NOEXCEPT macro expands to `noexcept` under C++ and
+ * nothing under plain C. */
 RAC_API rac_result_t rac_engine_manifest_validate_vtable(const rac_engine_manifest_t* manifest,
                                                          const rac_engine_vtable_t* vtable);
 
 RAC_API rac_result_t rac_engine_manifest_attach_vtable(const rac_engine_manifest_t* manifest,
-                                                       const rac_engine_vtable_t* vtable);
+                                                       const rac_engine_vtable_t* vtable)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-RAC_API rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable);
+RAC_API rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-RAC_API const rac_engine_manifest_t* rac_engine_manifest_find(const char* name);
+RAC_API const rac_engine_manifest_t*
+rac_engine_manifest_find(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
-RAC_API size_t rac_engine_manifest_count(void);
+RAC_API size_t rac_engine_manifest_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 static inline const rac_engine_vtable_t*
 rac_engine_entry_with_manifest(const rac_engine_manifest_t* manifest,

@@ -261,6 +261,21 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * Registry operations (implemented in src/plugin/rac_plugin_registry.cpp)
  * =========================================================================== */
 
+/* All registry functions below are noexcept under C++ linkage: they cross
+ * the C ABI into Swift / Kotlin (JNI) / Dart (FFI) / Hermes (NitroModules)
+ * / WASM. Propagating a C++ exception out of an extern "C" function is
+ * undefined behavior per ISO C++ [except.handle]/9. Internally each
+ * implementation wraps allocator-throwing operations + third-party
+ * callbacks in try/catch and coerces failures to RAC_ERROR_OUT_OF_MEMORY /
+ * RAC_ERROR_PLUGIN_LOAD_FAILED / RAC_ERROR_INTERNAL. The noexcept
+ * specifier is conditionally compiled so plain C consumers see the C
+ * signatures unchanged. */
+#ifdef __cplusplus
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT noexcept
+#else
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT
+#endif
+
 /**
  * @brief Register a plugin vtable. Performs ABI validation + capability check
  *        + dedup by `metadata.name`.
@@ -271,12 +286,12 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable);
+rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.
  */
-rac_result_t rac_plugin_unregister(const char* name);
+rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the highest-priority plugin that serves `primitive`, or NULL
@@ -285,7 +300,7 @@ rac_result_t rac_plugin_unregister(const char* name);
  * Thread-safe. The returned pointer is valid for the remaining lifetime of
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
+const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending
@@ -296,13 +311,13 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
  */
 RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
                                      const rac_engine_vtable_t** out_plugins, size_t max,
-                                     size_t* out_count);
+                                     size_t* out_count) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Total number of registered plugins (across all primitives,
  *        counting each plugin once).
  */
-size_t rac_plugin_count(void);
+size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 #ifdef __cplusplus
 }
