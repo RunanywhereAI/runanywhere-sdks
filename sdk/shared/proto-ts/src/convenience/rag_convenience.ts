@@ -25,7 +25,6 @@ export const rAGConfigurationDefaults = (): RAGConfiguration => ({
   similarityThreshold: 0.7,
   chunkSize: 512,
   chunkOverlap: 64,
-  maxContextTokens: 0,
   persistIndex: false,
   rerankResults: false,
 });

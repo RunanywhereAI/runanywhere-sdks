@@ -82,27 +82,36 @@ message RAGConfiguration {
 
     // Embedding vector dimension — must match the embedding model.
     // Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-    int32  embedding_dimension   = 3 [(runanywhere.v1.rac_default) = "384"];
+    // Optional so callers can distinguish "unset" (commons stamps the
+    // canonical default) from explicit zero / explicit override.
+    optional int32 embedding_dimension   = 3 [(runanywhere.v1.rac_default) = "384"];
 
     // Number of top chunks to retrieve per query.
-    int32  top_k                 = 4 [(runanywhere.v1.rac_default) = "5"];
+    // Optional so callers can distinguish "unset" from an explicit value.
+    optional int32 top_k                 = 4 [(runanywhere.v1.rac_default) = "5"];
 
     // Minimum cosine similarity threshold (0.0–1.0). Chunks below this
     // score are discarded before being passed to the LLM as context.
-    float  similarity_threshold  = 5 [
+    // Optional so callers can distinguish "unset" from explicit 0.0
+    // (accept-everything) without losing the canonical default.
+    optional float similarity_threshold  = 5 [
         (runanywhere.v1.rac_default) = "0.7",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
     // Tokens per chunk when splitting documents during ingestion.
-    int32  chunk_size            = 6 [(runanywhere.v1.rac_default) = "512"];
+    // Optional so callers can distinguish "unset" from an explicit value.
+    optional int32 chunk_size            = 6 [(runanywhere.v1.rac_default) = "512"];
 
     // Overlap tokens between consecutive chunks. Must be < chunk_size.
-    int32  chunk_overlap         = 7 [(runanywhere.v1.rac_default) = "64"];
+    // Optional so callers can explicitly request zero overlap (no overlap)
+    // without it being silently replaced by the canonical default of 64.
+    optional int32 chunk_overlap         = 7 [(runanywhere.v1.rac_default) = "64"];
 
     // Maximum tokens of retrieved context passed to the LLM.
-    int32  max_context_tokens    = 8;
+    // Optional so callers can distinguish "unset" from an explicit value.
+    optional int32 max_context_tokens    = 8;
 
     // Prompt template with `{context}` and `{query}` placeholders.
     optional string prompt_template = 9;

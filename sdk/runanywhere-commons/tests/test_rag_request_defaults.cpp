@@ -164,6 +164,28 @@ int test_rag_defaults_with_numeric_overrides() {
     return 0;
 }
 
+// Verifies that explicitly setting a numeric field to zero is honored
+// post-defaults (proto3 `optional` semantics). This guards the fix for
+// idl-008-A: callers who explicitly want chunk_overlap=0 (no overlap)
+// must not have it silently replaced by the canonical default of 64.
+int test_rag_defaults_preserves_explicit_zero() {
+    runanywhere::v1::RAGConfiguration request;
+    request.set_chunk_overlap(0);
+    request.set_top_k(0);
+    request.set_similarity_threshold(0.0f);
+
+    runanywhere::v1::RAGConfiguration cfg;
+    ASSERT_TRUE(dispatch_with_defaults(request, &cfg));
+
+    ASSERT_EQ(cfg.chunk_overlap(), 0);
+    ASSERT_EQ(cfg.top_k(), 0);
+    ASSERT_FLOAT_EQ(cfg.similarity_threshold(), 0.0f);
+    // Unset numeric fields still receive canonical defaults.
+    ASSERT_EQ(cfg.embedding_dimension(), 384);
+    ASSERT_EQ(cfg.chunk_size(), 512);
+    return 0;
+}
+
 // Verifies optional string overrides (prompt_template, reranker_model_id, etc.)
 // pass through verbatim.
 int test_rag_defaults_with_optional_strings() {
@@ -229,6 +251,7 @@ int main(int /*argc*/, char** /*argv*/) {
         {"rag_defaults_with_empty_input", test_rag_defaults_with_empty_input},
         {"rag_defaults_with_inbound_ids", test_rag_defaults_with_inbound_ids},
         {"rag_defaults_with_numeric_overrides", test_rag_defaults_with_numeric_overrides},
+        {"rag_defaults_preserves_explicit_zero", test_rag_defaults_preserves_explicit_zero},
         {"rag_defaults_with_optional_strings", test_rag_defaults_with_optional_strings},
         {"rag_defaults_null_out", test_rag_defaults_null_out},
         {"rag_defaults_invalid_input_bytes", test_rag_defaults_invalid_input_bytes},

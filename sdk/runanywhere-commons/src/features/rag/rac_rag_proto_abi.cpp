@@ -181,17 +181,20 @@ Session* as_session(rac_handle_t handle) {
 
 RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& proto) {
     RAGBackendConfig bc;
-    if (proto.embedding_dimension() > 0)
+    // Numeric fields are proto3 `optional`, so presence == "caller-supplied
+    // override". This preserves explicit-zero values (e.g. chunk_overlap=0
+    // = no overlap) instead of silently re-applying the struct's defaults.
+    if (proto.has_embedding_dimension())
         bc.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
-    if (proto.top_k() > 0)
+    if (proto.has_top_k())
         bc.top_k = static_cast<size_t>(proto.top_k());
-    if (proto.similarity_threshold() > 0.0f)
+    if (proto.has_similarity_threshold())
         bc.similarity_threshold = proto.similarity_threshold();
-    if (proto.max_context_tokens() > 0)
+    if (proto.has_max_context_tokens())
         bc.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
-    if (proto.chunk_size() > 0)
+    if (proto.has_chunk_size())
         bc.chunk_size = static_cast<size_t>(proto.chunk_size());
-    if (proto.chunk_overlap() >= 0)
+    if (proto.has_chunk_overlap())
         bc.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
     if (proto.has_prompt_template() && !proto.prompt_template().empty())
         bc.prompt_template = proto.prompt_template();

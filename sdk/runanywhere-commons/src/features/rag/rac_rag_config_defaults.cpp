@@ -15,8 +15,12 @@
  *   chunk_overlap         = 64
  *
  * Field-merge semantics mirror Swift's per-field setter pattern:
- *   - Inbound numeric / bool fields override the default when the inbound
- *     value is non-zero (proto zero == "use default").
+ *   - Inbound numeric fields are `optional` in the proto, so we use the
+ *     generated `has_*()` accessors: presence == "caller-supplied override",
+ *     absence == "use canonical default". This preserves explicit-zero
+ *     values (e.g. chunk_overlap=0 = no overlap).
+ *   - Inbound bool fields pass through verbatim (schema zero is the natural
+ *     default; no separate canonical default exists).
  *   - String / id fields pass through verbatim from the inbound request
  *     (proto zero is the empty string; that is what Swift's
  *     `RARAGConfiguration.defaults(embeddingModelID: "", llmModelID: "")`
@@ -94,10 +98,11 @@ rac_rag_request_with_defaults_proto(const uint8_t* in_request_bytes, size_t in_s
     }
 
     // Start from the canonical defaults, then layer caller overrides over them.
-    // Numeric/bool overrides only apply when the inbound is non-zero (proto
-    // zero == "use default"). Strings pass through verbatim — empty inbound
-    // string means "no caller-supplied id", which mirrors Swift's
-    // `defaults(embeddingModelID: "", llmModelID: "")` behavior.
+    // Numeric overrides apply when the field is *present* on the wire
+    // (proto3 `optional` semantics), which preserves explicit-zero values
+    // such as chunk_overlap=0 ("no overlap"). Strings pass through verbatim —
+    // empty inbound string means "no caller-supplied id", which mirrors
+    // Swift's `defaults(embeddingModelID: "", llmModelID: "")` behavior.
     runanywhere::v1::RAGConfiguration cfg;
     cfg.set_embedding_dimension(384);
     cfg.set_top_k(5);
@@ -124,27 +129,23 @@ rac_rag_request_with_defaults_proto(const uint8_t* in_request_bytes, size_t in_s
         cfg.set_reranker_model_id(request.reranker_model_id());
     }
 
-    // Numeric overrides — non-zero wins.
-    if (request.embedding_dimension() != 0) {
+    // Numeric overrides — presence (has_*) wins, so explicit zero is honored.
+    if (request.has_embedding_dimension()) {
         cfg.set_embedding_dimension(request.embedding_dimension());
     }
-    if (request.top_k() != 0) {
+    if (request.has_top_k()) {
         cfg.set_top_k(request.top_k());
     }
-    if (request.similarity_threshold() != 0.0f) {
+    if (request.has_similarity_threshold()) {
         cfg.set_similarity_threshold(request.similarity_threshold());
     }
-    if (request.chunk_size() != 0) {
+    if (request.has_chunk_size()) {
         cfg.set_chunk_size(request.chunk_size());
     }
-    // chunk_overlap proto zero is a valid override (no overlap), but Swift's
-    // defaults() always stamps 64. Treat zero as "use default" for parity;
-    // callers that genuinely want zero overlap can pass any non-zero default
-    // chunk_overlap from the SDK side post-defaults if needed.
-    if (request.chunk_overlap() != 0) {
+    if (request.has_chunk_overlap()) {
         cfg.set_chunk_overlap(request.chunk_overlap());
     }
-    if (request.max_context_tokens() != 0) {
+    if (request.has_max_context_tokens()) {
         cfg.set_max_context_tokens(request.max_context_tokens());
     }
 

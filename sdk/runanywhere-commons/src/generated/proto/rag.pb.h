@@ -1374,7 +1374,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_reranker_model_id();
 
   public:
-  // int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+  // optional int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+  [[nodiscard]] bool has_embedding_dimension()
+      const;
   void clear_embedding_dimension() ;
   [[nodiscard]] ::int32_t embedding_dimension() const;
   void set_embedding_dimension(::int32_t value);
@@ -1384,7 +1386,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_embedding_dimension(::int32_t value);
 
   public:
-  // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+  // optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+  [[nodiscard]] bool has_top_k()
+      const;
   void clear_top_k() ;
   [[nodiscard]] ::int32_t top_k() const;
   void set_top_k(::int32_t value);
@@ -1394,7 +1398,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  [[nodiscard]] bool has_similarity_threshold()
+      const;
   void clear_similarity_threshold() ;
   [[nodiscard]] float similarity_threshold() const;
   void set_similarity_threshold(float value);
@@ -1404,7 +1410,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_similarity_threshold(float value);
 
   public:
-  // int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+  // optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+  [[nodiscard]] bool has_chunk_size()
+      const;
   void clear_chunk_size() ;
   [[nodiscard]] ::int32_t chunk_size() const;
   void set_chunk_size(::int32_t value);
@@ -1414,7 +1422,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_chunk_size(::int32_t value);
 
   public:
-  // int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+  // optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+  [[nodiscard]] bool has_chunk_overlap()
+      const;
   void clear_chunk_overlap() ;
   [[nodiscard]] ::int32_t chunk_overlap() const;
   void set_chunk_overlap(::int32_t value);
@@ -1424,7 +1434,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_chunk_overlap(::int32_t value);
 
   public:
-  // int32 max_context_tokens = 8;
+  // optional int32 max_context_tokens = 8;
+  [[nodiscard]] bool has_max_context_tokens()
+      const;
   void clear_max_context_tokens() ;
   [[nodiscard]] ::int32_t max_context_tokens() const;
   void set_max_context_tokens(::int32_t value);
@@ -4047,7 +4059,11 @@ inline void RAGConfiguration::set_allocated_llm_model_id(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.llm_model_id)
 }
 
-// int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+// optional int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+inline bool RAGConfiguration::has_embedding_dimension() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  return value;
+}
 inline void RAGConfiguration::clear_embedding_dimension() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.embedding_dimension_ = 0;
@@ -4071,7 +4087,11 @@ inline void RAGConfiguration::_internal_set_embedding_dimension(::int32_t value)
   _impl_.embedding_dimension_ = value;
 }
 
-// int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+// optional int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
+inline bool RAGConfiguration::has_top_k() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  return value;
+}
 inline void RAGConfiguration::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
@@ -4095,7 +4115,11 @@ inline void RAGConfiguration::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+inline bool RAGConfiguration::has_similarity_threshold() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  return value;
+}
 inline void RAGConfiguration::clear_similarity_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.similarity_threshold_ = 0;
@@ -4119,7 +4143,11 @@ inline void RAGConfiguration::_internal_set_similarity_threshold(float value) {
   _impl_.similarity_threshold_ = value;
 }
 
-// int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+// optional int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
+inline bool RAGConfiguration::has_chunk_size() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
+  return value;
+}
 inline void RAGConfiguration::clear_chunk_size() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.chunk_size_ = 0;
@@ -4143,7 +4171,11 @@ inline void RAGConfiguration::_internal_set_chunk_size(::int32_t value) {
   _impl_.chunk_size_ = value;
 }
 
-// int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+// optional int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
+inline bool RAGConfiguration::has_chunk_overlap() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
+  return value;
+}
 inline void RAGConfiguration::clear_chunk_overlap() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.chunk_overlap_ = 0;
@@ -4167,7 +4199,11 @@ inline void RAGConfiguration::_internal_set_chunk_overlap(::int32_t value) {
   _impl_.chunk_overlap_ = value;
 }
 
-// int32 max_context_tokens = 8;
+// optional int32 max_context_tokens = 8;
+inline bool RAGConfiguration::has_max_context_tokens() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  return value;
+}
 inline void RAGConfiguration::clear_max_context_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_context_tokens_ = 0;

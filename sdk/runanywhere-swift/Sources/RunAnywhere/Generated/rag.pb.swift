@@ -147,23 +147,74 @@ public nonisolated struct RARAGConfiguration: Sendable {
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-  public var embeddingDimension: Int32 = 0
+  /// Optional so callers can distinguish "unset" (commons stamps the
+  /// canonical default) from explicit zero / explicit override.
+  public var embeddingDimension: Int32 {
+    get {_embeddingDimension ?? 0}
+    set {_embeddingDimension = newValue}
+  }
+  /// Returns true if `embeddingDimension` has been explicitly set.
+  public var hasEmbeddingDimension: Bool {self._embeddingDimension != nil}
+  /// Clears the value of `embeddingDimension`. Subsequent reads from it will return its default value.
+  public mutating func clearEmbeddingDimension() {self._embeddingDimension = nil}
 
   /// Number of top chunks to retrieve per query.
-  public var topK: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var topK: Int32 {
+    get {_topK ?? 0}
+    set {_topK = newValue}
+  }
+  /// Returns true if `topK` has been explicitly set.
+  public var hasTopK: Bool {self._topK != nil}
+  /// Clears the value of `topK`. Subsequent reads from it will return its default value.
+  public mutating func clearTopK() {self._topK = nil}
 
   /// Minimum cosine similarity threshold (0.0–1.0). Chunks below this
   /// score are discarded before being passed to the LLM as context.
-  public var similarityThreshold: Float = 0
+  /// Optional so callers can distinguish "unset" from explicit 0.0
+  /// (accept-everything) without losing the canonical default.
+  public var similarityThreshold: Float {
+    get {_similarityThreshold ?? 0}
+    set {_similarityThreshold = newValue}
+  }
+  /// Returns true if `similarityThreshold` has been explicitly set.
+  public var hasSimilarityThreshold: Bool {self._similarityThreshold != nil}
+  /// Clears the value of `similarityThreshold`. Subsequent reads from it will return its default value.
+  public mutating func clearSimilarityThreshold() {self._similarityThreshold = nil}
 
   /// Tokens per chunk when splitting documents during ingestion.
-  public var chunkSize: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var chunkSize: Int32 {
+    get {_chunkSize ?? 0}
+    set {_chunkSize = newValue}
+  }
+  /// Returns true if `chunkSize` has been explicitly set.
+  public var hasChunkSize: Bool {self._chunkSize != nil}
+  /// Clears the value of `chunkSize`. Subsequent reads from it will return its default value.
+  public mutating func clearChunkSize() {self._chunkSize = nil}
 
   /// Overlap tokens between consecutive chunks. Must be < chunk_size.
-  public var chunkOverlap: Int32 = 0
+  /// Optional so callers can explicitly request zero overlap (no overlap)
+  /// without it being silently replaced by the canonical default of 64.
+  public var chunkOverlap: Int32 {
+    get {_chunkOverlap ?? 0}
+    set {_chunkOverlap = newValue}
+  }
+  /// Returns true if `chunkOverlap` has been explicitly set.
+  public var hasChunkOverlap: Bool {self._chunkOverlap != nil}
+  /// Clears the value of `chunkOverlap`. Subsequent reads from it will return its default value.
+  public mutating func clearChunkOverlap() {self._chunkOverlap = nil}
 
   /// Maximum tokens of retrieved context passed to the LLM.
-  public var maxContextTokens: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var maxContextTokens: Int32 {
+    get {_maxContextTokens ?? 0}
+    set {_maxContextTokens = newValue}
+  }
+  /// Returns true if `maxContextTokens` has been explicitly set.
+  public var hasMaxContextTokens: Bool {self._maxContextTokens != nil}
+  /// Clears the value of `maxContextTokens`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxContextTokens() {self._maxContextTokens = nil}
 
   /// Prompt template with `{context}` and `{query}` placeholders.
   public var promptTemplate: String {
@@ -223,6 +274,12 @@ public nonisolated struct RARAGConfiguration: Sendable {
 
   public init() {}
 
+  fileprivate var _embeddingDimension: Int32? = nil
+  fileprivate var _topK: Int32? = nil
+  fileprivate var _similarityThreshold: Float? = nil
+  fileprivate var _chunkSize: Int32? = nil
+  fileprivate var _chunkOverlap: Int32? = nil
+  fileprivate var _maxContextTokens: Int32? = nil
   fileprivate var _promptTemplate: String? = nil
   fileprivate var _embeddingConfigJson: String? = nil
   fileprivate var _llmConfigJson: String? = nil
@@ -739,12 +796,12 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.embeddingModelID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.llmModelID) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.embeddingDimension) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.chunkSize) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.chunkOverlap) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self._embeddingDimension) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self._topK) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self._similarityThreshold) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self._chunkSize) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._chunkOverlap) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._maxContextTokens) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self._promptTemplate) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._embeddingConfigJson) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._llmConfigJson) }()
@@ -768,24 +825,24 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.llmModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 2)
     }
-    if self.embeddingDimension != 0 {
-      try visitor.visitSingularInt32Field(value: self.embeddingDimension, fieldNumber: 3)
-    }
-    if self.topK != 0 {
-      try visitor.visitSingularInt32Field(value: self.topK, fieldNumber: 4)
-    }
-    if self.similarityThreshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.similarityThreshold, fieldNumber: 5)
-    }
-    if self.chunkSize != 0 {
-      try visitor.visitSingularInt32Field(value: self.chunkSize, fieldNumber: 6)
-    }
-    if self.chunkOverlap != 0 {
-      try visitor.visitSingularInt32Field(value: self.chunkOverlap, fieldNumber: 7)
-    }
-    if self.maxContextTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 8)
-    }
+    try { if let v = self._embeddingDimension {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._topK {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._similarityThreshold {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._chunkSize {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._chunkOverlap {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._maxContextTokens {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try { if let v = self._promptTemplate {
       try visitor.visitSingularStringField(value: v, fieldNumber: 9)
     } }()
@@ -813,12 +870,12 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
   public static func ==(lhs: RARAGConfiguration, rhs: RARAGConfiguration) -> Bool {
     if lhs.embeddingModelID != rhs.embeddingModelID {return false}
     if lhs.llmModelID != rhs.llmModelID {return false}
-    if lhs.embeddingDimension != rhs.embeddingDimension {return false}
-    if lhs.topK != rhs.topK {return false}
-    if lhs.similarityThreshold != rhs.similarityThreshold {return false}
-    if lhs.chunkSize != rhs.chunkSize {return false}
-    if lhs.chunkOverlap != rhs.chunkOverlap {return false}
-    if lhs.maxContextTokens != rhs.maxContextTokens {return false}
+    if lhs._embeddingDimension != rhs._embeddingDimension {return false}
+    if lhs._topK != rhs._topK {return false}
+    if lhs._similarityThreshold != rhs._similarityThreshold {return false}
+    if lhs._chunkSize != rhs._chunkSize {return false}
+    if lhs._chunkOverlap != rhs._chunkOverlap {return false}
+    if lhs._maxContextTokens != rhs._maxContextTokens {return false}
     if lhs._promptTemplate != rhs._promptTemplate {return false}
     if lhs._embeddingConfigJson != rhs._embeddingConfigJson {return false}
     if lhs._llmConfigJson != rhs._llmConfigJson {return false}
