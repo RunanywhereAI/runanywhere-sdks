@@ -274,6 +274,13 @@ private func platformSecureGetCallback(
     var result: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &result)
 
+    // Distinguish a clean "key does not exist" miss from a real Keychain
+    // failure per the rac_platform_adapter.h:secure_get contract — commons
+    // consumers (e.g. rac_device_get_or_create_persistent_id) depend on the
+    // miss code to decide between fallback and propagation.
+    if status == errSecItemNotFound {
+        return RAC_ERROR_FILE_NOT_FOUND
+    }
     guard status == errSecSuccess, let data = result as? Data else {
         return RAC_ERROR_SECURE_STORAGE_FAILED
     }
