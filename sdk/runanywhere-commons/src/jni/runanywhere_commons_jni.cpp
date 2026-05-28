@@ -37,6 +37,7 @@
 
 #include <jni.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #ifndef _WIN32
@@ -162,6 +163,12 @@ static jmethodID g_method_secure_get = nullptr;
 static jmethodID g_method_secure_set = nullptr;
 static jmethodID g_method_secure_delete = nullptr;
 static jmethodID g_method_now_ms = nullptr;
+// kotlin-005-C: directory enumeration slots populated by Kotlin adapter so the
+// model-registry refresh path (rescan_local) and rac_model_info_make_proto's
+// is_downloaded probe for multi-file artifacts work on Android the same way
+// they do on Web. See rac_platform_adapter.h for the cross-SDK contract.
+static jmethodID g_method_file_list_directory = nullptr;
+static jmethodID g_method_is_non_empty_directory = nullptr;
 
 // =============================================================================
 // JNI OnLoad/OnUnload
@@ -799,6 +806,145 @@ static int64_t jni_now_ms_callback(void* user_data) {
 
     return env->CallLongMethod(g_platform_adapter, g_method_now_ms);
 }
+
+// kotlin-005-C: directory enumeration via java.io.File.listFiles().
+//
+// Two-call semantics (per `rac_file_list_directory_fn`):
+//   1. out_entries == NULL -> write total entry count into *in_out_count,
+//      return RAC_SUCCESS without touching the entries array.
+//   2. out_entries != NULL -> fill up to *in_out_count entries, update
+//      *in_out_count to the number written.
+//
+// Truncation contract (per `rac_directory_entry_t::name`): when a UTF-8 entry
+// name (+NUL) would exceed RAC_DIRECTORY_ENTRY_NAME_MAX the Kotlin callback
+// MUST skip the entry rather than truncate; we mirror that on the JNI side
+// in case the Kotlin layer ever forwards an oversized name (defensive copy
+// uses strncpy with explicit NUL-termination so we never produce a half-name
+// that aliases a different artifact).
+static rac_result_t jni_file_list_directory_callback(const char* dir_path,
+                                                     rac_directory_entry_t* out_entries,
+                                                     size_t* in_out_count, void* user_data) {
+    if (in_out_count == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr ||
+        g_method_file_list_directory == nullptr) {
+        return RAC_ERROR_ADAPTER_NOT_SET;
+    }
+
+    jstring jPath = env->NewStringUTF(dir_path ? dir_path : "");
+    jobjectArray result = static_cast<jobjectArray>(env->CallObjectMethod(
+        g_platform_adapter, g_method_file_list_directory, jPath));
+    env->DeleteLocalRef(jPath);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return RAC_ERROR_INTERNAL;
+    }
+    // Kotlin returns null to signal "directory does not exist" per the C ABI
+    // contract; any other error is mapped to a structured Throwable above.
+    if (result == nullptr) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+
+    const jsize total = env->GetArrayLength(result);
+
+    // Capacity-query branch: caller wants the entry count.
+    if (out_entries == nullptr) {
+        *in_out_count = static_cast<size_t>(total);
+        env->DeleteLocalRef(result);
+        return RAC_SUCCESS;
+    }
+
+    // Fill branch: write up to *in_out_count entries.
+    const size_t capacity = *in_out_count;
+    const size_t write_count = std::min(capacity, static_cast<size_t>(total));
+
+    for (size_t i = 0; i < write_count; ++i) {
+        jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
+        if (entryObj == nullptr) {
+            // Skip null slots defensively — the Kotlin contract should never
+            // emit them, but treat as a benign skip rather than abort the
+            // whole listing.
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            continue;
+        }
+
+        // Kotlin RacDirectoryEntry is a data class with `name: String`,
+        // `isDir: Boolean`, `sizeBytes: Long`. Look up the fields once per
+        // entry — class lookup is cheap and the array length is typically
+        // small (model-registry rescan_local on a single artifact dir).
+        jclass entryClass = env->GetObjectClass(entryObj);
+        jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
+        jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
+        jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+
+        jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
+        jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
+        jlong jSize = env->GetLongField(entryObj, sizeField);
+
+        const char* nameChars = (jName != nullptr) ? env->GetStringUTFChars(jName, nullptr) : nullptr;
+        if (nameChars != nullptr) {
+            const size_t nameLen = std::strlen(nameChars);
+            if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
+                std::memcpy(out_entries[i].name, nameChars, nameLen);
+                out_entries[i].name[nameLen] = '\0';
+            } else {
+                // Defensive: Kotlin should already have filtered oversized
+                // entries per the truncation contract. Zero-fill so we
+                // never expose a half-name to commons.
+                std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            }
+            env->ReleaseStringUTFChars(jName, nameChars);
+        } else {
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+        }
+
+        out_entries[i].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
+        out_entries[i].size_bytes = static_cast<int64_t>(jSize);
+
+        if (jName != nullptr) {
+            env->DeleteLocalRef(jName);
+        }
+        env->DeleteLocalRef(entryClass);
+        env->DeleteLocalRef(entryObj);
+    }
+
+    *in_out_count = write_count;
+    env->DeleteLocalRef(result);
+    return RAC_SUCCESS;
+}
+
+// kotlin-005-C: cheap directory-probe used by rac_model_info_make_proto's
+// is_downloaded gating. Falls back to file_list_directory + entry-count
+// inside commons if NULL; we populate it so multi-file artifacts (mmproj +
+// GGUF pairs, tokenizer + ONNX bundles) get the fast path on Android.
+static rac_bool_t jni_is_non_empty_directory_callback(const char* path, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr ||
+        g_method_is_non_empty_directory == nullptr) {
+        return RAC_FALSE;
+    }
+
+    jstring jPath = env->NewStringUTF(path ? path : "");
+    jboolean result =
+        env->CallBooleanMethod(g_platform_adapter, g_method_is_non_empty_directory, jPath);
+    env->DeleteLocalRef(jPath);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return RAC_FALSE;
+    }
+    return result ? RAC_TRUE : RAC_FALSE;
+}
 // NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 
 // =============================================================================
@@ -957,6 +1103,27 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_delete =
         env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
     g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+    // kotlin-005-C: optional Kotlin-side directory probes. Method lookup is
+    // best-effort — older host apps that haven't been recompiled against the
+    // new adapter surface will miss these IDs and commons will fall through
+    // to its NULL-callback branches (rescan_local emits a warning,
+    // is_downloaded for multi-file artifacts reports false). New builds
+    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
+    // so the model-registry and is_downloaded paths match the Web/Swift
+    // behaviour documented in rac_platform_adapter.h.
+    g_method_file_list_directory = env->GetMethodID(
+        adapterClass, "fileListDirectory",
+        "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/RacDirectoryEntry;");
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_method_file_list_directory = nullptr;
+    }
+    g_method_is_non_empty_directory =
+        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_method_is_non_empty_directory = nullptr;
+    }
 
     env->DeleteLocalRef(adapterClass);
 
@@ -971,6 +1138,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_c_adapter.secure_set = jni_secure_set_callback;
     g_c_adapter.secure_delete = jni_secure_delete_callback;
     g_c_adapter.now_ms = jni_now_ms_callback;
+    // kotlin-005-C: populate directory enumeration slots iff the Kotlin
+    // adapter exposed the corresponding methods. get_vendor_id intentionally
+    // remains NULL — Android has no UIDevice.identifierForVendor analog, so
+    // commons synthesizes + persists a UUID via secure_set per the cross-SDK
+    // contract in rac_platform_adapter.h.
+    g_c_adapter.file_list_directory =
+        (g_method_file_list_directory != nullptr) ? jni_file_list_directory_callback : nullptr;
+    g_c_adapter.is_non_empty_directory =
+        (g_method_is_non_empty_directory != nullptr) ? jni_is_non_empty_directory_callback : nullptr;
     g_c_adapter.user_data = nullptr;
 
     LOGi("racSetPlatformAdapter: adapter set successfully");
