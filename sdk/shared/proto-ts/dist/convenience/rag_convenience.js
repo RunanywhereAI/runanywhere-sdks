@@ -23,13 +23,12 @@ const rAGConfigurationDefaults = () => ({
     similarityThreshold: 0.7,
     chunkSize: 512,
     chunkOverlap: 64,
-    maxContextTokens: 0,
     persistIndex: false,
     rerankResults: false,
 });
 exports.rAGConfigurationDefaults = rAGConfigurationDefaults;
 const validateRAGConfiguration = (m) => {
-    if (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0) {
+    if (m.similarityThreshold !== undefined && (m.similarityThreshold < 0.0 || m.similarityThreshold > 1.0)) {
         throw new _errors_1.ValidationError({
             fieldPath: 'RAGConfiguration.similarity_threshold',
             message: `similarity_threshold must be in 0.0...1.0 (got ${m.similarityThreshold})`,

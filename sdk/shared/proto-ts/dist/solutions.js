@@ -421,7 +421,7 @@ function createBaseVoiceAgentConfig() {
         chunkMs: 0,
         audioSource: 0,
         audioFilePath: "",
-        enableBargeIn: false,
+        enableBargeIn: undefined,
         bargeInThresholdMs: 0,
         systemPrompt: "",
         maxContextTokens: 0,
@@ -460,7 +460,7 @@ exports.VoiceAgentConfig = {
         if (message.audioFilePath !== "") {
             writer.uint32(122).string(message.audioFilePath);
         }
-        if (message.enableBargeIn !== false) {
+        if (message.enableBargeIn !== undefined) {
             writer.uint32(64).bool(message.enableBargeIn);
         }
         if (message.bargeInThresholdMs !== 0) {
@@ -671,7 +671,7 @@ exports.VoiceAgentConfig = {
                 ? globalThis.Boolean(object.enableBargeIn)
                 : isSet(object.enable_barge_in)
                     ? globalThis.Boolean(object.enable_barge_in)
-                    : false,
+                    : undefined,
             bargeInThresholdMs: isSet(object.bargeInThresholdMs)
                 ? globalThis.Number(object.bargeInThresholdMs)
                 : isSet(object.barge_in_threshold_ms)
@@ -734,7 +734,7 @@ exports.VoiceAgentConfig = {
         if (message.audioFilePath !== "") {
             obj.audioFilePath = message.audioFilePath;
         }
-        if (message.enableBargeIn !== false) {
+        if (message.enableBargeIn !== undefined) {
             obj.enableBargeIn = message.enableBargeIn;
         }
         if (message.bargeInThresholdMs !== 0) {
@@ -774,7 +774,7 @@ exports.VoiceAgentConfig = {
         message.chunkMs = object.chunkMs ?? 0;
         message.audioSource = object.audioSource ?? 0;
         message.audioFilePath = object.audioFilePath ?? "";
-        message.enableBargeIn = object.enableBargeIn ?? false;
+        message.enableBargeIn = object.enableBargeIn ?? undefined;
         message.bargeInThresholdMs = object.bargeInThresholdMs ?? 0;
         message.systemPrompt = object.systemPrompt ?? "";
         message.maxContextTokens = object.maxContextTokens ?? 0;
