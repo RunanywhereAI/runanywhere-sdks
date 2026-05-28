@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_classes_with_only_static_members
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
@@ -195,6 +196,39 @@ class DartBridgePlatform {
       adapter.ref.httpDownload = nullptr;
       adapter.ref.httpDownloadCancel = nullptr;
       adapter.ref.extractArchive = nullptr;
+
+      // Directory enumeration — commons uses these from the model-registry
+      // refresh path (rescan_local) and the canonical RAModelInfo factory
+      // (is_downloaded gating for multi-file artifacts). Both are invoked
+      // from the Dart-owned isolate that initiates the corresponding SDK
+      // public API call, so Pointer.fromFunction trampolines are safe here
+      // (same constraint as file_exists / file_read above). See
+      // rac_platform_adapter.h doc-block for cross-SDK status.
+      adapter.ref.fileListDirectory =
+          Pointer.fromFunction<RacFileListDirectoryCallbackNative>(
+        _platformFileListDirectoryCallback,
+        _exceptionalReturnInt32,
+      );
+      adapter.ref.isNonEmptyDirectory =
+          Pointer.fromFunction<RacIsNonEmptyDirectoryCallbackNative>(
+        _platformIsNonEmptyDirectoryCallback,
+        _exceptionalReturnFalse,
+      );
+
+      // Vendor ID — intentionally null. Apple-only slot per
+      // rac_platform_adapter.h:get_vendor_id; commons calls it from
+      // rac_device_get_or_create_persistent_id() only after secure_get
+      // misses. Flutter pre-populates the device-id cache in
+      // dart_bridge_device.dart::_getOrCreateDeviceId() using
+      // device_info_plus (identifierForVendor on iOS, generated UUID on
+      // Android) and writes it through secure_set, so the commons chain
+      // resolves on the secure_get branch before reaching this slot. A
+      // direct FFI trampoline cannot bridge UIDevice.identifierForVendor
+      // anyway because Flutter exposes it only via the async
+      // device_info_plus MethodChannel, which FFI's synchronous return
+      // contract cannot await.
+      adapter.ref.getVendorId = nullptr;
+
       adapter.ref.userData = nullptr;
 
       // Register with C++
@@ -787,6 +821,138 @@ void _platformTrackErrorCallback(
   } catch (_) {
     // Ignore errors in error handling
   }
+}
+
+// =============================================================================
+// DIRECTORY ENUMERATION (Platform Adapter)
+// =============================================================================
+
+/// `rac_file_list_directory_fn` — enumerate directory entries into the
+/// caller-provided array. Implements the two-call semantics documented on
+/// the C typedef: pass `outEntries == NULL` to query capacity, then call
+/// again with an allocated array.
+///
+/// Truncation contract (per `rac_directory_entry_t::name`): entries whose
+/// UTF-8 byte length (+ NUL) exceeds [RAC_DIRECTORY_ENTRY_NAME_MAX] MUST be
+/// skipped, not truncated, to avoid producing half-names that alias other
+/// artifacts. We emit a RAC_LOG_WARN-equivalent log line via SDKLogger so
+/// operators can detect skips.
+int _platformFileListDirectoryCallback(
+  Pointer<Utf8> dirPath,
+  Pointer<Void> outEntries,
+  Pointer<IntPtr> inOutCount,
+  Pointer<Void> userData,
+) {
+  if (dirPath == nullptr || inOutCount == nullptr) {
+    return RacResultCode.errorInvalidParameter;
+  }
+
+  try {
+    final pathString = dirPath.toDartString();
+    final dir = Directory(pathString);
+    if (!dir.existsSync()) {
+      return RacResultCode.errorFileNotFound;
+    }
+
+    // Collect entries up front so capacity and fill calls observe the same
+    // snapshot. `listSync` is synchronous, hidden entries (.* / .. / .) are
+    // already filtered by dart:io for FileSystemEntity.
+    final entries = dir.listSync(followLinks: false);
+
+    // Filter out oversized names per the truncation contract; track skips.
+    final retained = <_DartDirectoryEntry>[];
+    var skipped = 0;
+    for (final entity in entries) {
+      final basename = entity.path.split(Platform.pathSeparator).last;
+      final encoded = utf8.encode(basename);
+      // +1 for NUL terminator must fit in the inline name buffer.
+      if (encoded.length + 1 > RAC_DIRECTORY_ENTRY_NAME_MAX) {
+        skipped++;
+        continue;
+      }
+      final isDir = entity is Directory;
+      var sizeBytes = 0;
+      if (entity is File) {
+        try {
+          sizeBytes = entity.lengthSync();
+        } catch (_) {
+          sizeBytes = 0;
+        }
+      }
+      retained.add(_DartDirectoryEntry(encoded, isDir, sizeBytes));
+    }
+
+    if (skipped > 0) {
+      SDKLogger('PlatformAdapter').warning(
+        'Skipped $skipped directory entries in $pathString: name longer '
+        'than $RAC_DIRECTORY_ENTRY_NAME_MAX bytes (truncation contract).',
+      );
+    }
+
+    if (outEntries == nullptr) {
+      // Capacity query: write total entry count, do not touch entries array.
+      inOutCount.value = retained.length;
+      return RacResultCode.success;
+    }
+
+    final capacity = inOutCount.value;
+    final count = capacity < retained.length ? capacity : retained.length;
+    final entriesPtr = outEntries.cast<RacDirectoryEntryStruct>();
+    for (var i = 0; i < count; i++) {
+      final entry = retained[i];
+      final slot = (entriesPtr + i).ref;
+      // Copy NUL-terminated UTF-8 into the inline name buffer; remaining
+      // bytes were zero-initialized by the caller's `calloc` / `memset`,
+      // but we still write the NUL explicitly to be defensive.
+      for (var j = 0; j < entry.utf8Name.length; j++) {
+        slot.name[j] = entry.utf8Name[j];
+      }
+      slot.name[entry.utf8Name.length] = 0;
+      slot.isDir = entry.isDir ? RAC_TRUE : RAC_FALSE;
+      slot.sizeBytes = entry.sizeBytes;
+    }
+    inOutCount.value = count;
+    return RacResultCode.success;
+  } catch (e) {
+    SDKLogger('PlatformAdapter').warning(
+      'file_list_directory failed: $e',
+    );
+    return RacResultCode.errorFileReadFailed;
+  }
+}
+
+/// `is_non_empty_directory` — RAC_TRUE iff `path` is a directory containing
+/// at least one entry. Used by `rac_model_info_make_proto` to compute the
+/// `is_downloaded` field for directory-based (multi-file) artifacts without
+/// forcing the SDK to enumerate the directory itself.
+int _platformIsNonEmptyDirectoryCallback(
+  Pointer<Utf8> path,
+  Pointer<Void> userData,
+) {
+  if (path == nullptr) {
+    return RAC_FALSE;
+  }
+  try {
+    final pathString = path.toDartString();
+    final dir = Directory(pathString);
+    if (!dir.existsSync()) {
+      return RAC_FALSE;
+    }
+    // Cheap probe: `listSync` returns an empty list for empty directories
+    // and dart:io filters `.` / `..`. We short-circuit on the first entry
+    // by using an iterator-style listing.
+    final iterator = dir.listSync(followLinks: false).iterator;
+    return iterator.moveNext() ? RAC_TRUE : RAC_FALSE;
+  } catch (_) {
+    return RAC_FALSE;
+  }
+}
+
+class _DartDirectoryEntry {
+  _DartDirectoryEntry(this.utf8Name, this.isDir, this.sizeBytes);
+  final List<int> utf8Name;
+  final bool isDir;
+  final int sizeBytes;
 }
 
 // =============================================================================

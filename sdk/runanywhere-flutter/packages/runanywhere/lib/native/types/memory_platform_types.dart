@@ -180,6 +180,30 @@ typedef RacGetVendorIdCallbackNative = Int32 Function(
 // Structs (using FFI Struct for native memory layout)
 // =============================================================================
 
+/// Maximum byte length (including NUL) of a `rac_directory_entry_t::name`
+/// field. Mirrors `RAC_DIRECTORY_ENTRY_NAME_MAX` in
+/// `sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h`. Used to
+/// size the inline name buffer in `RacDirectoryEntryStruct`.
+const int RAC_DIRECTORY_ENTRY_NAME_MAX = 512;
+
+/// Directory entry struct matching `rac_directory_entry_t`. Plain-old-data
+/// layout written by `RacFileListDirectoryCallbackNative` implementations:
+///   - 512 bytes inline `name` (NUL-terminated UTF-8)
+///   - 4 bytes `is_dir` (Int32, RAC_TRUE/RAC_FALSE)
+///   - 8 bytes `size_bytes` (Int64; 0 for directories or unknown)
+/// Total = 520 bytes per entry (Int64 alignment ⇒ no trailing padding on the
+/// platforms Flutter targets — iOS/Android/macOS arm64+x86_64).
+base class RacDirectoryEntryStruct extends Struct {
+  @Array(RAC_DIRECTORY_ENTRY_NAME_MAX)
+  external Array<Uint8> name;
+
+  @Int32()
+  external int isDir;
+
+  @Int64()
+  external int sizeBytes;
+}
+
 /// Platform adapter struct matching rac_platform_adapter_t
 /// Note: This is a complex struct - for simplicity we use `Pointer<Void>` in FFI calls
 /// and manage the struct manually in Dart
