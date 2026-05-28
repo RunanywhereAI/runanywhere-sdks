@@ -129,18 +129,18 @@ public class ComponentVTable internal constructor(
          * through the canonical `rac_model_lifecycle_load_proto`. The
          * registry resolves path/framework/category from the
          * `model_id`, so callers only need to supply the id here.
-         * Returns RAC_SUCCESS on success or RAC_ERROR_OPERATION_FAILED
+         * Returns RAC_SUCCESS on success or RAC_ERROR_MODEL_LOAD_FAILED
          * otherwise.
          */
         private fun loadViaLifecycle(modelId: String): Int {
             val result =
                 CppBridgeModelLifecycle.load(
                     ModelLoadRequest(model_id = modelId),
-                ) ?: return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+                ) ?: return RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
             return if (result.success) {
                 RunAnywhereBridge.RAC_SUCCESS
             } else {
-                RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+                RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
             }
         }
     }
