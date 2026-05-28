@@ -190,14 +190,19 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     /// optional `onError` closure may produce a terminal `Event` to yield
     /// before the stream finishes.
     ///
-    /// Cancellation: `onTermination` on the returned `AsyncStream` flips
-    /// the context's `isCancelled` flag (so the shared trampoline stops
-    /// decoding/yielding) and invokes the optional `onCancel` closure
-    /// where a domain-specific C cancel symbol is available (e.g.
-    /// `rac_llm_cancel_proto` / `rac_vlm_cancel_lifecycle_proto`). This
-    /// satisfies the AsyncStream ownership contract: dropping the
-    /// stream stops the native work instead of letting it run to
-    /// completion in the detached task.
+    /// Cancellation fires on BOTH paths: (1) `onTermination` on the
+    /// returned `AsyncStream` (consumer breaks out of / drops the stream),
+    /// and (2) a `withTaskCancellationHandler` around the detached body, so
+    /// cancelling the consumer's owning task — which terminates the stream
+    /// as `.finished` rather than `.cancelled` — still tears the native call
+    /// down. Either path flips the context's `isCancelled` flag (so the
+    /// shared trampoline stops decoding/yielding) and invokes the optional
+    /// `onCancel` closure where a domain-specific C cancel symbol is
+    /// available (e.g. `rac_llm_cancel_proto` /
+    /// `rac_vlm_cancel_lifecycle_proto`). This satisfies the AsyncStream
+    /// ownership contract: dropping the stream or cancelling its owner stops
+    /// the native work instead of letting it run to completion in the
+    /// detached task.
     ///
     /// - Parameters:
     ///   - request: Proto request to serialise into the bytes/size pair.
@@ -254,14 +259,27 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
                 }
             }
 
+            // The task is detached so the native call neither blocks the
+            // caller nor inherits its actor isolation, but a detached task
+            // also drops structured-concurrency cancellation. Wrap the body
+            // in `withTaskCancellationHandler` so a cancel on ANY enclosing
+            // task — including the case where the consumer's owning task is
+            // cancelled and the AsyncStream terminates as `.finished` rather
+            // than `.cancelled` — still flips `isCancelled` and fires the
+            // native cancel symbol instead of decoding to completion.
             Task.detached {
-                let rc = requestData.withUnsafeBytes { rawBuffer in
-                    body(
-                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        rawBuffer.count,
-                        protoStreamTrampoline,
-                        contextPtr
-                    )
+                let rc = await withTaskCancellationHandler {
+                    requestData.withUnsafeBytes { rawBuffer in
+                        body(
+                            rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                            rawBuffer.count,
+                            protoStreamTrampoline,
+                            contextPtr
+                        )
+                    }
+                } onCancel: {
+                    context.cancel()
+                    onCancel?()
                 }
                 Unmanaged<ProtoStreamContext<Event>>
                     .fromOpaque(contextPtr)
@@ -493,33 +511,45 @@ extension CppBridge.VLM {
                 }
             }
 
+            // Detached for the same reason as `runRequestStream`; wrap the
+            // native call in `withTaskCancellationHandler` so cancelling the
+            // consumer's owning task (AsyncStream terminates `.finished`, not
+            // `.cancelled`) still flips the context flag and fires the VLM
+            // cancel symbol instead of decoding the whole response.
             Task.detached {
                 var outBuffer = rac_proto_buffer_t()
                 defer { NativeProtoABI.free(&outBuffer) }
-                let rc = imageData.withUnsafeBytes { imageRaw in
-                    optionData.withUnsafeBytes { optionRaw in
-                        stream(
-                            handle,
-                            imageRaw.bindMemory(to: UInt8.self).baseAddress,
-                            imageRaw.count,
-                            optionRaw.bindMemory(to: UInt8.self).baseAddress,
-                            optionRaw.count,
-                            { bytes, size, userData in
-                                guard let userData else { return RAC_FALSE }
-                                let ctx = Unmanaged<ProtoStreamContext<RASDKEvent>>
-                                    .fromOpaque(userData)
-                                    .takeUnretainedValue()
-                                // Signal the C side to stop as soon as
-                                // the consumer cancels — skip the yield
-                                // entirely and return RAC_FALSE so the
-                                // native loop breaks on its next tick.
-                                if ctx.isCancelled { return RAC_FALSE }
-                                ctx.yield(bytes: bytes, size: size)
-                                return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
-                            },
-                            contextPtr,
-                            &outBuffer
-                        )
+                let rc = await withTaskCancellationHandler {
+                    imageData.withUnsafeBytes { imageRaw in
+                        optionData.withUnsafeBytes { optionRaw in
+                            stream(
+                                handle,
+                                imageRaw.bindMemory(to: UInt8.self).baseAddress,
+                                imageRaw.count,
+                                optionRaw.bindMemory(to: UInt8.self).baseAddress,
+                                optionRaw.count,
+                                { bytes, size, userData in
+                                    guard let userData else { return RAC_FALSE }
+                                    let ctx = Unmanaged<ProtoStreamContext<RASDKEvent>>
+                                        .fromOpaque(userData)
+                                        .takeUnretainedValue()
+                                    // Signal the C side to stop as soon as
+                                    // the consumer cancels — skip the yield
+                                    // entirely and return RAC_FALSE so the
+                                    // native loop breaks on its next tick.
+                                    if ctx.isCancelled { return RAC_FALSE }
+                                    ctx.yield(bytes: bytes, size: size)
+                                    return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
+                                },
+                                contextPtr,
+                                &outBuffer
+                            )
+                        }
+                    }
+                } onCancel: {
+                    context.cancel()
+                    if let cancel = VLMCustomProtoABI.cancel {
+                        _ = cancel(handle)
                     }
                 }
                 Unmanaged<ProtoStreamContext<RASDKEvent>>
