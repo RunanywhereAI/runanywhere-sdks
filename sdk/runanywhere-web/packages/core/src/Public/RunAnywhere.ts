@@ -58,7 +58,7 @@ import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+Voi
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
-import { ModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
 import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
@@ -878,8 +878,13 @@ export const RunAnywhere = {
   /** C++ model registry proto bridge — list/query/listDownloaded/get/mutate. */
   modelRegistry: ModelRegistryCapability,
 
-  /** C++ model lifecycle proto bridge — load/unload/current/snapshot. */
-  modelLifecycle: ModelLifecycleCapability,
+  // Cross-SDK lifecycle surface is the four top-level flat verbs below
+  // (`loadModel` / `unloadModel` / `currentModel` /
+  // `componentLifecycleSnapshot`), mirroring Swift's source-of-truth shape.
+  // Web's extra OPFS/MEMFS helpers live on the internal `WebModelLifecycle`
+  // namespace and are NOT exposed here; if cross-SDK code needs `isLoaded`,
+  // `isComponentReady`, `unloadAllModels`, `loadModelAsync`, etc., they
+  // must be promoted to the canonical contract in Swift first.
 
   /** Text generation — `RunAnywhere.textGeneration.generate(options)` etc. */
   textGeneration: TextGenerationCapability,

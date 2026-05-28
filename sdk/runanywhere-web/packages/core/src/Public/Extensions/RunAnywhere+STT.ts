@@ -31,7 +31,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderSTT,
@@ -354,8 +354,8 @@ export async function transcribe(
   let modelId = options?.modelId;
   let modelName: string | undefined;
 
-  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!modelPath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       includeModelMetadata: true,
     });

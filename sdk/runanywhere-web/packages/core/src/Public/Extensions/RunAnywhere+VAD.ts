@@ -34,7 +34,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { VADProtoAdapter, type ProtoEventHandler } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderVAD,
@@ -359,8 +359,8 @@ export async function detectVoice(
   let modelId = options?.modelId;
   let modelName: string | undefined;
 
-  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!modelPath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: true,
     });

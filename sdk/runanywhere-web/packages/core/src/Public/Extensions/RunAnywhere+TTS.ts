@@ -29,7 +29,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderTTS,
@@ -297,8 +297,8 @@ export async function synthesize(
   let voiceId = options?.voiceId;
   let voiceName: string | undefined;
 
-  if (!voicePath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!voicePath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       includeModelMetadata: true,
     });

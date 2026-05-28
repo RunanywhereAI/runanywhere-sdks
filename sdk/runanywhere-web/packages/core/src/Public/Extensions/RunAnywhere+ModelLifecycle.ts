@@ -70,7 +70,17 @@ async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null
     : opfsPath;
 }
 
-export const ModelLifecycle = {
+// Web-internal lifecycle namespace. The cross-SDK canonical contract lives on
+// `RunAnywhere.{loadModel,unloadModel,currentModel,componentLifecycleSnapshot}`
+// (top-level, mirroring Swift's source-of-truth surface). The extras exposed
+// below — `supportsNativeLifecycle`, `loadModelAsync`, `unloadModelAsync`,
+// `unloadAllModels`, `isLoaded`, `isComponentReady`, `reset` — are Web-only
+// helpers required by the OPFS/MEMFS async hydration model and the
+// multi-WASM module fan-out (LlamaCPP + ONNX private heaps). They are NOT
+// part of the portable cross-SDK surface; iOS/Android/Flutter/RN do not
+// expose them. Keep them internal to the Web package so app authors who
+// follow Swift as the reference do not accidentally bind to them.
+export const WebModelLifecycle = {
   supportsNativeLifecycle(): boolean {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
   },
@@ -186,7 +196,7 @@ export const ModelLifecycle = {
   },
 
   isLoaded(request: CurrentModelRequest = { includeModelMetadata: false }): boolean {
-    const current = ModelLifecycle.currentModel(request);
+    const current = WebModelLifecycle.currentModel(request);
     return Boolean(current?.modelId);
   },
 
@@ -211,7 +221,7 @@ export const ModelLifecycle = {
   },
 
   isComponentReady(component: SDKComponent): boolean {
-    return ModelLifecycle.componentLifecycleSnapshot(component)?.state ===
+    return WebModelLifecycle.componentLifecycleSnapshot(component)?.state ===
       ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
   },
 
