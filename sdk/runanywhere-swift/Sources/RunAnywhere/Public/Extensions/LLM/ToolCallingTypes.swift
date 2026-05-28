@@ -86,9 +86,10 @@ public extension RAToolValue {
     /// Parse a JSON object string into a `[String: RAToolValue]` map.
     ///
     /// Throws an `SDKException` (category `.internal`) when the input is not
-    /// valid JSON or the commons bridge cannot decode the payload. Callers
-    /// that previously relied on the silent-empty-dict fallback must now
-    /// translate the thrown error into their own failure surface (e.g.
+    /// valid JSON, the commons bridge cannot decode the payload, or the JSON
+    /// root is not an object (e.g. an array or scalar). Callers that
+    /// previously relied on the silent-empty-dict fallback must now translate
+    /// the thrown error into their own failure surface (e.g.
     /// `RAToolResult.success = false`).
     static func parseObjectJSON(_ json: String) throws -> [String: RAToolValue] {
         var wrapper = RAToolValueJSON(); wrapper.json = json
@@ -98,8 +99,14 @@ public extension RAToolValue {
             symbolName: ToolValueJSONABI.fromJSONName,
             responseType: RAToolValue.self
         )
-        if case .objectValue(let obj)? = value.kind { return obj.fields }
-        return [:]
+        guard case .objectValue(let obj)? = value.kind else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "ToolCall.argumentsJson must decode to a JSON object, got \(String(describing: value.kind))",
+                category: .internal
+            )
+        }
+        return obj.fields
     }
 
     static func jsonString(from object: [String: RAToolValue]) -> String {
