@@ -297,32 +297,55 @@ export function asSDKException(error: unknown): SDKException {
   return SDKException.unknown(String(error));
 }
 
-/** Category bucket for a proto error code. Mirrors Swift's getCategoryFromCode. */
+/**
+ * Map a proto `ErrorCode` (positive value, matches `|rac_result_t|`) to the
+ * canonical proto `ErrorCategory`.
+ *
+ * Verbatim port of the canonical 18-range table in
+ * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
+ * The native bridge cannot be called synchronously from every JS throw site
+ * (especially during bridge bootstrap), so the table is replicated here; any
+ * change to the canonical mapping MUST be mirrored in this function (and in
+ * the Web SDK equivalent). See commons-074-C.
+ */
 function categoryForCode(code: ErrorCodeProto): ErrorCategoryProto {
-  if (code >= 100 && code < 110)
+  if (code === 0) return ErrorCategoryProto.ERROR_CATEGORY_UNSPECIFIED;
+  if (code >= 100 && code <= 109)
     return ErrorCategoryProto.ERROR_CATEGORY_CONFIGURATION;
-  if (code >= 110 && code < 130) return ErrorCategoryProto.ERROR_CATEGORY_MODEL;
-  if (code >= 130 && code < 150)
+  if (code >= 110 && code <= 129) return ErrorCategoryProto.ERROR_CATEGORY_MODEL;
+  if (code >= 130 && code <= 149)
     return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
-  if (code >= 150 && code < 180)
+  if (code >= 150 && code <= 179)
     return ErrorCategoryProto.ERROR_CATEGORY_NETWORK;
-  if (code >= 180 && code < 220) return ErrorCategoryProto.ERROR_CATEGORY_IO;
-  if (code >= 220 && code < 230)
+  if ((code >= 180 && code <= 219) || (code >= 280 && code <= 299)) {
+    return ErrorCategoryProto.ERROR_CATEGORY_IO;
+  }
+  if (code >= 220 && code <= 229)
     return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
-  if (code >= 230 && code < 250)
+  if (code >= 230 && code <= 249)
     return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
-  if (code >= 250 && code < 280)
+  if (code >= 250 && code <= 279)
     return ErrorCategoryProto.ERROR_CATEGORY_VALIDATION;
-  if (code >= 280 && code < 320) return ErrorCategoryProto.ERROR_CATEGORY_IO;
-  if (code >= 320 && code < 330) return ErrorCategoryProto.ERROR_CATEGORY_AUTH;
-  if (code >= 330 && code < 400) return ErrorCategoryProto.ERROR_CATEGORY_IO;
-  if (code >= 400 && code < 500)
+  if (code >= 300 && code <= 319)
     return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
-  if (code >= 500 && code < 700)
+  if (code >= 320 && code <= 329) return ErrorCategoryProto.ERROR_CATEGORY_AUTH;
+  if (code >= 330 && code <= 349) return ErrorCategoryProto.ERROR_CATEGORY_AUTH;
+  if (code >= 350 && code <= 369) return ErrorCategoryProto.ERROR_CATEGORY_IO;
+  if (code >= 370 && code <= 379)
+    return ErrorCategoryProto.ERROR_CATEGORY_VALIDATION;
+  if (code >= 380 && code <= 389)
+    return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
+  if (code >= 400 && code <= 499)
     return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
-  if (code >= 700 && code < 800)
+  if (code >= 500 && code <= 599)
+    return ErrorCategoryProto.ERROR_CATEGORY_CONFIGURATION;
+  if (code >= 600 && code <= 699)
+    return ErrorCategoryProto.ERROR_CATEGORY_COMPONENT;
+  if (code >= 700 && code <= 799)
     return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
-  if (code >= 800 && code < 900)
+  if (code >= 800 && code <= 899)
     return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
-  return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
+  if (code >= 900 && code <= 999)
+    return ErrorCategoryProto.ERROR_CATEGORY_INTERNAL;
+  return ErrorCategoryProto.ERROR_CATEGORY_UNSPECIFIED;
 }
