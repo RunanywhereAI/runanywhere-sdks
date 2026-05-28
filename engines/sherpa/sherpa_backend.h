@@ -245,7 +245,6 @@ class SherpaSTT {
     STTModelType model_type_ = STTModelType::WHISPER;
     std::atomic<bool> model_loaded_{false};
     std::atomic<bool> cancel_requested_{false};
-    std::unordered_map<std::string, void*> streams_;
     int stream_counter_ = 0;
     std::string model_dir_;
     std::string language_;
