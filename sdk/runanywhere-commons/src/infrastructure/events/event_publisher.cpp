@@ -511,6 +511,10 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
         subscriptions = g_sdk_event_subscriptions;
     }
 
+    // Callbacks fire synchronously on the publishing thread (the snapshot is
+    // taken under lock, then dispatched outside it so a callback may re-enter
+    // subscribe/unsubscribe/publish). This is the cross-SDK threading contract
+    // documented on rac_sdk_event_publish_proto: subscribers MUST NOT block.
     const uint8_t* callback_data = buffer->empty() ? nullptr : buffer->data();
     const size_t callback_size = buffer->size();
     for (const auto& sub : subscriptions) {
