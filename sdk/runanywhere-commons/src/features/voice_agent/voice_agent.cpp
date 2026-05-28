@@ -55,6 +55,7 @@
 #include "voice_agent_internal.h"
 
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -206,10 +207,24 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         pipeline_snapshot->cancel();
     }
 
-    // Spin-wait until all in-flight operations complete
+    // commons-145: wait for in-flight lock-free ops (e.g. detect_speech)
+    // to drain. Sleep 1ms between checks rather than yield-spinning: on a
+    // multi-second LLM call holding the counter the yield form burns 100%
+    // CPU on the destroying thread (measurable battery/thermal hit on
+    // mobile), and on QoS-scheduled iOS threads the yielder can starve
+    // the worker holding the counter.
     while (handle->in_flight.load(std::memory_order_acquire) > 0) {
-        std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+
+    // commons-146: invoke cleanup() before tearing down components so the
+    // VAD's worker thread and the per-component lifecycle state are
+    // explicitly stopped/reset (symmetric with rac_voice_agent_cleanup).
+    // Done OUTSIDE handle->mutex because cleanup() acquires the same
+    // non-recursive mutex; the component_destroy calls below run under
+    // the mutex as before. is_shutting_down is already true, so any
+    // future entry-point call that races us will fail-fast.
+    (void)rac_voice_agent_cleanup(handle);
 
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
