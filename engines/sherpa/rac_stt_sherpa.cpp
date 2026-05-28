@@ -38,7 +38,8 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
         return RAC_ERROR_NULL_POINTER;
     }
 
-    auto* handle = new (std::nothrow) rac_sherpa_stt_handle_impl();
+    std::unique_ptr<rac_sherpa_stt_handle_impl> handle(
+        new (std::nothrow) rac_sherpa_stt_handle_impl());
     if (!handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -51,7 +52,6 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
     }
 
     if (!handle->backend->initialize(init_config)) {
-        delete handle;
         rac_error_set_details("Failed to initialize Sherpa backend");
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
@@ -59,7 +59,6 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
     // Get STT component
     handle->stt = handle->backend->get_stt();
     if (!handle->stt) {
-        delete handle;
         rac_error_set_details("STT component not available");
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
@@ -88,13 +87,12 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
         }
 
         if (!handle->stt->load_model(model_path, model_type)) {
-            delete handle;
             rac_error_set_details("Failed to load STT model");
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }
     }
 
-    *out_handle = static_cast<rac_handle_t>(handle);
+    *out_handle = static_cast<rac_handle_t>(handle.release());
 
     // DUP-06: "stt.backend.created" now emitted once by the commons STT
     // service layer
