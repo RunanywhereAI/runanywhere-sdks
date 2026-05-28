@@ -125,8 +125,8 @@ static int save_tokens_locked() {
     }
 
     if (g_auth_state.refresh_token) {
-        if (g_storage.store(RAC_KEY_REFRESH_TOKEN, g_auth_state.refresh_token,
-                            g_storage.context) != 0) {
+        if (g_storage.store(RAC_KEY_REFRESH_TOKEN, g_auth_state.refresh_token, g_storage.context) !=
+            0) {
             result = -1;
         }
     }
