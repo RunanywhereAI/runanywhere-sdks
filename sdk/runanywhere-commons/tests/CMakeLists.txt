@@ -977,6 +977,17 @@ target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_storage_analyzer_proto)
 add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
 
+# RT-CPU-03: ProviderRegistry<T> template unit tests (always built — no backend dep).
+add_executable(test_provider_registry test_provider_registry.cpp)
+target_include_directories(test_provider_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_provider_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_provider_registry)
+target_compile_features(test_provider_registry PRIVATE cxx_std_17)
+add_test(NAME provider_registry_tests COMMAND test_provider_registry)
+
 # T4.1: L1 runtime-plugin registry tests (always built — no backend dep).
 add_executable(test_runtime_registry test_runtime_registry.cpp)
 target_include_directories(test_runtime_registry PRIVATE
