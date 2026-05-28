@@ -14,12 +14,11 @@
 // share one source of truth. The exported symbols
 //   - rn_register_urlsession_transport
 //   - rn_unregister_urlsession_transport
-//   - rn_set_streaming_session       (newly exposed; not yet wired into
-//                                     the RN Swift facade — additive)
-//   - rn_cancel_all_streams          (newly exposed; not yet wired into
-//                                     the RN Swift facade — additive)
-// are referenced by the Swift façade at `URLSessionHttpTransport.swift`
-// (register/unregister) and by `HybridRunAnywhereCore.cpp` (register).
+//   - rn_set_streaming_session
+//   - rn_cancel_all_streams
+// are all wired into the RN Swift façade at `URLSessionHttpTransport.swift`
+// (matching the Flutter and Swift SDK source of truth) and consumed by
+// `HybridRunAnywhereCore.cpp` during SDK bootstrap.
 //
 // The path below is RELATIVE to this file on disk
 // (sdk/runanywhere-react-native/packages/core/ios/) so that the compiler

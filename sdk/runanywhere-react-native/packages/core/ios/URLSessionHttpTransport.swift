@@ -44,10 +44,46 @@ public final class URLSessionHttpTransport: NSObject {
         RARegisterURLSessionTransport()
     }
 
-    /// Restore the default libcurl transport. Primarily useful in tests.
+    /// Restore the default HTTP transport (no-op if none was installed).
+    /// Also cancels every in-flight streaming/resume task and clears the
+    /// streaming-session override, matching the Swift SDK reference.
     @objc(unregister)
     public static func unregister() {
         RAUnregisterURLSessionTransport()
+    }
+
+    /// Install a custom `URLSession` for streaming downloads (model GGUFs,
+    /// resume). Passing `nil` restores the built-in per-call session. Hosts
+    /// that need a true iOS background session —
+    /// `URLSessionConfiguration.background(withIdentifier:)` — supply one
+    /// here and wire `handleEventsForBackgroundURLSession` in their
+    /// `AppDelegate`, since that hook can only live in the application
+    /// layer.
+    ///
+    /// The override is consulted per call; there is no ownership transfer.
+    /// Thread-safe.
+    public static func register(streamingSession session: URLSession?) {
+        if let session = session {
+            // `Unmanaged.passUnretained` is the right tool here: the ObjC++
+            // side bridges via `__bridge NSURLSession*` (no transfer) and
+            // stores its own strong reference into the static override slot.
+            // The caller is responsible for keeping `session` alive until
+            // they replace it (or pass `nil`).
+            let raw = Unmanaged.passUnretained(session).toOpaque()
+            RASetStreamingSession(raw)
+        } else {
+            RASetStreamingSession(nil)
+        }
+    }
+
+    /// Cancel every in-flight streaming / resume task. Each pending
+    /// chunk-callback returns to its caller with `RAC_ERROR_CANCELLED`.
+    /// Complements the per-callback `return RAC_FALSE` cancel contract —
+    /// use this when the SDK is tearing down and there is no callback on
+    /// the stack to signal.
+    @objc(cancelAllStreams)
+    public static func cancelAllStreams() {
+        RACancelAllStreams()
     }
 }
 
@@ -63,3 +99,9 @@ private func RARegisterURLSessionTransport()
 
 @_silgen_name("rn_unregister_urlsession_transport")
 private func RAUnregisterURLSessionTransport()
+
+@_silgen_name("rn_set_streaming_session")
+private func RASetStreamingSession(_ session: UnsafeMutableRawPointer?)
+
+@_silgen_name("rn_cancel_all_streams")
+private func RACancelAllStreams()
