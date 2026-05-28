@@ -62,15 +62,39 @@
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "voice_agent_pipeline.hpp"
 
 namespace {
+
+constexpr const char* kVadComponent = "vad";
+#if !defined(RAC_HAVE_PROTOBUF)
+constexpr const char* kInitializeWithLoadedModelsOperation = "initializeWithLoadedModels";
+#endif
+constexpr const char* kMissingVadHandleMessage =
+    "Cannot initialize voice agent: VAD component handle is missing";
 
 inline void rac_va_emit(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event,
                         rac_voice_agent_event_callback_fn cb, void* user_data) {
     if (cb)
         cb(event, user_data);
     rac::voice_agent::dispatch_proto_event(handle, event);
+}
+
+bool all_required_models_ready(rac_voice_agent_handle_t handle) {
+    return rac::voice_agent::detail::validate_all_components_ready(handle) == RAC_SUCCESS;
+}
+
+void publish_initialize_with_loaded_models_failure(rac_voice_agent_handle_t handle,
+                                                  rac_result_t error_code,
+                                                  const char* message) {
+#if defined(RAC_HAVE_PROTOBUF)
+    rac::voice_agent::detail::emit_component_failure(handle, kVadComponent, error_code, message);
+#else
+    (void)handle;
+    (void)rac_sdk_event_publish_failure(error_code, message, kVadComponent,
+                                        kInitializeWithLoadedModelsOperation, RAC_TRUE);
+#endif
 }
 
 }  // namespace
@@ -111,9 +135,7 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, con
         rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
                                                         nullptr);
         // Check if all components are now ready
-        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
-            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
-            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+        if (all_required_models_ready(handle)) {
             rac::events::emit_voice_agent_all_ready();
         }
     } else {
@@ -143,9 +165,7 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, con
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
                                                         nullptr);
-        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
-            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
-            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+        if (all_required_models_ready(handle)) {
             rac::events::emit_voice_agent_all_ready();
         }
     } else {
@@ -175,9 +195,7 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, con
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADED, voice_id,
                                                         nullptr);
-        if (rac_stt_component_is_loaded(handle->stt_handle) == RAC_TRUE &&
-            rac_llm_component_is_loaded(handle->llm_handle) == RAC_TRUE &&
-            rac_tts_component_is_loaded(handle->tts_handle) == RAC_TRUE) {
+        if (all_required_models_ready(handle)) {
             rac::events::emit_voice_agent_all_ready();
         }
     } else {
@@ -238,7 +256,15 @@ rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handl
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    std::unique_lock<std::mutex> lock(handle->mutex);
+
+    if (!handle->vad_handle) {
+        lock.unlock();
+        publish_initialize_with_loaded_models_failure(handle, RAC_ERROR_INVALID_STATE,
+                                                      kMissingVadHandleMessage);
+        return rac_error_log_and_track(RAC_ERROR_INVALID_STATE, RAC_CATEGORY_VOICE_AGENT,
+                                       kMissingVadHandleMessage, __FILE__, __LINE__, __func__);
+    }
 
     RAC_LOG_INFO("VoiceAgent", "Initializing Voice Agent with already-loaded models");
 
