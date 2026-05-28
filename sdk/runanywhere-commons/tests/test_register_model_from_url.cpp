@@ -282,6 +282,47 @@ int test_invalid_input_bytes() {
     return 0;
 }
 
+// Empty input (size==0) parses to a default-zeroed request with an empty url.
+// That must be rejected rather than persisting a phantom model keyed by the
+// empty-string id (commons-121).
+int test_empty_input_rejected() {
+    install_noop_adapter();
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_register_model_from_url_proto(nullptr, 0, &out);
+    ASSERT_EQ(rc, RAC_ERROR_INVALID_ARGUMENT);
+    rac_proto_buffer_free(&out);
+
+    // The empty-string id must not have leaked into the registry.
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    ASSERT_TRUE(registry != nullptr);
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t get_rc = rac_model_registry_get_proto(registry, "", &bytes, &size);
+    ASSERT_EQ(get_rc, RAC_ERROR_NOT_FOUND);
+    if (bytes) {
+        rac_model_registry_proto_free(bytes);
+    }
+
+    clear_adapter();
+    return 0;
+}
+
+// An explicitly empty url in a non-empty request is rejected the same way.
+int test_empty_url_rejected() {
+    install_noop_adapter();
+
+    RegisterArgs args;
+    args.url = "";
+    args.name = "Phantom";
+
+    runanywhere::v1::ModelInfo saved;
+    ASSERT_TRUE(!register_proto(args, &saved));
+
+    clear_adapter();
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Regression: merge-not-replace on re-registration (commons-014).
 //
@@ -428,6 +469,8 @@ int main(int /*argc*/, char** /*argv*/) {
         {"register_with_source_override", test_register_with_source_override},
         {"null_out_pointer", test_null_out_pointer},
         {"invalid_input_bytes", test_invalid_input_bytes},
+        {"empty_input_rejected", test_empty_input_rejected},
+        {"empty_url_rejected", test_empty_url_rejected},
         {"re_register_preserves_download_state", test_re_register_preserves_download_state},
         {"re_register_allows_explicit_override", test_re_register_allows_explicit_override},
     };

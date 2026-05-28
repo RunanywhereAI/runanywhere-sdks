@@ -101,6 +101,15 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
                                           "failed to parse RegisterModelFromUrlRequest");
     }
 
+    // The url drives every derived field (id, name, format, artifact). An empty
+    // url yields a model keyed by the empty-string id, which pollutes the
+    // registry and breaks subsequent get(id) lookups. Reject it up front —
+    // mirrors the non-empty-url precondition the SDK download path relies on.
+    if (request.url().empty()) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "RegisterModelFromUrlRequest.url must not be empty");
+    }
+
     // -------------------------------------------------------------------------
     // 1) Build a ModelInfo via the canonical factory (P2-T4).
     // -------------------------------------------------------------------------
