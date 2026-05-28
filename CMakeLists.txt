@@ -316,6 +316,104 @@ if(RAC_BUILD_TESTS)
         add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
     endif()
 
+    # commons-012: whispercpp plugin-entry smoke test. Same wiring rationale as
+    # sherpa above — rac_backend_whispercpp is built by engines/ which is
+    # configured after sdk/runanywhere-commons/, so the target does not exist
+    # when commons/tests/CMakeLists.txt runs. whispercpp is the second STT
+    # engine (priority 80) that competes with sherpa (priority 90) for
+    # TRANSCRIBE routing; this smoke test guards that priority literal and the
+    # STT-only ops-slot population.
+    if(RAC_BACKEND_WHISPERCPP AND TARGET rac_backend_whispercpp
+       AND NOT TARGET test_plugin_entry_whispercpp)
+        add_executable(test_plugin_entry_whispercpp
+            sdk/runanywhere-commons/tests/test_plugin_entry_whispercpp.cpp)
+        target_include_directories(test_plugin_entry_whispercpp PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_whispercpp PRIVATE
+            rac_commons
+            rac_backend_whispercpp
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_whispercpp PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_whispercpp_tests COMMAND test_plugin_entry_whispercpp)
+    endif()
+
+    # commons-013: whisperkit_coreml plugin-entry smoke test. Same wiring
+    # rationale as the sherpa / whispercpp blocks above —
+    # rac_backend_whisperkit_coreml is built by engines/ which is configured
+    # after sdk/runanywhere-commons/. Locks the manifest's RAC_RUNTIME_ANE
+    # advertisement that test_engine_capability_honesty.cpp's
+    # ANEHintSelectsWhisperKit tiebreak relies on. Apple-only because the
+    # backend itself is Apple-only.
+    if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML AND TARGET rac_backend_whisperkit_coreml
+       AND NOT TARGET test_plugin_entry_whisperkit_coreml)
+        add_executable(test_plugin_entry_whisperkit_coreml
+            sdk/runanywhere-commons/tests/test_plugin_entry_whisperkit_coreml.cpp)
+        target_include_directories(test_plugin_entry_whisperkit_coreml PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE
+            rac_commons
+            rac_backend_whisperkit_coreml
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_whisperkit_coreml PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_whisperkit_coreml_tests
+                 COMMAND test_plugin_entry_whisperkit_coreml)
+    endif()
+
+    # commons-009: metalrt plugin-entry smoke test. Apple-gated (the engine is
+    # Apple-only — engines/metalrt/CMakeLists.txt forces RAC_BACKEND_METALRT=OFF
+    # on non-Apple hosts). MetalRT is an OBJECT library folded into rac_commons
+    # (see the `target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)`
+    # block earlier in this file), so the test only needs to link rac_commons —
+    # rac_plugin_entry_metalrt() resolves from the same archive. Wired here
+    # (not in commons/tests/CMakeLists.txt) for the same ordering reason as
+    # sherpa / whispercpp / whisperkit_coreml / genie: engines/ is configured
+    # after sdk/runanywhere-commons/. Guards the highest-priority Apple engine
+    # (priority=120, four primitives: LLM/STT/TTS/VLM) against silent vtable
+    # drift that would otherwise surface only at first-inference time.
+    if(APPLE AND RAC_BACKEND_METALRT AND TARGET rac_backend_metalrt
+       AND NOT TARGET test_plugin_entry_metalrt)
+        add_executable(test_plugin_entry_metalrt
+            sdk/runanywhere-commons/tests/test_plugin_entry_metalrt.cpp)
+        target_include_directories(test_plugin_entry_metalrt PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_metalrt PRIVATE rac_commons)
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_metalrt PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_metalrt_tests COMMAND test_plugin_entry_metalrt)
+    endif()
+
     if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
        AND TARGET rac_backend_diffusion_coreml
        AND NOT TARGET test_diffusion_coreml_generate)
