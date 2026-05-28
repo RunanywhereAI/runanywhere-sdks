@@ -32,50 +32,26 @@
 #ifdef RAC_HAVE_PROTOBUF
 namespace {
 
-// Canonical 9-bucket category mapping. Mirrors event_publisher.cpp's
-// error_category_for_code() so SDKError envelopes emitted via different
-// surfaces always classify the same code identically.
+// Mirrors event_publisher.cpp's error_category_for_code() for every documented
+// RAC_ERROR_* range while preserving UNSPECIFIED for values outside the ABI.
 ::runanywhere::v1::ErrorCategory category_for_code(rac_result_t code) {
-    if (code <= -100 && code >= -109)
-        return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if (code <= -110 && code >= -129)
-        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
-    if (code <= -130 && code >= -149)
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
     if (code <= -150 && code >= -179)
         return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
+    if (code <= -250 && code >= -279)
+        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
+    if (code <= -110 && code >= -129)
+        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
     if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299)) {
         return ::runanywhere::v1::ERROR_CATEGORY_IO;
     }
-    if (code <= -220 && code >= -229)
-        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
-    if (code <= -230 && code >= -249)
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    if (code <= -250 && code >= -279)
-        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -300 && code >= -319)
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
     if (code <= -320 && code >= -329)
         return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -330 && code >= -349)
-        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -350 && code >= -369)
-        return ::runanywhere::v1::ERROR_CATEGORY_IO;
-    if (code <= -370 && code >= -379)
-        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -380 && code >= -389)
-        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
-    if (code <= -400 && code >= -499)
-        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    if (code <= -500 && code >= -599)
+    if (code <= -100 && code >= -109)
         return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if (code <= -600 && code >= -699)
+    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319)) {
         return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    if (code <= -700 && code >= -799)
-        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
-    if (code <= -800 && code >= -899)
-        return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
-    if (code <= -900 && code >= -999)
+    }
+    if (code <= -100 && code >= -999)
         return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
     return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
 }
