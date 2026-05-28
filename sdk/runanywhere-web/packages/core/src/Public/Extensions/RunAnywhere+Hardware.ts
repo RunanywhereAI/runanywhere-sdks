@@ -22,6 +22,7 @@ import {
   type AcceleratorInfo,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
+import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
 export type {
   AcceleratorInfo,
@@ -88,6 +89,7 @@ function browserHardwareProfileResult(): HardwareProfileResult {
       efficiencyCores: 0,
       architecture: chip,
       platform: 'web',
+      npuChip: NPUChip.NPU_CHIP_NONE,
     },
     accelerators: [
       {
@@ -128,6 +130,7 @@ function mergeBrowserFacts(
           efficiencyCores: protoProfile.efficiencyCores || browserProfile.efficiencyCores,
           architecture: protoProfile.architecture || browserProfile.architecture,
           platform: protoProfile.platform || browserProfile.platform,
+          npuChip: protoProfile.npuChip || browserProfile.npuChip,
         }
       : protoProfile ?? browserProfile,
     accelerators: Array.from(acceleratorsByName.values()),
