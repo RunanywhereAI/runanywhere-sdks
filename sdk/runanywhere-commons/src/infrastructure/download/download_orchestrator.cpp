@@ -2,16 +2,23 @@
  * @file download_orchestrator.cpp
  * @brief Download Orchestrator - High-Level Model Download Lifecycle Management
  *
- * Consolidates download business logic from Swift/Kotlin/RN/Flutter SDKs into C++.
- * Each SDK now only provides the HTTP transport callback and calls rac_download_orchestrate().
+ * Consolidates download business logic from Swift/Kotlin/RN/Flutter/Web SDKs into C++.
+ * Each SDK provides an HTTP transport adapter (rac_http_transport_register) and
+ * drives the workflow through the proto-byte ABI: rac_download_plan_proto →
+ * rac_download_start_proto → rac_download_cancel_proto / rac_download_resume_proto /
+ * rac_download_progress_poll_proto / rac_download_cleanup_terminal_tasks_proto.
  *
  * Full lifecycle:
- *   1. Compute destination path (temp if extraction needed, final if not)
- *   2. Start HTTP download via platform adapter (rac_http_download)
- *   3. On HTTP completion:
- *      a. If extraction needed → rac_extract_archive_native → find model path → cleanup archive
- *      b. Update download manager state
- *   4. Invoke user's complete_callback with final model path
+ *   1. Plan: rac_download_plan_proto validates the model + storage and emits a
+ *      DownloadPlanResult with per-file destinations rooted under the per-model
+ *      folder (path-traversal hardened via safe_descriptor_path_under).
+ *   2. Start: rac_download_start_proto registers a proto_download_task and
+ *      spawns a worker thread (run_proto_download_worker) that drives the
+ *      transfer via rac::http::execute_stream.
+ *   3. Worker: for each file → execute_stream → optional extraction →
+ *      post-finalize size guard → update progress / model registry.
+ *   4. Cancel/resume/progress flow through the proto-byte entry points and
+ *      observe per-task atomics on proto_download_task.
  */
 
 #include <algorithm>
@@ -311,10 +318,21 @@ struct proto_progress_sink {
     //
     // Keeping the last N serializations alive guarantees each emitted pointer
     // remains valid long enough for the slowest async binding to copy it out.
-    // A ring size of 32 comfortably exceeds the number of in-flight progress
-    // messages a SDK binding can queue during a typical download burst (~64
-    // KiB reporting interval).
-    static constexpr size_t kRingSize = 32;
+    //
+    // commons-087: bumped from 32 → 128. The original 32 was sized for the
+    // ~64 KiB reporting interval the platform HTTP stacks use, but
+    // `rac_http_download` actually emits progress on every transport-delivered
+    // chunk (no time-based throttling), which on a 5 GB GGUF with 8 KiB
+    // OkHttp chunks produces ~600 k events. Async bindings (Flutter Dart
+    // `NativeCallable.listener`, React Native NitroModules) can lag the
+    // emission thread by tens of milliseconds while decoding on a different
+    // isolate; at 32 slots the ring rotated in ~5 ms, leaving a small but
+    // non-zero window where the slowest binding could read freed memory.
+    // 128 widens the window to ~20 ms — still O(KB) of resident memory while
+    // covering steady-state async-decode latencies. (Further headroom would
+    // require coalescing progress in commons; see follow-up suggestions in
+    // commons-087.)
+    static constexpr size_t kRingSize = 128;
     std::array<std::string, kRingSize> bytes_ring;
     size_t ring_index = 0;
 };
@@ -674,6 +692,30 @@ std::shared_ptr<proto_download_task> find_task(const std::string& task_id,
         }
     }
     if (!model_id.empty()) {
+        // commons-118: when looking up by model_id only, prefer non-terminal
+        // (active) tasks over terminal ones. `proto_state().tasks` is sorted
+        // by task_id, so the older (likely terminal) entry would be returned
+        // first if we did a single-pass scan — cancel(model_id=X) and
+        // pollProgress(model_id=X) would then act on the stale task instead
+        // of the running one. Two-pass: first scan returns any active match;
+        // second pass falls back to any terminal match (preserves the
+        // historical behaviour for callers that legitimately look up a
+        // completed task by model id).
+        for (auto& pair : proto_state().tasks) {
+            if (!pair.second || pair.second->model_id != model_id) {
+                continue;
+            }
+            std::lock_guard<std::mutex> tlock(pair.second->mutex);
+            const auto state = pair.second->progress.state();
+            const bool active = state == rav1::DOWNLOAD_STATE_PENDING ||
+                                state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
+                                state == rav1::DOWNLOAD_STATE_EXTRACTING ||
+                                state == rav1::DOWNLOAD_STATE_RESUMING ||
+                                state == rav1::DOWNLOAD_STATE_RETRYING;
+            if (active) {
+                return pair.second;
+            }
+        }
         for (auto& pair : proto_state().tasks) {
             if (pair.second && pair.second->model_id == model_id) {
                 return pair.second;
@@ -1012,9 +1054,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
             // up with `Models/Sherpa/<model_id>/<nested>/<files>`. Collapse
             // to the nested path so the backend's `load_model()` sees the
             // directory that actually contains `model.onnx`/`tokens.txt`/
-            // `espeak-ng-data/`. Mirrors the legacy orchestrator path
-            // (`orchestrate_http_complete` above) which already does this
-            // via the same helper.
+            // `espeak-ng-data/`.
             char resolved_path[4096];
             rac_result_t find_rc = rac_find_model_path_after_extraction(
                 task->model_folder_path.c_str(), task->archive_structure, task->framework,
@@ -1068,6 +1108,10 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     // 386 MB final) without forcing a false-positive failure on the slop.
     bool sanity_check_passed = true;
     std::string sanity_error;
+    // commons-150: track the index of the file that tripped the guard so the
+    // FAILED progress event reports the actual offender (current_file_index +
+    // storage_key) instead of mislabelling it as the LAST file of the plan.
+    size_t failing_index = 0;
     if (!task->files.empty()) {
         for (size_t i = 0; i < task->files.size(); ++i) {
             const auto& file = task->files[i];
@@ -1091,6 +1135,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
             // for any 64-bit file size.
             if (actual * 5 < file.expected_bytes * 4) {
                 sanity_check_passed = false;
+                failing_index = i;
                 sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
                                std::to_string(actual) + " bytes on disk but expected " +
                                std::to_string(file.expected_bytes) +
@@ -1107,10 +1152,9 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     }
     if (!sanity_check_passed) {
         int64_t failed_bytes = total_expected > 0 ? completed_before_file : 0;
-        set_task_progress(
-            task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING, failed_bytes,
-            total_expected, static_cast<int32_t>(task->files.size() - 1),
-            task->files.empty() ? "" : task->files.back().storage_key, "", sanity_error);
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          failed_bytes, total_expected, static_cast<int32_t>(failing_index),
+                          task->files[failing_index].storage_key, "", sanity_error);
         mark_task_stopped(task);
         emit_progress(task);
         return;
@@ -1526,171 +1570,6 @@ static std::string find_nested_directory(const char* extracted_dir) {
 }
 
 // =============================================================================
-// ORCHESTRATION CONTEXT (passed through HTTP callbacks)
-// =============================================================================
-
-struct orchestrate_context {
-    // Download manager handle
-    rac_download_manager_handle_t dm_handle;
-
-    // Model info
-    std::string model_id;
-    std::string download_url;
-    rac_inference_framework_t framework;
-    rac_model_format_t format;
-    rac_archive_structure_t archive_structure;
-
-    // Paths
-    std::string download_dest_path;  // Where HTTP downloads to
-    std::string model_folder_path;   // Final model folder
-    bool needs_extraction;
-
-    // Task tracking
-    std::string task_id;
-
-    // User callbacks
-    rac_download_progress_callback_fn user_progress_callback;
-    rac_download_complete_callback_fn user_complete_callback;
-    void* user_data;
-};
-
-/**
- * Prevent double-free of orchestrate_context when async callbacks race with error paths.
- *
- * The context is wrapped in a shared_ptr stored in a shared_ctx_holder.
- * The holder is passed as raw void* to C callbacks.
- * Both the caller and the callback own a reference via the shared_ptr,
- * ensuring the context outlives all users.
- */
-struct shared_ctx_holder {
-    std::shared_ptr<orchestrate_context> ctx;
-};
-
-/**
- * HTTP progress callback — forwards to download manager which recalculates overall progress.
- *
- * Adapts the `rac_http_download_progress_fn` signature (uint64 / rac_bool_t return) to
- * the existing `orchestrate_context` / download-manager progress API. Returning RAC_TRUE
- * keeps the transfer going — the orchestrator currently never cancels from inside
- * progress itself (download-manager observes cancellation separately).
- */
-static rac_bool_t orchestrate_http_progress(uint64_t bytes_downloaded, uint64_t total_bytes,
-                                            void* callback_user_data) {
-    auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
-    if (!holder || !holder->ctx || !holder->ctx->dm_handle)
-        return RAC_TRUE;
-
-    auto& ctx = holder->ctx;
-    rac_download_manager_update_progress(ctx->dm_handle, ctx->task_id.c_str(),
-                                         static_cast<int64_t>(bytes_downloaded),
-                                         static_cast<int64_t>(total_bytes));
-    return RAC_TRUE;
-}
-
-/**
- * HTTP completion callback — handles post-download extraction and cleanup.
- * Deletes the holder (releasing its shared_ptr reference) when done.
- */
-static void orchestrate_http_complete(rac_result_t result, const char* downloaded_path,
-                                      void* callback_user_data) {
-    auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
-    if (!holder || !holder->ctx) {
-        delete holder;
-        return;
-    }
-
-    // Take ownership — holder is deleted at every exit path below
-    auto ctx = holder->ctx;
-    delete holder;
-
-    if (result != RAC_SUCCESS) {
-        // HTTP download failed
-        RAC_LOG_ERROR(LOG_TAG, "HTTP download failed for model: %s", ctx->model_id.c_str());
-        rac_download_manager_mark_failed(ctx->dm_handle, ctx->task_id.c_str(), result,
-                                         "HTTP download failed");
-
-        if (ctx->user_complete_callback) {
-            ctx->user_complete_callback(ctx->task_id.c_str(), result, nullptr, ctx->user_data);
-        }
-        return;
-    }
-
-    std::string final_path;
-
-    if (ctx->needs_extraction) {
-        // Mark download as complete (transitions to EXTRACTING state)
-        rac_download_manager_mark_complete(ctx->dm_handle, ctx->task_id.c_str(),
-                                           downloaded_path ? downloaded_path
-                                                           : ctx->download_dest_path.c_str());
-
-        RAC_LOG_INFO(LOG_TAG, "Starting extraction for model: %s", ctx->model_id.c_str());
-
-        // Extract archive using native libarchive
-        rac_extraction_result_t extraction_result = {};
-        rac_result_t extract_result = rac_extract_archive_native(
-            downloaded_path ? downloaded_path : ctx->download_dest_path.c_str(),
-            ctx->model_folder_path.c_str(), nullptr /* default options */,
-            nullptr /* no progress */, nullptr /* no user data */, &extraction_result);
-
-        if (extract_result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_TAG, "Extraction failed for model: %s", ctx->model_id.c_str());
-            rac_download_manager_mark_extraction_failed(
-                ctx->dm_handle, ctx->task_id.c_str(), extract_result, "Archive extraction failed");
-
-            if (ctx->user_complete_callback) {
-                ctx->user_complete_callback(ctx->task_id.c_str(), extract_result, nullptr,
-                                            ctx->user_data);
-            }
-
-            // Cleanup temp archive
-            delete_file(ctx->download_dest_path.c_str());
-            return;
-        }
-
-        RAC_LOG_INFO(LOG_TAG, "Extraction complete: %d files, %lld bytes",
-                     extraction_result.files_extracted, extraction_result.bytes_extracted);
-
-        // Find the actual model path after extraction
-        char model_path[4096];
-        rac_result_t find_result = rac_find_model_path_after_extraction(
-            ctx->model_folder_path.c_str(), ctx->archive_structure, ctx->framework, ctx->format,
-            model_path, sizeof(model_path));
-
-        if (find_result == RAC_SUCCESS) {
-            final_path = model_path;
-        } else {
-            // Fallback to model folder itself
-            final_path = ctx->model_folder_path;
-            RAC_LOG_WARNING(LOG_TAG,
-                            "Could not find specific model file after extraction, using folder: %s",
-                            final_path.c_str());
-        }
-
-        // Cleanup temp archive file
-        delete_file(ctx->download_dest_path.c_str());
-
-        // Mark extraction complete
-        rac_download_manager_mark_extraction_complete(ctx->dm_handle, ctx->task_id.c_str(),
-                                                      final_path.c_str());
-    } else {
-        // No extraction needed — file downloaded directly to model folder
-        final_path = downloaded_path ? std::string(downloaded_path) : ctx->download_dest_path;
-
-        rac_download_manager_mark_complete(ctx->dm_handle, ctx->task_id.c_str(),
-                                           final_path.c_str());
-    }
-
-    RAC_LOG_INFO(LOG_TAG, "Download orchestration complete for model: %s → %s",
-                 ctx->model_id.c_str(), final_path.c_str());
-
-    // Invoke user callback
-    if (ctx->user_complete_callback) {
-        ctx->user_complete_callback(ctx->task_id.c_str(), RAC_SUCCESS, final_path.c_str(),
-                                    ctx->user_data);
-    }
-}
-
-// =============================================================================
 // PUBLIC API — DOWNLOAD ORCHESTRATION
 // =============================================================================
 
@@ -1968,7 +1847,15 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // model_id, return the in-flight task instead of spawning a duplicate
     // worker. Fixes SWIFT-IOS-001 (double-tap of Get cancelling the first
     // download) at the commons layer so every SDK gets the same guarantee.
-    if (!request.resume()) {
+    //
+    // commons-151: the dedup must also fire when the caller passes
+    // resume=true. Swift/Kotlin/Flutter/RN all set resume to plan.canResume,
+    // so two concurrent start(resume=true) for the same model_id used to
+    // spawn two workers writing to the same destination file — data
+    // corruption. Only allow resume=true to spawn a fresh worker when the
+    // previous task is already in a terminal state (handled implicitly: the
+    // loop only short-circuits on active states).
+    {
         std::lock_guard<std::mutex> lock(proto_state().mutex);
         for (const auto& entry : proto_state().tasks) {
             const auto& existing = entry.second;
@@ -2006,11 +1893,6 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // model (only one nested subdir in `Downloads/`), broken as soon as
     // two archive models have been extracted (`find_nested_directory`
     // falls back to the root because it sees multiple subdirs).
-    //
-    // Mirrors the legacy `rac_download_manager_start_orchestrated_download`
-    // path (see `orchestrate_http_complete` below) which already computes
-    // `model_folder_path` via `rac_model_paths_get_model_folder` and then
-    // calls `rac_find_model_path_after_extraction` post-extract.
     //
     // pass3-syn-104: also drives the per-file destination-path containment
     // check performed by files_from_plan() below — must run BEFORE
@@ -2222,11 +2104,21 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
         result.set_resume_token(task->resume_token);
     }
 
+    bool worker_observed_stop = !was_running;
     if (was_running) {
         std::unique_lock<std::mutex> lock(task->mutex);
-        task->cv.wait_for(lock, std::chrono::seconds(2), [&task] { return !task->running; });
-        deleted = task->last_deleted_bytes;
-        preserved_bytes = task->last_partial_bytes;
+        // commons-048: honor the cv.wait_for return value. If the worker
+        // doesn't drain within the timeout, the partial_bytes_*/deleted
+        // fields below would be stale (initial 0 or a pre-cancel snapshot)
+        // and the worker may still race ahead to delete the partial file
+        // after we returned `partial_bytes_preserved=true`. Surface the
+        // failure to the caller instead of lying about a clean cancel.
+        worker_observed_stop = task->cv.wait_for(lock, std::chrono::seconds(2),
+                                                 [&task] { return !task->running; });
+        if (worker_observed_stop) {
+            deleted = task->last_deleted_bytes;
+            preserved_bytes = task->last_partial_bytes;
+        }
     } else {
         int64_t total_bytes = 0;
         {
@@ -2250,6 +2142,15 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
                           task->files.empty() ? "" : task->files.front().storage_key, "",
                           "download cancelled");
         emit_progress(task);
+    }
+
+    if (!worker_observed_stop) {
+        result.set_success(false);
+        result.set_was_running(true);
+        result.set_partial_bytes_deleted(0);
+        result.set_partial_bytes_preserved(false);
+        result.set_error_message("cancel timed out waiting for worker to drain");
+        return serialize_proto_to_buffer(result, out_result);
     }
 
     result.set_success(true);
@@ -2489,326 +2390,6 @@ extern "C" rac_result_t rac_download_cleanup_terminal_tasks_proto(size_t* out_pu
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 }
 #endif
-
-rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle, const char* model_id,
-                                      const char* download_url, rac_inference_framework_t framework,
-                                      rac_model_format_t format,
-                                      rac_archive_structure_t archive_structure,
-                                      rac_download_progress_callback_fn progress_callback,
-                                      rac_download_complete_callback_fn complete_callback,
-                                      void* user_data, char** out_task_id) {
-    if (!dm_handle || !model_id || !download_url || !out_task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // 1. Compute model folder path
-    char model_folder[4096];
-    rac_result_t path_result =
-        rac_model_paths_get_model_folder(model_id, framework, model_folder, sizeof(model_folder));
-    if (path_result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_TAG, "Failed to compute model folder path for: %s", model_id);
-        return path_result;
-    }
-
-    // Ensure model folder exists
-    mkdir_p(model_folder);
-
-    // 2. Determine if extraction is needed
-    rac_archive_type_t archive_type;
-    bool needs_extraction = rac_archive_type_from_path(download_url, &archive_type) == RAC_TRUE;
-
-    // 3. Compute download destination
-    std::string download_dest;
-    if (needs_extraction) {
-        // Download to temp path — will be extracted to model folder
-        char downloads_dir[4096];
-        rac_result_t dl_result =
-            rac_model_paths_get_downloads_directory(downloads_dir, sizeof(downloads_dir));
-        if (dl_result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_TAG, "Failed to get downloads directory");
-            return dl_result;
-        }
-        mkdir_p(downloads_dir);
-
-        std::string ext = get_file_extension(download_url);
-        std::string stem = get_filename_stem(download_url);
-        if (stem.empty())
-            stem = model_id;
-
-        download_dest = std::string(downloads_dir) + "/" + stem + (ext.empty() ? "" : "." + ext);
-    } else {
-        // Download directly to model folder
-        std::string ext = get_file_extension(download_url);
-        std::string stem = get_filename_stem(download_url);
-        if (stem.empty())
-            stem = model_id;
-
-        download_dest = std::string(model_folder) + "/" + stem + (ext.empty() ? "" : "." + ext);
-    }
-
-    // 4. Register with download manager (creates task tracking state)
-    char* task_id = nullptr;
-    rac_result_t start_result =
-        rac_download_manager_start(dm_handle, model_id, download_url, download_dest.c_str(),
-                                   needs_extraction ? RAC_TRUE : RAC_FALSE, progress_callback,
-                                   nullptr /* we handle complete */, user_data, &task_id);
-
-    if (start_result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_TAG, "Failed to register download task for: %s", model_id);
-        return start_result;
-    }
-
-    // 5. Create orchestration context for callbacks (shared_ptr for safe async lifetime)
-    auto ctx = std::make_shared<orchestrate_context>();
-    ctx->dm_handle = dm_handle;
-    ctx->model_id = model_id;
-    ctx->download_url = download_url;
-    ctx->framework = framework;
-    ctx->format = format;
-    ctx->archive_structure = archive_structure;
-    ctx->download_dest_path = download_dest;
-    ctx->model_folder_path = model_folder;
-    ctx->needs_extraction = needs_extraction;
-    ctx->task_id = task_id;
-    ctx->user_progress_callback = progress_callback;
-    ctx->user_complete_callback = complete_callback;
-    ctx->user_data = user_data;
-
-    // Wrap in holder for C callback void* — callback takes ownership and deletes holder
-    auto* holder = new shared_ctx_holder{ctx};
-
-    // 6. Start HTTP download via the internal C++ facade (Stage 2 refactor).
-    //
-    // Previously this invoked the platform adapter's async `rac_http_download`
-    // callback, which returned immediately and delivered the completion on a
-    // platform-owned thread. The facade is synchronous, so we spawn a worker
-    // thread that drives the transfer via `rac::http::execute_stream` and then
-    // invokes `orchestrate_http_complete` — preserving the exact external
-    // contract (function returns immediately, completion callback fires later
-    // on a background thread).
-    std::thread([ctx, holder, download_url_str = std::string(download_url),
-                 download_dest_str = download_dest]() {
-        rac_http_download_request_t dl_req{};
-        dl_req.url = download_url_str.c_str();
-        dl_req.destination_path = download_dest_str.c_str();
-        dl_req.timeout_ms = 0;  // library default — matches old platform-adapter behaviour
-        dl_req.follow_redirects = RAC_TRUE;
-        dl_req.resume_from_byte = 0;
-        dl_req.expected_sha256_hex = nullptr;
-
-        int32_t http_status = 0;
-        rac_http_download_status_t status =
-            rac::http::execute_stream(dl_req, orchestrate_http_progress, holder, &http_status);
-
-        // Map the download status back to rac_result_t for the existing
-        // completion-callback signature. Anything non-OK maps to a download
-        // failure; the specific sub-code (cancel/timeout/etc.) is still
-        // available via the download manager's failure path.
-        rac_result_t rc = RAC_SUCCESS;
-        if (status != RAC_HTTP_DL_OK) {
-            switch (status) {
-                case RAC_HTTP_DL_CANCELLED:
-                    rc = RAC_ERROR_CANCELLED;
-                    break;
-                case RAC_HTTP_DL_TIMEOUT:
-                    rc = RAC_ERROR_TIMEOUT;
-                    break;
-                case RAC_HTTP_DL_INVALID_URL:
-                    rc = RAC_ERROR_INVALID_ARGUMENT;
-                    break;
-                default:
-                    rc = RAC_ERROR_DOWNLOAD_FAILED;
-                    break;
-            }
-        }
-
-        // Deliver the completion event on this worker thread — same threading
-        // contract as the old platform-adapter callback (invoked from a
-        // non-caller thread). orchestrate_http_complete deletes the holder.
-        orchestrate_http_complete(rc, download_dest_str.c_str(), holder);
-    }).detach();
-
-    *out_task_id = task_id;
-
-    RAC_LOG_INFO(LOG_TAG, "Download orchestration started: model=%s, extraction=%s", model_id,
-                 needs_extraction ? "yes" : "no");
-
-    return RAC_SUCCESS;
-}
-
-rac_result_t rac_download_orchestrate_multi(
-    rac_download_manager_handle_t dm_handle, const char* model_id,
-    const rac_model_file_descriptor_t* files, size_t file_count, const char* base_download_url,
-    rac_inference_framework_t framework, [[maybe_unused]] rac_model_format_t format,
-    rac_download_progress_callback_fn progress_callback,
-    rac_download_complete_callback_fn complete_callback, void* user_data, char** out_task_id) {
-    if (!dm_handle || !model_id || !files || file_count == 0 || !base_download_url ||
-        !out_task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // Compute model folder
-    char model_folder[4096];
-    rac_result_t path_result =
-        rac_model_paths_get_model_folder(model_id, framework, model_folder, sizeof(model_folder));
-    if (path_result != RAC_SUCCESS) {
-        return path_result;
-    }
-    mkdir_p(model_folder);
-
-    // Register a single task for the multi-file download
-    std::string composite_url =
-        std::string(base_download_url) + " [" + std::to_string(file_count) + " files]";
-    char* task_id = nullptr;
-    rac_result_t start_result = rac_download_manager_start(
-        dm_handle, model_id, composite_url.c_str(), model_folder, RAC_FALSE /* no extraction */,
-        progress_callback, complete_callback, user_data, &task_id);
-
-    if (start_result != RAC_SUCCESS) {
-        return start_result;
-    }
-
-    // Shared state for async completion barrier across all file downloads.
-    // Each launched download increments pending; its callback decrements and notifies.
-    // After the loop we wait until all in-flight downloads have reported back.
-    struct multi_download_barrier {
-        std::mutex mtx;
-        std::condition_variable cv;
-        int pending{0};
-        bool any_required_failed{false};
-    };
-    auto barrier = std::make_shared<multi_download_barrier>();
-
-    // Per-file context passed through the C callback void*.
-    struct multi_file_holder {
-        std::shared_ptr<multi_download_barrier> barrier;
-        bool is_required;
-    };
-
-    // Stage 2 refactor: there's no synchronous "failed to launch" path
-    // anymore — spawning the worker thread itself is the only thing that
-    // can fail before the request runs, and that throws. Failures are
-    // now observed via `barrier->any_required_failed`.
-    for (size_t i = 0; i < file_count; ++i) {
-        const rac_model_file_descriptor_t& file = files[i];
-
-        // Build full download URL
-        std::string file_url = std::string(base_download_url);
-        if (!file_url.empty() && file_url.back() != '/')
-            file_url += "/";
-        file_url += file.relative_path;
-
-        // Build destination path
-        std::string dest_path = std::string(model_folder);
-        if (file.destination_path && file.destination_path[0] != '\0') {
-            dest_path += "/" + std::string(file.destination_path);
-        } else {
-            dest_path += "/" + std::string(file.relative_path);
-        }
-
-        // Ensure parent directory exists
-        auto last_slash = dest_path.rfind('/');
-        if (last_slash != std::string::npos) {
-            mkdir_p(dest_path.substr(0, last_slash).c_str());
-        }
-
-        // Update download manager with file-level progress
-        int64_t fake_downloaded =
-            static_cast<int64_t>(static_cast<double>(i) / static_cast<double>(file_count) * 100);
-        rac_download_manager_update_progress(dm_handle, task_id, fake_downloaded, 100);
-
-        // Increment pending count *before* launching so the barrier is always ahead of callbacks
-        {
-            std::lock_guard<std::mutex> lk(barrier->mtx);
-            barrier->pending++;
-        }
-
-        auto* file_holder =
-            new multi_file_holder{.barrier = barrier, .is_required = file.is_required == RAC_TRUE};
-
-        // Stage 2 HTTP refactor: replace the async platform adapter with the
-        // synchronous C++ facade driven on a detached worker thread. The
-        // completion bookkeeping (barrier decrement, required-failed flag)
-        // stays identical so the outer wait loop still works unchanged.
-        std::thread([file_holder, file_url, dest_path]() {
-            rac_http_download_request_t dl_req{};
-            dl_req.url = file_url.c_str();
-            dl_req.destination_path = dest_path.c_str();
-            dl_req.timeout_ms = 0;
-            dl_req.follow_redirects = RAC_TRUE;
-            dl_req.resume_from_byte = 0;
-            dl_req.expected_sha256_hex = nullptr;
-
-            int32_t http_status = 0;
-            rac_http_download_status_t status = rac::http::execute_stream(
-                dl_req, nullptr /* no per-file progress */, nullptr, &http_status);
-
-            // Emulate the old `file_complete` callback inline.
-            auto b = file_holder->barrier;
-            bool required = file_holder->is_required;
-            delete file_holder;
-
-            std::lock_guard<std::mutex> lk(b->mtx);
-            if (status != RAC_HTTP_DL_OK && required) {
-                b->any_required_failed = true;
-            }
-            b->pending--;
-            b->cv.notify_all();
-        }).detach();
-
-        // Download started — detached thread owns file_holder
-    }
-
-    // commons-core-infra-013: bound the wait so a detached worker that
-    // throws (or dies before it can decrement `pending`) cannot block the
-    // caller forever. The timeout is generous enough that a real multi-GB
-    // VLM download finishes before tripping, but tight enough that a stuck
-    // worker surfaces as a download failure instead of an indefinite hang.
-    // Computation: 1h per file * file_count, clamped to [1h, 12h]. The
-    // ceiling matches the upper bound CDN-served GGUF downloads observed
-    // in production.
-    constexpr auto kPerFileBudget = std::chrono::hours(1);
-    constexpr auto kMaxWait = std::chrono::hours(12);
-    auto wait_budget = kPerFileBudget * static_cast<int64_t>(file_count);
-    if (wait_budget > kMaxWait) {
-        wait_budget = kMaxWait;
-    }
-
-    bool barrier_completed = false;
-    {
-        std::unique_lock<std::mutex> lk(barrier->mtx);
-        barrier_completed =
-            barrier->cv.wait_for(lk, wait_budget, [&barrier] { return barrier->pending == 0; });
-    }
-
-    const bool any_failed = barrier->any_required_failed;
-    if (!barrier_completed) {
-        // commons-core-infra-013 (deferred follow-up): surface the bounded
-        // wait timeout as RAC_ERROR_TIMEOUT distinct from the existing
-        // per-file download failure code. The detached file worker(s) still
-        // own their barrier reference so they remain safe to complete after
-        // this function returns (the barrier shared_ptr outlives the call).
-        rac_download_manager_mark_failed(
-            dm_handle, task_id, RAC_ERROR_TIMEOUT,
-            "Multi-file download timed out waiting for per-file workers");
-        *out_task_id = task_id;
-        return RAC_ERROR_TIMEOUT;
-    }
-
-    if (any_failed) {
-        rac_download_manager_mark_failed(dm_handle, task_id, RAC_ERROR_DOWNLOAD_FAILED,
-                                         "One or more required files failed to download");
-        *out_task_id = task_id;
-        return RAC_ERROR_DOWNLOAD_FAILED;
-    } else {
-        // Update final progress
-        rac_download_manager_update_progress(dm_handle, task_id, 100, 100);
-        rac_download_manager_mark_complete(dm_handle, task_id, model_folder);
-    }
-
-    *out_task_id = task_id;
-    return RAC_SUCCESS;
-}
 
 // =============================================================================
 // PUBLIC API — POST-EXTRACTION MODEL PATH FINDING

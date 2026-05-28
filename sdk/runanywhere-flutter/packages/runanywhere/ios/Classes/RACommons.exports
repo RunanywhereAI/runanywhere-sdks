@@ -775,7 +775,6 @@ _rac_download_manager_pause_all
 _rac_download_manager_resume_all
 _rac_download_manager_start
 _rac_download_manager_update_progress
-_rac_download_orchestrate
 _rac_download_requires_extraction
 _rac_download_task_ids_free
 

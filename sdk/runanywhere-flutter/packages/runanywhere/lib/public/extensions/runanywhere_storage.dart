@@ -316,7 +316,7 @@ class RunAnywhereStorage {
   // ===========================================================================
 
   /// Low-level download stream. Emits proto-generated `DownloadProgress`
-  /// events driven by the C++ `rac_download_orchestrate` state machine.
+  /// events driven by the C++ `rac_download_start_proto` state machine.
   /// Mirrors Swift's `downloadModel(_:onProgress:)`.
   static Stream<DownloadProgress> downloadModel(String modelId) =>
       RunAnywhereDownloads.shared.start(modelId);
