@@ -99,6 +99,7 @@
 #include "rac/features/vad/rac_vad_stream.h"
 // Round-1 CPP fix: hardware ABI, structured output, VAD statistics.
 #include "rac/core/rac_sdk_state.h"
+#include "rac/features/llm/rac_llm_schema_to_json.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -4179,6 +4180,42 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionCreateProt
     return reinterpret_cast<jlong>(session);
 }
 
+// commons-123-A: parallel thunk that surfaces the underlying rac_result_t via
+// outRc[0] so the Kotlin caller can build a typed SDKException instead of the
+// opaque "returned 0" message produced by the legacy primitive-jlong thunk.
+// Matches the parity contract Swift's CppBridge.RAG.createPipeline satisfies
+// at sdk/runanywhere-swift/.../ModalityProtoABI+Generated.swift:641-654.
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionCreateProtoWithError(
+    JNIEnv* env, jclass clazz, jbyteArray configProto, jintArray outRc) {
+    (void)clazz;
+    auto writeRc = [&](rac_result_t rc) {
+        if (outRc == nullptr)
+            return;
+        if (env->GetArrayLength(outRc) < 1)
+            return;
+        jint tmp = static_cast<jint>(rc);
+        env->SetIntArrayRegion(outRc, 0, 1, &tmp);
+    };
+    JByteArrayView config(env, configProto);
+    if (!config.ok) {
+        writeRc(RAC_ERROR_INVALID_ARGUMENT);
+        return 0L;
+    }
+    using Fn = rac_result_t (*)(const uint8_t*, size_t, rac_handle_t*);
+    Fn createSession = optionalNativeSymbol<Fn>("rac_rag_session_create_proto");
+    if (createSession == nullptr) {
+        writeRc(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+        return 0L;
+    }
+    rac_handle_t session = nullptr;
+    rac_result_t rc = createSession(config.u8(), config.size(), &session);
+    writeRc(rc);
+    if (RAC_FAILED(rc))
+        return 0L;
+    return reinterpret_cast<jlong>(session);
+}
+
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionDestroyProto(JNIEnv* env,
                                                                                    jclass clazz,
@@ -5376,6 +5413,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputVali
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     return callProtoBufferFn(env, requestProto, rac_structured_output_validate_proto,
                              "racStructuredOutputValidateProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputSchemaToJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray schemaProto) {
+    return callProtoBufferFn(env, schemaProto, rac_structured_output_schema_to_json_proto,
+                             "racStructuredOutputSchemaToJsonProto");
 }
 
 JNIEXPORT jint JNICALL
