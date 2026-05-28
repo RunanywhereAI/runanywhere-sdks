@@ -22,6 +22,12 @@ extension CppBridge {
 
         private static var callbacksRegistered = false
 
+        /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
+        private static let deviceInfoStrings =
+            OSAllocatedUnfairLock<DeviceCStringStore>(initialState: DeviceCStringStore())
+        private static let httpResponseStrings =
+            OSAllocatedUnfairLock<DeviceCStringStore>(initialState: DeviceCStringStore())
+
         // MARK: - Persistent Device ID Cache
 
         /// In-process cache of the persistent device id resolved by commons.
@@ -95,32 +101,37 @@ extension CppBridge {
                 let deviceInfo = DeviceInfo.current
                 let deviceId = CppBridge.Device.persistentId
 
-                // Fill out the device info struct
-                // Note: C strings are managed by Swift and remain valid during callback
+                // Commons reads these `const char*` fields after this callback
+                // returns, so back them with strdup'd storage that outlives the
+                // call. The previous fill is freed before this one is staged.
+                CppBridge.Device.deviceInfoStrings.withLock { store in
+                    store.reset()
 
-                // Required fields (backend schema)
-                outInfo.pointee.device_id = (deviceId as NSString).utf8String
-                outInfo.pointee.device_model = (deviceInfo.deviceModel as NSString).utf8String
-                outInfo.pointee.device_name = (deviceInfo.deviceName as NSString).utf8String
-                outInfo.pointee.platform = (deviceInfo.platform as NSString).utf8String
-                outInfo.pointee.os_version = (deviceInfo.osVersion as NSString).utf8String
-                outInfo.pointee.form_factor = (deviceInfo.formFactor as NSString).utf8String
-                outInfo.pointee.architecture = (deviceInfo.architecture as NSString).utf8String
-                outInfo.pointee.chip_name = (deviceInfo.chipName as NSString).utf8String
+                    // Required fields (backend schema)
+                    outInfo.pointee.device_id = store.dup(deviceId)
+                    outInfo.pointee.device_model = store.dup(deviceInfo.deviceModel)
+                    outInfo.pointee.device_name = store.dup(deviceInfo.deviceName)
+                    outInfo.pointee.platform = store.dup(deviceInfo.platform)
+                    outInfo.pointee.os_version = store.dup(deviceInfo.osVersion)
+                    outInfo.pointee.form_factor = store.dup(deviceInfo.formFactor)
+                    outInfo.pointee.architecture = store.dup(deviceInfo.architecture)
+                    outInfo.pointee.chip_name = store.dup(deviceInfo.chipName)
+                    outInfo.pointee.gpu_family = store.dup(deviceInfo.gpuFamily)
+                    if let batteryState = deviceInfo.batteryState {
+                        outInfo.pointee.battery_state = store.dup(batteryState)
+                    }
+                    outInfo.pointee.device_fingerprint = store.dup(deviceId)
+                }
+
                 outInfo.pointee.total_memory = Int64(deviceInfo.totalMemory)
                 outInfo.pointee.available_memory = Int64(deviceInfo.availableMemory)
                 outInfo.pointee.has_neural_engine = deviceInfo.hasNeuralEngine ? RAC_TRUE : RAC_FALSE
                 outInfo.pointee.neural_engine_cores = Int32(deviceInfo.neuralEngineCores)
-                outInfo.pointee.gpu_family = (deviceInfo.gpuFamily as NSString).utf8String
                 outInfo.pointee.battery_level = deviceInfo.batteryLevel ?? -1.0
-                if let batteryState = deviceInfo.batteryState {
-                    outInfo.pointee.battery_state = (batteryState as NSString).utf8String
-                }
                 outInfo.pointee.is_low_power_mode = deviceInfo.isLowPowerMode ? RAC_TRUE : RAC_FALSE
                 outInfo.pointee.core_count = Int32(deviceInfo.coreCount)
                 outInfo.pointee.performance_cores = Int32(deviceInfo.performanceCores)
                 outInfo.pointee.efficiency_cores = Int32(deviceInfo.efficiencyCores)
-                outInfo.pointee.device_fingerprint = (deviceId as NSString).utf8String
             }
 
             // Get device ID callback
@@ -155,45 +166,71 @@ extension CppBridge {
                 let jsonStr = String(cString: jsonBody)
                 let needsAuth = requiresAuth == RAC_TRUE
 
-                // Make synchronous HTTP call (we're already on a background thread from C++)
+                // Bridge the async HTTP call back to this synchronous C callback.
+                // `Task.detached` keeps the work off the caller's actor: commons
+                // can invoke http_post from the MainActor during init, and a
+                // plain `Task {}` could be scheduled onto that same blocked
+                // executor, deadlocking against `semaphore.wait()`. The bounded
+                // wait is a backstop against any residual hang.
                 let semaphore = DispatchSemaphore(value: 0)
-                var result: rac_result_t = RAC_SUCCESS
+                let resultBox = OSAllocatedUnfairLock<rac_result_t>(initialState: RAC_ERROR_NETWORK_ERROR)
 
-                Task {
+                Task.detached {
+                    var status: rac_result_t = RAC_ERROR_NETWORK_ERROR
+                    defer {
+                        resultBox.withLock { $0 = status }
+                        semaphore.signal()
+                    }
                     do {
                         guard let jsonData = jsonStr.data(using: .utf8) else {
-                            outResponse.pointee.result = RAC_ERROR_INVALID_ARGUMENT
-                            outResponse.pointee.status_code = 0
-                            outResponse.pointee.error_message = ("Invalid JSON data" as NSString).utf8String
-                            result = RAC_ERROR_INVALID_ARGUMENT
-                            semaphore.signal()
+                            CppBridge.Device.writeHTTPResponse(
+                                outResponse,
+                                result: RAC_ERROR_INVALID_ARGUMENT,
+                                statusCode: 0,
+                                body: nil,
+                                error: "Invalid JSON data"
+                            )
+                            status = RAC_ERROR_INVALID_ARGUMENT
                             return
                         }
 
-                        // Use the HTTP bridge to make the request
                         let responseData = try await CppBridge.HTTP.shared.postRaw(
                             endpointStr,
                             jsonData,
                             requiresAuth: needsAuth
                         )
 
-                        outResponse.pointee.result = RAC_SUCCESS
-                        outResponse.pointee.status_code = 200
-                        if let responseStr = String(data: responseData, encoding: .utf8) {
-                            outResponse.pointee.response_body = (responseStr as NSString).utf8String
-                        }
-                        result = RAC_SUCCESS
+                        CppBridge.Device.writeHTTPResponse(
+                            outResponse,
+                            result: RAC_SUCCESS,
+                            statusCode: 200,
+                            body: String(data: responseData, encoding: .utf8),
+                            error: nil
+                        )
+                        status = RAC_SUCCESS
                     } catch {
-                        outResponse.pointee.result = RAC_ERROR_NETWORK_ERROR
-                        outResponse.pointee.status_code = 0
-                        outResponse.pointee.error_message = (error.localizedDescription as NSString).utf8String
-                        result = RAC_ERROR_NETWORK_ERROR
+                        CppBridge.Device.writeHTTPResponse(
+                            outResponse,
+                            result: RAC_ERROR_NETWORK_ERROR,
+                            statusCode: 0,
+                            body: nil,
+                            error: error.localizedDescription
+                        )
+                        status = RAC_ERROR_NETWORK_ERROR
                     }
-                    semaphore.signal()
                 }
 
-                semaphore.wait()
-                return result
+                guard semaphore.wait(timeout: .now() + 30) == .success else {
+                    CppBridge.Device.writeHTTPResponse(
+                        outResponse,
+                        result: RAC_ERROR_TIMEOUT,
+                        statusCode: 0,
+                        body: nil,
+                        error: "Device registration HTTP request timed out"
+                    )
+                    return RAC_ERROR_TIMEOUT
+                }
+                return resultBox.withLock { $0 }
             }
 
             callbacks.user_data = nil
@@ -204,6 +241,27 @@ extension CppBridge {
                 SDKLogger(category: "CppBridge.Device").debug("Device manager callbacks registered")
             } else {
                 SDKLogger(category: "CppBridge.Device").error("Failed to register device manager callbacks: \(setResult)")
+            }
+        }
+
+        /// Populate `rac_device_http_response_t`. Commons reads `response_body`
+        /// / `error_message` after the http_post callback returns and does not
+        /// take ownership, so the strings are strdup'd into a store freed on the
+        /// next response (avoiding both the autorelease UAF and an unbounded
+        /// leak).
+        private static func writeHTTPResponse(
+            _ outResponse: UnsafeMutablePointer<rac_device_http_response_t>,
+            result: rac_result_t,
+            statusCode: Int32,
+            body: String?,
+            error: String?
+        ) {
+            httpResponseStrings.withLock { store in
+                store.reset()
+                outResponse.pointee.result = result
+                outResponse.pointee.status_code = statusCode
+                outResponse.pointee.response_body = body.flatMap { store.dup($0) }
+                outResponse.pointee.error_message = error.flatMap { store.dup($0) }
             }
         }
 
@@ -264,5 +322,27 @@ extension CppBridge {
         // v3.0.0 (C2): `buildRegistrationJSON` DELETED. Use registerIfNeeded()
         // — all registration logic now lives in C++ via the rac_device_manager
         // API; Swift no longer needs to hand-build the JSON request.
+    }
+}
+
+/// Owns `strdup`'d C-string backing for `const char*` fields that commons
+/// reads after a device callback returns (device-info struct, http response).
+/// `(NSString).utf8String` is only valid until the autorelease pool drains;
+/// these copies survive the callback and are freed when the next fill calls
+/// `reset()`, bounding the lifetime to one outstanding generation.
+private final class DeviceCStringStore {
+    private var buffers: [UnsafeMutablePointer<CChar>] = []
+
+    /// Duplicate `value` into long-lived storage and return a pointer valid
+    /// until the next `reset()`.
+    func dup(_ value: String) -> UnsafePointer<CChar>? {
+        guard let copy = strdup(value) else { return nil }
+        buffers.append(copy)
+        return UnsafePointer(copy)
+    }
+
+    func reset() {
+        buffers.forEach { free($0) }
+        buffers.removeAll(keepingCapacity: true)
     }
 }
