@@ -11,6 +11,7 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
+#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
 
@@ -206,18 +207,7 @@ rac_result_t metal_copy_buffer(rac_runtime_buffer_t* dst, size_t dst_offset,
 }
 
 void metal_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (!tensor)
-        return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
-        std::free(tensor->data);
-    }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
-        std::free(tensor->shape);
-    }
-    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->buffer) {
-        metal_free_buffer(tensor->buffer);
-    }
-    *tensor = rac_runtime_tensor_t{};
+    rac::runtime::rac_runtime_release_tensor(tensor, metal_free_buffer);
 }
 
 rac_result_t metal_device_info(rac_runtime_device_info_t* out) {

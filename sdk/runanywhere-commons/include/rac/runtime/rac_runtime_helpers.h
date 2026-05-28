@@ -10,8 +10,7 @@
  * runtime-specific `free_buffer` function pointer for the buffer slot.
  *
  * Scope:
- *   - CPU + ONNXRT use these helpers today.
- *   - CoreML / Metal are explicitly skipped (DEC-01, Apple-only, deferred).
+ *   - CPU, ONNXRT, CoreML, and Metal all delegate `release_tensor` here.
  */
 
 #ifndef RAC_RUNTIME_HELPERS_H
