@@ -701,3 +701,158 @@ bool PlatformAdapter_httpDownloadCancel(const char* taskId) {
         return [[RunAnywhereHttpDownloadManager shared] cancelDownload:taskStr];
     }
 }
+
+// ============================================================================
+// Directory Enumeration (Platform Adapter Slots)
+//
+// Cross-SDK parity with Swift CppBridge+PlatformAdapter (the source of truth)
+// and the Kotlin / Flutter siblings of CLUSTER-280-SPLIT. The same logic
+// powers the C++ model-registry refresh path (rescan_local) and the
+// rac_model_info_make_proto is_downloaded probe for multi-file artifacts.
+// ============================================================================
+
+#define PLATFORM_DIRECTORY_ENTRY_NAME_MAX 512  // RAC_DIRECTORY_ENTRY_NAME_MAX
+
+void PlatformAdapter_listDirectory(const char* dirPath,
+                                   PlatformDirectoryEntry* outEntries,
+                                   size_t* inOutCount,
+                                   int* outResult) {
+    @autoreleasepool {
+        if (!outResult) {
+            return;
+        }
+        if (!dirPath || !inOutCount) {
+            *outResult = -106;  // RAC_ERROR_INVALID_ARGUMENT
+            return;
+        }
+
+        NSString* pathStr = [NSString stringWithUTF8String:dirPath];
+        if (!pathStr) {
+            *outResult = -106;
+            return;
+        }
+
+        NSFileManager* fm = [NSFileManager defaultManager];
+        BOOL isDirectory = NO;
+        if (![fm fileExistsAtPath:pathStr isDirectory:&isDirectory] || !isDirectory) {
+            *outResult = -183;  // RAC_ERROR_FILE_NOT_FOUND
+            return;
+        }
+
+        NSError* error = nil;
+        NSArray<NSString*>* entries = [fm contentsOfDirectoryAtPath:pathStr error:&error];
+        if (!entries) {
+            NSLog(@"[PlatformAdapterBridge] listDirectory error: %@", error);
+            *outResult = -805;  // RAC_ERROR_INTERNAL
+            return;
+        }
+
+        if (!outEntries) {
+            *inOutCount = entries.count;
+            *outResult = 0;
+            return;
+        }
+
+        const size_t capacity = *inOutCount;
+        const size_t total = entries.count;
+        const size_t writeCount = total < capacity ? total : capacity;
+        size_t written = 0;
+        size_t skipped = 0;
+
+        for (size_t i = 0; i < writeCount; i++) {
+            NSString* entryName = entries[i];
+            const char* utf8Name = [entryName UTF8String];
+            if (!utf8Name) {
+                continue;
+            }
+            size_t nameLen = strlen(utf8Name);
+            // Truncation contract (rac_directory_entry_t::name): skip oversized
+            // names rather than emit a half-name. Mirrors Kotlin / Flutter siblings.
+            if (nameLen + 1 > PLATFORM_DIRECTORY_ENTRY_NAME_MAX) {
+                skipped++;
+                continue;
+            }
+
+            memset(outEntries[written].name, 0, PLATFORM_DIRECTORY_ENTRY_NAME_MAX);
+            memcpy(outEntries[written].name, utf8Name, nameLen);
+
+            NSString* fullPath = [pathStr stringByAppendingPathComponent:entryName];
+            BOOL entryIsDir = NO;
+            BOOL exists = [fm fileExistsAtPath:fullPath isDirectory:&entryIsDir];
+            outEntries[written].is_dir = (exists && entryIsDir) ? true : false;
+
+            if (exists && !entryIsDir) {
+                NSDictionary* attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+                outEntries[written].size_bytes = attrs ? (int64_t)[attrs fileSize] : 0;
+            } else {
+                outEntries[written].size_bytes = 0;
+            }
+            written++;
+        }
+
+        if (skipped > 0) {
+            NSLog(@"[PlatformAdapterBridge] listDirectory: skipped %zu oversized entry name(s) in %@",
+                  skipped, pathStr);
+        }
+
+        *inOutCount = written;
+        *outResult = 0;
+    }
+}
+
+bool PlatformAdapter_isNonEmptyDirectory(const char* path) {
+    @autoreleasepool {
+        if (!path) {
+            return false;
+        }
+        NSString* pathStr = [NSString stringWithUTF8String:path];
+        if (!pathStr) {
+            return false;
+        }
+
+        NSFileManager* fm = [NSFileManager defaultManager];
+        BOOL isDirectory = NO;
+        if (![fm fileExistsAtPath:pathStr isDirectory:&isDirectory] || !isDirectory) {
+            return false;
+        }
+
+        NSError* error = nil;
+        NSArray<NSString*>* entries = [fm contentsOfDirectoryAtPath:pathStr error:&error];
+        if (!entries) {
+            return false;
+        }
+        return entries.count > 0;
+    }
+}
+
+int PlatformAdapter_getVendorId(char* outBuffer, size_t bufferSize) {
+    @autoreleasepool {
+        if (!outBuffer) {
+            return -101;  // RAC_ERROR_NULL_POINTER
+        }
+        if (bufferSize < 37) {
+            return -261;  // RAC_ERROR_BUFFER_TOO_SMALL
+        }
+
+        @try {
+            NSUUID* vendorId = [[UIDevice currentDevice] identifierForVendor];
+            if (!vendorId) {
+                return -423;  // RAC_ERROR_NOT_FOUND
+            }
+            NSString* uuidString = [vendorId UUIDString];
+            const char* utf8 = [uuidString UTF8String];
+            if (!utf8) {
+                return -805;  // RAC_ERROR_INTERNAL
+            }
+            size_t len = strlen(utf8);
+            if (len + 1 > bufferSize) {
+                return -261;
+            }
+            memcpy(outBuffer, utf8, len + 1);
+            return 0;  // RAC_SUCCESS
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getVendorId exception: %@", exception);
+            return -805;
+        }
+    }
+}

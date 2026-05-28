@@ -93,6 +93,12 @@ extern jmethodID g_getGPUFamilyMethod;
 extern jmethodID g_isTabletMethod;
 extern jmethodID g_httpDownloadMethod;
 extern jmethodID g_httpDownloadCancelMethod;
+// Directory enumeration slots populated by Kotlin PlatformAdapterBridge so
+// the C++ model-registry refresh path (rescan_local) and
+// rac_model_info_make_proto's is_downloaded probe for multi-file artifacts
+// behave the same on Android as they do on iOS / Web.
+extern jmethodID g_fileListDirectoryMethod;
+extern jmethodID g_isNonEmptyDirectoryMethod;
 
 // Helper to get JNIEnv for current thread
 static JNIEnv* getJNIEnv() {
@@ -481,6 +487,111 @@ namespace AndroidBridge {
 
         return result == JNI_TRUE;
     }
+
+    // CLUSTER-280-SPLIT-sdk-react-native: directory enumeration via
+    // java.io.File.listFiles(). Two-call semantics matching
+    // rac_file_list_directory_fn. Truncation contract: skip oversized
+    // names rather than write a half-name that aliases a different
+    // artifact (Kotlin side already filters; we defend on this side too).
+    rac_result_t fileListDirectory(const char* dir_path,
+                                   rac_directory_entry_t* out_entries,
+                                   size_t* in_out_count) {
+        if (!in_out_count) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        JNIEnv* env = getJNIEnv();
+        if (!env) {
+            return RAC_ERROR_ADAPTER_NOT_SET;
+        }
+        if (!g_platformAdapterBridgeClass || !g_fileListDirectoryMethod) {
+            return RAC_ERROR_NOT_SUPPORTED;
+        }
+
+        jstring jPath = env->NewStringUTF(dir_path ? dir_path : "");
+        jobjectArray result = static_cast<jobjectArray>(env->CallStaticObjectMethod(
+            g_platformAdapterBridgeClass, g_fileListDirectoryMethod, jPath));
+        env->DeleteLocalRef(jPath);
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in fileListDirectory");
+            return RAC_ERROR_INTERNAL;
+        }
+        // Kotlin returns null when the path does not exist or is not a
+        // directory — map to RAC_ERROR_FILE_NOT_FOUND per the C ABI contract.
+        if (!result) {
+            return RAC_ERROR_FILE_NOT_FOUND;
+        }
+
+        const jsize total = env->GetArrayLength(result);
+
+        if (!out_entries) {
+            *in_out_count = static_cast<size_t>(total);
+            env->DeleteLocalRef(result);
+            return RAC_SUCCESS;
+        }
+
+        const size_t capacity = *in_out_count;
+        const size_t write_count =
+            (capacity < static_cast<size_t>(total)) ? capacity : static_cast<size_t>(total);
+        size_t written = 0;
+
+        for (size_t i = 0; i < write_count; ++i) {
+            jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
+            if (!entryObj) {
+                continue;
+            }
+            jclass entryClass = env->GetObjectClass(entryObj);
+            jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
+            jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
+            jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+
+            jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
+            jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
+            jlong jSize = env->GetLongField(entryObj, sizeField);
+
+            const char* nameChars =
+                jName ? env->GetStringUTFChars(jName, nullptr) : nullptr;
+            if (nameChars) {
+                const size_t nameLen = std::strlen(nameChars);
+                if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
+                    std::memset(out_entries[written].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+                    std::memcpy(out_entries[written].name, nameChars, nameLen);
+                    out_entries[written].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
+                    out_entries[written].size_bytes = static_cast<int64_t>(jSize);
+                    written++;
+                }
+                env->ReleaseStringUTFChars(jName, nameChars);
+            }
+
+            if (jName) {
+                env->DeleteLocalRef(jName);
+            }
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+        }
+
+        *in_out_count = written;
+        env->DeleteLocalRef(result);
+        return RAC_SUCCESS;
+    }
+
+    bool isNonEmptyDirectory(const char* path) {
+        JNIEnv* env = getJNIEnv();
+        if (!env || !g_platformAdapterBridgeClass || !g_isNonEmptyDirectoryMethod) {
+            return false;
+        }
+        jstring jPath = env->NewStringUTF(path ? path : "");
+        jboolean result = env->CallStaticBooleanMethod(
+            g_platformAdapterBridgeClass, g_isNonEmptyDirectoryMethod, jPath);
+        env->DeleteLocalRef(jPath);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return false;
+        }
+        return result == JNI_TRUE;
+    }
 } // namespace AndroidBridge
 #elif defined(__APPLE__)
 #include <cstdio>
@@ -516,6 +627,22 @@ extern "C" {
     );
 
     bool PlatformAdapter_httpDownloadCancel(const char* taskId);
+
+    // Directory enumeration + Apple vendor-id (CLUSTER-280-SPLIT-sdk-react-native).
+    // Mirrors `PlatformDirectoryEntry` in PlatformAdapterBridge.h field-for-field
+    // with `rac_directory_entry_t` so we can memcpy entries straight across.
+    typedef struct PlatformDirectoryEntry {
+        char name[512];  // RAC_DIRECTORY_ENTRY_NAME_MAX
+        bool is_dir;
+        int64_t size_bytes;
+    } PlatformDirectoryEntry;
+
+    void PlatformAdapter_listDirectory(const char* dirPath,
+                                       PlatformDirectoryEntry* outEntries,
+                                       size_t* inOutCount,
+                                       int* outResult);
+    bool PlatformAdapter_isNonEmptyDirectory(const char* path);
+    int PlatformAdapter_getVendorId(char* outBuffer, size_t bufferSize);
 }
 #define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[InitBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
@@ -1114,6 +1241,88 @@ static void platformTrackErrorCallback(const char* errorJson, void* userData) {
 }
 
 // =============================================================================
+// Directory Enumeration + Vendor ID Callbacks (Platform Adapter)
+//
+// Cross-SDK parity with Swift (CppBridge+PlatformAdapter), Kotlin
+// (CppBridgePlatformAdapter), and Flutter (dart_bridge_platform.dart) — the
+// commons model-registry refresh path and rac_model_info_make_proto rely on
+// these three slots being populated for rescan_local to succeed and for the
+// is_downloaded gating on multi-file artifacts (mmproj + GGUF pairs,
+// tokenizer + ONNX bundles) to report TRUE. See rac_platform_adapter.h.
+// =============================================================================
+
+static rac_result_t platformFileListDirectoryCallback(const char* dir_path,
+                                                      rac_directory_entry_t* out_entries,
+                                                      size_t* in_out_count,
+                                                      void* user_data) {
+    (void)user_data;
+    if (!dir_path || !in_out_count) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::fileListDirectory(dir_path, out_entries, in_out_count);
+#elif defined(__APPLE__)
+    // Use a stack/heap PlatformDirectoryEntry buffer that mirrors
+    // rac_directory_entry_t field-for-field so we can copy across without
+    // an additional marshalling pass.
+    int result = -805;  // RAC_ERROR_INTERNAL
+    if (!out_entries) {
+        PlatformAdapter_listDirectory(dir_path, nullptr, in_out_count, &result);
+        return static_cast<rac_result_t>(result);
+    }
+
+    const size_t capacity = *in_out_count;
+    std::vector<PlatformDirectoryEntry> buffer(capacity);
+    PlatformAdapter_listDirectory(dir_path, buffer.data(), in_out_count, &result);
+    if (result != 0) {
+        return static_cast<rac_result_t>(result);
+    }
+
+    const size_t written = *in_out_count;
+    for (size_t i = 0; i < written; ++i) {
+        std::memcpy(out_entries[i].name, buffer[i].name, RAC_DIRECTORY_ENTRY_NAME_MAX);
+        out_entries[i].is_dir = buffer[i].is_dir ? RAC_TRUE : RAC_FALSE;
+        out_entries[i].size_bytes = buffer[i].size_bytes;
+    }
+    return RAC_SUCCESS;
+#else
+    (void)out_entries;
+    return RAC_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+static rac_bool_t platformIsNonEmptyDirectoryCallback(const char* path, void* user_data) {
+    (void)user_data;
+    if (!path) {
+        return RAC_FALSE;
+    }
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::isNonEmptyDirectory(path) ? RAC_TRUE : RAC_FALSE;
+#elif defined(__APPLE__)
+    return PlatformAdapter_isNonEmptyDirectory(path) ? RAC_TRUE : RAC_FALSE;
+#else
+    return RAC_FALSE;
+#endif
+}
+
+#if defined(__APPLE__)
+// Apple-only: populates UIDevice.identifierForVendor.uuidString into the
+// commons device-identity chain. Non-Apple platforms intentionally leave
+// adapter_.get_vendor_id NULL — commons then walks
+// secure_get -> synthesized UUID per the cross-SDK contract on
+// rac_platform_adapter.h:get_vendor_id (Android has no equivalent stable
+// per-app vendor ID).
+static rac_result_t platformGetVendorIdCallback(char* out_buffer,
+                                                size_t buffer_size,
+                                                void* user_data) {
+    (void)user_data;
+    int result = PlatformAdapter_getVendorId(out_buffer, buffer_size);
+    return static_cast<rac_result_t>(result);
+}
+#endif
+
+// =============================================================================
 // HTTP Download Callbacks (Platform Adapter)
 // =============================================================================
 
@@ -1303,6 +1512,21 @@ void InitBridge::registerPlatformAdapter() {
 
     // Archive extraction (handled by JS layer)
     adapter_.extract_archive = nullptr;
+
+    // CLUSTER-280-SPLIT-sdk-react-native: directory enumeration + Apple
+    // vendor-id slots. Cross-SDK parity with Swift / Kotlin / Flutter / Web.
+    // file_list_directory + is_non_empty_directory are populated on both
+    // platforms (FileManager.contentsOfDirectory on iOS, java.io.File.listFiles
+    // on Android via JNI). get_vendor_id is Apple-only — Android leaves it
+    // NULL per the cross-SDK contract on rac_platform_adapter.h:get_vendor_id
+    // (commons synthesizes + persists a UUID via secure_set on Android).
+    adapter_.file_list_directory = platformFileListDirectoryCallback;
+    adapter_.is_non_empty_directory = platformIsNonEmptyDirectoryCallback;
+#if defined(__APPLE__)
+    adapter_.get_vendor_id = platformGetVendorIdCallback;
+#else
+    adapter_.get_vendor_id = nullptr;
+#endif
 
     adapter_.user_data = nullptr;
 

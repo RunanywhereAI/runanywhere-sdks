@@ -32,6 +32,11 @@ jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
 jmethodID g_httpDownloadMethod = nullptr;
 jmethodID g_httpDownloadCancelMethod = nullptr;
+// Directory enumeration slots (CLUSTER-280-SPLIT-sdk-react-native): cached
+// so InitBridge.cpp can populate rac_platform_adapter_t::file_list_directory
+// and rac_platform_adapter_t::is_non_empty_directory.
+jmethodID g_fileListDirectoryMethod = nullptr;
+jmethodID g_isNonEmptyDirectoryMethod = nullptr;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
   g_javaVM = vm;
@@ -63,6 +68,24 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
       g_httpDownloadMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownload", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
       g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
+      // Best-effort directory enumeration lookups. If the host app's Kotlin
+      // bridge predates these methods, GetStaticMethodID returns NULL and the
+      // platform adapter falls through to its existing NULL-callback branches
+      // (commons emits the documented warning string instead).
+      g_fileListDirectoryMethod = env->GetStaticMethodID(
+          g_platformAdapterBridgeClass,
+          "fileListDirectory",
+          "(Ljava/lang/String;)[Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$RacDirectoryEntry;");
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_fileListDirectoryMethod = nullptr;
+      }
+      g_isNonEmptyDirectoryMethod = env->GetStaticMethodID(
+          g_platformAdapterBridgeClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_isNonEmptyDirectoryMethod = nullptr;
+      }
 
       if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
           g_getModelBaseDirectoryMethod &&
