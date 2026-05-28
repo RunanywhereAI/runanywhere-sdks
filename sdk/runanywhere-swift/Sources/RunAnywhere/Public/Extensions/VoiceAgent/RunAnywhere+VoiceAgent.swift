@@ -200,6 +200,8 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
+        try await ensureServicesReady()
+
         guard await CppBridge.VoiceAgent.shared.isReady else {
             throw SDKException(code: .notInitialized, message: "Voice agent not ready", category: .component)
         }
@@ -223,6 +225,7 @@ public extension RunAnywhere {
 
                 let handle: rac_voice_agent_handle_t
                 do {
+                    try await ensureServicesReady()
                     handle = try await CppBridge.VoiceAgent.shared.getHandle()
                 } catch {
                     continuation.finish()
