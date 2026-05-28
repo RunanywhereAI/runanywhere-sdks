@@ -111,18 +111,30 @@ class SDKState {
     }
 
     const char* getBaseUrl() const {
+        // Use thread_local copy to avoid returning c_str() that dangles after mutex release.
+        // Valid until the next call from the same thread.
+        static thread_local std::string tl_base_url;
         std::lock_guard<std::mutex> lock(mutex_);
-        return base_url_.c_str();
+        tl_base_url = base_url_;
+        return tl_base_url.c_str();
     }
 
     const char* getApiKey() const {
+        // Use thread_local copy to avoid returning c_str() that dangles after mutex release.
+        // Valid until the next call from the same thread.
+        static thread_local std::string tl_api_key;
         std::lock_guard<std::mutex> lock(mutex_);
-        return api_key_.c_str();
+        tl_api_key = api_key_;
+        return tl_api_key.c_str();
     }
 
     const char* getDeviceId() const {
+        // Use thread_local copy to avoid returning c_str() that dangles after mutex release.
+        // Valid until the next call from the same thread.
+        static thread_local std::string tl_device_id;
         std::lock_guard<std::mutex> lock(mutex_);
-        return device_id_.c_str();
+        tl_device_id = device_id_;
+        return tl_device_id.c_str();
     }
 
     // ==========================================================================
