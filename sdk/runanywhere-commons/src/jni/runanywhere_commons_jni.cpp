@@ -42,8 +42,10 @@
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include <exception>
 #include <limits>
 #include <mutex>
+#include <new>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
@@ -144,7 +146,11 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 
 static JavaVM* g_jvm = nullptr;
 static jobject g_platform_adapter = nullptr;
-static std::mutex g_adapter_mutex;
+// commons-155: recursive so jni_*_callback can lock around g_platform_adapter
+// reads even when the writer (racSetPlatformAdapter) emits log lines while
+// already holding the lock — `LOGw(...)` in the writer routes through
+// jni_log_callback which now also takes this mutex.
+static std::recursive_mutex g_adapter_mutex;
 
 // Method IDs for platform adapter callbacks (cached)
 static jmethodID g_method_log = nullptr;
@@ -168,17 +174,37 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_VERSION_1_6;
 }
 
+// Forward declarations of the per-listener-map cleanup helpers defined further
+// down the file. JNI_OnUnload calls them so every GlobalRef cached by this TU
+// is released when the JVM unloads the native library (commons-154).
+namespace {
+void rac_jni_release_all_listener_global_refs(JNIEnv* env);
+}  // namespace
+
 // NOLINTNEXTLINE(misc-unused-parameters): `vm`/`reserved` are part of the JNI ABI.
 JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
     LOGi("JNI_OnUnload: runanywhere_commons_jni unloading");
 
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
-    if (g_platform_adapter != nullptr) {
-        JNIEnv* env = nullptr;
-        if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
-            env->DeleteGlobalRef(g_platform_adapter);
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        env = nullptr;
+    }
+
+    // commons-154: drain every per-handle / per-subscription GlobalRef map so
+    // GlobalRefs are not leaked when the JVM unloads the native library.
+    // Mirrors the g_platform_adapter cleanup below.
+    if (env != nullptr) {
+        rac_jni_release_all_listener_global_refs(env);
+    }
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+        if (g_platform_adapter != nullptr) {
+            if (env != nullptr) {
+                env->DeleteGlobalRef(g_platform_adapter);
+            }
+            g_platform_adapter = nullptr;
         }
-        g_platform_adapter = nullptr;
     }
     g_jvm = nullptr;
 }
@@ -209,21 +235,36 @@ static JNIEnv* getJNIEnv() {
     return env;
 }
 
-static std::string getCString(JNIEnv* env, jstring str) {
+// commons-056: noexcept by construction — the only throwing call below is the
+// `std::string` ctor which can raise std::bad_alloc on memory-constrained
+// devices. Letting it escape across the JNI vtable boundary is UB per JNI
+// §13.1; we catch and return an empty string instead. Callers that need to
+// distinguish "empty input" from "OOM" must check for the input being null
+// before calling.
+static std::string getCString(JNIEnv* env, jstring str) noexcept {
     if (str == nullptr)
-        return "";
+        return std::string();
     const char* chars = env->GetStringUTFChars(str, nullptr);
     if (chars == nullptr)
-        return "";
-    std::string result(chars);
-    env->ReleaseStringUTFChars(str, chars);
-    return result;
+        return std::string();
+    try {
+        std::string result(chars);
+        env->ReleaseStringUTFChars(str, chars);
+        return result;
+    } catch (...) {
+        env->ReleaseStringUTFChars(str, chars);
+        return std::string();
+    }
 }
 
-static const char* getNullableCString(JNIEnv* env, jstring str, std::string& storage) {
+static const char* getNullableCString(JNIEnv* env, jstring str, std::string& storage) noexcept {
     if (str == nullptr)
         return nullptr;
-    storage = getCString(env, str);
+    try {
+        storage = getCString(env, str);
+    } catch (...) {
+        storage.clear();
+    }
     return storage.c_str();
 }
 
@@ -568,9 +609,15 @@ static rac_platform_adapter_t g_c_adapter;
 // JNI implementations don't need the user_data hand-off because they retrieve
 // state via JVM globals; the unused parameters are required by the C ABI.
 // NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
+// commons-155: each jni_*_callback takes g_adapter_mutex (now recursive) so a
+// concurrent racSetPlatformAdapter cannot DeleteGlobalRef while we are
+// mid-CallXxxMethod on the same jobject. Recursion permits LOGw inside the
+// writer (which already holds the lock) to re-enter jni_log_callback without
+// deadlocking.
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
         // since this function IS the platform adapter's log callback)
@@ -594,6 +641,7 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
 
 static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_exists == nullptr) {
         return RAC_FALSE;
     }
@@ -608,6 +656,7 @@ static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
 static rac_result_t jni_file_read_callback(const char* path, void** out_data, size_t* out_size,
                                            void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_read == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -640,6 +689,7 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
 static rac_result_t jni_file_write_callback(const char* path, const void* data, size_t size,
                                             void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_write == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -659,6 +709,7 @@ static rac_result_t jni_file_write_callback(const char* path, const void* data, 
 
 static rac_result_t jni_file_delete_callback(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -672,6 +723,7 @@ static rac_result_t jni_file_delete_callback(const char* path, void* user_data) 
 
 static rac_result_t jni_secure_get_callback(const char* key, char** out_value, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -704,6 +756,7 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
 
 static rac_result_t jni_secure_set_callback(const char* key, const char* value, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -720,6 +773,7 @@ static rac_result_t jni_secure_set_callback(const char* key, const char* value, 
 
 static rac_result_t jni_secure_delete_callback(const char* key, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -733,6 +787,7 @@ static rac_result_t jni_secure_delete_callback(const char* key, void* user_data)
 
 static int64_t jni_now_ms_callback(void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_now_ms == nullptr) {
         // Fallback to system time
         return static_cast<int64_t>(time(nullptr)) * 1000;
@@ -769,6 +824,53 @@ std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
     return m;
 }
 }  // namespace
+
+// =============================================================================
+// commons-056: JNI exception-safety macros.
+// =============================================================================
+// Per JNI Spec §13.1, a C++ exception that escapes a native method invocation
+// is undefined behavior: ART's exception slot is left in an inconsistent
+// state and subsequent ExceptionCheck calls either silently miss the throw or
+// abort with "JNI DETECTED ERROR IN APPLICATION USE OF JNI". On
+// memory-constrained Android devices `std::string` construction in the
+// helpers below can raise `std::bad_alloc`, so every JNIEXPORT thunk that
+// performs C++ allocations should wrap its body with RAC_JNI_TRY /
+// RAC_JNI_CATCH_*. The catch arms translate std::bad_alloc to
+// RAC_ERROR_OUT_OF_MEMORY and any other std::exception (or unknown type) to
+// RAC_ERROR_INTERNAL, mirroring the contract of the rest of the C ABI.
+//
+// Pure forwarders that only pass primitives through the C ABI do not throw
+// and may remain unwrapped. The helpers `getCString` / `getNullableCString`
+// above are themselves `noexcept`, so simple ID-string thunks that already
+// route through them are protected at the helper layer.
+#define RAC_JNI_TRY try
+#define RAC_JNI_CATCH_RET(ret_on_oom, ret_on_internal)    \
+    catch (const std::bad_alloc& _e) {                    \
+        LOGe("JNI thunk: out of memory (%s)", _e.what()); \
+        return (ret_on_oom);                              \
+    }                                                     \
+    catch (const std::exception& _e) {                    \
+        LOGe("JNI thunk: %s", _e.what());                 \
+        return (ret_on_internal);                         \
+    }                                                     \
+    catch (...) { /* unknown exception type */            \
+        LOGe("JNI thunk: unknown exception");             \
+        return (ret_on_internal);                         \
+    }
+#define RAC_JNI_CATCH_INT()                                       \
+    RAC_JNI_CATCH_RET(static_cast<jint>(RAC_ERROR_OUT_OF_MEMORY), \
+                      static_cast<jint>(RAC_ERROR_INTERNAL))
+#define RAC_JNI_CATCH_PTR() RAC_JNI_CATCH_RET(nullptr, nullptr)
+#define RAC_JNI_CATCH_VOID()                              \
+    catch (const std::bad_alloc& _e) {                    \
+        LOGe("JNI thunk: out of memory (%s)", _e.what()); \
+    }                                                     \
+    catch (const std::exception& _e) {                    \
+        LOGe("JNI thunk: %s", _e.what());                 \
+    }                                                     \
+    catch (...) {                                         \
+        LOGe("JNI thunk: unknown exception");             \
+    }
 
 // NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 extern "C" {
@@ -819,7 +921,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
                                                                                jobject adapter) {
     LOGi("racSetPlatformAdapter called");
 
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
     // Clean up previous adapter
     if (g_platform_adapter != nullptr) {
@@ -874,7 +976,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 JNIEXPORT jobject JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racGetPlatformAdapter(JNIEnv* env,
                                                                                jclass clazz) {
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     return g_platform_adapter;
 }
 
@@ -2750,17 +2852,29 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventSubscribe(JN
     if (listener == nullptr) {
         return 0;
     }
-    jobject globalListener = env->NewGlobalRef(listener);
-    uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
-    if (subscriptionId == 0) {
-        env->DeleteGlobalRef(globalListener);
-        return 0;
+    RAC_JNI_TRY {
+        jobject globalListener = env->NewGlobalRef(listener);
+        uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
+        if (subscriptionId == 0) {
+            env->DeleteGlobalRef(globalListener);
+            return 0;
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+            // commons-056: map allocation can throw std::bad_alloc on low-mem
+            // devices; the surrounding try/catch translates that to 0 (the
+            // INVALID_SUBSCRIPTION sentinel) and releases the GlobalRef.
+            try {
+                g_sdk_event_listeners[subscriptionId] = globalListener;
+            } catch (...) {
+                rac_sdk_event_unsubscribe(subscriptionId);
+                env->DeleteGlobalRef(globalListener);
+                throw;
+            }
+        }
+        return static_cast<jlong>(subscriptionId);
     }
-    {
-        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
-        g_sdk_event_listeners[subscriptionId] = globalListener;
-    }
-    return static_cast<jlong>(subscriptionId);
+    RAC_JNI_CATCH_RET(0L, 0L)
 }
 
 JNIEXPORT void JNICALL
@@ -2926,7 +3040,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPoll
 
 static int auth_storage_store(const char* key, const char* value, void* /*ctx*/) {
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
         return -1;
     }
@@ -2964,7 +3078,7 @@ static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer
     if (out_value == nullptr || buffer_size == 0)
         return -1;
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
         return -1;
     }
@@ -3000,7 +3114,7 @@ static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer
 
 static int auth_storage_delete(const char* key, void* /*ctx*/) {
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
         return -1;
     }
@@ -3293,8 +3407,15 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeU
 
     rac_voice_agent_handle_t racHandle =
         reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
-    // Clear the C-side slot first so no further callbacks fire.
+    // commons-059 fix: prevent UAF between in-flight `va_stream_trampoline`
+    // and `delete ctx`. The unset clears the slot for FUTURE dispatches but
+    // a concurrent dispatcher that already copied the slot can still be
+    // mid-CallObjectMethod on `ctx->lambda_ref`. Quiesce spin-waits until
+    // every in-flight invocation has returned, mirroring the destroy
+    // ordering documented at rac_voice_event_abi.h:97-118 and applied in
+    // voice_agent.cpp:250.
     rac_voice_agent_set_proto_callback(racHandle, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
 
     auto* ctx = reinterpret_cast<VaStreamCallbackCtx*>(static_cast<uintptr_t>(callbackId));
     if (ctx->lambda_ref)
@@ -3604,20 +3725,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-        auto it = g_vad_proto_listeners.find(key);
-        if (it != g_vad_proto_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_vad_proto_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+            auto it = g_vad_proto_listeners.find(key);
+            if (it != g_vad_proto_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_vad_proto_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 // =============================================================================
@@ -3654,20 +3778,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCal
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-        auto it = g_vad_stream_listeners.find(key);
-        if (it != g_vad_stream_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_vad_stream_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+            auto it = g_vad_stream_listeners.find(key);
+            if (it != g_vad_stream_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_vad_stream_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_vad_set_stream_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_vad_set_stream_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -4431,28 +4558,40 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCr
     if (!request.ok || listener == nullptr)
         return 0L;
 
-    // The listener lives for the entire session lifetime. Kotlin side is
-    // responsible for calling racToolCallingSessionDestroyProto to release
-    // this global ref — see below.
-    jobject globalListener = env->NewGlobalRef(listener);
-    auto* ctx = new ProtoListenerUserData{.listener = globalListener,
-                                          .operation = "racToolCallingSessionCreateProto"};
+    RAC_JNI_TRY {
+        // The listener lives for the entire session lifetime. Kotlin side is
+        // responsible for calling racToolCallingSessionDestroyProto to release
+        // this global ref — see below.
+        jobject globalListener = env->NewGlobalRef(listener);
+        auto* ctx = new ProtoListenerUserData{.listener = globalListener,
+                                              .operation = "racToolCallingSessionCreateProto"};
 
-    uint64_t sessionHandle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        request.u8(), request.size(),
-        reinterpret_cast<rac_tool_calling_session_event_callback_fn>(proto_void_callback), ctx,
-        &sessionHandle);
-    if (rc != RAC_SUCCESS || sessionHandle == 0) {
-        env->DeleteGlobalRef(globalListener);
-        delete ctx;
-        return 0L;
+        uint64_t sessionHandle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            request.u8(), request.size(),
+            reinterpret_cast<rac_tool_calling_session_event_callback_fn>(proto_void_callback), ctx,
+            &sessionHandle);
+        if (rc != RAC_SUCCESS || sessionHandle == 0) {
+            env->DeleteGlobalRef(globalListener);
+            delete ctx;
+            return 0L;
+        }
+        {
+            std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+            // commons-056: map allocation can throw bad_alloc; unwind the
+            // already-registered session so we don't leak a dangling ctx.
+            try {
+                toolCallingCtxMap()[sessionHandle] = ctx;
+            } catch (...) {
+                rac_tool_calling_session_destroy_proto(sessionHandle);
+                env->DeleteGlobalRef(globalListener);
+                delete ctx;
+                throw;
+            }
+        }
+        return static_cast<jlong>(sessionHandle);
     }
-    {
-        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
-        toolCallingCtxMap()[sessionHandle] = ctx;
-    }
-    return static_cast<jlong>(sessionHandle);
+    RAC_JNI_CATCH_RET(0L, 0L)
 }
 
 JNIEXPORT jint JNICALL
@@ -5333,20 +5472,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetStreamProtoCal
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-        auto it = g_llm_stream_proto_listeners.find(key);
-        if (it != g_llm_stream_proto_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_llm_stream_proto_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+            auto it = g_llm_stream_proto_listeners.find(key);
+            if (it != g_llm_stream_proto_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_llm_stream_proto_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_llm_set_stream_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? llm_stream_proto_trampoline : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_llm_set_stream_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? llm_stream_proto_trampoline : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 JNIEXPORT jint JNICALL
@@ -5914,6 +6056,85 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetBy
 
 }  // extern "C"
 // NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
+
+// commons-154: definition of the JNI_OnUnload cleanup helper. Each per-handle
+// listener map and singleton GlobalRef declared above is drained here so the
+// JVM does not leak references when the native library is dlclose'd. Mirrors
+// the g_platform_adapter cleanup pattern already present in JNI_OnUnload.
+namespace {
+void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
+    if (env == nullptr) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+        for (auto& kv : g_sdk_event_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_sdk_event_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
+        if (g_download_proto_listener != nullptr) {
+            env->DeleteGlobalRef(g_download_proto_listener);
+            g_download_proto_listener = nullptr;
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        for (auto& kv : g_vad_proto_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_vad_proto_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        for (auto& kv : g_vad_stream_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_vad_stream_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+        for (auto& kv : g_llm_stream_proto_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_llm_stream_proto_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+        for (auto& kv : toolCallingCtxMap()) {
+            auto* ctx = kv.second;
+            if (ctx != nullptr) {
+                if (ctx->listener != nullptr) {
+                    env->DeleteGlobalRef(ctx->listener);
+                }
+                delete ctx;
+            }
+        }
+        toolCallingCtxMap().clear();
+    }
+
+    if (g_file_callbacks_obj != nullptr) {
+        env->DeleteGlobalRef(g_file_callbacks_obj);
+        g_file_callbacks_obj = nullptr;
+    }
+}
+}  // namespace
 
 // =============================================================================
 // NOTE: Backend registration functions have been MOVED to their respective
