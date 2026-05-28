@@ -1028,6 +1028,36 @@ static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* i
             default:
                 break;
         }
+    } else if (incoming->artifact_case() == ModelInfo::kMultiFile &&
+               existing.artifact_case() == ModelInfo::kMultiFile) {
+        // Per-descriptor merge for multi-file artifacts: re-registering a
+        // catalog seed rebuilds the file descriptors from URL/filename but
+        // does not carry the per-file local_path or checksum_sha256 that the
+        // downloader populated. Match descriptors by URL and preserve those
+        // runtime fields so the next launch finds the files on disk.
+        const auto& existing_files = existing.multi_file().files();
+        auto* incoming_files = incoming->mutable_multi_file()->mutable_files();
+        for (int i = 0; i < incoming_files->size(); ++i) {
+            ModelFileDescriptor* file = incoming_files->Mutable(i);
+            if (file->url().empty()) {
+                continue;
+            }
+            for (const ModelFileDescriptor& prior : existing_files) {
+                if (prior.url() != file->url()) {
+                    continue;
+                }
+                if (!file->has_local_path() && prior.has_local_path()) {
+                    file->set_local_path(prior.local_path());
+                }
+                if (!file->has_checksum_sha256() && prior.has_checksum_sha256()) {
+                    file->set_checksum_sha256(prior.checksum_sha256());
+                }
+                if (!file->has_size_bytes() && prior.has_size_bytes()) {
+                    file->set_size_bytes(prior.size_bytes());
+                }
+                break;
+            }
+        }
     }
 }
 
@@ -2054,6 +2084,24 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
     }
+
+    // Merge-not-replace: when re-registering an existing model_id (catalog
+    // re-seed on app launch), preserve runtime fields the caller doesn't set
+    // — local_path, is_downloaded, checksum_sha256, expected_files,
+    // multi_file.files[*].local_path, etc. Without this, a registerModel()
+    // call that only carries factory defaults clobbers download progress and
+    // forces the user to re-download on every launch. Same merge contract as
+    // rac_model_registry_update_proto (see preserve_absent_proto_fields).
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        auto existing_it = handle->models.find(proto_model.id());
+        if (existing_it != handle->models.end()) {
+            ModelInfo existing =
+                model_snapshot_locked(handle, proto_model.id(), existing_it->second);
+            preserve_absent_proto_fields(existing, &proto_model);
+        }
+    }
+
     normalize_model_registry_state(&proto_model);
 
     rac_model_info_t* model = model_info_from_proto(proto_model);

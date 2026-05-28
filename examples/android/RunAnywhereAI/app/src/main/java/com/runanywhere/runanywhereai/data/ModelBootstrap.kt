@@ -42,24 +42,6 @@ object ModelBootstrap {
         }
     }
 
-    /**
-     * Snapshot of model IDs already in the native registry. Used to skip
-     * re-registration so we don't overwrite the downloaded `local_path` /
-     * `is_downloaded` flags maintained by the C++ self-heal path.
-     */
-    private suspend fun existingRegistryIds(): Set<String> =
-        try {
-            RunAnywhere
-                .listModels(ModelListRequest())
-                .models
-                ?.models
-                .orEmpty()
-                .map { it.id }
-                .toSet()
-        } catch (_: Throwable) {
-            emptySet()
-        }
-
     private suspend fun registerBackends() {
         try {
             LlamaCPP.register()
@@ -115,74 +97,45 @@ object ModelBootstrap {
 
     /**
      * Seed the curated model catalog. Each call registers a ModelInfo into
-     * the native registry via the proto ABI (`rac_model_registry_save_proto`).
-     * Failures are logged and do not abort the seed pass.
+     * the native registry via the proto ABI (`rac_register_model_from_url_proto`
+     * → `rac_model_registry_register_proto`). The commons registry merges
+     * runtime fields (`local_path`, `is_downloaded`, `checksum_sha256`,
+     * multi-file per-file `local_path`) from the existing snapshot on
+     * re-registration, so re-running this on app launch is idempotent and
+     * cannot clobber download progress. Failures are logged and do not abort
+     * the seed pass.
      *
      * Model list mirrors `RunAnywhereAIApp.swift:registerModulesAndModels`
      * (commit 34e32b68a deleted the equivalent Android `ModelList.kt`).
      */
     private suspend fun seedCuratedCatalog() {
         Timber.i("🌱 Seeding curated model catalog...")
-        // Avoid re-registering models that are already in the registry — saving
-        // an existing entry would clobber `local_path` / `is_downloaded` set
-        // by the download self-heal (KOT-DOWNLOAD-004) and force users to
-        // re-download on every app launch.
-        val alreadyKnown = existingRegistryIds()
         var registered = 0
-        var skipped = 0
         var failed = 0
 
         for (m in LLM_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterSingle(m)) registered++ else failed++
         }
         for (m in VLM_MULTIFILE_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
         for (m in VLM_ARCHIVE_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in STT_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in TTS_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in VAD_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterSingle(m)) registered++ else failed++
         }
         for (m in EMBEDDING_MULTIFILE_MODELS) {
-            if (m.id in alreadyKnown) {
-                skipped++
-                continue
-            }
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
 
-        Timber.i("🌱 Catalog seed complete — registered=$registered, preserved=$skipped, failed=$failed")
+        Timber.i("🌱 Catalog seed complete — registered=$registered, failed=$failed")
     }
 
     /**

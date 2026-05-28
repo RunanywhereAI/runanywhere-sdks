@@ -15,6 +15,13 @@
  * RegisterModelFromUrlRequest → ModelInfoMakeRequest (1:1 field mapping) and
  * then forward to the registry register_proto_buffer save path on the global
  * registry handle.
+ *
+ * Re-registration semantics: when a model_id already exists in the registry,
+ * rac_model_registry_register_proto preserves runtime fields the caller did
+ * not set (local_path, is_downloaded, checksum_sha256, expected_files,
+ * multi_file per-file local_path). Callers reseeding a curated catalog on app
+ * launch therefore retain previous download progress; no example-app
+ * workaround is needed to skip already-known IDs.
  */
 
 #include <cstdint>

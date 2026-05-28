@@ -198,6 +198,15 @@ RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registr
  * The registry converts the proto to its internal C++/C representation and
  * applies the same semantics as rac_model_registry_save().
  *
+ * Merge-not-replace on existing entries: when the model_id is already in the
+ * registry, runtime fields the caller did not set (local_path, is_downloaded,
+ * checksum_sha256, expected_files, multi_file per-file local_path) are
+ * preserved from the existing snapshot. Callers reseeding a curated catalog
+ * on app launch therefore retain previous download progress without needing
+ * an example-app skip-if-present workaround. To force a clean reset, callers
+ * must explicitly populate the desired field on the incoming ModelInfo (the
+ * "absent" check is field-presence-based via the proto `has_*` accessors).
+ *
  * @param handle Registry handle
  * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
  * @param proto_size Byte count
