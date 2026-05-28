@@ -83,6 +83,12 @@ export enum SDKErrorCode {
 
 /**
  * Map a signed-negative `SDKErrorCode` to the matching proto-ts `ErrorCategory`.
+ *
+ * Verbatim port of the canonical 18-range table in
+ * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
+ * Web cannot call the C++ helper synchronously before WASM is loaded, so the
+ * table is replicated here; any change to the canonical mapping MUST be
+ * mirrored in this function (and in the RN equivalent). See commons-074-A.
  */
 function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
   if (code === 0) return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
@@ -91,10 +97,23 @@ function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
   if (abs >= 110 && abs <= 129) return ProtoErrorCategory.ERROR_CATEGORY_MODEL;
   if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
   if (abs >= 150 && abs <= 179) return ProtoErrorCategory.ERROR_CATEGORY_NETWORK;
-  if (abs >= 180 && abs <= 219) return ProtoErrorCategory.ERROR_CATEGORY_IO;
-  if (abs >= 220 && abs <= 229) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) {
+    return ProtoErrorCategory.ERROR_CATEGORY_IO;
+  }
+  if (abs >= 220 && abs <= 229) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 230 && abs <= 249) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 250 && abs <= 279) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if (abs >= 300 && abs <= 319) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 320 && abs <= 329) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
+  if (abs >= 330 && abs <= 349) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
+  if (abs >= 350 && abs <= 369) return ProtoErrorCategory.ERROR_CATEGORY_IO;
+  if (abs >= 370 && abs <= 379) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if (abs >= 380 && abs <= 389) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
+  if (abs >= 400 && abs <= 499) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 500 && abs <= 599) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
   if (abs >= 600 && abs <= 699) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 700 && abs <= 799) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
+  if (abs >= 800 && abs <= 899) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 900 && abs <= 999) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
 }
@@ -124,10 +143,19 @@ function componentForCode(code: SDKErrorCode): string {
   if (abs >= 110 && abs <= 129) return 'model';
   if (abs >= 130 && abs <= 149) return 'generation';
   if (abs >= 150 && abs <= 179) return 'network';
-  if (abs >= 180 && abs <= 219) return 'storage';
-  if (abs >= 220 && abs <= 229) return 'validation';
+  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) return 'storage';
+  if (abs >= 220 && abs <= 229) return 'sdk';
   if (abs >= 230 && abs <= 249) return 'component';
+  if (abs >= 250 && abs <= 279) return 'validation';
+  if (abs >= 300 && abs <= 319) return 'component';
+  if (abs >= 320 && abs <= 349) return 'auth';
+  if (abs >= 350 && abs <= 369) return 'storage';
+  if (abs >= 370 && abs <= 379) return 'validation';
+  if (abs >= 380 && abs <= 389) return 'sdk';
+  if (abs >= 400 && abs <= 499) return 'component';
+  if (abs >= 500 && abs <= 599) return 'sdk';
   if (abs >= 600 && abs <= 699) return 'backend';
+  if (abs >= 700 && abs <= 899) return 'sdk';
   if (abs >= 900 && abs <= 999) return 'wasm';
   return 'sdk';
 }
