@@ -51,23 +51,24 @@ function ensureNative() {
 /**
  * Create a RAG pipeline with the given configuration.
  *
- * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)`.
+ * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)` — the config is passed
+ * through to the C++ commons layer verbatim. Numeric RAGConfiguration fields
+ * are proto3 `optional`, so absent fields are honored by commons (which
+ * stamps canonical defaults via `rac_rag_request_with_defaults_proto`) and
+ * explicit zero values (e.g. `chunkOverlap: 0` to disable overlap) are
+ * preserved end-to-end. Callers that want the canonical defaults can seed
+ * the input with the generated `rAGConfigurationDefaults()` helper from
+ * `@runanywhere/proto-ts/convenience/rag_convenience`.
  */
 export async function ragCreatePipeline(
   config: RAGConfiguration
 ): Promise<void> {
   const native = ensureNative();
-  const configWithDefaults = RAGConfigurationMessage.create({
-    ...config,
-    embeddingDimension: config.embeddingDimension ?? 384,
-    topK: config.topK ?? 3,
-    similarityThreshold: config.similarityThreshold ?? 0.12,
-    chunkSize: config.chunkSize ?? 180,
-    chunkOverlap: config.chunkOverlap ?? 30,
-    maxContextTokens: config.maxContextTokens ?? 0,
-  });
   const success = await native.ragCreatePipelineProto(
-    encodeProtoMessage(configWithDefaults, RAGConfigurationMessage)
+    encodeProtoMessage(
+      RAGConfigurationMessage.fromPartial(config),
+      RAGConfigurationMessage
+    )
   );
   if (!success) {
     throw SDKException.generationFailedWith('Failed to create RAG pipeline');
