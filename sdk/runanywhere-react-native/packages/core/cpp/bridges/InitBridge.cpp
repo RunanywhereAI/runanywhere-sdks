@@ -974,12 +974,19 @@ static rac_result_t platformSecureGetCallback(
     try {
         std::string value = g_platformCallbacks->secureGet(key);
         if (value.empty()) {
-            return RAC_ERROR_SECURE_STORAGE_FAILED;
+            // Contract (rac_platform_adapter.h secure_get): a clean key-miss
+            // MUST return RAC_ERROR_FILE_NOT_FOUND so commons consumers (e.g.
+            // rac_device_get_or_create_persistent_id) can distinguish a benign
+            // miss from a real secure-storage failure. The JS/TS bridge
+            // signals the miss case by resolving with an empty string.
+            return RAC_ERROR_FILE_NOT_FOUND;
         }
 
         *outValue = strdup(value.c_str());
         return *outValue ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     } catch (...) {
+        // Real failure path stays distinct from the not-found code so the
+        // discrimination above remains meaningful.
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 }
