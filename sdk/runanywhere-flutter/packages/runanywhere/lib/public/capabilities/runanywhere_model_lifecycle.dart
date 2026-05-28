@@ -7,12 +7,13 @@ import 'package:runanywhere/generated/model_types.pb.dart'
         CurrentModelRequest,
         CurrentModelResult,
         ModelFileDescriptor,
+        ModelInfo,
         ModelLoadRequest,
         ModelLoadResult,
         ModelUnloadRequest,
         ModelUnloadResult;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show ModelFileRole;
+    show ModelCategory, ModelFileRole;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -59,6 +60,20 @@ class RunAnywhereModelLifecycle {
       return Future.value(CurrentModelResult());
     }
     return DartBridge.modelLifecycle.current(request ?? CurrentModelRequest());
+  }
+
+  /// Full [ModelInfo] for the model currently loaded under [category], or
+  /// `null` when nothing is loaded for it.
+  ///
+  /// Wraps [current] with `includeModelMetadata = true` so callers (e.g. view
+  /// models surfacing the loaded model's display name / framework) get the
+  /// populated proto instead of reconstructing a stand-in.
+  Future<ModelInfo?> modelInfoForCategory(ModelCategory category) async {
+    final result = await current(
+      CurrentModelRequest(category: category, includeModelMetadata: true),
+    );
+    if (!result.found || !result.hasModel()) return null;
+    return result.model;
   }
 
   /// Snapshot the live lifecycle state for a model-backed component.

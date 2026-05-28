@@ -12,6 +12,8 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
@@ -56,6 +58,21 @@ suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModel
     requireLifecycleInitialized(this)
     return CppBridgeModelLifecycle.currentModel(request)
         ?: throw SDKException.model("Native current model proto API unavailable")
+}
+
+/**
+ * Full [ModelInfo] for the model currently loaded under [category], or `null`
+ * when nothing is loaded for it.
+ *
+ * Wraps [currentModel] with `includeModelMetadata = true` so callers (e.g. view
+ * models surfacing the loaded model's display name / framework) get the
+ * populated proto instead of reconstructing a stand-in.
+ */
+suspend fun RunAnywhere.modelInfoForCategory(category: ModelCategory): ModelInfo? {
+    val result = currentModel(
+        CurrentModelRequest(category = category, include_model_metadata = true),
+    )
+    return if (result.found) result.model else null
 }
 
 suspend fun RunAnywhere.componentLifecycleSnapshot(

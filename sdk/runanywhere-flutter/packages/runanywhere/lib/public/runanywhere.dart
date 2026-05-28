@@ -29,6 +29,8 @@ import 'package:runanywhere/generated/model_types.pb.dart'
         ModelLoadResult,
         ModelUnloadRequest,
         ModelUnloadResult;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelCategory;
 import 'package:runanywhere/generated/rag.pb.dart'
     show
         RAGConfiguration,
@@ -737,6 +739,11 @@ abstract final class RunAnywhere {
   static Future<CurrentModelResult> currentModel([
     CurrentModelRequest? request,
   ]) => RunAnywhereModelLifecycle.shared.current(request);
+
+  /// Full [ModelInfo] for the model currently loaded under [category], or
+  /// `null` when nothing is loaded for it.
+  static Future<ModelInfo?> modelInfoForCategory(ModelCategory category) =>
+      RunAnywhereModelLifecycle.shared.modelInfoForCategory(category);
 
   /// Proto-backed component lifecycle snapshot.
   static sdk_events_pb.ComponentLifecycleSnapshot? componentLifecycleSnapshot(

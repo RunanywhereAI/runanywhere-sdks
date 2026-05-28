@@ -1,6 +1,7 @@
 import type {
   CurrentModelRequest,
   CurrentModelResult,
+  ModelCategory,
   ModelInfo,
   ModelLoadRequest,
   ModelLoadResult,
@@ -198,6 +199,17 @@ export const WebModelLifecycle = {
   isLoaded(request: CurrentModelRequest = { includeModelMetadata: false }): boolean {
     const current = WebModelLifecycle.currentModel(request);
     return Boolean(current?.modelId);
+  },
+
+  // Canonical cross-SDK helper (mirrors Swift `modelInfoForCategory`):
+  // returns the full `ModelInfo` for the model currently loaded under
+  // `category`, or null when nothing is loaded. Forces
+  // `includeModelMetadata=true` so callers get the populated proto rather
+  // than reconstructing a stand-in.
+  modelInfoForCategory(category: ModelCategory): ModelInfo | null {
+    const result = WebModelLifecycle.currentModel({ category, includeModelMetadata: true });
+    if (!result?.found) return null;
+    return result.model ?? null;
   },
 
   componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot | null {

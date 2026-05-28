@@ -1007,6 +1007,12 @@ export const RunAnywhere = {
     return ModelLifecycleCapability.currentModel(request);
   },
 
+  modelInfoForCategory(
+    category: Parameters<typeof ModelLifecycleCapability.modelInfoForCategory>[0],
+  ): ReturnType<typeof ModelLifecycleCapability.modelInfoForCategory> {
+    return ModelLifecycleCapability.modelInfoForCategory(category);
+  },
+
   componentLifecycleSnapshot(
     component: Parameters<typeof ModelLifecycleCapability.componentLifecycleSnapshot>[0],
   ): ReturnType<typeof ModelLifecycleCapability.componentLifecycleSnapshot> {
