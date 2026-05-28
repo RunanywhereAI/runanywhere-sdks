@@ -517,13 +517,17 @@ private func platformSecureSetCallback(
     ]
     SecItemDelete(deleteQuery as CFDictionary)
 
-    // Add new item
+    // Add new item — mirror KeychainManager.baseQuery() to ensure
+    // device-bound storage (excluded from iCloud backup by design,
+    // per Apple TN3137).
     // swiftlint:disable:next avoid_any_type prefer_concrete_types
     let addQuery: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: platformKeychainService,
         kSecAttrAccount as String: keyString,
-        kSecValueData as String: data
+        kSecValueData as String: data,
+        kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+        kSecAttrSynchronizable as String: false
     ]
 
     let status = SecItemAdd(addQuery as CFDictionary, nil)
