@@ -29,12 +29,17 @@ namespace runanywhere {
 namespace rag {
 
 struct RAGBackendConfig {
+    // Canonical defaults mirrored from idl/rag.proto `rac_default` annotations
+    // (see also Swift RARAGConfiguration.defaults() and
+    // rac_rag_request_with_defaults_proto). Keep these in sync with the IDL
+    // so callers that pass a partial RAGConfiguration (proto zeros) end up
+    // with the same chunk/retrieval behavior across every platform SDK.
     size_t embedding_dimension = 384;
-    size_t top_k = 10;
-    float similarity_threshold = 0.12f;
+    size_t top_k = 5;
+    float similarity_threshold = 0.7f;
     size_t max_context_tokens = 2048;
-    size_t chunk_size = 180;
-    size_t chunk_overlap = 30;
+    size_t chunk_size = 512;
+    size_t chunk_overlap = 64;
     std::string prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
 };
 
