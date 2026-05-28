@@ -35,6 +35,14 @@ class DartBridgeDownload {
   static NativeCallable<RacDownloadProtoProgressCallbackNative>? _callback;
   static bool _registered = false;
 
+  // commons-081: active downloads tracked by (task_id, model_id) so the
+  // wake-up listener (_onNativeProgress) can drain authoritative state via
+  // rac_download_progress_poll_proto without trusting the racing ring-slot
+  // pointer it was handed. Updated by startProto/resumeProto (insert) and
+  // cancelProto + terminal-state observation (remove).
+  static final Map<String, _ActiveDownload> _activeDownloads =
+      <String, _ActiveDownload>{};
+
   Stream<download_pb.DownloadProgress> get progressStream {
     _ensureProgressCallbackRegistered();
     return _progressController.stream;
@@ -75,22 +83,121 @@ class DartBridgeDownload {
     }
   }
 
+  // commons-081: the commons callback hands us a pointer into a 32-slot
+  // serialization ring that may have rotated by the time this listener
+  // dispatches on the Dart isolate (NativeCallable.listener is async). Under
+  // bursty multi-file downloads the bytes may already represent a different
+  // emission or be partially overwritten — producing 'invalid tag (zero)'
+  // decode errors and silently-dropped progress events. Same shape as the
+  // SDKEvent wake-up race documented in dart_bridge_events.dart:193-209.
+  //
+  // Flutter-only mitigation: treat the pointer args as a wake-up signal and
+  // drain the canonical per-task progress via rac_download_progress_poll_proto
+  // for every download we are currently tracking. The poll API copies progress
+  // out under task->mutex, so the bytes we ultimately emit are race-free
+  // regardless of ring slot rotation. Tracked tasks are populated by
+  // startProto/resumeProto and pruned on cancel + observed terminal states.
+  // A cross-SDK queue ABI (rac_download_progress_poll mirroring
+  // rac_sdk_event_poll) would let us drain without per-task bookkeeping but
+  // requires a commons change outside this cluster's scope.
   static void _onNativeProgress(
     Pointer<Uint8> bytesPtr,
     int bytesLen,
     Pointer<Void> _,
   ) {
-    if (_progressController.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+    if (_progressController.isClosed) {
       return;
     }
-    try {
-      final copy = bytesPtr.asTypedList(bytesLen).toList(growable: false);
-      _progressController.add(
-        download_pb.DownloadProgress.fromBuffer(copy),
-      );
-    } catch (e) {
-      _logger.debug('Failed to decode DownloadProgress: $e');
+    // Pointer args intentionally unused — they reference a ring slot that
+    // may already be stale. Keep params bound for the typedef-compatible
+    // signature.
+    if (bytesPtr == nullptr && bytesLen < 0) {
+      return; // Unreachable; satisfies analyzer.
     }
+    _drainActiveProgress();
+  }
+
+  static void _drainActiveProgress() {
+    final poll = RacNative.bindings.rac_download_progress_poll_proto;
+    if (poll == null) {
+      return;
+    }
+    final snapshot = _activeDownloads.values.toList(growable: false);
+    for (final entry in snapshot) {
+      final progress = _pollProgress(entry, poll);
+      if (progress == null) {
+        continue;
+      }
+      _progressController.add(progress);
+      final state = progress.state;
+      if (state == download_pb.DownloadState.DOWNLOAD_STATE_COMPLETED ||
+          state == download_pb.DownloadState.DOWNLOAD_STATE_FAILED ||
+          state == download_pb.DownloadState.DOWNLOAD_STATE_CANCELLED) {
+        _activeDownloads.remove(entry.key);
+      }
+    }
+  }
+
+  static download_pb.DownloadProgress? _pollProgress(
+    _ActiveDownload entry,
+    RacDownloadProtoDart poll,
+  ) {
+    final request = download_pb.DownloadSubscribeRequest(
+      modelId: entry.modelId,
+      taskId: entry.taskId,
+    );
+    final bytes = request.writeToBuffer();
+    final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      if (bytes.isNotEmpty) {
+        requestPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = poll(requestPtr, bytes.length, out);
+      if (code != RacResultCode.success ||
+          out.ref.status != RacResultCode.success) {
+        if (code == RacResultCode.errorNotFound) {
+          // Task already purged in commons (e.g. cleanup_terminal_tasks ran)
+          // — drop our tracking entry so we stop polling for it.
+          _activeDownloads.remove(entry.key);
+        }
+        return null;
+      }
+      if (out.ref.data == nullptr || out.ref.size == 0) {
+        return null;
+      }
+      final resultBytes =
+          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      return download_pb.DownloadProgress.fromBuffer(resultBytes);
+    } catch (e) {
+      _logger.debug('rac_download_progress_poll_proto drain error: $e');
+      return null;
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
+    }
+  }
+
+  static String _activeKey(String taskId, String modelId) =>
+      '$taskId $modelId';
+
+  static void _trackActive(String taskId, String modelId) {
+    if (taskId.isEmpty && modelId.isEmpty) {
+      return;
+    }
+    final key = _activeKey(taskId, modelId);
+    _activeDownloads[key] = _ActiveDownload(key, taskId, modelId);
+  }
+
+  static void _untrackActive(String taskId, String modelId) {
+    if (taskId.isEmpty && modelId.isEmpty) {
+      return;
+    }
+    _activeDownloads.remove(_activeKey(taskId, modelId));
   }
 
   Future<download_pb.DownloadPlanResult> planProto(
@@ -112,12 +219,18 @@ class DartBridgeDownload {
   Future<download_pb.DownloadStartResult> startProto(
     download_pb.DownloadStartRequest request,
   ) async {
+    // commons-081: subscribe before commons starts emitting so the wake-up
+    // listener never misses the first burst of a freshly-started download.
+    _ensureProgressCallbackRegistered();
     final result = await _callDownloadProto(
       request,
       RacNative.bindings.rac_download_start_proto,
       download_pb.DownloadStartResult.fromBuffer,
       'rac_download_start_proto',
     );
+    if (result != null && result.accepted) {
+      _trackActive(result.taskId, result.modelId);
+    }
     return result ??
         download_pb.DownloadStartResult(
           accepted: false,
@@ -135,6 +248,10 @@ class DartBridgeDownload {
       download_pb.DownloadCancelResult.fromBuffer,
       'rac_download_cancel_proto',
     );
+    // commons-081: stop polling the cancelled task even if commons still has
+    // residual progress events queued — capability layer relies on the
+    // terminal-state emission, which the per-task poll also serves.
+    _untrackActive(request.taskId, request.modelId);
     return result ??
         download_pb.DownloadCancelResult(
           success: false,
@@ -147,12 +264,16 @@ class DartBridgeDownload {
   Future<download_pb.DownloadResumeResult> resumeProto(
     download_pb.DownloadResumeRequest request,
   ) async {
+    _ensureProgressCallbackRegistered();
     final result = await _callDownloadProto(
       request,
       RacNative.bindings.rac_download_resume_proto,
       download_pb.DownloadResumeResult.fromBuffer,
       'rac_download_resume_proto',
     );
+    if (result != null && result.accepted) {
+      _trackActive(result.taskId, result.modelId);
+    }
     return result ??
         download_pb.DownloadResumeResult(
           accepted: false,
@@ -219,4 +340,11 @@ class DartBridgeDownload {
       calloc.free(out);
     }
   }
+}
+
+class _ActiveDownload {
+  const _ActiveDownload(this.key, this.taskId, this.modelId);
+  final String key;
+  final String taskId;
+  final String modelId;
 }
