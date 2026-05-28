@@ -245,6 +245,35 @@ RAC_API rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* mo
  */
 RAC_API void rac_model_path_resolution_free(rac_model_path_resolution_t* resolution);
 
+/**
+ * @brief Infer the canonical descriptor role for a single sidecar filename.
+ *
+ * Source-of-truth port of Swift's
+ * `RAModelFileRole+Inference.swift::inferModelFileRole(filename:modality:)`.
+ * Every platform SDK delegates here so the mmproj / tokenizer / vocab / merges
+ * / config classification used when composing multi-file model descriptors
+ * stays byte-identical across SDKs (no per-SDK hand-rolled heuristic to drift).
+ *
+ * The vision-projector (`mmproj`) branch only matches when @p modality_proto
+ * is the multimodal category; every other modality skips it.
+ *
+ * @param filename Sidecar filename. Matching is case-insensitive and any
+ *        directory components are ignored.
+ * @param modality_proto The model's category as a `runanywhere.v1.ModelCategory`
+ *        proto value (i.e. the generated `ModelCategory` raw value each SDK
+ *        already holds). Unrecognized values are treated as a non-multimodal
+ *        category.
+ * @param out_role_proto Output: the matching role as a
+ *        `runanywhere.v1.ModelFileRole` proto value (identical to the
+ *        `rac_model_file_role_t` ordinal). Set to
+ *        `MODEL_FILE_ROLE_PRIMARY_MODEL` when the filename matches none of the
+ *        documented sidecar conventions.
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER if @p filename or
+ *         @p out_role_proto is NULL.
+ */
+RAC_API rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_proto,
+                                               int32_t* out_role_proto);
+
 // =============================================================================
 // OTHER DIRECTORIES - Mirrors ModelPathUtils other directory methods
 // =============================================================================

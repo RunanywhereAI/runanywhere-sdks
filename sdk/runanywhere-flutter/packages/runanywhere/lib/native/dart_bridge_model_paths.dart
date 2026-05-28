@@ -352,6 +352,37 @@ class DartBridgeModelPaths {
     }
   }
 
+  // MARK: - File Role Inference
+
+  /// Infer the descriptor role for a sidecar filename. Delegates to the shared
+  /// commons classifier `rac_infer_model_file_role` so the heuristic stays
+  /// byte-identical with the C++ resolver and every other SDK.
+  /// [modalityProto] / the return value are proto `ModelCategory` /
+  /// `ModelFileRole` int values. Returns the primary-model role (1) on any
+  /// FFI failure.
+  int inferFileRole(String filename, int modalityProto) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final inferFn = lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Int32, Pointer<Int32>),
+          int Function(Pointer<Utf8>, int,
+              Pointer<Int32>)>('rac_infer_model_file_role');
+
+      final filenamePtr = filename.toNativeUtf8();
+      final rolePtr = calloc<Int32>()..value = 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+      try {
+        inferFn(filenamePtr, modalityProto, rolePtr);
+        return rolePtr.value;
+      } finally {
+        calloc.free(filenamePtr);
+        calloc.free(rolePtr);
+      }
+    } catch (e) {
+      _logger.debug('rac_infer_model_file_role error: $e');
+      return 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+    }
+  }
+
   T? _withCModelInfo<T>(
     ModelInfo model,
     T? Function(Pointer<RacModelInfoCStruct>) body,

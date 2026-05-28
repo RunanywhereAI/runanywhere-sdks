@@ -238,6 +238,30 @@ RAC_API rac_result_t rac_model_paths_extract_framework(const char* path,
 RAC_API rac_bool_t rac_model_paths_is_model_path(const char* path);
 
 // =============================================================================
+// MODEL FILE ROLE INFERENCE
+// =============================================================================
+
+/**
+ * @brief Infer the canonical descriptor role for a single sidecar filename.
+ *
+ * Source-of-truth port of Swift's
+ * `RAModelFileRole+Inference.swift::inferModelFileRole(filename:modality:)`.
+ * Every platform SDK delegates here so the mmproj / tokenizer / vocab / merges
+ * / config classification stays byte-identical across SDKs.
+ *
+ * @param filename Sidecar filename (case-insensitive; directory components
+ *        ignored).
+ * @param modality_proto Model category as a `runanywhere.v1.ModelCategory`
+ *        proto value. The mmproj branch only matches the multimodal category.
+ * @param out_role_proto Output: matching role as a
+ *        `runanywhere.v1.ModelFileRole` proto value;
+ *        `MODEL_FILE_ROLE_PRIMARY_MODEL` when nothing matches.
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER for NULL arguments.
+ */
+RAC_API rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_proto,
+                                               int32_t* out_role_proto);
+
+// =============================================================================
 // PATH UTILITIES
 // =============================================================================
 

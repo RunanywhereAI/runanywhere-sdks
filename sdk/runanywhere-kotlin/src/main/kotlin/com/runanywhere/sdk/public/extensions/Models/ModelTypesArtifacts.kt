@@ -32,6 +32,8 @@ import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -83,6 +85,26 @@ fun ModelFileDescriptor.Companion.create(
         relative_path = url.substringAfterLast('/').takeIf { it.isNotEmpty() } ?: filename,
         destination_path = filename,
     )
+
+/**
+ * Infer the canonical [ModelFileRole] for a single sidecar filename in a
+ * multi-file model. Mirrors Swift's
+ * `RunAnywhere.inferModelFileRole(filename:modality:)` and delegates to the
+ * shared commons classifier `rac_infer_model_file_role`, so the SDK and the
+ * C++ model-paths resolver always agree on which file is the primary model,
+ * the vision projector (`mmproj`), tokenizer, vocabulary, etc.
+ *
+ * @param filename The sidecar's filename (case-insensitive; directory
+ *   components are ignored).
+ * @param modality The model's [ModelCategory]; only
+ *   [ModelCategory.MODEL_CATEGORY_MULTIMODAL] enables the `mmproj` match path.
+ * @return The matching [ModelFileRole], or
+ *   [ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL] when nothing matches.
+ */
+fun RunAnywhere.inferModelFileRole(filename: String, modality: ModelCategory): ModelFileRole {
+    val roleValue = RunAnywhereBridge.racInferModelFileRole(filename, modality.value)
+    return ModelFileRole.fromValue(roleValue) ?: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+}
 
 /** Returns the descriptor's URL field, or null if it is empty. */
 val ModelFileDescriptor.urlValue: String?

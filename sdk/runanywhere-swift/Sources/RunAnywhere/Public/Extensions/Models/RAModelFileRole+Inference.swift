@@ -31,34 +31,6 @@ public extension RunAnywhere {
         filename: String,
         modality: ModelCategory
     ) -> RAModelFileRole {
-        let lower = (filename as NSString).lastPathComponent.lowercased()
-
-        if modality == .multimodal,
-           lower.hasSuffix(".gguf"),
-           lower.contains("mmproj")
-             || lower.contains("mm-proj")
-             || lower.contains("vision-projector")
-             || lower.contains("vision_projector")
-             || lower.contains("multimodal_projector")
-             || lower.contains("multi-modal-projector") {
-            return .visionProjector
-        }
-
-        switch lower {
-        case "tokenizer.json", "tokenizer.model", "tokenizer_config.json",
-             "special_tokens_map.json", "added_tokens.json", "tokens.txt",
-             "sentencepiece.bpe.model", "spm.model":
-            return .tokenizer
-        case "vocab.txt", "vocab.json":
-            return .vocabulary
-        case "merges.txt":
-            return .merges
-        case "config.json", "generation_config.json", "preprocessor_config.json",
-             "processor_config.json", "image_processor_config.json",
-             "model_config.json":
-            return .config
-        default:
-            return .primaryModel
-        }
+        CppBridge.ModelPaths.inferFileRole(filename: filename, modality: modality)
     }
 }

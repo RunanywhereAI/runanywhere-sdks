@@ -259,6 +259,21 @@ int rac_wasm_sizeof_embeddings_result(void) {
 EMSCRIPTEN_KEEPALIVE
 int rac_wasm_ping(void) { return 42; }
 
+/**
+ * Infer the descriptor role for a single sidecar filename
+ * (model-file-role-classifier family). Thin wrapper over the commons
+ * classifier rac_infer_model_file_role so the Web SDK shares the same
+ * heuristic as every other SDK. `modality_proto` is a proto ModelCategory
+ * value; the return value is a proto ModelFileRole value
+ * (MODEL_FILE_ROLE_PRIMARY_MODEL == 1 on any failure).
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_infer_model_file_role(const char *filename, int modality_proto) {
+  int role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+  rac_infer_model_file_role(filename, modality_proto, &role);
+  return role;
+}
+
 // =============================================================================
 // FIELD OFFSET HELPERS
 //

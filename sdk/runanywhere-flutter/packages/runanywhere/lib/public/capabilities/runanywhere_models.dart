@@ -198,6 +198,26 @@ class RunAnywhereModels {
     return model;
   }
 
+  /// Infer the canonical [ModelFileRole] for a single sidecar filename in a
+  /// multi-file model. Mirrors Swift's
+  /// `RunAnywhere.inferModelFileRole(filename:modality:)` and delegates to the
+  /// shared commons classifier `rac_infer_model_file_role`, so the SDK and the
+  /// C++ model-paths resolver always agree on which file is the primary model,
+  /// the vision projector (`mmproj`), tokenizer, vocabulary, etc.
+  ///
+  /// Only [ModelCategory.MODEL_CATEGORY_MULTIMODAL] enables the `mmproj` match
+  /// path. Returns [ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL] when the
+  /// filename matches none of the documented sidecar conventions.
+  ModelFileRole inferModelFileRole({
+    required String filename,
+    required ModelCategory modality,
+  }) {
+    final roleValue =
+        DartBridge.modelPaths.inferFileRole(filename, modality.value);
+    return ModelFileRole.valueOf(roleValue) ??
+        ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
+  }
+
   /// Update the download status / local path for a model in the C++
   /// registry. Called after a successful generated-proto download completes.
   /// download.

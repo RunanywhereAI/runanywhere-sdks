@@ -6060,6 +6060,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsIsModelPat
     return rac_model_paths_is_model_path(p.c_str()) == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
 }
 
+// Single-file role classifier (model-file-role-classifier family). Delegates to
+// rac_infer_model_file_role so Kotlin shares the commons heuristic. Takes/returns
+// proto ModelCategory / ModelFileRole int values.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferModelFileRole(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jstring filename,
+                                                                               jint modalityProto) {
+    (void)clazz;
+    std::string name = getCString(env, filename);
+    int32_t role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+    rac_infer_model_file_role(name.c_str(), static_cast<int32_t>(modalityProto), &role);
+    return static_cast<jint>(role);
+}
+
 // ---------- Group G: File manager (Swift-aligned aliases) ----------------------
 //
 // These call the rac_file_manager_* C ABI using Swift-aligned naming and a

@@ -1568,6 +1568,13 @@ object RunAnywhereBridge {
     /** Check if the given path is a canonical model path. */
     @JvmStatic external fun racModelPathsIsModelPath(path: String): Boolean
 
+    /**
+     * Infer the descriptor role for a sidecar filename. Delegates to the shared
+     * commons classifier `rac_infer_model_file_role`. [modalityProto] is a
+     * `ModelCategory.value`; returns a `ModelFileRole.value`.
+     */
+    @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
+
     // ========================================================================
     // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE (Group G)
     // ========================================================================

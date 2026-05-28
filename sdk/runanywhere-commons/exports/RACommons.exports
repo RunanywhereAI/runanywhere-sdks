@@ -701,6 +701,10 @@ _rac_model_registry_update_last_used
 
 # Model paths helpers — {base_dir}/RunAnywhere/Models/{framework}/{modelId}/
 # resolution (called from CppBridge+ModelPaths.swift / DartBridgeModelPaths).
+# rac_infer_model_file_role is the shared single-file role classifier each SDK
+# delegates to (model-file-role-classifier family); proto ModelCategory in,
+# proto ModelFileRole out.
+_rac_infer_model_file_role
 _rac_model_paths_extract_framework
 _rac_model_paths_extract_model_id
 _rac_model_paths_get_base_dir
