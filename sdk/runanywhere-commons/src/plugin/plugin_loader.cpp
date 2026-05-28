@@ -74,6 +74,42 @@ namespace {
 
 constexpr const char* LOG_CAT = "PluginLoader";
 
+#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
+/* RAII guard for a dlopen handle. Auto-closes on scope exit unless `release()`
+ * is called on the final success branch. Replaces the prior manual
+ * `rac_dl_close(handle)` on every error path: a future maintainer who adds a
+ * new validation step between the dlopen and the final
+ * `rac_plugin_registry_set_dl_handle` no longer needs to remember to balance
+ * the open — the destructor handles it. Linux `dlopen` refcounts the mapping,
+ * so any leaked handle would persist for the whole process lifetime. */
+struct DlGuard {
+    rac_lib_handle_t h{nullptr};
+    DlGuard() = default;
+    explicit DlGuard(rac_lib_handle_t handle) : h(handle) {}
+    ~DlGuard() {
+        if (h != nullptr)
+            rac_dl_close(h);
+    }
+    DlGuard(const DlGuard&) = delete;
+    DlGuard& operator=(const DlGuard&) = delete;
+    DlGuard(DlGuard&& other) noexcept : h(other.h) { other.h = nullptr; }
+    DlGuard& operator=(DlGuard&& other) noexcept {
+        if (this != &other) {
+            if (h != nullptr)
+                rac_dl_close(h);
+            h = other.h;
+            other.h = nullptr;
+        }
+        return *this;
+    }
+    rac_lib_handle_t release() noexcept {
+        auto r = h;
+        h = nullptr;
+        return r;
+    }
+};
+#endif
+
 /**
  * Derive the plugin entry-symbol name from a library path.
  *
@@ -135,19 +171,18 @@ rac_result_t rac_registry_load_plugin(const char* path) {
     if (path == nullptr)
         return RAC_ERROR_NULL_POINTER;
 
-    rac_lib_handle_t handle = rac_dl_open(path);
-    if (handle == nullptr) {
+    DlGuard guard{rac_dl_open(path)};
+    if (guard.h == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlopen failed (%s)", path,
                       rac_dl_error());
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
     const std::string sym = entry_symbol_from_path(path);
-    void* entry_sym = rac_dl_sym(handle, sym.c_str());
+    void* entry_sym = rac_dl_sym(guard.h, sym.c_str());
     if (entry_sym == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): dlsym('%s') failed (%s)", path,
                       sym.c_str(), rac_dl_error());
-        rac_dl_close(handle);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
@@ -157,7 +192,6 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         RAC_LOG_ERROR(LOG_CAT,
                       "rac_registry_load_plugin('%s'): entry '%s' returned NULL or unnamed vtable",
                       path, sym.c_str());
-        rac_dl_close(handle);
         return RAC_ERROR_PLUGIN_LOAD_FAILED;
     }
 
@@ -169,7 +203,6 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         RAC_LOG_ERROR(LOG_CAT, "rac_registry_load_plugin('%s'): rac_plugin_register('%s') -> %d",
                       path, vt->metadata.name, static_cast<int>(rc));
         (void)rac_engine_manifest_detach_vtable(vt);
-        rac_dl_close(handle);
         return rc;
     }
 
@@ -182,7 +215,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
      * different path, and on POSIX the extra refcount from a same-path
      * re-dlopen is never balanced. Taking before setting also avoids a race
      * window where a concurrent unload could see the new handle before we
-     * drop the old one. Note `prior` may equal `handle` on POSIX when the
+     * drop the old one. Note `prior` may equal `guard.h` on POSIX when the
      * same path is reopened (dlopen returns the same handle and bumps the
      * refcount); the matching dlclose still has to happen so the OS refcount
      * returns to 1 after the redundant load. */
@@ -190,8 +223,10 @@ rac_result_t rac_registry_load_plugin(const char* path) {
         rac_dl_close(static_cast<rac_lib_handle_t>(prior));
     }
 
-    /* Track the handle so unload can dlclose it exactly once. */
-    rac_plugin_registry_set_dl_handle(vt->metadata.name, handle);
+    /* Track the handle so unload can dlclose it exactly once. Ownership of the
+     * dlopen mapping transfers from `guard` to the registry here — `release()`
+     * suppresses the destructor's close so we don't double-free. */
+    rac_plugin_registry_set_dl_handle(vt->metadata.name, guard.release());
     RAC_LOG_DEBUG(LOG_CAT, "rac_registry_load_plugin('%s'): registered '%s' from '%s'", path,
                   vt->metadata.name, sym.c_str());
     return RAC_SUCCESS;
