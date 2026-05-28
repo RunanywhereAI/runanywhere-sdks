@@ -35,6 +35,7 @@
 
 #include <jni.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -284,6 +285,33 @@ rac_result_t copy_jstring_headers(JNIEnv* env, jobjectArray arr, rac_http_header
     return RAC_SUCCESS;
 }
 
+// kotlin-025: map transport failures by inspecting the Kotlin-side error
+// message prefix. OkHttpHttpTransport formats errorMessage as
+// `${e.javaClass.simpleName}: ${e.message}`, so the leading token is the
+// JVM exception class. SocketTimeoutException and InterruptedIOException
+// signal a timeout (timeout_ms ceiling, connect timeout, read timeout);
+// every other Throwable collapses to a generic network error. Mirrors
+// Swift URLSessionHttpTransport.mapTransportError NSURLErrorTimedOut →
+// RAC_ERROR_TIMEOUT case so cross-SDK retry policies see the same signal.
+rac_result_t map_kotlin_transport_error(const std::string& msg) {
+    if (msg.rfind("SocketTimeoutException", 0) == 0 ||
+        msg.rfind("InterruptedIOException", 0) == 0) {
+        return RAC_ERROR_TIMEOUT;
+    }
+    return RAC_ERROR_NETWORK_ERROR;
+}
+
+// kotlin-026: wall-clock for `rac_http_response_t.elapsed_ms`. OkHttp's
+// per-call timing isn't exposed across JNI without DTO changes, so we
+// time the dispatch boundary (JNI call → response received) which is the
+// same envelope Swift's URLSessionHttpTransport.elapsedMilliseconds(since:)
+// measures.
+inline uint64_t elapsed_ms_since(std::chrono::steady_clock::time_point start) {
+    auto now = std::chrono::steady_clock::now();
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+}
+
 // =============================================================================
 // Vtable callbacks
 // =============================================================================
@@ -333,6 +361,9 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     }
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+
+    // kotlin-026: dispatch-boundary timing for `out_resp->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
 
     // Call into Kotlin. OkHttpTransport.executeRequest returns a non-null
     // HttpResponse on any transport outcome (including errors) — a null
@@ -389,13 +420,14 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
             env->DeleteLocalRef(j_body_bytes);
         if (j_error_msg)
             env->DeleteLocalRef(j_error_msg);
-        return RAC_ERROR_NETWORK_ERROR;
+        return map_kotlin_transport_error(msg);
     }
 
     // Populate out_resp. All allocations must be freed by the caller via
     // rac_http_response_free(out_resp) — same contract as libcurl default.
     std::memset(out_resp, 0, sizeof(*out_resp));
     out_resp->status = static_cast<int32_t>(status_code);
+    out_resp->elapsed_ms = elapsed_ms_since(t_start);
 
     rac_result_t rc =
         copy_jbytes_to_malloc(env, j_body_bytes, &out_resp->body_bytes, &out_resp->body_len);
@@ -491,6 +523,9 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
 
+    // kotlin-026: dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
+
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_streaming_request_mid,
                                                  j_method, j_url, j_headers, j_body, j_timeout_ms,
                                                  j_native_cb, j_native_ud);
@@ -553,13 +588,14 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
             env->DeleteLocalRef(j_headers_out);
         if (j_error_msg)
             env->DeleteLocalRef(j_error_msg);
-        return RAC_ERROR_NETWORK_ERROR;
+        return map_kotlin_transport_error(msg);
     }
 
     // Populate metadata. body_bytes stays NULL — the body was already
     // delivered chunk-by-chunk through the native callback.
     std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
     out_resp_meta->status = static_cast<int32_t>(status_code);
+    out_resp_meta->elapsed_ms = elapsed_ms_since(t_start);
 
     rac_result_t rc = copy_jstring_headers(env, j_headers_out, &out_resp_meta->headers,
                                            &out_resp_meta->header_count);
@@ -627,6 +663,9 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
 
+    // kotlin-026: dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
+
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
                                                  j_method, j_url, j_headers, j_body, j_timeout_ms,
                                                  j_resume_from, j_native_cb, j_native_ud);
@@ -686,11 +725,12 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
             env->DeleteLocalRef(j_headers_out);
         if (j_error_msg)
             env->DeleteLocalRef(j_error_msg);
-        return RAC_ERROR_NETWORK_ERROR;
+        return map_kotlin_transport_error(msg);
     }
 
     std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
     out_resp_meta->status = static_cast<int32_t>(status_code);
+    out_resp_meta->elapsed_ms = elapsed_ms_since(t_start);
 
     rac_result_t rc = copy_jstring_headers(env, j_headers_out, &out_resp_meta->headers,
                                            &out_resp_meta->header_count);
