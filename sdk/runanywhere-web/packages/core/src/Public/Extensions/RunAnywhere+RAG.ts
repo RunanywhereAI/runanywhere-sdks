@@ -17,6 +17,7 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
+import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -321,22 +322,15 @@ function validateNativeRAGConfiguration(config: RAGConfiguration, feature: strin
 export function createDefaultRAGConfiguration(
   overrides: Partial<RAGConfiguration> = {},
 ): RAGConfiguration {
+  // Seed with the proto-generated canonical defaults so Web matches Swift /
+  // Kotlin / Flutter / RN parity (embeddingDimension=384, topK=5,
+  // similarityThreshold=0.7, chunkSize=512, chunkOverlap=64). Caller-supplied
+  // overrides (including explicit 0 for chunkOverlap / similarityThreshold)
+  // are honored end-to-end because RAGConfiguration numeric fields are proto3
+  // `optional` — commons distinguishes "unset" from "explicit zero" via
+  // `has_*()` in rac_rag_request_with_defaults_proto.
   return {
-    embeddingModelId: '',
-    llmModelId: '',
-    embeddingDimension: 0,
-    topK: 3,
-    similarityThreshold: 0,
-    chunkSize: 256,
-    chunkOverlap: 0,
-    maxContextTokens: 0,
-    promptTemplate: undefined,
-    embeddingConfigJson: undefined,
-    llmConfigJson: undefined,
-    indexPath: undefined,
-    persistIndex: false,
-    rerankResults: false,
-    rerankerModelId: undefined,
+    ...rAGConfigurationDefaults(),
     ...overrides,
   };
 }
@@ -346,6 +340,10 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
+  // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
+  // "use the RAGConfiguration default" so falling back to 0 when neither the
+  // per-query override nor the pipeline config supplies a value is the
+  // correct way to defer to commons.
   return {
     question,
     systemPrompt: options.systemPrompt,
@@ -353,8 +351,8 @@ function makeRAGQuery(
     temperature: options.temperature ?? 0.4,
     topP: options.topP ?? 1,
     topK: options.topK ?? 0,
-    retrievalTopK: options.retrievalTopK ?? config.topK,
-    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold,
+    retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
+    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
   };
 }
