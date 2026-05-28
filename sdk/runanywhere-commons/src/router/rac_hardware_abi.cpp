@@ -255,7 +255,7 @@ static std::vector<uint8_t> build_accelerator_info_bytes(const std::string& name
 
 static std::vector<uint8_t> build_hardware_profile_result_bytes(bool include_profile) {
     using namespace rac::router;
-    const HardwareProfile& hp = HardwareProfile::cached();
+    const HardwareProfile hp = HardwareProfile::cached();
 
     std::vector<uint8_t> result_buf;
 

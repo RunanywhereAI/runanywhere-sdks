@@ -219,11 +219,13 @@ std::mutex g_cache_mu;
 std::optional<HardwareProfile> g_cached;
 }  // namespace
 
-const HardwareProfile& HardwareProfile::cached() {
+HardwareProfile HardwareProfile::cached() {
     std::lock_guard<std::mutex> lock(g_cache_mu);
     if (!g_cached.has_value()) {
         g_cached = HardwareProfile::detect();
     }
+    /* Return by value: copy under the lock so the caller's view is stable
+     * even if another thread calls refresh() between the caller's reads. */
     return *g_cached;
 }
 

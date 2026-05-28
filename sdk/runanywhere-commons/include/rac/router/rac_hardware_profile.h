@@ -75,9 +75,11 @@ struct HardwareProfile {
 
     /**
      * Memoized accessor. The first call performs `detect()`; subsequent
-     * callers receive the same const-ref. Thread-safe.
+     * callers receive a copy of the memoized profile. Thread-safe — the
+     * copy is made under the cache mutex so a concurrent `refresh()` can
+     * never tear an in-flight read.
      */
-    static const HardwareProfile& cached();
+    static HardwareProfile cached();
 
     /**
      * Drop the memoized cache so the next `cached()` call re-runs `detect()`.

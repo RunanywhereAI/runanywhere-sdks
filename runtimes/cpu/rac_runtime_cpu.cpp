@@ -134,7 +134,7 @@ void cpu_destroy(void) {
 const char* cpu_device_id_from_profile() {
     using rac::router::CpuVendor;
     using rac::router::HardwareProfile;
-    const HardwareProfile& hp = HardwareProfile::cached();
+    const HardwareProfile hp = HardwareProfile::cached();
     switch (hp.cpu_vendor) {
         case CpuVendor::Apple:
             return "cpu-apple";
@@ -157,7 +157,7 @@ const char* cpu_device_id_from_profile() {
 rac_result_t cpu_device_info(rac_runtime_device_info_t* out) {
     if (out == nullptr)
         return RAC_ERROR_NULL_POINTER;
-    const rac::router::HardwareProfile& hp = rac::router::HardwareProfile::cached();
+    const rac::router::HardwareProfile hp = rac::router::HardwareProfile::cached();
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_CPU;
     out->device_id = cpu_device_id_from_profile();
