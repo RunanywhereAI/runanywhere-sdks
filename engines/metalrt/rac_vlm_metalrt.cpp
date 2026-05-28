@@ -52,6 +52,67 @@ struct rac_vlm_metalrt_impl {
 
 namespace {
 
+// pass3-syn-128 / engines-011: build the engine's vision-options struct from
+// the caller's rac_vlm_options_t. Mirrors llamacpp_vlm sampler handling for the
+// fields the MetalRT engine ABI exposes today (max_tokens, temperature, top_k)
+// and emits a single WARNING when callers set sampler fields metalrt cannot
+// forward (top_p, seed, repetition_penalty, min_p, emit_image_embeddings).
+// Without the warning, an app pinning metalrt would see callers' seeds /
+// penalties silently discarded — the exact regression engines-011 calls out.
+//
+// When the MetalRT engine ABI grows top_p/seed/etc., the stub layout in
+// engines/metalrt/stubs/metalrt_c_api.h must be extended in lockstep and the
+// extra fields populated here.
+void populate_vision_options(MetalRTVisionOptions& vopts, const rac_vlm_options_t* options,
+                             const char* call_site) {
+    vopts.max_tokens = options ? options->max_tokens : 256;
+    // Align default with llamacpp VLM (0.7) so unset temperature doesn't silently
+    // force greedy decoding on metalrt while llamacpp samples — same proto call,
+    // same default behavior.
+    vopts.temperature = options ? options->temperature : 0.7f;
+    // 40 mirrors llama.cpp's historical built-in default; only used when the
+    // caller leaves top_k at the zero sentinel (RAC_VLM_OPTIONS_DEFAULT).
+    vopts.top_k = (options && options->top_k > 0) ? options->top_k : 40;
+    vopts.think = false;
+
+    if (!options)
+        return;
+
+    // Surface the silent-discard so an SDK-pinned-to-metalrt user can see why
+    // their seed/penalty/embedding request didn't take effect. One log per call
+    // is enough; do not spam per token.
+    if (options->top_p > 0.0f && options->top_p < 1.0f) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "%s: caller-supplied top_p=%.3f is dropped; "
+                        "MetalRT VLM ABI does not expose top_p yet",
+                        call_site, options->top_p);
+    }
+    if (options->seed != 0) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "%s: caller-supplied seed=%lld is dropped; "
+                        "MetalRT VLM ABI does not expose seed yet",
+                        call_site, static_cast<long long>(options->seed));
+    }
+    if (options->repetition_penalty > 0.0f && options->repetition_penalty != 1.0f) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "%s: caller-supplied repetition_penalty=%.3f is dropped; "
+                        "MetalRT VLM ABI does not expose repetition_penalty yet",
+                        call_site, options->repetition_penalty);
+    }
+    if (options->min_p > 0.0f) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "%s: caller-supplied min_p=%.3f is dropped; "
+                        "MetalRT VLM ABI does not expose min_p yet",
+                        call_site, options->min_p);
+    }
+    if (options->emit_image_embeddings == RAC_TRUE) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "%s: caller requested emit_image_embeddings=true; "
+                        "MetalRT VLM does not surface image-embedding events",
+                        call_site);
+    }
+}
+
 class MetalRTVLMPin {
    public:
     explicit MetalRTVLMPin(rac_vlm_metalrt_impl* impl) : impl_(impl) {
@@ -159,10 +220,7 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
-    vopts.max_tokens = options ? options->max_tokens : 256;
-    vopts.temperature = options ? options->temperature : 0.0f;
-    vopts.top_k = 40;
-    vopts.think = false;
+    populate_vision_options(vopts, options, "rac_vlm_metalrt_process");
 
     struct MetalRTVisionResult result = {};
 
@@ -235,10 +293,7 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
         return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
-    vopts.max_tokens = options ? options->max_tokens : 256;
-    vopts.temperature = options ? options->temperature : 0.0f;
-    vopts.top_k = 40;
-    vopts.think = false;
+    populate_vision_options(vopts, options, "rac_vlm_metalrt_process_stream");
 
     VLMStreamCtx ctx = {callback, user_data, false};
     struct MetalRTVisionResult result = {};
