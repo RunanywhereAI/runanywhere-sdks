@@ -820,10 +820,6 @@ void SherpaSTT::destroy_stream(const std::string& stream_id) {
 #endif
 }
 
-void SherpaSTT::cancel() {
-    cancel_requested_ = true;
-}
-
 std::vector<std::string> SherpaSTT::get_supported_languages() const {
     return {"en", "zh", "de",  "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl",
             "ar", "sv", "it",  "id", "hi", "fi", "vi", "he", "uk", "el", "ms", "cs", "ro",

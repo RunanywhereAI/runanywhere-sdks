@@ -209,7 +209,6 @@ class SherpaSTT {
     void reset_stream(const std::string& stream_id);
     void destroy_stream(const std::string& stream_id);
 
-    void cancel();
     std::vector<std::string> get_supported_languages() const;
 
    private:
@@ -244,7 +243,6 @@ class SherpaSTT {
 #endif
     STTModelType model_type_ = STTModelType::WHISPER;
     std::atomic<bool> model_loaded_{false};
-    std::atomic<bool> cancel_requested_{false};
     int stream_counter_ = 0;
     std::string model_dir_;
     std::string language_;
