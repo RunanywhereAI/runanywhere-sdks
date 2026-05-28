@@ -1160,6 +1160,11 @@ if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie)
     add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
 endif()
 
+# Note: sherpa plugin-entry test is wired in the root CMakeLists.txt (alongside
+# the genie test) because rac_backend_sherpa is built by engines/ which is
+# configured after sdk/runanywhere-commons/, so the target does not exist yet
+# when this file runs in a root-level build.
+
 if(APPLE AND RAC_BACKEND_DIFFUSION_COREML AND TARGET rac_backend_diffusion_coreml)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
     target_include_directories(test_diffusion_coreml_generate PRIVATE

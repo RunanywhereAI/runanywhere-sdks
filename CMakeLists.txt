@@ -288,6 +288,34 @@ if(RAC_BUILD_TESTS)
         add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
     endif()
 
+    # commons-010: sherpa plugin-entry smoke test. Mirrors the genie wiring
+    # block above for the same reason — rac_backend_sherpa is built by engines/
+    # which is configured after sdk/runanywhere-commons/, so the target does
+    # not exist when commons/tests/CMakeLists.txt runs.
+    if(RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa AND NOT TARGET test_plugin_entry_sherpa)
+        add_executable(test_plugin_entry_sherpa
+            sdk/runanywhere-commons/tests/test_plugin_entry_sherpa.cpp)
+        target_include_directories(test_plugin_entry_sherpa PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_sherpa PRIVATE
+            rac_commons
+            rac_backend_sherpa
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_sherpa PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
+    endif()
+
     if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
        AND TARGET rac_backend_diffusion_coreml
        AND NOT TARGET test_diffusion_coreml_generate)
