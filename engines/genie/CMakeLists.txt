@@ -107,6 +107,15 @@ rac_add_engine_plugin(genie
     FORMATS             ${GENIE_PLUGIN_FORMATS}
 )
 
+if(RAC_STATIC_PLUGINS)
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_genie.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${RAC_COMMONS_ROOT_DIR}/include
+    )
+endif()
+
 if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_genie PRIVATE log)
     target_compile_options(rac_backend_genie PRIVATE -O3 -ffunction-sections -fdata-sections)
