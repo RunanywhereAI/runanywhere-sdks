@@ -209,6 +209,31 @@ jobjectArray build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers
     return arr;
 }
 
+// commons-153: guard the empty-headers fallback. FindClass can fail under
+// JVM shutdown / classloader pressure, so never hand a null class to
+// NewObjectArray (which throws NPE and would ship a malformed request).
+rac_result_t ensure_headers_array(JNIEnv* env, jobjectArray* headers) {
+    if (*headers != nullptr)
+        return RAC_SUCCESS;
+
+    jclass strCls = env->FindClass("java/lang/String");
+    if (strCls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        return RAC_ERROR_INTERNAL;
+    }
+
+    *headers = env->NewObjectArray(0, strCls, nullptr);
+    env->DeleteLocalRef(strCls);
+    if (*headers == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    return RAC_SUCCESS;
+}
+
 // Helper: copy a jbyteArray into a freshly-malloced buffer. `*out_ptr`
 // is NULL when the array is empty; `*out_len` is always set.
 // Returns RAC_SUCCESS on success, RAC_ERROR_OUT_OF_MEMORY otherwise.
@@ -344,11 +369,13 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     jstring j_method = env->NewStringUTF(req->method);
     jstring j_url = env->NewStringUTF(req->url);
     jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    if (j_headers == nullptr) {
-        jclass strCls = env->FindClass("java/lang/String");
-        j_headers = env->NewObjectArray(0, strCls, nullptr);
-        if (strCls != nullptr)
-            env->DeleteLocalRef(strCls);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
     }
 
     jbyteArray j_body = nullptr;
@@ -500,11 +527,13 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     jstring j_method = env->NewStringUTF(req->method);
     jstring j_url = env->NewStringUTF(req->url);
     jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    if (j_headers == nullptr) {
-        jclass strCls = env->FindClass("java/lang/String");
-        j_headers = env->NewObjectArray(0, strCls, nullptr);
-        if (strCls != nullptr)
-            env->DeleteLocalRef(strCls);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
     }
 
     jbyteArray j_body = nullptr;
@@ -642,11 +671,13 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jstring j_method = env->NewStringUTF(req->method);
     jstring j_url = env->NewStringUTF(req->url);
     jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
-    if (j_headers == nullptr) {
-        jclass strCls = env->FindClass("java/lang/String");
-        j_headers = env->NewObjectArray(0, strCls, nullptr);
-        if (strCls != nullptr)
-            env->DeleteLocalRef(strCls);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
     }
 
     jbyteArray j_body = nullptr;
