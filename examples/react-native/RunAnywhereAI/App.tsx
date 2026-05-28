@@ -43,7 +43,6 @@ import {
   InferenceFramework,
   ModelArtifactType,
 } from '@runanywhere/proto-ts/model_types';
-import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
 // Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
@@ -331,73 +330,19 @@ async function registerModulesAndModels(): Promise<void> {
   }
 
   // =========================================================================
-  // Genie NPU backend + Snapdragon-only model catalog (Android only)
+  // Genie NPU backend (Android / Snapdragon only)
   //
-  // Drive per-chip model selection from the canonical hardware namespace:
-  // `RunAnywhere.hardware.getNPUChip()` returns the structured `NPUChip`
-  // vendor enum (Qualcomm Hexagon, Apple Neural Engine, etc.) and
-  // `RunAnywhere.hardware.getChip()` returns the raw SoC string for
-  // intra-vendor model variant selection (e.g. 8 Elite vs 8 Elite Gen 5).
+  // Mirrors the Flutter example's Genie registration: register the backend
+  // when available and let the SDK own NPU model selection. Per-chip model
+  // catalogs (Qualcomm SoC slug → Genie model bundle URL) are SDK-internal
+  // knowledge per AGENTS.md "Business Logic Layering Rules" and belong in
+  // `@runanywhere/genie`, not in this example.
   // =========================================================================
   if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
     await Genie.register();
-    const npuChip = await RunAnywhere.hardware.getNPUChip();
-    if (npuChip === NPUChip.NPU_CHIP_QUALCOMM_HEXAGON) {
-      const rawChip = (await RunAnywhere.hardware.getChip()).toLowerCase();
-      const isGen5 =
-        rawChip.includes('gen 5') || rawChip.includes('8 elite gen 5');
-      const isElite =
-        rawChip.includes('8 elite') || rawChip.includes('snapdragon 8 elite');
-      const chipSlug = isGen5 ? '8elite-gen5' : isElite ? '8elite' : null;
-      if (chipSlug) {
-        const baseUrl = `https://github.com/RunanywhereAI/runanywhere-genie-models/releases/download/v1`;
-        const genieModels = [
-          {
-            slug: 'qwen3-4b',
-            name: 'Qwen3 4B',
-            memoryRequirement: 2_800_000_000,
-            chips: ['8elite-gen5'],
-          },
-          {
-            slug: 'llama3.2-1b-instruct',
-            name: 'Llama 3.2 1B Instruct',
-            memoryRequirement: 1_200_000_000,
-            chips: ['8elite', '8elite-gen5'],
-          },
-          {
-            slug: 'sea-lion3.5-8b-instruct',
-            name: 'SEA-LION v3.5 8B Instruct',
-            memoryRequirement: 4_800_000_000,
-            chips: ['8elite', '8elite-gen5'],
-          },
-        ];
-        await Promise.all(
-          genieModels
-            .filter((m) => m.chips.includes(chipSlug))
-            .map((m) =>
-              registerModel({
-                id: `${m.slug}-npu-${chipSlug}`,
-                name: `${m.name} (NPU - ${chipSlug})`,
-                url: `${baseUrl}/${m.slug}-${chipSlug}.bin`,
-                framework: InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
-                modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                memoryRequirement: m.memoryRequirement,
-              })
-            )
-        );
-        logDiagnostic(
-          `[App] Genie NPU models registered for ${chipSlug} (${rawChip})`
-        );
-      } else {
-        logDiagnostic(
-          `[App] Genie available but Snapdragon variant '${rawChip}' has no model catalog`
-        );
-      }
-    } else {
-      logDiagnostic(
-        '[App] Genie backend registered but device is not Snapdragon Hexagon'
-      );
-    }
+    logDiagnostic(
+      '[App] Genie backend registered; NPU model catalog is pending generated registry/catalog support'
+    );
   }
 
   // =========================================================================

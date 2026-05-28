@@ -22,12 +22,19 @@ import AppKit
 // MARK: - Model Catalog Seed
 //
 // Registers the default example-app model catalog with the SDK registry.
-// Mirrors the Flutter example's `_registerModulesAndModels()` and matches
-// the Kotlin / RN / Web examples so every SDK surfaces the same baseline
-// set of LLM / VLM / STT / TTS / VAD / embedding models (six modalities
-// total — diffusion is deferred from the Swift v1 build). The example
-// apps are each responsible for seeding their own catalog — the SDK does
-// not ship a default list. See BUG-SWIFT-IOS-002.
+// Mirrors the Android `ModelBootstrap.seedCuratedCatalog` and Flutter
+// `_registerModulesAndModels()` and matches the RN / Web examples so every
+// SDK surfaces the same baseline set of LLM / VLM / STT / TTS / VAD /
+// embedding models (six modalities total — diffusion is deferred from the
+// Swift v1 build). Each SDK's example owns its own catalog — the SDK does
+// not ship a default list.
+//
+// Re-registration is idempotent: `rac_model_registry_register_proto`
+// merges runtime fields (local_path, is_downloaded, checksum_sha256,
+// multi-file per-file local_path) from the existing snapshot, so reseeding
+// the catalog on every cold launch cannot clobber download progress.
+// No example-app skip-if-present guard is required — the commons fix in
+// register_model_from_url.cpp delivers this behavior to all five SDKs.
 
 // swiftlint:disable type_body_length
 @main
@@ -254,9 +261,12 @@ struct RunAnywhereAIApp: App {
 
     // MARK: - Model Catalog Seeding
     //
-    // Mirrors the Flutter example's `_registerModulesAndModels()`. Uses the
-    // canonical `RunAnywhere.registerModel(...)` async public API, including
-    // the multi-file and archive-with-structure overloads added in P5-T2.
+    // Mirrors the Android `ModelBootstrap.seedCuratedCatalog` and Flutter
+    // `_registerModulesAndModels()`. Uses the canonical
+    // `RunAnywhere.registerModel(...)` async public API, including the
+    // multi-file and archive-with-structure overloads added in P5-T2. Safe
+    // to re-run on every cold launch — commons merges runtime fields on
+    // re-registration (see `register_model_from_url.cpp` header).
     //
     // swiftlint:disable:next function_body_length
     private func registerModulesAndModels() async {
