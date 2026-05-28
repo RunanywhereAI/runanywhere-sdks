@@ -54,6 +54,21 @@ public extension RunAnywhere {
         CppBridge.ModelLifecycle.currentModel(request)
     }
 
+    /// Full `RAModelInfo` for the model currently loaded under `category`,
+    /// or `nil` when nothing is loaded for it.
+    ///
+    /// Wraps `currentModel(_:)` with `includeModelMetadata = true` so callers
+    /// (e.g. view models surfacing the loaded model's display name / framework)
+    /// get the populated proto instead of reconstructing a stand-in.
+    static func modelInfoForCategory(_ category: RAModelCategory) -> RAModelInfo? {
+        var request = RACurrentModelRequest()
+        request.category = category
+        request.includeModelMetadata = true
+        let result = currentModel(request)
+        guard result.found, result.hasModel else { return nil }
+        return result.model
+    }
+
     static func componentLifecycleSnapshot(
         _ component: RASDKComponent
     ) -> RAComponentLifecycleSnapshot? {
