@@ -47,7 +47,8 @@ private final class SDKEventSubscriptionBox {
     }
 }
 
-private let sdkEventSubscriptionPointers = OSAllocatedUnfairLock<[UInt64: UInt]>(initialState: [:])
+private let sdkEventSubscriptionPointers =
+    OSAllocatedUnfairLock<[UInt64: UnsafeMutableRawPointer]>(initialState: [:])
 
 private func sdkEventProtoCallback(
     protoBytes: UnsafePointer<UInt8>?,
@@ -74,7 +75,7 @@ extension CppBridge.Events {
             return 0
         }
         sdkEventSubscriptionPointers.withLock {
-            $0[subscriptionId] = UInt(bitPattern: opaque)
+            $0[subscriptionId] = opaque
         }
         return subscriptionId
     }
@@ -82,10 +83,10 @@ extension CppBridge.Events {
     public static func unsubscribeSDKEvents(_ subscriptionId: UInt64) {
         SDKEventProtoABI.unsubscribe?(subscriptionId)
 
-        let opaqueValue = sdkEventSubscriptionPointers.withLock { pointers in
+        let opaque = sdkEventSubscriptionPointers.withLock { pointers in
             pointers.removeValue(forKey: subscriptionId)
         }
-        if let opaqueValue, let opaque = UnsafeMutableRawPointer(bitPattern: opaqueValue) {
+        if let opaque {
             Unmanaged<SDKEventSubscriptionBox>.fromOpaque(opaque).release()
         }
     }
