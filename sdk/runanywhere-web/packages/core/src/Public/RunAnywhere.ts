@@ -28,6 +28,8 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import {
   DownloadState,
+  type DownloadPlanRequest,
+  type DownloadPlanResult,
   type DownloadProgress,
 } from '@runanywhere/proto-ts/download_service';
 import type { TTSSpeakResult } from '@runanywhere/proto-ts/tts_options';
@@ -501,6 +503,38 @@ async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
       `vision-language provider sync skipped: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+/**
+ * Plan a download and retry once after clearing oversize partial bytes.
+ *
+ * Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
+ * interrupted download left more bytes on disk than the new plan expects
+ * (e.g. the server reported a smaller Content-Length after a CDN swap),
+ * delete the oversize partials and re-plan instead of surfacing
+ * `existing partial bytes exceed` to the caller as a hard error. Web partials
+ * live in each module's MEMFS and in OPFS under the synthetic `/opfs/` prefix,
+ * so the removal goes through `OPFSBridge.removeFile`.
+ */
+async function planDownloadWithSelfHeal(
+  modelId: string,
+  request: DownloadPlanRequest,
+): Promise<DownloadPlanResult | null> {
+  const plan = DownloadsCapability.plan(request);
+  if (!plan || plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+    return plan;
+  }
+
+  const modules = getAllRegisteredModules();
+  for (const file of plan.files) {
+    if (!file.destinationPath) continue;
+    await OPFSBridge.removeFile(modules, file.destinationPath);
+    logger.warning(
+      `Removed oversize partial download at '${file.destinationPath}' for '${modelId}'`,
+    );
+  }
+
+  return DownloadsCapability.plan(request);
 }
 
 // commons-core-infra (web-core-005 DEMOTE): the previous in-TS multi-file
@@ -1074,7 +1108,7 @@ export const RunAnywhere = {
     });
     ModelRegistryCapability.registerModel(model);
 
-    const plan = DownloadsCapability.plan({
+    const planRequest = {
       modelId: request.modelId,
       model,
       resumeExisting: request.resumeExisting ?? false,
@@ -1084,7 +1118,8 @@ export const RunAnywhere = {
       validateExistingBytes: request.validateExistingBytes ?? false,
       verifyChecksums: request.verifyChecksums ?? false,
       requiredFreeBytesAfterDownload: request.requiredFreeBytesAfterDownload ?? 0,
-    });
+    };
+    const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
       throw SDKException.backendNotAvailable(
         'downloadModel',

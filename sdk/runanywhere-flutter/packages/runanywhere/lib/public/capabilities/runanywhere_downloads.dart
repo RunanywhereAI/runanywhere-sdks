@@ -3,6 +3,8 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
+import 'dart:io';
+
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -39,6 +41,46 @@ class RunAnywhereDownloads {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.planProto(request);
+  }
+
+  /// Plan a download and retry once after clearing oversize partial bytes.
+  ///
+  /// Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
+  /// interrupted download left more bytes on disk than the new plan expects
+  /// (e.g. the server reported a smaller Content-Length after a CDN swap),
+  /// delete the oversize partials and re-plan instead of surfacing
+  /// `existing partial bytes exceed` to the caller as a hard error.
+  Future<DownloadPlanResult> _planWithSelfHeal(
+    DownloadPlanRequest request,
+  ) async {
+    final planResult = await plan(request);
+    if (planResult.canStart ||
+        !planResult.errorMessage.contains('existing partial bytes exceed')) {
+      return planResult;
+    }
+
+    final logger = SDKLogger('RunAnywhere.Download');
+    for (final file in planResult.files) {
+      final destinationPath = file.destinationPath;
+      if (destinationPath.isEmpty) continue;
+      final partial = File(destinationPath);
+      if (partial.existsSync()) {
+        try {
+          partial.deleteSync();
+          logger.warning(
+            'Removed oversize partial download at $destinationPath '
+            'for ${request.modelId}',
+          );
+        } catch (e) {
+          logger.warning(
+            'Failed to remove oversize partial download at $destinationPath '
+            'for ${request.modelId}: $e',
+          );
+        }
+      }
+    }
+
+    return plan(request);
   }
 
   /// Start a generated download plan in C++.
@@ -84,7 +126,7 @@ class RunAnywhereDownloads {
       return;
     }
 
-    final planResult = await plan(DownloadPlanRequest(
+    final planResult = await _planWithSelfHeal(DownloadPlanRequest(
       modelId: modelId,
       model: model,
       resumeExisting: true,
