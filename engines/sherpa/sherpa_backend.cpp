@@ -1466,6 +1466,17 @@ SherpaVAD::~SherpaVAD() {
 // Sherpa SilerVad ABI has no equivalent slot (pass3-syn-131).
 static constexpr int kSherpaVadDefaultPaddingMs = 30;
 
+namespace {
+
+constexpr int32_t kSherpaVadDefaultWindowSize = 512;
+
+int32_t derive_sherpa_vad_window_size(const VADConfig& config) {
+    const int derived_window = (config.window_size_ms * config.sample_rate) / 1000;
+    return derived_window > 0 ? derived_window : kSherpaVadDefaultWindowSize;
+}
+
+}  // namespace
+
 void SherpaVAD::fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig& out) const {
     // Translate VADConfig (ms-based, schema-aligned with Swift/Kotlin/Dart) into
     // the Sherpa-ONNX SilerVadModelConfig (seconds / samples). Single source of
@@ -1494,8 +1505,7 @@ void SherpaVAD::fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig& out) con
     // SilerVAD's window_size is in samples. Derive it from window_size_ms at
     // the configured sample rate so a caller who passes the Silero-native
     // window (e.g. 32 ms @ 16 kHz) gets the canonical 512-sample window.
-    const int derived_window = (config_.window_size_ms * config_.sample_rate) / 1000;
-    out.silero_vad.window_size = derived_window > 0 ? derived_window : 512;
+    out.silero_vad.window_size = derive_sherpa_vad_window_size(config_);
     out.sample_rate = config_.sample_rate > 0 ? config_.sample_rate : 16000;
     out.num_threads = 1;
     out.debug = 0;
@@ -1718,20 +1728,19 @@ VADResult SherpaVAD::process(const std::vector<float>& audio_samples, int sample
         return result;
     }
 
-    static constexpr int32_t SILERO_WINDOW_SIZE = 512;
+    const int32_t window_size = derive_sherpa_vad_window_size(config_);
 
     // Append incoming audio to the pending buffer.
-    // Audio capture may deliver chunks smaller than SILERO_WINDOW_SIZE (e.g. 256
-    // samples), but Silero VAD requires exactly 512 samples per call.
+    // Audio capture may deliver chunks smaller than Silero's configured window.
     pending_samples_.insert(pending_samples_.end(), audio_samples.begin(), audio_samples.end());
 
-    // Feed complete SILERO_WINDOW_SIZE chunks to Silero VAD.
+    // Feed complete configured windows to Silero VAD.
     // Use offset tracking instead of repeated front-erase (O(n) per erase).
     size_t consumed = 0;
-    while (consumed + SILERO_WINDOW_SIZE <= pending_samples_.size()) {
+    while (consumed + window_size <= pending_samples_.size()) {
         SherpaOnnxVoiceActivityDetectorAcceptWaveform(
-            sherpa_vad_, pending_samples_.data() + consumed, SILERO_WINDOW_SIZE);
-        consumed += SILERO_WINDOW_SIZE;
+            sherpa_vad_, pending_samples_.data() + consumed, window_size);
+        consumed += window_size;
     }
     if (consumed > 0) {
         pending_samples_.erase(pending_samples_.begin(),
