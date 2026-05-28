@@ -190,21 +190,31 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     const bool has_options = request.has_options();
     const auto& opts = request.options();
 
+    // max_tokens proto3 zero means "unset → engine default" (idl/llm_options.proto:45-47).
     const int max_tokens =
         (has_options && opts.max_tokens() > 0) ? opts.max_tokens() : request.max_tokens();
     if (max_tokens > 0) {
         options.max_tokens = max_tokens;
     }
 
-    const float temperature =
-        (has_options && opts.temperature() > 0.0f) ? opts.temperature() : request.temperature();
-    if (temperature > 0.0f) {
-        options.temperature = temperature;
+    // temperature: when the canonical LLMGenerationOptions is set, pass its value through
+    // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
+    // (idl/llm_options.proto:49). Mirrors RALLMTypes+CppBridge.swift:53. The legacy inline
+    // scalar still uses `> 0.0f` so an unmigrated caller that left the field zero gets the
+    // engine default (0.8) instead of accidental greedy decoding.
+    if (has_options) {
+        options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
+    } else if (request.temperature() > 0.0f) {
+        options.temperature = std::clamp(request.temperature(), 0.0f, 2.0f);
     }
 
-    const float top_p = (has_options && opts.top_p() > 0.0f) ? opts.top_p() : request.top_p();
-    if (top_p > 0.0f) {
-        options.top_p = top_p;
+    // top_p: same contract — proto3 zero is the unset sentinel, 1.0 means no truncation
+    // (idl/llm_options.proto:53). Pass embedded value through unconditionally; gate the
+    // legacy inline scalar to avoid clobbering the engine default on unmigrated callers.
+    if (has_options) {
+        options.top_p = opts.top_p();
+    } else if (request.top_p() > 0.0f) {
+        options.top_p = request.top_p();
     }
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
