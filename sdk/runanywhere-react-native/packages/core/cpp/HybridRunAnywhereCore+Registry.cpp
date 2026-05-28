@@ -237,6 +237,24 @@ rac_result_t registryRequestProto(
 #endif
 }
 
+rac_result_t registerFromUrlProto(
+    const uint8_t* bytes,
+    size_t size,
+    rac_proto_buffer_t* outResult) {
+#if defined(__APPLE__)
+    return rac_register_model_from_url_proto(bytes, size, outResult);
+#else
+    auto registerProto =
+        proto_compat::symbol<proto_compat::RegisterModelFromUrlProtoFn>(
+            "rac_register_model_from_url_proto");
+    if (!registerProto) {
+        LOGE("registerModelFromUrlProto: rac_register_model_from_url_proto unavailable");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    return registerProto(bytes, size, outResult);
+#endif
+}
+
 std::shared_ptr<ArrayBuffer> ownedProtoBuffer(uint8_t* protoBytes, size_t protoSize) {
     if (!protoBytes || protoSize == 0) {
         freeRegistryProtoBytes(protoBytes);
@@ -347,6 +365,33 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModelProto(
             return false;
         }
         return true;
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::registerModelFromUrlProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [bytes = std::move(bytes)]() -> std::shared_ptr<ArrayBuffer> {
+        // rac_register_model_from_url_proto resolves the global registry
+        // (rac_get_model_registry()) internally; the bridge handle gate just
+        // fails fast before init, matching the other registry thunks.
+        if (!ModelRegistryBridge::shared().getHandle()) {
+            LOGE("registerModelFromUrlProto: registry not initialized");
+            return emptyProtoBuffer();
+        }
+
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = registerFromUrlProto(bytes.data(), bytes.size(), &out);
+        if (rc != RAC_SUCCESS) {
+            LOGE("registerModelFromUrlProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyProtoBuffer();
+        }
+
+        return ownedRegistryBuffer("registerModelFromUrlProto", out);
     });
 }
 

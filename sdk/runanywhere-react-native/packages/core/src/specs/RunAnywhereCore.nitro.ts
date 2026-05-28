@@ -148,6 +148,20 @@ export interface RunAnywhereCore extends HybridObject<{
   registerModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
 
   /**
+   * Canonical single-call URL -> saved ModelInfo registration.
+   *
+   * Routes a serialized runanywhere.v1.RegisterModelFromUrlRequest through the
+   * commons `rac_register_model_from_url_proto` C ABI, which owns
+   * framework-aware defaulting, artifact-type-from-extension inference, and
+   * stable id-from-URL derivation, then persists through the registry's proto
+   * save path. Returns the saved runanywhere.v1.ModelInfo bytes (empty buffer
+   * when the ABI is unavailable on the staged native artifact). Mirrors Swift
+   * `RunAnywhere.registerModelFromUrl` and Kotlin
+   * `CppBridgeModelRegistry.registerModelFromUrl`.
+   */
+  registerModelFromUrlProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
    * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
    */
   updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;

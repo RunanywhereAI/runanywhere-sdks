@@ -111,6 +111,14 @@ using RegistryRemoveProtoFn = rac_result_t (*)(
     const char*);
 using RegistryProtoFreeFn = void (*)(uint8_t*);
 
+// rac_register_model_from_url_proto: handle-less global-registry C ABI that
+// translates a RegisterModelFromUrlRequest into the canonical build-and-save
+// flow (framework defaulting + artifact inference + id derivation).
+using RegisterModelFromUrlProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+
 using ProtoBufferCallFn = rac_result_t (*)(
     const uint8_t*,
     size_t,

@@ -74,6 +74,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> registerModelFromUrlProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> updateModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
