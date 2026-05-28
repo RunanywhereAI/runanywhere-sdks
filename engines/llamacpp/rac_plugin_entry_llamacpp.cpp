@@ -18,11 +18,15 @@
  * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
+#include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+
+#include <cstddef>
+#include <mutex>
 
 extern "C" {
 
@@ -33,6 +37,39 @@ extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
 
 rac_result_t rac_llamacpp_cpu_runtime_register(void);
 void rac_llamacpp_cpu_runtime_unregister(void);
+
+}  // extern "C"
+
+namespace {
+
+std::mutex g_llamacpp_runtime_mutex;
+std::size_t g_llamacpp_runtime_refcount = 0;
+
+void retain_llamacpp_cpu_runtime() {
+    std::lock_guard<std::mutex> lock(g_llamacpp_runtime_mutex);
+    if (g_llamacpp_runtime_refcount == 0) {
+        rac_result_t rc = rac_llamacpp_cpu_runtime_register();
+        if (rc != RAC_SUCCESS) {
+            return;
+        }
+    }
+    ++g_llamacpp_runtime_refcount;
+}
+
+void release_llamacpp_cpu_runtime() {
+    std::lock_guard<std::mutex> lock(g_llamacpp_runtime_mutex);
+    if (g_llamacpp_runtime_refcount == 0) {
+        return;
+    }
+    --g_llamacpp_runtime_refcount;
+    if (g_llamacpp_runtime_refcount == 0) {
+        rac_llamacpp_cpu_runtime_unregister();
+    }
+}
+
+}  // namespace
+
+extern "C" {
 
 /* Declares which runtimes + model formats this plugin serves so the
  * EngineRouter can score it against the caller's preferred_runtime and model
@@ -90,7 +127,7 @@ static const rac_engine_manifest_t k_llamacpp_manifest = {
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
 static void llamacpp_on_unload(void) {
-    rac_llamacpp_cpu_runtime_unregister();
+    release_llamacpp_cpu_runtime();
 }
 
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
@@ -124,7 +161,7 @@ RAC_PLUGIN_ENTRY_DEF(llamacpp) {
     const rac_engine_vtable_t* vt =
         rac_engine_entry_with_manifest(&k_llamacpp_manifest, &g_llamacpp_engine_vtable);
     if (vt != nullptr) {
-        (void)rac_llamacpp_cpu_runtime_register();
+        retain_llamacpp_cpu_runtime();
     }
     return vt;
 }
