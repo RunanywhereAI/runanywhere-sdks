@@ -6,6 +6,7 @@
 //
 
 import Combine
+import os
 
 // MARK: - Event Bus
 
@@ -36,20 +37,43 @@ public final class EventBus: @unchecked Sendable {
         subject.eraseToAnyPublisher()
     }
 
-    private var nativeSubscriptionId: UInt64 = 0
+    private let nativeSubscriptionId = OSAllocatedUnfairLock<UInt64>(initialState: 0)
 
     // MARK: - Initialization
 
-    private init() {
-        nativeSubscriptionId = CppBridge.Events.subscribeSDKEvents { [weak self] event in
-            self?.subject.send(event)
+    private init() {}
+
+    // No `deinit`: `shared` is the only allocation site and it lives for the
+    // process lifetime. The native subscription is owned by the explicit
+    // `start()` / `stop()` lifecycle below.
+
+    // MARK: - Native subscription lifecycle
+
+    /// Start the native SDK event subscription. Idempotent: calling twice is a
+    /// no-op. Invoked by `CppBridge.initialize` after the C++ commons core is
+    /// brought up so native lifecycle/model/error events flow into `events`.
+    ///
+    /// Subscribing before `start()` is safe, but events emitted before the
+    /// native subscription is wired are not delivered.
+    public func start() {
+        nativeSubscriptionId.withLock { id in
+            guard id == 0 else { return }
+            id = CppBridge.Events.subscribeSDKEvents { [weak self] event in
+                self?.subject.send(event)
+            }
         }
     }
 
-    // No `deinit`: `shared` is the only allocation site and it lives for the
-    // process lifetime, so the previous unsubscribe-on-deinit path was dead
-    // code. Native subscription cleanup, when required, runs through
-    // `RunAnywhere.reset()` -> `CppBridge.shutdown()` instead.
+    /// Stop the native SDK event subscription. Idempotent: calling twice is a
+    /// no-op. Invoked during shutdown before the C++ commons core is torn down
+    /// so the unsubscribe call still has a working native ABI surface.
+    public func stop() {
+        nativeSubscriptionId.withLock { id in
+            guard id != 0 else { return }
+            CppBridge.Events.unsubscribeSDKEvents(id)
+            id = 0
+        }
+    }
 
     // MARK: - Publishing
 
