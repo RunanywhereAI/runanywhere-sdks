@@ -17,6 +17,7 @@
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/tts/rac_tts_service.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
@@ -43,25 +44,39 @@ static const uint32_t k_platform_formats[] = {
     RAC_MODEL_FORMAT_ID_COREML,
 };
 
+static const rac_primitive_t k_platform_primitives[] = {
+    RAC_PRIMITIVE_GENERATE_TEXT,
+    RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_DIFFUSION,
+};
+
+static const rac_engine_manifest_t k_platform_manifest = {
+    .name = "platform",
+    .display_name = "Apple Platform Services",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_platform",
+    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE, /* Apple-only. */
+    /* Diffusion: high priority (100) — it's the sole CoreML diffusion
+     * provider. LLM: lower priority (50) — llamacpp is preferred on
+     * macOS when a GGUF model is available. TTS: system TTS is the
+     * lowest-priority fallback (10). Per-primitive priority tweaking
+     * isn't in the ABI yet; we use the router's format-match bonus
+     * (e.g. COREML models hit this plugin naturally). */
+    .priority = 50,
+    .capability_flags = 0,
+    .primitives = k_platform_primitives,
+    .primitives_count = sizeof(k_platform_primitives) / sizeof(k_platform_primitives[0]),
+    .runtimes = k_platform_runtimes,
+    .runtimes_count = sizeof(k_platform_runtimes) / sizeof(k_platform_runtimes[0]),
+    .formats = k_platform_formats,
+    .formats_count = sizeof(k_platform_formats) / sizeof(k_platform_formats[0]),
+    .reserved_0 = 0,
+    .reserved_1 = 0,
+};
+
 static const rac_engine_vtable_t g_platform_engine_vtable = {
-    /* metadata */ {
-        .abi_version = RAC_PLUGIN_API_VERSION,
-        .name = "platform",
-        .display_name = "Apple Platform Services",
-        .engine_version = nullptr,
-        /* Diffusion: high priority (100) — it's the sole CoreML diffusion
-         * provider. LLM: lower priority (50) — llamacpp is preferred on
-         * macOS when a GGUF model is available. TTS: system TTS is the
-         * lowest-priority fallback (10). Per-primitive priority tweaking
-         * isn't in the ABI yet; we use the router's format-match bonus
-         * (e.g. COREML models hit this plugin naturally). */
-        .priority = 50,
-        .capability_flags = 0,
-        .runtimes = k_platform_runtimes,
-        .runtimes_count = sizeof(k_platform_runtimes) / sizeof(k_platform_runtimes[0]),
-        .formats = k_platform_formats,
-        .formats_count = sizeof(k_platform_formats) / sizeof(k_platform_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_platform_manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
@@ -88,7 +103,7 @@ static const rac_engine_vtable_t g_platform_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(platform) {
-    return &g_platform_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_platform_manifest, &g_platform_engine_vtable);
 }
 
 }  // extern "C"
