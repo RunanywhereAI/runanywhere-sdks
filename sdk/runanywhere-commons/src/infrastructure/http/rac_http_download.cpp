@@ -49,6 +49,37 @@ namespace {
 
 constexpr const char* kTag = "rac_http_download";
 
+// RAII guard for the C-ABI rac_http_client_t handle so the destroy fires
+// regardless of which return path the runner takes. Closes the leak window
+// any future early-return added between create and the success-path destroy
+// would otherwise open.
+struct HttpClientGuard {
+    rac_http_client_t* c{nullptr};
+    HttpClientGuard() = default;
+    HttpClientGuard(const HttpClientGuard&) = delete;
+    HttpClientGuard& operator=(const HttpClientGuard&) = delete;
+    ~HttpClientGuard() {
+        if (c)
+            rac_http_client_destroy(c);
+    }
+};
+
+// RAII guard for the .rac_resume_fallback.tmp file produced by the shift-left
+// rename dance. Multiple early returns between the rename and the explicit
+// remove can otherwise leave the tmp file in the caller's app dir. Call
+// disarm() on the success branch once the tmp has been consumed.
+struct PathRemoveGuard {
+    fs::path p;
+    void arm(fs::path pp) { p = std::move(pp); }
+    void disarm() { p.clear(); }
+    ~PathRemoveGuard() {
+        if (!p.empty()) {
+            std::error_code ec;
+            fs::remove(p, ec);
+        }
+    }
+};
+
 // =============================================================================
 // Embedded SHA-256 — public-domain reference implementation
 // (RFC 6234). Small enough (<150 LOC) that it's not worth a separate
@@ -403,8 +434,8 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     }
 
     // ---- Create http client ----------------------------------------
-    rac_http_client_t* client = nullptr;
-    if (rac_http_client_create(&client) != RAC_SUCCESS) {
+    HttpClientGuard cg;
+    if (rac_http_client_create(&cg.c) != RAC_SUCCESS) {
         return RAC_HTTP_DL_UNKNOWN;
     }
 
@@ -421,7 +452,6 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         if (effective_resume_from > 0) {
             std::ifstream in(dest, std::ios::binary);
             if (!in.is_open()) {
-                rac_http_client_destroy(client);
                 return RAC_HTTP_DL_FILE_ERROR;
             }
             std::vector<uint8_t> buf(static_cast<size_t>(64) * 1024);
@@ -460,10 +490,10 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     rac_http_response_t resp_meta{};
     rac_result_t rc;
     if (effective_resume_from > 0) {
-        rc = rac_http_request_resume(client, &http_req, effective_resume_from, on_chunk, &ctx,
+        rc = rac_http_request_resume(cg.c, &http_req, effective_resume_from, on_chunk, &ctx,
                                      &resp_meta);
     } else {
-        rc = rac_http_request_stream(client, &http_req, on_chunk, &ctx, &resp_meta);
+        rc = rac_http_request_stream(cg.c, &http_req, on_chunk, &ctx, &resp_meta);
     }
 
     int32_t http_status = resp_meta.status;
@@ -526,7 +556,6 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
     rac_http_response_free(&resp_meta);
-    rac_http_client_destroy(client);
 
     out.flush();
     out.close();
@@ -660,12 +689,20 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         if (ren_ec) {
             return RAC_HTTP_DL_FILE_ERROR;
         }
+        PathRemoveGuard tmpg;
+        tmpg.arm(tmp_path);
         {
             std::ifstream src(tmp_path, std::ios::binary);
             std::ofstream dst(dest, std::ios::binary | std::ios::trunc);
             if (!src.is_open() || !dst.is_open()) {
+                // Try to put the original file back; the guard will clean up
+                // tmp_path either way (if restore succeeded the remove is a
+                // harmless no-op).
                 std::error_code restore_ec;
                 fs::rename(tmp_path, dest, restore_ec);
+                if (!restore_ec) {
+                    tmpg.disarm();
+                }
                 return RAC_HTTP_DL_FILE_ERROR;
             }
             src.seekg(static_cast<std::streamoff>(effective_resume_from));
@@ -677,14 +714,10 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                     break;
                 dst.write(shift_buf.data(), n);
                 if (!dst.good()) {
-                    std::error_code rm_ec;
-                    fs::remove(tmp_path, rm_ec);
                     return RAC_HTTP_DL_FILE_ERROR;
                 }
             }
         }
-        std::error_code rm_ec;
-        fs::remove(tmp_path, rm_ec);
 
         // Re-hash from the corrected file. The previously rehydrated hasher
         // covered the now-discarded prefix plus a body that turned out to be
