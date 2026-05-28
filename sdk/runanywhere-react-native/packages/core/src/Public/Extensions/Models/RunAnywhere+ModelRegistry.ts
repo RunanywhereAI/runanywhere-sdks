@@ -489,6 +489,49 @@ function isCompletedProgress(progress: DownloadProgress): boolean {
   );
 }
 
+/**
+ * Plan a download and retry once after clearing oversize partial bytes.
+ *
+ * Mirrors Swift's `RunAnywhere+Storage.swift` `planDownload(...)` self-heal:
+ * when a previous interrupted download left more bytes on disk than the new
+ * plan expects (e.g. a CDN swap shrank Content-Length), commons rejects with
+ * "existing partial bytes exceed". Instead of surfacing that as a permanent
+ * stuck state, delete the oversize partials and re-plan once. `react-native-fs`
+ * is an optional dependency; if it is unavailable we fall back to the original
+ * rejection so callers still see a deterministic error.
+ */
+async function planDownload(
+  native: ReturnType<typeof requireNativeModule>,
+  request: DownloadPlanRequest
+): Promise<DownloadPlanResult> {
+  const planBytes = await native.downloadPlanProto(
+    encodeProtoMessage(request, DownloadPlanRequest)
+  );
+  const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
+  if (plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+    return plan;
+  }
+
+  let RNFS: typeof import('react-native-fs');
+  try {
+    RNFS = require('react-native-fs');
+  } catch {
+    return plan;
+  }
+
+  for (const file of plan.files) {
+    if (!file.destinationPath) continue;
+    if (await RNFS.exists(file.destinationPath)) {
+      await RNFS.unlink(file.destinationPath).catch(() => {});
+    }
+  }
+
+  const retryBytes = await native.downloadPlanProto(
+    encodeProtoMessage(request, DownloadPlanRequest)
+  );
+  return DownloadPlanResult.decode(arrayBufferToBytes(retryBytes));
+}
+
 async function persistDownloadCompletion(
   model: ModelInfo,
   progress: DownloadProgress
@@ -620,10 +663,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             modelId,
             model,
           });
-          const planBytes = await native.downloadPlanProto(
-            encodeProtoMessage(planRequest, DownloadPlanRequest)
-          );
-          const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
+          const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
             streamError = new Error(
               plan.errorMessage || `download plan rejected for ${modelId}`
