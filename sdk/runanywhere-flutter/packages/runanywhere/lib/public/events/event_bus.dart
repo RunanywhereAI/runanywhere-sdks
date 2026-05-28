@@ -16,9 +16,6 @@ class EventBus {
   Stream<SDKEvent> get initializationEvents =>
       _where(EventCategory.EVENT_CATEGORY_INITIALIZATION);
 
-  Stream<SDKEvent> get configurationEvents =>
-      _where(EventCategory.EVENT_CATEGORY_SDK);
-
   Stream<SDKEvent> get generationEvents =>
       _where(EventCategory.EVENT_CATEGORY_LLM);
 
