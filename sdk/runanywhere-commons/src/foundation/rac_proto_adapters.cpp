@@ -1183,17 +1183,14 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->base64_data = copy_string_required(in.base64());
         out->data_size = in.base64().size();
     } else if (in.has_encoded()) {
-        // No exact C ABI carrier — surface as RGB_PIXELS bytes (encoded
-        // payload). Caller must inspect the (proto-side) format hint
-        // separately. This is a best-effort path; pixel data will not be
-        // raw RGB but the caller can still treat it as opaque bytes.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
-        out->data_size = in.encoded().size();
-        if (out->data_size > 0) {
-            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, in.encoded().data(), out->data_size);
-            out->pixel_data = buf;
-        }
+        // The C ABI has no carrier for encoded JPEG/PNG/WEBP containers.
+        // Coercing them into RGB_PIXELS would silently feed container bytes
+        // into mtmd_bitmap_init (which expects width*height*3 raw pixels)
+        // and crash the engine. Mirror the BASE64 hotspot fix — refuse at
+        // the proto boundary so the caller sees a clean decoding error
+        // instead of a backend crash. SDKs must decode containers to
+        // RAW_RGB or supply a file path before calling C.
+        return false;
     } else {
         // No source set — leave pointers NULL and pick FILE_PATH as the
         // safest default (matches RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0).
@@ -1475,6 +1472,12 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
     if (in->image_data && in->image_size > 0) {
         out->set_image_data(
             ::std::string(reinterpret_cast<const char*>(in->image_data), in->image_size));
+        // Every shipped C-ABI diffusion engine (diffusion-coreml,
+        // rac_diffusion_platform) emits raw RGBA bytes — surface the media
+        // type so SDKs can route through CGContext/Canvas instead of
+        // Image(data:). A future backend that returns a PNG container must
+        // override this on a parallel C-side carrier.
+        out->set_image_media_type("image/raw-rgba");
     }
     out->set_width(in->width);
     out->set_height(in->height);
