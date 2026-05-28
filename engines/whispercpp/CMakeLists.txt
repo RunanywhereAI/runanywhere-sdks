@@ -157,6 +157,7 @@ rac_add_engine_plugin(whispercpp
     LINK_LIBRARIES      ${WHISPERCPP_LINK_LIBS}
     INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include
                         ${CMAKE_SOURCE_DIR}/include/rac/backends
+                        ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
                         ${whispercpp_SOURCE_DIR}/include
                         ${whispercpp_SOURCE_DIR}/ggml/include
     COMPILE_DEFINITIONS ${WHISPERCPP_COMPILE_DEFS}

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "common/rac_engine_device_type.h"
+#include "common/rac_engine_stt_types.h"
 
 // Sherpa-ONNX C API for TTS/STT
 #if SHERPA_ONNX_AVAILABLE
@@ -71,37 +72,8 @@ struct DeviceInfo {
     int cpu_cores = 0;
 };
 
-// =============================================================================
-// STT TYPES
-// =============================================================================
-
-enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, NEMO_CTC, CUSTOM };
-
-struct AudioSegment {
-    std::string text;
-    double start_time_ms = 0.0;
-    double end_time_ms = 0.0;
-    float confidence = 0.0f;
-    std::string language;
-};
-
-struct STTRequest {
-    std::vector<float> audio_samples;
-    int sample_rate = 16000;
-    std::string language;
-    bool detect_language = false;
-    bool word_timestamps = false;
-};
-
-struct STTResult {
-    std::string text;
-    std::string detected_language;
-    std::vector<AudioSegment> segments;
-    double audio_duration_ms = 0.0;
-    double inference_time_ms = 0.0;
-    float confidence = 0.0f;
-    bool is_final = true;
-};
+// STT types (STTModelType, AudioSegment, STTRequest, STTResult) are shared
+// across engines — see engines/common/rac_engine_stt_types.h.
 
 // =============================================================================
 // TTS TYPES

@@ -19,59 +19,13 @@
 #include <string>
 #include <vector>
 
+// DeviceType + STT request/result types are shared across engines — see
+// engines/common/. Defining them here used to fight sherpa_backend.h's
+// definitions in any TU that pulled in both (ODR landmine).
+#include "common/rac_engine_device_type.h"
+#include "common/rac_engine_stt_types.h"
+
 namespace runanywhere {
-
-// =============================================================================
-// INTERNAL TYPES
-// =============================================================================
-
-enum class DeviceType {
-    CPU = 0,
-    GPU = 1,
-    METAL = 3,
-    CUDA = 4,
-};
-
-enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, CUSTOM };
-
-// =============================================================================
-// STT RESULT TYPES
-// =============================================================================
-
-struct WordTiming {
-    std::string word;
-    double start_time_ms = 0.0;
-    double end_time_ms = 0.0;
-    float confidence = 0.0f;
-};
-
-struct AudioSegment {
-    std::string text;
-    double start_time_ms = 0.0;
-    double end_time_ms = 0.0;
-    float confidence = 0.0f;
-    std::string language;
-};
-
-struct STTRequest {
-    std::vector<float> audio_samples;
-    int sample_rate = 16000;
-    std::string language;
-    bool detect_language = false;
-    bool word_timestamps = false;
-    bool translate_to_english = false;
-};
-
-struct STTResult {
-    std::string text;
-    std::string detected_language;
-    std::vector<AudioSegment> segments;
-    std::vector<WordTiming> word_timings;
-    double audio_duration_ms = 0.0;
-    double inference_time_ms = 0.0;
-    float confidence = 0.0f;
-    bool is_final = true;
-};
 
 // =============================================================================
 // FORWARD DECLARATIONS
