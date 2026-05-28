@@ -19,7 +19,9 @@
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -38,12 +40,98 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
+#include "model_types.pb.h"
 #include "voice_agent_service.pb.h"
 #include "voice_events.pb.h"
 #endif
 
 #include "voice_agent_internal.h"
 #include "voice_agent_internal_helpers.h"
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Catalogued default Silero VAD model id, seeded by every example app's
+// catalog. Mirrors Swift `RunAnywhere.defaultVADModelID`.
+constexpr const char* kDefaultVADModelID = "silero-vad";
+
+// Ensure a VAD model is loaded in the canonical lifecycle before the voice
+// agent session starts. When no `.voiceActivityDetection` model is current,
+// load the catalogued default (`silero-vad`) so the orchestrator's
+// speech-start / speech-end lifecycle events fire — the energy-based fallback
+// emits none of them, so without this the session stays silent after init.
+//
+// Ports Swift `RunAnywhere.ensureDefaultVAD(modelID:)` down into commons so
+// every SDK (Kotlin/Flutter/RN/Web) gets the behavior for free instead of each
+// re-implementing the workaround. Idempotent and best-effort: a failed
+// auto-load is logged, not fatal — init proceeds on the energy fallback.
+void ensure_default_vad_loaded() {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        return;
+    }
+
+    runanywhere::v1::CurrentModelRequest current_request;
+    current_request.set_category(runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION);
+    std::string current_bytes;
+    if (!current_request.SerializeToString(&current_bytes)) {
+        return;
+    }
+    rac_proto_buffer_t current_out;
+    rac_proto_buffer_init(&current_out);
+    if (rac_model_lifecycle_current_model_proto(
+            reinterpret_cast<const uint8_t*>(current_bytes.data()), current_bytes.size(),
+            &current_out) == RAC_SUCCESS &&
+        current_out.status == RAC_SUCCESS && current_out.data) {
+        runanywhere::v1::CurrentModelResult current_result;
+        if (current_result.ParseFromArray(current_out.data,
+                                          static_cast<int>(current_out.size)) &&
+            current_result.found() && !current_result.model_id().empty()) {
+            rac_proto_buffer_free(&current_out);
+            return;
+        }
+    }
+    rac_proto_buffer_free(&current_out);
+
+    RAC_LOG_INFO("VoiceAgent", "Auto-loading default VAD '%s' for voice-agent session",
+                 kDefaultVADModelID);
+
+    runanywhere::v1::ModelLoadRequest load_request;
+    load_request.set_model_id(kDefaultVADModelID);
+    load_request.set_category(runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION);
+    std::string load_bytes;
+    if (!load_request.SerializeToString(&load_bytes)) {
+        return;
+    }
+    rac_proto_buffer_t load_out;
+    rac_proto_buffer_init(&load_out);
+    const rac_result_t rc = rac_model_lifecycle_load_proto(
+        registry, reinterpret_cast<const uint8_t*>(load_bytes.data()), load_bytes.size(),
+        &load_out);
+    bool loaded = false;
+    std::string error_message;
+    if (rc == RAC_SUCCESS && load_out.status == RAC_SUCCESS && load_out.data) {
+        runanywhere::v1::ModelLoadResult load_result;
+        if (load_result.ParseFromArray(load_out.data, static_cast<int>(load_out.size))) {
+            loaded = load_result.success();
+            error_message = load_result.error_message();
+        }
+    }
+    rac_proto_buffer_free(&load_out);
+
+    if (!loaded) {
+        RAC_LOG_WARNING("VoiceAgent",
+                        "Default VAD '%s' auto-load failed: %s — voice agent will use energy "
+                        "fallback",
+                        kDefaultVADModelID,
+                        error_message.empty() ? "unknown error" : error_message.c_str());
+    }
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+}  // namespace
 
 rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
                                               const uint8_t* config_proto_bytes,
@@ -84,6 +172,11 @@ rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
     if (handle->vad_handle) {
         (void)rac_vad_component_configure(handle->vad_handle, &vad_config);
     }
+
+    // Guarantee a VAD model is loaded in the canonical lifecycle before the
+    // session starts so the orchestrator's speech-start / speech-end events
+    // fire. Best-effort: falls back to the energy detector on failure.
+    ensure_default_vad_loaded();
 
     rac_result_t rc = rac_voice_agent_initialize(handle, &config);
     runanywhere::v1::VoiceAgentComponentStates states;
