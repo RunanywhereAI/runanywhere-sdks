@@ -7,6 +7,14 @@
  *
  * NOTE: HTTP networking is delegated to the platform layer (Swift/Kotlin).
  * The C++ layer only handles orchestration logic.
+ *
+ * Threading contract:
+ *   Adapter callbacks may be invoked from any thread (download workers,
+ *   voice-agent pipeline, LLM streaming, model-registry refresh, etc.).
+ *   All callbacks MUST be thread-safe and re-entrant unless an individual
+ *   slot's doc-block explicitly documents otherwise. Implementations that
+ *   guard shared state (keychain, file handles, log sinks) are responsible
+ *   for their own synchronization — commons does not serialize calls.
  */
 
 #ifndef RAC_PLATFORM_ADAPTER_H
@@ -69,7 +77,17 @@ typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_
  * can fill caller-provided arrays without managing additional ownership.
  */
 typedef struct rac_directory_entry {
-    /** Entry name (no path component). UTF-8, null-terminated. */
+    /** Entry name (no path component). UTF-8, null-terminated.
+     *
+     * Truncation contract: when the underlying filesystem produces an entry
+     * name whose byte length (including NUL) would exceed
+     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST skip
+     * that entry rather than silently truncate it, and SHOULD emit a
+     * RAC_LOG_WARN log via the adapter's `log` slot (category
+     * "PlatformAdapter") so operators can detect oversized names. This keeps
+     * the canonical RunAnywhere model-registry path layout safe — model IDs
+     * never approach 511 bytes in practice — while ensuring the no-error
+     * path cannot return a half-name that aliases a different artifact. */
     char name[RAC_DIRECTORY_ENTRY_NAME_MAX];
     /** RAC_TRUE if the entry is a directory, RAC_FALSE for regular files. */
     rac_bool_t is_dir;
