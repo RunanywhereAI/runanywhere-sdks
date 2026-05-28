@@ -16,6 +16,8 @@ const char* rac_audio_pipeline_state_name(rac_audio_pipeline_state_t state) {
     switch (state) {
         case RAC_AUDIO_PIPELINE_IDLE:
             return "idle";
+        case RAC_AUDIO_PIPELINE_WAITING_WAKEWORD:
+            return "waitingWakeWord";
         case RAC_AUDIO_PIPELINE_LISTENING:
             return "listening";
         case RAC_AUDIO_PIPELINE_PROCESSING_SPEECH:
@@ -38,6 +40,7 @@ rac_bool_t rac_audio_pipeline_can_activate_microphone(rac_audio_pipeline_state_t
                                                       int64_t cooldown_duration_ms) {
     switch (current_state) {
         case RAC_AUDIO_PIPELINE_IDLE:
+        case RAC_AUDIO_PIPELINE_WAITING_WAKEWORD:
         case RAC_AUDIO_PIPELINE_LISTENING:
             if (last_tts_end_time_ms > 0) {
                 int64_t now_ms = rac_get_current_time_ms();
@@ -72,8 +75,17 @@ rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t fro
 
     switch (from_state) {
         case RAC_AUDIO_PIPELINE_IDLE:
-            return (to_state == RAC_AUDIO_PIPELINE_LISTENING ||
+            return (to_state == RAC_AUDIO_PIPELINE_WAITING_WAKEWORD ||
+                    to_state == RAC_AUDIO_PIPELINE_LISTENING ||
                     to_state == RAC_AUDIO_PIPELINE_COOLDOWN)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+
+        // Wake-word mode: armed from IDLE/COOLDOWN, advances to LISTENING on
+        // detection, or back to IDLE when the session stops.
+        case RAC_AUDIO_PIPELINE_WAITING_WAKEWORD:
+            return (to_state == RAC_AUDIO_PIPELINE_LISTENING ||
+                    to_state == RAC_AUDIO_PIPELINE_IDLE)
                        ? RAC_TRUE
                        : RAC_FALSE;
 
@@ -102,7 +114,10 @@ rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t fro
                        : RAC_FALSE;
 
         case RAC_AUDIO_PIPELINE_COOLDOWN:
-            return (to_state == RAC_AUDIO_PIPELINE_IDLE) ? RAC_TRUE : RAC_FALSE;
+            return (to_state == RAC_AUDIO_PIPELINE_IDLE ||
+                    to_state == RAC_AUDIO_PIPELINE_WAITING_WAKEWORD)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
 
         case RAC_AUDIO_PIPELINE_ERROR:
             return (to_state == RAC_AUDIO_PIPELINE_IDLE) ? RAC_TRUE : RAC_FALSE;
