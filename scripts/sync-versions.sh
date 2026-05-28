@@ -16,10 +16,9 @@
 #   sdk/runanywhere-commons/VERSION                        (single line)
 #   sdk/runanywhere-commons/VERSIONS                       (PROJECT_VERSION line)
 #   Package.swift                                          (sdkVersion line)
-#   sdk/runanywhere-swift/.../SDKConstants.swift           (public `RunAnywhere.version`)
 #   sdk/runanywhere-swift/.../Generated/Versions.swift     (RAVersions.sdkVersion)
 #   sdk/runanywhere-kotlin/gradle.properties               (runanywhere.nativeLibVersion + SDK_VERSION)
-#   sdk/runanywhere-kotlin/.../SDKConstants.kt             (Kotlin VERSION constant)
+#   sdk/runanywhere-kotlin/src/main/.../SDKConstants.kt    (Kotlin VERSION constant)
 #   sdk/shared/proto-ts/package.json                       (proto-ts package version)
 #   sdk/runanywhere-web/package.json                       (root version)
 #   sdk/runanywhere-web/packages/*/package.json            (each package version)
@@ -33,6 +32,10 @@
 #   dependencies/versions.json                             (@runanywhere/proto-ts pin — first-party suite version)
 #
 # Does NOT touch (intentional, documented SoT for distinct domains):
+#   - sdk/runanywhere-swift/.../SDKConstants.swift — its `version` constant now
+#     reads `rac_sdk_get_version()` from commons at runtime (single source of
+#     truth = sdk/runanywhere-commons/VERSION above), so it has no literal to
+#     bump. See commons-130.
 #   - SwiftPM XCFramework checksums — use sync-checksums.sh after release zips exist.
 #   - sdk/runanywhere-commons/VERSIONS dep-pin lines (ONNX/Sherpa/llama.cpp) —
 #     those track UPSTREAM library versions, not OUR release version.
@@ -165,10 +168,10 @@ if [ -f "$SWIFT_VERSION_FILE" ]; then
     echo "$NEW_VERSION" > "$SWIFT_VERSION_FILE"
     echo "  bumped: sdk/runanywhere-swift/VERSION"
 fi
-# SDKConstants.swift — public API `RunAnywhere.version` surface
-bump_line "${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift" \
-    'public static let version = "[^"]+"' \
-    "public static let version = \"${NEW_VERSION}\""
+# SDKConstants.swift is intentionally NOT bumped here: its `version` constant
+# now reads `rac_sdk_get_version()` from commons at runtime (single source of
+# truth = sdk/runanywhere-commons/VERSION above), so there is no string literal
+# to rewrite. See commons-130.
 # Versions.swift — RAVersions.sdkVersion (centralized version constant whose
 # file header explicitly states `Do not hand-edit; run scripts/sync-versions.sh
 # to refresh.`). The other RAVersions literals (swiftToolsVersion, dep floors)
@@ -196,7 +199,7 @@ if [ -f "$KOTLIN_PROPS" ]; then
     fi
 fi
 # Kotlin public `RunAnywhere.version` surface (mirrors Swift SDKConstants.version).
-bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
+bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
     'const val VERSION = "[^"]+"' \
     "const val VERSION = \"${NEW_VERSION}\""
 

@@ -1,3 +1,5 @@
+import CRACommons
+
 /// SDK-wide constants (metadata only)
 /// Capability-specific constants are in their respective capabilities:
 /// - LLMConstants (LLM capability)
@@ -6,10 +8,10 @@
 /// - LifecycleConstants (Lifecycle capability)
 /// - RegistryConstants (Registry capability)
 public enum SDKConstants {
-    /// SDK version - must match `sdk/runanywhere-commons/VERSION` and
-    /// `sdk/runanywhere-swift/VERSION`. Updated by `scripts/sync-versions.sh`
-    /// (see SDK_CONSTANTS_SWIFT bump in that script).
-    public static let version = "0.19.13"
+    /// SDK version. Single source of truth is `sdk/runanywhere-commons/VERSION`,
+    /// exposed through `rac_sdk_get_version()`, so the value reported here can
+    /// never drift from the version commons reports in telemetry / auth headers.
+    public static let version = String(cString: rac_sdk_get_version())
 
     /// SDK name
     public static let name = "RunAnywhere SDK"

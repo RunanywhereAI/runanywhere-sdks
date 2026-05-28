@@ -88,6 +88,19 @@ RAC_API rac_bool_t rac_is_initialized(void);
 RAC_API rac_version_t rac_get_version(void);
 
 /**
+ * Gets the canonical SDK version string.
+ *
+ * Returns the value of `sdk/runanywhere-commons/VERSION`, injected at build
+ * time via the RAC_VERSION_STRING compile define. This is the single source of
+ * truth every platform SDK delegates to for its public `version` constant
+ * instead of hand-maintaining a copy that can drift.
+ *
+ * @return Static, NUL-terminated version string (e.g. "0.19.13"); never NULL,
+ *         valid for the lifetime of the process. Do not free.
+ */
+RAC_API const char* rac_sdk_get_version(void);
+
+/**
  * Configures logging based on the environment.
  *
  * This configures C++ local logging (stderr) based on the environment:

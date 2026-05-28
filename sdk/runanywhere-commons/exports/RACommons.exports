@@ -48,6 +48,7 @@ _rac_init
 _rac_is_initialized
 _rac_shutdown
 _rac_get_version
+_rac_sdk_get_version
 _rac_log
 
 # Time

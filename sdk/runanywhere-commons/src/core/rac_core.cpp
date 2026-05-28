@@ -8,6 +8,8 @@
 #include "rac/core/rac_core.h"
 
 #include <atomic>
+#include <cstdint>
+#include <cstdio>
 #include <mutex>
 #include <string>
 
@@ -48,10 +50,30 @@ static std::mutex s_model_registry_mutex;
 static rac_lora_registry_handle_t s_lora_registry = nullptr;
 static std::mutex s_lora_registry_mutex;
 
-// Version info
-static const char* s_version_string = "1.0.0";
-static const rac_version_t s_version = {
-    .major = 1, .minor = 0, .patch = 0, .string = s_version_string};
+// Version info — single source of truth is sdk/runanywhere-commons/VERSION,
+// injected at configure time as the RAC_VERSION_STRING compile define by
+// CMakeLists.txt. The "0.0.0" literal is a compile-time fallback that only
+// applies to a stray TU compiled without the define; real builds always carry
+// the canonical VERSION so rac_get_version() never reports a placeholder.
+#ifndef RAC_VERSION_STRING
+#define RAC_VERSION_STRING "0.0.0"
+#endif
+static const char* s_version_string = RAC_VERSION_STRING;
+
+// Parse "major.minor.patch[-suffix]" from the canonical version string once so
+// the numeric fields stay in lockstep with the string instead of being a
+// hand-maintained second copy that can drift (the prior 1.0.0/string mismatch).
+static rac_version_t make_version(void) {
+    rac_version_t v = {.major = 0, .minor = 0, .patch = 0, .string = s_version_string};
+    unsigned int major = 0, minor = 0, patch = 0;
+    if (std::sscanf(s_version_string, "%u.%u.%u", &major, &minor, &patch) == 3) {
+        v.major = static_cast<uint16_t>(major);
+        v.minor = static_cast<uint16_t>(minor);
+        v.patch = static_cast<uint16_t>(patch);
+    }
+    return v;
+}
+static const rac_version_t s_version = make_version();
 
 // =============================================================================
 // INTERNAL LOGGING HELPER
@@ -186,6 +208,10 @@ rac_bool_t rac_is_initialized(void) {
 
 rac_version_t rac_get_version(void) {
     return s_version;
+}
+
+const char* rac_sdk_get_version(void) {
+    return s_version_string;
 }
 
 rac_result_t rac_configure_logging(rac_environment_t environment) {

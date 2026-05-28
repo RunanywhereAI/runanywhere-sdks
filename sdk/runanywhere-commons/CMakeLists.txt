@@ -993,6 +993,13 @@ endif()
 # this define, so accidental SDK-side inclusion still triggers the warning.
 target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
 
+# Canonical SDK version string (from the VERSION file) injected as a compile
+# define so rac_get_version()/rac_sdk_get_version() return the real release
+# version. Single source of truth: sdk/runanywhere-commons/VERSION -> RAC_VERSION
+# (read at the top of this file). Every platform SDK delegates its public
+# version constant to this value instead of hand-maintaining a copy.
+target_compile_definitions(rac_commons PRIVATE RAC_VERSION_STRING="${RAC_VERSION}")
+
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
     target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_SHARED=1)
