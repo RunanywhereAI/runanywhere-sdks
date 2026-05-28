@@ -23,13 +23,18 @@ extension CppBridge {
         private static let logger = SDKLogger(category: "CppBridge.Platform")
         private static var isInitialized = false
 
-        // MARK: - Service Instances
-
-        /// Cached Foundation Models service (type-erased for iOS 26+ availability)
-        private static var foundationModelsService: (any Sendable)?
-
-        /// Cached System TTS service instance
-        private static var systemTTSService: SystemTTSService?
+        // MARK: - Service Handle Convention
+        //
+        // The platform C ABI (`rac_platform_llm_create_fn` /
+        // `rac_platform_tts_create_fn`) documents the create return value as a
+        // "Swift object pointer". We honour that literally: `create` retains the
+        // freshly built service with `Unmanaged.passRetained` and returns its
+        // opaque pointer as the `rac_handle_t`. `generate` / `synthesize` /
+        // `stop` recover the same instance with `takeUnretainedValue()`, and
+        // `destroy` balances the retain with `takeRetainedValue()`. Storing the
+        // service inside the handle (rather than a single static slot) keeps
+        // each session self-contained and supports concurrent sessions, mirroring
+        // the `ProtoStreamContext` Unmanaged idiom used elsewhere in this bridge.
 
         // MARK: - Initialization
 
@@ -105,8 +110,6 @@ extension CppBridge {
             guard isInitialized else { return }
 
             _ = rac_backend_platform_unregister()
-            foundationModelsService = nil
-            systemTTSService = nil
             isInitialized = false
             logger.info("Platform backend unregistered")
         }
@@ -162,10 +165,10 @@ extension CppBridge {
                     do {
                         let service = SystemFoundationModelsService()
                         try await service.initialize(modelPath: "built-in")
-                        Platform.foundationModelsService = service
 
-                        // Return a marker handle - actual service is managed by Swift
-                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
+                        // Retain the service and hand its opaque pointer back as
+                        // the handle; `generate`/`destroy` recover it via Unmanaged.
+                        serviceHandle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
                         Platform.logger.info("Foundation Models service created")
                     } catch {
                         Platform.logger.error("Failed to create Foundation Models service: \(error)")
@@ -178,8 +181,9 @@ extension CppBridge {
                 return serviceHandle
             }
 
-            callbacks.generate = { _, promptPtr, _, outResponsePtr, _ -> rac_result_t in
-                guard let promptPtr = promptPtr,
+            callbacks.generate = { handle, promptPtr, _, outResponsePtr, _ -> rac_result_t in
+                guard let handle = handle,
+                      let promptPtr = promptPtr,
                       let outResponsePtr = outResponsePtr else {
                     return RAC_ERROR_INVALID_PARAMETER
                 }
@@ -188,9 +192,8 @@ extension CppBridge {
                     return RAC_ERROR_NOT_SUPPORTED
                 }
 
-                guard let service = Platform.foundationModelsService as? SystemFoundationModelsService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
+                let service = Unmanaged<SystemFoundationModelsService>
+                    .fromOpaque(handle).takeUnretainedValue()
 
                 let prompt = String(cString: promptPtr)
 
@@ -217,8 +220,12 @@ extension CppBridge {
                 return result
             }
 
-            callbacks.destroy = { _, _ in
-                Platform.foundationModelsService = nil
+            callbacks.destroy = { handle, _ in
+                guard let handle = handle else { return }
+                // The handle can only have been minted by `create`, which is
+                // gated to iOS/macOS 26+, so the release is too.
+                guard #available(iOS 26.0, macOS 26.0, *) else { return }
+                Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
                 Platform.logger.debug("Foundation Models service destroyed")
             }
 
@@ -262,24 +269,22 @@ extension CppBridge {
                 // This ensures proper thread safety for AVSpeechSynthesizer
                 DispatchQueue.main.sync {
                     let service = SystemTTSService()
-                    Platform.systemTTSService = service
 
-                    // Return a marker handle
-                    serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
+                    // Retain the service and hand its opaque pointer back as the
+                    // handle; synthesize/stop/destroy recover it via Unmanaged.
+                    serviceHandle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
                     Platform.logger.info("System TTS service created")
                 }
 
                 return serviceHandle
             }
 
-            callbacks.synthesize = { _, textPtr, optionsPtr, _ -> rac_result_t in
-                guard let textPtr = textPtr else {
+            callbacks.synthesize = { handle, textPtr, optionsPtr, _ -> rac_result_t in
+                guard let handle = handle, let textPtr = textPtr else {
                     return RAC_ERROR_INVALID_PARAMETER
                 }
 
-                guard let service = Platform.systemTTSService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeUnretainedValue()
 
                 let text = String(cString: textPtr)
 
@@ -323,16 +328,21 @@ extension CppBridge {
                 return result
             }
 
-            callbacks.stop = { _, _ in
+            callbacks.stop = { handle, _ in
+                guard let handle = handle else { return }
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeUnretainedValue()
                 DispatchQueue.main.async {
-                    Platform.systemTTSService?.stop()
+                    service.stop()
                 }
             }
 
-            callbacks.destroy = { _, _ in
+            callbacks.destroy = { handle, _ in
+                guard let handle = handle else { return }
+                // Recover the +1 retain from `create`; stop on the main actor
+                // first, then drop the final reference so the service deinits.
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeRetainedValue()
                 DispatchQueue.main.async {
-                    Platform.systemTTSService?.stop()
-                    Platform.systemTTSService = nil
+                    service.stop()
                     Platform.logger.debug("System TTS service destroyed")
                 }
             }
@@ -345,19 +355,6 @@ extension CppBridge {
             } else {
                 logger.error("Failed to register TTS callbacks: \(result)")
             }
-        }
-
-        // MARK: - Service Access
-
-        /// Get the cached Foundation Models service (if created)
-        @available(iOS 26.0, macOS 26.0, *)
-        public static func getFoundationModelsService() -> SystemFoundationModelsService? {
-            return foundationModelsService as? SystemFoundationModelsService
-        }
-
-        /// Get the cached System TTS service (if created)
-        public static func getSystemTTSService() -> SystemTTSService? {
-            return systemTTSService
         }
     }
 }
