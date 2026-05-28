@@ -65,6 +65,12 @@ class SDKException implements Exception {
       category: category,
       message: message,
     );
+    // Round-trip C ABI code: positive proto code ↔ negative rac_result_t.
+    // Mirrors Swift: `if raw > 0 && raw <= 899 { proto.cAbiCode = -Int32(raw) }`.
+    final raw = code.value;
+    if (raw > 0 && raw <= 899) {
+      err.cAbiCode = -raw;
+    }
     if (fieldPath != null) {
       err.context =
           pb.ErrorContext(metadata: <String, String>{'field_path': fieldPath}.entries);
