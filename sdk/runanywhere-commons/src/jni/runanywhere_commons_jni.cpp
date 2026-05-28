@@ -733,9 +733,13 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
         static_cast<jstring>(env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
     env->DeleteLocalRef(jKey);
 
+    // Contract (rac_platform_adapter.h secure_get): MUST return
+    // RAC_ERROR_FILE_NOT_FOUND on a clean key-miss so commons consumers can
+    // discriminate misses from real keychain failures. The Kotlin callback
+    // returns null for the miss case (see CppBridgePlatformAdapter.secureGetCallback).
     if (result == nullptr) {
         *out_value = nullptr;
-        return RAC_ERROR_NOT_FOUND;
+        return RAC_ERROR_FILE_NOT_FOUND;
     }
 
     const char* chars = env->GetStringUTFChars(result, nullptr);
