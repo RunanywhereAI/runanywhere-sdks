@@ -284,22 +284,54 @@ extension RAThinkingTagPattern: Codable {
 extension RAArchiveType: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        switch raw.lowercased() {
-        case "zip":              self = .zip
-        case "tar.bz2", "tbz2":  self = .tarBz2
-        case "tar.gz", "tgz":   self = .tarGz
-        case "tar.xz", "txz":   self = .tarXz
-        default:                 self = .unspecified
-        }
+        self = RAArchiveType.fromWireString(raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(self.fileExtension)
+        try container.encode(self.wireString)
     }
 }
 
 public extension RAArchiveType {
+    /// Canonical proto wire string (e.g. `ARCHIVE_TYPE_ZIP`). The proto enum
+    /// has no `rac_archive_type_wire_string` ABI, so the name is built from the
+    /// value to stay aligned with `idl/model_types.proto`'s `ARCHIVE_TYPE_*`.
+    var wireString: String {
+        switch self {
+        case .unspecified: return "ARCHIVE_TYPE_UNSPECIFIED"
+        case .zip:         return "ARCHIVE_TYPE_ZIP"
+        case .tarBz2:      return "ARCHIVE_TYPE_TAR_BZ2"
+        case .tarGz:       return "ARCHIVE_TYPE_TAR_GZ"
+        case .tarXz:       return "ARCHIVE_TYPE_TAR_XZ"
+        default:           return "ARCHIVE_TYPE_UNSPECIFIED"
+        }
+    }
+
+    /// Parse a `RAArchiveType` from a wire string. Matches case-insensitively
+    /// against the canonical proto-name `wireString` (e.g. `ARCHIVE_TYPE_ZIP`)
+    /// AND the legacy short extension from `rac_archive_type_extension`
+    /// (e.g. `zip`, `tar.bz2`, `tbz2`). The legacy fallback preserves Codable
+    /// round-trip for persisted model metadata written with the pre-IDL short
+    /// names, mirroring `RAModelFormat.fromWireString`.
+    static func fromWireString(_ raw: String) -> RAArchiveType? {
+        let lowered = raw.lowercased()
+        switch lowered {
+        case "tbz2": return .tarBz2
+        case "tgz":  return .tarGz
+        case "txz":  return .tarXz
+        default:     break
+        }
+        for type in RAArchiveType.allCases {
+            if type.wireString.lowercased() == lowered { return type }
+            if !type.fileExtension.isEmpty,
+               type.fileExtension.lowercased() == lowered {
+                return type
+            }
+        }
+        return nil
+    }
+
     /// File extension used in URLs, sourced from
     /// `rac_archive_type_extension` (e.g. "zip", "tar.bz2").
     var fileExtension: String {
