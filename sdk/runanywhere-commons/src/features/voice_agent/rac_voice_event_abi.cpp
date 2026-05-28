@@ -39,6 +39,79 @@
 
 namespace {
 
+// commons-040/041: The voice-agent pipeline (voice_agent_pipeline.cpp:319-330)
+// wraps TTS Float32 PCM in a 44-byte WAV header (Int16 PCM container) before
+// emitting RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED. The C-struct audio arm
+// has no metadata fields, so we inspect the bytes here: a valid WAV container
+// is unambiguously identified by the "RIFF....WAVE" magic, and the sample
+// rate / bits-per-sample are stored at fixed offsets. When detected, we strip
+// the header and emit the contained raw PCM with accurate encoding +
+// sample_rate so proto-only consumers (Kotlin Flow, Dart Stream, RN/TS
+// AsyncIterable) can pipe the bytes straight into their decoder.
+//
+// If the bytes are not a WAV (length < 44 or magic mismatch), we treat them
+// as raw float32 PCM at the legacy default — preserving the in-process
+// direct-call path used by tests and any future raw producers.
+struct DecodedAudio {
+    const void* data;     // pointer into the source buffer (or original buffer)
+    size_t size;          // size of @data in bytes
+    int32_t sample_rate;  // best-effort source sample rate (0 = unknown)
+    int32_t channels;     // 1 if WAV is mono / unknown
+    // proto enum value for runanywhere::v1::AudioEncoding. Kept as int so this
+    // header doesn't drag in the .pb.h: 1 = PCM_F32_LE, 2 = PCM_S16_LE.
+    int32_t encoding_enum;
+};
+
+// Default fallback when the bytes carry no inline metadata. Matches the
+// legacy contract — raw float32 PCM at 24kHz (Kokoro defaults) — so the
+// unit test in test_proto_event_dispatch.cpp keeps round-tripping.
+constexpr int32_t kAudioDefaultSampleRate = 24000;
+constexpr int32_t kAudioEncodingPcmF32Le = 1;
+constexpr int32_t kAudioEncodingPcmS16Le = 2;
+
+inline uint32_t read_u32_le(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
+}
+
+inline uint16_t read_u16_le(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+DecodedAudio decode_audio_payload(const void* audio_data, size_t audio_size) {
+    DecodedAudio out{audio_data, audio_size, kAudioDefaultSampleRate, /*channels=*/1,
+                     kAudioEncodingPcmF32Le};
+    if (audio_data == nullptr || audio_size < 44) {
+        return out;
+    }
+    const auto* bytes = static_cast<const uint8_t*>(audio_data);
+    // RIFF/WAVE fmt-PCM container produced by rac_audio_float32_to_wav. We
+    // only support that exact shape (mono, Int16, fmt chunk first) — anything
+    // else (extensible fmt, multi-channel WAVE, non-PCM codec) falls through
+    // to the raw default rather than emit a half-decoded payload.
+    if (std::memcmp(bytes, "RIFF", 4) != 0 || std::memcmp(bytes + 8, "WAVE", 4) != 0 ||
+        std::memcmp(bytes + 12, "fmt ", 4) != 0 || std::memcmp(bytes + 36, "data", 4) != 0) {
+        return out;
+    }
+    const uint16_t audio_format = read_u16_le(bytes + 20);
+    const uint16_t channels = read_u16_le(bytes + 22);
+    const uint32_t sample_rate = read_u32_le(bytes + 24);
+    const uint16_t bits_per_sample = read_u16_le(bytes + 34);
+    if (audio_format != 1 /* PCM */ || channels != 1 || bits_per_sample != 16) {
+        return out;
+    }
+    const uint32_t data_size = read_u32_le(bytes + 40);
+    if (static_cast<size_t>(data_size) > audio_size - 44) {
+        return out;
+    }
+    out.data = bytes + 44;
+    out.size = data_size;
+    out.sample_rate = static_cast<int32_t>(sample_rate);
+    out.channels = static_cast<int32_t>(channels);
+    out.encoding_enum = kAudioEncodingPcmS16Le;
+    return out;
+}
+
 /** Registered (callback, user_data) per handle. */
 struct CallbackSlot {
     rac_voice_agent_proto_event_callback_fn fn = nullptr;
@@ -198,14 +271,20 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
             auto* a = dst.mutable_audio();
-            if (src.data.audio.audio_data && src.data.audio.audio_size > 0) {
-                a->set_pcm(src.data.audio.audio_data, src.data.audio.audio_size);
+            // commons-040/041: the pipeline wraps TTS output in a WAV
+            // container at the real TTS sample rate (Piper=22050, Kokoro=24000,
+            // espeak=22050). Decode the container so the proto wire matches
+            // the bytes the consumer receives, instead of mis-tagging a WAV
+            // payload as raw f32@24kHz.
+            const DecodedAudio decoded =
+                decode_audio_payload(src.data.audio.audio_data, src.data.audio.audio_size);
+            if (decoded.data && decoded.size > 0) {
+                a->set_pcm(decoded.data, decoded.size);
             }
-            /* Encoding metadata not yet plumbed through the C struct; the
-             * agent emits 24kHz mono f32 today (Kokoro defaults). */
-            a->set_sample_rate_hz(24000);
-            a->set_channels(1);
-            a->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
+            a->set_sample_rate_hz(decoded.sample_rate);
+            a->set_channels(decoded.channels);
+            a->set_encoding(
+                static_cast<runanywhere::v1::AudioEncoding>(decoded.encoding_enum));
             break;
         }
 
@@ -493,15 +572,16 @@ void encode_assistant_token(std::vector<uint8_t>& s, const char* text) {
     wire_enum_field(s, 3, 1);
 }
 
-void encode_audio_frame(std::vector<uint8_t>& s, const void* pcm, size_t pcm_size) {
+void encode_audio_frame(std::vector<uint8_t>& s, const void* pcm, size_t pcm_size,
+                        int32_t sample_rate_hz, int32_t channels, int32_t encoding_enum) {
     /*  1: bytes pcm              */
     wire_bytes_field(s, 1, pcm, pcm_size);
-    /*  2: int32 sample_rate_hz   (24000) */
-    wire_int32_field(s, 2, 24000);
-    /*  3: int32 channels         (1) */
-    wire_int32_field(s, 3, 1);
-    /*  4: enum  encoding         (1 = AUDIO_ENCODING_PCM_F32_LE) */
-    wire_enum_field(s, 4, 1);
+    /*  2: int32 sample_rate_hz   (real TTS rate — Piper=22050, Kokoro=24000) */
+    wire_int32_field(s, 2, sample_rate_hz);
+    /*  3: int32 channels         */
+    wire_int32_field(s, 3, channels);
+    /*  4: enum  encoding         (1 = AUDIO_ENCODING_PCM_F32_LE, 2 = PCM_S16_LE) */
+    wire_enum_field(s, 4, encoding_enum);
 }
 
 void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
@@ -511,9 +591,10 @@ void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
     wire_enum_field(s, 1, 3);
     /*  2: int64 frame_offset_us (default 0 → omitted) */
     /*  4: bool  is_speech  (proto3 omits defaults; emit only when true)     */
-    if (speech_active) {
-        wire_enum_field(s, 4, 1);
-    }
+    // commons-170: use the bool helper (semantically identical bytes today —
+    // tag(4, varint) + 0x01 — but typed correctly so future is_speech changes
+    // can't accidentally pass enum values > 1 via the wrong helper).
+    wire_bool_field(s, 4, speech_active);
 }
 
 void encode_state_change(std::vector<uint8_t>& s, int32_t previous, int32_t current) {
@@ -637,10 +718,15 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
         }
 
         case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
-            const void* pcm = event->data.audio.audio_data;
-            const size_t len = event->data.audio.audio_size;
-            wire_submessage(scratch, /*field=*/12,
-                            [&](std::vector<uint8_t>& s) { encode_audio_frame(s, pcm, len); });
+            // commons-040/041: decode WAV container (if present) so the
+            // hand-encoded wire matches the protobuf path and consumers
+            // receive raw PCM with accurate sample_rate/encoding metadata.
+            const DecodedAudio decoded =
+                decode_audio_payload(event->data.audio.audio_data, event->data.audio.audio_size);
+            wire_submessage(scratch, /*field=*/12, [&](std::vector<uint8_t>& s) {
+                encode_audio_frame(s, decoded.data, decoded.size, decoded.sample_rate,
+                                   decoded.channels, decoded.encoding_enum);
+            });
             break;
         }
 
