@@ -63,6 +63,10 @@ struct RouteResult {
 /**
  * @brief Stateless scorer over the global plugin registry.
  *
+ * Non-C++ callers reach this through the C ABI wrapper `rac_plugin_route`;
+ * the `rac::router::` namespace is the C++ equivalent of the `rac_` public-
+ * symbol prefix used for C ABI types in this SDK.
+ *
  * Construct once per call site (or once per process) and re-use. Thread-safe;
  * each `route()` call snapshots the registry under its lock, then scores
  * outside the lock so concurrent registrations don't block routing.
@@ -76,7 +80,12 @@ struct RouteResult {
  */
 class EngineRouter {
    public:
-    explicit EngineRouter(const HardwareProfile& profile);
+    /* commons-098: store the profile by value rather than by reference so the
+     * router has no lifetime contract on its constructor argument — temporaries
+     * such as `EngineRouter(HardwareProfile::detect())` are safe. The profile
+     * struct is small (a few enums + bools + one short string) so the
+     * single per-construction copy is negligible compared to a routing call. */
+    explicit EngineRouter(HardwareProfile profile);
 
     /** Pick the single best plugin. */
     RouteResult route(const RouteRequest& req) const;
@@ -92,7 +101,7 @@ class EngineRouter {
     /** True iff the vtable serves this primitive (slot is non-NULL). */
     bool serves(const rac_engine_vtable_t& vt, rac_primitive_t p) const;
 
-    const HardwareProfile& profile_;
+    HardwareProfile profile_;
 };
 
 }  // namespace rac::router

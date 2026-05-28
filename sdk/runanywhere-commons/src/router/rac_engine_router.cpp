@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "plugin/plugin_registry_internal.h"
@@ -197,7 +198,7 @@ bool matches_model_format(const rac_engine_vtable_t& vt, uint32_t format) {
 
 }  // namespace
 
-EngineRouter::EngineRouter(const HardwareProfile& profile) : profile_(profile) {}
+EngineRouter::EngineRouter(HardwareProfile profile) : profile_(std::move(profile)) {}
 
 bool EngineRouter::serves(const rac_engine_vtable_t& vt, rac_primitive_t p) const {
     return rac_engine_vtable_slot(&vt, p) != nullptr;
