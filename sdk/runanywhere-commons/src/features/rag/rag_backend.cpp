@@ -166,10 +166,18 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
     doc_chunks.reserve(chunks.size());
 
     for (size_t i = 0; i < chunks.size(); ++i) {
+        // Atomic ingest: if any chunk failed to embed (empty vector from
+        // embed_text fallback) or returned the wrong dimension, abort the
+        // whole document instead of silently skipping. Skipping leaves the
+        // caller's RAGStatistics looking like a successful ingest while
+        // future queries against those chunks silently never match — data
+        // loss without notification. Callers see this as
+        // RAC_ERROR_PROCESSING_FAILED via rac_rag_ingest_proto.
         if (embeddings[i].size() != embedding_dimension) {
-            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu", i,
-                 embeddings[i].size(), embedding_dimension);
-            continue;
+            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
+                 "document ingest",
+                 i, embeddings[i].size(), embedding_dimension);
+            return false;
         }
 
         DocumentChunk chunk;
