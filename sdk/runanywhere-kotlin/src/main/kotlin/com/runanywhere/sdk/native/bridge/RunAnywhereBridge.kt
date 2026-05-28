@@ -1086,6 +1086,9 @@ object RunAnywhereBridge {
     /** Create a RAG session. Returns 0 on failure. */
     @JvmStatic external fun racRagSessionCreateProto(configProto: ByteArray): Long
 
+    /** Create a RAG session and write the native rac_result_t into outRc[0]. */
+    @JvmStatic external fun racRagSessionCreateProtoWithError(configProto: ByteArray, outRc: IntArray): Long
+
     /** Destroy a RAG session and release all resources. */
     @JvmStatic external fun racRagSessionDestroyProto(handle: Long)
 
