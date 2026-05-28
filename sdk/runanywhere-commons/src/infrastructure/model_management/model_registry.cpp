@@ -2840,37 +2840,57 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
 
 namespace {
 
-constexpr size_t kRescanInitialEntryCapacity = 64;
 constexpr size_t kRescanMaxEntryCapacity = 4096;
 
-// List a directory through the platform adapter. Resizes the entry buffer to
-// fit. Returns RAC_SUCCESS on success (entries.size() is the count) or the
-// callback's error code (FILE_NOT_FOUND when the directory does not exist).
+// List a directory through the platform adapter using the POSIX two-call
+// contract documented on `rac_file_list_directory_fn`: first call with
+// out_entries=NULL to learn the required entry count, then allocate and call
+// again with a buffer of at least that capacity. Header-compliant adapters
+// (e.g. the Web TypeScript implementation) never write more than the capacity
+// we pass on the second call, so we cannot rely on a "needed more space"
+// signal — we must size up-front.
 rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, const char* dir_path,
                                         std::vector<rac_directory_entry_t>* out_entries) {
     if (!adapter || !adapter->file_list_directory || !dir_path || !out_entries) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     out_entries->clear();
-    size_t capacity = kRescanInitialEntryCapacity;
-    while (capacity <= kRescanMaxEntryCapacity) {
-        out_entries->resize(capacity);
-        size_t count = capacity;
-        rac_result_t rc =
-            adapter->file_list_directory(dir_path, out_entries->data(), &count, adapter->user_data);
-        if (rc != RAC_SUCCESS) {
-            out_entries->clear();
-            return rc;
-        }
-        if (count <= capacity) {
-            out_entries->resize(count);
-            return RAC_SUCCESS;
-        }
-        // Caller asked for more space than we provided — grow and retry.
-        capacity = count;
+
+    // Step 1: capacity probe.
+    size_t required = 0;
+    rac_result_t probe_rc =
+        adapter->file_list_directory(dir_path, /*out_entries=*/nullptr, &required, adapter->user_data);
+    if (probe_rc != RAC_SUCCESS) {
+        return probe_rc;
     }
-    out_entries->clear();
-    return RAC_ERROR_OUT_OF_MEMORY;
+    if (required == 0) {
+        return RAC_SUCCESS;
+    }
+    if (required > kRescanMaxEntryCapacity) {
+        // Defensive cap to keep refresh sweep bounded even on pathological dirs.
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Step 2: allocate and fetch. Use a small headroom in case the directory
+    // gained entries between the probe and the read; entries written beyond
+    // the probed count are still safe because we resize to the actual count
+    // the adapter reports.
+    const size_t capacity = required + 4;
+    out_entries->resize(capacity);
+    size_t count = capacity;
+    rac_result_t fill_rc =
+        adapter->file_list_directory(dir_path, out_entries->data(), &count, adapter->user_data);
+    if (fill_rc != RAC_SUCCESS) {
+        out_entries->clear();
+        return fill_rc;
+    }
+    if (count > capacity) {
+        // Header forbids this, but guard against a buggy adapter — never
+        // expose entries we did not actually receive.
+        count = capacity;
+    }
+    out_entries->resize(count);
+    return RAC_SUCCESS;
 }
 
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
@@ -3281,11 +3301,26 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
-    // Collect discovered models
+    // Lock-copy-dispatch: snapshot the registered ids (and which ones already
+    // have a local_path) under the lock, then drop it for the entire
+    // filesystem scan. Platform callbacks (Swift FileManager, Kotlin
+    // Files.exists, dart_ffi) MUST NOT be invoked while holding handle->mutex
+    // — they can stall on cold OS caches and may re-enter registry APIs via
+    // SDK glue, which would deadlock. Matches the event publisher's
+    // lock-copy-dispatch pattern documented in commons AGENTS.md.
+    std::map<std::string, bool> needs_link_by_id;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        for (const auto& pair : handle->models) {
+            const rac_model_info_t* model = pair.second;
+            const bool needs_link = !model || !model->local_path || model->local_path[0] == '\0';
+            needs_link_by_id.emplace(pair.first, needs_link);
+        }
+    }
+
+    // Collect discovered models (unlocked phase — no handle->mutex held).
     std::vector<rac_discovered_model_t> discovered;
     size_t unregistered = 0;
-
-    std::lock_guard<std::mutex> lock(handle->mutex);
 
     for (size_t f = 0; f < framework_count; f++) {
         rac_inference_framework_t framework = frameworks[f];
@@ -3343,39 +3378,37 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
                 continue;
             }
 
-            // Check if this model is registered
-            auto it = handle->models.find(model_id);
-            if (it != handle->models.end()) {
-                // Model is registered - check if it needs update
-                rac_model_info_t* model = it->second;
-
-                if (!model->local_path || strlen(model->local_path) == 0) {
-                    // Update the local path
-                    if (model->local_path) {
-                        free(model->local_path);
-                    }
-                    model->local_path = rac_strdup(model_path.c_str());
-                    model->updated_at = rac_get_current_time_ms() / 1000;
-#ifdef RAC_HAVE_PROTOBUF
-                    store_proto_snapshot_locked(handle, model_id, model,
-                                                /*preserve_proto_only_fields=*/true,
-                                                /*overwrite_registry_state=*/true);
-#endif
-
-                    // Add to discovered list
-                    rac_discovered_model_t disc;
-                    disc.model_id = rac_strdup(model_id);
-                    disc.local_path = rac_strdup(model_path.c_str());
-                    disc.framework = framework;
-                    discovered.push_back(disc);
-
-                    RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
-                }
-            } else {
+            // Check if this model is registered (using snapshot taken above)
+            auto snap_it = needs_link_by_id.find(model_id);
+            if (snap_it == needs_link_by_id.end()) {
                 // Model folder exists but not registered
                 unregistered++;
                 RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
+                continue;
             }
+            if (!snap_it->second) {
+                // Already linked at snapshot time — nothing to do.
+                continue;
+            }
+
+            // Apply the link under the registry's own lock via the canonical
+            // update entry point (it takes/releases handle->mutex briefly).
+            rac_result_t link_rc =
+                rac_model_registry_update_download_status(handle, model_id, model_path.c_str());
+            if (link_rc != RAC_SUCCESS) {
+                RAC_LOG_WARNING("ModelRegistry", "Discovery: failed to link '%s' (rc=%d)", model_id,
+                                static_cast<int>(link_rc));
+                continue;
+            }
+
+            // Add to discovered list
+            rac_discovered_model_t disc;
+            disc.model_id = rac_strdup(model_id);
+            disc.local_path = rac_strdup(model_path.c_str());
+            disc.framework = framework;
+            discovered.push_back(disc);
+
+            RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
         }
 
         if (callbacks->free_entries) {
