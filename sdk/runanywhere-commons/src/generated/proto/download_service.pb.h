@@ -61,6 +61,8 @@ enum DownloadStage : int;
 extern const uint32_t DownloadStage_internal_data_[];
 enum DownloadState : int;
 extern const uint32_t DownloadState_internal_data_[];
+enum HttpDownloadStatus : int;
+extern const uint32_t HttpDownloadStatus_internal_data_[];
 class DownloadCancelRequest;
 struct DownloadCancelRequestGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -159,6 +161,9 @@ internal::EnumTraitsT<::runanywhere::v1::DownloadStage_internal_data_>
 template <>
 internal::EnumTraitsT<::runanywhere::v1::DownloadState_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::DownloadState>;
+template <>
+internal::EnumTraitsT<::runanywhere::v1::HttpDownloadStatus_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::HttpDownloadStatus>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -253,6 +258,52 @@ template <>
 [[nodiscard]] inline bool DownloadState_Parse(
     ::absl::string_view name, DownloadState* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<DownloadState>(DownloadState_descriptor(), name,
+                                           value);
+}
+enum HttpDownloadStatus : int {
+  HTTP_DOWNLOAD_STATUS_OK = 0,
+  HTTP_DOWNLOAD_STATUS_NETWORK_ERROR = 1,
+  HTTP_DOWNLOAD_STATUS_FILE_ERROR = 2,
+  HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE = 3,
+  HTTP_DOWNLOAD_STATUS_INVALID_URL = 4,
+  HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED = 5,
+  HTTP_DOWNLOAD_STATUS_CANCELLED = 6,
+  HTTP_DOWNLOAD_STATUS_SERVER_ERROR = 7,
+  HTTP_DOWNLOAD_STATUS_TIMEOUT = 8,
+  HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE = 9,
+  HTTP_DOWNLOAD_STATUS_DNS_ERROR = 10,
+  HTTP_DOWNLOAD_STATUS_SSL_ERROR = 11,
+  HTTP_DOWNLOAD_STATUS_UNKNOWN = 99,
+  HttpDownloadStatus_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  HttpDownloadStatus_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t HttpDownloadStatus_internal_data_[];
+inline constexpr HttpDownloadStatus HttpDownloadStatus_MIN =
+    static_cast<HttpDownloadStatus>(0);
+inline constexpr HttpDownloadStatus HttpDownloadStatus_MAX =
+    static_cast<HttpDownloadStatus>(99);
+[[nodiscard]] inline bool HttpDownloadStatus_IsValid(int value) {
+  return ::google::protobuf::internal::ValidateEnum(value, HttpDownloadStatus_internal_data_);
+}
+inline constexpr int HttpDownloadStatus_ARRAYSIZE = 99 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+HttpDownloadStatus_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HttpDownloadStatus) {
+  return HttpDownloadStatus_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& HttpDownloadStatus_Name(T value) {
+  static_assert(::std::is_same<T, HttpDownloadStatus>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to HttpDownloadStatus_Name().");
+  return ::google::protobuf::internal::NameOfEnum(HttpDownloadStatus_descriptor(), value);
+}
+[[nodiscard]] inline bool HttpDownloadStatus_Parse(
+    ::absl::string_view name, HttpDownloadStatus* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<HttpDownloadStatus>(HttpDownloadStatus_descriptor(), name,
                                            value);
 }
 using ::google::protobuf::internal::generated_enum::AbslParseFlag;
@@ -7570,6 +7621,12 @@ struct is_proto_enum<::runanywhere::v1::DownloadState> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::DownloadState>() {
   return ::runanywhere::v1::DownloadState_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::HttpDownloadStatus> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HttpDownloadStatus>() {
+  return ::runanywhere::v1::HttpDownloadStatus_descriptor();
 }
 
 }  // namespace protobuf

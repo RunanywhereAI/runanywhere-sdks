@@ -85,5 +85,76 @@ class DownloadState extends $pb.ProtobufEnum {
   const DownloadState._(super.value, super.name);
 }
 
+/// HTTP transport download status — numeric values MUST match
+/// rac_http_download_status_t (RAC_HTTP_DL_*) in
+/// sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+/// rac_http_download_execute returns this int directly through the C ABI;
+/// every SDK consumes the proto-generated enum so a new RAC_HTTP_DL_* value
+/// added in commons fails compilation across all bindings until the enum is
+/// extended here. OK = 0 mirrors the C ABI's success sentinel (no separate
+/// UNSPECIFIED needed — success is the proto3 zero default).
+class HttpDownloadStatus extends $pb.ProtobufEnum {
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_OK =
+      HttpDownloadStatus._(0, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_OK');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_NETWORK_ERROR =
+      HttpDownloadStatus._(
+          1, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_NETWORK_ERROR');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_FILE_ERROR =
+      HttpDownloadStatus._(
+          2, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_FILE_ERROR');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE =
+      HttpDownloadStatus._(
+          3, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_INVALID_URL =
+      HttpDownloadStatus._(
+          4, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_INVALID_URL');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED =
+      HttpDownloadStatus._(
+          5, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_CANCELLED =
+      HttpDownloadStatus._(
+          6, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_CANCELLED');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_SERVER_ERROR =
+      HttpDownloadStatus._(
+          7, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_SERVER_ERROR');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_TIMEOUT =
+      HttpDownloadStatus._(
+          8, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_TIMEOUT');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE =
+      HttpDownloadStatus._(
+          9, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_DNS_ERROR =
+      HttpDownloadStatus._(
+          10, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_DNS_ERROR');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_SSL_ERROR =
+      HttpDownloadStatus._(
+          11, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_SSL_ERROR');
+  static const HttpDownloadStatus HTTP_DOWNLOAD_STATUS_UNKNOWN =
+      HttpDownloadStatus._(
+          99, _omitEnumNames ? '' : 'HTTP_DOWNLOAD_STATUS_UNKNOWN');
+
+  static const $core.List<HttpDownloadStatus> values = <HttpDownloadStatus>[
+    HTTP_DOWNLOAD_STATUS_OK,
+    HTTP_DOWNLOAD_STATUS_NETWORK_ERROR,
+    HTTP_DOWNLOAD_STATUS_FILE_ERROR,
+    HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE,
+    HTTP_DOWNLOAD_STATUS_INVALID_URL,
+    HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED,
+    HTTP_DOWNLOAD_STATUS_CANCELLED,
+    HTTP_DOWNLOAD_STATUS_SERVER_ERROR,
+    HTTP_DOWNLOAD_STATUS_TIMEOUT,
+    HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE,
+    HTTP_DOWNLOAD_STATUS_DNS_ERROR,
+    HTTP_DOWNLOAD_STATUS_SSL_ERROR,
+    HTTP_DOWNLOAD_STATUS_UNKNOWN,
+  ];
+
+  static final $core.Map<$core.int, HttpDownloadStatus> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static HttpDownloadStatus? valueOf($core.int value) => _byValue[value];
+
+  const HttpDownloadStatus._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

@@ -2327,7 +2327,7 @@ const ::_pbi::ClassData* DownloadPlanRequest_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_download_5fservice_2eproto[2];
+    file_level_enum_descriptors_download_5fservice_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_download_5fservice_2eproto = nullptr;
 const ::uint32_t
@@ -2639,21 +2639,34 @@ const char descriptor_table_protodef_download_5fservice_2eproto[] ABSL_ATTRIBUTE
     "PLETED\020\005\022\031\n\025DOWNLOAD_STATE_FAILED\020\006\022\034\n\030D"
     "OWNLOAD_STATE_CANCELLED\020\007\022\031\n\025DOWNLOAD_ST"
     "ATE_PAUSED\020\010\022\033\n\027DOWNLOAD_STATE_RESUMING\020"
-    "\t2\270\003\n\010Download\022O\n\004Plan\022#.runanywhere.v1."
-    "DownloadPlanRequest\032\".runanywhere.v1.Dow"
-    "nloadPlanResult\022R\n\005Start\022$.runanywhere.v"
-    "1.DownloadStartRequest\032#.runanywhere.v1."
-    "DownloadStartResult\022Y\n\tSubscribe\022(.runan"
-    "ywhere.v1.DownloadSubscribeRequest\032 .run"
-    "anywhere.v1.DownloadProgress0\001\022U\n\006Cancel"
-    "\022%.runanywhere.v1.DownloadCancelRequest\032"
-    "$.runanywhere.v1.DownloadCancelResult\022U\n"
-    "\006Resume\022%.runanywhere.v1.DownloadResumeR"
-    "equest\032$.runanywhere.v1.DownloadResumeRe"
-    "sultB\217\001\n\027ai.runanywhere.proto.v1B\024Downlo"
-    "adServiceProtoP\001Z<github.com/runanywhere"
-    "/runanywhere-sdks/idl/v1;runanywherev1\370\001"
-    "\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\t*\202\004\n\022HttpDownloadStatus\022\033\n\027HTTP_DOWNLOA"
+    "D_STATUS_OK\020\000\022&\n\"HTTP_DOWNLOAD_STATUS_NE"
+    "TWORK_ERROR\020\001\022#\n\037HTTP_DOWNLOAD_STATUS_FI"
+    "LE_ERROR\020\002\022-\n)HTTP_DOWNLOAD_STATUS_INSUF"
+    "FICIENT_STORAGE\020\003\022$\n HTTP_DOWNLOAD_STATU"
+    "S_INVALID_URL\020\004\022(\n$HTTP_DOWNLOAD_STATUS_"
+    "CHECKSUM_FAILED\020\005\022\"\n\036HTTP_DOWNLOAD_STATU"
+    "S_CANCELLED\020\006\022%\n!HTTP_DOWNLOAD_STATUS_SE"
+    "RVER_ERROR\020\007\022 \n\034HTTP_DOWNLOAD_STATUS_TIM"
+    "EOUT\020\010\022,\n(HTTP_DOWNLOAD_STATUS_NETWORK_U"
+    "NAVAILABLE\020\t\022\"\n\036HTTP_DOWNLOAD_STATUS_DNS"
+    "_ERROR\020\n\022\"\n\036HTTP_DOWNLOAD_STATUS_SSL_ERR"
+    "OR\020\013\022 \n\034HTTP_DOWNLOAD_STATUS_UNKNOWN\020c2\270"
+    "\003\n\010Download\022O\n\004Plan\022#.runanywhere.v1.Dow"
+    "nloadPlanRequest\032\".runanywhere.v1.Downlo"
+    "adPlanResult\022R\n\005Start\022$.runanywhere.v1.D"
+    "ownloadStartRequest\032#.runanywhere.v1.Dow"
+    "nloadStartResult\022Y\n\tSubscribe\022(.runanywh"
+    "ere.v1.DownloadSubscribeRequest\032 .runany"
+    "where.v1.DownloadProgress0\001\022U\n\006Cancel\022%."
+    "runanywhere.v1.DownloadCancelRequest\032$.r"
+    "unanywhere.v1.DownloadCancelResult\022U\n\006Re"
+    "sume\022%.runanywhere.v1.DownloadResumeRequ"
+    "est\032$.runanywhere.v1.DownloadResumeResul"
+    "tB\217\001\n\027ai.runanywhere.proto.v1B\024DownloadS"
+    "erviceProtoP\001Z<github.com/runanywhere/ru"
+    "nanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002"
+    "\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_download_5fservice_2eproto_deps[1] = {
@@ -2663,7 +2676,7 @@ static ::absl::once_flag descriptor_table_download_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_download_5fservice_2eproto = {
     false,
     false,
-    3598,
+    4115,
     descriptor_table_protodef_download_5fservice_2eproto,
     "download_service.proto",
     &descriptor_table_download_5fservice_2eproto_once,
@@ -2692,6 +2705,13 @@ DownloadState_descriptor() {
 }
 PROTOBUF_CONSTINIT const uint32_t DownloadState_internal_data_[] = {
     655360u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+HttpDownloadStatus_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_download_5fservice_2eproto);
+  return file_level_enum_descriptors_download_5fservice_2eproto[2];
+}
+PROTOBUF_CONSTINIT const uint32_t HttpDownloadStatus_internal_data_[] = {
+    786432u, 65536u, 99u, };
 // ===================================================================
 
 DownloadSubscribeRequest::DownloadSubscribeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)

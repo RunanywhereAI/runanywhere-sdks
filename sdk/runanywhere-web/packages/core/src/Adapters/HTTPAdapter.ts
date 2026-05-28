@@ -34,6 +34,8 @@
  *   dedicated worker or the main thread without caller-side changes.
  */
 
+import { HttpDownloadStatus } from '@runanywhere/proto-ts/download_service';
+
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { FetchHttpTransport } from './FetchHttpTransport';
 
@@ -191,22 +193,13 @@ export interface DownloadRequest {
   expectedSha256Hex?: string;
 }
 
-// Mirrors rac_http_download_status_t in rac_http_download.h — keep in sync.
-export enum DownloadStatus {
-  OK = 0,
-  NetworkError = 1,
-  FileError = 2,
-  InsufficientStorage = 3,
-  InvalidUrl = 4,
-  ChecksumFailed = 5,
-  Cancelled = 6,
-  ServerError = 7,
-  Timeout = 8,
-  NetworkUnavailable = 9,
-  DnsError = 10,
-  SslError = 11,
-  Unknown = 99,
-}
+// Re-export the proto-generated HTTP download status enum as `DownloadStatus`
+// for backwards compatibility. Single source of truth lives in
+// idl/download_service.proto (HttpDownloadStatus) and mirrors the C ABI
+// rac_http_download_status_t in
+// sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+// Numeric values are part of the C ABI return and must not be renumbered.
+export { HttpDownloadStatus as DownloadStatus } from '@runanywhere/proto-ts/download_service';
 
 // RAC_TRUE / RAC_FALSE from rac_types.h — curl-backed client returns
 // these raw ints through the chunk / progress callbacks.
@@ -466,7 +459,7 @@ export class HTTPAdapter {
    * native behaviour (iOS / Android / RN all hand the caller a file
    * path, not a buffer).
    */
-  async download(req: DownloadRequest, onProgress?: DownloadProgressHandler): Promise<DownloadStatus> {
+  async download(req: DownloadRequest, onProgress?: DownloadProgressHandler): Promise<HttpDownloadStatus> {
     const scope = new AllocScope(this.m);
 
     // Function-table trampoline for rac_http_download_progress_fn:
@@ -509,10 +502,10 @@ export class HTTPAdapter {
       const status = await this.ccall('rac_http_download_execute', 'number',
         ['number', 'number', 'number', 'number'],
         [reqPtr, progressPtr, 0, outHttpStatusPtr]) as number;
-      if (status !== DownloadStatus.OK && cancelled) {
-        return DownloadStatus.Cancelled;
+      if (status !== HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_OK && cancelled) {
+        return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CANCELLED;
       }
-      return status as DownloadStatus;
+      return status as HttpDownloadStatus;
     } finally {
       if (progressPtr !== 0) this.m.removeFunction(progressPtr);
       scope.free();

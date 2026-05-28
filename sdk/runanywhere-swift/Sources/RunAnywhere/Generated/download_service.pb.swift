@@ -139,6 +139,92 @@ public nonisolated enum RADownloadState: SwiftProtobuf.Enum, Swift.CaseIterable 
 
 }
 
+/// HTTP transport download status — numeric values MUST match
+/// rac_http_download_status_t (RAC_HTTP_DL_*) in
+/// sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+/// rac_http_download_execute returns this int directly through the C ABI;
+/// every SDK consumes the proto-generated enum so a new RAC_HTTP_DL_* value
+/// added in commons fails compilation across all bindings until the enum is
+/// extended here. OK = 0 mirrors the C ABI's success sentinel (no separate
+/// UNSPECIFIED needed — success is the proto3 zero default).
+public nonisolated enum RAHttpDownloadStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case ok // = 0
+  case networkError // = 1
+  case fileError // = 2
+  case insufficientStorage // = 3
+  case invalidURL // = 4
+  case checksumFailed // = 5
+  case cancelled // = 6
+  case serverError // = 7
+  case timeout // = 8
+  case networkUnavailable // = 9
+  case dnsError // = 10
+  case sslError // = 11
+  case unknown // = 99
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .ok
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .ok
+    case 1: self = .networkError
+    case 2: self = .fileError
+    case 3: self = .insufficientStorage
+    case 4: self = .invalidURL
+    case 5: self = .checksumFailed
+    case 6: self = .cancelled
+    case 7: self = .serverError
+    case 8: self = .timeout
+    case 9: self = .networkUnavailable
+    case 10: self = .dnsError
+    case 11: self = .sslError
+    case 99: self = .unknown
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .ok: return 0
+    case .networkError: return 1
+    case .fileError: return 2
+    case .insufficientStorage: return 3
+    case .invalidURL: return 4
+    case .checksumFailed: return 5
+    case .cancelled: return 6
+    case .serverError: return 7
+    case .timeout: return 8
+    case .networkUnavailable: return 9
+    case .dnsError: return 10
+    case .sslError: return 11
+    case .unknown: return 99
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAHttpDownloadStatus] = [
+    .ok,
+    .networkError,
+    .fileError,
+    .insufficientStorage,
+    .invalidURL,
+    .checksumFailed,
+    .cancelled,
+    .serverError,
+    .timeout,
+    .networkUnavailable,
+    .dnsError,
+    .sslError,
+    .unknown,
+  ]
+
+}
+
 public nonisolated struct RADownloadSubscribeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -542,6 +628,10 @@ nonisolated extension RADownloadStage: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RADownloadState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_STATE_UNSPECIFIED\0\u{1}DOWNLOAD_STATE_PENDING\0\u{1}DOWNLOAD_STATE_DOWNLOADING\0\u{1}DOWNLOAD_STATE_EXTRACTING\0\u{1}DOWNLOAD_STATE_RETRYING\0\u{1}DOWNLOAD_STATE_COMPLETED\0\u{1}DOWNLOAD_STATE_FAILED\0\u{1}DOWNLOAD_STATE_CANCELLED\0\u{1}DOWNLOAD_STATE_PAUSED\0\u{1}DOWNLOAD_STATE_RESUMING\0")
+}
+
+nonisolated extension RAHttpDownloadStatus: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HTTP_DOWNLOAD_STATUS_OK\0\u{1}HTTP_DOWNLOAD_STATUS_NETWORK_ERROR\0\u{1}HTTP_DOWNLOAD_STATUS_FILE_ERROR\0\u{1}HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE\0\u{1}HTTP_DOWNLOAD_STATUS_INVALID_URL\0\u{1}HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED\0\u{1}HTTP_DOWNLOAD_STATUS_CANCELLED\0\u{1}HTTP_DOWNLOAD_STATUS_SERVER_ERROR\0\u{1}HTTP_DOWNLOAD_STATUS_TIMEOUT\0\u{1}HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE\0\u{1}HTTP_DOWNLOAD_STATUS_DNS_ERROR\0\u{1}HTTP_DOWNLOAD_STATUS_SSL_ERROR\0\u{2}X\u{1}HTTP_DOWNLOAD_STATUS_UNKNOWN\0")
 }
 
 nonisolated extension RADownloadSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

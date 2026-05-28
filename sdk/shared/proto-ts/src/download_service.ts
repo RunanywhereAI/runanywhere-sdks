@@ -142,6 +142,115 @@ export function downloadStateToJSON(object: DownloadState): string {
   }
 }
 
+/**
+ * HTTP transport download status — numeric values MUST match
+ * rac_http_download_status_t (RAC_HTTP_DL_*) in
+ * sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+ * rac_http_download_execute returns this int directly through the C ABI;
+ * every SDK consumes the proto-generated enum so a new RAC_HTTP_DL_* value
+ * added in commons fails compilation across all bindings until the enum is
+ * extended here. OK = 0 mirrors the C ABI's success sentinel (no separate
+ * UNSPECIFIED needed — success is the proto3 zero default).
+ */
+export enum HttpDownloadStatus {
+  HTTP_DOWNLOAD_STATUS_OK = 0,
+  HTTP_DOWNLOAD_STATUS_NETWORK_ERROR = 1,
+  HTTP_DOWNLOAD_STATUS_FILE_ERROR = 2,
+  HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE = 3,
+  HTTP_DOWNLOAD_STATUS_INVALID_URL = 4,
+  HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED = 5,
+  HTTP_DOWNLOAD_STATUS_CANCELLED = 6,
+  HTTP_DOWNLOAD_STATUS_SERVER_ERROR = 7,
+  HTTP_DOWNLOAD_STATUS_TIMEOUT = 8,
+  HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE = 9,
+  HTTP_DOWNLOAD_STATUS_DNS_ERROR = 10,
+  HTTP_DOWNLOAD_STATUS_SSL_ERROR = 11,
+  HTTP_DOWNLOAD_STATUS_UNKNOWN = 99,
+  UNRECOGNIZED = -1,
+}
+
+export function httpDownloadStatusFromJSON(object: any): HttpDownloadStatus {
+  switch (object) {
+    case 0:
+    case "HTTP_DOWNLOAD_STATUS_OK":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_OK;
+    case 1:
+    case "HTTP_DOWNLOAD_STATUS_NETWORK_ERROR":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_NETWORK_ERROR;
+    case 2:
+    case "HTTP_DOWNLOAD_STATUS_FILE_ERROR":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_FILE_ERROR;
+    case 3:
+    case "HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE;
+    case 4:
+    case "HTTP_DOWNLOAD_STATUS_INVALID_URL":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_INVALID_URL;
+    case 5:
+    case "HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED;
+    case 6:
+    case "HTTP_DOWNLOAD_STATUS_CANCELLED":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CANCELLED;
+    case 7:
+    case "HTTP_DOWNLOAD_STATUS_SERVER_ERROR":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_SERVER_ERROR;
+    case 8:
+    case "HTTP_DOWNLOAD_STATUS_TIMEOUT":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_TIMEOUT;
+    case 9:
+    case "HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE;
+    case 10:
+    case "HTTP_DOWNLOAD_STATUS_DNS_ERROR":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_DNS_ERROR;
+    case 11:
+    case "HTTP_DOWNLOAD_STATUS_SSL_ERROR":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_SSL_ERROR;
+    case 99:
+    case "HTTP_DOWNLOAD_STATUS_UNKNOWN":
+      return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_UNKNOWN;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return HttpDownloadStatus.UNRECOGNIZED;
+  }
+}
+
+export function httpDownloadStatusToJSON(object: HttpDownloadStatus): string {
+  switch (object) {
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_OK:
+      return "HTTP_DOWNLOAD_STATUS_OK";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_NETWORK_ERROR:
+      return "HTTP_DOWNLOAD_STATUS_NETWORK_ERROR";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_FILE_ERROR:
+      return "HTTP_DOWNLOAD_STATUS_FILE_ERROR";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE:
+      return "HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_INVALID_URL:
+      return "HTTP_DOWNLOAD_STATUS_INVALID_URL";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED:
+      return "HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CANCELLED:
+      return "HTTP_DOWNLOAD_STATUS_CANCELLED";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_SERVER_ERROR:
+      return "HTTP_DOWNLOAD_STATUS_SERVER_ERROR";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_TIMEOUT:
+      return "HTTP_DOWNLOAD_STATUS_TIMEOUT";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE:
+      return "HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_DNS_ERROR:
+      return "HTTP_DOWNLOAD_STATUS_DNS_ERROR";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_SSL_ERROR:
+      return "HTTP_DOWNLOAD_STATUS_SSL_ERROR";
+    case HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_UNKNOWN:
+      return "HTTP_DOWNLOAD_STATUS_UNKNOWN";
+    case HttpDownloadStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface DownloadSubscribeRequest {
   modelId: string;
   taskId: string;
