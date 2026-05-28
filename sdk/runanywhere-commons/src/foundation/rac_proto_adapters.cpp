@@ -1171,12 +1171,38 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
     } else if (in.has_raw_rgb()) {
+        // The `raw_rgb` oneof slot carries either RAW_RGB (3 B/px) or
+        // RAW_RGBA (4 B/px); only `in.format()` distinguishes them. The
+        // C ABI / mtmd backend speak RGB only, so downsample RGBA → RGB at
+        // the proto boundary — mirrors RAVLMImage.fromUIImage's CGContext
+        // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
+        // which reads it as 3 B/px, overshoots the heap by 33%, and either
+        // hallucinates or EXC_BAD_ACCESSes (see commons-004-A).
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
-        out->data_size = in.raw_rgb().size();
-        if (out->data_size > 0) {
+        const ::std::string& src = in.raw_rgb();
+        if (in.format() == ::runanywhere::v1::VLM_IMAGE_FORMAT_RAW_RGBA) {
+            const size_t pixels = static_cast<size_t>(out->width) * out->height;
+            if (pixels == 0 || src.size() < pixels * 4) {
+                // Dimensions inconsistent with RGBA payload — refuse rather
+                // than read past the buffer.
+                return false;
+            }
+            out->data_size = pixels * 3;
             uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, in.raw_rgb().data(), out->data_size);
+            const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
+            for (size_t i = 0; i < pixels; ++i) {
+                buf[i * 3 + 0] = in_px[i * 4 + 0];
+                buf[i * 3 + 1] = in_px[i * 4 + 1];
+                buf[i * 3 + 2] = in_px[i * 4 + 2];
+            }
             out->pixel_data = buf;
+        } else {
+            out->data_size = src.size();
+            if (out->data_size > 0) {
+                uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+                std::memcpy(buf, src.data(), out->data_size);
+                out->pixel_data = buf;
+            }
         }
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
