@@ -10,6 +10,7 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
+#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
 
@@ -31,8 +32,23 @@ struct CoreMLSession {
 };
 
 rac_result_t coreml_init(void) {
-    Class model_class = NSClassFromString(@"MLModel");
-    return model_class != Nil ? RAC_SUCCESS : RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    // NSClassFromString(@"MLModel") only proves the framework is linked, which
+    // is true on every host where this TU is compiled in -- so the registry
+    // accepts CoreML on iOS Simulator x86_64 / older OSes that cannot actually
+    // run a CoreML graph, and the failure surfaces much later at
+    // coreml_create_session as RAC_ERROR_MODEL_LOAD_FAILED, after the router
+    // has already pinned this runtime (runtimes-006). Mirror Metal's pattern
+    // and probe a real CoreML object: if MLModelConfiguration cannot be
+    // instantiated the runtime cannot run, so self-reject at registry time
+    // and let the router fall back to ONNX/llamacpp paths.
+    @autoreleasepool {
+        MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
+        if (cfg == nil) {
+            return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+        }
+        cfg.computeUnits = MLComputeUnitsAll;
+    }
+    return RAC_SUCCESS;
 }
 
 void coreml_destroy(void) {}
@@ -79,8 +95,18 @@ void coreml_destroy_session(rac_runtime_session_t* session) {
     auto* sess = reinterpret_cast<CoreMLSession*>(session);
     if (!sess)
         return;
-    [sess->model release];
-    sess->model = nil;
+    // -[MLModel release] triggers Apple's dealloc, which autoreleases internal
+    // temporaries (compiled-model handles, NSError descriptors, metadata
+    // dictionaries). Callers may invoke us from threads without an outer pool
+    // (worker pthreads, libdispatch concurrent queues, Swift cooperative
+    // Tasks between hops), so wrap the release in our own pool to drain those
+    // temporaries at destroy time -- otherwise repeated load/unload cycles
+    // grow RSS unboundedly (runtimes-001). Matches the @autoreleasepool used
+    // by coreml_create_session above and diffusion_coreml_backend.mm.
+    @autoreleasepool {
+        [sess->model release];
+        sess->model = nil;
+    }
     delete sess;
 }
 
@@ -109,15 +135,11 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
 }
 
 void coreml_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (!tensor)
-        return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
-        std::free(tensor->data);
-    }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
-        std::free(tensor->shape);
-    }
-    *tensor = rac_runtime_tensor_t{};
+    // No runtime-owned buffer allocator on CoreML: pass nullptr so the helper
+    // matches the historical inline behavior of leaking RUNTIME-owned buffer
+    // slots (none are produced by this adapter today). Keeps CoreML on the
+    // same release path as CPU / ONNXRT (runtimes-003).
+    rac::runtime::rac_runtime_release_tensor(tensor, /*free_buffer=*/nullptr);
 }
 
 const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
