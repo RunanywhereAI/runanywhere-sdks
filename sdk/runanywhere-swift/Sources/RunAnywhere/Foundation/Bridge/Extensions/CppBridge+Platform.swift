@@ -114,9 +114,64 @@ extension CppBridge {
             logger.info("Platform backend unregistered")
         }
 
+        // MARK: - Synchronous Bridging
+
+        // The C++ platform router invokes the create/generate/synthesize
+        // callbacks synchronously on the caller's thread, which can be the
+        // main actor (Phase-2 init and `loadModel` UI flows). The platform
+        // services hop to the main actor internally (AVSpeechSynthesizer,
+        // Foundation Models), so a `DispatchGroup.wait()` / `DispatchQueue
+        // .main.sync` on that thread dead-locks against work that needs the
+        // same actor. `Task.detached` breaks actor inheritance so the work
+        // runs off the caller's actor, and the bounded semaphore wait turns a
+        // hang into a clean timeout the router can recover from.
+
+        /// Upper bound for a single platform create/generate/synthesize call.
+        /// Speech and on-device generation finish well inside this; exceeding
+        /// it indicates a stall, surfaced as a failure rather than a hang.
+        private static let callbackTimeout: DispatchTime = .now() + .seconds(120)
+
+        /// Run `work` to completion off the caller's actor and return its
+        /// handle, or `nil` on timeout / error.
+        private static func syncWait(
+            _ work: @escaping @Sendable () async throws -> rac_handle_t?,
+            onTimeout: @Sendable () -> Void,
+            onError: @escaping @Sendable (Error) -> Void
+        ) -> rac_handle_t? {
+            let semaphore = DispatchSemaphore(value: 0)
+            let box = UnsafeResultBox<rac_handle_t?>(nil)
+            Task.detached(priority: .userInitiated) {
+                do { box.value = try await work() } catch { onError(error) }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                onTimeout()
+                return nil
+            }
+            return box.value
+        }
+
+        /// Run `work` to completion off the caller's actor and return its
+        /// `rac_result_t`, mapping timeout → `RAC_ERROR_TIMEOUT` and a thrown
+        /// error → `RAC_ERROR_INTERNAL`.
+        private static func syncWaitResult(
+            _ work: @escaping @Sendable () async throws -> rac_result_t,
+            onError: @escaping @Sendable (Error) -> Void
+        ) -> rac_result_t {
+            let semaphore = DispatchSemaphore(value: 0)
+            let box = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            Task.detached(priority: .userInitiated) {
+                do { box.value = try await work() } catch { onError(error) }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                return RAC_ERROR_TIMEOUT
+            }
+            return box.value
+        }
+
         // MARK: - LLM Callbacks (Foundation Models)
 
-        // swiftlint:disable:next function_body_length
         private static func registerLLMCallbacks() {
             var callbacks = rac_platform_llm_callbacks_t()
 
@@ -156,29 +211,19 @@ extension CppBridge {
                     return nil
                 }
 
-                // Use a dispatch group to synchronously wait for async creation
-                var serviceHandle: rac_handle_t?
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let service = SystemFoundationModelsService()
-                        try await service.initialize(modelPath: "built-in")
-
-                        // Retain the service and hand its opaque pointer back as
-                        // the handle; `generate`/`destroy` recover it via Unmanaged.
-                        serviceHandle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
-                        Platform.logger.info("Foundation Models service created")
-                    } catch {
-                        Platform.logger.error("Failed to create Foundation Models service: \(error)")
-                        serviceHandle = nil
-                    }
-                    group.leave()
+                return Platform.syncWait {
+                    let service = SystemFoundationModelsService()
+                    try await service.initialize(modelPath: "built-in")
+                    // Retain the service and hand its opaque pointer back as the
+                    // handle; `generate`/`destroy` recover it via Unmanaged.
+                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                    Platform.logger.info("Foundation Models service created")
+                    return handle
+                } onTimeout: {
+                    Platform.logger.error("Foundation Models service creation timed out")
+                } onError: { error in
+                    Platform.logger.error("Failed to create Foundation Models service: \(error)")
                 }
-
-                group.wait()
-                return serviceHandle
             }
 
             callbacks.generate = { handle, promptPtr, _, outResponsePtr, _ -> rac_result_t in
@@ -197,27 +242,16 @@ extension CppBridge {
 
                 let prompt = String(cString: promptPtr)
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let response = try await service.generate(
-                            prompt: prompt,
-                            options: RALLMGenerationOptions.defaults()
-                        )
-                        outResponsePtr.pointee = strdup(response)
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("Foundation Models generate failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
+                return Platform.syncWaitResult {
+                    let response = try await service.generate(
+                        prompt: prompt,
+                        options: RALLMGenerationOptions.defaults()
+                    )
+                    outResponsePtr.pointee = strdup(response)
+                    return RAC_SUCCESS
+                } onError: { error in
+                    Platform.logger.error("Foundation Models generate failed: \(error)")
                 }
-
-                group.wait()
-                return result
             }
 
             callbacks.destroy = { handle, _ in
@@ -241,7 +275,6 @@ extension CppBridge {
 
         // MARK: - TTS Callbacks (System TTS)
 
-        // swiftlint:disable:next function_body_length
         private static func registerTTSCallbacks() {
             var callbacks = rac_platform_tts_callbacks_t()
 
@@ -263,20 +296,22 @@ extension CppBridge {
             }
 
             callbacks.create = { _, _ -> rac_handle_t? in
-                var serviceHandle: rac_handle_t?
-
-                // Use DispatchQueue.main.sync to create the MainActor-isolated service
-                // This ensures proper thread safety for AVSpeechSynthesizer
-                DispatchQueue.main.sync {
-                    let service = SystemTTSService()
-
+                // `SystemTTSService` is `@MainActor`-isolated (AVSpeechSynthesizer).
+                // Build it on the main actor via a detached task so this works even
+                // when the C++ router invokes `create` from the main thread, where a
+                // direct `DispatchQueue.main.sync` would dead-lock.
+                Platform.syncWait {
+                    let service = await MainActor.run { SystemTTSService() }
                     // Retain the service and hand its opaque pointer back as the
                     // handle; synthesize/stop/destroy recover it via Unmanaged.
-                    serviceHandle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
                     Platform.logger.info("System TTS service created")
+                    return handle
+                } onTimeout: {
+                    Platform.logger.error("System TTS service creation timed out")
+                } onError: { error in
+                    Platform.logger.error("Failed to create System TTS service: \(error)")
                 }
-
-                return serviceHandle
             }
 
             callbacks.synthesize = { handle, textPtr, optionsPtr, _ -> rac_result_t in
@@ -309,23 +344,12 @@ extension CppBridge {
                 options.pitch = pitch
                 options.volume = volume
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        try await service.speak(text: text, options: options)
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("System TTS speak failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
+                return Platform.syncWaitResult {
+                    try await service.speak(text: text, options: options)
+                    return RAC_SUCCESS
+                } onError: { error in
+                    Platform.logger.error("System TTS speak failed: \(error)")
                 }
-
-                group.wait()
-                return result
             }
 
             callbacks.stop = { handle, _ in
@@ -357,4 +381,12 @@ extension CppBridge {
             }
         }
     }
+}
+
+/// Single-writer/single-reader handoff across the platform-callback semaphore
+/// boundary. The detached task writes before signalling; the caller reads only
+/// after a successful wait, so there is no concurrent access.
+private final class UnsafeResultBox<T>: @unchecked Sendable {
+    var value: T
+    init(_ value: T) { self.value = value }
 }
