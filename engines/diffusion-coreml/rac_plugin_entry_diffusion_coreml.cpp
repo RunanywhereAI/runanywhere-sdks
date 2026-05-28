@@ -129,9 +129,11 @@ static const rac_primitive_t k_dcoreml_primitives[] = {
 #endif
 
 static const rac_engine_manifest_t k_diffusion_coreml_manifest = {
-    /* The plugin name is kept distinct ("diffusion-coreml") so tooling
-     * can refer to it unambiguously. */
-    .name = "diffusion-coreml",
+    /* snake_case to match the RAC_PLUGIN_ENTRY_DEF(diffusion_coreml) symbol
+     * and the entry-name pattern derived by plugin_loader.cpp from the
+     * library filename, so a future dlopen of
+     * `librunanywhere_diffusion_coreml.{dylib,so}` resolves cleanly. */
+    .name = "diffusion_coreml",
     .display_name =
 #if RAC_DIFFUSION_COREML_ROUTABLE
         "Apple CoreML Diffusion",
