@@ -93,11 +93,20 @@ rac_whisperkit_coreml_stt_set_callbacks(const rac_whisperkit_coreml_stt_callback
 }
 
 const rac_whisperkit_coreml_stt_callbacks_t* rac_whisperkit_coreml_stt_get_callbacks(void) {
+    // engines-026: copy under the lock into thread-local storage and return a
+    // pointer to that snapshot. Returning &g_callbacks would hand back the
+    // shared mutable global after the lock_guard releases the mutex, so a
+    // concurrent set_callbacks() could tear the function pointers the caller is
+    // mid-read. Engine-internal callers should prefer snapshot_callbacks(out);
+    // this public C-ABI getter keeps its pointer-returning contract. The
+    // returned pointer is valid until the next get_callbacks() on this thread.
+    static thread_local rac_whisperkit_coreml_stt_callbacks_t tls_snapshot;
     std::lock_guard<std::mutex> lock(g_callbacks_mutex);
     if (!g_callbacks_set) {
         return nullptr;
     }
-    return &g_callbacks;
+    tls_snapshot = g_callbacks;
+    return &tls_snapshot;
 }
 
 rac_bool_t rac_whisperkit_coreml_stt_is_available(void) {
