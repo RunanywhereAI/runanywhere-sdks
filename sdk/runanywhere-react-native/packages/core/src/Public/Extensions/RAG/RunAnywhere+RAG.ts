@@ -53,12 +53,12 @@ function ensureNative() {
  *
  * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)` — the config is passed
  * through to the C++ commons layer verbatim. Numeric RAGConfiguration fields
- * are proto3 `optional`, so absent fields are honored by commons (which
- * stamps canonical defaults via `rac_rag_request_with_defaults_proto`) and
- * explicit zero values (e.g. `chunkOverlap: 0` to disable overlap) are
- * preserved end-to-end. Callers that want the canonical defaults can seed
- * the input with the generated `rAGConfigurationDefaults()` helper from
- * `@runanywhere/proto-ts/convenience/rag_convenience`.
+ * are proto3 `optional`, so absent fields are honored by commons (which stamps
+ * canonical defaults via the `RAGBackendConfig` in-struct defaults applied in
+ * `build_backend_config`) and explicit zero values (e.g. `chunkOverlap: 0` to
+ * disable overlap) are preserved end-to-end. Callers that want the canonical
+ * defaults can seed the input with the generated `rAGConfigurationDefaults()`
+ * helper from `@runanywhere/proto-ts/convenience/rag_convenience`.
  */
 export async function ragCreatePipeline(
   config: RAGConfiguration

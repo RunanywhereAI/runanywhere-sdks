@@ -695,12 +695,12 @@ target_compile_features(test_artifact_helpers_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_artifact_helpers_proto)
 add_test(NAME artifact_helpers_proto_tests COMMAND test_artifact_helpers_proto)
 
-# --- STT/TTS/RAG configuration defaults parity tests (P2-T14) ----------------
+# --- STT/TTS configuration defaults parity tests (P2-T14) --------------------
 # Exercises rac_stt_configuration_defaults_proto / rac_tts_configuration_defaults_proto
-# / rac_rag_request_with_defaults_proto — the commons-owned ports of Swift's
-# RA{STT,TTS,RAG}Configuration.defaults() helpers. Each test decodes the
-# returned proto bytes and pins the canonical default values so any drift
-# between commons and the Swift source-of-truth fails CI.
+# — the commons-owned ports of Swift's RA{STT,TTS}Configuration.defaults()
+# helpers. Each test decodes the returned proto bytes and pins the canonical
+# default values so any drift between commons and the Swift source-of-truth
+# fails CI.
 add_executable(test_stt_config_defaults test_stt_config_defaults.cpp)
 target_include_directories(test_stt_config_defaults PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -724,19 +724,8 @@ rac_test_define_have_protobuf(test_tts_config_defaults)
 add_test(NAME tts_config_defaults_tests COMMAND test_tts_config_defaults)
 
 # RAG symbols are folded into rac_commons only when the RAG OBJECT target is
-# enabled, so guard this test the same way as test_advanced_modality_proto_abi.
+# enabled, so guard these tests the same way as test_advanced_modality_proto_abi.
 if(TARGET rac_backend_rag)
-    add_executable(test_rag_request_defaults test_rag_request_defaults.cpp)
-    target_include_directories(test_rag_request_defaults PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-    )
-    target_link_libraries(test_rag_request_defaults PRIVATE rac_commons)
-    rac_link_archive_deps(test_rag_request_defaults)
-    target_compile_features(test_rag_request_defaults PRIVATE cxx_std_17)
-    rac_test_define_have_protobuf(test_rag_request_defaults)
-    add_test(NAME rag_request_defaults_tests COMMAND test_rag_request_defaults)
-
     # commons-features-llm-rag-007: direct ctest for the GraphScheduler-driven
     # RAG pipeline (rag_pipeline_graph.cpp). Exercises run_rag_query() input
     # validation and the RAGTokenSink cancel contract that

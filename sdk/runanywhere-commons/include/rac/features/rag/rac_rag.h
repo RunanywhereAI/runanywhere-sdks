@@ -96,48 +96,6 @@ RAC_API rac_result_t rac_rag_clear_proto(rac_handle_t session, rac_proto_buffer_
  */
 RAC_API rac_result_t rac_rag_stats_proto(rac_handle_t session, rac_proto_buffer_t* out_stats);
 
-// =============================================================================
-// CANONICAL DEFAULTS (P2-T14)
-// =============================================================================
-
-/**
- * @brief Merge an inbound runanywhere.v1.RAGConfiguration over canonical
- *        defaults and return the resolved configuration.
- *
- * Commons-owned port of Swift's `RARAGConfiguration.defaults()`. The canonical
- * defaults are:
- *
- *   embedding_dimension   = 384
- *   top_k                 = 5
- *   similarity_threshold  = 0.7
- *   chunk_size            = 512
- *   chunk_overlap         = 64
- *
- * String-id fields (embedding_model_id / llm_model_id / reranker_model_id /
- * prompt_template / index_path / embedding_config_json / llm_config_json) and
- * the optional `persist_index` / `rerank_results` fields default to the proto
- * zero values; callers populate them via the input request bytes.
- *
- * Field-merge semantics: any non-zero / non-empty / explicitly-set field on
- * the inbound request overrides the corresponding default. Numeric fields
- * (top_k, embedding_dimension, chunk_size, similarity_threshold) treat the
- * proto zero as "use default" so callers can omit them; pass an explicit
- * non-zero value to override. Strings and bools follow the same "non-empty
- * wins, otherwise default" rule.
- *
- * Empty inbound bytes (in_request_bytes == NULL && in_size == 0) yield a
- * pure-default RAGConfiguration. out_RARAGConfiguration receives serialized
- * runanywhere.v1.RAGConfiguration bytes; caller MUST release with
- * rac_proto_buffer_free().
- *
- * @retval RAC_SUCCESS                      Defaults merged and serialized.
- * @retval RAC_ERROR_NULL_POINTER           out_RARAGConfiguration is NULL.
- * @retval RAC_ERROR_DECODING_ERROR         in_request_bytes is malformed.
- * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
- */
-RAC_API rac_result_t rac_rag_request_with_defaults_proto(
-    const uint8_t* in_request_bytes, size_t in_size, rac_proto_buffer_t* out_RARAGConfiguration);
-
 #ifdef __cplusplus
 }
 #endif

@@ -23,9 +23,6 @@
 # instead of re-declaring its own private copies.
 #
 # Special cases:
-#   * `resolveRAGConfigurationDefaults` is optional-when-unsupported: returns
-#     `nil` instead of throwing when the symbol is missing. Emitted as a
-#     top-level free function (its modality.extension == "").
 #   * Each `kind: stream` entry has its own terminal-event factory keyed by
 #     c_symbol (see STREAM_ON_ERROR_FACTORIES).
 #
@@ -253,10 +250,6 @@ def render_generated_enum(modality: dict[str, Any]) -> str:
 
     enum_name = f"{name}GeneratedProtoABI"
 
-    # Special-case: resolveRAGConfigurationDefaults is optional-when-unsupported,
-    # so its dlsym load returns Optional<Fn>. The shared NativeProtoABI.load
-    # already returns Optional, so the typealias just reuses NativeProtoABI.ProtoRequest.
-
     lines: list[str] = []
     lines.append(f"private enum {enum_name} {{")
 
@@ -361,15 +354,10 @@ def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> st
     name = modality["name"]
     enum_ref = f"{name}GeneratedProtoABI"
     swift = method["swift_name"]
-    c_symbol = method["c_symbol"]
     request_proto = method.get("request")
     response_proto = method.get("response")
     context = method.get("context")
     is_static = bool(method.get("static"))
-
-    # Special case: optional-when-unsupported (RAGFreeFunctions only).
-    if c_symbol == "rac_rag_request_with_defaults_proto":
-        return _render_optional_freefunc(enum_ref, swift, request_proto, response_proto)
 
     # Visibility / static-ness. Methods without `static: true` become instance
     # methods on the actor/enum extension (matching the hand-written shape).
@@ -413,29 +401,6 @@ def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> st
 
     body_lines.append("    }")
     return head + "\n" + "\n".join(body_lines)
-
-
-def _render_optional_freefunc(
-    enum_ref: str, swift: str, request_proto: str, response_proto: str
-) -> str:
-    """Optional-when-unsupported free function: returns nil instead of throwing.
-
-    Mirrors the hand-written `resolveRAGConfigurationDefaults`. Lives at file
-    scope (no extension).
-    """
-    return (
-        f"func {swift}(_ request: {request_proto}) -> {response_proto}? {{\n"
-        f"    guard let symbol = {enum_ref}.{swift} else {{\n"
-        f"        return nil\n"
-        f"    }}\n"
-        f"    return try? NativeProtoABI.invoke(\n"
-        f"        request,\n"
-        f"        symbol: symbol,\n"
-        f"        symbolName: {enum_ref}.{swift}Name,\n"
-        f"        responseType: {response_proto}.self\n"
-        f"    )\n"
-        f"}}"
-    )
 
 
 def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> str:

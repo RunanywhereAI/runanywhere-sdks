@@ -328,7 +328,7 @@ export function createDefaultRAGConfiguration(
   // overrides (including explicit 0 for chunkOverlap / similarityThreshold)
   // are honored end-to-end because RAGConfiguration numeric fields are proto3
   // `optional` — commons distinguishes "unset" from "explicit zero" via
-  // `has_*()` in rac_rag_request_with_defaults_proto.
+  // `has_*()` in `build_backend_config` (rac_rag_proto_abi.cpp).
   return {
     ...rAGConfigurationDefaults(),
     ...overrides,

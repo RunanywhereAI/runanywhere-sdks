@@ -64,8 +64,6 @@ set(RAG_PIPELINE_SOURCES
     bm25_index.cpp
     rac_rag_register.cpp
     rac_rag_proto_abi.cpp
-    # P2-T14: canonical RAGConfiguration defaults helper
-    rac_rag_config_defaults.cpp
 )
 
 # ONNX embedding provider is owned by the ONNX engine plugin
