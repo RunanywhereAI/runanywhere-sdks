@@ -35,6 +35,7 @@ import {
   ModelQuery,
   type InferenceFramework,
 } from '@runanywhere/proto-ts/model_types';
+import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   DownloadCancelRequest,
   DownloadPlanRequest,
@@ -59,10 +60,16 @@ import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 /**
  * Single-file registration shorthand. Mirrors Swift's
- * `RunAnywhere.registerModel(id:name:url:framework:...)`.
+ * `RunAnywhere.registerModel(id:name:url:framework:...)` — keep the optional
+ * fields in lock-step with `RunAnywhere+Storage.swift:19-72`.
  */
 export interface RegisterModelInput {
-  id: string;
+  /**
+   * Optional stable id; when omitted we derive a Kotlin-fallback-style id
+   * from the URL tail (commons' `rac_register_model_from_url_proto` is not
+   * exposed to RN yet, so the canonical id derivation cannot run here).
+   */
+  id?: string;
   name: string;
   url: string;
   framework: InferenceFramework;
@@ -74,6 +81,8 @@ export interface RegisterModelInput {
   artifactType?: ModelArtifactType;
   /** Optional thinking-tag support flag. */
   supportsThinking?: boolean;
+  /** Optional LoRA adapter compatibility flag (Swift parity). */
+  supportsLora?: boolean;
 }
 
 /**
@@ -95,26 +104,96 @@ export interface RegisterMultiFileModelInput {
 
 /**
  * Register a model in the native registry from a single download URL.
+ *
+ * Cross-SDK signature parity with Swift `RunAnywhere+Storage.swift:19-72`:
+ * returns the resolved `ModelInfo` proto so callers can pipe it straight
+ * into `downloadModel(...)` — matching Swift / Kotlin which both return
+ * `RAModelInfo`. RN's old `Promise<boolean>` shape dropped the constructed
+ * proto and forced callers to round-trip through `getModel(...)`.
+ *
+ * The canonical `rac_register_model_from_url_proto` ABI is not yet exposed
+ * through Nitro on this RN build; until that binding lands we mirror
+ * Kotlin's local fallback (`buildModelFromUrlLocally` +
+ * `deriveModelIdFromUrl`) and then layer Swift's `needsResave` patches on
+ * top via `registerModelProto`. Re-fetching through `getModelInfoProto`
+ * returns the registry's saved snapshot so callers receive the same proto
+ * the registry will hand back from `getModel(...)`.
  */
-export async function registerModel(input: RegisterModelInput): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
+export async function registerModel(
+  input: RegisterModelInput,
+): Promise<ModelInfo> {
+  if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
+  const modality = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
+  const resolvedId = input.id ?? deriveModelIdFromUrl(input.url, input.name);
+  const memoryHint =
+    input.memoryRequirement !== undefined && input.memoryRequirement > 0
+      ? input.memoryRequirement
+      : undefined;
+  const supportsThinking = input.supportsThinking ?? false;
+  const supportsLora = input.supportsLora ?? false;
+
   const message = ModelInfoCodec.fromPartial({
-    id: input.id,
+    id: resolvedId,
     name: input.name,
-    category: input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    category: modality,
     framework: input.framework,
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl: input.url,
-    ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
-      ? { memoryRequiredBytes: input.memoryRequirement }
+    // Swift `RunAnywhere+Storage.swift:47-51` writes the memory hint into
+    // both `downloadSizeBytes` and `memoryRequiredBytes` so list-row UI and
+    // compatibility checks agree.
+    ...(memoryHint !== undefined
+      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
       : {}),
-    supportsThinking: input.supportsThinking ?? false,
+    supportsThinking,
+    // Swift sets `.defaultPattern` (<think>...</think>) whenever
+    // `supportsThinking` flips on (`RunAnywhere+Storage.swift:52-56`).
+    ...(supportsThinking
+      ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
+      : {}),
+    supportsLora,
     artifactType: input.artifactType,
+    updatedAtUnixMs: Date.now(),
   });
   const bytes = encodeProtoMessage(message, ModelInfoCodec);
-  return native.registerModelProto(bytes);
+  const accepted = await native.registerModelProto(bytes);
+  if (!accepted) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_STATE,
+      `Model registry rejected '${resolvedId}'. Ensure the SDK is initialized before calling registerModel().`,
+      { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
+    );
+  }
+
+  const savedBuffer = await native.getModelInfoProto(resolvedId);
+  const savedBytes = arrayBufferToBytes(savedBuffer);
+  if (savedBytes.byteLength === 0) {
+    // The registry accepted the write but our re-fetch came back empty —
+    // return the in-memory snapshot we just submitted so callers still get
+    // a usable `ModelInfo`. Swift never hits this path because its native
+    // helper returns the saved proto in one round trip.
+    return message;
+  }
+  return ModelInfoCodec.decode(savedBytes);
+}
+
+/**
+ * Kotlin-parity URL → id fallback. Mirrors `deriveModelIdFromUrl` in
+ * `RunAnywhereStorage.kt:337-344` so an RN caller that omits `id` ends up
+ * with the same id Kotlin's local fallback produces.
+ */
+function deriveModelIdFromUrl(url: string, name: string): string {
+  const tail = url.split('/').pop()?.split('?')[0]?.trim() ?? '';
+  if (tail.length > 0) {
+    const withoutExtension = tail.split('.')[0];
+    if (withoutExtension && withoutExtension.length > 0) {
+      return withoutExtension;
+    }
+  }
+  const normalized = name.replace(/\s+/g, '-').toLowerCase();
+  return normalized.length > 0 ? normalized : `model-${Date.now()}`;
 }
 
 /**
