@@ -245,10 +245,21 @@ class DartBridgeLLM {
         }
       } finally {
         calloc.free(requestPtr);
-        // flutter-core-014: quiesce first so any tail emissions the engine
-        // worker still has queued through this NativeCallable land BEFORE
-        // we tear it down. Matches the CONSOLIDATE-D pattern used by the
-        // voice-agent / STT / TTS / VAD / VLM streaming bridges.
+        // commons-127: safety here relies on Dart isolate single-threading
+        // plus the synchronous nature of `rac_llm_generate_stream_proto`
+        // (the single-call ABI used by this bridge). `fn(...)` only returns
+        // after the engine vtable's `generate_stream` has finished iterating
+        // tokens on this same isolate thread, so by the time we reach this
+        // `finally` the NativeCallable can no longer be invoked. The
+        // `rac_llm_proto_quiesce` call below is a NO-OP for this path
+        // (commons only increments the in-flight counter inside
+        // `dispatch_llm_stream_event`, which is the REGISTRY path used by
+        // `rac_llm_set_stream_proto_callback` — never invoked by Flutter)
+        // but we still issue it defensively so that if commons ever fans
+        // out a post-return emission on a worker through the single-call
+        // ABI, this teardown sequence does the right thing without further
+        // changes here. Pattern mirrors the voice-agent / STT / TTS / VAD /
+        // VLM streaming bridges.
         RacNative.bindings.rac_llm_proto_quiesce?.call();
         callback?.close();
         callback = null;
@@ -256,14 +267,17 @@ class DartBridgeLLM {
     }
 
     controller.onCancel = () {
-      // flutter-core-014: cancel → quiesce → close. `rac_llm_cancel_proto`
-      // only signals the engine to abort; the inference loop may still be
-      // mid-token and invoke this NativeCallable once more before noticing
-      // the flag. Spin-wait via `rac_llm_proto_quiesce` (no-op if commons
-      // does not export it) so the C side has fully drained any in-flight
-      // dispatch through the trampoline before we close the
-      // NativeCallable — without this the engine can call into a freed
-      // callback (UAF) on the proto scratch buffer.
+      // commons-127: cancel → quiesce → close. `rac_llm_cancel_proto`
+      // signals the engine to abort. Because the producing
+      // `rac_llm_generate_stream_proto` call runs synchronously on this
+      // Dart isolate thread, the NativeCallable cannot be re-entered once
+      // `run()` has returned — Dart isolate single-threading is what
+      // actually prevents the UAF here. `rac_llm_proto_quiesce` only spin-
+      // waits on commons' REGISTRY-path in-flight counter
+      // (`rac_llm_set_stream_proto_callback`), which Flutter never uses, so
+      // it is a NO-OP today. We still call it (best-effort, ignored if the
+      // symbol is absent) to future-proof this teardown the moment commons
+      // adds an async tail-emit on the single-call path.
       cancelProto();
       RacNative.bindings.rac_llm_proto_quiesce?.call();
       callback?.close();
