@@ -5,7 +5,8 @@
  * Centralizes the device-UUID resolution chain that Swift / Kotlin / RN /
  * Flutter / Web each used to reimplement:
  *
- *   secure_get("device_id") -> get_vendor_id (if available) -> generate UUID
+ *   secure_get("com.runanywhere.sdk.device.uuid") -> get_vendor_id (if available)
+ *       -> generate UUID
  *
  * On cache miss the resolved value is persisted back through secure_set so
  * the next process can short-circuit on the cache hit.
@@ -25,12 +26,13 @@
 namespace {
 
 constexpr const char* kLogCategory = "DeviceIdentity";
-constexpr const char* kSecureStorageKey = "device_id";
+constexpr const char* kSecureStorageKey = "com.runanywhere.sdk.device.uuid";
 constexpr size_t kCanonicalUuidLen = 36u;  // 8-4-4-4-12 plus four hyphens
 
 struct DeviceIdentityState {
     std::mutex mutex;
     std::string cached;  // empty when uncached
+    const rac_platform_adapter_t* cached_adapter = nullptr;
 };
 
 DeviceIdentityState& get_state() {
@@ -160,35 +162,39 @@ rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size) 
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
-    // Fast path: in-process cache.
-    if (!state.cached.empty()) {
-        return copy_into_out(state.cached, out, out_size);
-    }
-
     const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
     if (adapter == nullptr) {
         RAC_LOG_ERROR(kLogCategory, "Platform adapter not registered");
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    // 1) Cached id in secure storage.
+    // Re-read secure storage before trusting the in-process cache so a
+    // shutdown/re-init with a different backing store cannot return a stale id.
     std::string resolved = try_secure_get(adapter);
     if (!resolved.empty()) {
         RAC_LOG_DEBUG(kLogCategory, "Loaded device id from secure storage");
         state.cached = std::move(resolved);
+        state.cached_adapter = adapter;
         return copy_into_out(state.cached, out, out_size);
     }
 
-    // 2) Platform vendor id (Apple identifierForVendor, etc.).
+    if (!state.cached.empty() && state.cached_adapter == adapter && adapter->secure_get == nullptr) {
+        return copy_into_out(state.cached, out, out_size);
+    }
+    state.cached.clear();
+    state.cached_adapter = nullptr;
+
+    // 1) Platform vendor id (Apple identifierForVendor, etc.).
     resolved = try_vendor_id(adapter);
     if (!resolved.empty()) {
         RAC_LOG_DEBUG(kLogCategory, "Resolved device id from platform vendor id");
         try_secure_set(adapter, resolved);
         state.cached = std::move(resolved);
+        state.cached_adapter = adapter;
         return copy_into_out(state.cached, out, out_size);
     }
 
-    // 3) Synthesize a fresh UUID.
+    // 2) Synthesize a fresh UUID.
     resolved = generate_uuid_v4();
     if (resolved.size() != kCanonicalUuidLen) {
         // generate_uuid_v4 has a deterministic length contract; this branch is
@@ -199,6 +205,7 @@ rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size) 
     RAC_LOG_DEBUG(kLogCategory, "Generated and persisted new device id");
     try_secure_set(adapter, resolved);
     state.cached = std::move(resolved);
+    state.cached_adapter = adapter;
     return copy_into_out(state.cached, out, out_size);
 }
 
@@ -206,6 +213,7 @@ void rac_device_identity_reset_cache_for_testing(void) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
     state.cached.clear();
+    state.cached_adapter = nullptr;
 }
 
 }  // extern "C"
