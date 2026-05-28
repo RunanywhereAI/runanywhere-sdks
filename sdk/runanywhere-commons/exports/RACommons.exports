@@ -729,6 +729,7 @@ _rac_model_assignment_set_callbacks
 
 # Model category / framework helpers (capability probes).
 _rac_framework_raw_value
+_rac_model_category_default_framework
 _rac_model_category_requires_context_length
 _rac_model_category_supports_thinking
 _rac_model_check_compatibility

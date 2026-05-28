@@ -35,7 +35,7 @@ import {
   ModelQuery,
   ModelSource,
   RegisterModelFromUrlRequest,
-  type InferenceFramework,
+  InferenceFramework,
 } from '@runanywhere/proto-ts/model_types';
 import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
@@ -838,4 +838,27 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
       };
     },
   };
+}
+
+/**
+ * Framework the SDK falls back to when a category has no explicit model
+ * framework resolved (e.g. a pending UI selection that has not yet matched a
+ * catalogued model). Mirrors commons' `rac_model_category_default_framework`
+ * and Swift's `RAModelCategory.defaultFramework`.
+ */
+export function getDefaultFramework(
+  category: ModelCategory
+): InferenceFramework {
+  switch (category) {
+    case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+    case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      return InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
+    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+    case ModelCategory.MODEL_CATEGORY_EMBEDDING:
+    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+      return InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+    default:
+      return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+  }
 }

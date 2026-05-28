@@ -1033,6 +1033,12 @@ export const RunAnywhere = {
     return ModelRegistryCapability.downloadedModels();
   },
 
+  getDefaultFramework(
+    category: Parameters<typeof ModelRegistryCapability.defaultFramework>[0],
+  ): ReturnType<typeof ModelRegistryCapability.defaultFramework> {
+    return ModelRegistryCapability.defaultFramework(category);
+  },
+
   importModel(model: ModelInfo): boolean {
     return ModelRegistryCapability.registerModel(model);
   },

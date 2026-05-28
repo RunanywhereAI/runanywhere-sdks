@@ -546,6 +546,7 @@ export const RunAnywhere = {
   downloadedModels: ModelManagement.downloadedModels,
   importModel: ModelManagement.importModel,
   downloadModel: ModelManagement.downloadModel,
+  getDefaultFramework: ModelManagement.getDefaultFramework,
 
   // ============================================================================
   // Hardware namespace (CANONICAL_API §14)

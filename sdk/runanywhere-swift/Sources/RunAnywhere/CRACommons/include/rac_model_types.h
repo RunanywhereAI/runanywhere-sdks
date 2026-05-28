@@ -331,6 +331,20 @@ RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t cat
 RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t framework);
 
 /**
+ * @brief Get the default inference framework for a model category.
+ * Mirrors Swift's RAModelCategory.defaultFramework — the framework the SDK
+ * falls back to when a category has no explicit model framework resolved
+ * (e.g. a pending UI selection that has not yet matched a catalogued model).
+ *
+ * @param category Model category
+ * @return RAC_FRAMEWORK_LLAMACPP for language/multimodal, RAC_FRAMEWORK_ONNX
+ *         for speech recognition / synthesis / embedding / VAD, otherwise
+ *         RAC_FRAMEWORK_UNKNOWN.
+ */
+RAC_API rac_inference_framework_t rac_model_category_default_framework(
+    rac_model_category_t category);
+
+/**
  * @brief Get supported formats for a framework.
  * Mirrors Swift's InferenceFramework.supportedFormats.
  *

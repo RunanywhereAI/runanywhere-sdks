@@ -41,6 +41,8 @@ export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
 export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
 export 'public/configuration/sdk_environment.dart';
 export 'public/events/event_bus.dart' show EventBus;
+export 'public/extensions/model_category_extensions.dart'
+    show ModelCategoryDefaults;
 export 'public/extensions/rag_module.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_storage.dart';

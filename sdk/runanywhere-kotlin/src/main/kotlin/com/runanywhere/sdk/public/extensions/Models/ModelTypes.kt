@@ -24,6 +24,26 @@ val ModelCategory.requiresContextLength: Boolean
 val ModelCategory.supportsThinking: Boolean
     get() = requiresContextLength
 
+/**
+ * Framework the SDK falls back to when a category has no explicit model
+ * framework resolved (e.g. a pending UI selection that has not yet matched a
+ * catalogued model). Mirrors commons' `rac_model_category_default_framework`
+ * and Swift's `RAModelCategory.defaultFramework`.
+ */
+val ModelCategory.defaultFramework: InferenceFramework
+    get() =
+        when (this) {
+            ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+            -> InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            ModelCategory.MODEL_CATEGORY_EMBEDDING,
+            ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+            -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }
+
 val ModelCategory.catalogKey: String
     get() =
         when (this) {
