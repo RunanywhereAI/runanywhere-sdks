@@ -17,6 +17,7 @@
 #include <utility>
 #include <vector>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -52,12 +53,14 @@ namespace {
 // us natural backpressure across stage boundaries.
 // ---------------------------------------------------------------------------
 
-/// Borrowed audio frame. The underlying buffer is owned by the caller of
-/// `run_once()` and is guaranteed to outlive the pipeline run because the
-/// agent's outer mutex blocks the caller until the graph fully drains.
+/// Owned audio frame. `run_once()` copies the caller's buffer into `bytes`
+/// before pushing the frame onto the input edge, so the AudioFrame is safe
+/// to read from any worker thread even if the caller's stack frame is torn
+/// down or a future refactor reduces the outer-mutex hold time. The typical
+/// 16 kHz int16 PCM utterance is <= ~32 KB so the copy is cheap relative
+/// to the cost of running STT/LLM/TTS downstream (commons-078).
 struct AudioFrame {
-    const void* data;
-    size_t size;
+    std::vector<uint8_t> bytes;
 };
 
 struct Transcript {
@@ -147,32 +150,48 @@ class VADGateNode : public rac::graph::PipelineNode<AudioFrame, AudioFrame> {
 
    protected:
     void process(AudioFrame frame, OutputEdge& out) override {
-        // VAD expects float32 PCM at 16kHz. The agent ABI accepts arbitrary
-        // bytes (typically int16 PCM for the request path); convert if
-        // possible. If the buffer is empty or oddly sized, emit a
-        // non-speech VAD event and skip the speech-active flag — the
-        // downstream STT primitive will still produce its transcription.
-        const size_t bytes = frame.size;
-        rac_bool_t is_speech = RAC_FALSE;
+        // VAD expects float32 PCM at 16kHz. The voice-agent ABI contract
+        // (rac_voice_agent_process_stream / VoiceAgentPipeline::run_once)
+        // is int16 PCM at 16 kHz mono; non-int16-aligned buffers cannot be
+        // VAD-processed and are surfaced as RAC_ERROR_INVALID_FORMAT
+        // rather than silently skipped, so callers passing the wrong
+        // format (e.g. raw float32 WebAudio buffers) get a deterministic
+        // failure instead of bogus speech-detection results
+        // (commons-147).
+        const size_t bytes = frame.bytes.size();
         if (vad_ && bytes >= 2 && (bytes % sizeof(int16_t)) == 0) {
-            const int16_t* pcm = static_cast<const int16_t*>(frame.data);
+            const int16_t* pcm = reinterpret_cast<const int16_t*>(frame.bytes.data());
             const size_t count = bytes / sizeof(int16_t);
             std::vector<float> floats(count);
-            constexpr float kInv = 1.0f / 32768.0f;
-            for (size_t i = 0; i < count; ++i) {
-                floats[i] = static_cast<float>(pcm[i]) * kInv;
-            }
+            // commons-112: route through the shared helper so any future
+            // tuning (SIMD path, saturating clamp) applies here too.
+            rac::audio::rac_audio_pcm16_to_float32(pcm, count, floats.data());
+            rac_bool_t is_speech = RAC_FALSE;
             (void)rac_vad_component_process(vad_, floats.data(), count, &is_speech);
-        }
 
-        rac_voice_agent_event_t ev = {};
-        ev.type = RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED;
-        ev.data.vad_speech_active = is_speech;
-        dispatcher_.emit(ev);
+            rac_voice_agent_event_t ev = {};
+            ev.type = RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED;
+            ev.data.vad_speech_active = is_speech;
+            dispatcher_.emit(ev);
+        } else if (vad_) {
+            // Buffer is empty / odd / not int16-aligned. Bail out with an
+            // explicit error instead of dispatching a phantom non-speech
+            // VAD event followed by STT-on-garbage downstream.
+            dispatcher_.emit_error(RAC_ERROR_INVALID_FORMAT);
+            return;
+        } else {
+            // No VAD component configured — emit a non-speech advisory so
+            // the downstream STT stage still runs (preserves the legacy
+            // "always emit transcription" contract).
+            rac_voice_agent_event_t ev = {};
+            ev.type = RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED;
+            ev.data.vad_speech_active = RAC_FALSE;
+            dispatcher_.emit(ev);
+        }
 
         // Forward frame regardless — STT must still attempt transcription
         // so the legacy ABI's "always emit transcription" contract holds.
-        out.push(frame, this->cancel_token());
+        out.push(std::move(frame), this->cancel_token());
     }
 
    private:
@@ -181,7 +200,7 @@ class VADGateNode : public rac::graph::PipelineNode<AudioFrame, AudioFrame> {
 };
 
 // ---------------------------------------------------------------------------
-// STT — borrowed audio frame → transcript text.
+// STT — owned audio frame → transcript text.
 // ---------------------------------------------------------------------------
 
 class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
@@ -201,11 +220,13 @@ class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
         const bool have_lifecycle = rac::lifecycle::acquire_lifecycle_stt(&ref) == RAC_SUCCESS;
         rac_stt_result_t r = {};
         rac_result_t status;
+        const void* data = frame.bytes.data();
+        const size_t size = frame.bytes.size();
         if (have_lifecycle) {
             rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
-            status = rac_stt_transcribe(&service, frame.data, frame.size, nullptr, &r);
+            status = rac_stt_transcribe(&service, data, size, nullptr, &r);
         } else {
-            status = rac_stt_component_transcribe(stt_, frame.data, frame.size, nullptr, &r);
+            status = rac_stt_component_transcribe(stt_, data, size, nullptr, &r);
         }
         if (have_lifecycle) {
             rac::lifecycle::release_lifecycle_stt(&ref);
@@ -499,10 +520,14 @@ rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_s
 
     scheduler->start();
 
-    // Single-shot: push one frame, then close the input so each downstream
-    // stage observes EOF and the graph drains naturally.
-    AudioFrame frame{.data = audio_data, .size = audio_size};
-    input_edge->push(frame, scheduler->root_cancel_token().get());
+    // Single-shot: copy the caller's audio into an owned AudioFrame
+    // (commons-078: removes the outer-mutex-coupled borrow), push it,
+    // then close the input so each downstream stage observes EOF and the
+    // graph drains naturally.
+    AudioFrame frame;
+    frame.bytes.assign(static_cast<const uint8_t*>(audio_data),
+                       static_cast<const uint8_t*>(audio_data) + audio_size);
+    input_edge->push(std::move(frame), scheduler->root_cancel_token().get());
     input_edge->close();
 
     scheduler->wait();
