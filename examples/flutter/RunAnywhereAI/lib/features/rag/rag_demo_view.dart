@@ -69,26 +69,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     _scrollToBottom();
   }
 
-  /// Build a generated [sdk.RAGConfiguration] from selected registry models.
-  Future<sdk.RAGConfiguration?> _buildRagConfig() async {
-    final embeddingModel = _selectedEmbeddingModel;
-    final llmModel = _selectedLLMModel;
-    if (embeddingModel == null || llmModel == null) {
-      return null;
-    }
-
-    // Ensure model files resolve (they may not exist for registry-only models)
-    await sdk.RunAnywhere.models.resolveModelFilePath(embeddingModel);
-    await sdk.RunAnywhere.models.resolveModelFilePath(llmModel);
-
-    // RAGConfiguration now carries model ids — commons resolves paths via the
-    // canonical model registry (see rag.proto D-6 Wave D comment).
-    return sdk.RAGConfiguration(
-      embeddingModelId: embeddingModel.id,
-      llmModelId: llmModel.id,
-    );
-  }
-
   void _showEmbeddingModelSheet() {
     unawaited(showModalBottomSheet<void>(
       context: context,
@@ -124,6 +104,10 @@ class _RagDemoViewState extends State<RagDemoView> {
   }
 
   Future<void> _pickDocument() async {
+    final embeddingModel = _selectedEmbeddingModel;
+    final llmModel = _selectedLLMModel;
+    if (embeddingModel == null || llmModel == null) return;
+
     try {
       // file_picker 11.x: removed `FilePicker.platform` getter; `pickFiles`
       // is now a static method directly on `FilePicker`.
@@ -135,10 +119,7 @@ class _RagDemoViewState extends State<RagDemoView> {
       final filePath = result.files.first.path;
       if (filePath == null) return;
 
-      final ragConfig = await _buildRagConfig();
-      if (ragConfig == null) return;
-
-      await _viewModel.loadDocument(filePath, ragConfig);
+      await _viewModel.loadDocument(filePath, embeddingModel, llmModel);
     } catch (e) {
       _viewModel.error = 'Failed to pick file: $e';
     }

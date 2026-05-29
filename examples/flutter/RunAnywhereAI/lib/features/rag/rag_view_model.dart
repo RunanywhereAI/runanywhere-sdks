@@ -9,6 +9,7 @@ import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/features/rag/document_service.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// A single message in the RAG conversation.
 ///
@@ -72,8 +73,13 @@ class RAGViewModel extends ChangeNotifier {
   /// Load a document: extract text, create RAG pipeline, ingest text.
   ///
   /// [filePath] - Absolute path to the document (PDF or JSON).
-  /// [config] - RAG pipeline configuration with model paths and tuning parameters.
-  Future<void> loadDocument(String filePath, RAGConfiguration config) async {
+  /// [embeddingModel] - Registry model selected for embeddings.
+  /// [llmModel] - Registry model selected for answer generation.
+  Future<void> loadDocument(
+    String filePath,
+    ModelInfo embeddingModel,
+    ModelInfo llmModel,
+  ) async {
     _isLoadingDocument = true;
     _error = null;
     notifyListeners();
@@ -81,7 +87,10 @@ class RAGViewModel extends ChangeNotifier {
     try {
       final extractedText = await DocumentService.extractText(filePath);
 
-      await RunAnywhere.rag.createPipeline(config);
+      await RunAnywhere.rag.ragCreatePipelineForModels(
+        embeddingModel: embeddingModel,
+        llmModel: llmModel,
+      );
       await RunAnywhere.rag.ingest(extractedText);
 
       _documentName = File(filePath).uri.pathSegments.last;
