@@ -208,7 +208,9 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
       'https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.onnx',
-    downloadSizeBytes: 2_100_000,
+    // Actual silero_vad.onnx artifact size (verified Content-Length). Feeds the
+    // post-finalize download size guard (CLUSTER-13).
+    downloadSizeBytes: 2_327_524,
     memoryRequiredBytes: 5_000_000,
   },
 

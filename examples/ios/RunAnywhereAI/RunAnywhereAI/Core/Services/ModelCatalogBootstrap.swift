@@ -196,7 +196,12 @@ enum ModelCatalogBootstrap {
             url: "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx",
             framework: .onnx,
             modality: .voiceActivityDetection,
-            memoryRequirement: 5_000_000
+            // Actual silero_vad.onnx artifact size (verified Content-Length).
+            // memoryRequirement doubles as downloadSizeBytes (see
+            // RunAnywhere+Storage.swift), which feeds the post-finalize download
+            // size guard (CLUSTER-13). An over-stated 5 MB tripped the guard on a
+            // valid ~2.3 MB download.
+            memoryRequirement: 2_327_524
         )
         logger.info("Sherpa STT/TTS + Silero VAD models registered")
 

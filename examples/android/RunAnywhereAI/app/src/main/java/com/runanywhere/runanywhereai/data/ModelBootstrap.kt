@@ -524,7 +524,12 @@ object ModelBootstrap {
                 url = "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
                 category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-                memoryBytes = 5_000_000,
+                // Actual silero_vad.onnx artifact size (verified Content-Length).
+                // memoryBytes is passed as memoryRequirement and doubles as
+                // download_size_bytes (see RunAnywhereStorage.kt), which feeds the
+                // post-finalize download size guard (CLUSTER-13). An over-stated
+                // 5 MB tripped the guard on a valid ~2.3 MB download.
+                memoryBytes = 2_327_524,
             ),
         )
 

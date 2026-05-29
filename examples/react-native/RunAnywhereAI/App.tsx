@@ -401,7 +401,11 @@ async function registerModulesAndModels(): Promise<void> {
       url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-      memoryRequirement: 5_000_000,
+      // Actual silero_vad.onnx artifact size (verified Content-Length).
+      // memoryRequirement doubles as downloadSizeBytes, which feeds the
+      // post-finalize download size guard (CLUSTER-13). An over-stated 5 MB
+      // tripped the guard on a valid ~2.3 MB download.
+      memoryRequirement: 2_327_524,
     }),
     // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
     // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
