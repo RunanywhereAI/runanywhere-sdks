@@ -162,31 +162,20 @@ class RunAnywhereApplication : Application() {
                 )
                 Timber.i("✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
-                // PRODUCTION mode - requires API key and base URL
-                // Configure these via Settings screen or set environment variables
-                val apiKey = "YOUR_PRODUCTION_API_KEY"
-                val baseURL = "YOUR_PRODUCTION_BASE_URL"
-
-                // Detect placeholder credentials and abort production initialization
-                if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
-                    Timber.e(
-                        "❌ RunAnywhere.initialize with SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION failed: " +
-                            "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
-                    )
-                    // Fall back to development mode
+                // PRODUCTION mode without custom config: hard-fail so a release build that
+                // wasn't wired up with real credentials cannot silently boot into dev mode.
+                // Mirror iOS: #if DEBUG → initialize(); #else → fatalError(...).
+                if (BuildConfig.DEBUG_MODE) {
                     RunAnywhere.initialize(
                         context = appContext,
                         environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
                     )
-                    Timber.i("✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
+                    Timber.i("SDK initialized in DEVELOPMENT mode (no custom config)")
                 } else {
-                    RunAnywhere.initialize(
-                        context = appContext,
-                        apiKey = apiKey,
-                        baseURL = baseURL,
-                        environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+                    throw IllegalStateException(
+                        "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL " +
+                            "via gradle.properties or the Settings screen — configure before shipping.",
                     )
-                    Timber.i("✅ SDK initialized in PRODUCTION mode")
                 }
             }
 
