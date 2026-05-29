@@ -31,11 +31,11 @@ typedef _RacVlmGenerateProtoDart = int Function(
   ffi.Pointer<RacProtoBuffer>,
 );
 
-/// Thread-safe stream-event callback signature used with
-/// `NativeCallable.listener`. The underlying C type returns `rac_bool_t`, but
-/// the listener dispatches messages asynchronously and cannot return a value
-/// synchronously — matching the approach used by every other Flutter stream
-/// bridge (LLM, STT, voice-agent, tool-calling).
+/// Stream-event callback signature used with `NativeCallable.isolateLocal`.
+/// The underlying C type returns `rac_bool_t`, but the callback fires
+/// synchronously on the Dart isolate that invoked `rac_vlm_stream_proto`, so
+/// no value is returned — matching the canonical Flutter stream bridge (LLM,
+/// voice-agent).
 typedef _RacVlmStreamEventProtoCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
@@ -95,8 +95,19 @@ class DartBridgeVLM {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        callback =
-            ffi.NativeCallable<_RacVlmStreamEventProtoCallbackNative>.listener(
+        // flutter-003 fix (mirrors dart_bridge_llm.dart): use `isolateLocal`
+        // (not `.listener`) so the callback fires SYNCHRONOUSLY on the Dart
+        // isolate that invokes `rac_vlm_stream_proto`. Commons serializes each
+        // VLMStreamEvent into a thread-local scratch vector and calls the
+        // callback with `scratch.data()` inline; under `.listener` the callback
+        // is queued onto the event loop and runs after a later token has
+        // already resized/overwritten that scratch slot, so the captured
+        // pointer decodes partially-overwritten bytes (use-after-free). The
+        // engine vtable iterates tokens on this same calling thread, so the
+        // callback always fires on the isolate that created it — the exact
+        // precondition `isolateLocal` requires.
+        callback = ffi.NativeCallable<
+            _RacVlmStreamEventProtoCallbackNative>.isolateLocal(
           (
             ffi.Pointer<ffi.Uint8> bytesPtr,
             int bytesLen,
@@ -129,21 +140,12 @@ class DartBridgeVLM {
           callback!.nativeFunction,
           ffi.nullptr,
         );
-        // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
-        // `rac_vlm_stream_proto` is a blocking synchronous FFI call. While
-        // it runs, the main isolate's event loop is frozen, so
-        // NativeCallable.listener invocations queue up but do not execute.
-        // The terminal event therefore arrives ASYNCHRONOUSLY after `fn()`
-        // returns. Yield via the shared [drainPendingStreamCallbacks] helper
-        // so queued chunk/final callbacks can drain before the force-close
-        // branches below. See [kStreamDrainMaxMicrotasks].
-        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (code != RacResultCode.success && !controller.isClosed) {
           controller.addError(StateError(
             'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(code)}',
           ));
           await controller.close();
-        } else if (!controller.isClosed) {
+        } else if (!sawTerminalEvent && !controller.isClosed) {
           await controller.close();
         }
       } catch (e, st) {
@@ -153,14 +155,12 @@ class DartBridgeVLM {
         }
       } finally {
         calloc.free(requestPtr);
-        // CONSOLIDATE-D fix: drain in-flight VLM stream dispatches before
-        // closing the NativeCallable. `rac_vlm_stream_proto` may post the
-        // terminal callback from a worker thread that copies the user_data
-        // slot under commons' internal mutex and releases it BEFORE invoking
-        // the callback (see `rac/features/vlm/rac_vlm_service.h` warning).
-        // Without `rac_vlm_proto_quiesce()` the C side can invoke the
-        // trampoline backed by NativeCallable user_data after
-        // `callback.close()` — UAF on the proto scratch buffer.
+        // CONSOLIDATE-D / flutter-003 teardown: with `isolateLocal` every event
+        // has already drained by the time `fn` returns, but
+        // `rac_vlm_proto_quiesce()` is still invoked as a defensive barrier in
+        // case a future commons revision posts a late callback from a worker
+        // thread (see `rac/features/vlm/rac_vlm_service.h`) — closing the
+        // NativeCallable while that worker is mid-dispatch would be a UAF.
         RacNative.bindings.rac_vlm_proto_quiesce?.call();
         callback?.close();
         callback = null;
