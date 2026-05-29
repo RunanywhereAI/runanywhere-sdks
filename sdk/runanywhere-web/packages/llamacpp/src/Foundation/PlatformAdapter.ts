@@ -227,17 +227,17 @@ export class PlatformAdapter {
   }
 
   /**
-   * SECURITY NOTE: localStorage is **not** secure. Used only for the small
-   * SDK metadata C-side reads/writes (e.g. cached environment). Do not
-   * store API keys or PII here. Native platforms back this with Keychain /
-   * KeyStore which is hardware-encrypted; the browser has no equivalent.
+   * localStorage is plaintext — no OS-level encryption equivalent to
+   * Keychain/KeyStore. Restricted to non-sensitive SDK metadata (device/vendor
+   * IDs). The `rac_sdk_plaintext_` prefix makes the storage class visible in
+   * DevTools at a glance.
    */
   private registerSecureGet(): number {
     const m = this.m;
     return m.addFunction((keyPtr: number, outValuePtr: number, _userData: number) => {
       try {
         const key = m.UTF8ToString(keyPtr);
-        const value = localStorage.getItem(`rac_sdk_${key}`);
+        const value = localStorage.getItem(`rac_sdk_plaintext_${key}`);
         if (value === null) {
           m.setValue(outValuePtr, 0, '*');
           return RAC_ERROR_FILE_NOT_FOUND;
@@ -259,7 +259,7 @@ export class PlatformAdapter {
       try {
         const key = m.UTF8ToString(keyPtr);
         const value = m.UTF8ToString(valuePtr);
-        localStorage.setItem(`rac_sdk_${key}`, value);
+        localStorage.setItem(`rac_sdk_plaintext_${key}`, value);
         return RAC_OK;
       } catch {
         return RAC_ERROR_PLATFORM;
@@ -272,7 +272,7 @@ export class PlatformAdapter {
     return m.addFunction((keyPtr: number, _userData: number) => {
       try {
         const key = m.UTF8ToString(keyPtr);
-        localStorage.removeItem(`rac_sdk_${key}`);
+        localStorage.removeItem(`rac_sdk_plaintext_${key}`);
         return RAC_OK;
       } catch {
         return RAC_ERROR_PLATFORM;
@@ -324,22 +324,21 @@ export class PlatformAdapter {
     return m.addFunction((outInfoPtr: number, _userData: number) => {
       try {
         const nav = navigator as Navigator & { deviceMemory?: number };
-        const totalMB = nav.deviceMemory ?? 4;
-        const totalBytes = totalMB * 1024 * 1024 * 1024;
+        const deviceMemoryGiB = nav.deviceMemory ?? 4;
+        const deviceMemoryBytes = deviceMemoryGiB * 1024 * 1024 * 1024;
 
         const perf = performance as Performance & {
           memory?: { usedJSHeapSize?: number; jsHeapSizeLimit?: number };
         };
         const jsHeapUsed = perf.memory?.usedJSHeapSize ?? 0;
-        const jsHeapTotal = perf.memory?.jsHeapSizeLimit ?? totalBytes;
+        const jsHeapTotal = perf.memory?.jsHeapSizeLimit ?? deviceMemoryBytes;
+        // Clamp to avoid negative available when perf.memory disagrees with deviceMemory.
+        const jsHeapAvailable = Math.max(0, jsHeapTotal - jsHeapUsed);
 
-        // rac_memory_info_t: { uint64_t total, available, used } — write low/high pairs
-        m.setValue(outInfoPtr, jsHeapTotal & 0xFFFFFFFF, 'i32');
-        m.setValue(outInfoPtr + 4, 0, 'i32');
-        m.setValue(outInfoPtr + 8, (jsHeapTotal - jsHeapUsed) & 0xFFFFFFFF, 'i32');
-        m.setValue(outInfoPtr + 12, 0, 'i32');
-        m.setValue(outInfoPtr + 16, jsHeapUsed & 0xFFFFFFFF, 'i32');
-        m.setValue(outInfoPtr + 20, 0, 'i32');
+        // rac_memory_info_t: { uint64_t total, available, used } — 8 bytes each.
+        setI64(m, outInfoPtr,      jsHeapTotal);
+        setI64(m, outInfoPtr + 8,  jsHeapAvailable);
+        setI64(m, outInfoPtr + 16, jsHeapUsed);
         return RAC_OK;
       } catch {
         return RAC_ERROR_PLATFORM;
@@ -515,7 +514,7 @@ function setI64(m: LlamaCppModule, ptr: number, value: number): void {
 }
 
 function stableVendorId(): string {
-  const key = 'rac_sdk_vendor_id';
+  const key = 'rac_sdk_plaintext_vendor_id';
   try {
     const existing = localStorage.getItem(key);
     if (existing) return existing;
