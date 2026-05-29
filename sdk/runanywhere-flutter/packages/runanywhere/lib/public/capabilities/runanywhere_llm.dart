@@ -471,7 +471,19 @@ class RunAnywhereLLM {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        callback = ffi.NativeCallable<RacLlmStreamProtoCallbackNative>.listener(
+        // FLUTTER-IOS-006 / FLUTTER-AND-PROTO-002: use `isolateLocal` (not
+        // `.listener`) so the callback runs synchronously on the same thread
+        // that invoked `rac_llm_generate_stream_proto`. The commons producer
+        // serializes into a `thread_local std::vector<uint8_t> scratch` slot
+        // and immediately calls the callback with `scratch.data()`. With
+        // `.listener` mode the callback is queued and runs ASYNCHRONOUSLY —
+        // by then a subsequent token emission has already overwritten `scratch`,
+        // corrupting the bytes. `isolateLocal` is safe because
+        // `rac_llm_generate_stream_proto` and every engine vtable
+        // `generate_stream` implementation run synchronously on the calling
+        // Dart isolate thread, so the callback always fires on the isolate that
+        // created it — the exact precondition `isolateLocal` requires.
+        callback = ffi.NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
           (
             ffi.Pointer<ffi.Uint8> bytesPtr,
             int bytesLen,
@@ -504,17 +516,6 @@ class RunAnywhereLLM {
           callback!.nativeFunction,
           ffi.nullptr,
         );
-        // FLUTTER-IOS-001 fix: `rac_llm_generate_stream_proto` is a blocking
-        // synchronous FFI call. While it runs, the main isolate's event loop
-        // is frozen, so `NativeCallable.listener` invocations queue up but do
-        // not execute. The terminal event (`event.isFinal`) — which closes the
-        // controller — therefore arrives ASYNCHRONOUSLY after `fn()` returns.
-        // Yield via the shared [drainPendingStreamCallbacks] helper to let
-        // queued callbacks drain before deciding whether to force-close the
-        // controller; without this, the controller is closed before any tokens
-        // reach subscribers (manifesting as a silent stream hang on the
-        // example app). See [kStreamDrainMaxMicrotasks].
-        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (rc != RacResultCode.success && !controller.isClosed) {
           controller.addError(StateError(
             'rac_llm_generate_stream_proto failed: '
