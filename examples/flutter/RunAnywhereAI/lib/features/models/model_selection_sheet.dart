@@ -44,9 +44,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     }).toList();
 
     // Sort: built-in models first (Foundation Models / System TTS), then
-    // downloaded, then not downloaded. `isDownloaded` already collapses
-    // built-in + on-disk readiness into a single check (see
-    // ExampleModelInfoView.isDownloaded in model_types.dart).
+    // downloaded, then not downloaded. On-disk readiness is `localPath`; the
+    // built-in cases are handled explicitly below (see
+    // ExampleModelInfoView.isReadyOnDevice in model_types.dart).
     int priorityFor(ModelInfo m) {
       if (m.preferredFramework ==
               LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
@@ -384,7 +384,12 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     // category-aware load path (e.g. SYSTEM_TTS -> RunAnywhere.tts.loadVoice
     // in ModelListViewModel.loadModel). Other frameworks still require a
     // downloaded artifact before we attempt to load them.
-    if (!model.isDownloaded) {
+    //
+    // Gate on `isReadyOnDevice` (localPath + built-in), NOT the proto
+    // `isDownloaded` field — the C++ registry sets localPath on download but
+    // leaves the proto flag false, so `model.isDownloaded` would always be
+    // false here and silently no-op the load.
+    if (!model.isReadyOnDevice) {
       return; // Model not downloaded yet
     }
 

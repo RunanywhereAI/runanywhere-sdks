@@ -145,7 +145,17 @@ extension ExampleModelInfoView on ModelInfo {
 
   LLMFramework get preferredFramework => framework;
 
-  bool get isDownloaded =>
+  /// Readiness check for the example UI.
+  ///
+  /// NOTE: this is deliberately NOT named `isDownloaded`. The generated
+  /// `ModelInfo` proto already exposes a `bool isDownloaded` instance member,
+  /// and a Dart extension getter of the same name is silently shadowed by that
+  /// instance member. The C++ registry populates `localPath` on download but
+  /// does not flip the proto `isDownloaded` flag, so gating load on
+  /// `model.isDownloaded` resolved to the always-false proto field and made the
+  /// "Use" action a no-op. Gate on the same on-disk/built-in signal the row UI
+  /// uses instead (mirrors Swift `isDownloaded` / Kotlin `isDownloadedOnDisk`).
+  bool get isReadyOnDevice =>
       localPath.isNotEmpty ||
       framework ==
           sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
