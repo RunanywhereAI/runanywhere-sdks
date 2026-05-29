@@ -280,31 +280,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  /// Play audio using the audio player service (for Int16 PCM data)
-  // ignore: unused_element - kept for alternative audio formats
-  Future<void> _playAudio(List<int> audioData) async {
-    try {
-      // Convert List<int> to Uint8List
-      final audioBytes = Uint8List.fromList(audioData);
-
-      // The TTS component returns PCM16 data at 22050 Hz mono
-      // We need to pass the sample rate so the audio player can create proper WAV headers
-      await _playerService.playFromBytes(
-        audioBytes,
-        volume: 1.0, // Use full volume (pitch controls are in TTS synthesis)
-        rate: _speechRate,
-        sampleRate: 22050, // Piper TTS default sample rate
-        numChannels: 1, // Mono audio
-      );
-      debugPrint('🔊 Playing audio...');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
-      });
-    }
-  }
-
   Future<void> _togglePlayback() async {
     if (_isPlaying) {
       await _stopPlayback();
