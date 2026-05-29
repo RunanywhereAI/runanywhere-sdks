@@ -181,7 +181,7 @@ class STTViewModel: VoiceComponentViewModelBase {
 
         switch event.model.kind {
         case .loadCompleted:
-            applyLoadedModel(event.model)
+            applyCurrentModelSnapshot(reason: "loaded")
             logger.info("STT model loaded: \(modelId)")
         case .unloadCompleted:
             clearLoadedModel()

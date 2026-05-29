@@ -106,6 +106,16 @@ class VoiceComponentViewModelBase: ObservableObject {
     // MARK: - Initial Model State
 
     func checkInitialModelState() async {
+        applyCurrentModelSnapshot(reason: "already loaded")
+    }
+
+    /// Resolve the current model for this modality via the SDK snapshot and
+    /// apply it to published state. Shared by `checkInitialModelState()` (cold
+    /// start) and `handleSDKEvent` load-completed handling — `RAModelEvent`
+    /// (the event payload) only carries `modelID`/`kind`, so the full
+    /// `RAModelInfo` must be re-resolved through `RunAnywhere.currentModel`
+    /// rather than passed from the event.
+    func applyCurrentModelSnapshot(reason: String) {
         var request = RACurrentModelRequest()
         request.category = modelCategory
         let snapshot = RunAnywhere.currentModel(request)
@@ -118,7 +128,7 @@ class VoiceComponentViewModelBase: ObservableObject {
             model.id = snapshot.modelID
         }
         applyLoadedModel(model)
-        logger.info("Voice component model already loaded: \(model.id)")
+        logger.info("Voice component model \(reason): \(model.id)")
     }
 
     /// Apply a model resolved at startup (or via an event) to published state.

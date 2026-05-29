@@ -151,7 +151,7 @@ class VADViewModel: VoiceComponentViewModelBase {
 
         switch event.model.kind {
         case .loadCompleted:
-            applyLoadedModel(event.model)
+            applyCurrentModelSnapshot(reason: "loaded")
             logger.info("VAD model loaded: \(modelId)")
         case .unloadCompleted:
             clearLoadedModel()
