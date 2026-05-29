@@ -142,6 +142,10 @@ let _jsOnlyInit = false;
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
 let _hasCompletedServicesInit = false;
+// Separate from _hasCompletedServicesInit: Phase 2 marks services ready even
+// if the HTTP/auth round-trip failed (offline mode). ensureServicesReady()
+// retries HTTP-only on the next API call without re-running Phase 2.
+let _hasCompletedHTTPSetup = false;
 let _servicesInitPromise: Promise<void> | null = null;
 
 interface SdkInitModule extends EmscriptenRunanywhereModule {
@@ -587,6 +591,36 @@ async function planDownloadWithSelfHeal(
 // every other framework SDK; nothing Web-specific belongs in the TS layer.
 
 // ---------------------------------------------------------------------------
+// HTTP retry (mirrors Swift retryHTTPSetup / RN retryHTTPSetupInternal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Retry HTTP/auth after an offline initialization. The Web SDK does not yet
+ * have a browser-side authenticate flow, so the retry probes the commons
+ * auth state via `_rac_auth_is_authenticated` — if the C++ layer has since
+ * acquired a token (e.g. another call path authenticated), flip the flag.
+ * Once a full browser auth flow lands, the authenticate call goes here.
+ */
+async function retryHTTPSetup(): Promise<void> {
+  if (_hasCompletedHTTPSetup) return;
+  const module = tryRunanywhereModule() as SdkInitModule | null;
+  if (!module) return;
+
+  const authFn = module._rac_auth_is_authenticated;
+  if (typeof authFn !== 'function') return;
+
+  try {
+    const authenticated = authFn.call(module) !== 0;
+    if (authenticated) {
+      _hasCompletedHTTPSetup = true;
+      logger.info('HTTP/Auth setup succeeded on retry');
+    }
+  } catch {
+    // Still offline or auth state unavailable — leave _hasCompletedHTTPSetup false.
+  }
+}
+
+// ---------------------------------------------------------------------------
 // RunAnywhere Public API
 // ---------------------------------------------------------------------------
 
@@ -839,6 +873,7 @@ export const RunAnywhere = {
           completeNativePhase1ForModule(module);
         }
 
+        let httpConfigured = false;
         if (typeof module._rac_sdk_init_phase2_proto === 'function') {
           const bytes = SdkInitPhase2Request.encode({}).finish();
           const result = invokeSdkInitProto(
@@ -848,14 +883,33 @@ export const RunAnywhere = {
             'rac_sdk_init_phase2_proto',
           );
           throwIfSdkInitFailed(result, 'SDK Phase 2');
+          httpConfigured = result?.httpConfigured ?? false;
         } else {
           logger.warning(
             'WASM module missing _rac_sdk_init_phase2_proto; services init remains browser-only until rebuild.',
           );
         }
 
+        // Step 5 (deferred from C++): post-Phase-2 model discovery.
+        // Phase 2 fetches model assignments from the backend; models linked by
+        // those assignments won't appear in downloadedModels() until the OPFS
+        // scan runs again with the updated registry. Mirrors Swift Step 5:
+        // CppBridge.ModelRegistry.shared.discoverDownloadedModels().
+        try {
+          await RunAnywhere.hydrateModelRegistry();
+        } catch (err) {
+          logger.debug(
+            `Post-Phase-2 model discovery failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
         _hasCompletedServicesInit = true;
-        logger.debug('Services initialization complete (Phase 2)');
+        _hasCompletedHTTPSetup = httpConfigured;
+        if (httpConfigured) {
+          logger.debug('Services initialization complete (Phase 2)');
+        } else {
+          logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
+        }
       } catch (err) {
         // Clear the promise on failure so a subsequent retry can re-enter.
         _servicesInitPromise = null;
@@ -870,9 +924,19 @@ export const RunAnywhere = {
 
   /**
    * Internal-style guard used by extensions that need a fully-initialized SDK.
+   * Three-branch mirror of Swift's ensureServicesReady():
+   *   1. Fast path: services + HTTP both done → return immediately.
+   *   2. Recovery path: services done, HTTP failed (offline init) → retry HTTP only.
+   *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
    */
   async ensureServicesReady(): Promise<void> {
-    if (_hasCompletedServicesInit) return;
+    if (_hasCompletedServicesInit && _hasCompletedHTTPSetup) {
+      return;
+    }
+    if (_hasCompletedServicesInit && !_hasCompletedHTTPSetup) {
+      await retryHTTPSetup();
+      return;
+    }
     return RunAnywhere.completeServicesInitialization();
   },
 
@@ -1026,6 +1090,7 @@ export const RunAnywhere = {
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.loadModelAsync>>> {
+    await RunAnywhere.ensureServicesReady();
     const result = await ModelLifecycleCapability.loadModelAsync(request);
     // VLM lifecycle mirror: when the loaded model is multimodal/vision and a
     // Web vision-language provider is registered, automatically populate
@@ -1148,6 +1213,7 @@ export const RunAnywhere = {
     extra: CancellableCall = {},
   ): Promise<DownloadProgress> {
     throwIfAborted(extra.signal, 'downloadModel');
+    await RunAnywhere.ensureServicesReady();
     const request = typeof input === 'string' ? { modelId: input } : input;
     const model = request.model ?? ModelRegistryCapability.getModel(request.modelId) ?? undefined;
     if (!model) {
@@ -1402,11 +1468,12 @@ export const RunAnywhere = {
     );
   },
 
-  generate(
+  async generate(
     options: Parameters<typeof TextGenerationCapability.generate>[0],
     extra: CancellableCall = {},
   ): ReturnType<typeof TextGenerationCapability.generate> {
     throwIfAborted(extra.signal, 'generate');
+    await RunAnywhere.ensureServicesReady();
     // Mirror Swift's Task cancellation: bridge the abort signal to commons
     // cancelGeneration so the synchronous WASM call returns early.
     const detach = attachSignalToCancel(extra.signal, () => TextGenerationCapability.cancelGeneration());
@@ -1418,6 +1485,7 @@ export const RunAnywhere = {
     extra: CancellableCall = {},
   ): Promise<Awaited<ReturnType<typeof TextGenerationCapability.generateStream>>> {
     throwIfAborted(extra.signal, 'generateStream');
+    await RunAnywhere.ensureServicesReady();
     const stream = await TextGenerationCapability.generateStream(options);
     const detach = attachSignalToCancel(extra.signal, () => stream.cancel());
     void stream.result.finally(detach);
@@ -1726,6 +1794,7 @@ export const RunAnywhere = {
     _localFileStorage = null;
     _hasCompletedNativePhase1 = false;
     _hasCompletedServicesInit = false;
+    _hasCompletedHTTPSetup = false;
     _servicesInitPromise = null;
 
     logger.info('RunAnywhere Web SDK shut down');
