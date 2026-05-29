@@ -62,29 +62,29 @@ Notes:
 
 ### How It Works
 
-This sample app uses `settings.gradle.kts` with `includeBuild()` to reference the local Kotlin SDK:
+This sample app uses `settings.gradle.kts` with a `flatDir` repository to consume the Kotlin SDK as a pre-built AAR:
 
 ```
-This Sample App → Local Kotlin SDK (sdk/runanywhere-kotlin/)
-                          ↓
-              Local JNI Libraries (sdk/runanywhere-kotlin/src/androidMain/jniLibs/)
+This Sample App → runanywhere-sdk.aar (examples/android/RunAnywhereAI/libs/)
                           ↑
-           Built by: ./scripts/build-kotlin.sh --setup
+     Staged by: ./scripts/stage-sdk-aars.sh
+                          ↑
+     Built by: ./scripts/build-core-android.sh arm64-v8a
 ```
 
-The `build-kotlin.sh --setup` script:
-1. Downloads dependencies (Sherpa-ONNX, ~500MB)
-2. Builds the native C++ libraries from `runanywhere-commons`
-3. Copies JNI `.so` files to `sdk/runanywhere-kotlin/src/androidMain/jniLibs/`
-4. Sets `runanywhere.useLocalNatives=true` in `gradle.properties`
+The `build-core-android.sh` script:
+1. Builds the native C++ libraries from `runanywhere-commons` for the target ABI
+2. Compiles the Kotlin SDK and packages it as `runanywhere-sdk.aar`
+3. Copies the AAR into `examples/android/RunAnywhereAI/libs/`
+4. JNI `.so` files are bundled inside the AAR (located at `sdk/runanywhere-kotlin/src/main/jniLibs/`)
 
 ### After Modifying the SDK
 
-- **Kotlin SDK code changes**: Rebuild in Android Studio or run `./gradlew assembleDebug`
+- **Kotlin SDK code changes**: Re-run `./scripts/stage-sdk-aars.sh`, then rebuild in Android Studio or run `./gradlew assembleDebug`
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  cd sdk/runanywhere-kotlin
-  ./scripts/build-kotlin.sh --local --rebuild-commons
+  ./scripts/build-core-android.sh arm64-v8a
+  ./scripts/stage-sdk-aars.sh
   ```
 
 ---
@@ -120,9 +120,9 @@ This sample app demonstrates the full power of the RunAnywhere SDK:
 | **Real-time Analytics** | Token speed, generation time, inference metrics | `MessageAnalytics` |
 | **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.transcribe()` |
 | **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.synthesize()` |
-| **Voice Assistant** | Full STT -> LLM -> TTS pipeline with auto-detection | `RunAnywhere.processVoice()` |
+| **Voice Assistant** | Full STT -> LLM -> TTS pipeline with auto-detection | `RunAnywhere.processVoiceTurn()` |
 | **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.downloadModel()` |
-| **Storage Management** | View storage usage and delete models | `RunAnywhere.storageInfo()` |
+| **Storage Management** | View storage usage and delete models | `RunAnywhere.getStorageInfo()` |
 | **Offline Support** | All features work without internet | On-device inference |
 
 ---
@@ -291,11 +291,13 @@ adb shell am start -n com.runanywhere.runanywhereai.debug/.MainActivity
 The SDK is initialized in `RunAnywhereApplication.kt`:
 
 ```kotlin
-// Initialize SDK with development environment
-RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
-
-// Complete services initialization (device registration)
-RunAnywhere.completeServicesInitialization()
+// Initialize SDK (development mode — no API key needed)
+RunAnywhere.initialize(
+    context = appContext,
+    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+)
+// Phase 2 (device registration) runs lazily on the first feature call
+// via RunAnywhere.ensureServicesReady(). No explicit call needed here.
 
 // Register AI backends
 LlamaCPP.register(priority = 100)  // LLM backend (GGUF models)
@@ -306,21 +308,31 @@ RunAnywhere.registerModel(
     id = "smollm2-360m-q8_0",
     name = "SmolLM2 360M Q8_0",
     url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...",
-    framework = InferenceFramework.LLAMA_CPP,
-    memoryRequirement = 500_000_000,
+    framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    modality = ModelCategory.MODEL_CATEGORY_TEXT_GENERATION,
+    artifactType = null,
+    memoryRequirement = 500_000_000L,
+    supportsThinking = false,
+    supportsLora = false,
 )
 ```
 
 ### Download & Load a Model
 
 ```kotlin
-// Download with progress tracking
-RunAnywhere.downloadModel("smollm2-360m-q8_0").collect { progress ->
+// Download with progress tracking (pass the registered RAModelInfo)
+val modelInfo = RunAnywhere.registerModel(/* ... */)
+RunAnywhere.downloadModel(modelInfo).collect { progress ->
     println("Download: ${(progress.progress * 100).toInt()}%")
 }
 
 // Load into memory
-RunAnywhere.loadLLMModel("smollm2-360m-q8_0")
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "smollm2-360m-q8_0",
+        category = ModelCategory.MODEL_CATEGORY_TEXT_GENERATION,
+    )
+)
 ```
 
 ### Stream Text Generation
@@ -340,38 +352,48 @@ println("Response: ${result.text}")
 ### Speech-to-Text
 
 ```kotlin
-// Load STT model
-RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+// Load STT model via the unified loadModel API
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "sherpa-onnx-whisper-tiny.en",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    )
+)
 
 // Transcribe audio bytes
-val transcription = RunAnywhere.transcribe(audioBytes)
-println("Transcription: $transcription")
+val transcription = RunAnywhere.transcribe(audioBytes, RASTTOptions())
+println("Transcription: ${transcription.text}")
 ```
 
 ### Text-to-Speech
 
 ```kotlin
-// Load TTS voice
-RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+// Load TTS model via the unified loadModel API
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    )
+)
 
 // Synthesize speech
-val result = RunAnywhere.synthesize(text, TTSOptions(
-    rate = 1.0f,
-    pitch = 1.0f,
-))
-// result.audioData contains WAV audio bytes
+val result = RunAnywhere.synthesize(text, RATTSOptions())
+// result.audio_data contains raw Float32 PCM audio bytes
 ```
 
 ### Voice Pipeline (STT → LLM → TTS)
 
 ```kotlin
-// Process voice through full pipeline
-val result = RunAnywhere.processVoice(audioData)
+// Initialize the voice agent from currently-loaded STT/LLM/TTS models
+RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
-if (result.speechDetected) {
+// Process a single voice turn through the full pipeline
+val result = RunAnywhere.processVoiceTurn(audioData)
+
+if (result.transcription.isNotEmpty()) {
     println("User said: ${result.transcription}")
-    println("AI response: ${result.response}")
-    // result.synthesizedAudio contains TTS audio
+    println("AI response: ${result.response_text}")
+    // result.tts_audio contains synthesized TTS audio bytes
 }
 ```
 
@@ -403,7 +425,7 @@ if (result.speechDetected) {
 - Transcription metrics (confidence, RTF, word count)
 
 **Key SDK APIs:**
-- `RunAnywhere.loadSTTModel()` — Load Whisper model
+- `RunAnywhere.loadModel(RAModelLoadRequest(..., MODEL_CATEGORY_SPEECH_RECOGNITION))` — Load Whisper model
 - `RunAnywhere.transcribe()` — Batch transcription
 - `RunAnywhere.transcribeStream()` — Streaming transcription
 
@@ -416,7 +438,7 @@ if (result.speechDetected) {
 - Fun sample texts for testing
 
 **Key SDK APIs:**
-- `RunAnywhere.loadTTSVoice()` — Load TTS model
+- `RunAnywhere.loadModel(RAModelLoadRequest(..., MODEL_CATEGORY_SPEECH_SYNTHESIS))` — Load TTS model
 - `RunAnywhere.synthesize()` — Generate speech audio
 - `RunAnywhere.stopSynthesis()` — Cancel synthesis
 
@@ -429,9 +451,9 @@ if (result.speechDetected) {
 - Model status tracking for all 3 components (STT, LLM, TTS)
 
 **Key SDK APIs:**
-- `RunAnywhere.startVoiceSession()` — Start voice session
-- `RunAnywhere.processVoice()` — Process audio through pipeline
-- `RunAnywhere.voiceAgentComponentStates()` — Check component status
+- `RunAnywhere.initializeVoiceAgentWithLoadedModels()` — Initialize voice agent from loaded models
+- `RunAnywhere.processVoiceTurn()` — Process audio through full STT→LLM→TTS pipeline
+- `RunAnywhere.getVoiceAgentComponentStates()` — Check STT/LLM/TTS component status
 
 ### 5. Settings Screen (`SettingsScreen.kt`)
 
@@ -442,9 +464,9 @@ if (result.speechDetected) {
 - Cache clearing
 
 **Key SDK APIs:**
-- `RunAnywhere.storageInfo()` — Get storage details
-- `RunAnywhere.deleteModel()` — Remove downloaded model
-- V2 storage-plan bridge — Clear temporary files through generated/proto-backed storage actions
+- `RunAnywhere.getStorageInfo()` — Get storage details
+- `RunAnywhere.deleteStorage(StorageDeleteRequest(...))` — Remove downloaded model
+- `RunAnywhere.clearCache()` / `RunAnywhere.cleanTempFiles()` — Clear temporary files
 
 ---
 
