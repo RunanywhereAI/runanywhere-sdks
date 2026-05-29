@@ -1093,6 +1093,9 @@ typedef RacSdkEventSubscribeDart = int Function(
 typedef RacSdkEventUnsubscribeNative = ffi.Void Function(ffi.Uint64);
 typedef RacSdkEventUnsubscribeDart = void Function(int);
 
+typedef RacSdkEventQuiesceNative = ffi.Void Function();
+typedef RacSdkEventQuiesceDart = void Function();
+
 typedef RacSdkEventPublishProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
@@ -1698,6 +1701,10 @@ class RacBindings {
           () => lib.lookupFunction<RacSdkEventUnsubscribeNative,
               RacSdkEventUnsubscribeDart>('rac_sdk_event_unsubscribe'),
         ),
+        rac_sdk_event_quiesce = _lookupOptional<RacSdkEventQuiesceDart>(
+          () => lib.lookupFunction<RacSdkEventQuiesceNative,
+              RacSdkEventQuiesceDart>('rac_sdk_event_quiesce'),
+        ),
         rac_sdk_event_publish_proto =
             _lookupOptional<RacSdkEventPublishProtoDart>(
           () => lib.lookupFunction<RacSdkEventPublishProtoNative,
@@ -2135,6 +2142,8 @@ class RacBindings {
   final RacSdkEventSubscribeDart? rac_sdk_event_subscribe;
 
   final RacSdkEventUnsubscribeDart? rac_sdk_event_unsubscribe;
+
+  final RacSdkEventQuiesceDart? rac_sdk_event_quiesce;
 
   final RacSdkEventPublishProtoDart? rac_sdk_event_publish_proto;
 

@@ -75,6 +75,13 @@ class DartBridgeEvents {
       if (unsubscribe != null && _subscriptionId != 0) {
         unsubscribe(_subscriptionId);
       }
+      // Commons dispatches subscriber callbacks after releasing its mutex, so
+      // unsubscribe alone does not guarantee no publisher thread is mid-call
+      // into our NativeCallable. Drain in-flight callbacks per the documented
+      // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
+      // close) before closing the callable, mirroring the Swift/Kotlin/RN
+      // event bridges and avoiding a use-after-free onto the closing isolate.
+      RacNative.bindings.rac_sdk_event_quiesce?.call();
     } catch (e) {
       _logger.debug('SDKEvent proto unregistration failed: $e');
     } finally {
