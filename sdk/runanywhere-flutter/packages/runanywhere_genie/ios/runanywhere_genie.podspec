@@ -22,12 +22,14 @@ registration metadata on unsupported Apple platforms.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '15.1'
+  s.ios.deployment_target = '17.0'
   s.swift_version = '5.0'
 
   s.source_files = 'Classes/**/*'
 
   s.dependency 'Flutter'
+  # Depend on the core pod for RACommons (registry, error codes, plugin registry).
+  s.dependency 'runanywhere'
 
   # No vendored_frameworks — Genie has no iOS binary.
 
