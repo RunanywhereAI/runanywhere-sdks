@@ -274,10 +274,6 @@ async function main(): Promise<void> {
     publishReadiness('building-shell');
     buildAppShell();
     await waitForInteractiveShell();
-    // Hydrate OPFS model state now that the catalog has been registered during shell build.
-    void RunAnywhere.hydrateModelRegistry().then((n) => {
-      if (n > 0) console.log(`[RunAnywhere] hydrated ${n} model(s) from OPFS`);
-    });
   } catch (error) {
     // Show error view with retry
     const message = formatError(error);
