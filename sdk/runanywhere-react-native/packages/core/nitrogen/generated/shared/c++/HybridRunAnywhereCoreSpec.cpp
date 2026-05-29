@@ -16,6 +16,7 @@ namespace margelo::nitro::runanywhere {
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("initialize", &HybridRunAnywhereCoreSpec::initialize);
       prototype.registerHybridMethod("completeServicesInitialization", &HybridRunAnywhereCoreSpec::completeServicesInitialization);
+      prototype.registerHybridMethod("retryHTTPSetupProto", &HybridRunAnywhereCoreSpec::retryHTTPSetupProto);
       prototype.registerHybridMethod("destroy", &HybridRunAnywhereCoreSpec::destroy);
       prototype.registerHybridMethod("isInitialized", &HybridRunAnywhereCoreSpec::isInitialized);
       prototype.registerHybridMethod("pluginLoaderApiVersion", &HybridRunAnywhereCoreSpec::pluginLoaderApiVersion);

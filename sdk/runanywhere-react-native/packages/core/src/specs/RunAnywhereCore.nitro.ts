@@ -54,6 +54,15 @@ export interface RunAnywhereCore extends HybridObject<{
   completeServicesInitialization(): Promise<boolean>;
 
   /**
+   * Retry HTTP/auth setup after an offline initialization via the commons
+   * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
+   * `http_configured` flag so the TS recovery path knows whether the
+   * platform-side auth round-trip is still required.
+   * Matches Swift: CppBridge.SdkInit.retryHTTP().
+   */
+  retryHTTPSetupProto(): Promise<boolean>;
+
+  /**
    * Destroy the SDK and clean up resources
    */
   destroy(): Promise<void>;

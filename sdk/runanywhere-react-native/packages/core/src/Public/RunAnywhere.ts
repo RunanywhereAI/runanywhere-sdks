@@ -197,9 +197,6 @@ export const RunAnywhere = {
             baseURL: effectiveBaseURL,
             environment: envString,
             sdkVersion: SDKConstants.version,
-            supabaseURL: options.supabaseURL,
-            supabaseKey: options.supabaseKey,
-            buildToken: options.buildToken,
           });
 
           const initialized = await native.initialize(configJson);
@@ -650,6 +647,25 @@ async function retryHTTPSetupInternal(): Promise<void> {
   const native = requireNativeModule();
   logger.debug('Retrying HTTP/auth setup...');
   try {
+    // Idempotent fast path + config sanity check, owned by commons
+    // (rac_sdk_retry_http_proto). Mirrors Swift's CppBridge.SdkInit.retryHTTP().
+    // When commons reports HTTP configured, no platform-side round-trip is
+    // needed; otherwise fall through to the auth call below.
+    try {
+      const httpConfigured = await native.retryHTTPSetupProto();
+      if (httpConfigured) {
+        initState = markHTTPSetupCompleted(initState);
+        logger.info('HTTP/Auth setup succeeded on retry (commons reconfigured HTTP).');
+        return;
+      }
+    } catch (protoError) {
+      logger.debug(
+        `HTTP retry proto failed (non-fatal): ${
+          protoError instanceof Error ? protoError.message : String(protoError)
+        }`
+      );
+    }
+
     const authenticated = await native.isAuthenticated();
     if (authenticated) {
       initState = markHTTPSetupCompleted(initState);

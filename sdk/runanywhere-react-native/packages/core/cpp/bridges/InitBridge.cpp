@@ -762,6 +762,7 @@ struct SdkInitResultSummary {
 using ProtoBufferInitFn = void (*)(rac_proto_buffer_t*);
 using ProtoBufferFreeFn = void (*)(rac_proto_buffer_t*);
 using SdkInitProtoFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
+using SdkRetryHttpProtoFn = rac_result_t (*)(rac_proto_buffer_t*);
 
 template <typename Fn>
 Fn loadOptionalSymbol(const char* name) {
@@ -822,13 +823,13 @@ static void appendStringField(std::vector<uint8_t>& out,
     out.insert(out.end(), value.begin(), value.end());
 }
 
-static std::vector<uint8_t> makePhase1RequestBytes(SDKEnvironment environment,
+static std::vector<uint8_t> makePhase1RequestBytes(rac_environment_t environment,
                                                    const std::string& apiKey,
                                                    const std::string& baseURL,
                                                    const std::string& deviceId) {
     std::vector<uint8_t> bytes;
     appendVarint(bytes, 0x08);  // field 1: environment
-    appendVarint(bytes, static_cast<uint64_t>(InitBridge::toRacEnvironment(environment)));
+    appendVarint(bytes, static_cast<uint64_t>(environment));
     appendStringField(bytes, 2, apiKey);
     appendStringField(bytes, 3, baseURL);
     appendStringField(bytes, 4, deviceId);
@@ -995,6 +996,48 @@ static rac_result_t callSdkInitProto(const char* symbolName,
     (void)requestBytes;
     (void)outSummary;
     LOGW("rac_sdk_init.h unavailable in bundled headers; using legacy RN init path");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
+// rac_sdk_retry_http_proto takes no request bytes (output buffer only), so it
+// cannot reuse callSdkInitProto's request-bytes signature. Same buffer
+// lifecycle + feature-unavailable downgrade as the phase{1,2} path.
+static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
+#if RN_HAS_RAC_SDK_INIT_HEADER
+#if defined(__APPLE__)
+    SdkRetryHttpProtoFn fn = rac_sdk_retry_http_proto;
+#else
+    SdkRetryHttpProtoFn fn = loadOptionalSymbol<SdkRetryHttpProtoFn>("rac_sdk_retry_http_proto");
+#endif
+    if (!fn) {
+        LOGW("rac_sdk_retry_http_proto unavailable in bundled RACommons");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+
+    rac_proto_buffer_t out;
+    initProtoBuffer(&out);
+    rac_result_t rc = fn(&out);
+    if (outSummary) {
+        *outSummary = parseSdkInitResult(out);
+    }
+
+    if (rc != RAC_SUCCESS) {
+        if (out.error_message) {
+            LOGE("rac_sdk_retry_http_proto failed: %s", out.error_message);
+        } else {
+            LOGE("rac_sdk_retry_http_proto failed: %d", rc);
+        }
+        freeProtoBuffer(&out);
+        return rc;
+    }
+
+    rac_result_t status = out.status;
+    freeProtoBuffer(&out);
+    return status;
+#else
+    (void)outSummary;
+    LOGW("rac_sdk_init.h unavailable in bundled headers; skipping HTTP retry");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
 }
@@ -1541,21 +1584,8 @@ void InitBridge::registerPlatformAdapter() {
     }
 }
 
-rac_environment_t InitBridge::toRacEnvironment(SDKEnvironment env) {
-    switch (env) {
-        case SDKEnvironment::Development:
-            return RAC_ENV_DEVELOPMENT;
-        case SDKEnvironment::Staging:
-            return RAC_ENV_STAGING;
-        case SDKEnvironment::Production:
-            return RAC_ENV_PRODUCTION;
-        default:
-            return RAC_ENV_DEVELOPMENT;
-    }
-}
-
 rac_result_t InitBridge::initialize(
-    SDKEnvironment environment,
+    rac_environment_t environment,
     const std::string& apiKey,
     const std::string& baseURL,
     const std::string& deviceId
@@ -1574,8 +1604,7 @@ rac_result_t InitBridge::initialize(
     registerPlatformAdapter();
 
     // Step 2: Configure logging based on environment
-    rac_environment_t racEnv = toRacEnvironment(environment);
-    rac_result_t logResult = rac_configure_logging(racEnv);
+    rac_result_t logResult = rac_configure_logging(environment);
     if (logResult != RAC_SUCCESS) {
         LOGE("Failed to configure logging: %d", logResult);
         // Continue anyway - logging is not critical
@@ -1722,8 +1751,7 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     ) -> std::tuple<bool, int, std::string, std::string> {
         (void)requiresAuth;
 
-        rac_environment_t env = InitBridge::toRacEnvironment(
-            InitBridge::shared().getEnvironment());
+        rac_environment_t env = InitBridge::shared().getEnvironment();
         std::string baseURL;
         std::string token;
 
@@ -1789,6 +1817,32 @@ rac_result_t InitBridge::completeServicesInitialization() {
          phase2Summary.httpConfigured ? 1 : 0,
          phase2Summary.deviceRegistered ? 1 : 0,
          phase2Summary.linkedModelsCount);
+    return RAC_SUCCESS;
+}
+
+rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
+    outHttpConfigured = false;
+    if (!initialized_) {
+        LOGE("retryHTTPSetup called before initialize");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    SdkInitResultSummary summary;
+    rac_result_t result = callSdkRetryHttpProto(&summary);
+    // Feature-unavailable on older packaged natives is non-fatal — the JS
+    // layer still drives the platform-side auth round-trip.
+    if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        return RAC_SUCCESS;
+    }
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    outHttpConfigured = summary.httpConfigured;
+    if (!summary.warning.empty()) {
+        LOGI("HTTP retry warning: %s", summary.warning.c_str());
+    }
+    LOGI("HTTP retry complete (http=%d)", outHttpConfigured ? 1 : 0);
     return RAC_SUCCESS;
 }
 
