@@ -49,7 +49,7 @@ Pod::Spec.new do |s|
   s.libraries = "c++"
   s.frameworks = "Accelerate", "Foundation", "Metal", "MetalKit"
 
-  s.dependency 'RunAnywhereCore'
+  s.dependency 'RunAnywhereCore', "~> #{s.version}"
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
 
