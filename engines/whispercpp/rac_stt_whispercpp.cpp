@@ -147,9 +147,10 @@ rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle, const float* aud
             for (size_t i = 0; i < result.word_timings.size(); i++) {
                 out_result->words[i].text = strdup(result.word_timings[i].word.c_str());
                 if (!out_result->words[i].text) {
-                    // Clean up already-allocated word texts
+                    // Clean up already-allocated word texts. rac_stt_word_t::text
+                    // is `const char*`; const_cast to free the strdup() result.
                     for (size_t j = 0; j < i; j++) {
-                        free(out_result->words[j].text);
+                        free(const_cast<char*>(out_result->words[j].text));
                     }
                     free(out_result->words);
                     out_result->words = nullptr;
