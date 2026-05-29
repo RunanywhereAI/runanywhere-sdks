@@ -406,6 +406,32 @@ abstract final class RunAnywhere {
     // httpConfigured` (RunAnywhere.kt:460).
     _hasCompletedHTTPSetup = _resolveHasCompletedHTTPSetup(params);
 
+    // Flush buffered telemetry events now that HTTP is configured. Events
+    // that were queued before the auth round-trip (cold-start metrics) would
+    // otherwise sit in C++ and only flush on the next emit. Mirrors Swift
+    // `CppBridge.Telemetry.flush()` after HTTP becomes configured
+    // (RunAnywhere.swift:277).
+    if (_hasCompletedHTTPSetup) {
+      DartBridgeTelemetry.flush();
+    }
+
+    // Discover downloaded models using the registry handle the SDK already
+    // owns. Models linked via Phase-2 model assignments won't appear in
+    // `RunAnywhere.models.available()` without this pass. Mirrors Swift
+    // Step 5: `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
+    // (RunAnywhere.swift:310).
+    if (!_hasRunDiscovery) {
+      final discoveryResult =
+          await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+      if (discoveryResult.discoveredModels.isNotEmpty) {
+        logger.info(
+          'Discovered ${discoveryResult.discoveredModels.length} downloaded '
+          'models on startup',
+        );
+      }
+      _hasRunDiscovery = true;
+    }
+
     logger.info('Phase 2 complete (${params.environment.description})');
   }
 
