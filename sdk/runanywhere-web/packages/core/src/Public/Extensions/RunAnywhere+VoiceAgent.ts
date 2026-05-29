@@ -482,6 +482,7 @@ export function streamVoiceAgent(
     replayFromSeq: 0,
     includeAudio: false,
   },
+  signal?: AbortSignal,
 ): AsyncIterable<VoiceEvent> {
   const provider = activeProvider();
   if (!provider) return unavailableVoiceEventStream();
@@ -504,7 +505,39 @@ export function streamVoiceAgent(
   const adapter = 'transport' in src
     ? new VoiceAgentStreamAdapter(src.transport)
     : new VoiceAgentStreamAdapter(src.handle, src.module);
-  return adapter.stream(req);
+  const iterable = adapter.stream(req);
+  if (!signal) return iterable;
+  return wrapWithSignal(iterable, signal);
+}
+
+/**
+ * Wraps an AsyncIterable so that when `signal` fires an abort event the
+ * underlying iterator is torn down via `iterator.return?.()`. This mirrors
+ * how Swift Task cancellation propagates through `AsyncStream` and how Kotlin
+ * coroutine scope cancellation terminates a Flow — the iterator's `return()`
+ * path triggers `HandleFanOut.detach()` which clears the C++ callback slot
+ * when the last subscriber leaves.
+ */
+async function* wrapWithSignal(
+  source: AsyncIterable<VoiceEvent>,
+  signal: AbortSignal,
+): AsyncIterable<VoiceEvent> {
+  const iterator = source[Symbol.asyncIterator]();
+  const onAbort = (): void => {
+    void iterator.return?.();
+  };
+  signal.addEventListener('abort', onAbort);
+  try {
+    while (true) {
+      if (signal.aborted) break;
+      const { done, value } = await iterator.next();
+      if (done) break;
+      yield value;
+    }
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    void iterator.return?.();
+  }
 }
 
 export const VoiceAgent = {
