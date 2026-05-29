@@ -19,7 +19,6 @@ import 'package:uuid/uuid.dart';
 // Exceptional return constants for FFI callbacks
 // =============================================================================
 
-const int _exceptionalReturnNull = 0;
 const int _exceptionalReturnInt32 = -1;
 
 // =============================================================================
@@ -104,7 +103,7 @@ class DartBridgeDevice {
               _getDeviceInfoCallback);
       callbacks.ref.getDeviceId =
           Pointer.fromFunction<RacDeviceGetIdCallbackNative>(
-              _getDeviceIdCallback, _exceptionalReturnNull);
+              _getDeviceIdCallback);
       callbacks.ref.isRegistered =
           Pointer.fromFunction<RacDeviceIsRegisteredCallbackNative>(
               _isRegisteredCallback, _exceptionalReturnInt32);
@@ -587,11 +586,11 @@ List<Pointer<Utf8>> _cachedDeviceInfoPtrs = [];
 Pointer<Utf8>? _cachedDeviceIdPtr;
 
 /// Get device ID callback
-int _getDeviceIdCallback(Pointer<Void> userData) {
+Pointer<Utf8> _getDeviceIdCallback(Pointer<Void> userData) {
   try {
     final deviceId = DartBridgeDevice._cachedDeviceId;
     if (deviceId == null) {
-      return 0;
+      return nullptr;
     }
 
     // Free previous pointer if exists
@@ -601,9 +600,9 @@ int _getDeviceIdCallback(Pointer<Void> userData) {
 
     // Allocate and cache new pointer
     _cachedDeviceIdPtr = deviceId.toNativeUtf8();
-    return _cachedDeviceIdPtr!.address;
+    return _cachedDeviceIdPtr!;
   } catch (e) {
-    return 0;
+    return nullptr;
   }
 }
 
@@ -678,7 +677,7 @@ typedef RacDeviceGetInfoCallbackNative = Void Function(
     Pointer<RacDeviceRegistrationInfoStruct>, Pointer<Void>);
 
 /// Callback type: const char* (*get_device_id)(void*)
-typedef RacDeviceGetIdCallbackNative = IntPtr Function(Pointer<Void>);
+typedef RacDeviceGetIdCallbackNative = Pointer<Utf8> Function(Pointer<Void>);
 
 /// Callback type: rac_bool_t (*is_registered)(void*)
 typedef RacDeviceIsRegisteredCallbackNative = Int32 Function(Pointer<Void>);
