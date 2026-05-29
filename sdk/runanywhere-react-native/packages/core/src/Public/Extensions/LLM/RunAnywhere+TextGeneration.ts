@@ -159,14 +159,40 @@ export function generateStream(
   const requestBytes = encodeLLMGenerateRequest(llmRequest);
 
   return {
-    async *[Symbol.asyncIterator]() {
-      await ensureServicesReady();
-      const handle = await native.getLLMHandle();
-      const adapter = new LLMStreamAdapter(handle);
-      // Kick off generation before entering the event loop so the C++ side
-      // starts pushing proto-byte callbacks into the registered slot.
-      native.llmGenerateProto(requestBytes).catch(() => { /* errors surface as stream events */ });
-      yield* adapter.stream(llmRequest);
+    [Symbol.asyncIterator](): AsyncIterator<LLMStreamEventType> {
+      let inner: AsyncIterator<LLMStreamEventType> | null = null;
+      let started = false;
+
+      const ensureStarted = async (): Promise<AsyncIterator<LLMStreamEventType>> => {
+        if (!started) {
+          started = true;
+          await ensureServicesReady();
+          const handle = await native.getLLMHandle();
+          const adapter = new LLMStreamAdapter(handle);
+          // Kick off generation before entering the event loop so the C++ side
+          // starts pushing proto-byte callbacks into the registered slot.
+          native.llmGenerateProto(requestBytes).catch(() => { /* errors surface as stream events */ });
+          inner = adapter.stream(llmRequest)[Symbol.asyncIterator]();
+        }
+        return inner!;
+      };
+
+      return {
+        async next(): Promise<IteratorResult<LLMStreamEventType>> {
+          const it = await ensureStarted();
+          return it.next();
+        },
+        async return(): Promise<IteratorResult<LLMStreamEventType>> {
+          // Await the native cancel before resolving so back-to-back
+          // cancel → generate sequences are race-free. Matches Swift
+          // cancelGeneration() which awaits CppBridge.LLM.shared.cancelProto().
+          try { await native.llmCancelProto(); } catch { /* noop */ }
+          if (inner) {
+            try { await inner.return?.(); } catch { /* noop */ }
+          }
+          return { value: undefined as unknown as LLMStreamEventType, done: true };
+        },
+      };
     },
   };
 }
