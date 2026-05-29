@@ -70,8 +70,14 @@ suspend fun RunAnywhere.generateWithTools(
     toolOptions: RAToolCallingOptions?,
     toolChoice: ToolChoiceMode?,
     forcedToolName: String?,
+    validateCalls: Boolean? = null,
 ): RAToolCallingResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    // Swift parity (`RunAnywhere+ToolCalling.swift`): run the cold-start HTTP
+    // bootstrap before touching the native run loop so a caller that only
+    // completed Phase 1 init (`completeServicesInitialization` not yet run)
+    // doesn't drive tool-calling against an uninitialized service layer.
+    ensureServicesReady()
     // Swift parity: explicit `toolOptions` overrides any embedded
     // `options.tool_calling` payload, otherwise we fall back to the SDK
     // defaults via `toToolCallingOptions()` (which honors
@@ -93,5 +99,5 @@ suspend fun RunAnywhere.generateWithTools(
             tool_choice = toolChoice ?: baseToolOptions.tool_choice,
             forced_tool_name = forcedToolName ?: baseToolOptions.forced_tool_name,
         )
-    return ToolCallingOrchestrator.generateWithTools(prompt, effectiveToolOptions)
+    return ToolCallingOrchestrator.generateWithTools(prompt, effectiveToolOptions, validateCalls)
 }

@@ -210,6 +210,7 @@ internal object ToolCallingOrchestrator {
     suspend fun generateWithTools(
         prompt: String,
         options: ToolCallingOptions? = null,
+        validateCalls: Boolean? = null,
     ): ToolCallingResult =
         coroutineScope {
             require(RunAnywhere.isInitialized) { "SDK not initialized" }
@@ -229,7 +230,13 @@ internal object ToolCallingOrchestrator {
                     format_hint = effectiveOpts.effectiveToolFormatHint(),
                     max_iterations = effectiveOpts.effectiveMaxIterations(),
                     keep_tools_available = effectiveOpts.keep_tools_available ?: false,
-                    validate_calls = true,
+                    // Swift parity (`makeRunLoopRequest`, pass3-syn-149):
+                    // `validate_calls` is `optional bool` on the proto. When the
+                    // caller did not supply a value leave it unset (null) so
+                    // commons applies its documented default (true — enforce
+                    // schema + registry checks). Hosts that delegate validation
+                    // to their executor pass `validateCalls = false`.
+                    validate_calls = validateCalls,
                     tools = tools,
                     // pass2-syn-006-followup-kotlin: thread the OpenAI-style
                     // tool_choice / forced_tool_name knobs all the way through to
