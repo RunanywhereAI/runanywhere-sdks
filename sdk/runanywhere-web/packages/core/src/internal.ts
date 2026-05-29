@@ -80,6 +80,7 @@ export {
 export type { AccelerationMode } from './Foundation/WASMBridge';
 
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
+// SDKErrorCode is a @deprecated compat shim; prefer ProtoErrorCode from '@runanywhere/proto-ts/errors'.
 export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoSDKError, ProtoErrorContext } from './Foundation/SDKException';
 export {
