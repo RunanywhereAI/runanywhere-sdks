@@ -4,12 +4,8 @@
 // LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
-import 'dart:ffi' as ffi;
 import 'dart:io' as io;
-import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
-import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
@@ -21,14 +17,13 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
-    show ComponentLifecycleSnapshot, SDKEvent;
+    show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show JSONSchema, StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
+import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// LLM (text generation) capability surface.
@@ -413,9 +408,17 @@ class RunAnywhereLLM {
 
   /// Cancel any in-flight LLM generation.
   ///
-  /// Mirrors Swift `RunAnywhere.cancelGeneration()`.
-  Future<void> cancelGeneration() async {
-    _cancelProto();
+  /// Mirrors Swift `RunAnywhere.cancelGeneration()`: no-op when not
+  /// initialized; logs a warning on failure rather than surfacing the
+  /// exception to the caller (cancel is best-effort).
+  void cancelGeneration() {
+    if (!DartBridge.isInitialized) return;
+    try {
+      _cancelProto();
+    } catch (e) {
+      SDKLogger('RunAnywhere.cancelGeneration')
+          .warning('cancelGeneration failed: $e');
+    }
   }
 
   /// Extract structured output from arbitrary [text] using the provided JSON
@@ -442,30 +445,11 @@ class RunAnywhereLLM {
       );
 
   LLMGenerationResult _generateProto(LLMGenerateRequest request) {
-    final fn = RacNative.bindings.rac_llm_generate_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_llm_generate_proto is unavailable');
-    }
-
-    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
-      request: request,
-      invoke: fn,
-      decode: LLMGenerationResult.fromBuffer,
-      symbol: 'rac_llm_generate_proto',
-    );
+    return DartBridgeLLM.shared.generateProto(request);
   }
 
   Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
-    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
-    if (fn == null) {
-      return Stream<LLMStreamEvent>.error(
-        UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
-      );
-    }
-
     final controller = StreamController<LLMStreamEvent>(sync: false);
-    ffi.NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
-    var sawTerminalEvent = false;
 
     Future<void> run() async {
       try {
@@ -475,117 +459,18 @@ class RunAnywhereLLM {
         await controller.close();
         return;
       }
-
-      final bytes = request.writeToBuffer();
-      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
-
-      try {
-        // FLUTTER-IOS-006 / FLUTTER-AND-PROTO-002: use `isolateLocal` (not
-        // `.listener`) so the callback runs synchronously on the same thread
-        // that invoked `rac_llm_generate_stream_proto`. The commons producer
-        // serializes into a `thread_local std::vector<uint8_t> scratch` slot
-        // and immediately calls the callback with `scratch.data()`. With
-        // `.listener` mode the callback is queued and runs ASYNCHRONOUSLY —
-        // by then a subsequent token emission has already overwritten `scratch`,
-        // corrupting the bytes. `isolateLocal` is safe because
-        // `rac_llm_generate_stream_proto` and every engine vtable
-        // `generate_stream` implementation run synchronously on the calling
-        // Dart isolate thread, so the callback always fires on the isolate that
-        // created it — the exact precondition `isolateLocal` requires.
-        callback = ffi.NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
-          (
-            ffi.Pointer<ffi.Uint8> bytesPtr,
-            int bytesLen,
-            ffi.Pointer<ffi.Void> _,
-          ) {
-            if (controller.isClosed ||
-                bytesPtr == ffi.nullptr ||
-                bytesLen <= 0) {
-              return;
-            }
-
-            try {
-              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-              final event = LLMStreamEvent.fromBuffer(copy);
-              sawTerminalEvent = sawTerminalEvent || event.isFinal;
-              controller.add(event);
-              if (event.isFinal) {
-                unawaited(controller.close());
-              }
-            } catch (e, st) {
-              controller.addError(e, st);
-              unawaited(controller.close());
-            }
-          },
-        );
-
-        final rc = fn(
-          requestPtr,
-          bytes.length,
-          callback!.nativeFunction,
-          ffi.nullptr,
-        );
-        if (rc != RacResultCode.success && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_llm_generate_stream_proto failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
-          await controller.close();
-        } else if (!sawTerminalEvent && !controller.isClosed) {
-          await controller.close();
-        }
-      } catch (e, st) {
-        if (!controller.isClosed) {
-          controller.addError(e, st);
-          await controller.close();
-        }
-      } finally {
-        calloc.free(requestPtr);
-        // CONSOLIDATE-D fix: drain in-flight LLM stream dispatches before
-        // closing the NativeCallable. `rac_llm_generate_stream_proto` may
-        // post the terminal callback from a worker thread; the dispatcher
-        // copies the user_data slot under commons' internal mutex, releases
-        // the mutex, then invokes the user callback (see
-        // `rac/features/llm/rac_llm_stream.h` warning). Without
-        // `rac_llm_proto_quiesce()` the C side can invoke the trampoline
-        // backed by the NativeCallable's user_data after `callback.close()`
-        // tore it down — UAF against the thread_local proto scratch buffer.
-        // Mirrors Swift `HandleStreamAdapter`'s lock-release-before-unregister
-        // pattern in
-        // `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
-        RacNative.bindings.rac_llm_proto_quiesce?.call();
-        callback?.close();
-        callback = null;
-      }
+      final upstream = DartBridgeLLM.shared.generateStreamProto(request);
+      await controller.addStream(upstream);
+      await controller.close();
     }
 
-    controller.onCancel = () {
-      try {
-        _cancelProto();
-      } finally {
-        // Same CONSOLIDATE-D ordering as the `run()` teardown — quiesce
-        // first so any callbacks the cancel kicked off complete before we
-        // free the NativeCallable backing their user_data.
-        RacNative.bindings.rac_llm_proto_quiesce?.call();
-        callback?.close();
-        callback = null;
-      }
-    };
+    controller.onCancel = _cancelProto;
 
     unawaited(run());
     return controller.stream;
   }
 
   void _cancelProto() {
-    final fn = RacNative.bindings.rac_llm_cancel_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_llm_cancel_proto is unavailable');
-    }
-
-    DartBridgeProtoUtils.callOut<SDKEvent>(
-      invoke: fn,
-      decode: SDKEvent.fromBuffer,
-      symbol: 'rac_llm_cancel_proto',
-    );
+    DartBridgeLLM.shared.cancelProto();
   }
 }
