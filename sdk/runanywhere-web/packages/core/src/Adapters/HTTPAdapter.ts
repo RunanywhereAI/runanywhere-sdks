@@ -36,6 +36,7 @@
 
 import { HttpDownloadStatus } from '@runanywhere/proto-ts/download_service';
 
+import { SDKException, SDKErrorCode } from '../Foundation/SDKException';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { FetchHttpTransport } from './FetchHttpTransport';
 
@@ -264,7 +265,8 @@ function readBytes(m: HTTPModule, srcPtr: number, length: number): Uint8Array {
 
 function required<T>(fn: T | undefined, name: string): T {
   if (fn === undefined || fn === null) {
-    throw new Error(
+    throw SDKException.fromCode(
+      SDKErrorCode.WASMNotLoaded,
       `HTTPAdapter: WASM module is missing export '${name}'. ` +
       `Rebuild the WASM target with the T3.13 HTTP exports enabled.`,
     );
@@ -368,7 +370,10 @@ export class HTTPAdapter {
       const reqPtr = writeRequestStruct(scope, this.m, req);
       const rc = await this.ccall('rac_http_request_send', 'number', ['number', 'number', 'number'], [clientPtr, reqPtr, respPtr]);
       if (rc !== 0) {
-        throw new Error(`rac_http_request_send failed: rc=${rc} url=${req.url}`);
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          `rac_http_request_send failed: rc=${rc} url=${req.url}`,
+        );
       }
       const response = readResponseStruct(this.m, respPtr);
       required(this.m._rac_http_response_free, 'rac_http_response_free')(respPtr);
@@ -437,7 +442,10 @@ export class HTTPAdapter {
         [clientPtr, reqPtr, cbPtr, 0, respPtr]);
       if (rc !== 0) {
         const reason = cancelled ? 'cancelled by chunk handler' : `rc=${rc}`;
-        throw new Error(`rac_http_request_stream failed: ${reason} url=${req.url}`);
+        throw SDKException.fromCode(
+          cancelled ? SDKErrorCode.DownloadCancelled : SDKErrorCode.NetworkError,
+          `rac_http_request_stream failed: ${reason} url=${req.url}`,
+        );
       }
       const response = readResponseStruct(this.m, respPtr);
       required(this.m._rac_http_response_free, 'rac_http_response_free')(respPtr);
@@ -521,9 +529,19 @@ export class HTTPAdapter {
     try {
       this.m.setValue(outPtrPtr, 0, '*');
       const rc = await this.ccall('rac_http_client_create', 'number', ['number'], [outPtrPtr]) as number;
-      if (rc !== 0) throw new Error(`rac_http_client_create failed: rc=${rc}`);
+      if (rc !== 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          `rac_http_client_create failed: rc=${rc}`,
+        );
+      }
       const clientPtr = this.m.getValue(outPtrPtr, '*');
-      if (clientPtr === 0) throw new Error('rac_http_client_create returned NULL');
+      if (clientPtr === 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          'rac_http_client_create returned NULL',
+        );
+      }
       return clientPtr;
     } finally {
       this.m._free(outPtrPtr);
