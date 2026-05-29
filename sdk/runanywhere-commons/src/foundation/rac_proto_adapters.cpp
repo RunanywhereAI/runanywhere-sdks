@@ -1498,7 +1498,7 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
     if (in->image_data && in->image_size > 0) {
         out->set_image_data(
             ::std::string(reinterpret_cast<const char*>(in->image_data), in->image_size));
-        // Every shipped C-ABI diffusion engine (diffusion-coreml,
+        // Every shipped C-ABI diffusion engine (diffusion_coreml,
         // rac_diffusion_platform) emits raw RGBA bytes — surface the media
         // type so SDKs can route through CGContext/Canvas instead of
         // Image(data:). A future backend that returns a PNG container must

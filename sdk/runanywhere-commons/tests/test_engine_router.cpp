@@ -356,7 +356,7 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t coreml_rts[] = {RAC_RUNTIME_COREML, RAC_RUNTIME_ANE};
-        auto diffusion = make_vt("diffusion-coreml", 100, coreml_rts, 2, nullptr, 0);
+        auto diffusion = make_vt("diffusion_coreml", 100, coreml_rts, 2, nullptr, 0);
         diffusion.diffusion_ops =
             reinterpret_cast<const struct rac_diffusion_service_ops*>(&k_sentinel);
         diffusion.llm_ops = nullptr;
@@ -378,7 +378,7 @@ int main() {
         CHECK(stt_result.vtable == nullptr,
               "(10) WhisperKit rejects when CoreML runtime is not registered");
 
-        rac_plugin_unregister("diffusion-coreml");
+        rac_plugin_unregister("diffusion_coreml");
         rac_plugin_unregister("whisperkit_coreml");
     }
 

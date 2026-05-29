@@ -441,6 +441,41 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
+    # commons-008: diffusion-coreml plugin-entry smoke test. Same wiring
+    # rationale as the whisperkit_coreml / metalrt blocks above —
+    # rac_backend_diffusion_coreml is built by engines/ which is configured
+    # after sdk/runanywhere-commons/. diffusion-coreml is the sole
+    # RAC_PRIMITIVE_DIFFUSION provider, so this locks the manifest's COREML
+    # runtime/format + diffusion_ops slot that the EngineRouter routes against;
+    # test_diffusion_coreml_generate.cpp only exercises the backend directly and
+    # bypasses the plugin-entry/vtable path. Apple-only because the backend is.
+    if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
+       AND TARGET rac_backend_diffusion_coreml
+       AND NOT TARGET test_plugin_entry_diffusion_coreml)
+        add_executable(test_plugin_entry_diffusion_coreml
+            sdk/runanywhere-commons/tests/test_plugin_entry_diffusion_coreml.cpp)
+        target_include_directories(test_plugin_entry_diffusion_coreml PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE
+            rac_commons
+            rac_backend_diffusion_coreml
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_diffusion_coreml PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_diffusion_coreml_tests
+                 COMMAND test_plugin_entry_diffusion_coreml)
+    endif()
+
     # GAP 09 / v2 close-out Phase 4 — cross-SDK parity test harness.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/streaming/CMakeLists.txt")
         add_subdirectory(tests/streaming)

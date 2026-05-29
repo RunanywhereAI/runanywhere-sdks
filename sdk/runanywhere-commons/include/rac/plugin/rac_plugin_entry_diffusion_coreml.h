@@ -1,6 +1,6 @@
 /**
  * @file rac_plugin_entry_diffusion_coreml.h
- * @brief Public declaration of the diffusion-coreml unified-ABI plugin entry.
+ * @brief Public declaration of the diffusion_coreml unified-ABI plugin entry.
  *
  * GAP 02 Phase 8 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
  *

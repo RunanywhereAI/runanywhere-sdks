@@ -38,14 +38,14 @@ static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
         // The standalone engines/diffusion-coreml/rac_plugin_entry_diffusion_coreml.cpp
         // exists as an opt-in plugin for hosts that prefer the dedicated
         // CoreML diffusion vtable, but no SDK currently registers it. Pinning
-        // the engine name to "diffusion-coreml" here would cause the engine
+        // the engine name to "diffusion_coreml" here would cause the engine
         // router (rac_engine_router.cpp:185-189) to hard-reject the platform
         // vtable that Swift/Flutter actually load, returning
         // RAC_ERROR_BACKEND_NOT_FOUND for every direct CoreML diffusion
         // creation through this service — splitting public diffusion
         // behavior between the lifecycle path (which routes via "platform")
         // and the direct-service path (which used to route via
-        // "diffusion-coreml").
+        // "diffusion_coreml").
         case RAC_FRAMEWORK_COREML:
             return "platform";
         // ONNX diffusion is not supported; leave the hint blank so the
