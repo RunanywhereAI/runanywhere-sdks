@@ -132,6 +132,25 @@ typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
  *
  * Implements platform-specific operations via callbacks.
  * The SDK layer (Swift/Kotlin) provides these implementations.
+ *
+ * ABI-evolution contract (NORMATIVE):
+ *   This struct is a positional ABI contract shared between commons and every
+ *   SDK's pinned header copy (XCFramework / .so / WASM offset table). Unlike the
+ *   plugin vtable (`rac_engine_vtable_t`, which carries an `abi_version` that
+ *   commons rejects on mismatch), this struct has NO version/size field today,
+ *   so commons CANNOT detect a consumer that pins an older SDK while linking a
+ *   newer commons. The slot-by-slot NULL-check pattern (every call site guards
+ *   its slot before invoking it) is the only safety net: a divergent layout
+ *   typically surfaces as a NULL/garbage slot that fails its own guard rather
+ *   than silent state corruption. Therefore, when EXTENDING this struct, new
+ *   callback slots MUST be appended immediately before `user_data` (never
+ *   inserted earlier) and MUST be Optional / NULL-safe at their call site, so an
+ *   older SDK that zero-inits or omits the new tail slot still initialises
+ *   safely. A future hardening pass may prepend `uint32_t abi_version` +
+ *   `uint32_t struct_size`, but that is an ABI break requiring a synchronized
+ *   rollout across all five SDK populators (Swift/Kotlin-JNI/RN/Flutter/Web)
+ *   plus every pinned binary header and the WASM offset table, and is therefore
+ *   intentionally NOT done here.
  */
 typedef struct rac_platform_adapter {
     // -------------------------------------------------------------------------
@@ -390,10 +409,28 @@ typedef struct rac_platform_adapter {
      * download-button gating and ranks downloaded models below unfetched ones
      * in registry listings.
      *
+     * Error-conflation contract (NORMATIVE): the boolean return deliberately
+     * collapses "missing" / "empty" / "regular file" / "platform probe error"
+     * into a single RAC_FALSE. Commons treats RAC_FALSE as "not a usable
+     * directory" and falls back to `file_exists` for the single-file case
+     * (see rac_model_info_make_proto), so a transient platform error degrades
+     * gracefully to `is_downloaded == false` rather than surfacing a structured
+     * error. Implementations that hit a genuine platform fault (vs. a clean
+     * missing/empty path) SHOULD emit a RAC_LOG_WARN via the adapter's `log`
+     * slot (category "PlatformAdapter") so prod telemetry can detect
+     * adapter-misconfiguration even though the C ABI return cannot distinguish
+     * it. Promoting the signature to
+     * `rac_result_t (*)(const char*, rac_bool_t* out, void*)` would let callers
+     * branch on the fault, but is an ABI break requiring synchronized updates to
+     * every SDK populator (Web/Kotlin-JNI/RN/Flutter), the commons consumer, and
+     * the test mocks, and is intentionally deferred to a dedicated cross-SDK
+     * change.
+     *
      * @param path Absolute directory path (UTF-8, NUL-terminated).
      * @param user_data Platform context.
      * @return RAC_TRUE when the path is a directory with at least one entry;
-     *         RAC_FALSE otherwise (missing, empty, or a regular file).
+     *         RAC_FALSE otherwise (missing, empty, a regular file, or a probe
+     *         error — see the error-conflation contract above).
      */
     rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data);
 

@@ -7,6 +7,14 @@
  *
  * NOTE: HTTP networking is delegated to the platform layer (Swift/Kotlin).
  * The C++ layer only handles orchestration logic.
+ *
+ * Threading contract:
+ *   Adapter callbacks may be invoked from any thread (download workers,
+ *   voice-agent pipeline, LLM streaming, model-registry refresh, etc.).
+ *   All callbacks MUST be thread-safe and re-entrant unless an individual
+ *   slot's doc-block explicitly documents otherwise. Implementations that
+ *   guard shared state (keychain, file handles, log sinks) are responsible
+ *   for their own synchronization — commons does not serialize calls.
  */
 
 #ifndef RAC_PLATFORM_ADAPTER_H
@@ -69,7 +77,17 @@ typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_
  * can fill caller-provided arrays without managing additional ownership.
  */
 typedef struct rac_directory_entry {
-    /** Entry name (no path component). UTF-8, null-terminated. */
+    /** Entry name (no path component). UTF-8, null-terminated.
+     *
+     * Truncation contract: when the underlying filesystem produces an entry
+     * name whose byte length (including NUL) would exceed
+     * `RAC_DIRECTORY_ENTRY_NAME_MAX`, the platform implementation MUST skip
+     * that entry rather than silently truncate it, and SHOULD emit a
+     * RAC_LOG_WARN log via the adapter's `log` slot (category
+     * "PlatformAdapter") so operators can detect oversized names. This keeps
+     * the canonical RunAnywhere model-registry path layout safe — model IDs
+     * never approach 511 bytes in practice — while ensuring the no-error
+     * path cannot return a half-name that aliases a different artifact. */
     char name[RAC_DIRECTORY_ENTRY_NAME_MAX];
     /** RAC_TRUE if the entry is a directory, RAC_FALSE for regular files. */
     rac_bool_t is_dir;
@@ -114,6 +132,25 @@ typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
  *
  * Implements platform-specific operations via callbacks.
  * The SDK layer (Swift/Kotlin) provides these implementations.
+ *
+ * ABI-evolution contract (NORMATIVE):
+ *   This struct is a positional ABI contract shared between commons and every
+ *   SDK's pinned header copy (XCFramework / .so / WASM offset table). Unlike the
+ *   plugin vtable (`rac_engine_vtable_t`, which carries an `abi_version` that
+ *   commons rejects on mismatch), this struct has NO version/size field today,
+ *   so commons CANNOT detect a consumer that pins an older SDK while linking a
+ *   newer commons. The slot-by-slot NULL-check pattern (every call site guards
+ *   its slot before invoking it) is the only safety net: a divergent layout
+ *   typically surfaces as a NULL/garbage slot that fails its own guard rather
+ *   than silent state corruption. Therefore, when EXTENDING this struct, new
+ *   callback slots MUST be appended immediately before `user_data` (never
+ *   inserted earlier) and MUST be Optional / NULL-safe at their call site, so an
+ *   older SDK that zero-inits or omits the new tail slot still initialises
+ *   safely. A future hardening pass may prepend `uint32_t abi_version` +
+ *   `uint32_t struct_size`, but that is an ABI break requiring a synchronized
+ *   rollout across all five SDK populators (Swift/Kotlin-JNI/RN/Flutter/Web)
+ *   plus every pinned binary header and the WASM offset table, and is therefore
+ *   intentionally NOT done here.
  */
 typedef struct rac_platform_adapter {
     // -------------------------------------------------------------------------
@@ -162,10 +199,28 @@ typedef struct rac_platform_adapter {
 
     /**
      * Get a value from secure storage.
+     *
+     * Not-found vs error contract (normative):
+     *   - On a clean "key does not exist" miss the implementation MUST return
+     *     RAC_ERROR_FILE_NOT_FOUND and MUST NOT set *out_value. Commons
+     *     consumers (e.g. rac_device_get_or_create_persistent_id) use this
+     *     specific code to distinguish a benign miss from a real keychain
+     *     failure and decide whether to fall back vs propagate.
+     *   - On any real failure (keychain locked, permission denied, decoding
+     *     error, etc.) the implementation MUST return
+     *     RAC_ERROR_SECURE_STORAGE_FAILED (or another non-RAC_SUCCESS,
+     *     non-RAC_ERROR_FILE_NOT_FOUND code).
+     *   - Returning RAC_ERROR_NOT_FOUND, RAC_ERROR_SECURE_STORAGE_FAILED, or
+     *     any other code for the not-found case is a contract violation —
+     *     commons will conservatively treat all non-RAC_SUCCESS results as
+     *     "miss" today, but future consumers may rely on the discrimination.
+     *
      * @param key Key name
-     * @param out_value Output value (caller must free with rac_free)
+     * @param out_value Output value (caller must free with rac_free); only
+     *                  written on RAC_SUCCESS
      * @param user_data Platform context
-     * @return RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND if not found
+     * @return RAC_SUCCESS on success, RAC_ERROR_FILE_NOT_FOUND if not found,
+     *         RAC_ERROR_SECURE_STORAGE_FAILED (or other) on real errors
      */
     rac_result_t (*secure_get)(const char* key, char** out_value, void* user_data);
 
@@ -299,10 +354,29 @@ typedef struct rac_platform_adapter {
      * Optional. When non-NULL, the C++ model registry refresh path can rescan
      * on-disk model folders without the SDK having to wire up the legacy
      * `rac_discovery_callbacks_t` struct. When NULL the rescan path falls
-     * back to a no-op + warning, preserving prior behaviour.
+     * back to a no-op + a structured warning string in
+     * `ModelRegistryRefreshResult.warnings` ("rescan_local requires platform
+     * filesystem callbacks in the C ABI refresh path"), preserving prior
+     * behaviour.
      *
      * Two-call semantics: pass NULL `out_entries` to query capacity, then
      * allocate and call again. See `rac_file_list_directory_fn` docs.
+     *
+     * Cross-SDK status (each SDK is responsible for populating this slot on
+     * every platform whose runtime exposes a directory enumeration API):
+     *   - Web:           POPULATED (registerFileListDirectory in
+     *                    PlatformAdapter.ts via OPFS).
+     *   - Swift (iOS):   SHOULD be populated via FileManager.contentsOfDirectory
+     *                    (currently NULL — refresh emits the warning above).
+     *   - Kotlin / RN Android: SHOULD be populated via java.io.File.listFiles().
+     *   - Flutter:       SHOULD be populated via Dart FFI trampoline over
+     *                    dart:io Directory.listSync().
+     *   - RN iOS:        SHOULD be populated via FileManager.contentsOfDirectory.
+     *
+     * User-visible impact when this slot is NULL: model registry refresh with
+     * `rescan_local = true` cannot link on-disk model folders to registered
+     * entries — the warning in `ModelRegistryRefreshResult.warnings` is the
+     * only signal to consuming code that the local rescan was skipped.
      */
     rac_file_list_directory_fn file_list_directory;
 
@@ -317,12 +391,46 @@ typedef struct rac_platform_adapter {
      * (rac_model_info_make_proto) to compute the `is_downloaded` field for
      * directory-based artifacts (multi-file, archive-extracted) without
      * forcing the SDK to enumerate the directory itself. When NULL, commons
-     * falls back to file_list_directory + entry-count.
+     * falls back to `file_list_directory` + entry-count; if BOTH are NULL,
+     * `rac_path_is_non_empty_directory()` returns RAC_FALSE and
+     * `is_downloaded` reports false for every directory-based artifact.
+     *
+     * Cross-SDK status (populate on every platform whose runtime exposes a
+     * cheap directory probe — falling back to file_list_directory is
+     * acceptable but pays the enumeration cost):
+     *   - Web:           POPULATED (registerIsNonEmptyDirectory).
+     *   - Swift / RN iOS / Kotlin / RN Android / Flutter: SHOULD be populated
+     *     directly when the platform exposes a non-enumerating probe, otherwise
+     *     rely on the file_list_directory fallback above.
+     *
+     * User-visible impact when BOTH slots are NULL: multi-file model artifacts
+     * (e.g. mmproj + GGUF pairs, tokenizer + ONNX bundles) always report
+     * `is_downloaded == false`, which silently disables the example-app
+     * download-button gating and ranks downloaded models below unfetched ones
+     * in registry listings.
+     *
+     * Error-conflation contract (NORMATIVE): the boolean return deliberately
+     * collapses "missing" / "empty" / "regular file" / "platform probe error"
+     * into a single RAC_FALSE. Commons treats RAC_FALSE as "not a usable
+     * directory" and falls back to `file_exists` for the single-file case
+     * (see rac_model_info_make_proto), so a transient platform error degrades
+     * gracefully to `is_downloaded == false` rather than surfacing a structured
+     * error. Implementations that hit a genuine platform fault (vs. a clean
+     * missing/empty path) SHOULD emit a RAC_LOG_WARN via the adapter's `log`
+     * slot (category "PlatformAdapter") so prod telemetry can detect
+     * adapter-misconfiguration even though the C ABI return cannot distinguish
+     * it. Promoting the signature to
+     * `rac_result_t (*)(const char*, rac_bool_t* out, void*)` would let callers
+     * branch on the fault, but is an ABI break requiring synchronized updates to
+     * every SDK populator (Web/Kotlin-JNI/RN/Flutter), the commons consumer, and
+     * the test mocks, and is intentionally deferred to a dedicated cross-SDK
+     * change.
      *
      * @param path Absolute directory path (UTF-8, NUL-terminated).
      * @param user_data Platform context.
      * @return RAC_TRUE when the path is a directory with at least one entry;
-     *         RAC_FALSE otherwise (missing, empty, or a regular file).
+     *         RAC_FALSE otherwise (missing, empty, a regular file, or a probe
+     *         error — see the error-conflation contract above).
      */
     rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data);
 
@@ -340,6 +448,25 @@ typedef struct rac_platform_adapter {
      * a fresh UUID and persists it via secure_set.
      *
      * Buffer should be >= 37 bytes (UUID string + NUL).
+     *
+     * Cross-SDK status (Apple-only — non-Apple SDKs MUST leave this NULL,
+     * Apple-bridged SDKs SHOULD populate it so device-id is stable across
+     * keychain wipes and matches Swift/iOS behaviour):
+     *   - Web:           POPULATED (registerGetVendorId — no-op on non-Apple,
+     *                    used by Safari/WKWebView when available).
+     *   - Swift (iOS):   POPULATED (CppBridge+PlatformAdapter.swift wires
+     *                    UIDevice.identifierForVendor.uuidString).
+     *   - RN iOS:        SHOULD be populated via the same UIDevice API in the
+     *                    InitBridge platform-adapter struct.
+     *   - Flutter iOS:   SHOULD be populated via a Dart FFI trampoline that
+     *                    invokes the iOS platform channel for identifierForVendor.
+     *   - Kotlin / RN Android / Flutter Android: leave NULL (Android has no
+     *                    equivalent stable per-app vendor ID; commons
+     *                    synthesizes + persists a UUID instead).
+     *
+     * User-visible impact when this slot is NULL on Apple: every fresh
+     * install / keychain reset produces a new device ID, which breaks
+     * analytics identity continuity and forces license re-activation.
      *
      * @param out_buffer  Caller-provided buffer to receive the UUID string.
      * @param buffer_size Buffer size in bytes; MUST be >= 37 to succeed.

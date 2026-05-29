@@ -151,8 +151,10 @@ NULL slot = "not supported." ABI version mismatch → immediate rejection at reg
 
 `rac_platform_adapter_t` (`include/rac/core/rac_platform_adapter.h`) is the single struct through which all platform services enter C++. The platform SDK populates it before calling `rac_init()`:
 
-- **Mandatory**: `file_exists`, `file_read`, `file_write`, `file_delete`, `secure_get/set/delete`, `log`, `now_ms`, `get_memory_info`
-- **Optional (NULL-safe)**: `http_download/cancel`, `extract_archive` (falls back to libarchive), `track_error` (Sentry hook)
+- **Mandatory**: `file_exists`, `file_read`, `file_write`, `file_delete`, `secure_get/set/delete`, `log`, `now_ms`
+- **Optional (NULL-safe, each slot is null-checked at the call site with a documented fallback)**: `get_memory_info`, `track_error` (Sentry hook), `http_download/cancel`, `extract_archive` (falls back to libarchive), `file_list_directory`, `is_non_empty_directory`, `get_vendor_id` (Apple-only)
+
+`rac_init()` only enforces that `platform_adapter` itself is non-NULL — it does **not** validate individual slots, so the "Mandatory" list above is a contract for SDK authors rather than an enforced invariant. Slots listed as Optional are genuinely null-checked before every use (e.g. Kotlin's JNI ships without `get_memory_info`/`track_error`, which is why they are Optional and not Mandatory).
 
 All file I/O, secure storage, HTTP, and logging pass through this struct. C++ code never calls platform APIs directly.
 
