@@ -7,7 +7,8 @@
  * eviction dialog drifting from each other when proto enums add new values.
  */
 
-import { InferenceFramework, ModelCategory } from '@runanywhere/web';
+import { ModelCategory } from '@runanywhere/web';
+export { formatFramework } from '@runanywhere/web';
 
 /**
  * Returns the HTML entity for the emoji shown next to a model row. The
@@ -32,32 +33,6 @@ export function modalityEmoji(category: ModelCategory): string {
       return '&#128279;';
     default:
       return '&#9881;&#65039;';
-  }
-}
-
-/**
- * Human-friendly framework label shown in catalog rows. Mirrors the
- * commons `rac_framework_display_name()` mapping. (Until the web SDK
- * surfaces that helper directly, the example carries this table.)
- */
-export function formatFramework(framework: InferenceFramework): string {
-  switch (framework) {
-    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-      return 'llama.cpp';
-    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-      return 'ONNX';
-    case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-      return 'CoreML';
-    case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
-      return 'MLX';
-    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-      return 'Apple FM';
-    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-      return 'System TTS';
-    case InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
-      return 'FluidAudio';
-    default:
-      return 'Unknown';
   }
 }
 

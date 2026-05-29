@@ -104,3 +104,6 @@ export {
 export { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 
 export * from './types/index';
+
+// Helpers — pure-JS proxies for commons utilities.
+export { formatFramework } from './Public/Helpers/formatFramework';
