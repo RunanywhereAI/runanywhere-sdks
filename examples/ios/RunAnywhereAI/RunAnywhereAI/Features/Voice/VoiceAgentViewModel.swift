@@ -284,38 +284,27 @@ final class VoiceAgentViewModel: ObservableObject {
         }
         hasSubscribedToSDKEvents = true
 
-        RunAnywhere.events.events
+        let bus = RunAnywhere.events
+
+        bus.events(for: .component)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                // Defer state modifications to avoid "Publishing changes within view updates" warning
-                Task { @MainActor in
-                    self?.handleSDKEvent(event)
-                }
-            }
+            .sink { [weak self] event in Task { @MainActor in self?.handleComponentLifecycleEvent(event) } }
             .store(in: &cancellables)
-    }
 
-    private func handleSDKEvent(_ event: RASDKEvent) {
-        // The proto-lifecycle path publishes RAComponentLifecycleEvent under
-        // the `component` category. Handle that first so STT/TTS loads issued
-        // through RunAnywhere.loadModel reach the UI. Legacy model/generation
-        // payloads (still used by some LLM paths) fall through to the
-        // per-component handlers below.
-        if event.category == .component {
-            handleComponentLifecycleEvent(event)
-            return
-        }
+        bus.events(for: .llm)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in Task { @MainActor in self?.handleLLMEvent(event) } }
+            .store(in: &cancellables)
 
-        switch (event.category, event.component) {
-        case (.llm, _), (_, .llm):
-            handleLLMEvent(event)
-        case (.stt, _), (_, .stt):
-            handleSTTEvent(event)
-        case (.tts, _), (_, .tts):
-            handleTTSEvent(event)
-        default:
-            break
-        }
+        bus.events(for: .stt)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in Task { @MainActor in self?.handleSTTEvent(event) } }
+            .store(in: &cancellables)
+
+        bus.events(for: .tts)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in Task { @MainActor in self?.handleTTSEvent(event) } }
+            .store(in: &cancellables)
     }
 
     /// Handle the canonical component-lifecycle proto event published by
