@@ -3,11 +3,13 @@
  *
  * Canonical `RunAnywhere.hardware.*` namespace per CANONICAL_API.md §14.
  *
- * Surface:
- *   - `hardware.getProfile() → HardwareProfile`
- *   - `hardware.getChip() → string`
- *   - `hardware.hasNeuralEngine: boolean`
- *   - `hardware.accelerationMode: string`
+ * Surface (matches Swift/Kotlin canonical 3-method surface):
+ *   - `hardware.getProfile() → HardwareProfileResult`
+ *   - `hardware.getAccelerators() → AcceleratorInfo[]`
+ *   - `hardware.setAcceleratorPreference(preference) → boolean`
+ *
+ * Chip, NPU, and acceleration-mode data are available via
+ * `getProfile().profile.chip`, `.npuChip`, and `.accelerationMode`.
  *
  * Hardware data is decoded from the commons serialized-proto ABI when the
  * active WASM module exports it. Browser-owned facts (`navigator.*`, WebGPU,
@@ -145,28 +147,6 @@ export const Hardware = {
     return protoResult ? mergeBrowserFacts(protoResult, browserResult) : browserResult;
   },
 
-  /** Best-effort chip name (e.g., "apple-silicon", "x86_64"). */
-  getChip(): string {
-    return Hardware.getProfile().profile?.chip || detectChip();
-  },
-
-  /**
-   * Whether the device has a Neural Engine. The proto bridge is authoritative
-   * when present; browser detection fills the gap for older or partial modules.
-   */
-  get hasNeuralEngine(): boolean {
-    return Hardware.getProfile().profile?.hasNeuralEngine ?? detectChip() === 'apple-silicon';
-  },
-
-  /**
-   * Active acceleration mode. Reflects the value of
-   * `RunAnywhere.runtime.preferred` (or the resolved `activeMode` when
-   * `preferred === 'auto'`).
-   */
-  get accelerationMode(): string {
-    return Hardware.getProfile().profile?.accelerationMode || detectAccelerationMode();
-  },
-
   /**
    * Returns the available accelerators as a list. Swift parity:
    * `getAccelerators() throws -> [RAAcceleratorInfo]`. When the proto
@@ -182,6 +162,7 @@ export const Hardware = {
   /**
    * Set the preferred accelerator for subsequent inference. Swift parity:
    * `setAcceleratorPreference(_ preference: RAAccelerationPreference)`.
+   * Returns false when the preference is rejected (not supported on this platform).
    */
   setAcceleratorPreference(preference: AccelerationPreference): boolean {
     return HardwareAdapter.tryDefault()?.setAccelerationPreference(preference) ?? false;
