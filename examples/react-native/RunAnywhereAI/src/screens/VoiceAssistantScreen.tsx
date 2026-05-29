@@ -25,9 +25,11 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { requestMicrophonePermission } from '../utils/micPermission';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
@@ -68,7 +70,6 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [conversation, setConversation] = useState<VoiceConversationEntry[]>(
     []
   );
-  const [audioLevel, setAudioLevel] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(true);
   const [showModelSelection, setShowModelSelection] = useState(false);
@@ -85,11 +86,14 @@ export const VoiceAssistantScreen: React.FC = () => {
   // Check if all models are loaded
   const allModelsLoaded = sttModel && llmModel && ttsModel;
 
-  // Check model status on mount
-  useEffect(() => {
-    checkModelStatus();
-    loadAvailableModels();
-  }, []);
+  // Refresh model status whenever the screen comes into focus so that models
+  // loaded in other tabs (e.g. LLM from Chat) are reflected immediately.
+  useFocusEffect(
+    useCallback(() => {
+      checkModelStatus();
+      loadAvailableModels();
+    }, [])
+  );
 
   // Cleanup on unmount
   useEffect(() => {
@@ -158,7 +162,6 @@ export const VoiceAssistantScreen: React.FC = () => {
         case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
           setStatus(VoicePipelineStatus.Idle);
           setIsSessionActive(false);
-          setAudioLevel(0);
           break;
         default:
           break;
@@ -254,6 +257,11 @@ export const VoiceAssistantScreen: React.FC = () => {
           'Models Required',
           'Please load all required models (STT, LLM, TTS) to use the voice assistant.'
         );
+        return;
+      }
+
+      const hasMicPermission = await requestMicrophonePermission();
+      if (!hasMicPermission) {
         return;
       }
 
@@ -654,32 +662,15 @@ export const VoiceAssistantScreen: React.FC = () => {
           <View style={styles.controlsContainer}>
             {isSessionActive && (
               <View style={styles.recordingInfo}>
-                {/* Audio Level Indicator */}
-                <View style={styles.audioLevelContainer}>
-                  <View
-                    style={[
-                      styles.audioLevelBar,
-                      {
-                        width: `${Math.round(audioLevel * 100)}%`,
-                        backgroundColor:
-                          audioLevel > 0.1
-                            ? Colors.primaryGreen
-                            : Colors.primaryBlue,
-                      },
-                    ]}
-                  />
-                </View>
                 <Text style={styles.vadStatus}>
                   {status === VoicePipelineStatus.Listening
-                    ? audioLevel > 0.1
-                      ? '🎙️ Speaking...'
-                      : '👂 Listening...'
+                    ? 'Listening...'
                     : status === VoicePipelineStatus.Processing
-                      ? '⚙️ Processing...'
+                      ? 'Processing...'
                       : status === VoicePipelineStatus.Thinking
-                        ? '💭 Thinking...'
+                        ? 'Thinking...'
                         : status === VoicePipelineStatus.Speaking
-                          ? '🔊 Speaking...'
+                          ? 'Speaking...'
                           : ''}
                 </Text>
               </View>
@@ -892,18 +883,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.medium,
     width: '100%',
-  },
-  audioLevelContainer: {
-    width: 200,
-    height: 8,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: Spacing.small,
-  },
-  audioLevelBar: {
-    height: '100%',
-    borderRadius: 4,
   },
   vadStatus: {
     ...Typography.footnote,
