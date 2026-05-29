@@ -782,6 +782,12 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         llama_memory_clear(mem, true);
     }
 
+    // commons-030-A: honor the per-request thread hint (idl/llm_options.proto:119).
+    // 0 = backend default (the model-load thread count already on the context).
+    if (request.n_threads > 0) {
+        llama_set_n_threads(context_, request.n_threads, request.n_threads);
+    }
+
     cancel_requested_.store(false);
     decode_failed_ = false;
 
@@ -880,10 +886,14 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     // Configure sampler with request parameters — skip rebuild if params
     // unchanged
     {
-        const bool params_match = sampler_ && cached_temperature_ == request.temperature &&
-                                  cached_top_p_ == request.top_p &&
-                                  cached_top_k_ == request.top_k &&
-                                  cached_repetition_penalty_ == request.repetition_penalty;
+        const bool params_match =
+            sampler_ && cached_temperature_ == request.temperature &&
+            cached_top_p_ == request.top_p && cached_top_k_ == request.top_k &&
+            cached_repetition_penalty_ == request.repetition_penalty &&
+            cached_frequency_penalty_ == request.frequency_penalty &&
+            cached_presence_penalty_ == request.presence_penalty &&
+            cached_min_p_ == request.min_p && cached_seed_ == request.seed &&
+            cached_grammar_ == request.grammar;
 
         if (!params_match) {
             if (sampler_) {
@@ -894,18 +904,39 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             sparams.no_perf = true;
             sampler_ = llama_sampler_chain_init(sparams);
 
-            if (request.temperature > 0.0f) {
+            // commons-030-A: a GBNF grammar constrains the logits regardless of
+            // greedy-vs-sampled, so it must be the first sampler in the chain
+            // (matches llama.cpp common/sampling.cpp ordering).
+            if (!request.grammar.empty()) {
                 llama_sampler_chain_add(
-                    sampler_, llama_sampler_init_penalties(kRepeatPenaltyWindow,
-                                                           request.repetition_penalty, 0.0f, 0.0f));
+                    sampler_, llama_sampler_init_grammar(llama_model_get_vocab(model_),
+                                                         request.grammar.c_str(), "root"));
+            }
+
+            if (request.temperature > 0.0f) {
+                // commons-030-A: forward the OpenAI-style frequency/presence
+                // penalties (idl/llm_options.proto:100-101) into the penalty
+                // sampler; 0.0 leaves each disabled exactly as before.
+                llama_sampler_chain_add(
+                    sampler_, llama_sampler_init_penalties(
+                                  kRepeatPenaltyWindow, request.repetition_penalty,
+                                  request.frequency_penalty, request.presence_penalty));
 
                 if (request.top_k > 0) {
                     llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(request.top_k));
                 }
 
                 llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(request.top_p, 1));
+                // commons-030-A: min_p (idl/llm_options.proto:107). 0.0 = disabled.
+                if (request.min_p > 0.0f) {
+                    llama_sampler_chain_add(sampler_, llama_sampler_init_min_p(request.min_p, 1));
+                }
                 llama_sampler_chain_add(sampler_, llama_sampler_init_temp(request.temperature));
-                llama_sampler_chain_add(sampler_, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+                // commons-030-A: honor the deterministic seed (0 = backend default).
+                llama_sampler_chain_add(
+                    sampler_, llama_sampler_init_dist(request.seed != 0
+                                                          ? static_cast<uint32_t>(request.seed)
+                                                          : LLAMA_DEFAULT_SEED));
             } else {
                 llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
             }
@@ -914,6 +945,11 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             cached_top_p_ = request.top_p;
             cached_top_k_ = request.top_k;
             cached_repetition_penalty_ = request.repetition_penalty;
+            cached_frequency_penalty_ = request.frequency_penalty;
+            cached_presence_penalty_ = request.presence_penalty;
+            cached_min_p_ = request.min_p;
+            cached_seed_ = request.seed;
+            cached_grammar_ = request.grammar;
         }
     }
 
@@ -1197,6 +1233,11 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
         return result;
     }
 
+    // commons-030-A: honor the per-request thread hint (idl/llm_options.proto:119).
+    if (request.n_threads > 0) {
+        llama_set_n_threads(context_, request.n_threads, request.n_threads);
+    }
+
     cancel_requested_.store(false);
     decode_failed_ = false;
 
@@ -1256,15 +1297,32 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
         sparams.no_perf = true;
         sampler = llama_sampler_chain_init(sparams);
 
+        // commons-030-A: mirror the generate_stream sampler chain so the
+        // extended sampling knobs (grammar, OpenAI penalties, min_p, seed)
+        // apply on the context-continuation path too.
+        if (!request.grammar.empty()) {
+            llama_sampler_chain_add(sampler,
+                                    llama_sampler_init_grammar(llama_model_get_vocab(model_),
+                                                               request.grammar.c_str(), "root"));
+        }
+
         if (request.temperature > 0.0f) {
             llama_sampler_chain_add(
-                sampler, llama_sampler_init_penalties(64, request.repetition_penalty, 0.0f, 0.0f));
+                sampler, llama_sampler_init_penalties(64, request.repetition_penalty,
+                                                      request.frequency_penalty,
+                                                      request.presence_penalty));
             if (request.top_k > 0) {
                 llama_sampler_chain_add(sampler, llama_sampler_init_top_k(request.top_k));
             }
             llama_sampler_chain_add(sampler, llama_sampler_init_top_p(request.top_p, 1));
+            if (request.min_p > 0.0f) {
+                llama_sampler_chain_add(sampler, llama_sampler_init_min_p(request.min_p, 1));
+            }
             llama_sampler_chain_add(sampler, llama_sampler_init_temp(request.temperature));
-            llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+            llama_sampler_chain_add(
+                sampler, llama_sampler_init_dist(request.seed != 0
+                                                     ? static_cast<uint32_t>(request.seed)
+                                                     : LLAMA_DEFAULT_SEED));
         } else {
             llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
         }

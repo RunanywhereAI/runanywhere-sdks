@@ -486,10 +486,16 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     const std::string system_prompt =
         query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
 
-    rac_llm_options_t opts = {};
+    // Base off RAC_LLM_OPTIONS_DEFAULT so the sampling fields RAGQueryOptions
+    // does not expose (repetition_penalty, min_p, seed, grammar, ...) carry the
+    // proto-documented disabled/default sentinels instead of a raw zero-init.
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
     opts.temperature = query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
+    // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
+    // dropped; thread it through. 0 = disabled (engine default).
+    opts.top_k = query_proto.top_k();
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     // Per-query retrieval overrides from RAGQueryOptions (idl/rag.proto:180-183).

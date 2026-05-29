@@ -184,7 +184,8 @@ std::string system_prompt_from_request(const LLMGenerateRequest& request) {
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
-                                       std::vector<const char*>& stop_ptrs) {
+                                       std::vector<const char*>& stop_ptrs,
+                                       std::string& grammar_storage) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
 
     const bool has_options = request.has_options();
@@ -216,6 +217,31 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     } else if (request.top_p() > 0.0f) {
         options.top_p = request.top_p();
     }
+
+    // commons-030-A: thread the remaining sampling knobs the proto exposes
+    // (idl/llm_options.proto) into the C ABI so they reach the engine vtable.
+    // For every field except repetition_penalty the proto3 zero IS the
+    // documented "disabled" sentinel, so passing it through is identical to the
+    // struct default. repetition_penalty uses 1.0 = "no penalty"; proto3 zero
+    // means unset, so only override when positive (mirrors Swift's
+    // RALLMTypes+CppBridge defaults, which carry repetitionPenalty=1.0).
+    // Prefer the canonical embedded options; fall back to the legacy inline
+    // scalars for callers that have not migrated to `request.options()`.
+    options.top_k = has_options ? opts.top_k() : request.top_k();
+    const float repetition_penalty =
+        has_options ? opts.repetition_penalty() : request.repetition_penalty();
+    if (repetition_penalty > 0.0f) {
+        options.repetition_penalty = repetition_penalty;
+    }
+    options.frequency_penalty =
+        has_options ? opts.frequency_penalty() : request.frequency_penalty();
+    options.presence_penalty = has_options ? opts.presence_penalty() : request.presence_penalty();
+    options.min_p = has_options ? opts.min_p() : request.min_p();
+    options.seed = has_options ? opts.seed() : request.seed();
+    options.n_threads = has_options ? opts.n_threads() : request.n_threads();
+
+    grammar_storage = has_options ? opts.grammar() : request.grammar();
+    options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
@@ -639,8 +665,9 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
+    std::string grammar_storage;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -731,8 +758,9 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
+    std::string grammar_storage;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;

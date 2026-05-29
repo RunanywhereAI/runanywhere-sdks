@@ -12,6 +12,7 @@
 #include <llama.h>
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -37,6 +38,14 @@ struct TextGenerationRequest {
     float top_p = 0.9f;
     int top_k = 40;
     float repetition_penalty = 1.1f;
+    // commons-030-A: additional proto-exposed sampling knobs threaded through
+    // rac_llm_options_t. 0.0 / 0 / empty = disabled (apply only when set).
+    float frequency_penalty = 0.0f;
+    float presence_penalty = 0.0f;
+    float min_p = 0.0f;
+    int64_t seed = 0;        // 0 = LLAMA_DEFAULT_SEED
+    int n_threads = 0;       // 0 = backend default (model-load thread count)
+    std::string grammar;     // GBNF rule text; empty = unconstrained
     std::vector<std::string> stop_sequences;
 };
 
@@ -220,6 +229,13 @@ class LlamaCppTextGeneration {
     float cached_top_p_ = -1.0f;
     int cached_top_k_ = -1;
     float cached_repetition_penalty_ = -1.0f;
+    // commons-030-A: cache the extended sampling knobs too so a request that
+    // changes only a penalty / min_p / seed / grammar still rebuilds the chain.
+    float cached_frequency_penalty_ = -1.0f;
+    float cached_presence_penalty_ = -1.0f;
+    float cached_min_p_ = -1.0f;
+    int64_t cached_seed_ = -1;
+    std::string cached_grammar_ = "\x01";  // sentinel that no real grammar matches
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};

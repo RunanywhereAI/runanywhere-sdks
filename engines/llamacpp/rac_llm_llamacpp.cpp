@@ -89,6 +89,34 @@ size_t max_stop_length(const std::vector<std::string>& stops) {
     return m;
 }
 
+// commons-030-A: copy the proto-exposed sampling knobs from the C ABI options
+// struct onto the internal TextGenerationRequest. max_tokens / temperature /
+// top_p / system_prompt / stop_sequences are handled inline per call site (each
+// also logs them); this centralizes the remaining sampling fields so every
+// generation entry point (generate / generate_stream / *_with_timing /
+// from_context) threads top_k, repetition_penalty, the OpenAI-style penalties,
+// min_p, seed, n_threads, and grammar identically.
+void apply_extended_sampling_options(const rac_llm_options_t* options,
+                                     runanywhere::TextGenerationRequest* request) {
+    if (options == nullptr || request == nullptr) {
+        return;
+    }
+    if (options->top_k > 0) {
+        request->top_k = options->top_k;
+    }
+    if (options->repetition_penalty > 0.0f) {
+        request->repetition_penalty = options->repetition_penalty;
+    }
+    request->frequency_penalty = options->frequency_penalty;
+    request->presence_penalty = options->presence_penalty;
+    request->min_p = options->min_p;
+    request->seed = options->seed;
+    request->n_threads = options->n_threads;
+    if (options->grammar != nullptr && options->grammar[0] != '\0') {
+        request->grammar = options->grammar;
+    }
+}
+
 }  // namespace
 
 // =============================================================================
@@ -240,6 +268,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                 }
             }
         }
+        apply_extended_sampling_options(options, &request);
         RAC_LOG_INFO("LLM.LlamaCpp.C-API",
                      "[PARAMS] LLM C-API (from caller options): max_tokens=%d, "
                      "temperature=%.4f, "
@@ -351,6 +380,7 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
             }
         }
+        apply_extended_sampling_options(options, &request);
         RAC_LOG_INFO("LLM.LlamaCpp.C-API",
                      "[PARAMS] LLM C-API (from caller options): max_tokens=%d, "
                      "temperature=%.4f, "
@@ -490,6 +520,7 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
                 }
             }
         }
+        apply_extended_sampling_options(options, &request);
     }
 
     // Stream using C++ class with timing (see generate for rationale on
@@ -764,6 +795,7 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
                 }
             }
         }
+        apply_extended_sampling_options(options, &request);
     }
 
     try {
