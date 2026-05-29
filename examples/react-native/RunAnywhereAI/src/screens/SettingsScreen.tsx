@@ -49,12 +49,12 @@ import {
   SETTINGS_CONSTRAINTS,
   GENERATION_SETTINGS_KEYS,
 } from '../types/settings';
-import { safeEvaluateExpression } from '../utils/mathParser';
 import {
   getFrameworkDisplayName,
   getModelDownloadSizeBytes,
   getPrimaryFramework,
 } from '../utils/modelDisplay';
+import { registerDemoTools as registerSharedDemoTools } from '../utils/chatSampleTools';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
@@ -65,10 +65,6 @@ import {
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import type { HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
 import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
-import {
-  ToolDefinition,
-  ToolParameterType,
-} from '@runanywhere/proto-ts/tool_calling';
 import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
@@ -189,11 +185,6 @@ export const SettingsScreen: React.FC = () => {
   const [totalRAMBytes, setTotalRAMBytes] = useState<number>(0);
   const [cpuCores, setCpuCores] = useState<number>(0);
 
-  const [, setBackendInfoData] = useState<Record<string, unknown>>({});
-  const [, setIsSTTLoaded] = useState(false);
-  const [, setIsTTSLoaded] = useState(false);
-  const [, setIsTextLoaded] = useState(false);
-  const [, setIsVADLoaded] = useState(false);
   // Model catalog state
 
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
@@ -230,6 +221,17 @@ export const SettingsScreen: React.FC = () => {
     loadGenerationSettings();
     loadToolCallingSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cancel any in-progress downloads when the screen unmounts to avoid
+  // draining native callbacks and bandwidth with no UI handle to track them.
+  useEffect(() => {
+    return () => {
+      for (const iter of Object.values(downloadIteratorsRef.current)) {
+        iter.return?.().catch(() => {});
+      }
+      downloadIteratorsRef.current = {};
+    };
   }, []); /**
    * Load API configuration from AsyncStorage
    */
@@ -357,94 +359,7 @@ export const SettingsScreen: React.FC = () => {
    */
 
   const registerDemoTools = async () => {
-    // Clear existing tools
-    await RunAnywhere.clearTools(); // Weather tool - Real API (wttr.in - no key needed)
-
-    await RunAnywhere.registerTool(
-      ToolDefinition.fromPartial({
-        name: 'get_weather',
-        description: 'Gets the current weather for a city or location',
-        parameters: [
-          {
-            name: 'location',
-            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-            description:
-              'City name or location (e.g., "Tokyo", "New York", "London")',
-            required: true,
-            enumValues: [],
-          },
-        ],
-      }),
-      async (args: Record<string, unknown>) => {
-        const location = (args.location as string) || 'San Francisco';
-        try {
-          // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
-          const response = await fetch(
-            `https://wttr.in/${encodeURIComponent(location)}?format=j1`
-          );
-          const data = await response.json();
-          const current = data.current_condition?.[0];
-          return {
-            location,
-            temperature_c: current?.temp_C || 'N/A',
-            temperature_f: current?.temp_F || 'N/A',
-            condition: current?.weatherDesc?.[0]?.value || 'Unknown',
-            humidity: current?.humidity || 'N/A',
-            wind_kph: current?.windspeedKmph || 'N/A',
-          };
-        } catch (error) {
-          return { error: `Failed to get weather: ${error}` };
-        }
-      }
-    ); // Time tool - Real system time
-
-    await RunAnywhere.registerTool(
-      ToolDefinition.fromPartial({
-        name: 'get_current_time',
-        description: 'Gets the current date, time, and timezone information',
-        parameters: [],
-      }),
-      async () => {
-        const now = new Date();
-        return {
-          datetime: now.toLocaleString(),
-          time: now.toLocaleTimeString(),
-          timestamp: now.toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        };
-      }
-    ); // Calculator tool - Math evaluation
-
-    await RunAnywhere.registerTool(
-      ToolDefinition.fromPartial({
-        name: 'calculate',
-        description:
-          'Performs math calculations. Supports +, -, *, /, and parentheses',
-        parameters: [
-          {
-            name: 'expression',
-            type: ToolParameterType.TOOL_PARAMETER_TYPE_STRING,
-            description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
-            required: true,
-            enumValues: [],
-          },
-        ],
-      }),
-      async (args: Record<string, unknown>) => {
-        const expression = (args.expression as string) || '0';
-        try {
-          // Safe math evaluation using recursive descent parser
-          const result = safeEvaluateExpression(expression);
-          return {
-            expression: expression,
-            result: result,
-          };
-        } catch (error) {
-          return { error: `Failed to calculate: ${error}` };
-        }
-      }
-    );
-
+    await registerSharedDemoTools();
     await refreshRegisteredTools();
     Alert.alert(
       'Demo Tools Added',
@@ -553,14 +468,6 @@ export const SettingsScreen: React.FC = () => {
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Backend info:', backendInfo); // Override name with actual init status
 
-      const updatedBackendInfo = {
-        ...backendInfo,
-        name: isInit ? 'RunAnywhere Core' : 'Not initialized',
-        version: version,
-        initialized: isInit,
-      };
-      setBackendInfoData(updatedBackendInfo);
-
       const sttLoaded = await isModelLoadedForCategory(
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
@@ -573,11 +480,6 @@ export const SettingsScreen: React.FC = () => {
       const vadLoaded = await isModelLoadedForCategory(
         ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
       );
-
-      setIsSTTLoaded(sttLoaded);
-      setIsTTSLoaded(ttsLoaded);
-      setIsTextLoaded(textLoaded);
-      setIsVADLoaded(vadLoaded);
 
       console.warn(
         '[Settings] Models loaded - STT:',
