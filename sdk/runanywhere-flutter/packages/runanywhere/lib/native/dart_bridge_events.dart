@@ -28,8 +28,14 @@ class DartBridgeEvents {
   static Stream<event_pb.SDKEvent> get eventStream => _eventController.stream;
 
   /// Subscribe to the commons process-wide SDKEvent stream.
+  ///
+  /// Also wires the native publish hook into [EventBus] so that
+  /// [EventBus.publish] routes through [rac_sdk_event_publish_proto] first,
+  /// mirroring Swift's `CppBridge.Events.publishSDKEvent`.
   static void register() {
     if (_isRegistered) return;
+
+    EventBus.shared.setNativePublish(instance.publish);
 
     NativeCallable<RacSdkEventCallbackNative>? callback;
     try {
@@ -91,7 +97,7 @@ class DartBridgeEvents {
 
   void emit(event_pb.SDKEvent event) {
     _eventController.add(event);
-    EventBus.shared.publish(event);
+    EventBus.shared.addFromNative(event);
   }
 
   Future<bool> publish(event_pb.SDKEvent event) async {
