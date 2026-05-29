@@ -179,7 +179,7 @@ class DartBridgeHTTP {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         ..._defaultHeaders,
-        if (headers != null) ...headers,
+        ...?headers,
       };
 
       if (requiresAuth) {
