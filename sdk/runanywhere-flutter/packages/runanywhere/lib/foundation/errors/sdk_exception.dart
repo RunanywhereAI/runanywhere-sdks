@@ -398,6 +398,12 @@ class SDKException implements Exception {
         message: 'VLM model load failed: $message',
       );
 
+  static SDKException processingFailed(String message) => _build(
+        code: pb_enum.ErrorCode.ERROR_CODE_PROCESSING_FAILED,
+        category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+        message: message,
+      );
+
   static SDKException vlmProcessingFailed(String message) => _build(
         code: pb_enum.ErrorCode.ERROR_CODE_PROCESSING_FAILED,
         category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,

@@ -61,7 +61,7 @@ class RunAnywhereStorage {
     final saved =
         await DartBridgeModelRegistry.instance.registerModelFromUrl(request);
     if (saved == null) {
-      throw SDKException.storageError(
+      throw SDKException.processingFailed(
         'rac_register_model_from_url_proto unavailable',
       );
     }
