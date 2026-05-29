@@ -486,13 +486,26 @@ endif()
 # Configuration summary (matches the commons summary block for consistency)
 # =============================================================================
 
+# Resolve genex-free strings: message() runs at configure time and prints
+# generator expressions literally, so compute the mode labels with if().
+if(RAC_BUILD_SHARED)
+    set(_rac_build_mode "SHARED")
+else()
+    set(_rac_build_mode "STATIC")
+endif()
+if(RAC_STATIC_PLUGINS)
+    set(_rac_plugin_mode "STATIC (linked into commons)")
+else()
+    set(_rac_plugin_mode "SHARED (dlopen-loaded)")
+endif()
+
 message(STATUS "")
 message(STATUS "============================================")
 message(STATUS "RunAnywhere SDKs — root CMake configured")
 message(STATUS "============================================")
 message(STATUS "Version          : ${RAC_VERSION}")
-message(STATUS "Build mode       : $<IF:$<BOOL:${RAC_BUILD_SHARED}>,SHARED,STATIC>")
-message(STATUS "Plugin mode      : $<IF:$<BOOL:${RAC_STATIC_PLUGINS}>,STATIC (linked into commons),SHARED (dlopen-loaded)>")
+message(STATUS "Build mode       : ${_rac_build_mode}")
+message(STATUS "Plugin mode      : ${_rac_plugin_mode}")
 message(STATUS "Sanitizer        : ${RAC_SANITIZER}")
 message(STATUS "Tests            : ${RAC_BUILD_TESTS}")
 message(STATUS "Server (HTTP)    : ${RAC_BUILD_SERVER}")

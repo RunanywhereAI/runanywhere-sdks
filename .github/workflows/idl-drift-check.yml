@@ -12,7 +12,7 @@ on:
     paths:
       - 'idl/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
@@ -26,12 +26,15 @@ on:
     paths:
       - 'idl/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
+
+permissions:
+  contents: read
 
 jobs:
   check:

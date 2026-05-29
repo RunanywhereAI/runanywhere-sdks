@@ -15,19 +15,19 @@ repos:
       - id: trailing-whitespace
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
             sdk/runanywhere-commons/src/generated/|
             sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/runanywhere-web/packages/core/src/generated/|
+            sdk/shared/proto-ts/src/|
             idl/
           )
       - id: end-of-file-fixer
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
             sdk/runanywhere-commons/src/generated/|
             sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/runanywhere-web/packages/core/src/generated/|
+            sdk/shared/proto-ts/src/|
             idl/
           )
       - id: check-yaml
@@ -82,10 +82,29 @@ repos:
 
       - id: ios-sdk-periphery
         name: iOS SDK Periphery (Unused Code)
-        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime --targets FoundationModelsAdapter --targets FluidAudioDiarization 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
+        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
         language: system
         files: ^sdk/runanywhere-swift/.*\.swift$
         pass_filenames: false
+
+  # C/C++/ObjC format enforcement
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v20.1.8
+    hooks:
+      - id: clang-format
+        files: \.(c|cc|cpp|h|hpp|mm)$
+        exclude: ^(idl/|.*/generated/|.*\.pb\.|.*\.pbobjc\.)
+
+  # Dart format enforcement
+  # dart_style provides no .pre-commit-hooks.yaml manifest, so use a local hook.
+  - repo: local
+    hooks:
+      - id: dart-format
+        name: dart format
+        entry: dart format --set-exit-if-changed
+        language: system
+        files: \.dart$
+        exclude: ^.*/generated/
 
   # SwiftLint for iOS App
   - repo: local
