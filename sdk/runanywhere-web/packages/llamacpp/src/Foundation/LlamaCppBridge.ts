@@ -281,8 +281,14 @@ export class LlamaCppBridge {
       this._platformAdapter = new PlatformAdapter(this._module);
       this._platformAdapter.register();
 
-      // Initialize RACommons core within this WASM module
+      // Initialize RACommons core within this WASM module.
+      // Set _loaded=true immediately after _rac_init succeeds so that _teardown()
+      // will correctly call _rac_shutdown if an error is thrown later (e.g., during
+      // backend registration or registerWasmModule). _teardown() gates the shutdown
+      // call on `this._module && this._loaded`, so this flag doubles as the
+      // "rac_init was called" marker.
       await this._initRACommons(this._platformAdapter.getAdapterPtr());
+      this._loaded = true;
       completeNativePhase1ForModule(this._module);
 
       // Register the unified llama.cpp backend (LLM + VLM in one call).
@@ -315,20 +321,21 @@ export class LlamaCppBridge {
         HTTPAdapter.setDefaultModule(this._module);
       }
 
-      this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
     } catch (error) {
-      // WebGPU → CPU fallback in 'auto' mode
+      // WebGPU → CPU fallback in 'auto' mode.
+      // _teardown() handles _rac_shutdown (gated on _loaded, which is true only
+      // if _rac_init completed), platformAdapter.cleanup() (removes addFunction'd
+      // callbacks and frees the malloc'd rac_platform_adapter_t), and
+      // unregisterWasmModule (releases any claimed capability slots). This makes
+      // the resource release explicit and bounded rather than relying on GC.
       if (this._accelerationMode === 'webgpu' && acceleration === 'auto') {
         const reason = error instanceof Error ? error.message : String(error);
         logger.warning(`WebGPU WASM failed (${reason}), falling back to CPU`);
-        this._module = null;
-        this._loaded = false;
-        this._accelerationMode = 'cpu';
+        this._teardown();
         return this._doLoad('cpu');
       }
-      this._module = null;
-      this._loaded = false;
+      this._teardown();
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load LlamaCpp WASM: ${message}`);
       throw new SDKException(
