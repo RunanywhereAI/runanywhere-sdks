@@ -1,4 +1,5 @@
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show formatFramework;
 
 typedef ModelInfo = sdk.ModelInfo;
 typedef ModelCategory = sdk.ModelCategory;
@@ -94,24 +95,7 @@ extension ModelCategoryDisplay on ModelCategory {
 }
 
 extension InferenceFrameworkDisplay on LLMFramework {
-  String get displayName {
-    switch (this) {
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return 'llama.cpp';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-        return 'ONNX';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
-        return 'Sherpa-ONNX';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return 'Foundation Models';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return 'System TTS';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return 'Genie';
-      default:
-        return 'Unknown';
-    }
-  }
+  String get displayName => formatFramework(this);
 }
 
 extension ModelFormatDisplay on ModelFormat {
