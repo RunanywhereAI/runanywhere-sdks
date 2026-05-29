@@ -65,16 +65,6 @@ bool contains_format(const uint32_t* formats, size_t count, uint32_t needle) {
     return false;
 }
 
-bool contains_primitive(const rac_primitive_t* primitives, size_t count, rac_primitive_t needle) {
-    if (primitives == nullptr)
-        return false;
-    for (size_t i = 0; i < count; ++i) {
-        if (primitives[i] == needle)
-            return true;
-    }
-    return false;
-}
-
 }  // namespace
 
 int main() {
@@ -110,12 +100,9 @@ int main() {
     if (cap == RAC_SUCCESS) {
         // Routable build: this is the live image-generation path. Lock the full
         // routing contract the EngineRouter relies on to select diffusion-coreml
-        // for RAC_PRIMITIVE_DIFFUSION.
-        if (!contains_primitive(vt->metadata.primitives, vt->metadata.primitives_count,
-                                RAC_PRIMITIVE_DIFFUSION)) {
-            std::fprintf(stderr, "routable manifest missing RAC_PRIMITIVE_DIFFUSION\n");
-            return 1;
-        }
+        // for RAC_PRIMITIVE_DIFFUSION. Primitive routability is expressed via the
+        // vtable's diffusion_ops slot (verified below) — rac_engine_metadata no
+        // longer carries a primitives[] array.
         if (!contains_runtime(vt->metadata.runtimes, vt->metadata.runtimes_count,
                               RAC_RUNTIME_COREML)) {
             std::fprintf(stderr, "routable manifest missing RAC_RUNTIME_COREML\n");
@@ -165,8 +152,7 @@ int main() {
                      (int)cap);
         return 1;
     }
-    if (vt->metadata.primitives_count != 0 || vt->metadata.runtimes_count != 0 ||
-        vt->metadata.formats_count != 0 || vt->metadata.primitives != nullptr ||
+    if (vt->metadata.runtimes_count != 0 || vt->metadata.formats_count != 0 ||
         vt->metadata.runtimes != nullptr || vt->metadata.formats != nullptr) {
         std::fprintf(stderr, "stub diffusion-coreml advertised routing metadata\n");
         return 1;
