@@ -409,7 +409,16 @@ export class FetchHttpTransport {
           : useBinaryTextFallback
             ? this.binaryTextToBytes(xhr.responseText)
           : new Uint8Array(0);
-      const total = body.length;
+      const bodyLength = body.length;
+
+      // When the server honored the Range request (206) the body contains
+      // only the remaining bytes; fold resumeFromByte into the counters so
+      // the C-side chunk callback sees a monotonic absolute file position
+      // for `total_written` and a correct `content_length`. Mirrors
+      // URLSessionHttpTransport.swift:627-632 and OkHttpHttpTransport.kt:505-513.
+      const honoredRange = status === 206 && resumeFromByte > 0;
+      const baseOffset = honoredRange ? resumeFromByte : 0;
+      const total = honoredRange ? bodyLength + resumeFromByte : bodyLength;
 
       // Deliver the body through `STREAM_CHUNK_SIZE`-sized callbacks so the
       // C-side `rac_http_body_chunk_fn` sees meaningful progress and the
@@ -426,12 +435,12 @@ export class FetchHttpTransport {
       // an async transport (fetch + ReadableStream) and JSPI/ASYNCIFY in
       // the WASM build — tracked separately.
       let cancelled = false;
-      if (cbPtr !== 0 && total > 0) {
+      if (cbPtr !== 0 && bodyLength > 0) {
         let offset = 0;
-        while (offset < total) {
-          const end = Math.min(offset + STREAM_CHUNK_SIZE, total);
+        while (offset < bodyLength) {
+          const end = Math.min(offset + STREAM_CHUNK_SIZE, bodyLength);
           const chunk = body.subarray(offset, end);
-          const keepGoing = this.invokeChunkCallback(cbPtr, chunk, end, total, cbUd);
+          const keepGoing = this.invokeChunkCallback(cbPtr, chunk, baseOffset + end, total, cbUd);
           if (keepGoing === RAC_FALSE) {
             cancelled = true;
             break;
@@ -442,6 +451,14 @@ export class FetchHttpTransport {
 
       const responseHeaders = this.parseResponseHeaders(xhr.getAllResponseHeaders());
       const redirectedUrl = xhr.responseURL && xhr.responseURL.length > 0 ? xhr.responseURL : req.url;
+
+      // Emit X-RAC-Range-Honored so the commons download orchestrator can
+      // distinguish a genuine 206 partial-content reply from a CDN that
+      // wraps a full body in 206. Mirrors URLSessionHttpTransport.swift:503-506
+      // and OkHttpHttpTransport.kt:687-703.
+      if (resumeFromByte > 0) {
+        responseHeaders.push({ name: 'X-RAC-Range-Honored', value: honoredRange ? 'true' : 'false' });
+      }
 
       this.writeResponse(outMetaPtr, {
         status,
