@@ -64,7 +64,6 @@ Pod::Spec.new do |s|
     "HEADER_SEARCH_PATHS" => ([
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
-      "$(PODS_TARGET_SRCROOT)/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",
     ] + rac_header_dirs).join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1 RAC_HAS_HTTP_TRANSPORT=1",

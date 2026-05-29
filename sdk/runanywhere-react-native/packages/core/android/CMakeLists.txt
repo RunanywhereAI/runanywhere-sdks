@@ -7,28 +7,6 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
-# nlohmann/json - Header-only JSON library for robust JSON parsing.
-# Used by JSON-based bridge helpers such as RAGBridge.
-#
-# Version is centralized in sdk/runanywhere-commons/VERSIONS::NLOHMANN_JSON_VERSION.
-# This RN package is consumed standalone from node_modules (no access to the
-# monorepo VERSIONS file at consumer build time), so we fall back to a literal
-# pinned value when the parent CMake didn't already supply it. Keep the
-# fallback in sync with the canonical VERSIONS file when bumping.
-# =============================================================================
-include(FetchContent)
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v${NLOHMANN_JSON_VERSION}
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
-
-# =============================================================================
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
@@ -110,7 +88,6 @@ include_directories(
     # jniLibs/include so our copy wins where needed.
     "../cpp"
     "../cpp/bridges"
-    "../cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from runanywhere-commons (flat access)
     "${RAC_INCLUDE_DIR}"
@@ -157,9 +134,6 @@ target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 # OkHttp adapter is always compiled in — commons v0.2.0+ is required and
 # the bundled librac_commons.so always exports rac_http_transport_register.
 target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_HAS_HTTP_TRANSPORT=1)
-
-# Link nlohmann_json for JSON-based bridge helpers
-target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE
