@@ -75,8 +75,8 @@ bump_line() {
     # Cross-platform sed -i (BSD sed on macOS needs '' after -i).
     local file="$1" pattern="$2" replacement="$3"
     if [ ! -f "$file" ]; then
-        echo "  skip (not found): $file"
-        return 0
+        echo "ERROR: target path missing (sync-versions configuration is stale): $file" >&2
+        return 1
     fi
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' -E "s|${pattern}|${replacement}|" "$file"
@@ -287,6 +287,19 @@ done
 bump_line "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/lib/foundation/constants/sdk_constants.dart" \
     "static const String version = '[^']+'" \
     "static const String version = '${NEW_VERSION}'"
+
+# Flutter iOS podspecs — must be bumped in lockstep with pubspec.yaml.
+# Unlike RN podspecs (which derive s.version from package.json at eval time),
+# Flutter podspecs hardcode s.version and require an explicit bump here.
+for podspec in \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/ios/runanywhere.podspec" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/ios/runanywhere_genie.podspec" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/ios/runanywhere_llamacpp.podspec" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/ios/runanywhere_onnx.podspec"; do
+    bump_line "$podspec" \
+        "s\.version[[:space:]]*=[[:space:]]*'[^']+'" \
+        "s.version          = '${NEW_VERSION}'"
+done
 
 echo ""
 echo ">> Done. Verify with:"
