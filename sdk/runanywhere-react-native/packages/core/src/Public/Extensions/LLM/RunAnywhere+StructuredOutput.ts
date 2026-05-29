@@ -23,6 +23,7 @@ import {
 } from '@runanywhere/proto-ts/llm_options';
 import {
   type JSONSchema,
+  JSONSchema as JSONSchemaCodec,
   StructuredOutputOptions,
   StructuredOutputResult,
   StructuredOutputParseRequest,
@@ -105,16 +106,50 @@ async function callNativeProto(
   }
 }
 
-function structuredOutputOptionsForSchema(
+/**
+ * Canonical JSON Schema text consumed by the commons structured-output C ABI.
+ *
+ * Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15) so every
+ * SDK shares the same byte-exact, key-sorted, compact serializer. Returns
+ * `"{}"` on any serialization or bridge failure, mirroring Swift
+ * `RAJSONSchema.jsonSchemaString`.
+ */
+async function jsonSchemaStringForSchema(schema: JSONSchema): Promise<string> {
+  try {
+    const schemaBytes = encodeProtoMessage(schema, JSONSchemaCodec);
+    const responseBytes = await callNativeProto(
+      'structuredOutputSchemaToJsonProto',
+      schemaBytes,
+      'structuredOutputSchemaToJson'
+    );
+    if (responseBytes.byteLength === 0) {
+      return '{}';
+    }
+    const TextDecoderCtor = globalThis.TextDecoder;
+    if (typeof TextDecoderCtor === 'function') {
+      return new TextDecoderCtor('utf-8').decode(responseBytes);
+    }
+    let result = '';
+    for (let i = 0; i < responseBytes.byteLength; i++) {
+      result += String.fromCharCode(responseBytes[i]!);
+    }
+    return result || '{}';
+  } catch {
+    return '{}';
+  }
+}
+
+async function structuredOutputOptionsForSchema(
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): StructuredOutputOptions {
+): Promise<StructuredOutputOptions> {
+  const jsonSchema =
+    options?.jsonSchema ?? (await jsonSchemaStringForSchema(schema));
   return StructuredOutputOptions.fromPartial({
     ...options,
     schema: options?.schema ?? schema,
     includeSchemaInPrompt: options?.includeSchemaInPrompt ?? true,
-    jsonSchema:
-      options?.jsonSchema ?? schema.rawJson ?? JSON.stringify(schema),
+    jsonSchema,
   });
 }
 
@@ -123,15 +158,15 @@ function nextStructuredOutputRequestId(): string {
   return `rn-structured-${Date.now()}-${requestCounter}`;
 }
 
-function encodeStructuredOutputRequest(
+async function encodeStructuredOutputRequest(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): ArrayBuffer {
+): Promise<ArrayBuffer> {
   const request = StructuredOutputRequest.fromPartial({
     requestId: nextStructuredOutputRequestId(),
     prompt,
-    options: structuredOutputOptionsForSchema(schema, options),
+    options: await structuredOutputOptionsForSchema(schema, options),
     metadata: {},
   });
   return encodeProtoMessage(request, StructuredOutputRequest);
@@ -150,7 +185,7 @@ export async function generateStructured<T = unknown>(
   logger.debug('Generating structured output...');
   const responseBytes = await callNativeProto(
     'structuredOutputGenerateProto',
-    encodeStructuredOutputRequest(prompt, schema, options),
+    await encodeStructuredOutputRequest(prompt, schema, options),
     'structuredOutputGenerate'
   );
   return StructuredOutputResult.decode(responseBytes);
@@ -213,9 +248,8 @@ export function generateStructuredStream(
   schema: JSONSchema,
   options?: StructuredOutputOptions
 ): AsyncIterable<StructuredOutputStreamEvent> {
-  const requestBytes = encodeStructuredOutputRequest(prompt, schema, options);
-
   async function* resultGenerator(): AsyncGenerator<StructuredOutputStreamEvent> {
+    const requestBytes = await encodeStructuredOutputRequest(prompt, schema, options);
     if (!isNativeModuleAvailable()) {
       throw SDKException.nativeModuleUnavailable();
     }
@@ -314,7 +348,7 @@ export async function extractStructuredOutput(
     options: StructuredOutputOptions.fromPartial({
       schema,
       includeSchemaInPrompt: true,
-      jsonSchema: schema.rawJson || undefined,
+      jsonSchema: await jsonSchemaStringForSchema(schema),
     }),
   });
   const responseBytes = await callNativeProto(
