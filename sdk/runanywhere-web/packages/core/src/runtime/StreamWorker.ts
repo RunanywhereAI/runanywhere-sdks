@@ -106,6 +106,10 @@ export interface StreamWorkerModule {
   addFunction(fn: (...args: number[]) => number | void, signature: string): number;
   removeFunction(ptr: number): void;
 
+  _rac_proto_buffer_init?(bufferPtr: number): void;
+  _rac_proto_buffer_free?(bufferPtr: number): void;
+  _rac_wasm_sizeof_proto_buffer?(): number;
+
   _rac_llm_generate_stream_proto?(
     requestBytes: number,
     requestSize: number,
@@ -194,9 +198,11 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
    * any export becomes Asyncify-style interruptible.
    *
    * `handle` is captured for VLM, which cancels per-instance via
-   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation is global
-   * (`_rac_llm_cancel_proto(0)`), and STT/TTS have no cancel ABI yet —
-   * those entries are removed silently when `done` is posted.
+   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation requires a valid
+   * `rac_proto_buffer_t*` output pointer — passing 0 (null) returns
+   * `RAC_ERROR_NULL_POINTER` before the engine cancel ever runs.
+   * STT/TTS have no cancel ABI yet — those entries are removed silently
+   * when `done` is posted.
    */
   type InFlightModality =
     | { kind: 'stream.llm.generate' }
@@ -340,9 +346,27 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         const modality = inflight.get(msg.requestId);
         if (modality && mod) {
           switch (modality.kind) {
-            case 'stream.llm.generate':
-              mod._rac_llm_cancel_proto?.(0);
+            case 'stream.llm.generate': {
+              if (
+                mod._rac_llm_cancel_proto &&
+                mod._rac_wasm_sizeof_proto_buffer &&
+                mod._rac_proto_buffer_init &&
+                mod._rac_proto_buffer_free
+              ) {
+                const sz = mod._rac_wasm_sizeof_proto_buffer();
+                const bufPtr = mod._malloc(Math.max(sz, 1));
+                if (bufPtr) {
+                  try {
+                    mod._rac_proto_buffer_init(bufPtr);
+                    mod._rac_llm_cancel_proto(bufPtr);
+                  } finally {
+                    mod._rac_proto_buffer_free(bufPtr);
+                    mod._free(bufPtr);
+                  }
+                }
+              }
               break;
+            }
             case 'stream.vlm.process':
               mod._rac_vlm_cancel_proto?.(modality.handle);
               break;
