@@ -22,11 +22,17 @@ import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
 import type { SDKLogger } from './SDKLogger';
 
 /**
- * Signed-negative SDK error codes that mirror the rac_result_t C ABI ranges.
- * Web SDK still throws / catches numeric codes; the proto envelope holds a
- * round-tripped copy in `c_abi_code`. The proto-ts `ErrorCode` enum carries
- * POSITIVE values (proto3 forbids negative literals) — the absolute magnitude
- * matches.
+ * @deprecated Compat shim — use `ProtoErrorCode` (positive values from
+ * `@runanywhere/proto-ts/errors`) instead. The canonical path is already
+ * wired: `SDKException.protoCode` returns `ProtoErrorCode`, `isExpected()`
+ * accepts `ProtoErrorCode`, and the WASM bridge round-trips `cAbiCode`
+ * directly from `rac_result_t`. This enum will be removed in a follow-up
+ * once all internal call sites in CommonsModule / OffscreenRuntimeBridge /
+ * Extensions / HTTPAdapter / RunAnywhere.ts are migrated.
+ *
+ * Migration: replace `SDKErrorCode.Foo` (negative) with
+ * `-ProtoErrorCode.ERROR_CODE_FOO` as the cAbiCode literal; pass the
+ * proto code directly to `SDKException` constructors.
  */
 export enum SDKErrorCode {
   // Success
@@ -98,7 +104,7 @@ function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
   const abs = Math.abs(code);
   if (abs >= 100 && abs <= 109) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
   if (abs >= 110 && abs <= 129) return ProtoErrorCategory.ERROR_CATEGORY_MODEL;
-  if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 150 && abs <= 179) return ProtoErrorCategory.ERROR_CATEGORY_NETWORK;
   if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) {
     return ProtoErrorCategory.ERROR_CATEGORY_IO;
