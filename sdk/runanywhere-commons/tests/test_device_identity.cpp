@@ -64,10 +64,15 @@ void mock_reset() {
     g_mock.secure_set_result = RAC_SUCCESS;
 }
 
+// Canonical device-UUID secure-storage key shared with Swift KeychainManager
+// (`com.runanywhere.sdk.device.uuid`). Must stay in sync with kSecureStorageKey
+// in device_identity.cpp.
+constexpr const char* kDeviceIdKey = "com.runanywhere.sdk.device.uuid";
+
 rac_result_t mock_secure_get(const char* key, char** out_value, void* /*user_data*/) {
     std::lock_guard<std::mutex> lock(g_mock.mutex);
     g_mock.secure_get_calls++;
-    if (key == nullptr || std::strcmp(key, "device_id") != 0) {
+    if (key == nullptr || std::strcmp(key, kDeviceIdKey) != 0) {
         if (out_value)
             *out_value = nullptr;
         return RAC_ERROR_NOT_FOUND;
@@ -88,7 +93,7 @@ rac_result_t mock_secure_get(const char* key, char** out_value, void* /*user_dat
 rac_result_t mock_secure_set(const char* key, const char* value, void* /*user_data*/) {
     std::lock_guard<std::mutex> lock(g_mock.mutex);
     g_mock.secure_set_calls++;
-    if (key == nullptr || std::strcmp(key, "device_id") != 0) {
+    if (key == nullptr || std::strcmp(key, kDeviceIdKey) != 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     if (g_mock.secure_set_result != RAC_SUCCESS) {
