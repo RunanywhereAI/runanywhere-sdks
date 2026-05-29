@@ -44,6 +44,10 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => ([
+      # Package-local hybrid headers (HybridRunAnywhereLlama.hpp) — needed by the
+      # nitrogen-generated OnLoad + cpp-adapter (the forked rac_llm_llamacpp.h that
+      # used to live here was deleted; canonical commons header comes via rac_header_dirs).
+      "$(PODS_TARGET_SRCROOT)/cpp",
       # nlohmann/json (header-only) vendored by sibling @runanywhere/core package.
       "$(PODS_TARGET_SRCROOT)/../core/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",

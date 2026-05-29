@@ -84,6 +84,10 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 
 include_directories(
     "src/main/cpp"
+    # Package-local hybrid headers (HybridRunAnywhereLlama.hpp etc.) — needed by the
+    # nitrogen-generated OnLoad + cpp-adapter. The forked rac_llm_llamacpp.h that used
+    # to live here was deleted (canonical commons header resolves via CORE_INCLUDE_DIR).
+    "../cpp"
     # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
     # Sharing avoids re-fetching the dependency and keeps both packages on the
     # same JSON version.
