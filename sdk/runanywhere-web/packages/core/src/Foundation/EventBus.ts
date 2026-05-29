@@ -252,6 +252,10 @@ export class EventBus {
    *
    * Cross-SDK parity helper. Equivalent to Swift `events(for:)`, Kotlin
    * `events(category)`, RN `eventsFor(category)`, Flutter `onCategory()`.
+   *
+   * Multiple concurrent `next()` calls are safe: each call enqueues a
+   * waiter and is resolved in FIFO order when events arrive, matching the
+   * behaviour of Swift's `AsyncStream` and Kotlin's `SharedFlow`.
    */
   eventsFor(category: EventCategory): AsyncIterable<ProtoSDKEvent> {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -259,13 +263,12 @@ export class EventBus {
     return {
       [Symbol.asyncIterator](): AsyncIterator<ProtoSDKEvent> {
         const queue: ProtoSDKEvent[] = [];
-        let resolver: ((value: IteratorResult<ProtoSDKEvent>) => void) | null = null;
+        const waiters: Array<(value: IteratorResult<ProtoSDKEvent>) => void> = [];
         let closed = false;
 
         const unsubscribe = bus.onCategory(category, (event) => {
-          if (resolver) {
-            resolver({ value: event, done: false });
-            resolver = null;
+          if (waiters.length > 0) {
+            waiters.shift()!({ value: event, done: false });
           } else {
             queue.push(event);
           }
@@ -283,20 +286,20 @@ export class EventBus {
               });
             }
             return new Promise((resolve) => {
-              resolver = resolve;
+              waiters.push(resolve);
             });
           },
           return(): Promise<IteratorResult<ProtoSDKEvent>> {
             closed = true;
             unsubscribe();
-            if (resolver) {
-              resolver({ value: undefined as unknown as ProtoSDKEvent, done: true });
-              resolver = null;
-            }
-            return Promise.resolve({
+            const doneResult: IteratorResult<ProtoSDKEvent> = {
               value: undefined as unknown as ProtoSDKEvent,
               done: true,
-            });
+            };
+            for (const waiter of waiters.splice(0)) {
+              waiter(doneResult);
+            }
+            return Promise.resolve(doneResult);
           },
         };
       },
