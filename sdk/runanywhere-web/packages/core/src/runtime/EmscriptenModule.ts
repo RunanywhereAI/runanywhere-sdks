@@ -380,6 +380,30 @@ export interface EmscriptenRunanywhereModule {
   ): number;
 
   // -----------------------------------------------------------------------------
+  // Model-path helpers
+  // -----------------------------------------------------------------------------
+
+  /**
+   * `rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
+   *    rac_inference_framework_t* out);`
+   *
+   * Converts a proto enum integer (the JS `InferenceFramework` rawValue) to
+   * the C `rac_inference_framework_t` enum value required by path helpers.
+   * `outPtr` must point to a 4-byte malloc'd slot; read back with HEAP32.
+   */
+  _rac_inference_framework_from_proto?(protoValue: number, outPtr: number): number;
+
+  /**
+   * `const char* rac_framework_raw_value(rac_inference_framework_t framework);`
+   *
+   * Returns a statically-allocated C string with the directory-name component
+   * used under `/opfs/RunAnywhere/Models/<dir>/<modelId>/` (e.g. "LlamaCpp",
+   * "ONNX"). Returns "Unknown" for unrecognized values. The pointer is valid
+   * for the lifetime of the WASM module; callers must NOT free it.
+   */
+  _rac_framework_raw_value?(frameworkCEnum: number): number;
+
+  // -----------------------------------------------------------------------------
   // SDK initialization / auth state
   // -----------------------------------------------------------------------------
   _rac_sdk_init_phase1_proto?(
