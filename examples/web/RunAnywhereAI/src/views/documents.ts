@@ -11,7 +11,6 @@ import {
   type RAGDocumentSummary,
   type RAGSearchResult,
 } from '@runanywhere/web';
-import { ONNX } from '@runanywhere/web-onnx';
 import { ensureCatalogRegistered } from '../components/model-selection';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
@@ -27,10 +26,9 @@ let isBusy = false;
 
 export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   container = el;
-  // RAG requires the embedding + LLM models to be registered in the catalog
-  // (so ensureRAGReady can resolve their download URLs). Other tabs trigger
-  // this implicitly via their toolbar pickers; Docs has its own UI, so we
-  // call it explicitly on mount.
+  // Register the model catalog so the SDK's model registry has entries for
+  // the embedding and LLM models used by RAG. Other tabs trigger this
+  // implicitly via their toolbar pickers; Docs has its own UI.
   ensureCatalogRegistered();
   container.innerHTML = `
     <div class="toolbar">
@@ -111,9 +109,6 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  // ensureRAGReady() pre-downloads the embedding + LLM models so the
-  // native ingest path has resolved local paths. A failure here is a
-  // genuine ingest-time problem (vector store, embedding inference, etc).
   await RunAnywhere.ragIngest(text, JSON.stringify({
     docId,
     docName: file.name,
@@ -279,34 +274,19 @@ const RAG_LLM_MODEL_ID = 'smollm2-360m-q8_0';
 
 async function ensureRAGReady(): Promise<boolean> {
   try {
-    await ONNX.register();
-  } catch (err) {
-    setStatus(`ONNX register failed: ${formatError(err)}`);
-    return false;
-  }
-
-  const availability = RunAnywhere.rag.availability();
-  if (availability.available) return true;
-
-  if (availability.source === 'wasm-exports') {
-    try {
-      setStatus('Initializing RAG pipeline...');
-      await RunAnywhere.rag.createPipeline(
-        RunAnywhere.rag.defaultConfiguration({
-          embeddingModelId: RAG_EMBEDDING_MODEL_ID,
-          llmModelId: RAG_LLM_MODEL_ID,
-        }),
-      );
-      setStatus('RAG ready.');
-      return true;
-    } catch (err) {
-      setStatus(`RAG init failed: ${formatError(err)}. Download the embedding model (all-minilm-l6-v2) and an LLM (smollm2-360m-q8_0) from the Storage tab first.`);
+    const availability = await RunAnywhere.rag.ensureReady({
+      embeddingModelId: RAG_EMBEDDING_MODEL_ID,
+      llmModelId: RAG_LLM_MODEL_ID,
+    });
+    if (!availability.available) {
+      setStatus(availability.reason);
       return false;
     }
+    return true;
+  } catch (err) {
+    setStatus(`RAG init failed: ${formatError(err)}`);
+    return false;
   }
-
-  setStatus(availability.reason);
-  return false;
 }
 
 function formatAnswer(text: string, sources: RAGSearchResult[]): string {
