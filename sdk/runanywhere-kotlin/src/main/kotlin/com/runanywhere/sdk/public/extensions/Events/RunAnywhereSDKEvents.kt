@@ -10,20 +10,20 @@ package com.runanywhere.sdk.public.extensions.Events
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.events.SDKEvent
 
 /** Imperative SDK-event surface for cross-SDK parity with Swift. */
-fun RunAnywhere.subscribeSDKEvents(handler: (RASDKEvent) -> Unit): Long =
+fun RunAnywhere.subscribeSDKEvents(handler: (SDKEvent) -> Unit): Long =
     CppBridgeSDKEventStream.subscribe(handler)
 
 fun RunAnywhere.unsubscribeSDKEvents(subscriptionId: Long) {
     CppBridgeSDKEventStream.unsubscribe(subscriptionId)
 }
 
-fun RunAnywhere.publishSDKEvent(event: RASDKEvent): Boolean =
+fun RunAnywhere.publishSDKEvent(event: SDKEvent): Boolean =
     CppBridgeSDKEventStream.publish(event) == 0
 
-fun RunAnywhere.pollSDKEvent(): RASDKEvent? =
+fun RunAnywhere.pollSDKEvent(): SDKEvent? =
     CppBridgeSDKEventStream.poll()
 
 fun RunAnywhere.publishSDKFailure(

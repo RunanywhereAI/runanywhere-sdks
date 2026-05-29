@@ -18,7 +18,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.sdk.public.types.RAVLMResult
@@ -88,7 +88,7 @@ suspend fun RunAnywhere.processImage(
 fun RunAnywhere.processImageStream(
     image: RAVLMImage,
     options: RAVLMGenerationOptions,
-): Flow<RASDKEvent> =
+): Flow<SDKEvent> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
@@ -112,7 +112,7 @@ fun RunAnywhere.processImageStream(
                     // from the aggregate result so collectors/UI can finalize text.
                     if (result.text.isNotBlank()) {
                         trySend(
-                            RASDKEvent(
+                            SDKEvent(
                                 generation =
                                     GenerationEvent(
                                         kind = GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED,

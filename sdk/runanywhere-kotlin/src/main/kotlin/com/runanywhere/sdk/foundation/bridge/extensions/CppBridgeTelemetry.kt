@@ -31,7 +31,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
 import com.runanywhere.sdk.public.configuration.description
-import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.events.SDKEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -278,7 +278,7 @@ object CppBridgeTelemetry {
     // SDK lifecycle event emission helpers (parity with Swift's
     // `CppBridge.Events.emitSDKInit*` / `emitSDKModelsLoaded`).
     //
-    // Each builds an [InitializationEvent] + wraps it in an [RASDKEvent]
+    // Each builds an [InitializationEvent] + wraps it in an [SDKEvent]
     // and publishes it through the canonical SDKEvent proto stream via
     // [CppBridgeSDKEventStream.publish] — C++ owns fan-out + routing.
     // ─────────────────────────────────────────────────────────────────
@@ -337,7 +337,7 @@ object CppBridgeTelemetry {
             }
 
         val event =
-            RASDKEvent(
+            SDKEvent(
                 id = UUID.randomUUID().toString(),
                 timestamp_ms = System.currentTimeMillis(),
                 severity = severity,

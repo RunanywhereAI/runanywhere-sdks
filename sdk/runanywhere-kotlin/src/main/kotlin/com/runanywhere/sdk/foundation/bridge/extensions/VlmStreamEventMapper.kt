@@ -7,7 +7,7 @@
  *
  * C++ commons emits VLMStreamEvent on the stream callback (see
  * rac_vlm_proto_abi.cpp). React Native decodes VLMStreamEvent directly; Kotlin
- * keeps RASDKEvent at the public surface for example-app parity with Swift.
+ * keeps SDKEvent at the public surface for example-app parity with Swift.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -18,7 +18,6 @@ import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMStreamEvent
 import ai.runanywhere.proto.v1.VLMStreamEventKind
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.public.types.RASDKEvent
 
 internal object VlmStreamEventMapper {
     fun decodeStreamPayload(bytes: ByteArray): VLMStreamEvent? =
@@ -32,7 +31,7 @@ internal object VlmStreamEventMapper {
      * @return mapped SDK event, or null when the native event should be ignored
      * @throws SDKException on terminal ERROR events
      */
-    fun toSdkEvent(event: VLMStreamEvent): RASDKEvent? {
+    fun toSdkEvent(event: VLMStreamEvent): SDKEvent? {
         return when (event.kind) {
             VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
                 val token = event.token

@@ -29,7 +29,6 @@ import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
-import com.runanywhere.sdk.public.types.RASDKEvent
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -119,12 +118,26 @@ object CppBridgeLLM {
 
     // MARK: - LLM-specific operations
 
-    /** Cancel any in-flight generation. No-op if the handle is not created. */
-    suspend fun cancel(): RASDKEvent? {
+    /**
+     * Per-handle cancel of the in-flight generation on this component's
+     * handle. Mirrors Swift's `CppBridge.LLM.cancel()`
+     * (`rac_llm_component_cancel(handle)`). No-op if the handle is not
+     * created. Use [cancelProto] for the lifecycle-aware public cancel path.
+     */
+    suspend fun cancel() {
         val handle = inner.existingHandle()
-        if (handle == 0L) return null
-        return RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
+        if (handle == 0L) return
+        RunAnywhereBridge.racLlmComponentCancel(handle)
     }
+
+    /**
+     * Lifecycle-aware cancel of the lifecycle-loaded generation. Mirrors
+     * Swift's `LLMGeneratedProtoABI.cancelProto()` (`rac_llm_cancel_proto`),
+     * which the public `cancelGeneration()` path drives. Returns the emitted
+     * cancellation [SDKEvent], or null when no generation was in flight.
+     */
+    suspend fun cancelProto(): SDKEvent? =
+        RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
 
     /** One-shot generation. */
     suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {

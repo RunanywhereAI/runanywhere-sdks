@@ -42,7 +42,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.sdk.public.types.RAVLMResult
@@ -156,7 +155,7 @@ object CppBridgeVLM {
         )
 
     /**
-     * Stream VLM output as canonical [RASDKEvent] envelopes.
+     * Stream VLM output as canonical [SDKEvent] envelopes.
      *
      * Mirrors Swift `CppBridge.VLM.processStream` — the native call delivers
      * token events through the callback; the aggregate [VLMResult] returned
@@ -166,7 +165,7 @@ object CppBridgeVLM {
     suspend fun processStream(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
-        onEvent: (RASDKEvent) -> Boolean,
+        onEvent: (SDKEvent) -> Boolean,
     ): RAVLMResult {
         val handle = getHandle()
         return decodeOrThrow(
