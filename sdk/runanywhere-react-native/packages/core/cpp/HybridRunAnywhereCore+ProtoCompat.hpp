@@ -146,6 +146,7 @@ using SDKEventSubscribeFn = uint64_t (*)(
     SDKEventCallbackFn,
     void*);
 using SDKEventUnsubscribeFn = void (*)(uint64_t);
+using SDKEventQuiesceFn = void (*)();
 using SDKEventPublishProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t);
