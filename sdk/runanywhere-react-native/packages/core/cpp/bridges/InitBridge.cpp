@@ -15,6 +15,7 @@
 #include "rac_model_paths.h"
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/device/rac_device_identity.h"  // rac_device_get_or_create_persistent_id
 
 #include <cstddef>
 
@@ -1970,73 +1971,19 @@ bool InitBridge::secureExists(const std::string& key) {
 }
 
 std::string InitBridge::getPersistentDeviceUUID() {
-    // Key matches Swift: KeychainManager.KeychainKey.deviceUUID
-    static const char* DEVICE_UUID_KEY = "com.runanywhere.sdk.device.uuid";
-
-    // Thread-safe: cached result (matches Swift pattern)
-    static std::string cachedUUID;
-    static std::mutex uuidMutex;
-
-    {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        if (!cachedUUID.empty()) {
-            return cachedUUID;
-        }
+    // Delegate to the canonical commons resolver so RN shares one device-id
+    // stream with the native Swift / Kotlin SDKs. Commons walks
+    // secure_get -> get_vendor_id (Apple UIDevice.identifierForVendor, populated
+    // above) -> synthesized UUIDv4, then persists via secure_set. Caching,
+    // the secure-storage key, and UUID generation all live in commons; a local
+    // copy here is exactly the divergence rn-012 flags.
+    char buffer[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {0};
+    rac_result_t result = rac_device_get_or_create_persistent_id(buffer, sizeof(buffer));
+    if (result != RAC_SUCCESS) {
+        LOGE("rac_device_get_or_create_persistent_id failed: %d", result);
+        return "";
     }
-
-    // Strategy 1: Try to load from secure storage (survives reinstalls)
-    std::string storedUUID;
-    if (secureGet(DEVICE_UUID_KEY, storedUUID) && !storedUUID.empty()) {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        cachedUUID = storedUUID;
-        LOGI("Loaded persistent device UUID from keychain");
-        return cachedUUID;
-    }
-
-    // Strategy 2: Generate new UUID
-    // Generate a UUID4-like string: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    auto generateUUID = []() -> std::string {
-        static const char hexChars[] = "0123456789abcdef";
-
-        // Use high-resolution clock and random for seeding
-        auto now = std::chrono::high_resolution_clock::now();
-        auto seed = static_cast<unsigned>(
-            now.time_since_epoch().count() ^
-            reinterpret_cast<uintptr_t>(&now)
-        );
-        srand(seed);
-
-        char uuid[37];
-        for (int i = 0; i < 36; i++) {
-            if (i == 8 || i == 13 || i == 18 || i == 23) {
-                uuid[i] = '-';
-            } else if (i == 14) {
-                uuid[i] = '4'; // UUID version 4
-            } else if (i == 19) {
-                uuid[i] = hexChars[(rand() & 0x03) | 0x08]; // variant bits
-            } else {
-                uuid[i] = hexChars[rand() & 0x0F];
-            }
-        }
-        uuid[36] = '\0';
-        return std::string(uuid);
-    };
-
-    std::string newUUID = generateUUID();
-
-    // Store in secure storage
-    if (secureSet(DEVICE_UUID_KEY, newUUID)) {
-        LOGI("Generated and stored new persistent device UUID");
-    } else {
-        LOGW("Generated device UUID but failed to persist (will regenerate on restart)");
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        cachedUUID = newUUID;
-    }
-
-    return newUUID;
+    return std::string(buffer);
 }
 
 // =============================================================================
