@@ -35,9 +35,7 @@ final class VLMViewModel: NSObject {
 
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
-    // nonisolated(unsafe) so deinit can cancel the task (deinit is nonisolated in Swift 6)
-    nonisolated(unsafe) private var autoStreamTask: Task<Void, Never>?
-    private static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
+    static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
 
     // Camera
     private(set) var captureSession: AVCaptureSession?
@@ -59,9 +57,7 @@ final class VLMViewModel: NSObject {
     }
 
     deinit {
-        autoStreamTask?.cancel()
         NotificationCenter.default.removeObserver(self)
-        // Note: Camera cleanup is handled by onDisappear in VLMCameraView
     }
 
     // MARK: - Model
@@ -268,37 +264,17 @@ final class VLMViewModel: NSObject {
 
     func toggleAutoStreaming() {
         isAutoStreamingEnabled.toggle()
-        if isAutoStreamingEnabled {
-            startAutoStreaming()
-        } else {
-            stopAutoStreaming()
-        }
     }
 
-    func startAutoStreaming() {
-        guard autoStreamTask == nil else { return }
-
-        autoStreamTask = Task {
-            while !Task.isCancelled && isAutoStreamingEnabled {
-                // Wait for any current processing to finish
-                while isProcessing {
-                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-                    if Task.isCancelled { return }
-                }
-
-                // Capture and describe
-                await describeCurrentFrameForAutoStream()
-
-                // Wait before next capture
-                try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
+    func runAutoStreamLoop() async {
+        while !Task.isCancelled {
+            while isProcessing {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if Task.isCancelled { return }
             }
+            await describeCurrentFrameForAutoStream()
+            try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
         }
-    }
-
-    func stopAutoStreaming() {
-        autoStreamTask?.cancel()
-        autoStreamTask = nil
-        isAutoStreamingEnabled = false
     }
 
     private func describeCurrentFrameForAutoStream() async {
