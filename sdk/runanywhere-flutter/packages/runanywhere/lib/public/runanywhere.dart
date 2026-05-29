@@ -367,7 +367,7 @@ abstract final class RunAnywhere {
       }
     }
 
-    // Step 4: Telemetry sync + async device-info wiring.
+    // Step 3: Telemetry sync + async device-info wiring.
     DartBridgeTelemetry.initializeSync(environment: params.environment);
     final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
     await DartBridgeTelemetry.initialize(
@@ -378,7 +378,7 @@ abstract final class RunAnywhere {
           : null,
     );
 
-    // Step 5: Model registry.
+    // Step 4: Model registry.
     await DartBridgeModelRegistry.instance.initialize();
 
     // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
@@ -391,7 +391,7 @@ abstract final class RunAnywhere {
       ),
     );
 
-    // Step 6: Background services — device registration + auth. Failures
+    // Step 5: Background services — device registration + auth. Failures
     // here are non-critical (offline inference still works), so they are
     // logged and swallowed individually inside the helpers.
     await _registerDeviceIfNeeded(params, logger);
@@ -741,26 +741,28 @@ abstract final class RunAnywhere {
   static Future<void> refreshModelRegistry() =>
       RunAnywhereModels.shared.refreshModelRegistry();
 
-  /// Polymorphic load — dispatch on [ModelInfo.category]. Mirrors Swift
-  /// `RunAnywhere.loadModel(_:)`. Drop-in replacement for the per-capability
-  /// `llm.load` / `stt.load` / `tts.loadVoice` / `vlm.load` / `vad.loadModel`
-  /// switch ladders that example view-models otherwise hand-roll.
-  static Future<void> loadModel(ModelInfo model) =>
-      RunAnywhereModels.shared.loadModel(model);
-
-  /// Polymorphic unload — dispatch on [ModelInfo.category]. Mirrors Swift
-  /// `RunAnywhere.unloadModel(_:)`.
-  static Future<void> unloadModel(ModelInfo model) =>
-      RunAnywhereModels.shared.unloadModel(model);
-
-  /// Proto-backed model lifecycle load.
-  static Future<ModelLoadResult> loadModelLifecycle(ModelLoadRequest request) =>
+  /// Proto-backed model lifecycle load. Matches the universal
+  /// `RunAnywhere.loadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelLoadResult> loadModel(ModelLoadRequest request) =>
       RunAnywhereModelLifecycle.shared.load(request);
 
-  /// Proto-backed model lifecycle unload.
-  static Future<ModelUnloadResult> unloadModelLifecycle(
-    ModelUnloadRequest request,
-  ) => RunAnywhereModelLifecycle.shared.unload(request);
+  /// Proto-backed model lifecycle unload. Matches the universal
+  /// `RunAnywhere.unloadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelUnloadResult> unloadModel(ModelUnloadRequest request) =>
+      RunAnywhereModelLifecycle.shared.unload(request);
+
+  /// Polymorphic load — dispatch on [ModelInfo.category]. Drop-in replacement
+  /// for the per-capability `llm.load` / `stt.load` / `tts.loadVoice` /
+  /// `vlm.load` / `vad.loadModel` switch ladders that example view-models
+  /// otherwise hand-roll. Named `loadModelByInfo` to avoid collision with the
+  /// proto-backed [loadModel] overload (Dart has no method overloading).
+  static Future<void> loadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.loadModel(model);
+
+  /// Polymorphic unload — dispatch on [ModelInfo.category]. Named
+  /// `unloadModelByInfo` to avoid collision with the proto-backed [unloadModel].
+  static Future<void> unloadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.unloadModel(model);
 
   /// Proto-backed current-model query.
   static Future<CurrentModelResult> currentModel([
