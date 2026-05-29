@@ -72,12 +72,12 @@ export class LlamaCppProvider {
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
-    if (!isNativeLlamaModuleAvailable()) {
-      return false;
-    }
-
     if (!this.registered) {
       return true;
+    }
+
+    if (!isNativeLlamaModuleAvailable()) {
+      return false;
     }
 
     const native = requireNativeLlamaModule();
