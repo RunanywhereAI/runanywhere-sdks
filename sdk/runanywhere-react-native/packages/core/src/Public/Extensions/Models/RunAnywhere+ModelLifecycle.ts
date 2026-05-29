@@ -11,7 +11,6 @@ import {
   CurrentModelRequest,
   CurrentModelResult,
   ModelCategory,
-  ModelFileRole,
   ModelLoadRequest,
   ModelLoadResult,
   ModelUnloadRequest,
@@ -20,7 +19,6 @@ import {
 import type {
   CurrentModelRequest as CurrentModelRequestMessage,
   CurrentModelResult as CurrentModelResultMessage,
-  ModelFileDescriptor,
   ModelInfo,
   ModelLoadRequest as ModelLoadRequestMessage,
   ModelLoadResult as ModelLoadResultMessage,
@@ -49,16 +47,6 @@ export type {
   ComponentLifecycleSnapshot,
 } from '@runanywhere/proto-ts/sdk_events';
 
-export interface LifecycleArtifactSource {
-  modelId?: string;
-  resolvedArtifacts: ModelFileDescriptor[];
-}
-
-export interface VLMResolvedLifecycleArtifacts {
-  primaryModelPath: string;
-  visionProjectorPath: string;
-}
-
 function encode<T>(
   message: T,
   codec: { encode(value: T, writer?: { finish(): Uint8Array }): { finish(): Uint8Array } }
@@ -73,38 +61,6 @@ function decode<T>(
 ): T {
   const bytes = arrayBufferToBytes(buffer);
   return bytes.byteLength === 0 ? fallback : codec.decode(bytes);
-}
-
-function nonEmptyPath(path?: string): string | undefined {
-  const trimmed = path?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : undefined;
-}
-
-export function getLifecycleResolvedArtifactPath(
-  source: LifecycleArtifactSource,
-  role: ModelFileRole
-): string | undefined {
-  const artifact = source.resolvedArtifacts.find((item) => item.role === role);
-  return nonEmptyPath(artifact?.localPath);
-}
-
-export function resolveVLMArtifactsFromLifecycleResult(
-  source: LifecycleArtifactSource
-): VLMResolvedLifecycleArtifacts | null {
-  const primaryModelPath = getLifecycleResolvedArtifactPath(
-    source,
-    ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-  );
-  const visionProjectorPath = getLifecycleResolvedArtifactPath(
-    source,
-    ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR
-  );
-
-  if (!primaryModelPath || !visionProjectorPath) {
-    return null;
-  }
-
-  return { primaryModelPath, visionProjectorPath };
 }
 
 export async function loadModel(
@@ -211,7 +167,3 @@ export async function componentLifecycleSnapshot(
     ? null
     : ComponentLifecycleSnapshot.decode(bytes);
 }
-
-/**
- * Internal compatibility alias. Prefer `loadModel`.
- */
