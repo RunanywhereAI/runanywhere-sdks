@@ -34,7 +34,10 @@ declare global {
       isAuthenticated: boolean;
       textGeneration: Record<string, unknown>;
       modelRegistry: Record<string, unknown>;
-      modelLifecycle: Record<string, unknown>;
+      // Model lifecycle is exposed via flat top-level verbs
+      // (loadModel/unloadModel/currentModel) mirroring the Swift source-of-truth
+      // facade — there is intentionally no `modelLifecycle` namespace.
+      loadModel: (...args: unknown[]) => unknown;
       stt: Record<string, unknown>;
       tts: Record<string, unknown>;
       vad: Record<string, unknown>;
@@ -83,7 +86,7 @@ test.describe('Web SDK smoke test', () => {
           ra.textGeneration !== null &&
           typeof ra.textGeneration.generateStream === 'function',
         hasModelRegistry: typeof ra.modelRegistry === 'object' && ra.modelRegistry !== null,
-        hasModelLifecycle: typeof ra.modelLifecycle === 'object' && ra.modelLifecycle !== null,
+        hasLoadModel: typeof ra.loadModel === 'function',
         hasStt: typeof ra.stt === 'object' && ra.stt !== null,
         hasTts: typeof ra.tts === 'object' && ra.tts !== null,
         hasVad: typeof ra.vad === 'object' && ra.vad !== null,
@@ -105,7 +108,9 @@ test.describe('Web SDK smoke test', () => {
     // Public namespace facades must be present.
     expect(surface.hasTextGenerationStream).toBe(true);
     expect(surface.hasModelRegistry).toBe(true);
-    expect(surface.hasModelLifecycle).toBe(true);
+    // Model lifecycle is the flat `loadModel` verb (Swift-parity facade shape),
+    // not a `modelLifecycle` namespace.
+    expect(surface.hasLoadModel).toBe(true);
     expect(surface.hasStt).toBe(true);
     expect(surface.hasTts).toBe(true);
     expect(surface.hasVad).toBe(true);

@@ -12,8 +12,10 @@
  *
  *   1. install() returns null when the module lacks the Stage 3d export
  *      (so the emscripten_fetch fallback stays active).
- *   2. install() registers the request_stream + request_resume trampolines
- *      and returns a transport handle when the export is present.
+ *   2. install() registers the request_send + request_stream + request_resume
+ *      trampolines and returns a transport handle when the export is present.
+ *      (All three ops route through XHR for parity with the Swift
+ *      URLSessionHttpTransport, which registers request_send/_stream/_resume.)
  *   3. uninstall() unregisters and removes the trampolines (idempotent).
  *   4. A small body fits in a single chunk callback.
  *   5. A multi-MiB body fans out across >1 chunk callback at the
@@ -299,21 +301,26 @@ describe('FetchHttpTransport', () => {
     expect(handle.registrations).toHaveLength(0);
   });
 
-  it('install() registers stream + resume trampolines and uninstall() reverses it', () => {
+  it('install() registers send + stream + resume trampolines and uninstall() reverses it', () => {
     const handle = makeFakeModule();
     const transport = FetchHttpTransport.install(handle.module);
     expect(transport).not.toBeNull();
     expect(handle.registrations).toHaveLength(1);
     const reg = handle.registrations[0];
-    expect(reg.send).toBe(0); // send stays on emscripten_fetch
+    // All three ops are wired through XHR for parity with the Swift
+    // URLSessionHttpTransport (request_send/_stream/_resume), so each gets a
+    // distinct non-zero function-table trampoline.
+    expect(reg.send).not.toBe(0);
     expect(reg.stream).not.toBe(0);
     expect(reg.resume).not.toBe(0);
+    expect(new Set([reg.send, reg.stream, reg.resume]).size).toBe(3);
 
     transport!.uninstall();
     // After uninstall: register(0,0,0) was called and the function-table
     // entries were removed.
     expect(handle.registrations).toHaveLength(2);
     expect(handle.registrations[1]).toEqual({ send: 0, stream: 0, resume: 0 });
+    expect(handle.removedTrampolines).toContain(reg.send);
     expect(handle.removedTrampolines).toContain(reg.stream);
     expect(handle.removedTrampolines).toContain(reg.resume);
 

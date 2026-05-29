@@ -13,8 +13,8 @@
  * one site.
  */
 import {
-  InferenceFramework,
   ModelFileRole,
+  type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { tryRunanywhereModule } from '../runtime/EmscriptenModule';
