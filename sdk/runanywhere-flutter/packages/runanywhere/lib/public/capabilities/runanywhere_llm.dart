@@ -77,6 +77,7 @@ class RunAnywhereLLM {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
@@ -467,6 +468,14 @@ class RunAnywhereLLM {
     var sawTerminalEvent = false;
 
     Future<void> run() async {
+      try {
+        await DartBridge.ensureServicesReady();
+      } catch (e, st) {
+        controller.addError(e, st);
+        await controller.close();
+        return;
+      }
+
       final bytes = request.writeToBuffer();
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 

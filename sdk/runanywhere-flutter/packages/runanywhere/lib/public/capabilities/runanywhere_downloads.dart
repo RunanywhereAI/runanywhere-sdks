@@ -108,6 +108,7 @@ class RunAnywhereDownloads {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     final logger = SDKLogger('RunAnywhere.Download');
     logger.info('Starting download for model: $modelId');

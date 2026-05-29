@@ -86,6 +86,7 @@ class RunAnywhereSTT {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     final logger = SDKLogger('RunAnywhere.LoadSTTModel');
     logger.info('Loading STT model: $modelId');
@@ -155,6 +156,7 @@ class RunAnywhereSTT {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
     return _transcribeAudioData(
       audio,
       options ?? STTOptions(),

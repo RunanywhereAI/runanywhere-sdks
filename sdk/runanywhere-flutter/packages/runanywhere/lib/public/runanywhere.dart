@@ -301,6 +301,7 @@ abstract final class RunAnywhere {
       // Phase-1 failures (invalid env, library load) propagate to the
       // caller via the surrounding try / rethrow.
       DartBridge.initialize(params.environment);
+      DartBridge.registerEnsureServicesReadyHook(ensureServicesReady);
 
       logger.info(
         'Phase 1 complete (${params.environment.description}); '

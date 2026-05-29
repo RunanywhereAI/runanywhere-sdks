@@ -64,6 +64,11 @@ class DartBridge {
   static bool _servicesInitialized = false;
   static DynamicLibrary? _lib;
 
+  // Wired by RunAnywhere.initializeWithParams so capability files can call
+  // ensureServicesReady() without importing runanywhere.dart (which imports
+  // all capability files — a circular dependency). Null before Phase 1.
+  static Future<void> Function()? _ensureServicesReadyHook;
+
   /// Current environment
   static SDKEnvironment get environment => _environment;
 
@@ -72,6 +77,30 @@ class DartBridge {
 
   /// Whether Phase 2 (services) initialization is complete
   static bool get servicesInitialized => _servicesInitialized;
+
+  /// Register the Phase-2 readiness hook. Called once by
+  /// RunAnywhere.initializeWithParams so capability files can invoke
+  /// [ensureServicesReady] without importing runanywhere.dart.
+  static void registerEnsureServicesReadyHook(
+    Future<void> Function() hook,
+  ) {
+    _ensureServicesReadyHook = hook;
+  }
+
+  /// Await Phase-2 completion before any work that requires services (HTTP,
+  /// auth, model-assignment, model-discovery). Mirrors Swift's
+  /// `try? await ensureServicesReady()` guard in RunAnywhere+ModelLifecycle.swift
+  /// and RunAnywhere+Storage.swift. If Phase 1 has not run, throws
+  /// [SDKException.notInitialized]; if the hook is not yet wired (very early
+  /// call before initializeWithParams), returns immediately.
+  static Future<void> ensureServicesReady() {
+    if (!_isInitialized) {
+      throw StateError('SDK not initialized');
+    }
+    final hook = _ensureServicesReadyHook;
+    if (hook == null) return Future<void>.value();
+    return hook();
+  }
 
   /// Native library reference
   static DynamicLibrary get lib {
@@ -311,6 +340,7 @@ class DartBridge {
 
     _isInitialized = false;
     _servicesInitialized = false;
+    _ensureServicesReadyHook = null;
 
     _logger.info('DartBridge shutdown complete');
   }

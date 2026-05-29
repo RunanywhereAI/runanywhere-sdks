@@ -182,6 +182,7 @@ class RunAnywhereVAD {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     _logger.info('Loading VAD model: $modelId');
     final result = await RunAnywhereModelLifecycle.shared.load(
