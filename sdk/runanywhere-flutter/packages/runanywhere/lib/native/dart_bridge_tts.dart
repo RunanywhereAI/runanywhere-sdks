@@ -243,7 +243,21 @@ class DartBridgeTTS {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        callback = NativeCallable<RacTtsStreamEventCallbackNative>.listener((
+        // FLUTTER-IOS-006 fix (mirrors DartBridgeLLM.generateStreamProto):
+        // use `isolateLocal` (not `.listener`) so the callback runs
+        // synchronously on the same thread that invoked
+        // `rac_tts_synthesize_stream_lifecycle_proto`. The commons producer
+        // (`emit_event` / `chunk_bridge` in rac_nonllm_lifecycle_proto_abi.cpp)
+        // serializes each event into a stack-local `std::vector<uint8_t>` and
+        // calls the callback with that buffer's pointer inline. With
+        // `.listener` the callback is queued onto the isolate's event loop and
+        // runs ASYNCHRONOUSLY — by then the producing call has returned and the
+        // stack buffer is gone, so `bytesPtr.asTypedList` reads freed memory
+        // (use-after-free → malformed/empty TTSStreamEvent bytes).
+        // `isolateLocal` is safe because the ABI runs synchronously on the
+        // Dart isolate that created the callback, so it always fires on that
+        // isolate and cannot be re-entered after `fn()` returns.
+        callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal((
           Pointer<Uint8> bytesPtr,
           int bytesLen,
           Pointer<Void> _,
@@ -263,17 +277,6 @@ class DartBridgeTTS {
           callback!.nativeFunction,
           nullptr,
         );
-        // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
-        // `rac_tts_synthesize_stream_lifecycle_proto` is a blocking
-        // synchronous FFI call. While it runs the main isolate's event loop
-        // is frozen, so NativeCallable.listener invocations queue up but do
-        // not execute. The terminal COMPLETED/ERROR event therefore arrives
-        // ASYNCHRONOUSLY after `fn()` returns. Yield via the shared
-        // [drainPendingStreamCallbacks] helper so queued callbacks can drain
-        // before deciding whether to force-close the controller; otherwise
-        // subscribers receive an empty stream even though native emitted
-        // started/audio/final. See [kStreamDrainMaxMicrotasks].
-        await drainPendingStreamCallbacks(() => sawTerminalEvent);
         if (rc != RAC_SUCCESS && !controller.isClosed) {
           controller.addError(StateError(
             'rac_tts_synthesize_stream_lifecycle_proto failed: '
@@ -355,7 +358,14 @@ class DartBridgeTTS {
     NativeCallable<RacTtsProtoVoiceCallbackNative>? callback;
 
     try {
-      callback = NativeCallable<RacTtsProtoVoiceCallbackNative>.listener((
+      // `isolateLocal` (not `.listener`): `rac_tts_component_list_voices_proto`
+      // is a single synchronous enumeration on the calling thread — it invokes
+      // the callback inline once per voice (tts_component.cpp) and returns. With
+      // `.listener` the callbacks queue onto the event loop and run on a future
+      // microtask, so `return voices` below captures an empty list (and the
+      // stack-local proto buffer is freed by then). `isolateLocal` fires inline
+      // so voices accumulate synchronously before `fn(...)` returns.
+      callback = NativeCallable<RacTtsProtoVoiceCallbackNative>.isolateLocal((
         Pointer<Uint8> bytesPtr,
         int bytesLen,
         Pointer<Void> _,
@@ -443,7 +453,13 @@ class DartBridgeTTS {
       final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
 
       try {
-        callback = NativeCallable<RacTtsProtoChunkCallbackNative>.listener((
+        // FLUTTER-IOS-006 fix (same root cause as
+        // synthesizeStreamLifecycleProto): `isolateLocal` so the callback runs
+        // inline on the synchronous-FFI thread. `rac_tts_component_synthesize_
+        // stream_proto`'s `bridge` (tts_component.cpp) serializes each chunk
+        // into a stack-local buffer and invokes the callback inline; with
+        // `.listener` the deferred callback reads that freed buffer (UAF).
+        callback = NativeCallable<RacTtsProtoChunkCallbackNative>.isolateLocal((
           Pointer<Uint8> bytesPtr,
           int bytesLen,
           Pointer<Void> _,
