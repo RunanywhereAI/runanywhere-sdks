@@ -30,9 +30,9 @@ class RunAnywhereHardware {
 
   /// Set the C++ routing preference for future accelerator-aware operations.
   ///
-  /// Mirrors Swift `RunAnywhere.hardware.setAcceleratorPreference(_:)`.
-  /// Returns false when the bundled native library does not expose the hardware
-  /// ABI yet.
-  bool setAcceleratorPreference(AccelerationPreference preference) =>
+  /// Mirrors Swift `try RunAnywhere.hardware.setAcceleratorPreference(_:) throws`.
+  /// Throws [SDKException] when commons rejects the preference or the hardware
+  /// ABI is unavailable.
+  void setAcceleratorPreference(AccelerationPreference preference) =>
       DartBridgeHardware.setAccelerationPreference(preference);
 }

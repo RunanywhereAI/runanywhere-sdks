@@ -68,16 +68,35 @@ class DartBridgeHardware {
   }
 
   /// Set the commons accelerator preference for subsequent routing decisions.
-  static bool setAccelerationPreference(AccelerationPreference preference) {
+  ///
+  /// Throws [SDKException.featureNotAvailable] when the commons library is
+  /// unavailable or the symbol is missing; throws [SDKException.internalError]
+  /// when commons rejects the preference. Mirrors Swift
+  /// `try CppBridge.Hardware.setAcceleratorPreference(_:) throws`.
+  static void setAccelerationPreference(AccelerationPreference preference) {
+    final DynamicLibrary lib;
     try {
-      final lib = PlatformLoader.loadCommons();
-      final setPreference =
-          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+      lib = PlatformLoader.loadCommons();
+    } catch (e) {
+      throw SDKException.featureNotAvailable(
+        'hardware.setAcceleratorPreference: failed to load commons: $e',
+      );
+    }
+    final int Function(int) setPreference;
+    try {
+      setPreference = lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
         'rac_hardware_set_accelerator_preference',
       );
-      return setPreference(preference.value) == RAC_SUCCESS;
-    } catch (_) {
-      return false;
+    } catch (e) {
+      throw SDKException.featureNotAvailable(
+        'rac_hardware_set_accelerator_preference',
+      );
+    }
+    final result = setPreference(preference.value);
+    if (result != RAC_SUCCESS) {
+      throw SDKException.internalError(
+        'rac_hardware_set_accelerator_preference returned rc=$result',
+      );
     }
   }
 
