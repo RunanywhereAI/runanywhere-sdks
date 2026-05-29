@@ -487,27 +487,6 @@ fun ModelInfo.Companion.create(
     )
 }
 
-/**
- * Apply an inferred artifact to a freshly constructed [ModelInfo]. Mirrors
- * Swift's `inferredArtifact(from:format:)` — passes through to single-file
- * when no archive type can be derived, otherwise sets an archive artifact.
- *
- * Public on `ModelInfo.Companion` so external callers (and the registry)
- * can re-derive the artifact when only a URL changes.
- */
-@Suppress("UnusedParameter")
-fun ModelInfo.Companion.inferredArtifact(
-    url: String?,
-    archiveType: ArchiveType? = null,
-): SingleFileArtifact {
-    // Swift returns a `OneOf_Artifact` here; the Kotlin proto exposes a
-    // flat oneof, so the API surface differs. Single-file is the no-op
-    // case (no archive). Archive callers should use
-    // [ModelInfo.applyInferredArtifact] which routes to the correct setter.
-    // Parameters are retained for API parity with Swift's `inferredArtifact(from:format:)`.
-    return SingleFileArtifact()
-}
-
 private fun RAModelInfo.applyInferredArtifact(
     url: String?,
     explicitArchiveType: ArchiveType?,
