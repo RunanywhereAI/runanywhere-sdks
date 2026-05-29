@@ -950,9 +950,27 @@ static rac_result_t parse_model_query_bytes(const uint8_t* query_proto_bytes,
     return RAC_SUCCESS;
 }
 
-static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming) {
+// Merge fields the caller left unset from `existing` into `incoming`.
+//
+// `preserve_empty_local_path` encodes the two distinct caller contracts:
+//   - update_proto is a PARTIAL merge: an absent/empty local_path means "leave
+//     the existing one alone", so pass true and we carry a non-empty existing
+//     path forward. ModelInfo.local_path is a presence-less proto3 string
+//     (tag 7, no `optional`), so an unset field and an explicit "" are wire-
+//     identical; the partial-merge entry point therefore treats empty as
+//     "keep existing".
+//   - register_proto is an AUTHORITATIVE replace / explicit reset escape hatch:
+//     an empty local_path is a deliberate clear that must win, so pass false
+//     and we never overwrite the incoming (possibly empty) path.
+static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming,
+                                         bool preserve_empty_local_path) {
     if (!incoming) {
         return;
+    }
+
+    if (preserve_empty_local_path && incoming->local_path().empty() &&
+        !existing.local_path().empty()) {
+        incoming->set_local_path(existing.local_path());
     }
 
     if (!incoming->has_memory_required_bytes() && existing.has_memory_required_bytes()) {
@@ -2116,7 +2134,11 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
         if (existing_it != handle->models.end()) {
             ModelInfo existing =
                 model_snapshot_locked(handle, proto_model.id(), existing_it->second);
-            preserve_absent_proto_fields(existing, &proto_model);
+            // register_proto is an authoritative replace: an explicit empty
+            // local_path is a deliberate reset that must win (commons-014
+            // override escape hatch), so do NOT preserve an empty path.
+            preserve_absent_proto_fields(existing, &proto_model,
+                                         /*preserve_empty_local_path=*/false);
         }
     }
 
@@ -2170,7 +2192,11 @@ rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
             return RAC_ERROR_NOT_FOUND;
         }
         ModelInfo existing = model_snapshot_locked(handle, proto_model.id(), model_it->second);
-        preserve_absent_proto_fields(existing, &proto_model);
+        // update_proto is a partial merge: a field the caller left unset (or an
+        // empty local_path, which is wire-indistinguishable from unset for this
+        // presence-less proto3 string) must preserve the existing value.
+        preserve_absent_proto_fields(existing, &proto_model,
+                                     /*preserve_empty_local_path=*/true);
     }
     normalize_model_registry_state(&proto_model);
 
