@@ -71,8 +71,15 @@ scan_one_file() {
         for (i = 1; i <= NR; ++i) {
           if (index(lines[i], logger) == 0) continue
           joined = lines[i]
-          for (j = i + 1; j <= i + window && j <= NR; ++j) {
-            joined = joined " " lines[j]
+          # Stop accumulating once the logger call'\''s own statement ends
+          # (a line containing the call terminator ");"). This keeps
+          # legitimate multi-line-call detection while preventing the
+          # window from bleeding past the statement into unrelated tokens.
+          if (index(lines[i], ");") == 0) {
+            for (j = i + 1; j <= i + window && j <= NR; ++j) {
+              joined = joined " " lines[j]
+              if (index(lines[j], ");") > 0) break
+            }
           }
           printf "%d\t%s\n", i, joined
         }
