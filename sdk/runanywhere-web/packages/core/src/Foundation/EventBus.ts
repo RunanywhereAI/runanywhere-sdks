@@ -490,6 +490,22 @@ export class EventBus {
 //
 // Adding a new mapping is a single-case addition here plus its reverse arm in
 // `encodeEventToProto` below.
+//
+// Coverage note: the SDKEvent proto oneof has 24 arms (initialization,
+// configuration, generation, model, performance, network, storage, framework,
+// device, component_init, voice, voice_pipeline, component_lifecycle, session,
+// auth, model_registry, download, storage_lifecycle, hardware_routing,
+// capability, telemetry, cancellation, failure). Only 5 arms (initialization,
+// model, generation, voice, download) are translated to dotted-name SDKEventMap
+// entries. The remaining 19 arms do NOT produce dotted-name events; they are
+// routed to wildcard listeners only (with `{ proto: event }` in `data`).
+//
+// For any arm not listed above, use the category-based API instead — it
+// delivers the raw proto SDKEvent regardless of dotted-name coverage and is
+// the documented cross-SDK parity path:
+//   • `eventBus.onCategory(EventCategory.X, handler)`  — push subscription
+//   • `eventBus.eventsFor(EventCategory.X)`             — async iterable
+//   • `eventBus.onAny(handler)`                         — all events (wildcard)
 
 interface TranslatedEvent {
   type: string;
