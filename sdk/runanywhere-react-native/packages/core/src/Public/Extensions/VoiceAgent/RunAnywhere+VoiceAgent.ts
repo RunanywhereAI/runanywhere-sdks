@@ -11,6 +11,7 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { ErrorCode as ErrorCodeProto } from '@runanywhere/proto-ts/errors';
 import type {
   VoiceAgentResult,
   VoiceSessionConfig,
@@ -165,30 +166,77 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
 /**
  * Initialize voice agent using already-loaded models.
  *
- * When `ensureVAD` is `true` (default), the SDK guarantees that a VAD
- * model is loaded into the canonical lifecycle before initialization runs
- * via {@link ensureDefaultVAD}. Without this the session would silently
- * fall back to the energy-based detector and the C++ voice agent's
- * speech-start / speech-end lifecycle events would not fire. Set to
- * `false` only if the caller has already loaded an explicit VAD model
- * (or knows the energy fallback is acceptable for the deployment).
+ * Composes a `VoiceAgentComposeConfig` from the canonical model lifecycle
+ * (`currentModel`) snapshots for `.speechRecognition`, `.language`, and
+ * `.speechSynthesis`, then forwards to `voiceAgentInitializeProto`. Mirrors
+ * the Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)` API.
+ *
+ * When `ensureVAD` is `true` (default), the SDK guarantees that a VAD model
+ * is loaded into the canonical lifecycle before initialization runs via
+ * {@link ensureDefaultVAD}. Without this the session would silently fall back
+ * to the energy-based detector and the C++ voice agent's speech-start /
+ * speech-end lifecycle events would not fire. Set to `false` only if the
+ * caller has already loaded an explicit VAD model (or knows the energy
+ * fallback is acceptable for the deployment).
+ *
+ * @param ttsVoiceID Optional explicit voice id to pass through to the TTS
+ *   engine. For multi-voice TTS engines, this selects the voice within the
+ *   loaded model and is semantically distinct from the TTS model id. When
+ *   `undefined` (default), the engine's default voice is used. Never reuse
+ *   the TTS model id here — model id ≠ voice id.
+ * @param ensureVAD Whether to auto-load the catalogued default VAD when no
+ *   `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION` model is loaded. Defaults to
+ *   `true`.
  *
  * Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
  */
 export async function initializeVoiceAgentWithLoadedModels(
+  ttsVoiceID?: string,
   ensureVAD: boolean = true
-): Promise<boolean> {
+): Promise<void> {
   const native = ensureNative();
   try {
     if (ensureVAD) {
       await ensureDefaultVAD();
     }
-    logger.info('Initializing voice agent with loaded models...');
-    const result = await native.initializeVoiceAgentWithLoadedModels();
-    if (result) {
-      logger.info('Voice agent initialized with loaded models');
+
+    const sttSnap = await currentModel(
+      CurrentModelRequest.fromPartial({
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      })
+    );
+    const llmSnap = await currentModel(
+      CurrentModelRequest.fromPartial({
+        category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      })
+    );
+    const ttsSnap = await currentModel(
+      CurrentModelRequest.fromPartial({
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      })
+    );
+
+    const missing: string[] = [];
+    if (!sttSnap?.found || !sttSnap.modelId) missing.push('STT');
+    if (!llmSnap?.found || !llmSnap.modelId) missing.push('LLM');
+    if (!ttsSnap?.found || !ttsSnap.modelId) missing.push('TTS');
+    if (missing.length > 0) {
+      throw SDKException.of(
+        ErrorCodeProto.ERROR_CODE_MODEL_NOT_LOADED,
+        `Cannot initialize voice agent: Models not loaded: ${missing.join(', ')}`
+      );
     }
-    return result;
+
+    logger.info('Initializing voice agent with loaded models...');
+    const composeConfig = VoiceAgentComposeConfig.create({
+      sttModelId: sttSnap!.modelId,
+      llmModelId: llmSnap!.modelId,
+      ...(ttsVoiceID && ttsVoiceID.length > 0 ? { ttsVoiceId: ttsVoiceID } : {}),
+    });
+    await native.voiceAgentInitializeProto(
+      encodeProtoMessage(composeConfig, VoiceAgentComposeConfig)
+    );
+    logger.info('Voice agent initialized with loaded models');
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to initialize voice agent: ${msg}`);
