@@ -135,7 +135,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint('📦 Registering modules with their models...');
 
     // --- LLAMACPP MODULE ---
-    await LlamaCpp.register();
+    LlamaCpp.register();
     await Future<void>.delayed(Duration.zero);
 
     await _registerLanguageModel(

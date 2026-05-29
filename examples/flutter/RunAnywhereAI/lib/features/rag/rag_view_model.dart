@@ -5,7 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere/runanywhere.dart' hide ModelInfo;
 import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/features/rag/document_service.dart';
