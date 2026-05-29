@@ -781,8 +781,7 @@ abstract final class RunAnywhere {
 
   /// Canonical flat method — cancel any in-flight LLM generation.
   /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
-  static Future<void> cancelGeneration() async =>
-      RunAnywhereLLM.shared.cancelGeneration();
+  static void cancelGeneration() => RunAnywhereLLM.shared.cancelGeneration();
 
   /// True when an LLM model is currently loaded. Mirrors Swift's
   /// `isLLMModelLoaded: Bool` property.
