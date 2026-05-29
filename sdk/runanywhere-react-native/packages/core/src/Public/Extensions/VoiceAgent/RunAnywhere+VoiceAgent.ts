@@ -244,17 +244,21 @@ export async function cleanupVoiceAgent(): Promise<void> {
  * Stream voice agent events as an AsyncIterable<VoiceEvent>.
  *
  * This is the canonical cross-SDK public method for voice agent streaming.
- * Internally obtains the native voice-agent handle and wraps it with
- * `VoiceAgentStreamAdapter` so callers never need to reach into internals.
+ * The iterable is constructed synchronously; the native handle is obtained
+ * lazily on the first `next()` call, matching Swift's synchronous
+ * `AsyncStream` return and the existing RN `generateStream` pattern.
  *
  * Matches Swift: `RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>`.
  *
  * Usage:
- *   const stream = await RunAnywhere.streamVoiceAgent()
- *   for await (const evt of stream) { handleEvent(evt) }
+ *   for await (const evt of RunAnywhere.streamVoiceAgent()) { handleEvent(evt) }
  */
-export async function streamVoiceAgent(): Promise<AsyncIterable<VoiceEvent>> {
-  const handle = await getVoiceAgentHandle();
-  const adapter = new VoiceAgentStreamAdapter(handle);
-  return adapter.stream();
+export function streamVoiceAgent(): AsyncIterable<VoiceEvent> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      const handle = await getVoiceAgentHandle();
+      const adapter = new VoiceAgentStreamAdapter(handle);
+      yield* adapter.stream();
+    },
+  };
 }
