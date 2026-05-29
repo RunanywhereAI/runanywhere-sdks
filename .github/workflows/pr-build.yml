@@ -24,6 +24,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Minimal token surface — PR-triggered workflows run on untrusted fork code;
+# restricting to contents:read prevents token abuse via gh CLI calls.
+permissions:
+  contents: read
+
 jobs:
   # =============================================================================
   # Centralization gates — defend the T4 invariant that toolchain + library
@@ -123,6 +128,24 @@ jobs:
       # solution_runner_tests has two RAG-honest-failure subcases that
       # no longer hold (same as linux-debug + macos-debug above).
       - run: ctest --preset linux-asan -E "solution_runner_tests"
+
+  wasm:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+          /tmp/emsdk/emsdk install latest
+          /tmp/emsdk/emsdk activate latest
+      - name: Configure (WASM)
+        run: |
+          source /tmp/emsdk/emsdk_env.sh
+          cmake --preset wasm
+      - name: Build (WASM)
+        run: |
+          source /tmp/emsdk/emsdk_env.sh
+          cmake --build --preset wasm
 
   ios-device:
     runs-on: macos-15
