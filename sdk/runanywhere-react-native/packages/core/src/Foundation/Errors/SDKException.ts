@@ -85,11 +85,19 @@ export class SDKException extends Error {
       context?: ErrorContextProto;
     }
   ): SDKException {
+    // Round-trip C ABI code: positive proto code ↔ negative rac_result_t.
+    // Mirrors Swift SDKException.init: `if raw > 0 && raw <= 899 { proto.cAbiCode = -Int32(raw) }`.
+    const cAbiCode =
+      options?.cAbiCode !== undefined
+        ? options.cAbiCode
+        : code > 0 && code <= 899
+          ? -code
+          : undefined;
     const proto = SDKErrorProtoCtor.create({
       code,
       category: options?.category ?? categoryForCode(code),
       message,
-      cAbiCode: options?.cAbiCode,
+      cAbiCode,
       nestedMessage: options?.nestedMessage,
       context: options?.context,
     });
@@ -102,7 +110,10 @@ export class SDKException extends Error {
     const message = component
       ? `${component} not initialized`
       : 'SDK not initialized';
-    return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_INITIALIZED, message);
+    // Swift parity: notInitialized uses category .component, not .configuration.
+    return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_INITIALIZED, message, {
+      category: ErrorCategoryProto.ERROR_CATEGORY_COMPONENT,
+    });
   }
 
   /**
@@ -254,6 +265,16 @@ export class SDKException extends Error {
       ? `${feature} not implemented`
       : 'Not implemented';
     return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_IMPLEMENTED, message);
+  }
+
+  /**
+   * Common shortcut: cancelled operation. Not logged (cancellation is expected).
+   * Mirrors Swift `SDKException.cancelled` and Dart `SDKException.cancelled`.
+   */
+  static cancelled(message = 'Operation cancelled'): SDKException {
+    return SDKException.of(ErrorCodeProto.ERROR_CODE_CANCELLED, message, {
+      category: ErrorCategoryProto.ERROR_CATEGORY_INTERNAL,
+    });
   }
 
   static componentNotReady(component?: string): SDKException {
