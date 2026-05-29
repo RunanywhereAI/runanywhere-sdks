@@ -39,15 +39,16 @@ apply plugin: 'kotlin-android'
 
 android {
     namespace 'ai.runanywhere.sdk'
-    compileSdk 34
+    compileSdk 36
 
-    // Use NDK for native library support
-    // v3.1: NDK pin hoisted to root gradle.properties (racFlutterNdkVersion). Fallback keeps the previous value if root prop missing.
-    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.0.12077973"
+    // NDK pin: canonical version from sdk/runanywhere-commons/VERSIONS (NDK_VERSION=27.3.13750724).
+    // 27.3.13750724 is r27d (LTS); required for Android 15+ 16 KiB page-alignment.
+    // External apps may override via racFlutterNdkVersion in their root gradle.properties.
+    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.3.13750724"
 
     defaultConfig {
         minSdk 24
-        targetSdk 34
+        targetSdk 36
 
         // ABI filters for native libraries
         ndk {
