@@ -16,7 +16,10 @@
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import { WebModelLifecycle as ModelLifecycleCapability } from './RunAnywhere+ModelLifecycle';
-import { ModelRegistry as ModelRegistryCapability } from './RunAnywhere+ModelRegistry';
+import {
+  ModelRegistry as ModelRegistryCapability,
+} from './RunAnywhere+ModelRegistry';
+import type { RefreshOptions } from '../../Adapters/ModelRegistryAdapter';
 import {
   registerModelArchive as registerModelArchiveImpl,
   registerModelFromUrl,
@@ -97,6 +100,14 @@ export const flatFacade = {
     category: Parameters<typeof ModelRegistryCapability.defaultFramework>[0],
   ): ReturnType<typeof ModelRegistryCapability.defaultFramework> {
     return ModelRegistryCapability.defaultFramework(category);
+  },
+
+  /**
+   * Mirrors Swift `RunAnywhere.refreshModelRegistry(rescanLocal:includeRemoteCatalog:pruneOrphans:)`.
+   * Delegates to `modelRegistry.refresh(options)` on the Web flat facade.
+   */
+  refreshModelRegistry(options?: RefreshOptions): boolean {
+    return ModelRegistryCapability.refresh(options);
   },
 
   importModel(model: ModelInfo): boolean {
