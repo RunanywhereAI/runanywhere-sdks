@@ -12,6 +12,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 // KOT-15: `ModelSelectionContext` lived here as a UI filter helper but had
 // zero consumers inside the SDK. It was moved to the Android example app at
 // `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
@@ -80,57 +81,39 @@ val ModelFormat.catalogKey: String
             ModelFormat.MODEL_FORMAT_UNSPECIFIED -> "unspecified"
         }
 
+/**
+ * Canonical wire string for a framework (e.g. "LlamaCpp", "ONNX"). Routes
+ * through commons' `rac_framework_raw_value` so the Kotlin, Swift, and C++
+ * tables can never drift. Mirrors Swift's `RAInferenceFramework.rawValue`
+ * surface. Falls back to the proto enum name when the native lib is
+ * unavailable (e.g. non-inference unit-test contexts).
+ */
 val InferenceFramework.rawValue: String
-    get() =
-        when (this) {
-            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX"
-            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "LlamaCpp"
-            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "FoundationModels"
-            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "SystemTTS"
-            InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> "FluidAudio"
-            InferenceFramework.INFERENCE_FRAMEWORK_COREML -> "CoreML"
-            InferenceFramework.INFERENCE_FRAMEWORK_MLX -> "MLX"
-            InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML -> "WhisperKitCoreML"
-            InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> "MetalRT"
-            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "Genie"
-            InferenceFramework.INFERENCE_FRAMEWORK_TFLITE -> "TFLite"
-            InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH -> "ExecuTorch"
-            InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE -> "MediaPipe"
-            InferenceFramework.INFERENCE_FRAMEWORK_MLC -> "MLC"
-            InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM -> "PicoLLM"
-            InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS -> "PiperTTS"
-            InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT -> "WhisperKit"
-            InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER -> "OpenAIWhisper"
-            InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS -> "SwiftTransformers"
-            InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> "BuiltIn"
-            InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "None"
-            InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN -> "Unknown"
-            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "Sherpa"
-            InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> "Unspecified"
-        }
+    get() = RunAnywhereBridge.racFrameworkRawValue(value) ?: name
 
+/**
+ * Human-readable display name from commons'
+ * `rac_inference_framework_display_name` (e.g. "llama.cpp",
+ * "Foundation Models"). Mirrors Swift's `RAInferenceFramework.displayName`.
+ * Falls back to [rawValue] when the native lib is unavailable.
+ */
 val InferenceFramework.displayName: String
-    get() =
-        when (this) {
-            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX Runtime"
-            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "llama.cpp"
-            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Foundation Models"
-            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System TTS"
-            InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> "FluidAudio"
-            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "Qualcomm Genie"
-            InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> "Built-in"
-            InferenceFramework.INFERENCE_FRAMEWORK_NONE -> "None"
-            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> "Sherpa-ONNX"
-            InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED -> "Unspecified"
-            else -> rawValue
-        }
+    get() = RunAnywhereBridge.racInferenceFrameworkDisplayName(value) ?: rawValue
 
+/**
+ * Snake_case analytics key from commons'
+ * `rac_inference_framework_analytics_key` (e.g. "llama_cpp",
+ * "foundation_models"). Mirrors Swift's `RAInferenceFramework.analyticsKey`.
+ * Falls back to a local normalization of [rawValue] when the native lib is
+ * unavailable.
+ */
 val InferenceFramework.analyticsKey: String
     get() =
-        rawValue
-            .replace(Regex("([a-z])([A-Z])"), "$1_$2")
-            .replace('-', '_')
-            .lowercase()
+        RunAnywhereBridge.racInferenceFrameworkAnalyticsKey(value)
+            ?: rawValue
+                .replace(Regex("([a-z])([A-Z])"), "$1_$2")
+                .replace('-', '_')
+                .lowercase()
 
 val ArchiveType.fileExtension: String
     get() =
@@ -158,13 +141,13 @@ val ModelArtifactType.displayName: String
             ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED -> "Unspecified"
         }
 
+/**
+ * Detect the archive type for a URL/file-path. Routes through commons'
+ * `rac_archive_type_from_path` (the same detector Swift's `ArchiveType.from(url:)`
+ * wraps) so archive sniffing can never drift between SDKs. Returns null when
+ * the path is not a recognized archive.
+ */
 fun archiveTypeFromPath(path: String): ArchiveType? {
-    val lowercased = path.lowercase()
-    return when {
-        lowercased.endsWith(".tar.bz2") || lowercased.endsWith(".tbz2") -> ArchiveType.ARCHIVE_TYPE_TAR_BZ2
-        lowercased.endsWith(".tar.gz") || lowercased.endsWith(".tgz") -> ArchiveType.ARCHIVE_TYPE_TAR_GZ
-        lowercased.endsWith(".tar.xz") || lowercased.endsWith(".txz") -> ArchiveType.ARCHIVE_TYPE_TAR_XZ
-        lowercased.endsWith(".zip") -> ArchiveType.ARCHIVE_TYPE_ZIP
-        else -> null
-    }
+    val protoValue = RunAnywhereBridge.racArchiveTypeFromPath(path)
+    return if (protoValue < 0) null else ArchiveType.fromValue(protoValue)
 }

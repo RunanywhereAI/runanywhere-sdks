@@ -31,6 +31,31 @@ fun interface NativeProtoProgressListener {
 }
 
 /**
+ * Synchronous tool-execute callback invoked by
+ * [RunAnywhereBridge.racToolCallingRunLoopWithHandleAndCbProto] from the
+ * thread that called it. Receives a serialized `runanywhere.v1.ToolCall` and
+ * MUST return a serialized `runanywhere.v1.ToolResult`. Mirrors Swift's
+ * `toolExecuteTrampoline` — the C run loop blocks on this call until the
+ * result is returned.
+ */
+fun interface NativeToolExecuteListener {
+    fun executeToolCall(toolCallBytes: ByteArray): ByteArray
+}
+
+/**
+ * Synchronous handle-publication callback invoked by
+ * [RunAnywhereBridge.racToolCallingRunLoopWithHandleAndCbProto] the moment
+ * the cancellable run-loop handle is minted (before the first generate
+ * iteration). Lets the Kotlin caller route the handle into a thread-safe sink
+ * (e.g. `CompletableDeferred`) so a cancel coroutine can fan a cancel into
+ * [RunAnywhereBridge.racToolCallingRunLoopCancelProto]. Mirrors Swift's
+ * `HandleBox` publication and RN's `onHandle` JS callback.
+ */
+fun interface NativeRunLoopHandleListener {
+    fun onHandlePublished(runLoopHandle: Long)
+}
+
+/**
  * Response descriptor returned by [RunAnywhereBridge.racHttpRequestExecute].
  *
  * Fields are `@JvmField` so the JNI layer can construct this object via a

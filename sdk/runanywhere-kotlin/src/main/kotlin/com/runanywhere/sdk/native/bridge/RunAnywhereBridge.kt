@@ -170,6 +170,15 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
 
+    /**
+     * Per-handle cancel of an in-flight LLM generation. Mirrors Swift's
+     * `CppBridge.LLM.cancel()` which calls `rac_llm_component_cancel(handle)`
+     * — distinct from the lifecycle-aware [racLlmCancelProto] that drives the
+     * public `cancelGeneration()` path. Returns rac_result_t.
+     */
+    @JvmStatic
+    external fun racLlmComponentCancel(handle: Long): Int
+
     // ========================================================================
     // LLM GENERATED-PROTO ABI (rac_llm_service.h)
     // ========================================================================
@@ -1050,6 +1059,65 @@ object RunAnywhereBridge {
     external fun racToolCallingSessionCancelProto(sessionHandle: Long): Int
 
     // ========================================================================
+    // TOOL-CALLING RUN LOOP (rac_tool_calling.h — P2-T8)
+    // ========================================================================
+    //
+    // Single-call native orchestration. Mirrors Swift's
+    // RunAnywhere+ToolCalling.swift which drives
+    // rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
+    // `_and_cb_proto` variant so the just-minted run-loop handle is published
+    // synchronously into a Kotlin sink the moment it is minted, letting a
+    // cancel coroutine on a different thread fan a cancel into
+    // [racToolCallingRunLoopCancelProto].
+
+    /**
+     * Run the full generate → parse → validate → execute → loop cycle in
+     * commons. Accepts serialized `ToolCallingSessionCreateRequest` bytes.
+     * [executor] is invoked synchronously for each tool call (returns a
+     * serialized `ToolResult`); [onHandle] is fired the moment the
+     * cancellable handle is minted (may be null). Returns serialized
+     * `ToolCallingResult` bytes, or null on failure.
+     */
+    @JvmStatic
+    external fun racToolCallingRunLoopWithHandleAndCbProto(
+        requestBytes: ByteArray,
+        executor: NativeToolExecuteListener,
+        onHandle: NativeRunLoopHandleListener?,
+    ): ByteArray?
+
+    /**
+     * Cancel an in-flight run loop from any thread. Idempotent — a stale or
+     * zero handle is a no-op returning RAC_SUCCESS.
+     */
+    @JvmStatic
+    external fun racToolCallingRunLoopCancelProto(runLoopHandle: Long): Int
+
+    // ========================================================================
+    // TOOL VALUE JSON BRIDGE (rac_tool_calling.h — G3)
+    // ========================================================================
+    //
+    // Moves the recursive ToolValue <-> JSON walk into commons. Mirrors
+    // Swift's ToolCallingTypes.swift which loads the same two symbols.
+
+    /**
+     * Serialize a `runanywhere.v1.ToolValue` proto to its JSON string. Input
+     * is serialized ToolValue bytes; output is serialized `ToolValueJSON`
+     * bytes (whose `json` field holds the canonical JSON text), or null on
+     * failure. Forwards to `rac_tool_value_to_json_proto`.
+     */
+    @JvmStatic
+    external fun racToolValueToJsonProto(toolValueProto: ByteArray): ByteArray?
+
+    /**
+     * Parse a JSON string into a `runanywhere.v1.ToolValue` proto. Input is
+     * serialized `ToolValueJSON` bytes (whose `json` field carries the JSON
+     * text); output is serialized ToolValue bytes, or null on failure.
+     * Forwards to `rac_tool_value_from_json_proto`.
+     */
+    @JvmStatic
+    external fun racToolValueFromJsonProto(toolValueJsonProto: ByteArray): ByteArray?
+
+    // ========================================================================
     // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
     // ========================================================================
     //
@@ -1591,6 +1659,82 @@ object RunAnywhereBridge {
      * `ModelCategory.value`; returns a `ModelFileRole.value`.
      */
     @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
+
+    // ========================================================================
+    // INFERENCE FRAMEWORK display / analytics / raw tables (web-024)
+    // ========================================================================
+    //
+    // Replaces the hand-written rawValue/displayName/analyticsKey switch
+    // tables in ModelTypes.kt with the canonical commons tables Swift
+    // consumes. Each takes the proto InferenceFramework int (the generated
+    // enum's `value`); commons converts to its C enum internally via
+    // rac_inference_framework_from_proto.
+
+    /** Human-readable display name (e.g. "llama.cpp"). Null on failure. */
+    @JvmStatic external fun racInferenceFrameworkDisplayName(frameworkProto: Int): String?
+
+    /** Snake_case analytics key (e.g. "llama_cpp"). Null on failure. */
+    @JvmStatic external fun racInferenceFrameworkAnalyticsKey(frameworkProto: Int): String?
+
+    /** Canonical raw value string (e.g. "LlamaCpp", "ONNX"). Null on failure. */
+    @JvmStatic external fun racFrameworkRawValue(frameworkProto: Int): String?
+
+    // ========================================================================
+    // ARCHIVE TYPE helpers (kotlin-017)
+    // ========================================================================
+
+    /**
+     * Detect the archive type from a URL/file-path. Returns the proto
+     * `ArchiveType` int (>= 0), or -1 when no archive is detected. Forwards to
+     * `rac_archive_type_from_path`.
+     */
+    @JvmStatic external fun racArchiveTypeFromPath(path: String): Int
+
+    /**
+     * File extension for an archive type (e.g. "zip", "tar.bz2"). Input is the
+     * proto `ArchiveType` int. Null on failure. Forwards to
+     * `rac_archive_type_extension`.
+     */
+    @JvmStatic external fun racArchiveTypeExtension(archiveProto: Int): String?
+
+    /**
+     * Resolve the canonical [ai.runanywhere.proto.v1.ExpectedModelFiles]
+     * manifest for a serialized `ModelInfo`. Mirrors Swift's
+     * `expectedArtifactFiles`. Returns serialized ExpectedModelFiles bytes, or
+     * null on failure. Forwards to `rac_artifact_expected_files_proto` (P2-T7).
+     */
+    @JvmStatic external fun racArtifactExpectedFilesProto(modelInfoProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // TWO-PHASE SDK INIT (rac_sdk_init.h — P2-T9)
+    // ========================================================================
+    //
+    // Mirrors Swift's CppBridge.SdkInit. phase1/phase2 take a serialized
+    // request and return a serialized SdkInitResult; retryHttp takes no input.
+
+    /**
+     * Drive Phase 1 (synchronous core init: validation + secure-storage
+     * persist + rac_state_initialize) from serialized
+     * `SdkInitPhase1Request` bytes. Returns serialized `SdkInitResult` bytes,
+     * or null on failure. Forwards to `rac_sdk_init_phase1_proto`.
+     */
+    @JvmStatic external fun racSdkInitPhase1Proto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Drive Phase 2 (services init step list owned by commons) from
+     * serialized `SdkInitPhase2Request` bytes. Returns serialized
+     * `SdkInitResult` bytes, or null on failure. Forwards to
+     * `rac_sdk_init_phase2_proto`.
+     */
+    @JvmStatic external fun racSdkInitPhase2Proto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Re-attempt the HTTP/auth setup from Phase 2 after an offline init.
+     * Idempotent fast-path when already authenticated. Returns serialized
+     * `SdkInitResult` bytes, or null on failure. Forwards to
+     * `rac_sdk_retry_http_proto`.
+     */
+    @JvmStatic external fun racSdkRetryHttpProto(): ByteArray?
 
     // ========================================================================
     // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE (Group G)

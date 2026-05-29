@@ -74,13 +74,13 @@ fun RunAnywhere.generateStream(
             }
         awaitClose {
             driver.cancel()
-            runBlocking { CppBridgeLLM.cancel() }
+            runBlocking { CppBridgeLLM.cancelProto() }
         }
     }.flowOn(Dispatchers.IO)
 }
 
 fun RunAnywhere.cancelGeneration() {
-    runBlocking { CppBridgeLLM.cancel() }
+    runBlocking { CppBridgeLLM.cancelProto() }
 }
 
 // MARK: - Stream Aggregation

@@ -104,6 +104,7 @@
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -5135,6 +5136,165 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCa
 }
 
 // =============================================================================
+// Tool-calling run loop (P2-T8) — single-call native orchestration.
+// =============================================================================
+//
+// Mirrors Swift's RunAnywhere+ToolCalling.swift, which drives
+// rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
+// `_and_cb_proto` variant so the just-minted run-loop handle is published
+// SYNCHRONOUSLY into a Kotlin sink (CompletableDeferred) the moment it is
+// minted — letting a cancel coroutine on a different thread fan a cancel into
+// rac_tool_calling_run_loop_cancel_proto. Both the executor and the
+// handle-publication callbacks fire on the SAME thread that invoked the
+// run-loop (commons runs the loop inline), so capturing the calling JNIEnv in
+// the context struct is safe.
+namespace {
+struct RunLoopExecuteCtx {
+    JNIEnv* env;
+    jobject executor;         // fun interface: executeToolCall([B) -> [B]
+    jobject on_handle;        // fun interface: onHandlePublished(J), may be null
+    const char* operation;
+};
+
+rac_result_t run_loop_execute_trampoline(const uint8_t* in_tool_call_bytes, size_t in_size,
+                                         rac_proto_buffer_t* out_tool_result_bytes,
+                                         void* user_data) {
+    if (out_tool_result_bytes == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_tool_result_bytes);
+    auto* ctx = static_cast<RunLoopExecuteCtx*>(user_data);
+    if (ctx == nullptr || ctx->env == nullptr || ctx->executor == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    JNIEnv* env = ctx->env;
+
+    if (in_size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    jbyteArray inBytes = env->NewByteArray(static_cast<jsize>(in_size));
+    if (inBytes == nullptr) {
+        env->ExceptionClear();
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    if (in_size > 0 && in_tool_call_bytes != nullptr) {
+        env->SetByteArrayRegion(inBytes, 0, static_cast<jsize>(in_size),
+                                reinterpret_cast<const jbyte*>(in_tool_call_bytes));
+    }
+
+    jclass cls = env->GetObjectClass(ctx->executor);
+    jmethodID method = env->GetMethodID(cls, "executeToolCall", "([B)[B");
+    env->DeleteLocalRef(cls);
+    if (method == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(inBytes);
+        return RAC_ERROR_INTERNAL;
+    }
+    auto resultBytes =
+        static_cast<jbyteArray>(env->CallObjectMethod(ctx->executor, method, inBytes));
+    env->DeleteLocalRef(inBytes);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        if (resultBytes != nullptr) {
+            env->DeleteLocalRef(resultBytes);
+        }
+        return RAC_ERROR_INTERNAL;
+    }
+    if (resultBytes == nullptr) {
+        return RAC_ERROR_INTERNAL;
+    }
+
+    const jsize resultLen = env->GetArrayLength(resultBytes);
+    jbyte* bytes = resultLen > 0 ? env->GetByteArrayElements(resultBytes, nullptr) : nullptr;
+    rac_result_t rc = rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes),
+                                            static_cast<size_t>(resultLen), out_tool_result_bytes);
+    if (bytes != nullptr) {
+        env->ReleaseByteArrayElements(resultBytes, bytes, JNI_ABORT);
+    }
+    env->DeleteLocalRef(resultBytes);
+    return rc;
+}
+
+void run_loop_handle_published_trampoline(uint64_t run_loop_handle, void* user_data) {
+    auto* ctx = static_cast<RunLoopExecuteCtx*>(user_data);
+    if (ctx == nullptr || ctx->env == nullptr || ctx->on_handle == nullptr) {
+        return;
+    }
+    JNIEnv* env = ctx->env;
+    jclass cls = env->GetObjectClass(ctx->on_handle);
+    jmethodID method = env->GetMethodID(cls, "onHandlePublished", "(J)V");
+    env->DeleteLocalRef(cls);
+    if (method == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    env->CallVoidMethod(ctx->on_handle, method, static_cast<jlong>(run_loop_handle));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+}
+}  // namespace
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopWithHandleAndCbProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes, jobject executor, jobject onHandle) {
+    (void)clazz;
+    static const char* operation = "racToolCallingRunLoopWithHandleAndCbProto";
+    JByteArrayView request(env, requestBytes);
+    if (!request.ok || executor == nullptr) {
+        return makeProtoCallResult(env, RAC_ERROR_NULL_POINTER, nullptr, operation);
+    }
+    RAC_JNI_TRY {
+        RunLoopExecuteCtx ctx{.env = env,
+                              .executor = executor,
+                              .on_handle = onHandle,
+                              .operation = operation};
+        uint64_t handle = 0;
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        rac_result_t rc = rac_tool_calling_run_loop_with_handle_and_cb_proto(
+            request.u8(), request.size(), run_loop_execute_trampoline, &ctx,
+            onHandle != nullptr ? run_loop_handle_published_trampoline : nullptr, &ctx, &handle,
+            &result);
+        return makeProtoCallResult(env, rc, &result, operation);
+    }
+    RAC_JNI_CATCH_PTR()
+}
+
+// pass2-syn-007: cancel the in-flight run loop from any thread. Idempotent —
+// a stale/zero handle is a no-op returning RAC_SUCCESS.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopCancelProto(
+    JNIEnv* env, jclass clazz, jlong runLoopHandle) {
+    (void)env;
+    (void)clazz;
+    if (runLoopHandle == 0L)
+        return RAC_SUCCESS;
+    return static_cast<jint>(
+        rac_tool_calling_run_loop_cancel_proto(static_cast<uint64_t>(runLoopHandle)));
+}
+
+// =============================================================================
+// Tool-value JSON bridge (G3) — rac_tool_value_{to,from}_json_proto.
+// Replaces the per-SDK recursive ToolValue<->JSON walk. Mirrors Swift's
+// ToolCallingTypes.swift which loads the same two symbols.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueToJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray toolValueProto) {
+    return callProtoBufferFn(env, toolValueProto, rac_tool_value_to_json_proto,
+                             "racToolValueToJsonProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueFromJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray toolValueJsonProto) {
+    return callProtoBufferFn(env, toolValueJsonProto, rac_tool_value_from_json_proto,
+                             "racToolValueFromJsonProto");
+}
+
+// =============================================================================
 // JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
 // =============================================================================
 //
@@ -6562,6 +6722,139 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetBy
     rac_model_info_array_free(models, count);
     jbyteArray empty = env->NewByteArray(0);
     return empty;
+}
+
+// =============================================================================
+// INFERENCE FRAMEWORK display / analytics / raw tables (web-024).
+// Replaces the hand-written 22-entry switch tables in Kotlin ModelTypes.kt
+// with the canonical commons tables Swift consumes via cWireString. Each
+// thunk takes the proto InferenceFramework int, converts to the C enum via
+// rac_inference_framework_from_proto, then reads the static literal.
+// =============================================================================
+
+namespace {
+rac_inference_framework_t frameworkFromProtoInt(int32_t protoValue) {
+    rac_inference_framework_t out = RAC_FRAMEWORK_UNKNOWN;
+    rac_inference_framework_from_proto(protoValue, &out);
+    return out;
+}
+}  // namespace
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferenceFrameworkDisplayName(
+    JNIEnv* env, jclass clazz, jint frameworkProto) {
+    (void)clazz;
+    const char* out = nullptr;
+    if (rac_inference_framework_display_name(frameworkFromProtoInt(frameworkProto), &out) !=
+            RAC_SUCCESS ||
+        out == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferenceFrameworkAnalyticsKey(
+    JNIEnv* env, jclass clazz, jint frameworkProto) {
+    (void)clazz;
+    const char* out = nullptr;
+    if (rac_inference_framework_analytics_key(frameworkFromProtoInt(frameworkProto), &out) !=
+            RAC_SUCCESS ||
+        out == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFrameworkRawValue(JNIEnv* env,
+                                                                             jclass clazz,
+                                                                             jint frameworkProto) {
+    (void)clazz;
+    const char* out = rac_framework_raw_value(frameworkFromProtoInt(frameworkProto));
+    return out != nullptr ? env->NewStringUTF(out) : nullptr;
+}
+
+// =============================================================================
+// ARCHIVE TYPE helpers (kotlin-017) — rac_archive_type_from_path /
+// rac_archive_type_extension. Detection returns the proto ArchiveType int
+// (>=0), or -1 when no archive is detected so the Kotlin caller maps to null.
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromPath(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jstring path) {
+    (void)clazz;
+    if (path == nullptr) {
+        return -1;
+    }
+    std::string storage;
+    const char* cPath = getNullableCString(env, path, storage);
+    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
+    if (rac_archive_type_from_path(cPath, &type) != RAC_TRUE) {
+        return -1;
+    }
+    int32_t protoValue = 0;
+    if (rac_archive_type_to_proto(type, &protoValue) != RAC_SUCCESS) {
+        return -1;
+    }
+    return static_cast<jint>(protoValue);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeExtension(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jint archiveProto) {
+    (void)clazz;
+    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
+    if (rac_archive_type_from_proto(static_cast<int32_t>(archiveProto), &type) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    const char* out = rac_archive_type_extension(type);
+    return out != nullptr ? env->NewStringUTF(out) : nullptr;
+}
+
+// =============================================================================
+// ARTIFACT expected-files (kotlin-017) — rac_artifact_expected_files_proto
+// (P2-T7). Resolves the canonical ExpectedModelFiles manifest from a
+// serialized ModelInfo, mirroring Swift's expectedArtifactFiles.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFilesProto(
+    JNIEnv* env, jclass clazz, jbyteArray modelInfoProto) {
+    return callProtoBufferFn(env, modelInfoProto, rac_artifact_expected_files_proto,
+                             "racArtifactExpectedFilesProto");
+}
+
+// =============================================================================
+// TWO-PHASE SDK INIT (kotlin-003-B / P2-T9) — rac_sdk_init_phase1_proto /
+// rac_sdk_init_phase2_proto / rac_sdk_retry_http_proto. Mirrors Swift's
+// CppBridge.SdkInit. phase1/phase2 take a serialized request and return a
+// serialized SdkInitResult; retryHTTP takes no input.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInitPhase1Proto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_sdk_init_phase1_proto, "racSdkInitPhase1Proto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInitPhase2Proto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_sdk_init_phase2_proto, "racSdkInitPhase2Proto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkRetryHttpProto(JNIEnv* env,
+                                                                             jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_sdk_retry_http_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racSdkRetryHttpProto");
 }
 
 }  // extern "C"

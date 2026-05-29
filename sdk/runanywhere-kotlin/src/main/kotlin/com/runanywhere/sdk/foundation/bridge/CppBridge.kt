@@ -18,6 +18,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
@@ -31,7 +32,6 @@ import com.runanywhere.sdk.infrastructure.logging.SentryDestination
 import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
-import com.runanywhere.sdk.public.configuration.cEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -292,49 +292,42 @@ object CppBridge {
     }
 
     /**
-     * Initialize SDK configuration with version, platform, and auth info.
+     * Initialize SDK configuration (Phase 1 core init) through the canonical
+     * commons C ABI `rac_sdk_init_phase1_proto`.
      *
-     * This sets up the C++ rac_sdk_config which is used by device registration
-     * to include the correct sdk_version (instead of "unknown").
+     * Drives validation (`rac_validate_api_key` / `rac_validate_base_url`),
+     * persists the api_key/base_url through secure storage, and runs
+     * `rac_state_initialize` — replacing the legacy `racSdkInit` struct ABI.
+     * The validation contract now runs on Android exactly like iOS, so a
+     * malformed apiKey/baseURL is rejected (throws [SDKException]) instead of
+     * silently booting.
      *
-     * Mirrors Swift SDK's rac_sdk_init() call in CppBridge+State.swift
+     * Mirrors Swift's `CppBridge.SdkInit.phase1(...)` call in RunAnywhere.swift.
      *
      * @param environment SDK environment
      * @param apiKey API key for authentication (required for production/staging)
      * @param baseURL Backend API base URL (required for production/staging)
      */
     private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
-        try {
-            val deviceId = CppBridgeDevice.getDeviceIdCallback()
-            val platform = SDKConstants.SDK_PLATFORM
-            val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION
-
-            logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=$environment")
-            if (!apiKey.isNullOrEmpty()) {
-                logger.info("API key provided: ${apiKey.take(10)}...")
-            }
-            if (!baseURL.isNullOrEmpty()) {
-                logger.info("Base URL: $baseURL")
-            }
-
-            val result =
-                RunAnywhereBridge.racSdkInit(
-                    environment = environment.cEnvironment,
-                    deviceId = deviceId.ifEmpty { null },
-                    platform = platform,
-                    sdkVersion = sdkVersion,
-                    apiKey = apiKey,
-                    baseUrl = baseURL,
-                )
-
-            if (result == 0) {
-                logger.info("✅ SDK config initialized with version: $sdkVersion")
-            } else {
-                logger.warn("SDK config init returned: $result")
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to initialize SDK config: ${e.message}")
+        val deviceId = CppBridgeDevice.getDeviceIdCallback()
+        logger.info("Initializing SDK config (phase 1): env=$environment")
+        if (!apiKey.isNullOrEmpty()) {
+            logger.info("API key provided: ${apiKey.take(10)}...")
         }
+        if (!baseURL.isNullOrEmpty()) {
+            logger.info("Base URL: $baseURL")
+        }
+
+        val result =
+            CppBridgeSdkInit.phase1(
+                environment = environment,
+                apiKey = apiKey.orEmpty(),
+                baseURL = baseURL.orEmpty(),
+                deviceId = deviceId,
+            )
+        logger.info(
+            "✅ SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
+        )
     }
 
     /**

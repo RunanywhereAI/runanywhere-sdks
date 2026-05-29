@@ -56,15 +56,6 @@ val ExpectedModelFiles.isEmptyManifest: Boolean
             optional_patterns.isEmpty() &&
             description.isNullOrEmpty()
 
-private fun ExpectedModelFiles.Companion.fromPatterns(
-    required: List<String>,
-    optional: List<String>,
-): ExpectedModelFiles =
-    ExpectedModelFiles(
-        required_patterns = required,
-        optional_patterns = optional,
-    )
-
 // MARK: - ModelFileDescriptor
 
 /**
@@ -249,35 +240,20 @@ val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
 
 /**
  * Resolve the [ExpectedModelFiles] manifest the SDK should hand to the
- * downloader, falling back to the artifact's pattern lists when no
- * explicit manifest is set. Mirrors Swift's `expectedArtifactFiles`.
+ * downloader. Mirrors Swift's `expectedArtifactFiles`: a top-level manifest
+ * short-circuits; otherwise the canonical fall-through (artifact-attached
+ * manifest → pattern shorthand → multi-file descriptor seed) is computed by
+ * commons via `rac_artifact_expected_files_proto` (P2-T7) so the Kotlin,
+ * Swift, and download-planner views can never drift.
  */
 val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles
     get() {
         expected_files?.let { if (!it.isEmptyManifest) return it }
-        single_file?.let { artifact ->
-            artifact.expected_files?.let { return it }
-            return ExpectedModelFiles.fromPatterns(
-                required = artifact.required_patterns,
-                optional = artifact.optional_patterns,
-            )
-        }
-        archive?.let { artifact ->
-            artifact.expected_files?.let { return it }
-            return ExpectedModelFiles.fromPatterns(
-                required = artifact.required_patterns,
-                optional = artifact.optional_patterns,
-            )
-        }
-        multi_file?.let { artifact ->
-            // Commons download planner only walks
-            // `model.expected_files.files` for multi-file/per-descriptor
-            // downloads. Seed it from the multi-file artifact so the
-            // per-file loop runs and every URL actually downloads.
-            if (artifact.files.isEmpty()) return ExpectedModelFiles.none
-            return ExpectedModelFiles(files = artifact.files)
-        }
-        return ExpectedModelFiles.none
+        val decoded =
+            RunAnywhereBridge
+                .racArtifactExpectedFilesProto(ModelInfo.ADAPTER.encode(this))
+                ?.let { ExpectedModelFiles.ADAPTER.decode(it) }
+        return decoded ?: ExpectedModelFiles.none
     }
 
 /**
