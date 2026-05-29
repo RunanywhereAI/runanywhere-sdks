@@ -8,14 +8,20 @@
 // `DartBridgeStructuredOutput`.
 
 import 'dart:async';
+import 'dart:ffi' as ffi;
 
+import 'package:ffi/ffi.dart' show calloc;
 import 'package:fixnum/fixnum.dart' show Int64;
+import 'package:runanywhere/core/native/rac_native.dart'
+    show RacNative, RacProtoBuffer;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
 import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart'
+    show DartBridgeProtoUtils;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 
@@ -281,5 +287,34 @@ extension StructuredOutputOptionsDefaults on StructuredOutputOptions {
 
 extension JSONSchemaStringHelpers on JSONSchema {
   /// JSON Schema text consumed by the structured-output C ABI.
-  String get jsonSchemaString => rawJson.isNotEmpty ? rawJson : '{}';
+  ///
+  /// Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15) so
+  /// every SDK shares the same byte-exact, key-sorted, compact serializer —
+  /// mirroring Swift `RAJSONSchema.jsonSchemaString`. Falls back to the
+  /// `raw_json` field (or `'{}'`) when the commons binary predates P2-T15.
+  String get jsonSchemaString {
+    final fn = RacNative.bindings.rac_structured_output_schema_to_json_proto;
+    if (fn == null) {
+      return rawJson.isNotEmpty ? rawJson : '{}';
+    }
+    final bytes = writeToBuffer();
+    if (bytes.isEmpty) return '{}';
+    final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+    final out = calloc<RacProtoBuffer>();
+    try {
+      RacNative.bindings.rac_proto_buffer_init(out);
+      final code = fn(requestPtr, bytes.length, out);
+      if (code != 0 || out.ref.status != 0) {
+        return rawJson.isNotEmpty ? rawJson : '{}';
+      }
+      if (out.ref.data == ffi.nullptr || out.ref.size == 0) {
+        return rawJson.isNotEmpty ? rawJson : '{}';
+      }
+      return String.fromCharCodes(out.ref.data.asTypedList(out.ref.size));
+    } finally {
+      RacNative.bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
+    }
+  }
 }

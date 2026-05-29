@@ -1837,6 +1837,13 @@ class RacBindings {
             'rac_structured_output_prepare_prompt_proto',
           ),
         ),
+        rac_structured_output_schema_to_json_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_structured_output_schema_to_json_proto',
+          ),
+        ),
         rac_audio_compute_level_db =
             _lookupOptional<RacAudioComputeLevelDbDart>(
           () => lib.lookupFunction<RacAudioComputeLevelDbNative,
@@ -2199,6 +2206,15 @@ class RacBindings {
   /// Null when the commons binary predates the proto-byte API.
   final RacLifecycleRequestProtoDart?
       rac_structured_output_prepare_prompt_proto;
+
+  /// `rac_structured_output_schema_to_json_proto` — serializes a
+  /// `JSONSchema` proto to canonical compact, key-sorted JSON Schema text.
+  /// Mirrors Swift `RAJSONSchema.jsonSchemaString` (P2-T15). Output bytes
+  /// are raw UTF-8 text, NOT a proto message; callers extract the string
+  /// directly from the `rac_proto_buffer_t` data field. Null when the
+  /// commons binary predates the P2-T15 export.
+  final RacLifecycleRequestProtoDart?
+      rac_structured_output_schema_to_json_proto;
 
   // Audio utils (Phase G — rac_audio_utils.h) -------------------------------
 
