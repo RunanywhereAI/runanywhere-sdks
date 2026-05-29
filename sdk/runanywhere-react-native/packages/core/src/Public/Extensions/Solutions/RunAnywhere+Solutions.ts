@@ -107,30 +107,38 @@ export class SolutionHandle {
   }
 }
 
-/** Arguments to [solutions.run]. Exactly one of the three must be set. */
-export interface SolutionRunArgs {
-  /** Typed `SolutionConfig` proto — encoded by the SDK before dispatch. */
-  config?: SolutionConfig;
-  /** Raw SolutionConfig / PipelineSpec proto bytes. */
-  configBytes?: Uint8Array;
-  /** YAML sugar (SolutionConfig-shape or PipelineSpec-shape). */
-  yaml?: string;
-}
+/**
+ * Discriminated-union argument for [solutions.run].
+ *
+ * Exactly one input kind is accepted at compile time — the TypeScript
+ * compiler rejects call sites that supply more than one of {config,
+ * configBytes, yaml}, mirroring the three overloads on Swift/Kotlin.
+ */
+export type SolutionRunArgs =
+  | {
+      /** Typed `SolutionConfig` proto — encoded by the SDK before dispatch. */
+      config: SolutionConfig;
+      configBytes?: never;
+      yaml?: never;
+    }
+  | {
+      config?: never;
+      /** Raw SolutionConfig / PipelineSpec proto bytes. */
+      configBytes: Uint8Array;
+      yaml?: never;
+    }
+  | {
+      config?: never;
+      configBytes?: never;
+      /** YAML sugar (SolutionConfig-shape or PipelineSpec-shape). */
+      yaml: string;
+    };
 
 /**
  * Construct and return a (created, not yet started) solution. Callers
  * own the returned [SolutionHandle] — invoke `.destroy()` when finished.
  */
 async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
-  const supplied = [args.config, args.configBytes, args.yaml].filter(
-    (v) => v !== undefined
-  ).length;
-  if (supplied !== 1) {
-    throw SDKException.invalidInput(
-      `RunAnywhere.solutions.run requires exactly one of config / configBytes / yaml (got ${supplied})`
-    );
-  }
-
   const native = ensureNative();
 
   if (args.yaml !== undefined) {
