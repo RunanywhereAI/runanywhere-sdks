@@ -216,6 +216,14 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
             setState(() {
               _sessionState = UiVoiceSessionState.speaking;
+              // Flush accumulated assistant tokens as a completed turn.
+              if (_assistantResponse.isNotEmpty) {
+                _conversation.add(_ConversationTurn(
+                  role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+                  text: _assistantResponse,
+                ));
+                _assistantResponse = '';
+              }
             });
             break;
           case sdk.PipelineState.PIPELINE_STATE_STOPPED:
@@ -278,16 +286,15 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.userSaid:
         final text = event.userSaid.text;
         setState(() {
-          _currentTranscript = text;
           if (text.isNotEmpty) {
-            // Turn-completion aggregation: when the user said transcript
-            // arrives, append the user turn. The assistant turn is
-            // appended when thinking→speaking transition fires.
             _conversation.add(_ConversationTurn(
               role: proto.MessageRole.MESSAGE_ROLE_USER,
               text: text,
             ));
           }
+          // Clear in-progress transcript so the committed bubble above
+          // is not double-rendered.
+          _currentTranscript = '';
         });
         break;
 
