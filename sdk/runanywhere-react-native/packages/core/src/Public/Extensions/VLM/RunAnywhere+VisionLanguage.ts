@@ -44,15 +44,12 @@ function ensureNative() {
 }
 
 function buildVLMOptions(
-  prompt: string,
   options: Partial<VLMGenerationOptions> | undefined,
   streamingEnabled: boolean
 ): VLMGenerationOptions {
-  const requestedPrompt =
-    options?.prompt && options.prompt.length > 0 ? options.prompt : prompt;
   return VLMGenerationOptionsMessage.fromPartial({
     ...options,
-    prompt: requestedPrompt,
+    prompt: options?.prompt ?? '',
     maxTokens: options?.maxTokens ?? 2048,
     temperature: options?.temperature ?? 0.7,
     topP: options?.topP ?? 0.9,
@@ -80,14 +77,13 @@ function nextVLMRequestId(): string {
 
 function encodeVLMRequest(
   image: VLMImage,
-  prompt: string,
   options: Partial<VLMGenerationOptions> | undefined,
   streamingEnabled: boolean
 ): ArrayBuffer {
   const request = VLMGenerationRequest.fromPartial({
     requestId: nextVLMRequestId(),
     images: [VLMImageMessage.fromPartial(image)],
-    options: buildVLMOptions(prompt, options, streamingEnabled),
+    options: buildVLMOptions(options, streamingEnabled),
     metadata: {},
   });
   return encodeProtoMessage(request, VLMGenerationRequest);
@@ -104,16 +100,24 @@ function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {
 /**
  * Process an image with full options and metrics.
  *
- * Matches iOS: `RunAnywhere.processImage(_:prompt:maxTokens:temperature:topP:)`.
+ * Canonical form matches iOS: `RunAnywhere.processImage(_:options:)` where
+ * `options.prompt` carries the prompt text.
+ *
+ * Ergonomic overload: `processImage(image, prompt, options?)` — prompt is
+ * merged into options.prompt so existing call sites continue to compile.
  */
 export async function processImage(
   image: VLMImage,
-  prompt: string,
-  options?: Partial<VLMGenerationOptions>
+  optionsOrPrompt: Partial<VLMGenerationOptions> | string,
+  legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<VLMResult> {
   const native = ensureNative();
+  const resolvedOptions: Partial<VLMGenerationOptions> =
+    typeof optionsOrPrompt === 'string'
+      ? { ...legacyOptions, prompt: optionsOrPrompt }
+      : optionsOrPrompt;
   const resultBytes = await native.vlmProcessProto(
-    encodeVLMRequest(image, prompt, options, false)
+    encodeVLMRequest(image, resolvedOptions, false)
   );
   return decodeVLMResult(resultBytes, 'vlmProcessProto');
 }
@@ -121,17 +125,24 @@ export async function processImage(
 /**
  * Stream image processing with canonical proto stream events.
  *
- * Matches Swift: `RunAnywhere.processImageStream(...) async throws
- * -> AsyncStream<RASDKEvent>`; RN exposes the native VLM stream event proto as
- * AsyncIterable.
+ * Canonical form matches iOS: `RunAnywhere.processImageStream(_:options:)` where
+ * `options.prompt` carries the prompt text. RN exposes the native VLM stream
+ * event proto as AsyncIterable.
+ *
+ * Ergonomic overload: `processImageStream(image, prompt, options?)` — prompt is
+ * merged into options.prompt so existing call sites continue to compile.
  */
 export async function processImageStream(
   image: VLMImage,
-  prompt: string,
-  options?: Partial<VLMGenerationOptions>
+  optionsOrPrompt: Partial<VLMGenerationOptions> | string,
+  legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<AsyncIterable<VLMStreamEvent>> {
   const native = ensureNative();
-  const requestBytes = encodeVLMRequest(image, prompt, options, true);
+  const resolvedOptions: Partial<VLMGenerationOptions> =
+    typeof optionsOrPrompt === 'string'
+      ? { ...legacyOptions, prompt: optionsOrPrompt }
+      : optionsOrPrompt;
+  const requestBytes = encodeVLMRequest(image, resolvedOptions, true);
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {
