@@ -581,12 +581,14 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
 
         auto destroyFn = proto_compat::symbol<proto_compat::RAGSessionDestroyProtoFn>(
             "rac_rag_session_destroy_proto");
-        {
-            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
-            if (g_ragProtoSession && destroyFn) {
-                destroyFn(g_ragProtoSession);
-                g_ragProtoSession = nullptr;
-            }
+
+        // Hold the mutex across destroy + create + install so concurrent
+        // callers cannot interleave and leak a session (Kotlin CppBridgeRAG
+        // serializes the same sequence with @Synchronized).
+        std::lock_guard<std::mutex> lock(g_ragProtoMutex);
+        if (g_ragProtoSession && destroyFn) {
+            destroyFn(g_ragProtoSession);
+            g_ragProtoSession = nullptr;
         }
 
         rac_handle_t session = nullptr;
@@ -596,10 +598,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
             LOGE("ragCreatePipelineProto: rc=%d", rc);
             return false;
         }
-        {
-            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
-            g_ragProtoSession = session;
-        }
+        g_ragProtoSession = session;
         return true;
     });
 }
