@@ -279,8 +279,7 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 
   cleanupVoiceAgent(): void {
-    // The current C ABI exposes callback detachment through the stream adapter
-    // but no voice-agent-handle destroy function at this facade layer.
+    this.adapter.destroy(this.handle);
   }
 
   getVoiceAgentStream(): VoiceAgentStreamSource {

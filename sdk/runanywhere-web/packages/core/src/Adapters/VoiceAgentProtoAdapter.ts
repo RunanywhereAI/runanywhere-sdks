@@ -97,6 +97,10 @@ export class VoiceAgentProtoAdapter {
     ));
   }
 
+  destroy(handle: number): void {
+    this.module._rac_voice_agent_component_destroy_proto?.(handle);
+  }
+
   private bridge(): ProtoWasmBridge {
     return new ProtoWasmBridge(this.module, logger);
   }

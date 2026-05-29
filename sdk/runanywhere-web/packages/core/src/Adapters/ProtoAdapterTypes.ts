@@ -120,6 +120,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_voice_agent_component_destroy_proto?(handle: number): number;
 
   _rac_vlm_process_proto?(
     handle: number,
