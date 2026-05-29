@@ -143,9 +143,6 @@ target_link_libraries(
     rac_backend_llamacpp
 )
 
-# HAS_LLAMACPP and HAS_RACOMMONS are always defined since backends are required
-target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1 HAS_RACOMMONS=1)
-
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE
     -Wl,-z,max-page-size=16384
