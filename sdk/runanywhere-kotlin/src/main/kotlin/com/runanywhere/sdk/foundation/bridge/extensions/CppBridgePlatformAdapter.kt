@@ -12,8 +12,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import okio.ByteString.Companion.decodeBase64
-import okio.ByteString.Companion.toByteString
 import java.io.File
 
 /**
@@ -97,65 +95,20 @@ object CppBridgePlatformAdapter {
     private const val TAG = "CppBridge"
 
     /**
-     * FQCN of the JVM-only AES-GCM secure storage fallback. Loaded reflectively
-     * so the shared jvmAndroidMain source set does not accumulate a hard
-     * reference to a jvmMain-only class.
-     */
-    private const val JVM_SECURE_STORAGE_CLASS =
-        "com.runanywhere.sdk.foundation.security.JvmKeychainManager"
-
-    /**
-     * Android runtime marker class; used to detect whether the SDK is running
-     * on Android and should skip the JVM-file-based secure storage fallback.
-     */
-    private const val ANDROID_BUILD_CLASS = "android.os.Build"
-
-    /**
-     * Fetch the configured [PlatformSecureStorage], auto-installing the JVM
-     * file-based AES-GCM implementation if nothing is configured AND we're
-     * running on a non-Android JVM. Android consumers MUST call
-     * [setContext] (or [setPlatformStorage] directly) explicitly — there is no
-     * sane auto-fallback on Android since we need a real [android.content.Context].
+     * Fetch the configured [PlatformSecureStorage].
+     *
+     * Android consumers MUST call [setContext] (or [setPlatformStorage] directly)
+     * before any secure-storage callback is invoked. This SDK is Android-only;
+     * there is no automatic fallback.
      */
     private fun requirePlatformStorage(): PlatformSecureStorage {
         platformStorage?.let { return it }
         synchronized(lock) {
             platformStorage?.let { return it }
-            val fallback = tryInstallJvmFallback()
-            if (fallback != null) {
-                platformStorage = fallback
-                return fallback
-            }
         }
         throw IllegalStateException(
             "Platform secure storage not configured — call RunAnywhere.setPlatformStorage() before use",
         )
-    }
-
-    /**
-     * Attempt to load the JVM AES-GCM secure storage via reflection. Returns
-     * null if we're on Android or the JVM-only class is not present on the
-     * classpath. Keeps the jvmAndroidMain source set free of direct jvmMain
-     * class references (those classes only exist in the JVM jar, not the AAR).
-     */
-    private fun tryInstallJvmFallback(): PlatformSecureStorage? {
-        return try {
-            // Short-circuit when we're clearly running on Android: the Build class
-            // is always present in the Android runtime.
-            try {
-                Class.forName(ANDROID_BUILD_CLASS)
-                return null
-            } catch (_: ClassNotFoundException) {
-                // Not Android — proceed to load the JVM implementation.
-            }
-            val cls = Class.forName(JVM_SECURE_STORAGE_CLASS)
-            val ctor = cls.getDeclaredConstructor()
-            val instance = ctor.newInstance()
-            instance as? PlatformSecureStorage
-        } catch (e: Throwable) {
-            logCallback(LogLevel.DEBUG, TAG, "JvmKeychainManager auto-install skipped: ${e.message}")
-            null
-        }
     }
 
     /**
@@ -616,22 +569,10 @@ object CppBridgePlatformAdapter {
 
     fun secureGet(key: String): String? {
         val value = secureGetCallback(key) ?: return null
-        // Use okio.ByteString.base64() instead of java.util.Base64 so the
-        // JNI secure-storage callback path stays compatible with minSdk 24
-        // (java.util.Base64 is API 26+; the AAR currently has no core-library
-        // desugaring configured).
-        return value.toByteString().base64()
+        return String(value, Charsets.UTF_8)
     }
 
-    fun secureSet(key: String, value: String): Boolean {
-        val bytes =
-            value.decodeBase64()
-                ?: run {
-                    logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: invalid base64 payload")
-                    return false
-                }
-        return secureSetCallback(key, bytes.toByteArray())
-    }
+    fun secureSet(key: String, value: String): Boolean = secureSetCallback(key, value.toByteArray(Charsets.UTF_8))
 
     fun secureDelete(key: String): Boolean = secureDeleteCallback(key)
 
