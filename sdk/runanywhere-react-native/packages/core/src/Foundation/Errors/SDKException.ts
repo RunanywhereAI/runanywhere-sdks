@@ -231,8 +231,16 @@ export class SDKException extends Error {
 
   static networkError(details?: string, cause?: Error): SDKException {
     return SDKException.of(
-      ErrorCodeProto.ERROR_CODE_NETWORK_UNAVAILABLE,
+      ErrorCodeProto.ERROR_CODE_NETWORK_ERROR,
       details ?? 'Network error',
+      { nestedMessage: cause?.message }
+    );
+  }
+
+  static networkUnavailable(details?: string, cause?: Error): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_NETWORK_UNAVAILABLE,
+      details ?? 'Network unavailable',
       { nestedMessage: cause?.message }
     );
   }
