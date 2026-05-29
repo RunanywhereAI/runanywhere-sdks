@@ -29,7 +29,8 @@ import {
   LLMGenerateRequest,
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
-import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
+import { inferenceFrameworkToJSON, ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { modelInfoForCategory } from '../Models/RunAnywhere+ModelLifecycle';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { LLMStreamAdapter } from '../../../Adapters/LLMStreamAdapter';
@@ -208,4 +209,82 @@ export async function cancelGeneration(): Promise<void> {
   }
   const native = requireNativeModule();
   await native.llmCancelProto();
+}
+
+/**
+ * Drive an async-iterable LLM stream to completion, tallying tokens, TTFT,
+ * and tokens/sec, and populating `framework` via the model registry.
+ *
+ * Mirrors Swift SDK: `RunAnywhere.aggregateStream(prompt:events:onToken:)`.
+ *
+ * @param prompt   The original prompt string (used to estimate input tokens
+ *                 when the native side does not report them, matching Swift's
+ *                 `max(1, prompt.count / 4)` heuristic).
+ * @param iterable The `AsyncIterable<LLMStreamEvent>` returned by
+ *                 `generateStream(...)`. Consumed until `isFinal == true`
+ *                 or the stream ends.
+ * @param onToken  Optional callback invoked after each non-empty token is
+ *                 appended. Receives the full aggregated transcript so far —
+ *                 suitable for live UI updates.
+ * @returns A populated `LLMGenerationResult` with `text`, timing metrics,
+ *          and `framework` resolved from the currently-loaded language model.
+ */
+export async function aggregateStream(
+  prompt: string,
+  iterable: AsyncIterable<LLMStreamEventType>,
+  onToken?: (transcript: string) => void | Promise<void>,
+): Promise<LLMGenerationResult> {
+  let fullResponse = '';
+  let tokenCount = 0;
+  let firstTokenTimeMs: number | undefined;
+  const startTimeMs = Date.now();
+  let finishReason = '';
+  let terminalError = '';
+
+  for await (const event of iterable) {
+    if (event.token && event.token.length > 0) {
+      if (firstTokenTimeMs === undefined) {
+        firstTokenTimeMs = Date.now();
+      }
+      fullResponse += event.token;
+      tokenCount += 1;
+      if (onToken) {
+        await onToken(fullResponse);
+      }
+    }
+    if (event.isFinal) {
+      finishReason = event.finishReason ?? '';
+      terminalError = event.errorMessage ?? '';
+      break;
+    }
+  }
+
+  const totalLatencyMs = Date.now() - startTimeMs;
+  const ttftMs =
+    firstTokenTimeMs !== undefined ? firstTokenTimeMs - startTimeMs : undefined;
+
+  // Resolve the currently-loaded language model to populate `framework`.
+  const modelInfo = await modelInfoForCategory(
+    ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  ).catch(() => null);
+  const modelId = modelInfo?.id ?? '';
+  const framework =
+    modelInfo?.framework !== undefined
+      ? inferenceFrameworkToJSON(modelInfo.framework)
+      : '';
+
+  return LLMGenerationResultMessage.fromPartial({
+    text: fullResponse,
+    inputTokens: Math.max(1, Math.floor(prompt.length / 4)),
+    tokensGenerated: tokenCount,
+    responseTokens: tokenCount,
+    modelUsed: modelId,
+    generationTimeMs: totalLatencyMs,
+    framework,
+    tokensPerSecond:
+      totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0,
+    ...(ttftMs !== undefined ? { ttftMs } : {}),
+    ...(finishReason.length > 0 ? { finishReason } : {}),
+    ...(terminalError.length > 0 ? { errorMessage: terminalError } : {}),
+  });
 }

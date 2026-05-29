@@ -478,6 +478,7 @@ export const RunAnywhere = {
 
   generate: TextGeneration.generate,
   generateStream: TextGeneration.generateStream,
+  aggregateStream: TextGeneration.aggregateStream,
   cancelGeneration: TextGeneration.cancelGeneration,
 
   // ============================================================================
