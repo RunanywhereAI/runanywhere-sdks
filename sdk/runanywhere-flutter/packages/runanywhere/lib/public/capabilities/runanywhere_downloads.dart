@@ -181,31 +181,58 @@ class RunAnywhereDownloads {
       }
     }
 
-    await for (final progress in progressStream) {
-      yield progress;
+    // Track whether the native download reached a terminal state. When the
+    // Stream subscription is cancelled before a terminal event, the finally
+    // block sends rac_download_cancel_proto so the detached native worker stops
+    // instead of leaking bandwidth, battery, and file handles.
+    // Mirrors Kotlin's NonCancellable finally and Swift's CancellationError catch.
+    // delete_partial_bytes=false preserves resume bytes for a later retry.
+    var reachedTerminal = false;
+    try {
+      await for (final progress in progressStream) {
+        yield progress;
 
-      if (progress.stage == DownloadStage.DOWNLOAD_STAGE_DOWNLOADING) {
-        final pct = (progress.stageProgress * 100).toStringAsFixed(1);
-        if (progress.bytesDownloaded.toInt() % (1024 * 1024) < 10000) {
-          logger.debug('Download progress: $pct%');
+        if (progress.stage == DownloadStage.DOWNLOAD_STAGE_DOWNLOADING) {
+          final pct = (progress.stageProgress * 100).toStringAsFixed(1);
+          if (progress.bytesDownloaded.toInt() % (1024 * 1024) < 10000) {
+            logger.debug('Download progress: $pct%');
+          }
+        } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
+          logger.info('Extracting model...');
+        } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
+          logger.info('Download completed for model: $modelId');
+        } else if (progress.errorMessage.isNotEmpty) {
+          logger.error('Download failed: ${progress.errorMessage}');
         }
-      } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
-        logger.info('Extracting model...');
-      } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-        logger.info('Download completed for model: $modelId');
-      } else if (progress.errorMessage.isNotEmpty) {
-        logger.error('Download failed: ${progress.errorMessage}');
-      }
 
-      if (_isTerminalState(progress.state)) {
-        if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
-          await _handleDownloadCompleted(progress, logger);
+        if (_isTerminalState(progress.state)) {
+          reachedTerminal = true;
+          if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
+            await _handleDownloadCompleted(progress, logger);
+          }
+          break;
         }
-        break;
       }
+    } finally {
+      if (!reachedTerminal) {
+        try {
+          await DartBridgeDownload.instance.cancelProto(DownloadCancelRequest(
+            modelId: modelId,
+            taskId: startResult.taskId,
+            deletePartialBytes: false,
+          ));
+          logger.info(
+            'Download cancelled for $modelId (task=${startResult.taskId})',
+          );
+        } catch (e) {
+          logger.warning(
+            'Failed to cancel native download for $modelId '
+            '(task=${startResult.taskId}): $e',
+          );
+        }
+      }
+      _activeTaskIdsByModel.remove(modelId);
     }
-
-    _activeTaskIdsByModel.remove(modelId);
   }
 
   static bool _isTerminalState(DownloadState state) {
