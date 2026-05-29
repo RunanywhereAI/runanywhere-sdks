@@ -100,16 +100,6 @@ Two patterns coexist:
 - **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android `EncryptedSharedPreferences`; keys prefixed with `com.runanywhere.RunAnywhereAI_`
 - **PermissionService** — wraps `permission_handler`; requests microphone + speech (iOS only) for STT, camera for VLM
 
-### Platform Channel (com.runanywhere.sdk/native)
-
-Both platforms implement the same 6 methods for audio session and device info — this is separate from the AI SDK's FFI path:
-
-- `configureAudioSession(mode)` / `activateAudioSession` / `deactivateAudioSession`
-- `requestMicrophonePermission` / `hasMicrophonePermission`
-- `getDeviceCapabilities` (memory, processors)
-
-iOS: `AppDelegate.swift`. Android: `PlatformChannelHandler.kt`.
-
 ### SDK API Surface Used
 
 All AI calls go through `RunAnywhere`:
