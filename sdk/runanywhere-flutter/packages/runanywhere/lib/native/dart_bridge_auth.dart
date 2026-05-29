@@ -119,6 +119,11 @@ class DartBridgeAuth {
     } catch (e) {
       _logger.debug('rac_auth_reset not available: $e');
     }
+    // Mirror Swift CppBridge.State.shutdown() which resets authStorageInstalled
+    // so that a subsequent initialize() re-wires the secure-storage vtable.
+    // Without this, initialize()'s early-return guard fires and token
+    // persistence silently breaks on logout→login re-init flows.
+    _isInitialized = false;
   }
 
   // ============================================================================
