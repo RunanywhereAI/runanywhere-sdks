@@ -29,6 +29,7 @@ struct ChatInterfaceView: View {
     @State private var showingLoRAFilePicker = false
     @State private var showingLoRAScaleSheet = false
     @State private var showingLoRAManagement = false
+    @State private var openFilePickerAfterManagementDismiss = false
     @State private var pendingLoRAURL: URL?
     @State private var loraScale: Float = 1.0
     @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
@@ -66,19 +67,12 @@ struct ChatInterfaceView: View {
                 conversation: viewModel.currentConversation
             )
         }
-        .onAppear {
-            setupInitialState()
+        .task {
+            await viewModel.initialize()
         }
-        .onReceive(
-            NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))
-        ) { _ in
-            Task {
-                await viewModel.checkModelStatus()
-                if viewModel.isModelLoaded {
-                    await MainActor.run {
-                        showModelLoadedToast = true
-                    }
-                }
+        .onChange(of: viewModel.isModelLoaded) { wasLoaded, isLoaded in
+            if isLoaded && !wasLoaded {
+                showModelLoadedToast = true
             }
         }
         .alert("Debug Info", isPresented: $showDebugAlert) {
@@ -117,21 +111,32 @@ struct ChatInterfaceView: View {
             }
             .presentationDetents([.height(280)])
         }
-        .sheet(isPresented: $showingLoRAManagement) {
-            LoRAManagementSheetView(
-                viewModel: viewModel,
-                onOpenFilePicker: {
-                    showingLoRAManagement = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showingLoRAFilePicker = true
-                    }
-                },
-                onDismiss: {
-                    showingLoRAManagement = false
-                }
-            )
-            .presentationDetents([.large])
+        .sheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
+            loraManagementSheet
         }
+    }
+
+    // Chain the file picker off the management sheet's dismissal instead of
+    // racing it behind a fixed delay.
+    private func handleLoRAManagementDismiss() {
+        if openFilePickerAfterManagementDismiss {
+            openFilePickerAfterManagementDismiss = false
+            showingLoRAFilePicker = true
+        }
+    }
+
+    private var loraManagementSheet: some View {
+        LoRAManagementSheetView(
+            viewModel: viewModel,
+            onOpenFilePicker: {
+                openFilePickerAfterManagementDismiss = true
+                showingLoRAManagement = false
+            },
+            onDismiss: {
+                showingLoRAManagement = false
+            }
+        )
+        .presentationDetents([.large])
     }
 }
 
@@ -347,12 +352,6 @@ extension ChatInterfaceView {
                     }
                 }
             }
-        }
-    }
-
-    func setupInitialState() {
-        Task {
-            await viewModel.checkModelStatus()
         }
     }
 

@@ -383,22 +383,12 @@ extension ModelSelectionSheet {
         let isLLM = context == .llm ||
             (context == .voice && [.language, .multimodal].contains(model.category))
 
+        // `RunAnywhere.loadModel` already published the canonical
+        // component-lifecycle event the LLM/VLM ViewModels subscribe to, so the
+        // app only updates its own shared selection state here.
         if isLLM {
             await MainActor.run {
                 viewModel.setCurrentModel(model)
-                NotificationCenter.default.post(
-                    name: Notification.Name("ModelLoaded"),
-                    object: model
-                )
-            }
-        }
-
-        if context == .vlm {
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: Notification.Name("VLMModelLoaded"),
-                    object: model
-                )
             }
         }
 

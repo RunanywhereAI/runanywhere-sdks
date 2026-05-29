@@ -148,14 +148,6 @@ class ModelListViewModel: ObservableObject {
         do {
             try await loadModel(model)
             setCurrentModel(model)
-
-            // Post notification that model was loaded successfully
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: Notification.Name("ModelLoaded"),
-                    object: model
-                )
-            }
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
             // Don't set currentModel if loading failed

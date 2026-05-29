@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
+import Combine
 @preconcurrency import AVFoundation
 import os.log
 
@@ -42,22 +43,14 @@ final class VLMViewModel: NSObject {
     private var currentFrame: CVPixelBuffer?
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VLM")
+    private var lifecycleCancellable: AnyCancellable?
 
     // MARK: - Init
 
     override init() {
         super.init()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(vlmModelLoaded(_:)),
-            name: Notification.Name("VLMModelLoaded"),
-            object: nil
-        )
+        subscribeToModelLifecycle()
         Task { await checkModelStatus() }
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Model
@@ -68,15 +61,33 @@ final class VLMViewModel: NSObject {
         isModelLoaded = RunAnywhere.currentModel(req).found
     }
 
-    @objc
-    private func vlmModelLoaded(_ notification: Notification) {
-        Task {
-            if let model = notification.object as? RAModelInfo {
-                isModelLoaded = true
-                loadedModelName = model.name
-            } else {
-                await checkModelStatus()
+    /// Track the VLM model slot via the SDK event bus. Model loads route through
+    /// `RunAnywhere.loadModel(category: .multimodal)`, which publishes a
+    /// component-lifecycle event for SDK_COMPONENT_VLM — the single source of
+    /// truth, replacing the former "VLMModelLoaded" NotificationCenter post.
+    private func subscribeToModelLifecycle() {
+        lifecycleCancellable = RunAnywhere.events.events(for: .component)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                Task { @MainActor in self?.handleComponentLifecycleEvent(event) }
             }
+    }
+
+    private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
+        let lifecycle = event.componentLifecycle
+        guard lifecycle.component == .vlm else { return }
+
+        switch lifecycle.currentState {
+        case .ready:
+            isModelLoaded = true
+            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == lifecycle.modelID }) {
+                loadedModelName = model.name
+            }
+        case .notLoaded, .unloading, .shutdown, .deleting:
+            isModelLoaded = false
+            loadedModelName = nil
+        default:
+            break
         }
     }
 

@@ -62,9 +62,7 @@ struct ChatMessageListView: View {
                 }
             }
             #endif
-            .onReceive(
-                NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))
-            ) { _ in
+            .onChange(of: viewModel.messages.last?.content) { _, _ in
                 if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
                     proxy.scrollTo(lastMessage.id, anchor: .bottom)
                 }

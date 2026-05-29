@@ -30,11 +30,9 @@ extension LLMViewModel {
         ) { fullResponse in
             let displayText = Self.stripThinkTags(from: fullResponse)
             await MainActor.run {
+                // `@Observable` publishes the message mutation; the chat view
+                // auto-scrolls via `.onChange(of: messages.last?.content)`.
                 self.updateMessageContent(at: messageIndex, content: displayText)
-                NotificationCenter.default.post(
-                    name: Notification.Name("MessageContentUpdated"),
-                    object: nil
-                )
             }
         }
 

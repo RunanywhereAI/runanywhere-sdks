@@ -64,6 +64,7 @@ final class LLMViewModel {
     var lifecycleCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    private var isViewModelInitialized = false
 
     // MARK: - Internal Accessors for Extensions
 
@@ -159,18 +160,29 @@ final class LLMViewModel {
     // MARK: - Initialization
 
     init() {
-        // Don't create conversation yet - wait until first message is sent
-        currentConversation = nil
+        // Sync model state immediately from shared state to avoid the race condition
+        // where the model was loaded before this ViewModel was created.
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            isModelLoaded = true
+            loadedModelName = currentModel.name
+            loadedModelSupportsThinking = currentModel.supportsThinking
+            selectedFramework = currentModel.framework
+        }
+    }
 
-        // Listen for model loaded notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(modelLoaded(_:)),
-            name: Notification.Name("ModelLoaded"),
-            object: nil
-        )
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
-        // Listen for conversation selection
+    /// Subscribes to SDK events and applies initial settings.
+    /// Idempotent — safe to call from View's `.task { }`.
+    func initialize() async {
+        guard !isViewModelInitialized else { return }
+        isViewModelInitialized = true
+
+        // Conversation selection is purely intra-app state with no SDK event
+        // counterpart, so it stays on NotificationCenter. Model lifecycle flows
+        // through the SDK event bus (subscribeToModelLifecycle) instead.
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationSelected(_:)),
@@ -178,37 +190,17 @@ final class LLMViewModel {
             object: nil
         )
 
-        // Sync model state immediately from shared state to avoid race condition
-        // where the model was loaded before this ViewModel was initialized
-        // (i.e. the "ModelLoaded" notification was missed).
-        if let currentModel = ModelListViewModel.shared.currentModel {
-            isModelLoaded = true
-            loadedModelName = currentModel.name
-            loadedModelSupportsThinking = currentModel.supportsThinking
-            selectedFramework = currentModel.framework
+        subscribeToModelLifecycle()
+
+        // Reconcile against the SDK's authoritative model snapshot in case a
+        // model was loaded before this ViewModel subscribed.
+        await checkModelStatusFromSDK()
+
+        if isModelLoaded {
+            addSystemMessage()
         }
 
-        // Defer state-modifying operations to avoid "Publishing changes within view updates" warning
-        // These are deferred because init() may be called during view body evaluation
-        Task { @MainActor in
-            // Small delay to ensure view is fully initialized
-            try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
-
-            // Subscribe to SDK events
-            self.subscribeToModelLifecycle()
-
-            // Add system message if model is already loaded
-            if self.isModelLoaded {
-                self.addSystemMessage()
-            }
-
-            // Ensure settings are applied
-            await self.ensureSettingsAreApplied()
-        }
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+        await ensureSettingsAreApplied()
     }
 
     // MARK: - Public Methods
@@ -677,32 +669,6 @@ final class LLMViewModel {
             SystemPrompt: \(savedSystemPrompt ?? "nil")
             """
         )
-    }
-
-    @objc
-    private func modelLoaded(_ notification: Notification) {
-        Task {
-            if let model = notification.object as? RAModelInfo {
-                // All LLM backends expose streaming via the canonical
-                // generateStream entry; the SDK no longer publishes a
-                // per-model capability flag.
-                await MainActor.run {
-                    self.isModelLoaded = true
-                    self.loadedModelName = model.name
-                    self.loadedModelSupportsThinking = model.supportsThinking
-                    self.selectedFramework = model.framework
-                    self.modelSupportsStreaming = true
-
-                    if self.messages.first?.role == .system {
-                        self.messages.removeFirst()
-                    }
-                    self.addSystemMessage()
-                    Task { await self.refreshAvailableAdapters() }
-                }
-            } else {
-                await self.checkModelStatus()
-            }
-        }
     }
 
     @objc
