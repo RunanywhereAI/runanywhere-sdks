@@ -272,14 +272,25 @@ export class ModelRegistryAdapter {
     }
   }
 
+  /**
+   * Register a model in every known WASM module's `s_model_registry`.
+   *
+   * **Web-only contract (differs from native SDKs):** Because Emscripten
+   * modules do not share global state, each WASM backend has its own
+   * `s_model_registry` singleton. This method broadcasts the write to every
+   * known module and returns `true` when the PRIMARY module (the last one
+   * passed to `setDefaultModule`) accepts the registration. A sibling module
+   * rejecting the write (e.g. RAC_ERROR_FEATURE_NOT_AVAILABLE on a minimal
+   * WASM build) is logged at warning level but does not fail the call.
+   *
+   * On Swift/Kotlin/Flutter/RN a single shared `s_model_registry` handle is
+   * used, so `register` is all-or-nothing. On Web, the catalog diverges if
+   * the primary succeeds but a sibling fails — subsequent `get`/`list` calls
+   * will reflect the primary's state, but a backend WASM whose registry is
+   * out-of-sync may fail `rac_get_model` lookups. Callers that need strict
+   * all-module consistency should inspect the warning log after registration.
+   */
   register(model: ProtoModelInfo): boolean {
-    // Broadcast registration to every known module so the per-module C++
-    // `s_model_registry` singletons stay aligned. Returns success if the
-    // primary module accepted the registration — sibling failures are logged
-    // but do not fail the call, because (a) some sibling modules may not
-    // export the proto registry symbols at all, and (b) the user-visible
-    // "did register?" answer is determined by the primary module that holds
-    // the plugin route.
     const bytes = ProtoModelInfoCodec.encode(model).finish();
     return this.broadcastWrite('rac_model_registry_register_proto', (mod, handle) => (
       this.withHeapBytesOnModule(mod, bytes, (bytesPtr, bytesLen) => (
@@ -288,6 +299,12 @@ export class ModelRegistryAdapter {
     ));
   }
 
+  /**
+   * Update an existing model entry in every known WASM module's registry.
+   * Same primary-wins / at-least-one-success broadcast contract as
+   * {@link register} — see that method's JSDoc for the Web vs native
+   * semantic difference.
+   */
   update(model: ProtoModelInfo): boolean {
     const bytes = ProtoModelInfoCodec.encode(model).finish();
     return this.broadcastWrite('rac_model_registry_update_proto', (mod, handle) => (
@@ -361,11 +378,15 @@ export class ModelRegistryAdapter {
     return bytes ? ProtoModelInfoListCodec.decode(bytes) : null;
   }
 
+  /**
+   * Remove a model from every known WASM module's registry.
+   * Same primary-wins / at-least-one-success broadcast contract as
+   * {@link register} — see that method's JSDoc for the Web vs native
+   * semantic difference. Sibling RAC_ERROR_NOT_FOUND results (the model was
+   * never seen by that module) are logged at warning level and do not fail
+   * the call.
+   */
   remove(modelId: string): boolean {
-    // Broadcast removal so the primary registry and every sibling stay in
-    // sync. Sibling failures (e.g. not-found because that module never saw
-    // the matching `register`) are tolerated — the user-visible result still
-    // comes from the primary module.
     return this.broadcastWrite('rac_model_registry_remove_proto', (mod, handle) => {
       const idPtr = this.allocUtf8OnModule(mod, modelId);
       if (!idPtr) return -1;
@@ -485,19 +506,26 @@ export class ModelRegistryAdapter {
    * Run a write op against every known WASM module (commons + every backend
    * that registered against `ModelRegistryAdapter`). The return value is the
    * result of the call against the PRIMARY module — sibling failures are
-   * logged at debug level but do not poison the user-visible result.
+   * logged at warning level but do not change the user-visible result.
    *
-   * Modules that don't expose proto-byte registry exports are skipped without
-   * a warning (e.g. a minimal WASM build that compiled out the proto path).
-   * Modules that DO expose them but return RAC_ERROR_FEATURE_NOT_AVAILABLE
-   * are flagged via `markProtoRegistryUnsupported` so subsequent calls skip
-   * them immediately.
+   * **Partial-failure contract:** If the primary accepts the write but a
+   * sibling rejects it, the method returns `true` while emitting a warning.
+   * This differs from native SDKs (Swift/Kotlin/Flutter/RN) where a single
+   * shared `s_model_registry` means the write is all-or-nothing. Callers
+   * that require strict cross-module consistency should treat any warning
+   * emission as a partial failure.
    *
-   * Used by `register`, `update`, and `remove` to keep the catalog in sync
-   * across modules. Without this fan-out, the C++ download orchestrator
-   * (which runs in whichever module owns `DownloadAdapter`) cannot find the
-   * model when its own `s_model_registry` is empty even though a sibling
-   * module's registry is fully populated.
+   * Modules that don't expose proto-byte registry exports are skipped
+   * silently (e.g. a minimal WASM build that compiled out the proto path).
+   * Modules that expose the ABI but return RAC_ERROR_FEATURE_NOT_AVAILABLE
+   * are flagged via `markProtoRegistryUnsupported` and skipped on all
+   * subsequent calls.
+   *
+   * Used by `register`, `update`, and `remove` to keep the per-module C++
+   * `s_model_registry` singletons in sync. Without this fan-out, the C++
+   * download orchestrator (which runs in whichever module owns
+   * `DownloadAdapter`) cannot find a model when its own `s_model_registry`
+   * is empty while a sibling module's registry is fully populated.
    */
   private broadcastWrite(
     functionName: string,
