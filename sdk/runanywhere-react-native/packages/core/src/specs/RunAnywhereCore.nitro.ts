@@ -383,13 +383,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Configure HTTP client base URL / API key for downstream C++ consumers
-   * (DeviceBridge etc.). TypeScript callers use `httpRequest` directly.
-   * @returns true if configured successfully
-   */
-  configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
-
-  /**
    * Perform a synchronous HTTP request via the native curl-backed client.
    * Returns a JSON string `{"status": number, "body": string, "headersJson":
    * string}` on any HTTP response (including 4xx/5xx). Rejects the promise
@@ -437,29 +430,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * @returns The new auth response body as a JSON string.
    */
   authRefreshToken(baseURL: string): Promise<string>;
-
-  // ============================================================================
-  // Utility Functions
-  // ============================================================================
-
-  /**
-   * Extract an archive (tar.bz2, tar.gz, zip)
-   * @param archivePath Path to the archive
-   * @param destPath Destination directory
-   */
-  extractArchive(archivePath: string, destPath: string): Promise<boolean>;
-
-  /**
-   * Get device capabilities
-   * @returns JSON string with device info
-   */
-  getDeviceCapabilities(): Promise<string>;
-
-  /**
-   * Get memory usage
-   * @returns Current memory usage in bytes
-   */
-  getMemoryUsage(): Promise<number>;
 
   // ============================================================================
   // LLM Capability (Backend-Agnostic)
@@ -600,58 +570,9 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   vlmCancelProto(): Promise<ArrayBuffer>;
 
-  // ============================================================================
-  // Secure Storage
-  // Matches Swift: KeychainManager.swift
-  // Uses platform secure storage (Keychain on iOS, Keystore on Android)
-  // ============================================================================
-
   /**
-   * Store a string value securely
-   * @param key Storage key (e.g., "com.runanywhere.sdk.apiKey")
-   * @param value String value to store
-   * @returns true if stored successfully
-   */
-  secureStorageSet(key: string, value: string): Promise<boolean>;
-
-  /**
-   * Retrieve a string value from secure storage
-   * @param key Storage key
-   * @returns Stored value or null if not found
-   */
-  secureStorageGet(key: string): Promise<string | null>;
-
-  /**
-   * Delete a value from secure storage
-   * @param key Storage key
-   * @returns true if deleted successfully
-   */
-  secureStorageDelete(key: string): Promise<boolean>;
-
-  /**
-   * Check if a key exists in secure storage
-   * @param key Storage key
-   * @returns true if key exists
-   */
-  secureStorageExists(key: string): Promise<boolean>;
-
-  /**
-   * Store a string value securely (semantic alias for secureStorageSet)
-   * @param key Storage key
-   * @param value String value to store
-   */
-  secureStorageStore(key: string, value: string): Promise<void>;
-
-  /**
-   * Retrieve a string value from secure storage (semantic alias for secureStorageGet)
-   * @param key Storage key
-   * @returns Stored value or null if not found
-   */
-  secureStorageRetrieve(key: string): Promise<string | null>;
-
-  /**
-   * Get persistent device UUID
-   * This UUID survives app reinstalls (stored in Keychain/Keystore)
+   * Get persistent device UUID.
+   * Survives app reinstalls (stored in Keychain/Keystore).
    * Matches Swift: DeviceIdentity.persistentUUID
    * @returns Persistent device UUID
    */
