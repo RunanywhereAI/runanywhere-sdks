@@ -3,11 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * The main entry point for the RunAnywhere SDK.
- * Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
- *   * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
- *   * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
- *     assignments, HTTP-state snapshot)
- *   * HTTP retry → rac_sdk_retry_http_proto
+ * Two-phase initialization delegates to CppBridge (P2-T9):
+ *   * Phase 1 → CppBridge.initialize() → racSdkInit (legacy struct ABI) for
+ *     config/state init; rac_sdk_init_phase1_proto JNI thunks are pending
+ *     (expansion needed: RunAnywhereBridge + CppBridgeSdkInit + JNI).
+ *   * Phase 2 → CppBridge.initializeServices() — device registration, HTTP
+ *     auth round-trip, telemetry flush; rac_sdk_init_phase2_proto JNI thunks
+ *     are pending (same expansion).
+ *   * HTTP retry → retryHTTPSetup() re-runs initializeServices(); idempotent
+ *     guard via rac_sdk_retry_http_proto is pending (same expansion).
  * Kotlin retains only the parts that cannot move into C++:
  *   * Coroutine Mutex + servicesMutex concurrency primitive
  *   * EncryptedSharedPreferences / file-backed SDK params persistence
@@ -49,7 +53,8 @@ import kotlinx.coroutines.sync.withLock
 //     │    ├─ Events.register()           ← Analytics callback
 //     │    ├─ Telemetry.initialize()      ← HTTP callback
 //     │    ├─ Device.register()           ← Device registration
-//     │    └─ SDKInit.phase1(proto)       ← validate + state init
+//     │    └─ racSdkInit (legacy struct ABI) ← config/state init
+//     │         (rac_sdk_init_phase1_proto wiring pending)
 //     ├─ Emit SDKInitStarted / SDKInitCompleted events (via CppBridge)
 //     └─ Mark: isInitialized = true; spawn Phase 2 in background
 //
@@ -57,11 +62,10 @@ import kotlinx.coroutines.sync.withLock
 // ────────────────────────────────────────────────────────────────────
 //   RunAnywhere.completeServicesInitialization()
 //     ├─ CppBridge.initializeServices()  (via initializePlatformBridgeServices expect)
-//     │    ├─ Step 1 (deferred from C++): HTTP transport + auth round-trip
-//     │    ├─ Step 2 (MainActor / Main dispatcher): platform-plugin registration
-//     │    ├─ Step 3 (C++): SDKInit.phase2(proto) – device reg + model assignments
-//     │    ├─ Step 4 (deferred from C++): dev-mode device registration with build token
-//     │    └─ Step 5 (deferred from C++): filesystem-backed model discovery
+//     │    ├─ Step 1: HTTP transport + auth round-trip (OkHttp/CppBridgeAuth)
+//     │    ├─ Step 2: telemetry flush (CppBridgeTelemetry)
+//     │    ├─ Step 3: device registration (CppBridgeDevice.triggerRegistration)
+//     │         (rac_sdk_init_phase2_proto wiring pending)
 //     └─ Mark: areServicesReady = true; capture hasCompletedHTTPSetup flag
 //
 // ═══════════════════════════════════════════════════════════════════════════
@@ -238,8 +242,9 @@ object RunAnywhere {
      *    (`rac_validate_api_key` / `rac_validate_base_url`) — invalid combos
      *    throw [SDKException] before any native state is mutated.
      * 3. Calls the platform bridge, which internally drives Phase 1
-     *    (`rac_sdk_init_phase1_proto`), telemetry boot, and the
-     *    `emitSDKInitStarted` / `emitSDKInitCompleted` event pair.
+     *    (legacy `racSdkInit` struct ABI for config/state init), telemetry
+     *    boot, and the `emitSDKInitStarted` / `emitSDKInitCompleted` event
+     *    pair. Migration to `rac_sdk_init_phase1_proto` is pending.
      * 4. Spawns Phase 2 in the background via [initScope] so the call
      *    returns synchronously (mirrors Swift's
      *    `Task.detached(priority: .userInitiated)`).
@@ -321,7 +326,8 @@ object RunAnywhere {
      * `performCoreInit(with:startBackgroundServices:)`.
      *
      * The platform bridge encapsulates the canonical step list:
-     *   * Phase 1 proto (`rac_sdk_init_phase1_proto`) validation + state init.
+     *   * Legacy `racSdkInit` struct ABI for config/state init (migration
+     *     to `rac_sdk_init_phase1_proto` is pending CppBridgeSdkInit wiring).
      *   * SDK config + Keychain auth-storage install.
      *   * `emitSDKInitStarted` / `emitSDKInitCompleted` event emission.
      *
@@ -356,10 +362,10 @@ object RunAnywhere {
                 SDKLogger.setLevel(logLevel)
 
                 // Hand off to the platform bridge, which loads native libs,
-                // registers the platform adapter, runs `rac_sdk_init_phase1_proto`
-                // (validation + state init), and emits SDKInitStarted /
-                // SDKInitCompleted events. Mirrors Swift's
-                // `CppBridge.SdkInit.phase1(...)` step inside `performCoreInit`.
+                // registers the platform adapter, runs the legacy racSdkInit
+                // struct ABI (config/state init), and emits SDKInitStarted /
+                // SDKInitCompleted events. Migration to CppBridgeSdkInit.phase1
+                // (rac_sdk_init_phase1_proto) is pending JNI thunk expansion.
                 initializePlatformBridge(
                     environment = params.environment,
                     apiKey = params.apiKey,
@@ -405,20 +411,19 @@ object RunAnywhere {
      * once. Mirrors Swift's `completeServicesInitialization()` (the
      * `_servicesInitTask` + `_servicesInitLock.sync { ... }` fan-in).
      *
-     * The platform bridge owns the canonical 5-step Phase 2 sequence:
-     *   1. (deferred from C++) HTTP transport + auth round-trip.
+     * The platform bridge runs:
+     *   1. HTTP transport + auth round-trip (OkHttp/CppBridgeAuth).
      *      Tolerates offline mode — local/cached models stay accessible.
-     *   2. (MainActor / Main dispatcher) platform-plugin registration.
-     *   3. (C++) `rac_sdk_init_phase2_proto` — device registration + model
-     *      assignments + HTTP-state snapshot.
-     *   4. (deferred from C++) dev-mode device registration with the
-     *      build-token path.
-     *   5. (deferred from C++) filesystem-backed model discovery.
+     *   2. Telemetry flush (CppBridgeTelemetry.flush).
+     *   3. Device registration (CppBridgeDevice.triggerRegistration).
      *
-     * Each step's outcome surfaces through the [SdkInitResult] envelope; the
-     * `http_configured` flag drives [_hasCompletedHTTPSetup] so a later
-     * [ensureServicesReady] call can retry HTTP without re-running the rest of
-     * the bootstrap.
+     * Migration to `rac_sdk_init_phase2_proto` (which would also surface
+     * `linked_models_count` and the idempotent HTTP guard) is pending
+     * CppBridgeSdkInit + JNI thunk expansion.
+     *
+     * HTTPClientAdapter.isConfigured drives [_hasCompletedHTTPSetup] so a
+     * later [ensureServicesReady] call can retry HTTP without re-running the
+     * rest of the bootstrap.
      */
     suspend fun completeServicesInitialization() {
         // Fast path: already completed.
@@ -442,11 +447,9 @@ object RunAnywhere {
             logger.info("Initializing services for ${params.environment.wireString} mode...")
 
             try {
-                // Delegate to the platform bridge — runs the full Step-1..5
-                // sequence including `rac_sdk_init_phase2_proto`. The bridge
-                // also flushes the linked-models warning and dev-mode device
-                // registration. Mirrors Swift's awaited steps in
-                // `_performServicesInitialization`.
+                // Delegate to the platform bridge — runs HTTP auth, telemetry
+                // flush, and device registration. Migration to
+                // rac_sdk_init_phase2_proto is pending CppBridgeSdkInit wiring.
                 val httpConfigured = initializePlatformBridgeServices()
 
                 // Decouple "services ready" from "HTTP/auth complete" so
@@ -508,14 +511,11 @@ object RunAnywhere {
 
     /**
      * Retry HTTP/auth after an offline initialization. Mirrors Swift's
-     * private `retryHTTPSetup()` — combines the C ABI idempotency guard
-     * (`rac_sdk_retry_http_proto`) with the platform-side auth round-trip
-     * that the proto explicitly defers.
+     * private `retryHTTPSetup()`.
      *
-     * Implementation note: routes through [initializePlatformBridgeServices]
-     * for now because the bridge's existing services init already calls
-     * `CppBridgeDevConfig.configureHTTP()` and `HTTPClientAdapter.configure()`
-     * on the same code path the Swift `setupHTTP` helper exercises.
+     * Routes through [initializePlatformBridgeServices] which calls the
+     * OkHttp/CppBridgeAuth path directly. The idempotent C ABI fast-path
+     * (`rac_sdk_retry_http_proto`) is pending CppBridgeSdkInit JNI expansion.
      */
     private suspend fun retryHTTPSetup() {
         val params = _initParams ?: return
