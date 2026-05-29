@@ -242,7 +242,24 @@ class DartBridge {
     final effectiveDeviceId =
         deviceId ?? DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
 
-    // Step 2: Initialize C++ state with credentials
+    // Step 2: HTTP transport — configure C++ HTTP layer BEFORE phase2 so that
+    // rac_sdk_init_phase2_proto's device-registration POST has a live transport.
+    // Mirrors Swift Step 1 in _performServicesInitialization(): setupHTTP runs
+    // before CppBridge.SdkInit.phase2() (RunAnywhere.swift:266-279 → :287).
+    if (!DartBridgeHTTP.instance.isConfigured) {
+      try {
+        await DartBridgeHTTP.instance.configure(
+          environment: _environment,
+          apiKey: apiKey,
+          baseURL: baseURL,
+        );
+        _logger.debug('HTTP transport configured');
+      } catch (e) {
+        _logger.warning('HTTP setup failed (offline?): $e');
+      }
+    }
+
+    // Step 3: Initialize C++ state with credentials
     // Matches Swift: CppBridge.State.initialize(environment:apiKey:baseURL:deviceId:)
     await DartBridgeState.instance.initialize(
       environment: _environment,
@@ -252,9 +269,9 @@ class DartBridge {
     );
     _logger.debug('C++ state initialized');
 
-    // Step 2b: Drive the canonical Phase 2 step-list inside commons.
-    // Matches Swift: CppBridge.SdkInit.phase2() — runs auth + device
-    // registration + model-assignment fetch + telemetry flush inside C++.
+    // Step 4: Drive the canonical Phase 2 step-list inside commons. HTTP is
+    // now configured so device-registration completes in a single round-trip.
+    // Matches Swift Step 3: CppBridge.SdkInit.phase2() (RunAnywhere.swift:287).
     // Soft failures (offline mode, missing creds) come back as
     // success=true + warning; hard failures throw.
     try {
@@ -272,10 +289,10 @@ class DartBridge {
       _logger.warning('SDK Phase 2 proto error: $e');
     }
 
-    // Step 3: Initialize service bridges
+    // Step 5: Initialize service bridges
     // Matches Swift: CppBridge.initializeServices()
 
-    // Step 3a: Model assignment callbacks
+    // Step 5a: Model assignment callbacks
     // Only auto-fetch in staging/production, not development
     final shouldAutoFetch =
         _environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
@@ -286,11 +303,11 @@ class DartBridge {
     _logger.debug(
         'Model assignment callbacks registered (autoFetch: $shouldAutoFetch)');
 
-    // Step 3b: Platform services (Foundation Models, System TTS)
+    // Step 5b: Platform services (Foundation Models, System TTS)
     await DartBridgePlatform.registerServices();
     _logger.debug('Platform services registered');
 
-    // Step 4: Flush telemetry (if any queued events)
+    // Step 6: Flush telemetry (if any queued events)
     // Matches Swift: CppBridge.Telemetry.flush()
     DartBridgeTelemetry.flush();
     _logger.debug('Telemetry flushed');
