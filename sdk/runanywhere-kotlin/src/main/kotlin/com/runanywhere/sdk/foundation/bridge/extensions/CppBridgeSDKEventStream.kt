@@ -38,10 +38,11 @@ private fun <M : Message<M, *>> decodeOrNull(
  * Thin generated-proto facade over the canonical SDKEvent stream.
  */
 object CppBridgeSDKEventStream {
-    fun subscribe(onEvent: (RASDKEvent) -> Boolean): Long =
+    fun subscribe(onEvent: (RASDKEvent) -> Unit): Long =
         RunAnywhereBridge.racSdkEventSubscribe(
             NativeProtoProgressListener { bytes ->
-                decodeOrNull(SDKEvent.ADAPTER, bytes, "sdkEventCallback")?.let(onEvent) ?: false
+                decodeOrNull(SDKEvent.ADAPTER, bytes, "sdkEventCallback")?.also(onEvent)
+                true
             },
         )
 

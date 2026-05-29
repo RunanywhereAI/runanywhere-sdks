@@ -36,14 +36,9 @@ internal fun startNativeSubscription() {
         try {
             // The native callback fires on a JNI thread; we hop straight
             // into MutableSharedFlow.tryEmit (non-suspending) so we never
-            // block the caller. Returning true tells the native layer
-            // we accepted the event; tryEmit returning false (buffer
-            // overrun) is reported up so commons can apply backpressure
-            // metrics if it wants to, but we still keep the subscription
-            // alive.
+            // block the caller.
             CppBridgeSDKEventStream.subscribe { event ->
                 EventBus.emitFromNative(event)
-                true
             }
         } catch (e: UnsatisfiedLinkError) {
             logger.warn("Native SDK event subscription unavailable: ${e.message}")
