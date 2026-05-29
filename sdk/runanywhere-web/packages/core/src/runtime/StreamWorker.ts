@@ -111,7 +111,7 @@ export interface StreamWorkerModule {
     requestSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
   _rac_llm_cancel_proto?(outEvent: number): number;
 
   _rac_stt_component_transcribe_stream_proto?(
@@ -122,7 +122,7 @@ export interface StreamWorkerModule {
     optionsSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
 
   _rac_tts_component_synthesize_stream_proto?(
     handle: number,
@@ -131,7 +131,7 @@ export interface StreamWorkerModule {
     optionsSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
 
   _rac_vlm_process_stream_proto?(
     handle: number,
@@ -142,7 +142,7 @@ export interface StreamWorkerModule {
     callbackPtr: number,
     userData: number,
     outResult: number,
-  ): number;
+  ): number | Promise<number>;
   _rac_vlm_cancel_proto?(handle: number): number;
 }
 
@@ -275,7 +275,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
   const runWithCallback = (
     requestId: string,
     callbackReturnsBool: boolean,
-    invoke: (callbackPtr: number) => number,
+    invoke: (callbackPtr: number) => number | Promise<number>,
   ): void => {
     const moduleRef = ensureModule();
     if (!moduleRef) {
@@ -288,22 +288,24 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       return;
     }
     const callbackPtr = installCallback(moduleRef, requestId, callbackReturnsBool);
-    let returnCode = 0;
-    try {
-      returnCode = invoke(callbackPtr);
-    } catch (err) {
-      postError(`stream export threw: ${(err as Error).message}`, requestId);
-      returnCode = -902;
-    } finally {
-      moduleRef.removeFunction(callbackPtr);
-      // Prune per-request bookkeeping. Once `done` is posted no further
-      // callbacks can arrive for this requestId, so retaining it in the
-      // `cancelled` set or the `inflight` map is dead weight that grows
-      // unbounded over the worker's lifetime. See pass2-syn-091.
-      inflight.delete(requestId);
-      cancelled.delete(requestId);
-    }
-    scope.postMessage({ type: 'done', requestId, returnCode });
+    void (async (): Promise<void> => {
+      let returnCode = 0;
+      try {
+        returnCode = await invoke(callbackPtr);
+      } catch (err) {
+        postError(`stream export threw: ${(err as Error).message}`, requestId);
+        returnCode = -902;
+      } finally {
+        moduleRef.removeFunction(callbackPtr);
+        // Prune per-request bookkeeping. Once `done` is posted no further
+        // callbacks can arrive for this requestId, so retaining it in the
+        // `cancelled` set or the `inflight` map is dead weight that grows
+        // unbounded over the worker's lifetime. See pass2-syn-091.
+        inflight.delete(requestId);
+        cancelled.delete(requestId);
+      }
+      scope.postMessage({ type: 'done', requestId, returnCode });
+    })();
   };
 
   scope.onmessage = (ev: MessageEvent<WorkerRequest>): void => {
