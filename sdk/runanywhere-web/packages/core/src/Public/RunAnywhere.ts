@@ -1535,13 +1535,21 @@ export const RunAnywhere = {
   },
 
   transcribeStream(
-    ...args: Parameters<typeof STTCapability.transcribeStream>
+    handle: Parameters<typeof STTCapability.transcribeStream>[0],
+    audio: Parameters<typeof STTCapability.transcribeStream>[1],
+    options: Parameters<typeof STTCapability.transcribeStream>[2],
+    extra: CancellableCall = {},
   ): ReturnType<typeof STTCapability.transcribeStream> {
-    // The handle-driven stream APIs accept cancellation through the
-    // existing stop/destroy verbs and the AbortSignal pattern on the flat
-    // verb; callers wanting to plumb a signal should pre-check it before
-    // entering the loop.
-    return STTCapability.transcribeStream(...args);
+    throwIfAborted(extra.signal, 'transcribeStream');
+    const iterable = STTCapability.transcribeStream(handle, audio, options);
+    if (!extra.signal) return iterable;
+    const signal = extra.signal;
+    return (async function* () {
+      for await (const partial of iterable) {
+        throwIfAborted(signal, 'transcribeStream');
+        yield partial;
+      }
+    })();
   },
 
   synthesize(
@@ -1554,13 +1562,22 @@ export const RunAnywhere = {
   },
 
   synthesizeStream(
-    ...args: Parameters<typeof TTSCapability.synthesizeStream>
+    handle: Parameters<typeof TTSCapability.synthesizeStream>[0],
+    text: Parameters<typeof TTSCapability.synthesizeStream>[1],
+    options: Parameters<typeof TTSCapability.synthesizeStream>[2],
+    extra: CancellableCall = {},
   ): ReturnType<typeof TTSCapability.synthesizeStream> {
-    // The handle-driven stream APIs accept cancellation through the
-    // existing stop/destroy verbs and the AbortSignal pattern on the flat
-    // verb; callers wanting to plumb a signal should pre-check it before
-    // entering the loop.
-    return TTSCapability.synthesizeStream(...args);
+    throwIfAborted(extra.signal, 'synthesizeStream');
+    const iterable = TTSCapability.synthesizeStream(handle, text, options);
+    if (!extra.signal) return iterable;
+    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stop(handle));
+    return (async function* () {
+      try {
+        yield* iterable;
+      } finally {
+        detach();
+      }
+    })();
   },
 
   async speak(
@@ -1749,7 +1766,7 @@ export const RunAnywhere = {
   // Shutdown
   // =========================================================================
 
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
     // Clear every WASM adapter singleton that `setRunanywhereModule()`
@@ -1764,11 +1781,11 @@ export const RunAnywhere = {
     HTTPAdapter.clearDefaultModule();
     StorageAdapter.clearDefaultHandles();
 
-    // Tear down any registered speech provider (e.g. standalone Sherpa
-    // installed by `@runanywhere/web-onnx`) so its backend module/component
-    // handles do not survive across shutdown/reset boundaries. Errors are
-    // logged but do not block the rest of the teardown.
-    void disposeSpeechProvider().catch((err) => {
+    // Await speech-provider teardown before resetting _isInitialized so that
+    // a subsequent initialize() cannot allocate fresh WASM handles while the
+    // previous provider's dispose() is still in flight. Mirrors Swift's
+    // async reset() which serializes teardown before clearing state flags.
+    await disposeSpeechProvider().catch((err) => {
       logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
     });
 
@@ -1804,8 +1821,8 @@ export const RunAnywhere = {
     logger.info('RunAnywhere Web SDK shut down');
   },
 
-  reset(): void {
-    RunAnywhere.shutdown();
+  reset(): Promise<void> {
+    return RunAnywhere.shutdown();
   },
 };
 
