@@ -48,6 +48,11 @@ export type {
   RAGEnsureReadyOptions,
 } from './Public/Extensions/RunAnywhere+RAG';
 export type {
+  EmbeddingsOptions,
+  EmbeddingsRequest,
+  EmbeddingsResult,
+} from './Public/Extensions/RunAnywhere+Embeddings';
+export type {
   RegisterModelFile,
   RegisterModelOptions,
   RegisterMultiFileOptions,

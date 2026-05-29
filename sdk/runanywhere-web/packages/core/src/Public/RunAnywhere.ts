@@ -54,6 +54,7 @@ import {
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG';
 import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent';
@@ -1063,6 +1064,9 @@ export const RunAnywhere = {
 
   /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
   rag: RAGCapability,
+
+  /** Embeddings generation — `RunAnywhere.embeddings.embed('text', {modelID})` etc. */
+  embeddings: EmbeddingsCapability,
 
   /** Voice-agent orchestration — `RunAnywhere.voiceAgent.processTurn(...)` etc. */
   voiceAgent: VoiceAgentCapability,
