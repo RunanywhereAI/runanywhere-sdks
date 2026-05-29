@@ -6,21 +6,21 @@ import os
 /// ViewModel for Voice Activity Detection functionality
 /// Manages microphone capture, VAD model loading, and real-time speech detection
 @MainActor
-class VADViewModel: ObservableObject {
-    private let logger = Logger(subsystem: "com.runanywhere", category: "VAD")
+class VADViewModel: VoiceComponentViewModelBase {
     private let audioCapture = AudioCaptureManager()
-    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Component Identity
+
+    override var component: RASDKComponent { .vad }
+    override var eventCategory: RAEventCategory { .vad }
+    override var modelCategory: RAModelCategory { .voiceActivityDetection }
 
     // MARK: - Published Properties (UI State)
 
-    @Published var selectedFramework: InferenceFramework?
-    @Published var selectedModelName: String?
-    @Published var selectedModelId: String?
     @Published var isListening = false
     @Published var isProcessing = false
     @Published var isSpeechDetected = false
     @Published var audioLevel: Float = 0.0
-    @Published var errorMessage: String?
 
     /// Log of speech activity events with timestamps
     @Published var activityLog: [SpeechActivityLogEntry] = []
@@ -29,23 +29,18 @@ class VADViewModel: ObservableObject {
 
     private var audioBuffer = Data()
     private var detectionTask: Task<Void, Never>?
-    private var isInitialized = false
     private var hasSubscribedToAudioLevel = false
-    private var hasSubscribedToSDKEvents = false
 
     // MARK: - Initialization
 
     init() {
+        super.init(loggerCategory: "VAD")
         logger.debug("VADViewModel initialized")
     }
 
     /// Initialize the ViewModel - request permissions and setup subscriptions
     func initialize() async {
-        guard !isInitialized else {
-            logger.debug("VAD view model already initialized, skipping")
-            return
-        }
-        isInitialized = true
+        guard beginInitialization() else { return }
 
         logger.info("Initializing VAD view model")
 
@@ -136,58 +131,33 @@ class VADViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func subscribeToSDKEvents() {
-        guard !hasSubscribedToSDKEvents else {
-            logger.debug("Already subscribed to SDK events, skipping")
-            return
-        }
-        hasSubscribedToSDKEvents = true
+    // MARK: - SDK Event Handling
 
-        RunAnywhere.events.events
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                Task { @MainActor in
-                    self?.handleSDKEvent(event)
-                }
-            }
-            .store(in: &cancellables)
+    /// VAD resolves the display name from the model catalog when available,
+    /// falling back to the id-derived name.
+    override func applyLoadedModel(_ model: RAModelInfo) {
+        selectedModelId = model.id
+        if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == model.id }) {
+            selectedModelName = matchingModel.name
+            selectedFramework = matchingModel.framework
+        } else {
+            selectedModelName = model.id.modelNameFromID()
+            selectedFramework = model.framework
+        }
     }
 
-    private func handleSDKEvent(_ event: RASDKEvent) {
-        guard event.category == .vad || event.component == .vad else { return }
-
+    override func handleSDKEvent(_ event: RASDKEvent) {
         let modelId = event.model.modelID
 
         switch event.model.kind {
         case .loadCompleted:
-            selectedModelId = modelId
-            if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                selectedModelName = matchingModel.name
-                selectedFramework = matchingModel.framework
-            } else {
-                selectedModelName = modelId.modelNameFromID()
-            }
+            applyLoadedModel(event.model)
             logger.info("VAD model loaded: \(modelId)")
         case .unloadCompleted:
-            selectedModelId = nil
-            selectedModelName = nil
-            selectedFramework = nil
+            clearLoadedModel()
             logger.info("VAD model unloaded")
         default:
             break
-        }
-    }
-
-    private func checkInitialModelState() async {
-        var req = RACurrentModelRequest()
-        req.category = .voiceActivityDetection
-        let snapshot = RunAnywhere.currentModel(req)
-        if snapshot.found {
-            let model = snapshot.model
-            selectedModelId = model.id
-            selectedModelName = model.name.modelNameFromID()
-            selectedFramework = model.framework
-            logger.info("VAD model already loaded: \(model.name)")
         }
     }
 
@@ -290,10 +260,8 @@ class VADViewModel: ObservableObject {
         audioCapture.stopRecording()
         detectionTask?.cancel()
         detectionTask = nil
-        cancellables.removeAll()
-        isInitialized = false
         hasSubscribedToAudioLevel = false
-        hasSubscribedToSDKEvents = false
+        cleanupBase()
     }
 }
 

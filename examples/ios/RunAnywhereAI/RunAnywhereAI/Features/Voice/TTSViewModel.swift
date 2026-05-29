@@ -9,19 +9,17 @@ import os
 ///
 /// Uses the simplified `RunAnywhere.speak()` API - the SDK handles all audio playback internally.
 @MainActor
-class TTSViewModel: ObservableObject {
-    private let logger = Logger(subsystem: "com.runanywhere", category: "TTS")
+class TTSViewModel: VoiceComponentViewModelBase {
+    // MARK: - Component Identity
+
+    override var component: RASDKComponent { .tts }
+    override var eventCategory: RAEventCategory { .tts }
+    override var modelCategory: RAModelCategory { .speechSynthesis }
 
     // MARK: - Published Properties
 
-    // Model State
-    @Published var selectedFramework: InferenceFramework?
-    @Published var selectedModelName: String?
-    @Published var selectedModelId: String?
-
     // Speaking State
     @Published var isSpeaking = false
-    @Published var errorMessage: String?
     @Published var lastResult: RATTSSpeakResult?
 
     // Voice Settings
@@ -29,38 +27,21 @@ class TTSViewModel: ObservableObject {
     // While removed from the UI, the backend still supports pitch, so we keep it here.
     @Published var pitch: Double = 1.0
 
-    // MARK: - Private Properties
-
-    private var cancellables = Set<AnyCancellable>()
-    private var isInitialized = false
-    private var hasSubscribedToEvents = false
-
     // MARK: - Initialization
+
+    init() {
+        super.init(loggerCategory: "TTS")
+    }
 
     /// Initialize the TTS view model
     /// This method is idempotent - calling it multiple times is safe
     func initialize() async {
-        guard !isInitialized else {
-            logger.debug("TTS view model already initialized, skipping")
-            return
-        }
-        isInitialized = true
+        guard beginInitialization() else { return }
 
         logger.info("Initializing TTS view model")
 
-        // Subscribe to SDK events for TTS model state
         subscribeToSDKEvents()
-
-        // Check initial TTS voice state
-        var req = RACurrentModelRequest()
-        req.category = .speechSynthesis
-        let snapshot = RunAnywhere.currentModel(req)
-        if snapshot.found {
-            let voiceId = snapshot.modelID
-            selectedModelId = voiceId
-            selectedModelName = voiceId
-            logger.info("TTS voice already loaded: \(voiceId)")
-        }
+        await checkInitialModelState()
     }
 
     // MARK: - Model Management
@@ -130,33 +111,19 @@ class TTSViewModel: ObservableObject {
 
     /// Clean up resources - call from view's onDisappear
     func cleanup() {
-        cancellables.removeAll()
-        isInitialized = false
-        hasSubscribedToEvents = false
+        cleanupBase()
     }
 
     // MARK: - SDK Event Handling
 
-    private func subscribeToSDKEvents() {
-        guard !hasSubscribedToEvents else {
-            logger.debug("Already subscribed to SDK events, skipping")
-            return
-        }
-        hasSubscribedToEvents = true
-
-        RunAnywhere.events.events
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                Task { @MainActor in
-                    self?.handleSDKEvent(event)
-                }
-            }
-            .store(in: &cancellables)
+    /// TTS surfaces the voice id directly as its display name rather than
+    /// resolving it through the model catalog.
+    override func applyLoadedModel(_ model: RAModelInfo) {
+        selectedModelId = model.id
+        selectedModelName = model.id
     }
 
-    private func handleSDKEvent(_ event: RASDKEvent) {
-        guard event.category == .tts || event.component == .tts else { return }
-
+    override func handleSDKEvent(_ event: RASDKEvent) {
         let voiceId = event.model.modelID
 
         switch event.model.kind {
@@ -165,9 +132,7 @@ class TTSViewModel: ObservableObject {
             selectedModelName = voiceId
             logger.info("TTS voice loaded: \(voiceId)")
         case .unloadCompleted:
-            selectedModelId = nil
-            selectedModelName = nil
-            selectedFramework = nil
+            clearLoadedModel()
             logger.info("TTS voice unloaded")
         default:
             break
