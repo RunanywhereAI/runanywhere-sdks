@@ -57,7 +57,7 @@ import Security
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key,
             kSecAttrSynchronizable as String: false,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
     }
 
