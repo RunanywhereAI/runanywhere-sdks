@@ -63,7 +63,6 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Display model for Device Status card. */
@@ -207,20 +206,12 @@ fun ModelSelectionBottomSheet(
                                 if (isReady) {
                                     scope.launch {
                                         viewModel.selectModel(model.id)
-                                        var attempts = 0
-                                        val maxAttempts = 120
-                                        while (viewModel.uiState.value.isLoadingModel && attempts < maxAttempts) {
-                                            delay(500)
-                                            attempts++
-                                        }
                                         val state = viewModel.uiState.value
-                                        if (!state.isLoadingModel && state.error == null) {
-                                            onModelSelected(model)
-                                            onDismiss()
-                                        } else if (state.error != null) {
+                                        if (state.error != null) {
                                             errorDialogText = "Model: ${model.id}\n\nError: ${state.error}"
                                         } else {
-                                            errorDialogText = "Model: ${model.id}\n\nTimed out waiting for model to load (${maxAttempts * 500}ms)"
+                                            onModelSelected(model)
+                                            onDismiss()
                                         }
                                     }
                                 }
