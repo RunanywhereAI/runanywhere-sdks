@@ -150,13 +150,58 @@ export async function transcribe(
 }
 
 /**
- * Stream transcription results as an `AsyncIterable<STTPartialResult>` over
- * the native `sttTranscribeStreamProto` proto-byte callback.
+ * Stream-in / stream-out overload: mirrors Swift's `transcribeStream(audio:AsyncStream<Data>)`.
  *
- * Matches the canonical cross-SDK spec §4:
- *   `transcribeStream(audio: Bytes) → Stream<STTPartialResult>`
+ * Accumulates VAD-segmented `Uint8Array` chunks from the caller's `AsyncIterable`,
+ * concatenates them into a single buffer, then forwards to the native
+ * `sttTranscribeStreamProto` callback — matching the Swift behaviour exactly.
+ * Prefer this overload for live-mic transcription; use the single-buffer overload
+ * only when the full clip is already assembled.
  */
 export function transcribeStream(
+  audio: AsyncIterable<Uint8Array>,
+  options?: Partial<STTOptions>
+): AsyncIterable<STTPartialResult>;
+
+/**
+ * Single-buffer convenience overload: accepts a pre-assembled audio clip.
+ * Kept for backward compatibility with existing callers.
+ */
+export function transcribeStream(
+  audio: Uint8Array | string | ArrayBuffer,
+  options?: Partial<STTOptions>
+): AsyncIterable<STTPartialResult>;
+
+export function transcribeStream(
+  audio: AsyncIterable<Uint8Array> | Uint8Array | string | ArrayBuffer,
+  options: Partial<STTOptions> = {}
+): AsyncIterable<STTPartialResult> {
+  if (audio != null && typeof audio === 'object' && Symbol.asyncIterator in audio) {
+    return transcribeStreamFromAsyncIterable(audio as AsyncIterable<Uint8Array>, options);
+  }
+  return transcribeStreamFromBuffer(audio as Uint8Array | string | ArrayBuffer, options);
+}
+
+async function* transcribeStreamFromAsyncIterable(
+  chunks: AsyncIterable<Uint8Array>,
+  options: Partial<STTOptions>
+): AsyncIterable<STTPartialResult> {
+  const parts: Uint8Array[] = [];
+  let totalLength = 0;
+  for await (const chunk of chunks) {
+    parts.push(chunk);
+    totalLength += chunk.byteLength;
+  }
+  const accumulated = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    accumulated.set(part, offset);
+    offset += part.byteLength;
+  }
+  yield* transcribeStreamFromBuffer(accumulated, options);
+}
+
+function transcribeStreamFromBuffer(
   audio: Uint8Array | string | ArrayBuffer,
   options: Partial<STTOptions> = {}
 ): AsyncIterable<STTPartialResult> {
