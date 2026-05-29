@@ -83,21 +83,45 @@ export async function ragDestroyPipeline(): Promise<void> {
   logger.info('RAG pipeline destroyed');
 }
 
-/** Ingest a document into the RAG pipeline. */
+/**
+ * Ingest a proto document into the RAG pipeline.
+ *
+ * Primary overload — matches Swift: `RunAnywhere.ragIngest(_:)`.
+ * Returns pipeline statistics after ingestion.
+ */
+export async function ragIngest(document: RAGDocument): Promise<RAGStatistics>;
+/**
+ * Ingest a text document into the RAG pipeline (convenience overload).
+ *
+ * Builds a `RAGDocument` proto from the text and optional JSON metadata,
+ * then delegates to the primary overload. Matches Swift:
+ * `RunAnywhere.ragIngest(text:metadataJSON:)`.
+ */
 export async function ragIngest(
   text: string,
   metadataJson?: string
-): Promise<void> {
+): Promise<RAGStatistics>;
+export async function ragIngest(
+  textOrDocument: string | RAGDocument,
+  metadataJson?: string
+): Promise<RAGStatistics> {
   const native = ensureNative();
-  // IDL-13: `metadata_json` proto field was deleted. Best-effort parse
-  // of the legacy JSON into the typed `metadata` map.
-  const metadata = parseMetadata(metadataJson);
-  const document = RAGDocument.create({
-    id: '',
-    text,
-    metadata,
-  });
-  await native.ragIngestProto(encodeProtoMessage(document, RAGDocument));
+  let document: RAGDocument;
+  if (typeof textOrDocument === 'string') {
+    // IDL-13: `metadata_json` proto field was deleted. Best-effort parse
+    // of the legacy JSON blob into the typed `metadata` map.
+    document = RAGDocument.create({
+      id: '',
+      text: textOrDocument,
+      metadata: parseMetadata(metadataJson),
+    });
+  } else {
+    document = textOrDocument;
+  }
+  const statsBytes = await native.ragIngestProto(
+    encodeProtoMessage(document, RAGDocument)
+  );
+  return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragIngestProto');
 }
 
 function parseMetadata(json?: string): Record<string, string> {
@@ -116,12 +140,35 @@ function parseMetadata(json?: string): Record<string, string> {
   }
 }
 
-/** Add multiple documents in batch. */
+/**
+ * Ingest multiple proto documents in batch.
+ *
+ * Primary overload — matches Swift: `RunAnywhere.ragAddDocumentsBatch(documents:)`.
+ */
+export async function ragAddDocumentsBatch(
+  documents: RAGDocument[]
+): Promise<void>;
+/**
+ * Ingest multiple text documents in batch (convenience overload).
+ *
+ * Builds `RAGDocument` protos from the ad-hoc shapes, then delegates to
+ * the primary overload.
+ */
 export async function ragAddDocumentsBatch(
   documents: Array<{ text: string; metadataJson?: string }>
+): Promise<void>;
+export async function ragAddDocumentsBatch(
+  documents: RAGDocument[] | Array<{ text: string; metadataJson?: string }>
 ): Promise<void> {
-  for (const document of documents) {
-    await ragIngest(document.text, document.metadataJson);
+  for (const doc of documents) {
+    // Distinguish RAGDocument proto (has typed `metadata` map) from the
+    // convenience ad-hoc shape (has `metadataJson` string).
+    if ('metadataJson' in doc) {
+      const adHoc = doc as { text: string; metadataJson?: string };
+      await ragIngest(adHoc.text, adHoc.metadataJson);
+    } else {
+      await ragIngest(doc as RAGDocument);
+    }
   }
 }
 
