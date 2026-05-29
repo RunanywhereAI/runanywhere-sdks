@@ -59,6 +59,7 @@ fun RunAnywhere.generateStream(
     llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
 
     return callbackFlow {
+        ensureServicesReady()
         val driver =
             launch(Dispatchers.IO) {
                 CppBridgeLLM.generateStream(prompt, opts) { event ->
