@@ -222,7 +222,7 @@ class VADViewModel : ViewModel() {
     private suspend fun checkInitialModelState() {
         val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_VAD)
         val isLoaded =
-            snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            snapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 snapshot.model_id.isNotEmpty()
         if (isLoaded) {
             val current =

@@ -268,7 +268,7 @@ class SpeechToTextViewModel : ViewModel() {
     private suspend fun checkInitialModelState() {
         val sttSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_STT)
         val isLoaded =
-            sttSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            sttSnapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 sttSnapshot.model_id.isNotEmpty()
         if (isLoaded) {
             val currentSTT =

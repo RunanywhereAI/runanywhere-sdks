@@ -226,7 +226,7 @@ class TextToSpeechViewModel(
     private suspend fun updateTTSState() {
         val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
         val isLoaded =
-            snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            snapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 snapshot.model_id.isNotEmpty()
         val voiceId =
             RunAnywhere
@@ -360,7 +360,7 @@ class TextToSpeechViewModel(
             val isSystem = _uiState.value.isSystemTTS
             val ttsSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
             val isTtsLoaded =
-                ttsSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                ttsSnapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     ttsSnapshot.model_id.isNotEmpty()
             if (!isSystem && !isTtsLoaded) {
                 _uiState.update {
