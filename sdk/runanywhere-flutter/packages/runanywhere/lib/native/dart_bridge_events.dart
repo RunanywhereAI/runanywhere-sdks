@@ -18,14 +18,12 @@ class DartBridgeEvents {
   static final _logger = SDKLogger('DartBridge.Events');
   static final DartBridgeEvents instance = DartBridgeEvents._();
 
-  static final _eventController =
-      StreamController<event_pb.SDKEvent>.broadcast();
-
   static bool _isRegistered = false;
   static int _subscriptionId = 0;
   static NativeCallable<RacSdkEventCallbackNative>? _eventCallback;
 
-  static Stream<event_pb.SDKEvent> get eventStream => _eventController.stream;
+  /// Thin alias for [EventBus.shared.allEvents] — single canonical bus.
+  static Stream<event_pb.SDKEvent> get eventStream => EventBus.shared.allEvents;
 
   /// Subscribe to the commons process-wide SDKEvent stream.
   ///
@@ -96,7 +94,6 @@ class DartBridgeEvents {
   }
 
   void emit(event_pb.SDKEvent event) {
-    _eventController.add(event);
     EventBus.shared.addFromNative(event);
   }
 
