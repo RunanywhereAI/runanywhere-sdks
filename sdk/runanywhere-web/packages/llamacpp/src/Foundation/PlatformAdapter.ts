@@ -52,16 +52,18 @@ export class PlatformAdapter {
 
   /**
    * Allocate the rac_platform_adapter_t struct, install JS callbacks via
-   * `addFunction()`, write the resulting indices into the struct in WASM
-   * memory, then call `_rac_set_platform_adapter()`.
+   * `addFunction()`, and write the resulting indices into the struct in WASM
+   * memory. The caller is responsible for passing `getAdapterPtr()` to
+   * `rac_init` via `config.platform_adapter` — that single install is
+   * authoritative. `_rac_set_platform_adapter` is NOT called here to avoid
+   * a redundant double-write when `rac_init` already stores the same pointer.
    */
   register(): void {
     const m = this.m;
     const sizeofPlatformAdapter = m._rac_wasm_sizeof_platform_adapter;
-    const setPlatformAdapter = m._rac_set_platform_adapter;
-    if (typeof sizeofPlatformAdapter !== 'function' || typeof setPlatformAdapter !== 'function') {
+    if (typeof sizeofPlatformAdapter !== 'function') {
       throw new Error(
-        'WASM module missing _rac_wasm_sizeof_platform_adapter or _rac_set_platform_adapter exports',
+        'WASM module missing _rac_wasm_sizeof_platform_adapter export',
       );
     }
 
@@ -129,13 +131,7 @@ export class PlatformAdapter {
     // user_data
     m.setValue(this.adapterPtr + getOffset('user_data'), 0, '*');
 
-    const result = setPlatformAdapter(this.adapterPtr);
-    if (result !== 0) {
-      logger.error(`Failed to set platform adapter: ${result}`);
-      this.cleanup();
-      throw new Error(`rac_set_platform_adapter returned ${result}`);
-    }
-    logger.info('Platform adapter registered successfully');
+    logger.info('Platform adapter struct populated; caller installs via rac_init config.platform_adapter');
   }
 
   /** Pointer to the rac_platform_adapter_t struct in WASM memory. */
