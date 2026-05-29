@@ -1,5 +1,4 @@
 import Flutter
-import UIKit
 
 /// RunAnywhere Genie Flutter Plugin - iOS Implementation
 ///
@@ -8,28 +7,5 @@ import UIKit
 /// without claiming runtime NPU support on an unsupported platform.
 public class GeniePlugin: NSObject, FlutterPlugin {
 
-    public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(
-            name: "runanywhere_genie",
-            binaryMessenger: registrar.messenger()
-        )
-        let instance = GeniePlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
-    }
-
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        switch call.method {
-        case "getPlatformVersion":
-            result("iOS " + UIDevice.current.systemVersion)
-        case "getBackendVersion":
-            // Aligns with `Genie.genieNativeVersion` in lib/genie.dart and the
-            // `genieVersion` constant in android/binary_config.gradle (the
-            // single source of truth for the Qualcomm Genie native binary).
-            result("0.3.0")
-        case "getBackendName":
-            result("Genie")
-        default:
-            result(FlutterMethodNotImplemented)
-        }
-    }
+    public static func register(with _: FlutterPluginRegistrar) {}
 }
