@@ -17,9 +17,6 @@ struct AddModelFromURLView: View {
     @State private var selectedFramework: InferenceFramework = .llamaCpp
     @State private var estimatedSize: String = ""
     @State private var supportsThinking = false
-    @State private var thinkingOpenTag = "<thinking>"
-    @State private var thinkingCloseTag = "</thinking>"
-    @State private var useCustomThinkingTags = false
     @State private var isAdding = false
     @State private var errorMessage: String?
     @State private var availableFrameworks: [InferenceFramework] = []
@@ -113,33 +110,6 @@ struct AddModelFromURLView: View {
 
         Section("Thinking Support") {
             Toggle("Model Supports Thinking", isOn: $supportsThinking)
-
-            if supportsThinking {
-                Toggle("Use Custom Tags", isOn: $useCustomThinkingTags)
-
-                if useCustomThinkingTags {
-                    TextField("Opening Tag", text: $thinkingOpenTag)
-                        .textFieldStyle(.roundedBorder)
-                        #if os(iOS)
-                        .autocapitalization(.none)
-                        #endif
-                        .autocorrectionDisabled()
-
-                    TextField("Closing Tag", text: $thinkingCloseTag)
-                        .textFieldStyle(.roundedBorder)
-                        #if os(iOS)
-                        .autocapitalization(.none)
-                        #endif
-                        .autocorrectionDisabled()
-                } else {
-                    HStack {
-                        Text("Default tags:")
-                        Text("<thinking>...</thinking>")
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
         }
 
         Section("Advanced (Optional)") {
