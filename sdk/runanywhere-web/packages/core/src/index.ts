@@ -57,6 +57,7 @@ export type {
   OnnxBackendStatus,
 } from './Public/Extensions/Backends/onnxStatus';
 export { LogLevel } from './Public/Extensions/RunAnywhere+Logging';
+export type { LoggingConfiguration, LogDestination } from './Public/Extensions/RunAnywhere+Logging';
 export type {
   HardwareProfile,
   HardwareProfileResult,
