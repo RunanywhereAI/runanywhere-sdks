@@ -48,6 +48,18 @@ class DartBridgeVoiceAgent {
   /// Default empty compose config is used if [getHandle] is invoked
   /// without an explicit [initializeProto] first — matches Swift's
   /// "compose on first access with defaults" behavior.
+  ///
+  /// No-yield invariant: the synchronous prefix below (read `_handle`,
+  /// read `_initFuture`, assign `_initFuture`) executes within a single
+  /// microtask — Dart's cooperative scheduler cannot interleave another
+  /// microtask at a non-`await` point. Concurrent `getHandle()` calls
+  /// therefore cannot both observe `_initFuture == null` and each create
+  /// a separate `Completer`, so only one C ABI
+  /// `rac_voice_agent_component_create_proto` call is issued per
+  /// lifecycle. Mirrors the `.installing` state gate in Swift's
+  /// `HandleFanOutAttachRole` / `HandleFanOut.attach`. Do NOT insert an
+  /// `await` between the null-checks and the `_initFuture` assignment —
+  /// that would open a real race window.
   Future<RacHandle> getHandle(
       [voice_agent_pb.VoiceAgentComposeConfig? config]) async {
     if (_handle != null) return _handle!;
