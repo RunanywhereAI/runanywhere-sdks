@@ -99,6 +99,10 @@ export async function detectVoiceActivity(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  const native = requireNativeModule();
+  if (!(await native.isInitialized())) {
+    throw SDKException.notInitialized();
+  }
   await ensureServicesReady();
   return processVAD(audioToArrayBuffer(audio), 16000, options);
 }
@@ -127,8 +131,13 @@ async function processVAD(
 
 /** Reset VAD state. */
 export async function resetVAD(): Promise<void> {
-  if (!isNativeModuleAvailable()) return;
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
   const native = requireNativeModule();
+  if (!(await native.isInitialized())) {
+    throw SDKException.notInitialized();
+  }
   await native.resetVAD();
   logger.debug('VAD state reset');
 }
