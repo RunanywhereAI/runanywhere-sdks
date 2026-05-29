@@ -441,7 +441,39 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
     // an already-declared single-file local path would otherwise rewrite
     // resolved_path based on directory contents that may not match the
     // declared filename (e.g. tests using synthetic /tmp paths).
-    if (!model.local_path().empty() && !model.has_multi_file() && !model.has_expected_files()) {
+    //
+    // EXCEPTION: directory-based frameworks (Sherpa-ONNX STT/TTS, ONNX,
+    // CoreML, ...) MUST always run rac_model_paths_resolve_artifact even
+    // when local_path is a plain folder with no multi-file/expected-files
+    // descriptors. Their archives ship as a single top-level nested dir
+    // (`<id>/<files>`) so extraction into `Models/Sherpa/<id>/` yields
+    // `Models/Sherpa/<id>/<id>/<files>`. The registry self-heal stores the
+    // OUTER folder as local_path; the loader (engines/sherpa load_model)
+    // does a non-recursive scan for `*encoder*.onnx`/`tokens.txt` and so
+    // needs the resolved path to point at the INNER directory that actually
+    // contains the artifacts. rac_model_paths_resolve_artifact ->
+    // effective_model_root() collapses that single nested level. Skipping it
+    // here returned the outer folder and broke STT/TTS/voice-agent load.
+    //
+    // EXCEPTION 2 (archive artifacts): a model registered as an archive
+    // (has_archive(), e.g. the SmolVLM `*.tar.gz` VLM) extracts to a
+    // DIRECTORY which the download orchestrator records as local_path
+    // (download_orchestrator.cpp sets completion_local_path =
+    // model_folder_path for archive-extracted entries). Such an entry has
+    // NO multi_file/expected_files descriptors and — for llama.cpp VLMs —
+    // a framework that is NOT directory-based, so without this guard it hit
+    // the single-file fast path and returned the extracted FOLDER as the
+    // primary path with mmproj_path EMPTY. The llama.cpp VLM loader then
+    // got a directory (not the `.gguf`) and no vision projector, failing
+    // the multimodal load before the native backend even ran. Archives must
+    // always run rac_model_paths_resolve_artifact so the folder scan +
+    // infer_file_role() recover the primary `.gguf` AND the `mmproj`
+    // projector. Cross-platform: the same commons path backs iOS/Android/
+    // Flutter/RN VLM loads.
+    if (!model.local_path().empty() && !model.has_multi_file() && !model.has_expected_files() &&
+        !model.has_archive() &&
+        rac_framework_uses_directory_based_models(c_framework_from_proto(model.framework())) !=
+            RAC_TRUE) {
         return out;
     }
     // Registry local_path may point at a single file (legacy self-heal picked
