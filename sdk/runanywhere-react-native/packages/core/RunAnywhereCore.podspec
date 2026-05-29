@@ -46,7 +46,7 @@ Pod::Spec.new do |s|
     "cpp/bridges/**/*.{cpp,hpp}",
   ]
   s.preserve_paths = [
-    "../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
+    "ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
   ]
 
   # Build header search paths: include the Headers root (for qualified includes

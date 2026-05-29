@@ -20,16 +20,21 @@
 // (matching the Flutter and Swift SDK source of truth) and consumed by
 // `HybridRunAnywhereCore.cpp` during SDK bootstrap.
 //
-// The path below is RELATIVE to this file on disk
-// (sdk/runanywhere-react-native/packages/core/ios/) so that the compiler
-// resolves it without needing a custom HEADER_SEARCH_PATHS entry. clang
-// receives the realpath of this .mm at compile time, so relative-to-source
-// resolution works for both Flutter and React Native consumers.
+// The canonical implementation is co-located at
+// ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm when built
+// from a published npm package (staged by the prepack script). When built
+// inside the monorepo without a prior prepack, the path resolves via the
+// repo-relative fallback below. Both paths are probed at compile time using
+// __has_include so no HEADER_SEARCH_PATHS entry is needed in either context.
 
 #define RAC_URLS_C_PREFIX    rn
 #define RAC_URLS_OBJC_PREFIX RNRunAnywhere
 
+#if __has_include("URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm")
+#include "URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+#else
 #include "../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm"
+#endif
 
 #undef RAC_URLS_C_PREFIX
 #undef RAC_URLS_OBJC_PREFIX
