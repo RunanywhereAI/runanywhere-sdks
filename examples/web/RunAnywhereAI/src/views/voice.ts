@@ -555,7 +555,7 @@ function decodePcm(frame: AudioFrameEvent): Float32Array {
     const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
     const samples = new Float32Array(pcm.byteLength / 2);
     for (let i = 0; i < samples.length; i += 1) {
-      samples[i] = view.getInt16(i * 2, true) / 0x7fff;
+      samples[i] = view.getInt16(i * 2, true) / 0x8000;
     }
     return samples;
   }
