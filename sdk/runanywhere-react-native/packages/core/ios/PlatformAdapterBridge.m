@@ -8,6 +8,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "PlatformDownloadBridge.h"
+#import "PlatformAdapterBridge.h"  // own header: PlatformDirectoryEntry + PlatformAdapter_listDirectory decls
 
 // Import the generated Swift header from the pod
 #if __has_include(<RunAnywhereCore/RunAnywhereCore-Swift.h>)
