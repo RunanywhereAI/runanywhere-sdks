@@ -320,6 +320,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         });
         break;
 
+      case sdk.VoiceEvent_Payload.audioLevel:
+        setState(() {
+          _audioLevel = event.audioLevel.rms.clamp(0.0, 1.0);
+        });
+        break;
+
       case sdk.VoiceEvent_Payload.interrupted:
       case sdk.VoiceEvent_Payload.metrics:
       case sdk.VoiceEvent_Payload.componentStateChanged:
@@ -329,10 +335,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.agentResponseStarted:
       case sdk.VoiceEvent_Payload.agentResponseCompleted:
       case sdk.VoiceEvent_Payload.turnLifecycle:
-      case sdk.VoiceEvent_Payload.audioLevel:
       case sdk.VoiceEvent_Payload.componentProgress:
       case sdk.VoiceEvent_Payload.notSet:
-        // No UX impact today.
         break;
     }
   }
