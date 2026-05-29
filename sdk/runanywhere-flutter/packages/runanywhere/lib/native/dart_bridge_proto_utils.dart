@@ -9,6 +9,8 @@ import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' as pb_enum;
 import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Maximum number of microtask yields the synchronous-FFI streaming wrappers
@@ -134,7 +136,11 @@ class DartBridgeProtoUtils {
         out.ref.status == RacResultCode.success) {
       return;
     }
-    throw StateError('$symbol failed: ${protoBufferError(out, code)}');
+    throw SDKException.make(
+      code: pb_enum.ErrorCode.ERROR_CODE_PROCESSING_FAILED,
+      message: '$symbol failed: ${protoBufferError(out, code)}',
+      category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+    );
   }
 
   static String protoBufferError(ffi.Pointer<RacProtoBuffer> out, int code) {
