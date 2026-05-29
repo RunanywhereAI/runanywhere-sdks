@@ -122,24 +122,63 @@ class RunAnywhereVoice {
   /// `false` only if the caller has already loaded an explicit VAD model
   /// (or knows the energy fallback is acceptable for the deployment).
   ///
+  /// [ttsVoiceID] is the voice id *within* the loaded TTS model, NOT the
+  /// model id. For single-voice engines, leave it unset to use the
+  /// engine's default voice. For multi-voice engines (Piper, Sherpa-ONNX-TTS
+  /// multi-voice), pass the desired voice id explicitly. Never reuse the TTS
+  /// model id here — model id ≠ voice id.
+  ///
   /// Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
-  Future<void> initializeWithLoadedModels({bool ensureVAD = true}) async {
+  Future<void> initializeWithLoadedModels({
+    String? ttsVoiceID,
+    bool ensureVAD = true,
+  }) async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
+
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
 
     if (ensureVAD) {
       await ensureDefaultVAD();
     }
 
-    if (!isReady) {
+    final sttSnap = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      ),
+    );
+    final llmSnap = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      ),
+    );
+    final ttsSnap = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+      ),
+    );
+
+    final missing = <String>[];
+    if (!sttSnap.found || sttSnap.modelId.isEmpty) missing.add('STT');
+    if (!llmSnap.found || llmSnap.modelId.isEmpty) missing.add('LLM');
+    if (!ttsSnap.found || ttsSnap.modelId.isEmpty) missing.add('TTS');
+    if (missing.isNotEmpty) {
       throw SDKException.voiceAgentNotReady(
-        'Voice agent components not ready. Load STT, LLM, and TTS models first.',
+        'Cannot initialize voice agent: Models not loaded: ${missing.join(', ')}',
       );
     }
 
+    final config = voice_agent_proto.VoiceAgentComposeConfig(
+      sttModelId: sttSnap.modelId,
+      llmModelId: llmSnap.modelId,
+    );
+    if (ttsVoiceID != null && ttsVoiceID.isNotEmpty) {
+      config.ttsVoiceId = ttsVoiceID;
+    }
+
     try {
-      await DartBridge.voiceAgent.initializeProto(
-        voice_agent_proto.VoiceAgentComposeConfig(),
-      );
+      await DartBridge.voiceAgent.initializeProto(config);
       logger.info('Voice agent initialized with loaded models');
     } catch (e) {
       logger.error('Failed to initialize voice agent: $e');
