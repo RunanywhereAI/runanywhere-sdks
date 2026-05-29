@@ -81,9 +81,6 @@ class RunAnywhereModelLifecycle {
     if (!DartBridge.isInitialized) return null;
     return DartBridge.modelLifecycle.componentSnapshot(component);
   }
-
-  /// Reset commons lifecycle state. Primarily useful for tests.
-  void reset() => DartBridge.modelLifecycle.reset();
 }
 
 /// Primary and companion paths selected by commons model path resolution.
