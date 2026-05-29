@@ -14,7 +14,6 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -40,21 +39,16 @@ private val vlmLogger = SDKLogger("VLM")
  * Returns true if a VLM model is loaded in the lifecycle under either the
  * `MULTIMODAL` or `VISION` category. Mirrors Swift `isVLMModelLoaded()`.
  *
- * Both categories collapse to `SDK_COMPONENT_VLM` in C++ commons. We route
- * through `ModelLifecycle` (the canonical source of truth) rather than the
- * per-actor `CppBridgeVLM.isLoaded()` handle state so the check cannot
- * disagree with what the lifecycle says is loaded.
+ * Both categories collapse to `SDK_COMPONENT_VLM` in C++ commons. Routes
+ * through the public `RunAnywhere.currentModel` API so cross-cutting
+ * concerns (telemetry, lifecycle audit) hook in correctly.
  */
-private fun isVLMModelLoaded(): Boolean {
+private suspend fun RunAnywhere.isVLMModelLoaded(): Boolean {
     for (category in arrayOf(
         ProtoModelCategory.MODEL_CATEGORY_MULTIMODAL,
         ProtoModelCategory.MODEL_CATEGORY_VISION,
     )) {
-        val result =
-            CppBridgeModelLifecycle.currentModel(
-                CurrentModelRequest(category = category),
-            )
-        if (result?.found == true) {
+        if (currentModel(CurrentModelRequest(category = category)).found) {
             return true
         }
     }
@@ -99,9 +93,7 @@ fun RunAnywhere.processImageStream(
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
         }
-
         ensureServicesReady()
-
         if (!isVLMModelLoaded()) {
             throw SDKException.vlm("VLM model not loaded")
         }
@@ -150,6 +142,6 @@ fun RunAnywhere.processImageStream(
 
 // MARK: - Generation Control
 
-fun RunAnywhere.cancelVLMGeneration() {
+suspend fun RunAnywhere.cancelVLMGeneration() {
     CppBridgeVLM.cancel()
 }
