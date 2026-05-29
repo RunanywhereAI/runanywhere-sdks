@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
@@ -106,24 +107,20 @@ class DartBridgeModelPaths {
   Future<void> setBaseDirectory([String? path]) async {
     final dir = path ?? (await getApplicationDocumentsDirectory()).path;
 
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final setBase = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-          int Function(Pointer<Utf8>)>('rac_model_paths_set_base_dir');
+    final lib = PlatformLoader.loadCommons();
+    final setBase = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
+        int Function(Pointer<Utf8>)>('rac_model_paths_set_base_dir');
 
-      final dirPtr = dir.toNativeUtf8();
-      try {
-        final result = setBase(dirPtr);
-        if (result == RacResultCode.success) {
-          _logger.debug('C++ base directory set to: $dir');
-        } else {
-          _logger.warning('Failed to set C++ base directory: $result');
-        }
-      } finally {
-        calloc.free(dirPtr);
+    final dirPtr = dir.toNativeUtf8();
+    try {
+      final result = setBase(dirPtr);
+      if (result != RacResultCode.success) {
+        throw SDKException.invalidConfiguration(
+            'rac_model_paths_set_base_dir failed: $result');
       }
-    } catch (e) {
-      _logger.warning('rac_model_paths_set_base_dir error: $e');
+      _logger.debug('C++ base directory set to: $dir');
+    } finally {
+      calloc.free(dirPtr);
     }
   }
 
