@@ -23,18 +23,21 @@
  * registry keyed by the raw Registration address. The trampoline looks
  * the registration up under a short mutex, takes its OWN strong copy of
  * the `shared_ptr`, drops the mutex, and only then dereferences the
- * Registration. The unsubscribe lambda calls `unset` (so no NEW
- * dispatch will start) and then erases the registry entry. Any
- * dispatcher that snapshotted the slot before unset and is racing the
- * unsubscribe lambda either:
- *   (a) wins the registry lookup → it owns a strong ref, Registration
- *       stays alive for the duration of its dispatch; or
- *   (b) loses the registry lookup → it observes a null shared_ptr and
- *       returns without touching freed memory.
+ * Registration. The unsubscribe lambda follows the canonical commons
+ * teardown sequence documented on `rac_llm_set_stream_proto_callback`
+ * (see rac_llm_stream.h) and mirrored by Swift's HandleStreamAdapter:
+ *   (1) `rac_llm_unset_stream_proto_callback` — no NEW dispatch starts;
+ *   (2) `rac_llm_proto_quiesce` — spin-wait until every in-flight
+ *       dispatch has returned;
+ *   (3) erase the registry entry, dropping the registry's strong ref.
+ * Step (2) closes the window where a dispatcher that snapshotted the
+ * slot before step (1) is still inside the trampoline when the erase
+ * could otherwise free the Registration. The shared_ptr registry keeps
+ * the trampoline read-path safe even if a dispatch overlaps the erase.
  *
- * Mirrors the spirit of Swift's HandleStreamAdapter (which keeps a
- * per-handle fan-out alive via `Unmanaged.passRetained` + a static
- * dictionary) and Kotlin's 2-phase install/uninstall.
+ * Mirrors Swift's HandleStreamAdapter (per-handle fan-out kept alive
+ * via `Unmanaged.passRetained` + a static dictionary, torn down with
+ * unregister → quiesce → release) and Kotlin's 2-phase install/uninstall.
  */
 
 #include "HybridLLM.hpp"
@@ -159,20 +162,22 @@ std::function<void()> HybridLLM::subscribeProtoEvents(
   }
 
   // The unsubscribe lambda owns its own strong reference (`reg`). The
-  // registry holds another. The unsubscribe:
+  // registry holds another. The unsubscribe follows the canonical
+  // commons teardown sequence (rac_llm_stream.h):
   //   1. Flips `active` (cheap fast-path skip for any dispatcher whose
   //      registry lookup happens to win the race with us).
   //   2. Calls `rac_llm_unset_stream_proto_callback` so no NEW dispatch
   //      starts after this point.
-  //   3. Erases the registry entry — drops the registry's strong ref.
-  //      If a concurrent dispatcher already acquired its own strong
-  //      ref before step 3 ran, Registration stays alive until that
-  //      dispatcher's local `reg` shared_ptr falls out of scope.
-  //   4. Drops the lambda's `reg` capture when the lambda is destroyed.
+  //   3. Calls `rac_llm_proto_quiesce` so every in-flight dispatch that
+  //      snapshotted the slot before step 2 has returned before we drop
+  //      the registry's ownership in step 4.
+  //   4. Erases the registry entry — drops the registry's strong ref.
+  //   5. Drops the lambda's `reg` capture when the lambda is destroyed.
   return [reg, llm_handle, user_data]() mutable {
     bool was_active = reg->active.exchange(false, std::memory_order_acq_rel);
     if (!was_active) return;
     rac_llm_unset_stream_proto_callback(llm_handle);
+    rac_llm_proto_quiesce();
     {
       std::lock_guard<std::mutex> lock(llm_registry_mu());
       llm_registry().erase(user_data);
