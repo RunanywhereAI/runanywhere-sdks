@@ -64,7 +64,7 @@ export type VoiceAgentStreamSource = {
 export interface VoiceAgentProvider {
   readonly providerKind?: 'custom' | 'wasm-handle';
   initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void>;
-  initializeVoiceAgentWithLoadedModels(): Promise<void>;
+  initializeVoiceAgentWithLoadedModels(ttsVoiceID?: string): Promise<void>;
   isVoiceAgentReady(): Promise<boolean> | boolean;
   getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> | VoiceAgentComponentStates;
   processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult>;
@@ -237,8 +237,8 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
     }
   }
 
-  async initializeVoiceAgentWithLoadedModels(): Promise<void> {
-    await this.initializeVoiceAgent(defaultVoiceAgentComposeConfig());
+  async initializeVoiceAgentWithLoadedModels(ttsVoiceID?: string): Promise<void> {
+    await this.initializeVoiceAgent(defaultVoiceAgentComposeConfig(ttsVoiceID));
   }
 
   isVoiceAgentReady(): boolean {
@@ -287,7 +287,7 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 }
 
-function defaultVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
+function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
     vadSampleRate: 16000,
     vadFrameLength: 0.1,
@@ -295,6 +295,7 @@ function defaultVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
     wakewordEnabled: false,
     wakewordThreshold: 0.5,
     sessionId: 'web-voice-agent',
+    ...(ttsVoiceID ? { ttsVoiceId: ttsVoiceID } : {}),
   };
 }
 
@@ -409,15 +410,24 @@ export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Pro
  * already loaded an explicit VAD model (or knows the energy fallback is
  * acceptable for the deployment).
  *
+ * @param ttsVoiceID Optional voice id within the loaded TTS model. For
+ *   multi-voice TTS engines (e.g., Sherpa-ONNX-TTS with Piper multi-speaker
+ *   models), this selects which voice to use and is semantically distinct from
+ *   the TTS model id. When `undefined` (the default), the engine's default
+ *   voice is used — appropriate for single-voice models. Never reuse the TTS
+ *   model id here — model id ≠ voice id.
  * @param ensureVAD Whether to auto-load the catalogued default VAD when no
  *   `MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION` model is loaded. Defaults to
  *   `true`.
  */
-export async function initializeVoiceAgentWithLoadedModels(ensureVAD = true): Promise<void> {
+export async function initializeVoiceAgentWithLoadedModels(
+  ttsVoiceID?: string,
+  ensureVAD = true,
+): Promise<void> {
   if (ensureVAD) {
     await ensureDefaultVAD();
   }
-  await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels();
+  await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels(ttsVoiceID);
 }
 
 export async function isVoiceAgentReady(): Promise<boolean> {
