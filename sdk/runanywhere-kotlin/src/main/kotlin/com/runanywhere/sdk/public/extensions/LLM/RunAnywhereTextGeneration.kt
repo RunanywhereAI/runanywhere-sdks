@@ -11,10 +11,14 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.analyticsKey
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
@@ -77,4 +81,78 @@ fun RunAnywhere.generateStream(
 
 fun RunAnywhere.cancelGeneration() {
     runBlocking { CppBridgeLLM.cancel() }
+}
+
+// MARK: - Stream Aggregation
+
+/**
+ * Build a canonical [RALLMGenerationResult] from a [Flow] of [RALLMStreamEvent]s
+ * and the currently-loaded LLM model.
+ *
+ * Mirrors Swift `RunAnywhere.aggregateStream(prompt:events:onToken:)` exactly:
+ * concatenates token text, computes TTFT / throughput from wall-clock timestamps,
+ * and resolves the framework string from [currentModel] so callers always get
+ * the registry's canonical analytics key rather than hardcoding a framework name.
+ *
+ * @param prompt Prompt text used to estimate [RALLMGenerationResult.input_tokens]
+ *   when the backend does not surface it directly.
+ * @param events Flow of stream events from [generateStream]. Consumed until
+ *   [RALLMStreamEvent.is_final] is true or the flow completes.
+ * @param onToken Optional callback invoked for each non-empty token text with the
+ *   accumulated transcript so far (suitable for live UI updates).
+ * @return A populated [RALLMGenerationResult] whose [RALLMGenerationResult.framework]
+ *   matches the loaded LLM model's analytics key; on terminal error events the
+ *   [RALLMGenerationResult.error_message] is propagated.
+ */
+suspend fun RunAnywhere.aggregateStream(
+    prompt: String,
+    events: Flow<RALLMStreamEvent>,
+    onToken: (suspend (String) -> Unit)? = null,
+): RALLMGenerationResult {
+    var fullResponse = ""
+    var tokenCount = 0
+    var firstTokenTimeMs: Long? = null
+    val startTimeMs = System.currentTimeMillis()
+    var finishReason = ""
+    var terminalError = ""
+
+    events.collect { event ->
+        if (event.token.isNotEmpty()) {
+            if (firstTokenTimeMs == null) firstTokenTimeMs = System.currentTimeMillis()
+            fullResponse += event.token
+            tokenCount += 1
+            onToken?.invoke(fullResponse)
+        }
+        if (event.is_final) {
+            finishReason = event.finish_reason
+            terminalError = event.error_message
+        }
+    }
+
+    val totalLatencyMs = (System.currentTimeMillis() - startTimeMs).toDouble()
+    val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
+
+    val snapshot = currentModel(
+        CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+    )
+    val modelID = if (snapshot.found) snapshot.model_id else ""
+    val framework = if (snapshot.found) {
+        snapshot.framework.analyticsKey
+    } else {
+        InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
+    }
+
+    return RALLMGenerationResult(
+        text = fullResponse,
+        input_tokens = maxOf(1, prompt.length / 4),
+        tokens_generated = tokenCount,
+        response_tokens = tokenCount,
+        model_used = modelID,
+        generation_time_ms = totalLatencyMs,
+        framework = framework,
+        tokens_per_second = if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
+        ttft_ms = ttftMs,
+        finish_reason = finishReason,
+        error_message = terminalError.ifEmpty { null },
+    )
 }
