@@ -264,6 +264,19 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     const std::string request_id = request.request_id();
     const std::string turn_id = d7_pick_turn_id(request_id);
 
+    // commons-042: admit under the in-flight barrier so rac_voice_agent_destroy's
+    // drain loop covers this full STT+LLM+TTS turn. The d7 path reads
+    // is_configured below outside handle->mutex, so without the barrier a
+    // concurrent destroy could flip is_shutting_down after that read and tear
+    // the agent down mid-turn while this thread still emits events on it.
+    InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        d7_emit_error(handle, RAC_ERROR_INVALID_STATE, "voice_agent",
+                      "voice agent is shutting down", session_id, turn_id, request_id,
+                      event_callback, user_data);
+        return RAC_ERROR_INVALID_STATE;
+    }
+
     if (!handle->is_configured.load(std::memory_order_acquire)) {
         d7_emit_error(handle, RAC_ERROR_NOT_INITIALIZED, "voice_agent",
                       "voice agent is not initialized", session_id, turn_id, request_id,
@@ -538,6 +551,14 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
                                           "transcribe request is missing audio_data");
     }
 
+    // commons-042: admit under the in-flight barrier so destroy()'s drain loop
+    // covers this STT inference call (which takes no handle->mutex at all).
+    InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                          "voice agent is shutting down");
+    }
+
     // commons-features-voice-001: prefer the canonical lifecycle STT ref; fall back
     // to the component-handle path so legacy callers still work end-to-end.
     rac::lifecycle::LifecycleSttRef stt_ref{};
@@ -614,6 +635,14 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
     if (request.text().empty()) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "synthesize request is missing text");
+    }
+
+    // commons-042: admit under the in-flight barrier so destroy()'s drain loop
+    // covers this TTS synthesis call (which takes no handle->mutex at all).
+    InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                          "voice agent is shutting down");
     }
 
     // commons-features-voice-001: prefer the canonical lifecycle TTS ref; fall back

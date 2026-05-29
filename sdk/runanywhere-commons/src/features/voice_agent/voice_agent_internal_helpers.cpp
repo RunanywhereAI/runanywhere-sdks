@@ -39,6 +39,30 @@
 
 namespace rac::voice_agent::detail {
 
+// commons-042: per-handle in-flight admission guard. See the header for the
+// race it closes. The flag/counter live on the rac_voice_agent struct, so
+// rac_voice_agent_destroy's existing `while (handle->in_flight > 0)` drain
+// loop now covers every long-running entry point that wraps its body here.
+InFlightGuard::InFlightGuard(rac_voice_agent_handle_t handle) : handle_(handle) {
+    if (!handle_ || handle_->is_shutting_down.load(std::memory_order_acquire)) {
+        return;
+    }
+    handle_->in_flight.fetch_add(1, std::memory_order_acq_rel);
+    // Re-check after incrementing to avoid TOCTOU with rac_voice_agent_destroy,
+    // which sets is_shutting_down=true and then drains the counter.
+    if (handle_->is_shutting_down.load(std::memory_order_acquire)) {
+        handle_->in_flight.fetch_sub(1, std::memory_order_acq_rel);
+        return;
+    }
+    admitted_ = true;
+}
+
+InFlightGuard::~InFlightGuard() {
+    if (admitted_) {
+        handle_->in_flight.fetch_sub(1, std::memory_order_acq_rel);
+    }
+}
+
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {

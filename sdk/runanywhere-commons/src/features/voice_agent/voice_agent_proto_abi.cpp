@@ -238,6 +238,17 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                           "voice agent is not initialized");
     }
 
+    // commons-042: admit under the in-flight barrier so rac_voice_agent_destroy's
+    // drain loop covers this multi-second STT+LLM+TTS turn. Without it the proto
+    // path read is_configured above outside the mutex, so a destroy that flipped
+    // is_shutting_down after that read could tear the agent down while this turn
+    // (and its deferred user-callback emits) is still running.
+    InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
+                                          "voice agent is shutting down");
+    }
+
     runanywhere::v1::VoiceAgentComponentStates states;
     fill_component_states(handle, &states);
     if (states.stt_state() != runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {

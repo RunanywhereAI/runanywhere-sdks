@@ -299,6 +299,14 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // commons-042: admit under the in-flight barrier before blocking on the
+    // mutex so destroy()'s drain loop covers this long-running turn and a
+    // concurrent destroy fails us fast instead of waiting out STT+LLM+TTS.
+    rac::voice_agent::detail::InFlightGuard guard(handle);
+    if (!guard.admitted()) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     if (!handle->is_configured.load(std::memory_order_acquire)) {
@@ -405,16 +413,19 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
-
-    // pass3-syn-090: bail out if destroy/cleanup has begun.
-    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+    // commons-042: admit under the in-flight barrier before the mutex so
+    // destroy()'s drain loop waits for this streaming run and a concurrent
+    // destroy fails us fast instead of blocking behind the pipeline drain.
+    rac::voice_agent::detail::InFlightGuard guard(handle);
+    if (!guard.admitted()) {
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = RAC_ERROR_NOT_INITIALIZED;
         rac_va_emit(handle, &error_event, callback, user_data);
         return RAC_ERROR_NOT_INITIALIZED;
     }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
 
     if (!handle->is_configured.load(std::memory_order_acquire)) {
         rac_voice_agent_event_t error_event = {};
@@ -560,21 +571,14 @@ rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, cons
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
-        return RAC_ERROR_INVALID_STATE;
-    }
-    handle->in_flight.fetch_add(1, std::memory_order_acq_rel);
-
-    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
-        handle->in_flight.fetch_sub(1, std::memory_order_acq_rel);
+    // commons-042: shared in-flight admission guard (was hand-rolled here).
+    rac::voice_agent::detail::InFlightGuard guard(handle);
+    if (!guard.admitted()) {
         return RAC_ERROR_INVALID_STATE;
     }
 
-    rac_result_t result =
-        rac_vad_component_process(handle->vad_handle, samples, sample_count, out_speech_detected);
-
-    handle->in_flight.fetch_sub(1, std::memory_order_acq_rel);
-    return result;
+    return rac_vad_component_process(handle->vad_handle, samples, sample_count,
+                                     out_speech_detected);
 }
 
 // =============================================================================

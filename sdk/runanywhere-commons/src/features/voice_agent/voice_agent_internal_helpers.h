@@ -32,6 +32,34 @@
 
 namespace rac::voice_agent::detail {
 
+// commons-042: RAII admission guard for every long-running voice-agent entry
+// point (process_voice_turn{,_proto}, process_stream, process_turn_proto,
+// transcribe_proto, synthesize_speech_proto, detect_speech). Implements the
+// canonical TOCTOU-safe sequence the lock-free design relies on:
+//   1. check handle->is_shutting_down before incrementing,
+//   2. increment handle->in_flight,
+//   3. re-check handle->is_shutting_down (publish-before-check race with
+//      rac_voice_agent_destroy, which sets the flag then drains the counter),
+//   4. RAII-decrement on scope exit.
+// `rac_voice_agent_destroy` spin-waits on handle->in_flight > 0, so wrapping
+// each entry point in this guard makes the shutdown barrier cover them all
+// instead of only detect_speech. Mirrors VlmInFlightGuard (rac_vlm_proto_abi)
+// and SDKEventInFlightGuard (event_publisher), but scoped per-handle because
+// the voice-agent counter/flag live on the rac_voice_agent struct.
+struct InFlightGuard {
+    explicit InFlightGuard(rac_voice_agent_handle_t handle);
+    ~InFlightGuard();
+    // True when the increment succeeded and shutdown was not in progress;
+    // entry points must early-return when this is false.
+    bool admitted() const { return admitted_; }
+    InFlightGuard(const InFlightGuard&) = delete;
+    InFlightGuard& operator=(const InFlightGuard&) = delete;
+
+   private:
+    rac_voice_agent_handle_t handle_;
+    bool admitted_{false};
+};
+
 #if defined(RAC_HAVE_PROTOBUF)
 
 // Validate that a (bytes, size) pair is decodable by Protobuf's
