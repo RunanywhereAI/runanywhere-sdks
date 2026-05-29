@@ -291,7 +291,7 @@ class ModelSelectionViewModel(
             }
 
             try {
-                RunAnywhere.downloadModel(model).collect { progress ->
+                RunAnywhere.downloadModel(model) { progress ->
                     val pct =
                         if (progress.total_bytes > 0) {
                             (progress.bytes_downloaded.toDouble() / progress.total_bytes * 100).toInt()
