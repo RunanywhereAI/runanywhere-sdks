@@ -207,7 +207,20 @@ class RunAnywhereSTT {
           }
 
           var sawTerminalEvent = false;
-          nativeCb = NativeCallable<RacSttStreamEventCallbackNative>.listener((
+          // Use `isolateLocal` (not `.listener`) so the callback runs
+          // synchronously on the same thread that invokes
+          // `rac_stt_transcribe_stream_lifecycle_proto`. The commons
+          // emit_event lambda in rac_nonllm_lifecycle_proto_abi.cpp
+          // serialises into a function-local std::vector<uint8_t> and calls
+          // the callback while that vector is alive. With `.listener` the
+          // Dart task fires asynchronously after the lambda has returned and
+          // the vector has been freed — bytesPtr references freed heap (UAF).
+          // `isolateLocal` is safe because Sherpa-ONNX (the only
+          // commons-shipped STT backend) runs transcribe_stream entirely on
+          // the calling thread; the callback always fires on the isolate that
+          // created the NativeCallable.
+          nativeCb =
+              NativeCallable<RacSttStreamEventCallbackNative>.isolateLocal((
             Pointer<Uint8> bytesPtr,
             int bytesLen,
             Pointer<Void> _,
@@ -242,17 +255,13 @@ class RunAnywhereSTT {
               nativeCb!.nativeFunction,
               nullptr,
             );
-            // FLUTTER-IOS-001 fix (mirrors RunAnywhereLLM._generateStreamProto):
-            // `rac_stt_transcribe_stream_lifecycle_proto` is a blocking
-            // synchronous FFI call. While it runs, the main isolate's event
-            // loop is frozen, so NativeCallable.listener invocations queue up
-            // but do not execute. Yield via the shared
-            // [drainPendingStreamCallbacks] helper so queued partial/final
-            // callbacks can drain before the controller is closed in the
-            // finally block — otherwise subscribers receive an empty stream
-            // even though native emitted partial/final events. See
-            // [kStreamDrainMaxMicrotasks].
-            await drainPendingStreamCallbacks(() => sawTerminalEvent);
+            // With `isolateLocal` all callbacks fire synchronously during `fn`
+            // above — no drain loop needed. Close the controller if commons
+            // did not emit a terminal event (e.g. an older native binary that
+            // never sends STT_STREAM_EVENT_KIND_FINAL).
+            if (!sawTerminalEvent && !controller.isClosed) {
+              unawaited(controller.close());
+            }
             if (code != 0) {
               controller.addError(StateError(
                 'rac_stt_transcribe_stream_lifecycle_proto failed: code=$code',
