@@ -82,10 +82,15 @@ class _VoiceHandleFanOut {
   NativeCallable<_CCallbackNative>? _nativeCb;
 
   bool attach(StreamController<VoiceEvent> controller) {
+    // Add the controller BEFORE calling _install() so that a
+    // synchronously-fired first event (legal per the commons contract; see
+    // HandleStreamAdapter.swift:123-129 mlt-002 record) is not dropped
+    // because _broadcast() snapshots an empty set.  Roll back on failure.
+    _controllers.add(controller);
     if (_nativeCb == null && !_install()) {
+      _controllers.remove(controller);
       return false;
     }
-    _controllers.add(controller);
     return true;
   }
 
