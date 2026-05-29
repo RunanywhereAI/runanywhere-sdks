@@ -16,6 +16,8 @@ import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -1004,6 +1006,32 @@ abstract final class RunAnywhere {
   /// Query the RAG pipeline.
   static Future<RAGResult> ragQuery(RAGQueryOptions options) =>
       RunAnywhereRAG.shared.ragQuery(options);
+
+  /// Download a registered model by id. Drains the commons-backed progress
+  /// stream, forwarding each event to [onProgress], and returns the terminal
+  /// [DownloadProgress] on completion.
+  ///
+  /// Mirrors Swift `RunAnywhere.downloadModel(_:onProgress:) async throws ->
+  /// RADownloadProgress`: callers await the final result and observe progress
+  /// via the optional callback — they do not need to manage the stream
+  /// themselves. Throws [SDKException] on failure or cancellation.
+  static Future<DownloadProgress> downloadModel(
+    String modelId, {
+    Future<void> Function(DownloadProgress)? onProgress,
+  }) async {
+    DownloadProgress? last;
+    await for (final progress in RunAnywhereDownloads.shared.start(modelId)) {
+      last = progress;
+      if (onProgress != null) {
+        await onProgress(progress);
+      }
+    }
+    return last ??
+        DownloadProgress(
+          modelId: modelId,
+          errorMessage: 'No progress events received for model: $modelId',
+        );
+  }
 
   /// Flat streaming voice agent events.
   /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.
