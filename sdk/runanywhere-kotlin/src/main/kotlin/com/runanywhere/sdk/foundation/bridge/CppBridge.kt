@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
@@ -565,6 +566,17 @@ object CppBridge {
                 logger.warn("Device registration failed (non-critical): ${e.message}")
                 // Emit device registration failed event
                 CppBridgeSDKEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
+            }
+
+            // Step 5 (deferred from C++): filesystem-backed model discovery.
+            // Mirrors Swift `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
+            // in `_performServicesInitialization` (sdk_init.cpp file header: deferred
+            // to platform SDKs). Phase-2 model assignments may have linked new models;
+            // without this call they won't surface in modelRegistry.list() until the
+            // next manual hydrate triggered by a UI action.
+            val discoveryResult = CppBridgeModelRegistry.discoverDownloadedModels()
+            if (discoveryResult.linked_count > 0) {
+                logger.info("Discovered ${discoveryResult.linked_count} downloaded models on startup")
             }
 
             synchronized(lock) {
