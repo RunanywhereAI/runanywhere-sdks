@@ -6,6 +6,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import {
   CurrentModelRequest,
   CurrentModelResult,
@@ -117,6 +118,7 @@ export async function loadModel(
     });
   }
 
+  await ensureServicesReady();
   const native = requireNativeModule();
   const buffer = await native.modelLifecycleLoadProto(
     encode(request, ModelLoadRequest)
@@ -142,6 +144,7 @@ export async function unloadModel(
     });
   }
 
+  await ensureServicesReady();
   const native = requireNativeModule();
   const buffer = await native.modelLifecycleUnloadProto(
     encode(request, ModelUnloadRequest)

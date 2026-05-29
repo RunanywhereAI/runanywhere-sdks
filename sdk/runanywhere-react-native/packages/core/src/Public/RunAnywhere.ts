@@ -27,9 +27,11 @@ import {
   markCoreInitialized,
   markServicesInitializing,
   markServicesInitialized,
+  markHTTPSetupCompleted,
   markInitializationFailed,
   resetState,
-} from '../Foundation/Initialization';
+} from '../Foundation/Initialization/InitializationState';
+import { registerServicesReadyGuard } from '../Foundation/Initialization/ServicesReadyGuard';
 import type { SDKInitOptions } from '../types/models';
 import {
   EventDestination,
@@ -308,8 +310,25 @@ export const RunAnywhere = {
         throw new Error('Native services initialization failed');
       }
 
-      initState = markServicesInitialized(initState);
-      logger.info('Services initialisation completed.');
+      // Probe authentication state to derive httpConfigured, mirroring
+      // Swift's `hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured`
+      // and Kotlin's `_hasCompletedHTTPSetup = httpConfigured`. An offline Phase 2
+      // completes with httpConfigured=false; ensureServicesReady() retries on the
+      // next online API call via retryHTTPSetupInternal().
+      let httpConfigured = false;
+      try {
+        httpConfigured = await native.isAuthenticated();
+      } catch {
+        // Probe failure is non-fatal; httpConfigured stays false so the retry
+        // branch in ensureServicesReadyInternal() fires on the next API call.
+      }
+
+      initState = markServicesInitialized(initState, httpConfigured);
+      if (httpConfigured) {
+        logger.info('Services initialisation completed.');
+      } else {
+        logger.info('Services initialisation completed (HTTP/auth deferred — will retry on next online call).');
+      }
       publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
     })();
 
@@ -612,3 +631,64 @@ export const RunAnywhere = {
   componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
 
 };
+
+// ============================================================================
+// Internal Phase-2 guard — mirrors Swift RunAnywhere.ensureServicesReady() and
+// Kotlin RunAnywhere.ensureServicesReady(). Three branches:
+//   1. Fast path: services + HTTP both done → return immediately (O(1)).
+//   2. Recovery path: services done, HTTP failed (offline init) → retry HTTP
+//      without re-running Phase 2. Keeps local-model inference alive after an
+//      offline boot while re-authenticating transparently once online.
+//   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
+// ============================================================================
+
+async function retryHTTPSetupInternal(): Promise<void> {
+  if (!isNativeModuleAvailable()) {
+    return;
+  }
+  const native = requireNativeModule();
+  logger.debug('Retrying HTTP/auth setup...');
+  try {
+    const authenticated = await native.isAuthenticated();
+    if (authenticated) {
+      initState = markHTTPSetupCompleted(initState);
+      logger.info('HTTP/Auth setup succeeded on retry (already authenticated).');
+      return;
+    }
+    const params = initState.initParams;
+    if (!params) {
+      return;
+    }
+    const deviceId = await native.getDeviceId().catch(() => '');
+    await native.authAuthenticate(
+      params.apiKey ?? '',
+      params.baseURL ?? '',
+      deviceId,
+      'react_native',
+      SDKConstants.version
+    );
+    initState = markHTTPSetupCompleted(initState);
+    logger.info('HTTP/Auth setup succeeded on retry.');
+  } catch (error) {
+    logger.debug(
+      `HTTP/Auth retry failed (still offline?): ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+async function ensureServicesReadyInternal(): Promise<void> {
+  if (initState.hasCompletedServicesInit && initState.hasCompletedHTTPSetup) {
+    return;
+  }
+  if (initState.hasCompletedServicesInit && !initState.hasCompletedHTTPSetup) {
+    await retryHTTPSetupInternal();
+    return;
+  }
+  await RunAnywhere.completeServicesInitialization();
+}
+
+// Register the Phase-2 guard so extension files can call ensureServicesReady()
+// without importing RunAnywhere directly (avoids circular imports).
+registerServicesReadyGuard(ensureServicesReadyInternal);

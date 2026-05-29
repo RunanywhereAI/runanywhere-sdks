@@ -12,6 +12,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
@@ -142,6 +143,7 @@ export async function transcribe(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  await ensureServicesReady();
   const native = requireNativeModule();
   const audioBytes = audioToArrayBuffer(audio);
   return decodeSTTOutput(
@@ -232,55 +234,60 @@ function transcribeStreamFromBuffer(
       const start = (): void => {
         if (started) return;
         started = true;
-        native
-          .sttTranscribeStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
-            try {
-              const event = STTStreamEvent.decode(arrayBufferToBytes(eventBytes));
-              const partial =
-                event.partial ??
-                (event.finalOutput
-                  ? STTPartialResultMessage.fromPartial({
-                      text: event.finalOutput.text,
-                      isFinal: true,
-                      confidence: event.finalOutput.confidence,
-                      language: event.finalOutput.language,
-                      timestampMs: event.finalOutput.timestampMs,
-                      requestId: event.requestId,
-                    })
-                  : null);
-              if (!partial) {
-                if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-                  throw SDKException.generationFailedWith(
-                    event.errorMessage ?? 'STT stream failed'
-                  );
+        ensureServicesReady().then(() => {
+          native
+            .sttTranscribeStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+              try {
+                const event = STTStreamEvent.decode(arrayBufferToBytes(eventBytes));
+                const partial =
+                  event.partial ??
+                  (event.finalOutput
+                    ? STTPartialResultMessage.fromPartial({
+                        text: event.finalOutput.text,
+                        isFinal: true,
+                        confidence: event.finalOutput.confidence,
+                        language: event.finalOutput.language,
+                        timestampMs: event.finalOutput.timestampMs,
+                        requestId: event.requestId,
+                      })
+                    : null);
+                if (!partial) {
+                  if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+                    throw SDKException.generationFailedWith(
+                      event.errorMessage ?? 'STT stream failed'
+                    );
+                  }
+                  return;
                 }
-                return;
-              }
-              if (resolver) {
-                resolver({ value: partial, done: false });
-                resolver = null;
-              } else {
-                queue.push(partial);
-              }
-              if (
-                partial.isFinal ||
-                event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
-              ) {
+                if (resolver) {
+                  resolver({ value: partial, done: false });
+                  resolver = null;
+                } else {
+                  queue.push(partial);
+                }
+                if (
+                  partial.isFinal ||
+                  event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
+                ) {
+                  finish();
+                }
+              } catch (error) {
+                streamError = error instanceof Error ? error : new Error(String(error));
                 finish();
               }
-            } catch (error) {
-              streamError = error instanceof Error ? error : new Error(String(error));
+            })
+            .then(() => {
+              if (!done) finish();
+            })
+            .catch((err: Error) => {
+              streamError = err;
+              logger.warning(`sttTranscribeStreamProto rejected: ${err.message}`);
               finish();
-            }
-          })
-          .then(() => {
-            if (!done) finish();
-          })
-          .catch((err: Error) => {
-            streamError = err;
-            logger.warning(`sttTranscribeStreamProto rejected: ${err.message}`);
-            finish();
-          });
+            });
+        }).catch((err: Error) => {
+          streamError = err;
+          finish();
+        });
       };
 
       return {

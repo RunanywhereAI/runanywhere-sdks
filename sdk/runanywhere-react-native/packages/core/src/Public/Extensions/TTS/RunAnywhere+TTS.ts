@@ -10,6 +10,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { AudioPlaybackManager } from '../../../Features/VoiceSession/AudioPlaybackManager';
@@ -104,6 +105,7 @@ export async function synthesize(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  await ensureServicesReady();
   const native = requireNativeModule();
   return decodeTTSOutput(
     await native.ttsSynthesizeProto(encodeTTSSynthesisRequest(text, options))
@@ -154,40 +156,45 @@ export function synthesizeStream(
       const start = (): void => {
         if (started) return;
         started = true;
-        native
-          .ttsSynthesizeStreamProto(
-            requestBytes,
-            (eventBytes: ArrayBuffer) => {
-              try {
-                const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
-                if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
-                  throw SDKException.generationFailedWith(
-                    event.errorMessage ?? 'TTS stream failed'
-                  );
-                }
-                if (event.output) {
-                  push(event.output);
-                }
-                if (
-                  event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED
-                ) {
+        ensureServicesReady().then(() => {
+          native
+            .ttsSynthesizeStreamProto(
+              requestBytes,
+              (eventBytes: ArrayBuffer) => {
+                try {
+                  const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
+                  if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
+                    throw SDKException.generationFailedWith(
+                      event.errorMessage ?? 'TTS stream failed'
+                    );
+                  }
+                  if (event.output) {
+                    push(event.output);
+                  }
+                  if (
+                    event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED
+                  ) {
+                    finish();
+                  }
+                } catch (error) {
+                  streamError =
+                    error instanceof Error ? error : new Error(String(error));
                   finish();
                 }
-              } catch (error) {
-                streamError =
-                  error instanceof Error ? error : new Error(String(error));
-                finish();
               }
-            }
-          )
-          .then(() => {
-            if (!done) finish();
-          })
-          .catch((err: Error) => {
-            streamError = err;
-            logger.warning(`ttsSynthesizeStreamProto rejected: ${err.message}`);
-            finish();
-          });
+            )
+            .then(() => {
+              if (!done) finish();
+            })
+            .catch((err: Error) => {
+              streamError = err;
+              logger.warning(`ttsSynthesizeStreamProto rejected: ${err.message}`);
+              finish();
+            });
+        }).catch((err: Error) => {
+          streamError = err;
+          finish();
+        });
       };
 
       return {

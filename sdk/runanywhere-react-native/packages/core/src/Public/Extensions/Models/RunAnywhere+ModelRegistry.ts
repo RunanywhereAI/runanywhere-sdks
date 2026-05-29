@@ -17,6 +17,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   ModelArtifactType,
@@ -735,6 +736,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
         if (started) return;
         started = true;
         try {
+          await ensureServicesReady();
           await subscribeToDownloadProgress(subscriberEntry);
           subscribed = true;
           const modelBuffer = await native.getModelInfoProto(modelId);

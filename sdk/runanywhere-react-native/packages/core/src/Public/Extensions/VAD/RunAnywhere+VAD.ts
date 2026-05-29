@@ -11,6 +11,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
@@ -98,6 +99,7 @@ export async function detectVoiceActivity(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  await ensureServicesReady();
   return processVAD(audioToArrayBuffer(audio), 16000, options);
 }
 
