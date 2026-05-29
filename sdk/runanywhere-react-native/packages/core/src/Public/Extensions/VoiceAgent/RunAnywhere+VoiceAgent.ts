@@ -14,7 +14,6 @@ import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { ErrorCode as ErrorCodeProto } from '@runanywhere/proto-ts/errors';
 import type {
   VoiceAgentResult,
-  VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
   VoiceAgentComposeConfig,
@@ -51,16 +50,18 @@ function audioToArrayBuffer(audioData: ArrayBuffer | Uint8Array): ArrayBuffer {
   return audioData;
 }
 
-function buildVoiceAgentComposeConfig(
-  config: VoiceSessionConfig
-): ReturnType<typeof VoiceAgentComposeConfig.create> {
+/**
+ * Default `VoiceAgentComposeConfig` with sensible VAD/wakeword settings.
+ * Callers may spread or override individual fields before passing to
+ * `initializeVoiceAgent`. Mirrors the web SDK `defaultVoiceAgentComposeConfig`.
+ */
+export function defaultVoiceAgentComposeConfig(): ReturnType<typeof VoiceAgentComposeConfig.create> {
   return VoiceAgentComposeConfig.create({
     vadSampleRate: 16000,
     vadFrameLength: 0.1,
-    vadEnergyThreshold: config.speechThreshold ?? 0.1,
+    vadEnergyThreshold: 0.1,
     wakewordEnabled: false,
     wakewordThreshold: 0,
-    sessionConfig: config,
   });
 }
 
@@ -81,16 +82,15 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
   }
 }
 
-/** Initialize voice agent with configuration. */
+/** Initialize voice agent with the canonical proto compose config. Mirrors Swift's `initializeVoiceAgent(_ config:)`. */
 export async function initializeVoiceAgent(
-  config: VoiceSessionConfig
+  config: ReturnType<typeof VoiceAgentComposeConfig.create>
 ): Promise<boolean> {
   const native = ensureNative();
   try {
     logger.info('Initializing voice agent...');
-    const composeConfig = buildVoiceAgentComposeConfig(config);
     const bytes = await native.voiceAgentInitializeProto(
-      encodeProtoMessage(composeConfig, VoiceAgentComposeConfig)
+      encodeProtoMessage(config, VoiceAgentComposeConfig)
     );
     const result = arrayBufferToBytes(bytes).byteLength > 0;
     if (result) {

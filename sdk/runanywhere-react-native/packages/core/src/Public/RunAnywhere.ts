@@ -514,6 +514,7 @@ export const RunAnywhere = {
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
+  defaultVoiceAgentComposeConfig: VoiceAgent.defaultVoiceAgentComposeConfig,
   defaultVADModelID: VoiceAgent.defaultVADModelID,
   ensureDefaultVAD: VoiceAgent.ensureDefaultVAD,
   getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
