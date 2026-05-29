@@ -63,6 +63,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   @override
   void dispose() {
+    if (_isGenerating) {
+      sdk.RunAnywhere.llm.cancelGeneration();
+    }
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
