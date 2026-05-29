@@ -39,6 +39,7 @@ object Embeddings {
     /** True when commons lifecycle has a ready embeddings model. */
     suspend fun isLoaded(): Boolean {
         val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
+            ?: return false
         return snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
             snapshot.model_id.isNotEmpty()
     }
@@ -46,6 +47,7 @@ object Embeddings {
     /** Currently-loaded embeddings model id, or null. */
     suspend fun currentModelID(): String? {
         val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
+            ?: return null
         if (snapshot.state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
             snapshot.model_id.isEmpty()
         ) {
