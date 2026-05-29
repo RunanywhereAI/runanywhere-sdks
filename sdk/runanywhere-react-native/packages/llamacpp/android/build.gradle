@@ -82,10 +82,10 @@ def getExtOrIntegerDefault(name) {
 }
 
 // =============================================================================
-// Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// Version Constants — read from sdk/runanywhere-commons/VERSION (single source of truth)
 // RABackendLlamaCPP from runanywhere-sdks
 // =============================================================================
-def coreVersion = "0.19.13"
+def coreVersion = file("${projectDir}/../../../../runanywhere-commons/VERSION").text.trim()
 
 // =============================================================================
 // Binary Source - RABackendLlamaCPP from runanywhere-sdks
