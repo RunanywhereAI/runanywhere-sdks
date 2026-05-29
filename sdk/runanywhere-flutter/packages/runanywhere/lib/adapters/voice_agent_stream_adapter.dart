@@ -102,6 +102,18 @@ class _VoiceHandleFanOut {
   }
 
   bool _install() {
+    // FLUTTER-VOICE-035: NativeCallable.listener dispatches the closure body
+    // asynchronously on the Dart isolate event loop — the C trampoline returns
+    // immediately and the commons dispatcher is free to overwrite its
+    // thread_local scratch buffer before this closure runs. The copy on line
+    // below therefore races the scratch buffer on a busy voice pipeline.
+    //
+    // The correct fix requires commons to expose either a poll-based owned-copy
+    // queue (`rac_voice_agent_proto_poll`, analogous to `rac_sdk_event_poll`)
+    // or an ABI that heap-allocates the proto bytes and transfers ownership
+    // to the caller (rac_proto_buffer_t pattern). Until that commons ABI
+    // exists, this listener-based path is the only available mechanism.
+    // See expansion_needed in CLUSTER-174/STATE.json.
     final cb = NativeCallable<_CCallbackNative>.listener((
       ffi.Pointer<ffi.Uint8> bytesPtr,
       int bytesLen,
