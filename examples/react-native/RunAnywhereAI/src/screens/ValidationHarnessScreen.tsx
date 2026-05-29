@@ -18,6 +18,7 @@ import {
   ToolCall,
   ToolDefinition,
   ToolParameterType,
+  type ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
 import {
   ModelCategory,
@@ -301,16 +302,16 @@ export const ValidationHarnessScreen: React.FC = () => {
               ],
               metadata: { lane: 'react-native-validation' },
             }),
-            async (args) => {
-              const includeDeviceId = args.includeDeviceId === true;
+            async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+              const includeDeviceId = args.includeDeviceId?.boolValue === true;
               const deviceId = includeDeviceId
                 ? await RunAnywhere.deviceId
                 : '';
               return {
-                label: `${Platform.OS}-${Platform.Version}`,
-                platform: Platform.OS,
-                version: String(Platform.Version),
-                deviceIdSuffix: deviceId ? deviceId.slice(-6) : '',
+                label: { stringValue: `${Platform.OS}-${Platform.Version}` },
+                platform: { stringValue: Platform.OS },
+                version: { stringValue: String(Platform.Version) },
+                deviceIdSuffix: { stringValue: deviceId ? deviceId.slice(-6) : '' },
               };
             }
           );

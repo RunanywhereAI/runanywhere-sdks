@@ -10,6 +10,7 @@ import { RunAnywhere } from '@runanywhere/core';
 import {
   ToolDefinition,
   ToolParameterType,
+  type ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from './mathParser';
 
@@ -37,8 +38,8 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (args: Record<string, unknown>) => {
-      const location = (args.location as string) || 'San Francisco';
+    async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+      const location = args.location?.stringValue || 'San Francisco';
       try {
         // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const response = await fetch(
@@ -47,15 +48,15 @@ export const registerDemoTools = async (): Promise<void> => {
         const data = await response.json();
         const current = data.current_condition?.[0];
         return {
-          location,
-          temperature_c: current?.temp_C || 'N/A',
-          temperature_f: current?.temp_F || 'N/A',
-          condition: current?.weatherDesc?.[0]?.value || 'Unknown',
-          humidity: current?.humidity || 'N/A',
-          wind_kph: current?.windspeedKmph || 'N/A',
+          location: { stringValue: location },
+          temperature_c: { stringValue: current?.temp_C || 'N/A' },
+          temperature_f: { stringValue: current?.temp_F || 'N/A' },
+          condition: { stringValue: current?.weatherDesc?.[0]?.value || 'Unknown' },
+          humidity: { stringValue: current?.humidity || 'N/A' },
+          wind_kph: { stringValue: current?.windspeedKmph || 'N/A' },
         };
       } catch (error) {
-        return { error: `Failed to get weather: ${error}` };
+        return { error: { stringValue: `Failed to get weather: ${error}` } };
       }
     }
   );
@@ -67,13 +68,13 @@ export const registerDemoTools = async (): Promise<void> => {
       description: 'Gets the current date, time, and timezone information',
       parameters: [],
     }),
-    async () => {
+    async (): Promise<Record<string, ToolValue>> => {
       const now = new Date();
       return {
-        datetime: now.toLocaleString(),
-        time: now.toLocaleTimeString(),
-        timestamp: now.toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        datetime: { stringValue: now.toLocaleString() },
+        time: { stringValue: now.toLocaleTimeString() },
+        timestamp: { stringValue: now.toISOString() },
+        timezone: { stringValue: Intl.DateTimeFormat().resolvedOptions().timeZone },
       };
     }
   );
@@ -94,13 +95,16 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (args: Record<string, unknown>) => {
-      const expression = (args.expression as string) || '0';
+    async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+      const expression = args.expression?.stringValue || '0';
       try {
         const result = safeEvaluateExpression(expression);
-        return { expression, result };
+        return {
+          expression: { stringValue: expression },
+          result: { numberValue: result },
+        };
       } catch (error) {
-        return { error: `Failed to calculate: ${error}` };
+        return { error: { stringValue: `Failed to calculate: ${error}` } };
       }
     }
   );
