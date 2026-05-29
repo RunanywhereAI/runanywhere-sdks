@@ -452,12 +452,24 @@ class RunAnywhereLLM {
     final controller = StreamController<LLMStreamEvent>(sync: false);
 
     Future<void> run() async {
+      // Best-effort Phase-2 readiness. On-device LLM generation must NOT be
+      // gated on a successful remote auth/config round-trip: an offline init
+      // (or unreachable dev endpoint) leaves HTTP/auth deferred, and the
+      // `ensureServicesReady()` recovery path may surface that as an error.
+      // Swallow it here and proceed to local generation — mirrors Swift
+      // (`ensureServicesReady` recovery is `await retryHTTPSetup()`,
+      // non-throwing) and Kotlin (`retryHTTPSetup` catches Throwable, logs
+      // "HTTP/auth deferred — will retry on next online call"). The
+      // non-streaming `generate`/`generateRequest` path is already
+      // ungated; this keeps streaming symmetric so local inference works
+      // offline just like the RAG / non-streaming paths.
       try {
         await DartBridge.ensureServicesReady();
-      } catch (e, st) {
-        controller.addError(e, st);
-        await controller.close();
-        return;
+      } catch (e) {
+        SDKLogger('RunAnywhere.GenerateStream').debug(
+          'Services not ready (HTTP/auth deferred — will retry on next '
+          'online call); proceeding with local generation: $e',
+        );
       }
       final upstream = DartBridgeLLM.shared.generateStreamProto(request);
       await controller.addStream(upstream);
