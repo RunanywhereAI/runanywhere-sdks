@@ -295,7 +295,50 @@ export class SDKException extends Error {
   // ---------------------------------------------------------------------------
 
   static notInitialized(message = 'SDK not initialized'): SDKException {
-    return SDKException.fromCode(SDKErrorCode.NotInitialized, message);
+    // Swift canonical: notInitialized uses category=COMPONENT (SDKException.swift:178-179).
+    // categoryForCode(-100) returns CONFIGURATION (matching C++ commons range table), so
+    // we construct the proto directly to override the category to COMPONENT.
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+      code: ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      cAbiCode: SDKErrorCode.NotInitialized,
+      message,
+      nestedMessage: undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(SDKErrorCode.NotInitialized),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
+  }
+
+  /**
+   * Canonical cancellation factory.
+   *
+   * Mirrors Swift `SDKException.cancelled(_:)` (SDKException.swift:225-226):
+   * code=.cancelled, category=.internal, shouldLog=false. Uses proto
+   * ERROR_CODE_CANCELLED=380 with cAbiCode=-380; isExpected() returns true so
+   * callers suppress ERROR-level logging.
+   */
+  static cancelled(message = 'Operation cancelled'): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+      code: ProtoErrorCode.ERROR_CODE_CANCELLED,
+      cAbiCode: -380,
+      message,
+      nestedMessage: undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
+      component: 'sdk',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
   }
 
   static wasmNotLoaded(message = 'WASM module not loaded'): SDKException {
