@@ -402,21 +402,24 @@ export const ChatScreen: React.FC = () => {
       };
       await addMessage(initialAssistantMessage, currentConversation.id);
 
-      // Stream tokens as they arrive — canonical cross-SDK path (§1
-      // spec). The SDK's `generateStream` wraps the native proto-byte
-      // callback bridge in a plain JS AsyncIterable, so the same code
-      // path works on iOS and Android. Manual async iteration is used
-      // because Hermes' `for await` doesn't recognise SDK async
-      // iterables produced this way; we call the protocol methods
-      // directly.
-      const stream = RunAnywhere.generateStream(prompt, genOptions);
-      const iterator = stream[Symbol.asyncIterator]();
-      let iterResult = await iterator.next();
-      while (!iterResult.done) {
-        const event = iterResult.value;
-        if (event.token) {
-          accumulatedText += event.token;
-          // In-memory update only — no disk write per token (mirrors iOS updateMessageContent).
+      // Stream tokens as they arrive — canonical cross-SDK path. We drive
+      // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
+      // like iOS LLMViewModel+Generation.swift: it consumes the
+      // `generateStream` AsyncIterable, accumulates the transcript, and
+      // invokes `onToken` with the full text so far for live UI updates.
+      //
+      // `updateMessage` is a synchronous in-memory store write (no per-token
+      // disk write). Because the whole stream resolves on the microtask
+      // queue, we must hand a macrotask back to React inside `onToken`
+      // (`setTimeout(0)`) so it can paint each token into the assistant
+      // bubble — otherwise the synchronous-update loop runs to completion
+      // before React ever re-renders and the bubble appears empty mid-stream.
+      const eventStream = RunAnywhere.generateStream(prompt, genOptions);
+      const result = await RunAnywhere.aggregateStream(
+        prompt,
+        eventStream,
+        async (transcript) => {
+          accumulatedText = transcript;
           updateMessage(
             {
               id: assistantMessageId,
@@ -433,12 +436,13 @@ export const ChatScreen: React.FC = () => {
             currentConversation.id
           );
           flatListRef.current?.scrollToEnd({ animated: false });
+          // Yield a macrotask so React flushes this token to the screen.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
-        if (event.isFinal) break;
-        iterResult = await iterator.next();
-      }
+      );
 
-      const finalContent = accumulatedText || '(No response generated)';
+      const finalContent =
+        result.text || accumulatedText || '(No response generated)';
 
       // Build the final message with analytics and persist to disk once
       // (mirrors iOS finalizeGeneration / updateConversation).
@@ -455,12 +459,13 @@ export const ChatScreen: React.FC = () => {
         },
         analytics: {
           performance: {
-            latencyMs: 0,
+            latencyMs: result.generationTimeMs,
             memoryBytes: 0,
-            throughputTokensPerSec: 0,
-            promptTokens: Math.ceil(prompt.length / 4),
-            completionTokens: Math.ceil(finalContent.length / 4),
+            throughputTokensPerSec: result.tokensPerSecond,
+            promptTokens: result.inputTokens,
+            completionTokens: result.tokensGenerated,
           },
+          timeToFirstToken: result.ttftMs,
           completionStatus: 'completed',
           wasThinkingMode: false,
           wasInterrupted: false,
