@@ -55,6 +55,9 @@ on:
       - 'sdk/runanywhere-web/packages/*/src/**/streaming/**'
       - 'sdk/runanywhere-web/packages/*/test/**/streaming/**'
 
+permissions:
+  contents: read
+
 jobs:
   cpp-producers-and-aggregators:
     # Note: we no longer apt-install libprotobuf-dev / libabsl-dev — Ubuntu
