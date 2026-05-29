@@ -63,6 +63,7 @@ import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry'
 import { Hardware as HardwareNamespace } from './Extensions/RunAnywhere+Hardware';
 import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
+import { SDKException } from '../Foundation/Errors/SDKException';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -177,11 +178,9 @@ export const RunAnywhere = {
 
         if (!isNativeModuleAvailable()) {
           logger.warning('Native module not available');
-          initState = markInitializationFailed(
-            initState,
-            new Error('Native module not available')
-          );
-          throw new Error('Native module not available');
+          const nativeUnavailableError = SDKException.nativeModuleUnavailable();
+          initState = markInitializationFailed(initState, nativeUnavailableError);
+          throw nativeUnavailableError;
         }
 
         const native = requireNativeModule();
@@ -205,7 +204,7 @@ export const RunAnywhere = {
 
           const initialized = await native.initialize(configJson);
           if (initialized === false) {
-            throw new Error('Native SDK initialization failed');
+            throw SDKException.notInitialized('Native SDK initialization failed');
           }
 
           initState = markCoreInitialized(initState, initParams, 'core');
@@ -273,7 +272,7 @@ export const RunAnywhere = {
    */
   async completeServicesInitialization(): Promise<void> {
     if (!initState.isCoreInitialized) {
-      throw new Error(
+      throw SDKException.notInitialized(
         'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
       );
     }
@@ -287,7 +286,7 @@ export const RunAnywhere = {
     }
 
     if (!isNativeModuleAvailable()) {
-      throw new Error('Native module not available');
+      throw SDKException.nativeModuleUnavailable();
     }
 
     servicesInitPromise = (async () => {
@@ -302,12 +301,12 @@ export const RunAnywhere = {
       } else {
         const initialized = await native.isInitialized();
         if (!initialized) {
-          throw new Error('Native core is not initialized');
+          throw SDKException.notInitialized('Native core is not initialized');
         }
         logger.debug('Native phase 2 bridge not available; core native init is already complete.');
       }
       if (phase2Result === false) {
-        throw new Error('Native services initialization failed');
+        throw SDKException.notInitialized('Native services initialization failed');
       }
 
       // Probe authentication state to derive httpConfigured, mirroring
