@@ -284,6 +284,15 @@ export function extractStructuredOutput(
 // ---------------------------------------------------------------------------
 
 export const TextGeneration = {
+  /**
+   * Returns true when a backend module's `register()` has installed a WASM
+   * module that exports the proto-byte LLM ABI (`rac_llm_*_proto` symbols).
+   * Mirrors `RunAnywhere.stt.supportsProtoSTT()` for the LLM modality.
+   */
+  supportsProtoLLM(): boolean {
+    return LLMProtoAdapter.tryDefault()?.supportsProtoLLM() ?? false;
+  },
+
   async generate(options: TextGenerationOptions): Promise<LLMGenerationResult> {
     const adapter = requireProtoLLM('TextGeneration.generate');
     const result = adapter.generate(buildLLMGenerateRequest(options.prompt, options, false));

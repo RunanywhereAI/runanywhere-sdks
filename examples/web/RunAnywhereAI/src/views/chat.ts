@@ -193,12 +193,8 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
 // ---------------------------------------------------------------------------
 
 function isLLMBackendAvailable(): boolean {
-  // The proto-byte LLM adapter is live iff a backend has installed the
-  // Emscripten module. `RunAnywhere.runtime.active` becomes non-null once
-  // LlamaCppBridge finishes booting the WASM, so this works as a cheap
-  // "is WASM loaded?" probe without reaching into internal adapters.
   try {
-    return RunAnywhere.runtime.active !== null;
+    return RunAnywhere.textGeneration.supportsProtoLLM();
   } catch {
     return false;
   }
