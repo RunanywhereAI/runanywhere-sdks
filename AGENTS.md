@@ -427,6 +427,7 @@ Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merg
 | `streaming-perf.yml` | Changes to `tests/streaming/` or voice agent | Cross-SDK streaming parity + performance tests |
 | `legacy-files-blocklist.yml` | All PRs/pushes | Prevents 5 specific deleted files from being re-introduced |
 | `secret-scan.yml` | PRs and pushes to main | Incremental gitleaks scan on diff range |
+| `check-no-pii-logging.yml` | All PRs/pushes to main, master, feat-branch | Regression guard against Android logcat / RAC_LOG_INFO calls that emit signed URLs alongside active-download destination paths |
 
 ---
 
