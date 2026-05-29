@@ -663,6 +663,19 @@ export interface EmscriptenRunanywhereModule {
   // Emscripten runtime helpers
   // =============================================================================
 
+  /**
+   * Read a scalar value from the WASM heap at `ptr`.
+   * `type` is an Emscripten type string: `'i8'`, `'i16'`, `'i32'`, `'i64'`,
+   * `'float'`, `'double'`, or `'*'` (pointer-width integer).
+   */
+  getValue(ptr: number, type: string): number;
+
+  /**
+   * Write a scalar value to the WASM heap at `ptr`.
+   * `type` mirrors the `getValue` type string vocabulary.
+   */
+  setValue(ptr: number, value: number, type: string): void;
+
   /** Raw heap as a typed array — only valid until the next WASM alloc. */
   readonly HEAPU8: Uint8Array;
   readonly HEAP32: Int32Array;
