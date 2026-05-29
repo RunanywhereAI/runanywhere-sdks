@@ -199,7 +199,12 @@ export class SDKException extends Error {
 
   /** The signed-negative SDKErrorCode (matches rac_result_t). */
   get code(): SDKErrorCode {
-    return (this.proto.cAbiCode as SDKErrorCode) ?? (-this.proto.code as SDKErrorCode);
+    return (this.proto.cAbiCode as SDKErrorCode) ?? SDKErrorCode.Success;
+  }
+
+  /** The positive proto ErrorCode value (matches Swift proto.code / RAErrorCode.rawValue). */
+  get protoCode(): ProtoErrorCode {
+    return this.proto.code;
   }
 
   /** Optional structured details (proto.nestedMessage). */
@@ -384,6 +389,17 @@ export class SDKException extends Error {
 /** Type guard: returns true if the value is an SDKException instance. */
 export function isSDKException(error: unknown): error is SDKException {
   return error instanceof SDKException;
+}
+
+/**
+ * Returns true when the proto error code represents a routine/expected
+ * condition (cancellation) that should not be logged at ERROR level.
+ *
+ * Mirrors Swift `RAErrorCode.isExpected`, Kotlin `ProtoErrorCode.isExpected`,
+ * and Dart `ErrorCodeClassification.isExpected` — all check the same two codes.
+ */
+export function isExpected(code: ProtoErrorCode): boolean {
+  return code === ProtoErrorCode.ERROR_CODE_CANCELLED || code === ProtoErrorCode.ERROR_CODE_STREAM_CANCELLED;
 }
 
 // Proto re-exports for advanced consumers needing the wire envelope shape.
