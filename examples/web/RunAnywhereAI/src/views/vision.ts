@@ -71,6 +71,20 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
     renderView();
   });
 
+  // Tear down the model-state subscription if the panel element ever
+  // detaches (e.g. a full app-shell re-render).
+  const rootParent = container.parentElement;
+  if (typeof MutationObserver !== 'undefined' && rootParent) {
+    const disposeObserver = new MutationObserver(() => {
+      if (!container.isConnected) {
+        disposeObserver.disconnect();
+        unsubscribeState?.();
+        unsubscribeState = null;
+      }
+    });
+    disposeObserver.observe(rootParent, { childList: true });
+  }
+
   return {
     onActivate: () => {
       ensureCatalogRegistered();
@@ -372,24 +386,4 @@ function setStatus(text: string): void {
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
   return formatError(err);
-}
-
-
-// Dispose subscription on full panel teardown (mirrors chat.ts pattern).
-const disposeObserver =
-  typeof MutationObserver !== 'undefined'
-    ? new MutationObserver(() => {
-        if (container && !container.isConnected) {
-          disposeObserver?.disconnect();
-          unsubscribeState?.();
-          unsubscribeState = null;
-        }
-      })
-    : null;
-if (disposeObserver && typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (container?.parentElement) {
-      disposeObserver.observe(container.parentElement, { childList: true });
-    }
-  });
 }
