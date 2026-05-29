@@ -205,7 +205,7 @@ int64_t now_us() {
  *   RESPONSE                         → assistant_token (is_final=true)
  *   AUDIO_SYNTHESIZED                → audio
  *   ERROR                            → error
- *   WAKEWORD_DETECTED                → wakeword_detected
+ *   WAKEWORD_DETECTED                → state (IDLE → LISTENING)
  *
  * Proto's `interrupted` arm has no current C-side producer; reserved
  * for the GAP 08 voice barge-in path.
@@ -283,8 +283,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             }
             a->set_sample_rate_hz(decoded.sample_rate);
             a->set_channels(decoded.channels);
-            a->set_encoding(
-                static_cast<runanywhere::v1::AudioEncoding>(decoded.encoding_enum));
+            a->set_encoding(static_cast<runanywhere::v1::AudioEncoding>(decoded.encoding_enum));
             break;
         }
 
@@ -300,14 +299,16 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED: {
+            // The proto VoiceEvent oneof has no native wakeword arm that the
+            // consumers act on; a wakeword detection is surfaced as the IDLE →
+            // LISTENING pipeline state transition it triggers. The wake_word /
+            // confidence / timestamp on the C struct have no home in
+            // StateChangeEvent and are intentionally dropped here.
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_WAKEWORD);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_WAKEWORD);
-            auto* w = dst.mutable_wakeword_detected();
-            if (src.data.wakeword.wake_word) {
-                w->set_wake_word(src.data.wakeword.wake_word);
-            }
-            w->set_confidence(src.data.wakeword.confidence);
-            w->set_timestamp_ms(src.data.wakeword.timestamp_ms);
+            auto* s = dst.mutable_state();
+            s->set_previous(runanywhere::v1::PIPELINE_STATE_IDLE);
+            s->set_current(runanywhere::v1::PIPELINE_STATE_LISTENING);
             break;
         }
     }
@@ -614,16 +615,6 @@ void encode_error(std::vector<uint8_t>& s, int32_t code) {
     /*  4: bool   is_recoverable  (false → omitted) */
 }
 
-void encode_wakeword_detected(std::vector<uint8_t>& s, const char* wake_word, float confidence,
-                              int64_t timestamp_ms) {
-    /*  1: string wake_word        */
-    wire_string_field(s, 1, wake_word);
-    /*  2: float  confidence       */
-    wire_float_field(s, 2, confidence);
-    /*  3: int64  timestamp_ms     */
-    wire_int64_field(s, 3, timestamp_ms);
-}
-
 void encode_metrics(std::vector<uint8_t>& /*s*/) {
     /*  1: double stt_final_ms       (0 → omitted)
      *  2: double llm_first_token_ms (0 → omitted)
@@ -738,10 +729,12 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
         }
 
         case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED:
-            wire_submessage(scratch, /*field=*/26, [&](std::vector<uint8_t>& s) {
-                encode_wakeword_detected(s, event->data.wakeword.wake_word,
-                                         event->data.wakeword.confidence,
-                                         event->data.wakeword.timestamp_ms);
+            // Mirror the Protobuf-path translate(): a wakeword detection is
+            // surfaced as the IDLE → LISTENING pipeline state transition it
+            // triggers (state, field 15), not the wakeword_detected arm.
+            // Enum literals: PIPELINE_STATE_IDLE = 1, PIPELINE_STATE_LISTENING = 2.
+            wire_submessage(scratch, /*field=*/15, [&](std::vector<uint8_t>& s) {
+                encode_state_change(s, /*previous=*/1, /*current=*/2);
             });
             break;
     }

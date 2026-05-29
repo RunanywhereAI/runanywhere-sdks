@@ -1713,8 +1713,18 @@ void rac_model_registry_destroy(rac_model_registry_handle_t handle) {
 // PUBLIC API - MODEL INFO
 // =============================================================================
 
-rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
-                                     const rac_model_info_t* model) {
+// Shared save implementation. `preserve_empty_local_path` controls the
+// legacy "registerModel() passes localPath=nil, keep the existing one"
+// heuristic: the C struct cannot carry proto field-presence, so for the
+// non-proto callers (Swift/Kotlin/etc. registerModel and platform/auto
+// registration) an empty incoming local_path is treated as "unset" and the
+// existing path is kept. The proto register/update paths set this to false
+// because they have already resolved local_path presence-aware in the proto
+// domain (preserve_absent_proto_fields), so an empty local_path there is an
+// *explicit* reset that must win.
+static rac_result_t save_model_info_impl(rac_model_registry_handle_t handle,
+                                         const rac_model_info_t* model,
+                                         bool preserve_empty_local_path) {
     if (!handle || !model || !model->id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1730,7 +1740,8 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         // overwriting a localPath that was set by download completion or discovery.
         const char* existing_local_path = it->second->local_path;
         bool should_preserve_path =
-            (existing_local_path != nullptr) && strlen(existing_local_path) > 0 &&
+            preserve_empty_local_path && (existing_local_path != nullptr) &&
+            strlen(existing_local_path) > 0 &&
             (model->local_path == nullptr || strlen(model->local_path) == 0);
 
         // Store a deep copy of the incoming model
@@ -1779,6 +1790,13 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
     RAC_LOG_DEBUG("ModelRegistry", "Model saved");
 
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
+                                     const rac_model_info_t* model) {
+    // Legacy / non-proto callers: keep the "empty local_path means unset, so
+    // preserve the existing one" behaviour.
+    return save_model_info_impl(handle, model, /*preserve_empty_local_path=*/true);
 }
 
 rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const char* model_id,
@@ -2110,7 +2128,13 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     }
 
     const std::string model_id = proto_model.id();
-    rac_result_t save_rc = rac_model_registry_save(handle, model);
+    // The proto register/update paths carry a caller-authored ModelInfo, so an
+    // empty local_path here is an explicit reset that must win. The merge-on-
+    // re-seed behaviour lives upstream (rac_register_model_from_url_proto carries
+    // the existing runtime fields forward before calling this), so the legacy
+    // C-struct "empty means keep the old path" heuristic must NOT fire here.
+    rac_result_t save_rc = save_model_info_impl(handle, model,
+                                                /*preserve_empty_local_path=*/false);
     rac_model_info_free(model);
     if (save_rc != RAC_SUCCESS) {
         return save_rc;
@@ -2156,7 +2180,13 @@ rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
     }
 
     const std::string model_id = proto_model.id();
-    rac_result_t save_rc = rac_model_registry_save(handle, model);
+    // The proto register/update paths carry a caller-authored ModelInfo, so an
+    // empty local_path here is an explicit reset that must win. The merge-on-
+    // re-seed behaviour lives upstream (rac_register_model_from_url_proto carries
+    // the existing runtime fields forward before calling this), so the legacy
+    // C-struct "empty means keep the old path" heuristic must NOT fire here.
+    rac_result_t save_rc = save_model_info_impl(handle, model,
+                                                /*preserve_empty_local_path=*/false);
     rac_model_info_free(model);
     if (save_rc != RAC_SUCCESS) {
         return save_rc;
@@ -2858,8 +2888,8 @@ rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, c
 
     // Step 1: capacity probe.
     size_t required = 0;
-    rac_result_t probe_rc =
-        adapter->file_list_directory(dir_path, /*out_entries=*/nullptr, &required, adapter->user_data);
+    rac_result_t probe_rc = adapter->file_list_directory(dir_path, /*out_entries=*/nullptr,
+                                                         &required, adapter->user_data);
     if (probe_rc != RAC_SUCCESS) {
         return probe_rc;
     }
