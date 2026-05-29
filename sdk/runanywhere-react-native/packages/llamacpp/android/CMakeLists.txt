@@ -84,7 +84,6 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 
 include_directories(
     "src/main/cpp"
-    "../cpp"
     # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
     # Sharing avoids re-fetching the dependency and keeps both packages on the
     # same JSON version.

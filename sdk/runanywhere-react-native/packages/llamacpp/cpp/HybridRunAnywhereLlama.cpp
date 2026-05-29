@@ -10,9 +10,11 @@
 
 #include "HybridRunAnywhereLlama.hpp"
 
-// Backend registration headers - always available
+// Backend registration headers - always available.
+// Resolve the canonical commons header (RACommons xcframework / jniLibs) rather
+// than a per-package fork, so the full published LlamaCPP ABI stays in sync.
 extern "C" {
-#include "rac_llm_llamacpp.h"
+#include "rac/backends/rac_llm_llamacpp.h"
 }
 
 #include "rac/core/rac_error.h"

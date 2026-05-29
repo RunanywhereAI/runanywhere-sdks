@@ -27,8 +27,16 @@ Pod::Spec.new do |s|
     "cpp/HybridRunAnywhereLlama.hpp",
   ]
 
+  # Header search paths for the RACommons xcframework (sibling @runanywhere/core
+  # package). Include the Headers root so qualified includes like
+  # "rac/backends/rac_llm_llamacpp.h" (and the canonical header's own
+  # "rac/core/..."/"rac/features/llm/..." includes) resolve, plus every
+  # subdirectory for flat includes like "rac_logger.h".
   rac_headers_root = File.expand_path("../core/ios/Binaries/RACommons.xcframework/ios-arm64/Headers", __dir__)
-  rac_header_dirs = Dir.glob(File.join(rac_headers_root, "**", "*.h"))
+  rac_headers_root_rel = "$(PODS_TARGET_SRCROOT)/" +
+                         Pathname.new(rac_headers_root).relative_path_from(Pathname.new(__dir__)).to_s
+  rac_header_dirs = [rac_headers_root_rel] +
+                    Dir.glob(File.join(rac_headers_root, "**", "*.h"))
                        .map { |f| File.dirname(f) }
                        .uniq
                        .map { |d| "$(PODS_TARGET_SRCROOT)/" + Pathname.new(d).relative_path_from(Pathname.new(__dir__)).to_s }
@@ -36,7 +44,6 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => ([
-      "$(PODS_TARGET_SRCROOT)/cpp",
       # nlohmann/json (header-only) vendored by sibling @runanywhere/core package.
       "$(PODS_TARGET_SRCROOT)/../core/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",
