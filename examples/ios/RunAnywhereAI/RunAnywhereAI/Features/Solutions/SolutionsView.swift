@@ -6,8 +6,17 @@
 //
 //  Two buttons run the canonical voice_agent.yaml and rag.yaml solutions
 //  via the SDK's solutions capability namespace. The YAML payloads are
-//  embedded inline as string constants — no asset-bundling churn — and
-//  match `sdk/runanywhere-commons/examples/solutions/*.yaml` byte-for-byte.
+//  embedded inline as string constants and currently match
+//  `sdk/runanywhere-commons/examples/solutions/*.yaml` byte-for-byte.
+//
+//  SYNC AUTHORITY: `sdk/runanywhere-commons/examples/solutions/` is the
+//  canonical source for these YAML payloads. Any change to system_prompt,
+//  max_context_tokens, sample_rate_hz, or model IDs MUST be made there first
+//  and then mirrored here. The React Native example already automates this via
+//  `examples/react-native/RunAnywhereAI/scripts/sync-solutions-yamls.js`;
+//  full resource-dedup for iOS (Xcode build-phase copy + Bundle.main.url) is
+//  a tracked follow-up that requires adding the YAML files to the Xcode
+//  project's resource build phase.
 //
 //  The screen renders the solution lifecycle as a simple log: every state
 //  transition (creating, started, error) is appended to a scrollable text
