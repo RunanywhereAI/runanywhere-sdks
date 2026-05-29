@@ -250,6 +250,16 @@ class DartBridgePlatform {
       _isRegistered = true;
       _logger.debug('Platform adapter registered successfully');
 
+      // Warm the synchronous secure-storage cache that backs secureGet.
+      // flutter_secure_storage is async-only, but the FFI secure_get
+      // trampoline must return synchronously, so commons reads through the
+      // in-memory cache. Kick the load off here (Phase 1 entry) and await it
+      // in registerServices() so the cache is populated before any C++
+      // secure_get (e.g. rac_device_get_or_create_persistent_id). Without
+      // this warm, every cold-start secure_get misses and commons mints a
+      // fresh device UUID, breaking device-id continuity.
+      unawaited(loadSecureStorageCache());
+
       // Note: We don't free the adapter here as C++ holds a reference to it
       // It will be valid for the lifetime of the application
     } catch (e, stack) {
@@ -293,6 +303,11 @@ class DartBridgePlatform {
   /// Foundation Models / System TTS / System STT availability checks.
   static Future<void> registerServices() async {
     if (_servicesRegistered) return;
+
+    // Guarantee the secure-storage cache is loaded before Phase 2 drives the
+    // commons step-list (device registration walks secure_get). register()
+    // starts this load; awaiting here closes the race for the async phase.
+    await loadSecureStorageCache();
 
     try {
       final lib = PlatformLoader.load();
@@ -556,23 +571,50 @@ int _platformFileDeleteCallback(
 /// Secure storage cache for synchronous access
 /// Note: flutter_secure_storage is async, so we cache values
 final Map<String, String> _secureStorageCache = {};
-bool _secureStorageCacheLoaded = false;
 
-/// Load secure storage cache (called during init)
-Future<void> loadSecureStorageCache() async {
-  if (_secureStorageCacheLoaded) return;
+/// In-flight async cache load, so concurrent callers (register +
+/// registerServices) await the same future instead of issuing two readAll()s.
+Future<void>? _secureStorageCacheLoad;
 
-  try {
-    const storage = FlutterSecureStorage(
-      aOptions: AndroidOptions(),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-    );
-    final all = await storage.readAll();
-    _secureStorageCache.addAll(all);
-    _secureStorageCacheLoaded = true;
-  } catch (_) {
-    // Ignore errors - cache will be empty
+/// Pending fire-and-forget persistence operations. [drainPendingSecureWrites]
+/// awaits these so a shutdown path can flush before the process exits,
+/// otherwise a force-quit between the cache update and the async write would
+/// silently drop the last secure_set/secure_delete (e.g. an auth token).
+final Set<Future<void>> _pendingSecureWrites = {};
+
+/// Load secure storage cache (called during platform-adapter registration).
+/// Idempotent: returns the same in-flight future on concurrent calls and a
+/// completed future once loaded.
+Future<void> loadSecureStorageCache() {
+  return _secureStorageCacheLoad ??= () async {
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(),
+        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      );
+      final all = await storage.readAll();
+      _secureStorageCache.addAll(all);
+    } catch (_) {
+      // Ignore errors - cache will be empty
+    }
+  }();
+}
+
+/// Await all in-flight secure-storage persistence operations. Callers on the
+/// shutdown path should await this so the last secure_set/secure_delete is
+/// durably written before the process exits.
+Future<void> drainPendingSecureWrites() async {
+  while (_pendingSecureWrites.isNotEmpty) {
+    await Future.wait(_pendingSecureWrites.toList());
   }
+}
+
+/// Track a fire-and-forget persistence future so [drainPendingSecureWrites]
+/// can flush it on shutdown, then self-remove once it settles.
+void _trackPendingSecureWrite(Future<void> op) {
+  late final Future<void> tracked;
+  tracked = op.whenComplete(() => _pendingSecureWrites.remove(tracked));
+  _pendingSecureWrites.add(tracked);
 }
 
 /// Secure get callback
@@ -625,8 +667,9 @@ int _platformSecureSetCallback(
     // Update cache immediately for sync access
     _secureStorageCache[keyString] = valueString;
 
-    // Schedule async write (fire and forget)
-    unawaited(_writeSecureStorage(keyString, valueString));
+    // Schedule async write; tracked so drainPendingSecureWrites() can flush
+    // it on shutdown before a force-quit drops it.
+    _trackPendingSecureWrite(_writeSecureStorage(keyString, valueString));
 
     return RacResultCode.success;
   } catch (_) {
@@ -634,7 +677,9 @@ int _platformSecureSetCallback(
   }
 }
 
-/// Async write to secure storage
+/// Async write to secure storage. Surfaces failures via a warning so a
+/// persist error is observable instead of silently dropped (the in-memory
+/// cache stays authoritative for the running process either way).
 Future<void> _writeSecureStorage(String key, String value) async {
   try {
     const storage = FlutterSecureStorage(
@@ -642,8 +687,10 @@ Future<void> _writeSecureStorage(String key, String value) async {
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
     );
     await storage.write(key: key, value: value);
-  } catch (_) {
-    // Ignore errors - cache is authoritative
+  } catch (e) {
+    SDKLogger('DartBridge.Platform').warning(
+      'Secure storage write failed; value held in cache only: $e',
+    );
   }
 }
 
@@ -662,8 +709,9 @@ int _platformSecureDeleteCallback(
     // Remove from cache
     _secureStorageCache.remove(keyString);
 
-    // Schedule async delete (fire and forget)
-    unawaited(_deleteSecureStorage(keyString));
+    // Schedule async delete; tracked so drainPendingSecureWrites() can flush
+    // it on shutdown before a force-quit drops it.
+    _trackPendingSecureWrite(_deleteSecureStorage(keyString));
 
     return RacResultCode.success;
   } catch (_) {
