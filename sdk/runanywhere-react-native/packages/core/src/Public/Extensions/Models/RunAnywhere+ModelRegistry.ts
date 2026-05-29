@@ -266,6 +266,25 @@ function deriveModelIdFromUrl(url: string, name: string): string {
 }
 
 /**
+ * Register a single-file remote model by URL. Canonical entry point that
+ * mirrors Swift's `RunAnywhere.registerModel(id:name:url:framework:...)`,
+ * Kotlin's `RunAnywhere.registerModel(...)`, Flutter's
+ * `RunAnywhere.registerModel(...)`, and Web's `registerModelFromUrl(...)`.
+ *
+ * Delegates to `registerModel` which routes through the commons
+ * `rac_register_model_from_url_proto` factory so format, artifact type,
+ * and id are inferred by commons rather than hard-coded by the caller.
+ */
+export async function registerModelFromUrl(
+  url: string,
+  name: string,
+  framework: InferenceFramework,
+  options: Omit<RegisterModelInput, 'url' | 'name' | 'framework'> = {},
+): Promise<ModelInfo> {
+  return registerModel({ url, name, framework, ...options });
+}
+
+/**
  * Register a multi-file model where the runtime needs more than one
  * artifact (e.g. VLM main + projector, embedding model + vocab).
  */

@@ -70,6 +70,9 @@ const logger = new SDKLogger('RunAnywhere');
 
 let initState: InitializationState = createInitialState();
 let servicesInitPromise: Promise<void> | null = null;
+// In-flight Phase 1 promise shared across concurrent initialize() callers.
+// Mirrors Swift's `guard !isInitializedFlag else { return }` + Kotlin's `synchronized` guard.
+let initializingPromise: Promise<void> | null = null;
 
 type NativePhase2Module = {
   completeServicesInitialization?: () => Promise<unknown>;
@@ -140,93 +143,114 @@ export const RunAnywhere = {
   // ============================================================================
 
   async initialize(options: SDKInitOptions = {}): Promise<void> {
-    const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-    const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
-    const effectiveApiKey = isUsableCredential(options.apiKey)
-      ? options.apiKey!.trim()
-      : '';
+    // Idempotency guard — mirrors Swift `guard !isInitializedFlag else { return }`.
+    if (initState.isCoreInitialized) return;
+    // Re-entrancy guard — concurrent callers share the in-flight Phase 1 promise
+    // instead of racing through init and double-emitting lifecycle events.
+    if (initializingPromise) return initializingPromise;
 
-    const initParams: SDKInitParams = {
-      apiKey: effectiveApiKey,
-      baseURL: effectiveBaseURL,
-      environment,
-    };
+    initializingPromise = (async () => {
+      try {
+        const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+        const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
+        const effectiveApiKey = isUsableCredential(options.apiKey)
+          ? options.apiKey!.trim()
+          : '';
 
-    publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
-    logger.info('SDK initialization starting...');
-    ensureProtoTextEncoding();
+        const initParams: SDKInitParams = {
+          apiKey: effectiveApiKey,
+          baseURL: effectiveBaseURL,
+          environment,
+        };
 
-    try {
-      await initializeNitroModulesGlobally();
-    } catch (error) {
-      logger.warning('NitroModules global initialization failed', { error });
-    }
+        publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
+        logger.info('SDK initialization starting...');
+        ensureProtoTextEncoding();
 
-    if (!isNativeModuleAvailable()) {
-      logger.warning('Native module not available');
-      initState = markInitializationFailed(
-        initState,
-        new Error('Native module not available')
-      );
-      throw new Error('Native module not available');
-    }
+        try {
+          await initializeNitroModulesGlobally();
+        } catch (error) {
+          logger.warning('NitroModules global initialization failed', { error });
+        }
 
-    const native = requireNativeModule();
+        if (!isNativeModuleAvailable()) {
+          logger.warning('Native module not available');
+          initState = markInitializationFailed(
+            initState,
+            new Error('Native module not available')
+          );
+          throw new Error('Native module not available');
+        }
 
-    try {
-      const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
-        : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
-          : 'production';
+        const native = requireNativeModule();
 
-      // RN still crosses an async native bridge for Phase 1. The work belongs
-      // to native commons; TypeScript only builds the call-site config.
-      const configJson = JSON.stringify({
-        apiKey: effectiveApiKey,
-        baseURL: effectiveBaseURL,
-        environment: envString,
-        sdkVersion: SDKConstants.version,
-        supabaseURL: options.supabaseURL,
-        supabaseKey: options.supabaseKey,
-        buildToken: options.buildToken,
-      });
+        try {
+          const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
+            : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
+              : 'production';
 
-      const initialized = await native.initialize(configJson);
-      if (initialized === false) {
-        throw new Error('Native SDK initialization failed');
+          // RN still crosses an async native bridge for Phase 1. The work belongs
+          // to native commons; TypeScript only builds the call-site config.
+          const configJson = JSON.stringify({
+            apiKey: effectiveApiKey,
+            baseURL: effectiveBaseURL,
+            environment: envString,
+            sdkVersion: SDKConstants.version,
+            supabaseURL: options.supabaseURL,
+            supabaseKey: options.supabaseKey,
+            buildToken: options.buildToken,
+          });
+
+          const initialized = await native.initialize(configJson);
+          if (initialized === false) {
+            throw new Error('Native SDK initialization failed');
+          }
+
+          initState = markCoreInitialized(initState, initParams, 'core');
+
+          logger.info('SDK initialized successfully');
+          publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
+
+          // completeServicesInitialization() manages servicesInitPromise internally.
+          // Do NOT wipe it here — an unconditional null would destroy any in-flight
+          // Phase 2 promise from a concurrent ensureServicesReady caller.
+          void this.completeServicesInitialization().catch(err => {
+            logger.warning(
+              `Phase 2 services initialization failed (non-fatal): ${
+                err instanceof Error ? err.message : String(err)
+              }`
+            );
+          });
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger.error(`SDK initialization failed: ${msg}`);
+          initState = markInitializationFailed(initState, error as Error);
+          publishInitializationEvent(
+            InitializationStage.INITIALIZATION_STAGE_FAILED,
+            msg
+          );
+          throw error;
+        }
+      } finally {
+        initializingPromise = null;
       }
+    })();
 
-      initState = markCoreInitialized(initState, initParams, 'core');
-
-      logger.info('SDK initialized successfully');
-      publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
-
-      servicesInitPromise = null;
-      void this.completeServicesInitialization().catch(err => {
-        logger.warning(
-          `Phase 2 services initialization failed (non-fatal): ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error(`SDK initialization failed: ${msg}`);
-      initState = markInitializationFailed(initState, error as Error);
-      publishInitializationEvent(
-        InitializationStage.INITIALIZATION_STAGE_FAILED,
-        msg
-      );
-      throw error;
-    }
+    return initializingPromise;
   },
 
   async reset(): Promise<void> {
+    // Clear local state BEFORE destroying native — mirrors Swift's order:
+    // clear flags first, then `await CppBridge.shutdown()`. This ensures any
+    // in-flight Phase 2 awaiter sees the reset state rather than hitting a
+    // dead bridge (RAC_ERROR_NOT_INITIALIZED).
+    initState = resetState();
+    servicesInitPromise = null;
+    initializingPromise = null;
     if (isNativeModuleAvailable()) {
       const native = requireNativeModule();
       await native.destroy();
     }
-    initState = resetState();
-    servicesInitPromise = null;
   },
 
   /**
@@ -330,46 +354,48 @@ export const RunAnywhere = {
    * Get current user ID from authentication.
    *
    * Matches Swift `RunAnywhere.getUserId() -> String?`. RN returns
-   * `Promise<string>` instead of `String?` because the user-id read
-   * crosses the Nitro JS<->C++ bridge; resolves to `''` when there is
-   * no authenticated user.
+   * `Promise<string | null>` instead of `String?` because the user-id read
+   * crosses the Nitro JS<->C++ bridge; resolves to `null` when there is
+   * no authenticated user, preserving the 3-state contract (authenticated /
+   * unauthenticated / unknown).
    *
-   * @returns User ID if authenticated, empty string otherwise
+   * @returns User ID if authenticated, null otherwise
    */
-  async getUserId(): Promise<string> {
-    if (!isNativeModuleAvailable()) return '';
+  async getUserId(): Promise<string | null> {
+    if (!isNativeModuleAvailable()) return null;
     const native = requireNativeModule();
     const userId = await native.getUserId();
-    return userId ?? '';
+    return userId != null && userId !== '' ? userId : null;
   },
 
   /**
    * Get current organization ID from authentication.
    *
    * Matches Swift `RunAnywhere.getOrganizationId() -> String?`. RN
-   * returns `Promise<string>` (rather than `String?`) because the read
-   * crosses the Nitro JS<->C++ bridge; resolves to `''` when there is
+   * returns `Promise<string | null>` (rather than `String?`) because the read
+   * crosses the Nitro JS<->C++ bridge; resolves to `null` when there is
    * no authenticated org.
    *
-   * @returns Organization ID if authenticated, empty string otherwise
+   * @returns Organization ID if authenticated, null otherwise
    */
-  async getOrganizationId(): Promise<string> {
-    if (!isNativeModuleAvailable()) return '';
+  async getOrganizationId(): Promise<string | null> {
+    if (!isNativeModuleAvailable()) return null;
     const native = requireNativeModule();
     const orgId = await native.getOrganizationId();
-    return orgId ?? '';
+    return orgId != null && orgId !== '' ? orgId : null;
   },
 
   /**
    * Check if currently authenticated.
    *
    * Matches Swift `RunAnywhere.isAuthenticated: Bool` (sync property).
-   * On RN this is `Promise<boolean>` because authentication state lives
-   * in native C++ behind the Nitro async bridge; JS cannot read it
-   * synchronously.
+   * On RN this is a method returning `Promise<boolean>` because authentication
+   * state lives in native C++ behind the Nitro async bridge; JS cannot read it
+   * synchronously. Using a method (not a getter-returning-Promise) avoids the
+   * property-returning-Promise antipattern.
    */
-  get isAuthenticated(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return Promise.resolve(false);
+  async isAuthenticated(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return false;
     const native = requireNativeModule();
     return native.isAuthenticated();
   },
@@ -539,6 +565,7 @@ export const RunAnywhere = {
   // ============================================================================
 
   registerModel: ModelManagement.registerModel,
+  registerModelFromUrl: ModelManagement.registerModelFromUrl,
   registerMultiFileModel: ModelManagement.registerMultiFileModel,
   listModels: ModelManagement.listModels,
   queryModels: ModelManagement.queryModels,
