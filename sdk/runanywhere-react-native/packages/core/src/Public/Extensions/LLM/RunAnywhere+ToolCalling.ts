@@ -20,6 +20,9 @@ import {
   ToolCallingSessionCreateRequest,
   type ToolDefinition,
   type ToolParameter,
+  type ToolValue,
+  type ToolValueArray,
+  type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
@@ -27,13 +30,16 @@ import { encodeProtoMessage } from '../../../services/ProtoWire';
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
 /**
- * Function type for tool executors. Receives the parsed JSON arguments
- * (decoded from `ToolCall.argumentsJson`) and returns a JSON-serialisable
- * result that will be re-encoded into `ToolResult.resultJson`.
+ * Function type for tool executors. Receives parsed arguments as a
+ * proto-canonical `ToolValue` map (mirrors Swift's `[String: RAToolValue]`
+ * and Kotlin's `Map<String, ToolValue>`) and returns a result in the same
+ * typed form. Fields are accessed via `args.location?.stringValue`,
+ * `args.count?.numberValue`, etc. — matching the Swift `RAToolValue.string`
+ * / `.number` pattern on the wire-canonical oneof tree (IDL-13).
  */
 export type ToolExecutor = (
-  args: Record<string, unknown>
-) => Promise<Record<string, unknown>>;
+  args: Record<string, ToolValue>
+) => Promise<Record<string, ToolValue>>;
 
 /** A registered tool with its proto-canonical definition and JS executor. */
 export interface RegisteredTool {
@@ -49,8 +55,94 @@ export type {
   ToolCallingOptions,
   ToolCallingResult,
   ToolCallingSessionCreateRequest,
+  ToolValue,
+  ToolValueArray,
+  ToolValueObject,
 };
 export { ToolParameterType };
+
+// ---------------------------------------------------------------------------
+// ToolValue ↔ plain-JSON bridge (RN-layer mirror of commons'
+// `rac_tool_value_from_json_proto` / `rac_tool_value_to_json_proto`).
+//
+// `argumentsJson` arriving from the LLM is plain JSON (e.g.
+// `{"location":"NYC","count":5}`). Swift delegates the deep walk to
+// commons via `RAToolValue.parseObjectJSON`; RN performs the equivalent
+// walk here in TypeScript so executors receive the same `ToolValue` oneof
+// tree (IDL-13) rather than `unknown`.
+// ---------------------------------------------------------------------------
+
+function plainJsonToToolValue(value: unknown): ToolValue {
+  if (value === null || value === undefined) {
+    return { nullValue: true };
+  }
+  if (typeof value === 'string') {
+    return { stringValue: value };
+  }
+  if (typeof value === 'number') {
+    return { numberValue: value };
+  }
+  if (typeof value === 'boolean') {
+    return { boolValue: value };
+  }
+  if (Array.isArray(value)) {
+    const arr: ToolValueArray = { values: value.map(plainJsonToToolValue) };
+    return { arrayValue: arr };
+  }
+  if (typeof value === 'object') {
+    const fields: Record<string, ToolValue> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      fields[k] = plainJsonToToolValue(v);
+    }
+    const obj: ToolValueObject = { fields };
+    return { objectValue: obj };
+  }
+  return { stringValue: String(value) };
+}
+
+function toolValueToPlainJson(tv: ToolValue): unknown {
+  if (tv.nullValue) return null;
+  if (tv.stringValue !== undefined) return tv.stringValue;
+  if (tv.numberValue !== undefined) return tv.numberValue;
+  if (tv.boolValue !== undefined) return tv.boolValue;
+  if (tv.arrayValue !== undefined) {
+    return tv.arrayValue.values.map(toolValueToPlainJson);
+  }
+  if (tv.objectValue !== undefined) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(tv.objectValue.fields)) {
+      out[k] = toolValueToPlainJson(v);
+    }
+    return out;
+  }
+  return null;
+}
+
+/** Parse a plain-JSON object string into a `Record<string, ToolValue>` map.
+ *  Mirrors `RAToolValue.parseObjectJSON` from Swift's ToolCallingTypes.swift. */
+function parseObjectJSON(json: string): Record<string, ToolValue> {
+  const raw: unknown = JSON.parse(json);
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      `ToolCall.argumentsJson must decode to a JSON object, got ${typeof raw}`
+    );
+  }
+  const result: Record<string, ToolValue> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    result[k] = plainJsonToToolValue(v);
+  }
+  return result;
+}
+
+/** Serialize a `Record<string, ToolValue>` result map back to a JSON string.
+ *  Mirrors `RAToolValue.jsonString(from:)` from Swift's ToolCallingTypes.swift. */
+function toolValueMapToJsonString(map: Record<string, ToolValue>): string {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(map)) {
+    out[k] = toolValueToPlainJson(v);
+  }
+  return JSON.stringify(out);
+}
 
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
@@ -104,11 +196,9 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
     });
   }
 
-  let parsedArgs: Record<string, unknown> = {};
+  let parsedArgs: Record<string, ToolValue> = {};
   try {
-    parsedArgs = toolCall.argumentsJson
-      ? (JSON.parse(toolCall.argumentsJson) as Record<string, unknown>)
-      : {};
+    parsedArgs = toolCall.argumentsJson ? parseObjectJSON(toolCall.argumentsJson) : {};
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Tool argument parsing failed: ${errorMessage}`);
@@ -129,7 +219,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
     return ToolResult.fromPartial({
       toolCallId: toolCall.id,
       name: toolCall.name,
-      resultJson: JSON.stringify(result),
+      resultJson: toolValueMapToJsonString(result),
       success: true,
       startedAtMs,
       completedAtMs: Date.now(),
