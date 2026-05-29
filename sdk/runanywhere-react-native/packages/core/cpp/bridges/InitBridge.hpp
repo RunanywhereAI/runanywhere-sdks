@@ -275,9 +275,13 @@ public:
 
     /**
      * @brief Get SDK version
-     * Returns centralized version passed from TypeScript SDKConstants
+     *
+     * Single source of truth is `sdk/runanywhere-commons/VERSION`, exposed via
+     * `rac_sdk_get_version()` (never NULL, process-lifetime static). Matches the
+     * Swift `SDKConstants.version` so the value reported to telemetry / device
+     * registration can never drift or fall back to a stale literal.
      */
-    std::string getSdkVersion() const { return sdkVersion_.empty() ? "0.2.0" : sdkVersion_; }
+    std::string getSdkVersion() const { return rac_sdk_get_version(); }
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
