@@ -591,6 +591,7 @@ export const RunAnywhere = {
   downloadedModels: ModelManagement.downloadedModels,
   importModel: ModelManagement.importModel,
   downloadModel: ModelManagement.downloadModel,
+  downloadModelWithProgress: ModelManagement.downloadModelWithProgress,
   getDefaultFramework: ModelManagement.getDefaultFramework,
 
   // ============================================================================

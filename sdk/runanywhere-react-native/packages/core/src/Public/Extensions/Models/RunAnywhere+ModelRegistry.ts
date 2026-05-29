@@ -862,6 +862,43 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
 }
 
 /**
+ * Flat alias for `downloadModel` that matches Swift's canonical shape:
+ * `RunAnywhere.downloadModel(_ model, onProgress:) async throws -> DownloadProgress`.
+ *
+ * Drives the underlying `AsyncIterable<DownloadProgress>` internally and calls
+ * `onProgress` for each event, returning the final terminal `DownloadProgress`
+ * on success or throwing on failure/cancellation — mirroring
+ * `RunAnywhere+Storage.swift:177-263`.
+ *
+ * Callers that prefer the streaming iterable can still use `downloadModel(id)`
+ * directly; both shapes are supported.
+ */
+export async function downloadModelWithProgress(
+  model: ModelInfo,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<DownloadProgress> {
+  const iterable = downloadModel(model.id);
+  const iterator = iterable[Symbol.asyncIterator]();
+  let last: DownloadProgress | undefined;
+  while (true) {
+    const result = await iterator.next();
+    if (result.done) break;
+    const progress = result.value;
+    onProgress?.(progress);
+    last = progress;
+    if (isTerminalProgress(progress)) break;
+  }
+  if (!last) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      'Download completed without any progress event',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK },
+    );
+  }
+  return last;
+}
+
+/**
  * Framework the SDK falls back to when a category has no explicit model
  * framework resolved (e.g. a pending UI selection that has not yet matched a
  * catalogued model). Mirrors commons' `rac_model_category_default_framework`
