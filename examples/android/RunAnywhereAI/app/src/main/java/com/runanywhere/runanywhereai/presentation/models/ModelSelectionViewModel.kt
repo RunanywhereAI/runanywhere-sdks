@@ -217,33 +217,10 @@ class ModelSelectionViewModel(
                     .takeIf { it.isNotEmpty() }
         }
 
-    /**
-     * Check if a model category is relevant for the current selection context
-     */
     private fun isModelRelevantForContext(
         category: ModelCategory,
         ctx: ModelSelectionContext,
-    ): Boolean =
-        when (ctx) {
-            ModelSelectionContext.LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
-            ModelSelectionContext.STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-            ModelSelectionContext.TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-            ModelSelectionContext.VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-            ModelSelectionContext.VOICE ->
-                category in
-                    listOf(
-                        ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                    )
-            ModelSelectionContext.RAG_EMBEDDING ->
-                category == ModelCategory.MODEL_CATEGORY_EMBEDDING
-            ModelSelectionContext.RAG_LLM ->
-                category == ModelCategory.MODEL_CATEGORY_LANGUAGE
-            ModelSelectionContext.VLM ->
-                category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
-                    category == ModelCategory.MODEL_CATEGORY_VISION
-        }
+    ): Boolean = ctx.isCategoryRelevant(category)
 
     /**
      * Toggle framework expansion

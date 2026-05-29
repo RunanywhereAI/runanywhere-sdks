@@ -13,7 +13,6 @@
 
 package com.runanywhere.runanywhereai.models
 
-import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 
 /**
@@ -55,30 +54,11 @@ enum class ModelSelectionContext(
             VOICE ->
                 category == ModelCategory.MODEL_CATEGORY_LANGUAGE ||
                     category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ||
-                    category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ||
-                    category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+                    category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
             RAG_EMBEDDING -> category == ModelCategory.MODEL_CATEGORY_EMBEDDING
             RAG_LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
             VLM ->
                 category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
                     category == ModelCategory.MODEL_CATEGORY_VISION
-        }
-
-    fun isFrameworkRelevant(framework: InferenceFramework): Boolean =
-        when (this) {
-            LLM ->
-                framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
-            STT -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            TTS ->
-                framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
-                    framework == InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
-            VAD -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            VOICE -> LLM.isFrameworkRelevant(framework) || STT.isFrameworkRelevant(framework) || TTS.isFrameworkRelevant(framework)
-            RAG_EMBEDDING -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            RAG_LLM -> framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-            VLM -> framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
         }
 }
