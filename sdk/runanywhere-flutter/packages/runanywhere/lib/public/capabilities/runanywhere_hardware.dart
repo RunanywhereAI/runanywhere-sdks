@@ -4,8 +4,6 @@
 // (canonical §14 namespace). Mirrors Swift `RunAnywhere.Hardware` and
 // the RN/Web `RunAnywhere.hardware.*` namespace.
 
-import 'dart:async' show Future;
-
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
 import 'package:runanywhere/native/dart_bridge_hardware.dart';
 
@@ -22,9 +20,7 @@ class RunAnywhereHardware {
   /// Mirrors Swift `try RunAnywhere.hardware.getProfile()` — throws
   /// `SDKException` when the hardware ABI is unavailable or commons returns
   /// a non-success result. No silent fallback (Wave H Swift parity).
-  Future<HardwareProfileResult> getProfile() async {
-    return DartBridgeHardware.getProfile();
-  }
+  HardwareProfileResult getProfile() => DartBridgeHardware.getProfile();
 
   /// Get available accelerators as generated proto data.
   ///
