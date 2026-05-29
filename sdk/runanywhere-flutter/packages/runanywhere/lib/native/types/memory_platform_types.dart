@@ -13,7 +13,7 @@ typedef RacFreeNative = Void Function(Pointer<Void> ptr);
 typedef RacFreeDart = void Function(Pointer<Void> ptr);
 
 /// void* rac_alloc(size_t size)
-typedef RacAllocNative = Pointer<Void> Function(IntPtr size);
+typedef RacAllocNative = Pointer<Void> Function(Size size);
 typedef RacAllocDart = Pointer<Void> Function(int size);
 
 /// char* rac_strdup(const char* str)
@@ -54,7 +54,7 @@ typedef RacFileExistsCallbackNative = Int32 Function(
 typedef RacFileReadCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Pointer<Void>> outData,
-  Pointer<IntPtr> outSize,
+  Pointer<Size> outSize,
   Pointer<Void> userData,
 );
 
@@ -62,7 +62,7 @@ typedef RacFileReadCallbackNative = Int32 Function(
 typedef RacFileWriteCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Void> data,
-  IntPtr size,
+  Size size,
   Pointer<Void> userData,
 );
 
@@ -159,7 +159,7 @@ typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
 typedef RacFileListDirectoryCallbackNative = Int32 Function(
   Pointer<Utf8> dirPath,
   Pointer<Void> outEntries,
-  Pointer<IntPtr> inOutCount,
+  Pointer<Size> inOutCount,
   Pointer<Void> userData,
 );
 
@@ -172,7 +172,7 @@ typedef RacIsNonEmptyDirectoryCallbackNative = Int32 Function(
 /// Get vendor ID callback: rac_result_t (*get_vendor_id)(char* out_buffer, size_t buffer_size, void* user_data)
 typedef RacGetVendorIdCallbackNative = Int32 Function(
   Pointer<Utf8> outBuffer,
-  IntPtr bufferSize,
+  Size bufferSize,
   Pointer<Void> userData,
 );
 
