@@ -132,6 +132,12 @@ let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
+/** True once the commons WASM loaded successfully during initialize(). When
+ * false, `isInitialized` reflects TS-layer readiness only; WASM-backed APIs
+ * will fail until a backend module registers and calls
+ * `completeNativePhase1ForModule`. This flag has the same semantics as
+ * Swift's `isInitializedFlag` combined with the Phase 1 proto success path. */
+let _jsOnlyInit = false;
 
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
@@ -167,9 +173,39 @@ function generateDeviceId(): string {
   });
 }
 
-/** Persist + retrieve a device ID across SDK sessions (best-effort localStorage). */
+/** Persist + retrieve a device ID across SDK sessions.
+ *
+ * Mirrors Swift's `CppBridge.Device.persistentId`: delegates to commons'
+ * device-identity chain (secure_get → vendor ID → synthesized UUID) when a
+ * WASM module is available, falling back to the TS-local UUID only when no
+ * module is installed. This ensures the same canonical ID is returned whether
+ * the call happens before or after a backend module registers.
+ *
+ * The `rac_state_get_persistent_device_id` function is exported by the commons
+ * WASM and reads/writes via the `secure_get` / `secure_set` ABI backed by
+ * `localStorage` with the `rac_sdk_` key prefix — the same storage slot that
+ * C++ uses, so there is only one device-ID registry entry.
+ */
 function ensureDeviceId(): string {
   if (_deviceId) return _deviceId;
+
+  // Prefer the commons device-identity chain so all layers share one ID.
+  try {
+    const mod = tryRunanywhereModule();
+    const modWithDeviceId = mod as (EmscriptenRunanywhereModule & { _rac_state_get_persistent_device_id?: () => number }) | null;
+    if (modWithDeviceId && typeof modWithDeviceId._rac_state_get_persistent_device_id === 'function') {
+      const ptr = modWithDeviceId._rac_state_get_persistent_device_id();
+      if (ptr) {
+        const id = modWithDeviceId.UTF8ToString(ptr);
+        if (id) {
+          _deviceId = id;
+          return id;
+        }
+      }
+    }
+  } catch { /* fall through to TS fallback */ }
+
+  // TS fallback: keep backwards-compat key so existing installs keep their ID.
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('runanywhere.deviceId');
@@ -563,9 +599,12 @@ export const RunAnywhere = {
     return _isInitialized;
   },
 
-  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete).
+   * Returns false when commons WASM failed to load during initialize() so
+   * callers know native Phase 1 was deferred and WASM-backed APIs are not yet
+   * available, even though `isInitialized` is true. */
   get areServicesReady(): boolean {
-    return _hasCompletedServicesInit;
+    return _hasCompletedServicesInit && !_jsOnlyInit;
   },
 
   /** Mirror Swift `RunAnywhere.isActive`. */
@@ -713,6 +752,10 @@ export const RunAnywhere = {
         // load their own WASM modules and install them via
         // `setRunanywhereModule`, so apps that only need backend-specific
         // operations can still proceed if the core artifact is missing.
+        // When it fails, `_jsOnlyInit = true` so `areServicesReady` accurately
+        // reflects that native Phase 1 was deferred (mirrors Swift's
+        // `isInitializedFlag = false` on Phase 1 failure, adapted to Web's
+        // intentional non-fatal policy).
         try {
           await CommonsModule.shared.ensureLoaded();
         } catch (err) {
@@ -721,6 +764,7 @@ export const RunAnywhere = {
               err instanceof Error ? err.message : String(err)
             }`,
           );
+          _jsOnlyInit = true;
         }
 
         _isInitialized = true;
@@ -773,7 +817,11 @@ export const RunAnywhere = {
   /**
    * Complete the Phase 2 (services) initialization. Mirror of Swift's
    * `RunAnywhere.completeServicesInitialization()`. Idempotent — concurrent
-   * callers share a single in-flight promise.
+   * callers share a single in-flight promise. The promise is kept alive until
+   * it either settles successfully (`_hasCompletedServicesInit = true`) or
+   * throws, mirroring Swift's `_servicesInitLock` + `_servicesInitTask` join
+   * pattern so two callers arriving concurrently never spawn duplicate Phase 2
+   * work.
    */
   async completeServicesInitialization(): Promise<void> {
     if (_hasCompletedServicesInit) return;
@@ -808,9 +856,14 @@ export const RunAnywhere = {
 
         _hasCompletedServicesInit = true;
         logger.debug('Services initialization complete (Phase 2)');
-      } finally {
+      } catch (err) {
+        // Clear the promise on failure so a subsequent retry can re-enter.
         _servicesInitPromise = null;
+        throw err;
       }
+      // Success path: leave _servicesInitPromise set so any late concurrent
+      // caller that reads it after _hasCompletedServicesInit flips true still
+      // gets a resolved promise rather than re-entering the init logic.
     })();
     return _servicesInitPromise;
   },
@@ -1092,7 +1145,9 @@ export const RunAnywhere = {
 
   async downloadModel(
     input: string | DownloadModelOptions,
+    extra: CancellableCall = {},
   ): Promise<DownloadProgress> {
+    throwIfAborted(extra.signal, 'downloadModel');
     const request = typeof input === 'string' ? { modelId: input } : input;
     const model = request.model ?? ModelRegistryCapability.getModel(request.modelId) ?? undefined;
     if (!model) {
@@ -1158,6 +1213,18 @@ export const RunAnywhere = {
       DownloadState.DOWNLOAD_STATE_FAILED,
       DownloadState.DOWNLOAD_STATE_CANCELLED,
     ]);
+
+    // Mirror Swift's `cancelNativeDownload(taskID:modelID:)`: wire the
+    // AbortSignal so rac_download_cancel_proto fires with deletePartialBytes=false
+    // (preserves resume tokens). Detach the listener in the finally block.
+    const detachCancel = attachSignalToCancel(extra.signal, () => {
+      DownloadsCapability.cancel({
+        modelId: request.modelId,
+        taskId: start.taskId,
+        deletePartialBytes: false,
+      });
+    });
+
     let lastProgress = start.initialProgress;
     // Suppress COMPLETED here for the same reason as the poll loop below:
     // a cached download whose `start.initialProgress` is already COMPLETED
@@ -1168,20 +1235,25 @@ export const RunAnywhere = {
       request.onProgress?.(lastProgress);
     }
 
-    while (!lastProgress || !terminal.has(lastProgress.state)) {
-      await delay(request.pollIntervalMs ?? 250);
-      const progress = DownloadsCapability.poll({
-        modelId: request.modelId,
-        taskId: start.taskId,
-      });
-      if (!progress) continue;
-      lastProgress = progress;
-      // Defer COMPLETED to onProgress until OPFS flush finishes (WEB-001).
-      // UI/E2E often triggers loadModel on COMPLETED; firing it early races
-      // the async MEMFS→OPFS persist that follows the poll loop.
-      if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
-        request.onProgress?.(progress);
+    try {
+      while (!lastProgress || !terminal.has(lastProgress.state)) {
+        throwIfAborted(extra.signal, 'downloadModel');
+        await delay(request.pollIntervalMs ?? 250);
+        const progress = DownloadsCapability.poll({
+          modelId: request.modelId,
+          taskId: start.taskId,
+        });
+        if (!progress) continue;
+        lastProgress = progress;
+        // Defer COMPLETED to onProgress until OPFS flush finishes (WEB-001).
+        // UI/E2E often triggers loadModel on COMPLETED; firing it early races
+        // the async MEMFS→OPFS persist that follows the poll loop.
+        if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+          request.onProgress?.(progress);
+        }
       }
+    } finally {
+      detachCancel();
     }
 
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -1648,6 +1720,7 @@ export const RunAnywhere = {
     EventBus.reset();
 
     _isInitialized = false;
+    _jsOnlyInit = false;
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;
