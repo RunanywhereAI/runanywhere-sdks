@@ -3,6 +3,7 @@
 //  RunAnywhereAI
 //
 
+import Foundation
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
