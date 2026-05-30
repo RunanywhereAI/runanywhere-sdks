@@ -452,25 +452,23 @@ class RunAnywhereLLM {
     final controller = StreamController<LLMStreamEvent>(sync: false);
 
     Future<void> run() async {
-      // Best-effort Phase-2 readiness. On-device LLM generation must NOT be
-      // gated on a successful remote auth/config round-trip: an offline init
-      // (or unreachable dev endpoint) leaves HTTP/auth deferred, and the
-      // `ensureServicesReady()` recovery path may surface that as an error.
-      // Swallow it here and proceed to local generation — mirrors Swift
-      // (`ensureServicesReady` recovery is `await retryHTTPSetup()`,
-      // non-throwing) and Kotlin (`retryHTTPSetup` catches Throwable, logs
-      // "HTTP/auth deferred — will retry on next online call"). The
-      // non-streaming `generate`/`generateRequest` path is already
-      // ungated; this keeps streaming symmetric so local inference works
-      // offline just like the RAG / non-streaming paths.
-      try {
-        await DartBridge.ensureServicesReady();
-      } catch (e) {
-        SDKLogger('RunAnywhere.GenerateStream').debug(
-          'Services not ready (HTTP/auth deferred — will retry on next '
-          'online call); proceeding with local generation: $e',
-        );
-      }
+      // Best-effort Phase-2 readiness, kicked off in the BACKGROUND (NOT
+      // awaited). On-device LLM generation must not be gated on — or delayed
+      // by — a remote auth/config round-trip: offline, `ensureServicesReady()`'s
+      // recovery path blocks ~4s on a DNS timeout (unreachable dev endpoint)
+      // before failing. Local generation resolves the engine from the commons
+      // model lifecycle and does not need it, so awaiting only adds latency to
+      // every send. Fire-and-forget; auth retries on the next online call.
+      // Mirrors the ungated non-streaming `generate` / RAG paths and Swift/Kotlin
+      // best-effort readiness.
+      unawaited(
+        DartBridge.ensureServicesReady().catchError((Object e) {
+          SDKLogger('RunAnywhere.GenerateStream').debug(
+            'Services not ready (HTTP/auth deferred — will retry on next '
+            'online call); proceeded with local generation: $e',
+          );
+        }),
+      );
       final upstream = DartBridgeLLM.shared.generateStreamProto(request);
       await controller.addStream(upstream);
       await controller.close();

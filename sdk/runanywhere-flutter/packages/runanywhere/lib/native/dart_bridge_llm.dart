@@ -136,10 +136,12 @@ class DartBridgeLLM {
 
   /// Generate text using the lifecycle-owned generated-proto LLM ABI.
   LLMGenerationResult generateProto(LLMGenerateRequest request) {
-    if (!isLoaded) {
-      throw StateError('No LLM model loaded. Call loadModel() first.');
-    }
-
+    // No `isLoaded` gate: the generated-proto ABI resolves the engine from the
+    // commons model lifecycle (acquire_lifecycle_llm), NOT from this bridge's
+    // own `_handle` (which the lifecycle load path never populates). Gating on
+    // `_handle`/isLoaded here is a phantom check that spuriously throws even
+    // when a model IS loaded via the lifecycle, diverging from Kotlin/Swift
+    // (which have no such gate). Commons returns a clear error if truly unloaded.
     final fn = RacNative.bindings.rac_llm_generate_proto;
     if (fn == null) {
       throw UnsupportedError('rac_llm_generate_proto is unavailable');
@@ -155,12 +157,10 @@ class DartBridgeLLM {
 
   /// Stream text generation using the lifecycle-owned generated-proto LLM ABI.
   Stream<LLMStreamEvent> generateStreamProto(LLMGenerateRequest request) {
-    if (!isLoaded) {
-      return Stream<LLMStreamEvent>.error(
-        StateError('No LLM model loaded. Call loadModel() first.'),
-      );
-    }
-
+    // No `isLoaded` gate (see generateProto): generation resolves via the
+    // commons model lifecycle, not this bridge's `_handle`. The phantom gate
+    // here was the root cause of Flutter-only "No LLM model loaded" stream
+    // errors offline (the spurious throw then triggered a downstream cancel).
     final fn = RacNative.bindings.rac_llm_generate_stream_proto;
     if (fn == null) {
       return Stream<LLMStreamEvent>.error(
