@@ -95,7 +95,7 @@ cmd_sdk_commons() {
         build-android) bash scripts/build-core-android.sh ;;
         build-ios)     require_macos; bash scripts/build-core-xcframework.sh ;;
         build-wasm)    bash scripts/build-core-wasm.sh ;;
-        build-linux)   cmake --preset=linux-x86_64 && cmake --build build/linux-x86_64 ;;
+        build-linux)   cmake --preset=linux-release && cmake --build --preset=linux-release ;;
         clean)         rm -rf build/android-* build/ios-* build/wasm-* build/linux-* ;;
         *)             bad_subcommand "sdk commons" "${1:-}" ;;
     esac
