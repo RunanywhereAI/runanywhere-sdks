@@ -81,7 +81,7 @@ class ComponentLifecycleState extends $pb.ProtobufEnum {
 /// Canonical event category carried by every SDKEvent envelope. Lives here
 /// (instead of sdk_events.proto) so voice_events.proto and voice_agent_service
 /// .proto can reference it without importing sdk_events.proto (which itself
-/// imports voice_events.proto — IDL-07 cycle resolution).
+/// imports voice_events.proto — cycle resolution).
 class EventCategory extends $pb.ProtobufEnum {
   static const EventCategory EVENT_CATEGORY_UNSPECIFIED =
       EventCategory._(0, _omitEnumNames ? '' : 'EVENT_CATEGORY_UNSPECIFIED');
@@ -156,7 +156,7 @@ class EventCategory extends $pb.ProtobufEnum {
   static const EventCategory EVENT_CATEGORY_ERROR =
       EventCategory._(35, _omitEnumNames ? '' : 'EVENT_CATEGORY_ERROR');
 
-  /// IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+  /// Absorbed from former VoiceEventCategory (voice_events.proto).
   /// AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
   /// previously only on the voice-pipeline side.
   static const EventCategory EVENT_CATEGORY_AUDIO =

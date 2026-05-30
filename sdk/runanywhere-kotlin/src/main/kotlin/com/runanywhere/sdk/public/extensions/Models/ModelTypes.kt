@@ -13,7 +13,7 @@ import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-// KOT-15: `ModelSelectionContext` lived here as a UI filter helper but had
+// `ModelSelectionContext` lived here as a UI filter helper but had
 // zero consumers inside the SDK. It was moved to the Android example app at
 // `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
 

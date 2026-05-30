@@ -200,14 +200,14 @@ class DartBridgeEvents {
   }
 }
 
-/// FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006: native callback is used as a
+/// The native callback is used as a
 /// wake-up signal only. The bytes pointed to by [protoBytes] are NOT safe to
 /// dereference from this listener because Dart `NativeCallable.listener`
 /// dispatches to the Dart isolate asynchronously — by the time this callback
 /// runs in the isolate, the commons producer (event_publisher.cpp) may have
 /// rotated its ring buffer slot to a newer serialization, leaving the pointer
 /// pointing at stale or partially overwritten bytes. This is precisely what
-/// CLUSTER-09's 64-slot ring tried to mitigate, but the contract in
+/// the 64-slot ring tried to mitigate, but the contract in
 /// `rac_sdk_event_stream.h:6-7` ("Callback memory is owned by commons and is
 /// valid only for the duration of the callback") cannot be honored when the
 /// listener runs after the native call returns.

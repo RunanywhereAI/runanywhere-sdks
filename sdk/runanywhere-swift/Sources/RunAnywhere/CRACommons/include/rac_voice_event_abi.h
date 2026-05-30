@@ -2,8 +2,6 @@
  * @file rac_voice_event_abi.h
  * @brief Proto-encoded VoiceEvent callback ABI for the voice agent.
  *
- * GAP 09 Phase 15 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
- *
  * This is the second event-delivery path on the voice agent, alongside the
  * existing struct callback (`rac_voice_agent_event_callback_fn` declared in
  * `rac_voice_agent.h`). Frontends that consume the IDL-generated
@@ -19,9 +17,9 @@
  *     using the codegen'd type. Saves ~150 LOC per SDK.
  *
  * Stability:
- *   - This header is GAP 09 NEW. The struct path is unchanged. Both
+ *   - The struct path is unchanged. Both
  *     callbacks may be set on the same handle; both fire per event. No
- *     contention with the GAP 02 plugin ABI version.
+ *     contention with the plugin ABI version.
  *   - RAC_ABI_VERSION (declared below) bumped to 2 by this header so
  *     consumers can detect runtime support.
  */
@@ -40,7 +38,7 @@ extern "C" {
 #endif
 
 /**
- * @brief RAC C ABI version. Bumped from 1 to 2 by GAP 09 to advertise the
+ * @brief RAC C ABI version. Bumped from 1 to 2 to advertise the
  *        proto-byte event ABI. Distinct from `RAC_PLUGIN_API_VERSION` which
  *        gates the engine plugin vtable layout.
  */

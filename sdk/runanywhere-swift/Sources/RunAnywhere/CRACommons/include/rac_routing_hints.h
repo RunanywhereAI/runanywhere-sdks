@@ -2,8 +2,6 @@
  * @file rac_routing_hints.h
  * @brief Caller-supplied hints that bias engine routing decisions.
  *
- * GAP 04 Phase 8 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
  * Hints are SUGGESTIONS, not requirements. The router gives matching plugins
  * a scoring bonus but still picks the next-best plugin if the hinted one is
  * unavailable on the host. The exception is `preferred_engine_name`, which
@@ -30,7 +28,7 @@ extern "C" {
  * same on 32-bit and 64-bit hosts. The leading `const char*` still matches
  * host pointer width — plugins are loaded into the host process, so pointer
  * width matches by construction. New fields land in the `_reserved[]` tail
- * and require an `RAC_PLUGIN_API_VERSION` bump per the GAP 02 compatibility
+ * and require an `RAC_PLUGIN_API_VERSION` bump per the compatibility
  * policy.
  */
 typedef struct rac_routing_hints {

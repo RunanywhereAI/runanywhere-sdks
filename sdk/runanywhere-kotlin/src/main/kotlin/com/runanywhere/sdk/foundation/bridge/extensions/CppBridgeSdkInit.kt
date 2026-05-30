@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Two-phase SDK init bridge — wraps the canonical C ABI surface in
- * rac_sdk_init.h (P2-T9). Mirrors Swift's
+ * rac_sdk_init.h. Mirrors Swift's
  * Foundation/Bridge/Extensions/CppBridge+SdkInit.swift exactly (adapting only
  * syntax): maps Kotlin parameters into SdkInitPhase{1,2}Request, invokes
  * rac_sdk_init_phase{1,2}_proto / rac_sdk_retry_http_proto via the JNI bridge,

@@ -1,11 +1,9 @@
 /**
  * VoiceAgentStreamAdapter.ts (React Native)
  *
- * GAP 09 Phase 19 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
- *
  * Wraps a Nitro HybridObject's per-message callback as an
  * `AsyncIterable<VoiceEvent>` using the codegen'd transport wrapper from
- * `idl/codegen/templates/ts_async_iterable.njk` (Phase 14).
+ * `idl/codegen/templates/ts_async_iterable.njk`.
  *
  * Public API:
  *     for await (const evt of new VoiceAgentStreamAdapter(handle).stream())

@@ -22,17 +22,17 @@ dependencies:
     sdk: flutter
   # FFI (Foreign Function Interface)
   ffi: ^2.2.0
-  # Networking: HTTP transport routed through the commons Phase H C ABI
+  # Networking: HTTP transport routed through the commons C ABI
   # (rac_http_client_*, rac_http_download_execute).
   # Protobuf runtime — consumed by the IDL-generated bindings in
-  # `lib/generated/` (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).
+  # `lib/generated/`.
   # Pinned to match the pinned protoc_plugin version in
   # scripts/setup-toolchain.sh / idl/codegen/generate_dart.sh.
-  # Bumped 2026-05-19 (P9 idl-codegen bump): ^3.1.0 -> ^6.0.0.
+  # Bumped 2026-05-19 (idl-codegen bump): ^3.1.0 -> ^6.0.0.
   # protoc_plugin 25.0.0 (PROTOC_GEN_DART_VERSION) emits `.pb.dart` bindings
   # against the protobuf 6.x runtime API — `protoc_plugin` 25.0.0 declares
   # `protobuf: ^6.0.0` as its peer dep. The 4.x/5.x lines were skipped; 6.0.0
-  # supersedes them. `lib/generated/` is regenerated under P9 in lockstep.
+  # supersedes them. `lib/generated/` is regenerated in lockstep.
   protobuf: ^6.0.0
   # `fixnum` is a transitive peer of `protobuf` — the generated bindings
   # import it directly for `int64` field handling, so it must be declared.
@@ -41,7 +41,7 @@ dependencies:
   shared_preferences: ^2.5.5
   path_provider: ^2.1.5
   flutter_secure_storage: ^10.2.0
-  # Device info — previous cap `<11.3.2` removed in P6 (2026-05-19 dep bump).
+  # Device info — previous cap `<11.3.2` removed 2026-05-19 (dep bump).
   # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
   # 13.x is now the latest stable and the cap is no longer warranted.
   device_info_plus: ^13.1.0
@@ -61,7 +61,7 @@ dev_dependencies:
   # this pin (the packages/runanywhere pubspec is the workspace source of
   # truth for shared deps — see the centralization comment block in
   # sdk/runanywhere-flutter/pubspec.yaml).
-  # Bumped 2026-05-19 (P9 idl-codegen bump): 22.0.0 -> 25.0.0.
+  # Bumped 2026-05-19 (idl-codegen bump): 22.0.0 -> 25.0.0.
   protoc_plugin: 25.0.0
 
 flutter:

@@ -115,7 +115,7 @@ class DartBridgeRAG {
     String text, {
     String? metadataJson,
   }) async {
-    // IDL-13: `metadata_json` proto field was deleted. Best-effort parse of
+    // The `metadata_json` proto field was deleted. Best-effort parse of
     // the legacy JSON into the typed `metadata` map before ingestion.
     return ingestDocument(
         RAGDocument(text: text, metadata: _parseMetadata(metadataJson).entries));

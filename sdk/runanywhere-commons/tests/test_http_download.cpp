@@ -86,14 +86,12 @@ rac_bool_t no_adapter_chunk(const uint8_t*, size_t, uint64_t, uint64_t, void*) {
     return RAC_TRUE;
 }
 
-// CLUSTER-13 / HTTP-416-STRICT (iter 3): shared error-stub payload used by
-// both the streaming and resume transports to simulate a CDN HTTP 416 +
-// text/html error response. Defined here so both test_transport_stream and
-// test_transport_resume can reference it.
+// Shared error-stub payload used by both the streaming and resume transports
+// to simulate a CDN HTTP 416 + text/html error response. Defined here so both
+// test_transport_stream and test_transport_resume can reference it.
 //
 // 47-byte body chosen to mirror the production-observed 49-byte error stub
-// that overwrote 386 MB gguf files in iter 2 (FLUTTER-AND-DL-002 /
-// FLUTTER-IOS-004 / WEB-DOWNLOAD-001).
+// that overwrote 386 MB gguf files.
 constexpr const char* k416HtmlBody = "<html><body>Range Not Satisfiable</body></html>";
 constexpr size_t k416HtmlBodyLen = 47;  // strlen(k416HtmlBody)
 
@@ -121,7 +119,7 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
         return RAC_SUCCESS;
     }
     if (path == "/tiny-416") {
-        // CLUSTER-13 / HTTP-416-STRICT: fresh-download variant. The server
+        // Fresh-download variant. The server
         // returns 416 with a tiny text/html stub even on a non-resume request
         // (some CDNs do this when the URL points at a resource that was
         // re-uploaded with a smaller size between the catalog refresh and
@@ -149,14 +147,14 @@ rac_result_t test_transport_stream(void*, const rac_http_request_t* req, rac_htt
 // rac_http_download_execute resume-fallback path (Range: bytes=N- → HTTP 200).
 std::atomic<bool> g_resume_returns_200{false};
 
-// CLUSTER-13 / HTTP-416-STRICT: when true the test transport replies to a
-// resume request with HTTP 416 + a 49-byte text/html error stub. This mirrors
-// Cloudflare/S3 behavior when the requested Range offset exceeds the resource
-// size — the wire shape that, in iter 2, was found to overwrite valid 386 MB
-// gguf files with 49 bytes of HTML on Flutter Android / iOS / Web targets.
+// When true the test transport replies to a resume request with HTTP 416 +
+// a 49-byte text/html error stub. This mirrors Cloudflare/S3 behavior when the
+// requested Range offset exceeds the resource size — the wire shape that was
+// found to overwrite valid 386 MB gguf files with 49 bytes of HTML on Flutter
+// Android / iOS / Web targets.
 std::atomic<bool> g_resume_returns_416_html{false};
 
-// pass2-syn-116 regression: when a resume request returns 206 but the body
+// Regression: when a resume request returns 206 but the body
 // stream is truncated mid-way (network drop), the first resume attempt must
 // surface an error AND leave the partial file intact so that a second
 // resume from the new offset can complete cleanly without corruption.
@@ -188,9 +186,8 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
     }
 
     if (g_resume_returns_416_html.load()) {
-        // CLUSTER-13 / HTTP-416-STRICT: simulate the CDN behavior that
-        // produced FLUTTER-AND-DL-002 / FLUTTER-IOS-004 / WEB-DOWNLOAD-001 —
-        // 416 status with a 47-byte text/html error stub. The runner MUST
+        // Simulate the CDN behavior that produced a 416 status with a 47-byte
+        // text/html error stub. The runner MUST
         // NOT let those 47 bytes overwrite the existing 386 MB payload on
         // disk; it must roll back to the pre-request file size and return
         // a network-error status.
@@ -216,7 +213,7 @@ rac_result_t test_transport_resume(void*, const rac_http_request_t* req, uint64_
     out_resp_meta->status = 206;
     size_t from = std::min<size_t>(static_cast<size_t>(resume_from_byte), g_payload.size());
 
-    // pass2-syn-116 regression: if the test asked us to truncate the first
+    // If the test asked us to truncate the first
     // resume attempt mid-stream, deliver `g_resume_truncate_after_bytes`
     // bytes starting at `from` and then return a network error. The runner
     // must propagate the error and leave the on-disk bytes for the next
@@ -795,7 +792,7 @@ void test_resume_with_200_full_body_replay_no_checksum() {
     fs::remove(dest);
 }
 
-// pass2-syn-116 regression: a partial resume that fails mid-stream must not
+// Regression: a partial resume that fails mid-stream must not
 // corrupt the on-disk file; a follow-up resume from the new offset must
 // complete cleanly and the final checksum must match the canonical payload.
 // This guards the shift-left fallback's interaction with the second-attempt
@@ -877,7 +874,7 @@ void test_resume_mid_stream_failure_then_retry_completes_cleanly() {
     fs::remove(dest);
 }
 
-// CLUSTER-13 / HTTP-416-STRICT (iter 3) regression: a resume request that
+// Regression: a resume request that
 // receives HTTP 416 + a tiny text/html error stub MUST NOT overwrite the
 // existing valid prefix on disk. The runner must roll back to the pre-request
 // file size and surface a network error so callers don't accept the corrupted
@@ -1012,10 +1009,9 @@ int main() {
         test_resume_rejects_stale_offset();
         test_resume_with_200_full_body_replay_checksum();
         test_resume_with_200_full_body_replay_no_checksum();
-        // pass2-syn-116 regression: mid-stream failure + retry must not corrupt.
+        // Mid-stream failure + retry must not corrupt.
         test_resume_mid_stream_failure_then_retry_completes_cleanly();
-        // CLUSTER-13 / HTTP-416-STRICT (iter 3) regression: 416 + tiny html
-        // body must NOT overwrite valid on-disk prefix.
+        // 416 + tiny html body must NOT overwrite valid on-disk prefix.
         test_resume_with_416_tiny_html_body_preserves_prefix();
         test_fresh_download_with_416_tiny_html_body_removes_stub();
 

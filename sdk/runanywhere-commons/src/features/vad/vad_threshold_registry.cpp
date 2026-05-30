@@ -2,8 +2,7 @@
  * @file vad_threshold_registry.cpp
  * @brief Implementation of the shared per-handle VAD threshold-mutex registry.
  *
- * See `vad_threshold_registry.h` for rationale (commons-features-voice-001 /
- * voice-006).
+ * See `vad_threshold_registry.h` for rationale.
  */
 
 #include "vad_threshold_registry.h"

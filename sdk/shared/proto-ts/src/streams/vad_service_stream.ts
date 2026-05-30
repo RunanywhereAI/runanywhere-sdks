@@ -3,7 +3,7 @@
  * Source: idl/vad_options.proto
  * Template: idl/codegen/templates/ts_async_iterable.njk
  *
- * GAP 09 Phase 14. Provides an AsyncIterable<VADStreamEvent> client
+ * Provides an AsyncIterable<VADStreamEvent> client
  * over an in-process server-streaming callback. The transport ("how a token
  * arrives in the JS heap") is platform-specific:
  *   - React Native: a Nitro HybridObject method whose callback fires once

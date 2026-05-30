@@ -1,6 +1,6 @@
 /**
  * @file rac_llm_stream.cpp
- * @brief Implementation of the v2 close-out Phase G-2 LLM proto-byte
+ * @brief Implementation of the LLM proto-byte
  *        stream ABI. See rac_llm_stream.h for the declared contract.
  *
  * Implementation mirrors rac_voice_event_abi.cpp:

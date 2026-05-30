@@ -282,11 +282,11 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
 
 // Static vtable for LlamaCpp
 //
-// GAP 02 Phase 8: this ops-struct is now also consumed by the unified engine
+// This ops-struct is now also consumed by the unified engine
 // plugin entry point in rac_plugin_entry_llamacpp.cpp. The `static` qualifier
 // has been dropped so the entry point TU can `extern` it; visibility is still
 // limited to the backend library via symbol hiding (the struct is `const`).
-// v3 Phase B1: `create` adapter called by commons rac_llm_create() after
+// The `create` adapter called by commons rac_llm_create() after
 // rac_plugin_route picks this plugin. Replaces the legacy factory that was
 // registered via rac_service_provider_t::create. The config_json parameter is
 // reserved for future engine-specific tuning (num_threads, gpu_layers, etc.);
@@ -340,7 +340,7 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id, const char* /*config
 
 }  // namespace
 
-// v2 close-out (B3-parallel for llamacpp): g_llamacpp_ops is declared
+// g_llamacpp_ops is declared
 // `extern const` from rac_plugin_entry_llamacpp.cpp (external linkage).
 // Defining it inside the anonymous namespace gave it internal linkage and only
 // worked because rac_backend_llamacpp was historically STATIC. The macro now
@@ -393,7 +393,7 @@ LlamaCPPRegistryState& get_state() {
     return state;
 }
 
-// v3 Phase B1: `llamacpp_can_handle` (rac_service_can_handle_fn) and
+// `llamacpp_can_handle` (rac_service_can_handle_fn) and
 // `llamacpp_create_service` (rac_service_create_fn) removed. The commons
 // consumer (rac_llm_create) now goes through rac_plugin_route →
 // g_llamacpp_ops.create which calls llamacpp_llm_create_impl (defined above).

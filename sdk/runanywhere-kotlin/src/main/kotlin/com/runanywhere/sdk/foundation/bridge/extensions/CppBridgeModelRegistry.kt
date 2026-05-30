@@ -219,7 +219,7 @@ object CppBridgeModelRegistry {
 
     /**
      * Canonical single-call URL → saved [ProtoModelInfo] via the
-     * `rac_register_model_from_url_proto` C ABI (P2-T6). Mirrors Swift
+     * `rac_register_model_from_url_proto` C ABI. Mirrors Swift
      * `RunAnywhere.registerModelFromUrl(_:)`.
      *
      * Commons performs the full build-and-save flow (URL → ModelInfoMakeRequest

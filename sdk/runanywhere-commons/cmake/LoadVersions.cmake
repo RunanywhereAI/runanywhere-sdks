@@ -44,7 +44,7 @@ foreach(_LINE IN LISTS _VERSIONS_LINES)
 
         # Also set without prefix for backward compatibility.
         #
-        # CLUSTER-14 / WEB-EXTRACT-001: ZLIB_VERSION is special — it shares its
+        # ZLIB_VERSION is special — it shares its
         # bare-name with CMake's FindZLIB VERSION_VAR. FindZLIB feeds whatever
         # `ZLIB_VERSION` holds into the numeric `find_package(ZLIB X.Y.Z)`
         # comparator, which rejects a leading 'v'. libarchive's bundled CMake
@@ -52,7 +52,7 @@ foreach(_LINE IN LISTS _VERSIONS_LINES)
         # `archive_read_support_filter_program("gzip -d")` when the version
         # check fails — broken on iOS app sandbox + Emscripten OPFS (no
         # fork+exec). Every other engine that re-`include(LoadVersions)` would
-        # otherwise restore the raw `v1.3.2` and undo the CLUSTER-02-FOLLOWUP
+        # otherwise restore the raw `v1.3.2` and undo the v-strip
         # fix on a per-subdirectory basis. Strip the 'v' once at the source for
         # ZLIB_VERSION specifically. Other VERSION keys (USEARCH/GOOGLETEST/
         # CPPHTTPLIB/WHISPERCPP) intentionally keep the 'v' because they feed

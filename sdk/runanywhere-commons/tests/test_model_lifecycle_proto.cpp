@@ -535,7 +535,7 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     return 0;
 }
 
-// commons-core-infra-011: covers the previous-model unload branch inside
+// Covers the previous-model unload branch inside
 // `rac_model_lifecycle_load_proto`. Loading a different model for the same
 // SDK component MUST destroy the previously-loaded impl exactly once before
 // the new impl is created, with the new impl observably swapped in via the

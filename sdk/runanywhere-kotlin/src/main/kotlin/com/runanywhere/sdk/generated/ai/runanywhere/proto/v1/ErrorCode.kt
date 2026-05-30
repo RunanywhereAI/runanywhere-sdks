@@ -328,6 +328,10 @@ public enum class ErrorCode(
    */
   ERROR_CODE_BUFFER_TOO_SMALL(261),
   /**
+   * RAC_ERROR_OUTPUT_TRUNCATED
+   */
+  ERROR_CODE_OUTPUT_TRUNCATED(262),
+  /**
    * -- Audio (-280..-299) -------------------------------------------------
    * RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED
    */
@@ -494,6 +498,10 @@ public enum class ErrorCode(
    */
   ERROR_CODE_BACKEND_UNAVAILABLE(604),
   /**
+   * RAC_ERROR_RUNTIME_UNAVAILABLE
+   */
+  ERROR_CODE_RUNTIME_UNAVAILABLE(605),
+  /**
    * RAC_ERROR_INVALID_HANDLE
    */
   ERROR_CODE_INVALID_HANDLE(610),
@@ -536,7 +544,7 @@ public enum class ErrorCode(
    */
   ERROR_CODE_INTERNAL(805),
   /**
-   * -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+   * -- Plugin (-810..-829) ------------------------------------------------
    * RAC_ERROR_ABI_VERSION_MISMATCH
    */
   ERROR_CODE_ABI_VERSION_MISMATCH(810),
@@ -650,6 +658,7 @@ public enum class ErrorCode(
       259 -> ERROR_CODE_INVALID_ARGUMENT
       260 -> ERROR_CODE_NULL_POINTER
       261 -> ERROR_CODE_BUFFER_TOO_SMALL
+      262 -> ERROR_CODE_OUTPUT_TRUNCATED
       280 -> ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED
       281 -> ERROR_CODE_AUDIO_SESSION_FAILED
       282 -> ERROR_CODE_MICROPHONE_PERMISSION_DENIED
@@ -689,6 +698,7 @@ public enum class ErrorCode(
       602 -> ERROR_CODE_BACKEND_INIT_FAILED
       603 -> ERROR_CODE_BACKEND_BUSY
       604 -> ERROR_CODE_BACKEND_UNAVAILABLE
+      605 -> ERROR_CODE_RUNTIME_UNAVAILABLE
       610 -> ERROR_CODE_INVALID_HANDLE
       700 -> ERROR_CODE_EVENT_INVALID_CATEGORY
       701 -> ERROR_CODE_EVENT_SUBSCRIPTION_FAILED

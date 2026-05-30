@@ -4,8 +4,8 @@
 // The RN example previously embedded VOICE_AGENT_YAML and RAG_YAML as inline
 // string constants in src/screens/SolutionsScreen.tsx because the placeholder
 // model IDs shipped in sdk/runanywhere-commons/examples/solutions/*.yaml did
-// not match what App.tsx seeds. CLUSTER-22 (commit b8cbb43bf) aligned those
-// IDs, so the inline copy is now byte-equivalent to the commons source.
+// not match what App.tsx seeds. Those IDs were later aligned, so the inline
+// copy is now byte-equivalent to the commons source.
 //
 // This script reads the canonical commons YAMLs and emits
 // src/generated/solutionsYaml.ts. Run via postinstall, prepended to the

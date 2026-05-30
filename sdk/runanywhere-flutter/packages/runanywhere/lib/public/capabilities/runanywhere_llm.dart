@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2 LLM capability — aligned to Swift + proto. Returns proto
+// LLM capability — aligned to Swift + proto. Returns proto
 // LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
@@ -77,7 +77,7 @@ class RunAnywhereLLM {
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
 
-    // FLUTTER-AND-002 fix: ensure the registry has a resolved `local_path`
+    // Ensure the registry has a resolved `local_path`
     // before delegating to commons. Without this, `rac_llm_create` falls
     // through to `model_path_owned = model_id` (see
     // sdk/runanywhere-commons/src/features/llm/rac_llm_service.cpp:108-127)

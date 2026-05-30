@@ -46,7 +46,7 @@ fun StructuredOutputOptions.Companion.defaults(
 
 /**
  * Canonical JSON Schema text consumed by the commons structured-output
- * C ABI. Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15)
+ * C ABI. Delegates to `rac_structured_output_schema_to_json_proto`
  * so every SDK shares the same byte-exact, key-sorted, compact serializer
  * (mirrors Swift `RAJSONSchema.jsonSchemaString`). Returns `"{}"` on any
  * serialization or ABI failure to preserve the previous fallback contract.

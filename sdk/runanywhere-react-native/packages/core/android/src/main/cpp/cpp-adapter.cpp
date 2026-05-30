@@ -32,8 +32,8 @@ jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
 jmethodID g_httpDownloadMethod = nullptr;
 jmethodID g_httpDownloadCancelMethod = nullptr;
-// Directory enumeration slots (CLUSTER-280-SPLIT-sdk-react-native): cached
-// so InitBridge.cpp can populate rac_platform_adapter_t::file_list_directory
+// Directory enumeration slots: cached so InitBridge.cpp can populate
+// rac_platform_adapter_t::file_list_directory
 // and rac_platform_adapter_t::is_non_empty_directory.
 jmethodID g_fileListDirectoryMethod = nullptr;
 jmethodID g_isNonEmptyDirectoryMethod = nullptr;

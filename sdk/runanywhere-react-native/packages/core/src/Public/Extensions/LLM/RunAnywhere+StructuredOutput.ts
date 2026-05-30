@@ -109,7 +109,7 @@ async function callNativeProto(
 /**
  * Canonical JSON Schema text consumed by the commons structured-output C ABI.
  *
- * Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15) so every
+ * Delegates to `rac_structured_output_schema_to_json_proto` so every
  * SDK shares the same byte-exact, key-sorted, compact serializer. Returns
  * `"{}"` on any serialization or bridge failure, mirroring Swift
  * `RAJSONSchema.jsonSchemaString`.

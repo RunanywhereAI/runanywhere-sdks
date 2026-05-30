@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/solutions/pipeline_executor.hpp — T4.7 spec → GraphScheduler
+// rac/solutions/pipeline_executor.hpp — spec → GraphScheduler
 // compiler.
 //
 // `PipelineSpec` describes a labelled DAG of operators (L5 layer in the
-// v3.1 architecture). `PipelineExecutor` is a pure translation layer that
+// architecture). `PipelineExecutor` is a pure translation layer that
 // walks the spec, asks `OperatorRegistry` to materialize one
 // `PipelineNode` per operator, resolves `EdgeSpec` endpoints against the
 // registered operator port schemas, and wires up a `GraphScheduler`.

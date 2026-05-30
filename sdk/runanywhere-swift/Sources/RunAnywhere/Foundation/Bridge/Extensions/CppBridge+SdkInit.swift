@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Two-phase SDK init bridge — wraps the canonical C ABI surface in
-//  rac_sdk_init.h (P2-T9). All step-list orchestration that used to live in
+//  rac_sdk_init.h. All step-list orchestration that used to live in
 //  RunAnywhere.swift is owned by commons; this file is the data envelope.
 //
 //  Maps Swift parameters into RASdkInitPhase{1,2}Request, invokes

@@ -6,8 +6,7 @@
  * counterpart at
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RAGProto+Helpers.swift`.
  *
- * The `RA*` typealiases land in workstream L2; for now these helpers operate
- * on the Wire-generated proto types directly.
+ * These helpers operate on the Wire-generated proto types directly.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -57,26 +56,33 @@ fun RAGConfiguration.Companion.defaults(
  * @throws SDKException if any constraint is violated.
  */
 fun RARAGConfiguration.validate() {
-    if (top_k <= 0) {
-        throw SDKException.invalidArgument("topK must be > 0 (got $top_k)")
+    // The proto fields are `optional`, so Wire exposes them as nullable; an
+    // unset field resolves to its canonical default (mirrors the defaults
+    // factory above and the commons-side stamping).
+    val effectiveTopK = top_k ?: 5
+    if (effectiveTopK <= 0) {
+        throw SDKException.invalidArgument("topK must be > 0 (got $effectiveTopK)")
     }
-    if (similarity_threshold < 0f || similarity_threshold > 1.0f) {
+    val effectiveThreshold = similarity_threshold ?: 0.7f
+    if (effectiveThreshold < 0f || effectiveThreshold > 1.0f) {
         throw SDKException.invalidArgument(
-            "Similarity threshold must be in 0..1.0 (got $similarity_threshold)",
+            "Similarity threshold must be in 0..1.0 (got $effectiveThreshold)",
         )
     }
-    if (chunk_size <= 0) {
+    val effectiveChunkSize = chunk_size ?: 512
+    if (effectiveChunkSize <= 0) {
         throw SDKException.invalidArgument("Chunk size must be > 0")
     }
-    if (chunk_overlap < 0 || chunk_overlap >= chunk_size) {
+    val effectiveChunkOverlap = chunk_overlap ?: 64
+    if (effectiveChunkOverlap < 0 || effectiveChunkOverlap >= effectiveChunkSize) {
         throw SDKException.invalidArgument(
-            "Chunk overlap must be >= 0 and < chunkSize (got $chunk_overlap vs $chunk_size)",
+            "Chunk overlap must be >= 0 and < chunkSize (got $effectiveChunkOverlap vs $effectiveChunkSize)",
         )
     }
 }
 
 /**
- * D-6: Commons owns model-id → path resolution. This helper simply stamps
+ * Commons owns model-id → path resolution. This helper simply stamps
  * the resolved model ids returned by the lifecycle onto the configuration
  * and defers actual path resolution to the native RAG session-create ABI.
  *
@@ -101,8 +107,8 @@ fun RARAGConfiguration.resolvingLifecycleArtifacts(
  * string), matching the Swift `RARAGDocument(text:metadataJSON:)`
  * initializer.
  *
- * IDL-13: the `metadata_json` proto field was removed; this helper decodes
- * the caller's blob into the typed `metadata` map so the wire payload stays
+ * The `metadata_json` proto field was removed; this helper decodes the
+ * caller's blob into the typed `metadata` map so the wire payload stays
  * canonical.
  */
 fun RAGDocument.Companion.create(
@@ -206,7 +212,7 @@ val RAGResult.generationTime: Double
 val RARAGStatistics.lastUpdated: Long?
     get() = last_updated_ms.takeIf { it > 0L }
 
-// D-6: `mergingRAGConfig` and the JSONSerialization-backed embedding-config
+// `mergingRAGConfig` and the JSONSerialization-backed embedding-config
 // merger are deliberately omitted — commons now resolves vocabulary paths
 // itself from the registered model descriptor, so the SDK no longer
 // assembles `embedding_config_json` on its side.

@@ -1,6 +1,6 @@
 /**
  * @file http_default_headers.cpp
- * @brief Single canonical default-header list shared across SDKs (P2-T11).
+ * @brief Single canonical default-header list shared across SDKs.
  *
  * The header values come from `rac_get_version()` (the canonical commons
  * version string defined in `src/core/rac_core.cpp`) plus a hard-coded

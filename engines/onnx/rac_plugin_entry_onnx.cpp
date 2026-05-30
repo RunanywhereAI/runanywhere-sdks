@@ -2,8 +2,6 @@
  * @file rac_plugin_entry_onnx.cpp
  * @brief Unified-ABI entry point for the ONNX Runtime backend.
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * A single vtable exposes ONNX-owned primitives. Sherpa-backed speech
  * primitives live in engines/sherpa; ONNX retains embeddings and generic
  * ONNX Runtime model services.
@@ -18,7 +16,7 @@
 
 extern "C" {
 
-/* runtimes-002: anchor the onnxrt runtime registrar translation unit at link
+/* Anchor the onnxrt runtime registrar translation unit at link
  * time. The onnx engine declares RAC_RUNTIME_ONNXRT in its manifest, so the
  * router hard-rejects it unless that runtime is in the registry. A file-scope
  * reference to rac_onnxrt_runtime_require_available — defined in the same TU as
@@ -33,7 +31,7 @@ extern "C" {
 void* const volatile rac_onnxrt_runtime_anchor =
     reinterpret_cast<void*>(&rac_onnxrt_runtime_require_available);
 
-/* ENG-ONNX-02 resolved: embeddings ops live next to this file in
+/* Embeddings ops live next to this file in
  * engines/onnx/rac_onnx_embeddings_register.cpp (engine-owned). When
  * RAC_BACKEND_RAG is off, onnx_embedding_provider.cpp is not compiled
  * and the symbol is unresolved — the vtable slot stays nullptr below

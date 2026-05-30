@@ -1,6 +1,6 @@
 /**
  * @file rac_voice_event_abi.cpp
- * @brief Implementation of the GAP 09 proto-byte event ABI for the voice
+ * @brief Implementation of the proto-byte event ABI for the voice
  *        agent. See rac_voice_event_abi.h for the declared contract.
  *
  * Implementation notes:
@@ -13,8 +13,8 @@
  *     protobuf wire format. The schema is small + stable so this avoids
  *     pulling 12 MB of libprotobuf into every Android APK just for one
  *     message. Layout matches `idl/voice_events.proto` field-for-field.
- *     Mirrors the LLMStreamEvent fix in rac_llm_stream.cpp (Phase A,
- *     B-AK-4-001) — same root cause, same hand-encoder pattern.
+ *     Mirrors the LLMStreamEvent hand-encoder in rac_llm_stream.cpp —
+ *     same root cause, same hand-encoder pattern.
  *
  * The actual hookup of `rac_voice_agent_set_proto_callback()` into the
  * agent's internal event dispatcher lives in voice_agent.cpp / the
@@ -39,7 +39,7 @@
 
 namespace {
 
-// commons-040/041: The voice-agent pipeline (voice_agent_pipeline.cpp:319-330)
+// The voice-agent pipeline (voice_agent_pipeline.cpp:319-330)
 // wraps TTS Float32 PCM in a 44-byte WAV header (Int16 PCM container) before
 // emitting RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED. The C-struct audio arm
 // has no metadata fields, so we inspect the bytes here: a valid WAV container
@@ -116,8 +116,8 @@ DecodedAudio decode_audio_payload(const void* audio_data, size_t audio_size) {
 struct CallbackSlot {
     rac_voice_agent_proto_event_callback_fn fn = nullptr;
     void* user_data = nullptr;
-    // Per-handle, per-session sequence counter. Mirrors the LLM stream fix
-    // (B-FL-7-001): a process-wide counter caused decoders to reject the
+    // Per-handle, per-session sequence counter. Mirrors the LLM stream fix:
+    // a process-wide counter caused decoders to reject the
     // second session on the same handle. Reset on every fresh registration
     // so each session starts at 1 again.
     uint64_t seq = 0;
@@ -132,7 +132,7 @@ std::unordered_map<rac_voice_agent_handle_t, CallbackSlot>& g_slots() {
     return m;
 }
 
-// commons-features-voice-002: in-flight counter for the proto-byte event
+// In-flight counter for the proto-byte event
 // dispatcher. Mirrors the LLM/VLM/VAD stream quiesce pattern. Callers
 // freeing user_data must (a) unregister via rac_voice_agent_set_proto_callback
 // then (b) call rac_voice_agent_proto_quiesce to spin-wait until every
@@ -195,7 +195,7 @@ int64_t now_us() {
 }
 
 /* Translate a C struct event to a proto VoiceEvent. Maps the 7 C union
- * arms into the 8 proto oneof arms via the GAP 09 mapping table:
+ * arms into the 8 proto oneof arms via the mapping table:
  *
  *   C event                          → proto VoiceEvent.payload
  *   ----------------------------------------------------------
@@ -208,7 +208,7 @@ int64_t now_us() {
  *   WAKEWORD_DETECTED                → state (IDLE → LISTENING)
  *
  * Proto's `interrupted` arm has no current C-side producer; reserved
- * for the GAP 08 voice barge-in path.
+ * for the voice barge-in path.
  */
 void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& dst) {
     dst.set_severity(src.type == RAC_VOICE_AGENT_EVENT_ERROR
@@ -231,7 +231,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_VAD);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
             auto* v = dst.mutable_vad();
-            // IDL-18: VADEvent.type now uses VADStreamEventKind. Speech-
+            // VADEvent.type now uses VADStreamEventKind. Speech-
             // start/end both ride SPEECH_ACTIVITY; direction is communicated
             // via the companion `is_speech` bool on VADEvent.
             v->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
@@ -260,7 +260,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             if (src.data.response)
                 t->set_text(src.data.response);
             /* Voice-agent response events are full-utterance, so is_final
-             * is true. Streaming token-level deltas come through GAP 09's
+             * is true. Streaming token-level deltas come through the
              * llm_service path, not this one. */
             t->set_is_final(true);
             t->set_kind(runanywhere::v1::TOKEN_KIND_ANSWER);
@@ -271,7 +271,7 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_TTS);
             auto* a = dst.mutable_audio();
-            // commons-040/041: the pipeline wraps TTS output in a WAV
+            // The pipeline wraps TTS output in a WAV
             // container at the real TTS sample rate (Piper=22050, Kokoro=24000,
             // espeak=22050). Decode the container so the proto wire matches
             // the bytes the consumer receives, instead of mis-tagging a WAV
@@ -334,7 +334,7 @@ namespace rac::voice_agent {
  */
 void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event) {
-    // commons-features-voice-002: hold the in-flight guard across the whole
+    // Hold the in-flight guard across the whole
     // dispatch so rac_voice_agent_proto_quiesce() can spin-wait on the
     // counter before user_data is freed by a concurrent teardown thread.
     ProtoInFlightGuard in_flight_guard;
@@ -586,13 +586,13 @@ void encode_audio_frame(std::vector<uint8_t>& s, const void* pcm, size_t pcm_siz
 }
 
 void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
-    /*  1: enum type  (VADStreamEventKind — IDL-18 canonical VAD event enum)
+    /*  1: enum type  (VADStreamEventKind — canonical VAD event enum)
      *     3 = VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY (start + end both ride this;
      *         direction is carried in the companion `is_speech` bool field).  */
     wire_enum_field(s, 1, 3);
     /*  2: int64 frame_offset_us (default 0 → omitted) */
     /*  4: bool  is_speech  (proto3 omits defaults; emit only when true)     */
-    // commons-170: use the bool helper (semantically identical bytes today —
+    // Use the bool helper (semantically identical bytes today —
     // tag(4, varint) + 0x01 — but typed correctly so future is_speech changes
     // can't accidentally pass enum values > 1 via the wrong helper).
     wire_bool_field(s, 4, speech_active);
@@ -655,7 +655,7 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
     if (event == nullptr)
         return;
 
-    // commons-features-voice-002: hold the in-flight guard across the whole
+    // Hold the in-flight guard across the whole
     // dispatch so rac_voice_agent_proto_quiesce() can spin-wait on the
     // counter before user_data is freed by a concurrent teardown thread.
     ProtoInFlightGuard in_flight_guard;
@@ -709,7 +709,7 @@ void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent
         }
 
         case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
-            // commons-040/041: decode WAV container (if present) so the
+            // Decode WAV container (if present) so the
             // hand-encoded wire matches the protobuf path and consumers
             // receive raw PCM with accurate sample_rate/encoding metadata.
             const DecodedAudio decoded =

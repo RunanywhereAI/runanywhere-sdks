@@ -21,7 +21,7 @@
 
 static const char* LOG_CAT = "STT.MetalRT";
 
-// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// See rac_llm_metalrt.cpp for the full ADR. Same
 // acquire/release pin pattern: destroy waits on cv_ for in-flight transcribe
 // pins to drain before tearing down the whisper handle and freeing impl.
 // Prevents the UAF where destroy could free impl while a concurrent

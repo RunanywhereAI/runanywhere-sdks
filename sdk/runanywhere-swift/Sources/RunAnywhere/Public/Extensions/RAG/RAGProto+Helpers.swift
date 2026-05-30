@@ -18,7 +18,7 @@ import Foundation
 // MARK: - RARAGConfiguration
 
 extension RARAGConfiguration {
-    /// D-6: Commons owns model-id → path resolution; this helper now only
+    /// Commons owns model-id → path resolution; this helper now only
     /// stamps resolved model ids onto the configuration. Callers pass
     /// `RAModelLoadResult` values so the lifecycle has been invoked (and the
     /// models are registered) before the native session-create runs.
@@ -37,7 +37,7 @@ extension RARAGConfiguration {
 
 extension RARAGDocument {
     public init(text: String, metadataJSON: String? = nil) {
-        // IDL-13: `metadata_json` proto field was removed; decode the caller's
+        // `metadata_json` proto field was removed; decode the caller's
         // JSON blob (if any) into the typed `metadata` map.
         self.init()
         self.text = text

@@ -337,7 +337,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearDurationMs() => $_clearField(9);
 
-  /// flutter-core-009: explicit two-phase HTTP-setup completion flag,
+  /// Explicit two-phase HTTP-setup completion flag,
   /// decoupled from services-init completion so SDKs that initialize
   /// offline (no connectivity) can still report success=true with
   /// has_completed_http_setup=false and retry HTTP later via the

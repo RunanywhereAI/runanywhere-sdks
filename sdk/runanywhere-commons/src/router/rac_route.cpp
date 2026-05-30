@@ -2,8 +2,8 @@
  * @file rac_route.cpp
  * @brief Implementation of the C ABI route() wrapper.
  *
- * GAP 04 Phase 12. CPP-05: distinguish runtime-unavailable rejections from
- * generic "no plugin" rejections via `RAC_ERROR_RUNTIME_UNAVAILABLE`.
+ * Distinguishes runtime-unavailable rejections from generic "no plugin"
+ * rejections via `RAC_ERROR_RUNTIME_UNAVAILABLE`.
  */
 
 #include "rac/router/rac_route.h"

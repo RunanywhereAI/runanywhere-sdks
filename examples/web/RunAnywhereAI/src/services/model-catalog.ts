@@ -124,7 +124,7 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
-    // pass3-syn-097: parity with Android/iOS/Flutter/RN catalogs.
+    // Parity with Android/iOS/Flutter/RN catalogs.
     id: 'qwen3-4b-q4_k_m',
     name: 'Qwen3 4B Q4_K_M',
     description: 'Qwen3 series larger LLM with thinking-mode support.',
@@ -209,7 +209,7 @@ const CATALOG: readonly CatalogEntry[] = [
     downloadUrl:
       'https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.onnx',
     // Actual silero_vad.onnx artifact size (verified Content-Length). Feeds the
-    // post-finalize download size guard (CLUSTER-13).
+    // post-finalize download size guard.
     downloadSizeBytes: 2_327_524,
     memoryRequiredBytes: 5_000_000,
   },

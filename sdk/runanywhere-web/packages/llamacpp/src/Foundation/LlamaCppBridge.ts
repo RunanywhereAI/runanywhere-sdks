@@ -398,7 +398,7 @@ export class LlamaCppBridge {
       }
       logger.info('RACommons initialized within LlamaCpp WASM module');
 
-      // BUG-WEB-002: Web has no native filesystem root, but the C++ download
+      // Web has no native filesystem root, but the C++ download
       // orchestrator rejects an empty base dir (g_base_dir.empty() causes
       // rac_model_paths_get_model_folder to fail with RAC_ERROR_NOT_FOUND).
       //

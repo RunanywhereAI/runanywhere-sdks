@@ -975,7 +975,7 @@ Static vtable instances:
 | `ComponentVTable.vad` (lines 105–114) | `.vad` | `rac_vad_component_*` |
 | `ComponentVTable.vlm` (lines 124–136) | `.vlm` | `rac_vlm_component_*`; `loadModel` passes `nil` for `vision_projector_path` |
 
-The inline comment at lines 117–123 documents that the `loadModel` slot is "dead in practice" for VLM after Wave 7/T23 — it is retained only to keep the `ComponentVTable` shape uniform across all five modalities.
+The inline comment at lines 117–123 documents that the `loadModel` slot is "dead in practice" for VLM — it is retained only to keep the `ComponentVTable` shape uniform across all five modalities.
 
 ### §6.4 HTTPClientAdapter — HTTP routing actor
 
@@ -1396,7 +1396,7 @@ All Keychain callbacks use service identifier `"com.runanywhere.sdk"` and `kSecC
 
 #### §6.5.23 CppBridge+Strategy.swift
 
-**LOC:** 67 — Extensions on `ArchiveType` and `ArchiveStructure`. Wave 7B — delegates bidirectional conversion to commons mappers.
+**LOC:** 67 — Extensions on `ArchiveType` and `ArchiveStructure`. Delegates bidirectional conversion to commons mappers.
 
 | Method | Line | C ABI |
 |---|---|---|
@@ -1504,7 +1504,7 @@ The `.tts` vtable's `loadModel` slot forwards to `rac_tts_component_load_voice`.
 | Method/Property | Line | C ABI |
 |---|---|---|
 | `getHandle()` async throws | 53 | via `ComponentActor.getHandle()` |
-| `cancel()` async | 66 | `cancelLifecycle()` (Wave 7 T23) |
+| `cancel()` async | 66 | `cancelLifecycle()` |
 | `supportsStreaming` { get async } | 79 | `rac_vlm_component_supports_streaming` |
 | `state` { get async } | 85 | `rac_vlm_component_get_state` |
 | `destroy()` async | 98 | via `ComponentActor` |

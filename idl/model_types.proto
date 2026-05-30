@@ -2,7 +2,7 @@
 //
 // Every enum below is the *union* of cases currently declared by hand across
 // Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL drift table
-// (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what motivated
+// is what motivated
 // this schema. Every SDK consumes generated output; nothing is hand-written.
 
 syntax = "proto3";
@@ -253,8 +253,8 @@ enum ModelFileRole {
 }
 
 // ---------------------------------------------------------------------------
-// AccelerationPreference enum moved to hardware_profile.proto (Wave H-2 /
-// IDL-01). Hardware preference is a pure hardware concern; consolidating it
+// AccelerationPreference enum moved to hardware_profile.proto.
+// Hardware preference is a pure hardware concern; consolidating it
 // there avoids cyclic proto imports and collapses the prior duplicate
 // AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
 // (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this
@@ -280,7 +280,7 @@ enum RoutingPolicy {
 }
 
 // Model-level thinking tag metadata uses the canonical ThinkingTagPattern from
-// thinking_tag_pattern.proto (Wave H-2 / IDL-02). Previously this file declared
+// thinking_tag_pattern.proto. Previously this file declared
 // a separate ModelThinkingTagPattern because llm_options.proto owned a distinct
 // ThinkingTagPattern with different field names; that duplicate has been
 // collapsed into the single shared message.
@@ -850,7 +850,7 @@ message ModelRegistryFetchAssignmentsResult {
 }
 
 // ---------------------------------------------------------------------------
-// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+// Inputs for the canonical RAModelInfo factory. Replaces Swift's
 // `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
 // logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
 // (id, name, category/format/framework defaults, context-length defaults,
@@ -882,8 +882,8 @@ message ModelInfoMakeRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
-// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+// Inputs for the canonical "register a model from a URL" entry point.
+// Composes ModelInfoMakeRequest with the existing registry save path
 // so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
 // Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
 // shape).

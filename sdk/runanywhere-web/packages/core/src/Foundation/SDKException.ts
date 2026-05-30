@@ -1,7 +1,7 @@
 /**
  * RunAnywhere Web SDK - SDKException.
  *
- * Wave 2: SDKException is the SOLE exception class. The legacy `SDKError` has
+ * SDKException is the SOLE exception class. The legacy `SDKError` has
  * been deleted; all throw sites now use SDKException. SDKException wraps the
  * canonical proto-ts `SDKError` shape from `@runanywhere/proto-ts/errors` so a
  * thrown error can carry the full proto envelope (category, code, message,
@@ -97,7 +97,7 @@ export enum SDKErrorCode {
  * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
  * Web cannot call the C++ helper synchronously before WASM is loaded, so the
  * table is replicated here; any change to the canonical mapping MUST be
- * mirrored in this function (and in the RN equivalent). See commons-074-A.
+ * mirrored in this function (and in the RN equivalent).
  */
 function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
   if (code === 0) return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
@@ -221,7 +221,7 @@ export class SDKException extends Error {
   /**
    * Structured validation field-path accessor.
    *
-   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
    * Reads `context.metadata['field_path']` populated by
    * `SDKException.validationFailed(...)` (see below). Cross-SDK consumer
    * code can rely on `e.fieldPath === 'X.y'` regardless of which SDK
@@ -389,7 +389,7 @@ export class SDKException extends Error {
   /**
    * Structured validation failure.
    *
-   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN
    * `SDKException.validationFailed(...)`. Encodes the structured field
    * path into `proto.context.metadata['field_path']` so consumers can
    * read it back uniformly across SDKs via {@link fieldPath}.

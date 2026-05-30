@@ -1,6 +1,6 @@
 /**
  * @file tool_calling_session.cpp
- * @brief Wave D-4: Tool-calling session state machine.
+ * @brief Tool-calling session state machine.
  *
  * Collapses the per-SDK 200-400 LOC tool-calling orchestration loop
  * (generate -> parse -> validate -> host-executes -> format follow-up
@@ -73,7 +73,7 @@ struct ToolCallingSession {
     uint64_t handle = 0;
     std::mutex mu;
 
-    // pass2-syn-007: in-flight LifecycleLlmRef tracking for cancel. The
+    // In-flight LifecycleLlmRef tracking for cancel. The
     // generate caller holds `mu` while ops->generate runs; cancel calls must
     // come from another thread and CANNOT take `mu` (would deadlock). Instead
     // we publish a pointer to the in-flight ref under `active_ref_mu` (a
@@ -100,7 +100,7 @@ struct ToolCallingSession {
     float top_p = 0.0f;
     std::string system_prompt;
 
-    // pass2-syn-006: request-level tool_choice / forced_tool_name overrides.
+    // Request-level tool_choice / forced_tool_name overrides.
     bool has_tool_choice = false;
     runanywhere::v1::ToolChoiceMode tool_choice = runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED;
     std::string forced_tool_name;
@@ -117,7 +117,7 @@ struct ToolCallingSession {
     std::string pending_tool_call_id;
     std::string pending_tool_name;
 
-    // commons-features-llm-rag-009: deferred-dispatch queue. emit_event runs
+    // Deferred-dispatch queue. emit_event runs
     // under session->mu (held by create_proto / step_with_result_proto while
     // run_generate_loop runs); invoking session.callback directly would
     // deadlock if the host callback re-entered rac_tool_calling_session_*
@@ -145,7 +145,7 @@ std::shared_ptr<ToolCallingSession> lookup_session(uint64_t handle) {
     return it == reg.sessions.end() ? nullptr : it->second;
 }
 
-// commons-features-llm-rag-003: process-global in-flight counter for the
+// Process-global in-flight counter for the
 // tool-calling-session event dispatcher. Mirrors the rac_llm_proto_quiesce /
 // rac_vlm_proto_quiesce / rac_stt_proto_quiesce pattern. drain_and_dispatch
 // snapshots (callback, user_data) under session->mu, releases the lock, then
@@ -173,7 +173,7 @@ struct ToolCallingSessionInFlightGuard {
 
 void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSessionEvent event) {
     event.set_seq(++session.seq);
-    // commons-features-llm-rag-009: serialize under the lock the caller holds,
+    // Serialize under the lock the caller holds,
     // queue bytes for deferred dispatch. drain_and_dispatch (invoked after the
     // outer session_lock is released) fires session.callback for each entry.
     const size_t size = event.ByteSizeLong();
@@ -184,13 +184,13 @@ void emit_event(ToolCallingSession& session, runanywhere::v1::ToolCallingSession
     session.pending_dispatches.push_back(std::move(bytes));
 }
 
-// commons-features-llm-rag-009: dispatch queued events after the caller has
+// Dispatch queued events after the caller has
 // released session->mu. Snapshots the callback/user_data and pending bytes
 // under the registry mutex via session.mu, then releases before invoking the
 // host callback so a re-entrant call into rac_tool_calling_session_* on the
 // same handle does not self-deadlock.
 //
-// commons-features-llm-rag-003: hold a ToolCallingSessionInFlightGuard for
+// Hold a ToolCallingSessionInFlightGuard for
 // the entire body so rac_tool_calling_session_proto_quiesce() can spin-wait
 // until every pending callback has returned. Without the guard,
 // rac_tool_calling_session_destroy_proto can return while this function is
@@ -291,7 +291,7 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSess
     if (!session.system_prompt.empty()) {
         options.set_system_prompt(session.system_prompt);
     }
-    // pass2-syn-006: honor request-level tool_choice / forced_tool_name on the
+    // Honor request-level tool_choice / forced_tool_name on the
     // snapshot consumed by the format/validate proto helpers.
     if (session.has_tool_choice) {
         options.set_tool_choice(session.tool_choice);
@@ -471,7 +471,7 @@ bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
         return false;
     }
 
-    // pass2-syn-007: publish the in-flight ref so cancel calls from other
+    // Publish the in-flight ref so cancel calls from other
     // threads can interrupt this generate. If a cancel arrived before we
     // got here, latch it onto the ref now.
     {
@@ -516,7 +516,7 @@ void run_generate_loop(ToolCallingSession& session) {
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(session, session.current_prompt, &response, &rc)) {
-            // pass3-syn-021: distinguish cancel from other generate failures.
+            // Distinguish cancel from other generate failures.
             // A cancel that landed before or during generate makes the session
             // terminal — emit a cancel error and mark state kCancelled so the
             // public step_with_result_proto guard rejects further steps.
@@ -642,7 +642,7 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     // that delegate validation/authorization to their executor opt out by
     // explicitly setting validate_calls=false.
     session->validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    // pass2-syn-006: pick up the OpenAI-style request-level tool_choice and
+    // Pick up the OpenAI-style request-level tool_choice and
     // forced_tool_name knobs (idl/tool_calling.proto fields 7/8).
     if (request.has_tool_choice()) {
         session->has_tool_choice = true;
@@ -664,7 +664,7 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
         reg.sessions[handle] = session;
     }
 
-    // commons-features-llm-rag-009: hold session->mu while run_generate_loop
+    // Hold session->mu while run_generate_loop
     // queues events into session.pending_dispatches, then release the lock
     // BEFORE drain_and_dispatch fires the host callback so a re-entrant
     // step_with_result_proto / cancel / destroy from inside the callback
@@ -710,14 +710,14 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-    // commons-features-llm-rag-009: hold session->mu only while we mutate
+    // Hold session->mu only while we mutate
     // session state and let run_generate_loop queue events. Drop the lock
     // BEFORE dispatching queued events so a host callback that re-enters
     // step_with_result_proto / cancel / destroy on the same handle does not
     // deadlock on session->mu.
     {
         std::lock_guard<std::mutex> session_lock(session->mu);
-        // pass3-syn-021: a cancelled session is terminal. Once
+        // A cancelled session is terminal. Once
         // rac_tool_calling_session_cancel_proto has latched cancel_requested, any
         // follow-up step_with_result_proto must be rejected so the host cannot
         // silently feed the cancelled session more iterations (which would then
@@ -773,7 +773,7 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     if (session_handle == 0) {
         return RAC_SUCCESS;
     }
-    // commons-features-llm-rag-003: quiesce before returning. Two races to
+    // Quiesce before returning. Two races to
     // close:
     //   (a) a concurrent rac_tool_calling_session_step_with_result_proto /
     //       create_proto is still inside run_generate_loop holding
@@ -832,7 +832,7 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     return RAC_SUCCESS;
 }
 
-// commons-features-llm-rag-003: public quiesce helper. Spin-waits until every
+// Public quiesce helper. Spin-waits until every
 // in-flight drain_and_dispatch invocation has returned. Mirrors
 // rac_llm_proto_quiesce / rac_vlm_proto_quiesce / rac_stt_proto_quiesce.
 // Called from rac_tool_calling_session_destroy_proto and exposed to SDK
@@ -867,12 +867,12 @@ extern "C" rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_h
         // run_loop_cancel_proto semantics).
         return RAC_SUCCESS;
     }
-    // pass2-syn-007: latch the cancel request first so a generate that
+    // Latch the cancel request first so a generate that
     // hasn't yet published active_ref will pick it up when it starts, then
     // forward to the in-flight ref if one is currently published. We hold
     // active_ref_mu (NOT session.mu, which the generate caller holds).
     //
-    // pass3-syn-021: setting cancel_requested makes the session terminal —
+    // Setting cancel_requested makes the session terminal —
     // subsequent rac_tool_calling_session_step_with_result_proto calls will
     // be rejected with RAC_ERROR_INVALID_STATE (see the guard at the top of
     // that function). Hosts must destroy the session and create a new one

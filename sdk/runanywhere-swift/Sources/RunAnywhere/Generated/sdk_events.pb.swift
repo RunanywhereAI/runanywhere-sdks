@@ -2135,7 +2135,7 @@ public nonisolated struct RAGenerationEvent: @unchecked Sendable {
   }
 
   /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-  /// Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+  /// Enables totalTokens = input_tokens + tokens_used analytics
   /// from the event stream alone.
   public var inputTokens: Int32 {
     get {_storage._inputTokens}

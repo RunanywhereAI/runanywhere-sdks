@@ -651,7 +651,7 @@ export async function ragEnsureReady(
  * Web-platform extensions that do not appear in the Swift source-of-truth
  * (`RunAnywhere+RAG.swift`). They live here until either the cross-SDK
  * spec adopts them (Kotlin / Flutter / RN / Swift) or the consumer surface
- * migrates to the Swift-aligned subset. See CLUSTER-44 / web-core-011.
+ * migrates to the Swift-aligned subset.
  *
  * Swift-aligned surface (cross-SDK canonical):
  *   - `createPipeline`     ↔ `ragCreatePipeline`

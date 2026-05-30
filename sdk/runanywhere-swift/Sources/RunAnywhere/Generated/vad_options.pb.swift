@@ -12,13 +12,13 @@
 //
 // Every message below is the *union* of fields currently declared by hand
 // across Swift, Kotlin, Dart, React Native, Web, and the C ABI. The pre-IDL
-// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is
+// drift table is
 // what motivated this schema. Every SDK consumes generated output; nothing
 // is hand-written.
 //
 // Note: this file does NOT redefine VADEvent — that lives in
 // voice_events.proto and is imported here when needed. VADStreamEventKind
-// below is the canonical VAD event enum (IDL-18 absorbed the deleted
+// below is the canonical VAD event enum (it absorbed the deleted
 // VADEventType from voice_events.proto).
 
 #if canImport(FoundationEssentials)
@@ -141,7 +141,7 @@ public nonisolated enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
   case stopped // = 5
   case error // = 6
 
-  /// IDL-18 fold: pipeline-level barge-in signal previously carried by the
+  /// Pipeline-level barge-in signal previously carried by the
   /// deleted VADEventType enum. Emitted when the VAD detects speech that
   /// interrupts active assistant playback; downstream pipeline typically
   /// routes this through InterruptedEvent/InterruptReason as well.

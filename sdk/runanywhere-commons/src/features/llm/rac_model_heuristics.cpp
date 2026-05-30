@@ -1,20 +1,18 @@
 /**
  * @file rac_model_heuristics.cpp
- * @brief CONSOLIDATE-A — commons-owned heuristics derived from RAModelInfo.
+ * @brief commons-owned heuristics derived from RAModelInfo.
  *
  * Background: every example app was duplicating the same model→tool-call-format
  * mapping (`name.contains("lfm2") && name.contains("tool")` →
  * `RAC_TOOL_FORMAT_LFM2`) and the same small-model regex (`0.3b`, `0.5b`,
  * `0.6b`, `350m`, `360m`, `500m`). The reviewer flagged this as four examples
- * encoding SDK-internal knowledge: examples-flutter-005,
- * examples-flutter-006, examples-ios-003, examples-android-008.
+ * encoding SDK-internal knowledge across the Flutter, iOS, and Android apps.
  *
  * Resolution: this TU centralizes the heuristics behind a proto-byte ABI so
  * SDKs derive every value from a serialized `runanywhere.v1.ModelInfo`. The
  * helpers consume the same `name` / `id` / `description` fields the examples
  * were inspecting by hand, so behaviour matches the existing reviewer
- * verifications byte-for-byte while the example heuristics can be deleted in
- * Wave 5.
+ * verifications byte-for-byte while the example heuristics can be deleted.
  */
 
 #include <algorithm>

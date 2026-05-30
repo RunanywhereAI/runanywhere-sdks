@@ -1,6 +1,6 @@
 /**
  * @file test_model_info_make_proto.cpp
- * @brief Tests for the canonical RAModelInfo factory (P2-T4).
+ * @brief Tests for the canonical RAModelInfo factory.
  *
  * Exercises rac_model_info_make_proto for representative URL shapes:
  *   - .gguf single-file → SINGLE_FILE artifact, LLAMA_CPP framework, LANGUAGE

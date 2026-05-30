@@ -226,7 +226,7 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Model states synced - VAD: \(vadState.isLoaded), STT: \(sttState.isLoaded), LLM: \(llmState.isLoaded), TTS: \(ttsState.isLoaded)")
     }
 
-    // IDL-04: RAComponentLoadState consolidated into the richer
+    // RAComponentLoadState consolidated into the richer
     // RAComponentLifecycleState (shared with SDKEvent).
     private func componentStateFromSnapshot(_ component: RASDKComponent) -> RAComponentLifecycleState {
         guard let snapshot = RunAnywhere.componentLifecycleSnapshot(component) else {
@@ -488,7 +488,7 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Voice session stopped")
     }
 
-    // MARK: - Proto Event Handling (v3.1)
+    // MARK: - Proto Event Handling
 
     // swiftlint:disable cyclomatic_complexity function_body_length
 
@@ -566,7 +566,7 @@ final class VoiceAgentViewModel: ObservableObject {
             // No UX-visible effect for these arms today.
             break
 
-        // Phase B regenerated RAVoiceEvent payload with new arms; we do not
+        // The regenerated RAVoiceEvent payload added new arms; we do not
         // surface them in the UI yet, so they are intentionally folded into
         // the same no-op bucket as .interrupted / .metrics.
         case .componentStateChanged, .sessionError, .sessionStarted,

@@ -36,7 +36,7 @@ fi
 
 echo "▶ protoc version: $(protoc --version)"
 
-# IDL-19c: canonical proto-file list shared with every per-language codegen
+# Canonical proto-file list shared with every per-language codegen
 # script via the RAC_PROTO_FILES env var (absolute paths, newline-separated,
 # sorted). Discovery via `ls` prevents drift when a new .proto is added — the
 # full list is derived from the filesystem, and each per-language script
@@ -55,7 +55,7 @@ echo "▶ Swift proto codegen"
 echo "▶ Kotlin proto codegen"
 "${SCRIPT_DIR}/generate_kotlin.sh"
 
-# T3.3: emit RAConvenience.kt from rac_options.proto annotations on top of the
+# Emit RAConvenience.kt from rac_options.proto annotations on top of the
 # Wire-generated message/enum types. Must run AFTER generate_kotlin.sh so the
 # referenced types (ai.runanywhere.proto.v1.*) exist on disk; Wire emits a
 # `companion object` on every message/enum, which the convenience extensions
@@ -85,7 +85,7 @@ fi
 
 echo "▶ TypeScript proto codegen (RN + Web)"
 "${SCRIPT_DIR}/generate_ts.sh"
-# T3.3-ts-impl: TypeScript convenience helpers (defaults / validate /
+# TypeScript convenience helpers (defaults / validate /
 # wireString) derived from rac_* annotations. Skips silently when python3
 # is absent, so a TS-only developer environment without Python still
 # completes the upstream codegen successfully.
@@ -98,16 +98,16 @@ fi
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"
 
-# GAP 09 Phase 14: AsyncIterable<T> stream wrappers for RN + Web. The
+# AsyncIterable<T> stream wrappers for RN + Web. The
 # template-based renderer is intentionally separate from generate_ts.sh
 # (which uses ts-proto for messages) — different tools, different outputs.
 #
-# hotspot-idl-005: a single shared script renders the streams once into
+# A single shared script renders the streams once into
 # sdk/shared/proto-ts/src/streams. Both RN and Web consume the result via
 # @runanywhere/proto-ts; the previous generate_rn_streams.sh /
 # generate_web_streams.sh pair was byte-identical and overwrote each
 # other's output, masking unilateral edits.
-echo "▶ Shared TS AsyncIterable streams (GAP 09)"
+echo "▶ Shared TS AsyncIterable streams"
 "${SCRIPT_DIR}/generate_streams.sh"
 
 echo "✓ All proto codegen complete."

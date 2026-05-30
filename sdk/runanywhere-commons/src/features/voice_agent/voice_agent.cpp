@@ -8,7 +8,7 @@
  * CRITICAL: This is a direct port of the Swift implementation - do NOT add
  * custom logic.
  *
- * commons-features-voice-003 SRP split: the legacy 2,291-LoC monolith was
+ * SRP split: the legacy 2,291-LoC monolith was
  * decomposed into per-ABI translation units:
  *   - voice_agent.cpp                          — lifecycle (create/destroy)
  *                                                + synchronous initialize +
@@ -18,19 +18,19 @@
  *                                                turn/stream + individual
  *                                                helpers + result-free)
  *   - voice_agent_proto_abi.cpp                — synchronous proto C ABI
- *   - voice_agent_d7_abi.cpp                   — Wave D-7 full-session
+ *   - voice_agent_d7_abi.cpp                   — full-session
  *                                                proto ABI
  *   - voice_agent_audio_pipeline_state.cpp     — audio pipeline state
  *                                                machine helpers
  *   - voice_agent_internal_helpers.{h,cpp}     — shared emit / state /
  *                                                proto-byte helpers
- *   - voice_agent_pipeline.cpp / .hpp          — GAP 05 Phase 2 graph
+ *   - voice_agent_pipeline.cpp / .hpp          — graph
  *                                                pipeline
  *
  * Public C ABI is unchanged across the split. The `rac_voice_agent` struct
  * definition lives in `voice_agent_internal.h`.
  *
- * Lifecycle-acquire pattern (SWIFT-VOICE-AGENT-001 / T16 / Path X):
+ * Lifecycle-acquire pattern:
  *
  *   All proto-byte entry points (`rac_voice_agent_*_proto`) MUST resolve
  *   modality state via `acquire_lifecycle_{stt,tts,vad,llm}` instead of
@@ -38,7 +38,7 @@
  *   handles stored on the agent are owned by the Swift bridge actor and
  *   are NOT the same as the level-1 (impl + ops) entries that
  *   `rac_model_lifecycle_load_proto` populates. Mirrors the precedent
- *   established in `rac_vlm_process_proto` (Phase 6j) where the
+ *   established in `rac_vlm_process_proto` where the
  *   component-handle pointer arithmetic produced an EXC_BAD_ACCESS on
  *   iPhone 17 Pro Max.
  *
@@ -49,7 +49,7 @@
  *   points live in voice_agent_legacy_abi.cpp and are marked
  *   `[[deprecated]]` via `RAC_VOICE_AGENT_LEGACY_DEPRECATED` so external
  *   callers (Playground/linux-voice, commons tests) surface as
- *   `-Wdeprecated-declarations` warnings (commons-features-voice-007).
+ *   `-Wdeprecated-declarations` warnings.
  */
 
 #include "voice_agent_internal.h"
@@ -132,11 +132,11 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
 // `rac_model_lifecycle_load_proto(...)` for each modality. The 4-handle
 // API is retained for the iOS Swift bridge, which still constructs its
 // per-modality component handles inside actors and threads them through
-// here. After SWIFT-VOICE-AGENT-001 (T16/Path X), proto entry points
+// here. Proto entry points
 // dispatch through the global lifecycle and ignore these stored handles
 // entirely; only the legacy non-proto entry points still dereference
-// them for backward compatibility. Removal is gated on T17/T18 (Swift
-// migration).
+// them for backward compatibility. Removal is gated on the Swift
+// migration.
 rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
                                     rac_handle_t stt_component_handle,
                                     rac_handle_t tts_component_handle,
@@ -179,16 +179,16 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     handle->is_shutting_down.store(true, std::memory_order_release);
     handle->is_configured.store(false, std::memory_order_release);
 
-    // GAP 05 Phase 2 — propagate cancel to any GraphScheduler-driven
-    // pipeline run currently in flight. commons-features-voice-003:
-    // snapshot the shared_ptr under handle->pipeline_mutex (held only
+    // Propagate cancel to any GraphScheduler-driven
+    // pipeline run currently in flight.
+    // Snapshot the shared_ptr under handle->pipeline_mutex (held only
     // while copying the control block) so we never race the
     // process_stream store/reset, then call cancel() OUTSIDE the lock.
     // The pipeline's cancel_all() is non-blocking and idempotent, so
     // racing destroy() against an in-flight run is safe once the
     // shared_ptr copy is established without UB.
     //
-    // commons-features-voice-008: a second "late_snapshot" re-cancel
+    // A second "late_snapshot" re-cancel
     // pass once we acquire the outer mutex would only fire if a
     // concurrent process_stream stored a fresh pipeline AFTER our pre-
     // mutex snapshot ran. process_stream holds handle->mutex from the
@@ -207,7 +207,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         pipeline_snapshot->cancel();
     }
 
-    // commons-145: wait for in-flight lock-free ops (e.g. detect_speech)
+    // Wait for in-flight lock-free ops (e.g. detect_speech)
     // to drain. Sleep 1ms between checks rather than yield-spinning: on a
     // multi-second LLM call holding the counter the yield form burns 100%
     // CPU on the destroying thread (measurable battery/thermal hit on
@@ -217,7 +217,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    // commons-146: invoke cleanup() before tearing down components so the
+    // Invoke cleanup() before tearing down components so the
     // VAD's worker thread and the per-component lifecycle state are
     // explicitly stopped/reset (symmetric with rac_voice_agent_cleanup).
     // Done OUTSIDE handle->mutex because cleanup() acquires the same
@@ -249,14 +249,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         }
     }
 
-    // B-FL-13/B-FL-5-001 sibling fix: clear any lingering proto-stream
+    // Clear any lingering proto-stream
     // callback registration keyed by this voice-agent handle BEFORE freeing
     // the memory. Without this, heap-pointer reuse on the next
     // rac_voice_agent_create() inherits a stale CallbackSlot { fn, user_data,
     // seq } from the previous session, corrupting the wire-seq sequence on
     // the very first VoiceEvent dispatch.
     rac_voice_agent_set_proto_callback(handle, nullptr, nullptr);
-    // commons-features-voice-002: spin-wait until every in-flight
+    // Spin-wait until every in-flight
     // dispatch_proto_event/dispatch_proto_voice_event invocation on another
     // thread has returned before freeing the handle memory. Without this,
     // a thread that copied the CallbackSlot before the unset above can
@@ -332,13 +332,13 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // GAP 05 Phase 2 — cancel any in-flight pipeline BEFORE taking the
+    // Cancel any in-flight pipeline BEFORE taking the
     // outer mutex; the pipeline run holds the same mutex while it drains
     // and cancel_all() is the only way out of a stalled stage.
-    // commons-features-voice-003: snapshot under pipeline_mutex so the
+    // Snapshot under pipeline_mutex so the
     // shared_ptr copy is synchronized with process_stream's store/reset.
     //
-    // commons-features-voice-008: process_stream holds handle->mutex for
+    // process_stream holds handle->mutex for
     // the entire store->run->reset window. By the time we acquire the
     // outer mutex below, any concurrent run has drained and reset
     // handle->pipeline to null, so the previously-emitted late-snapshot

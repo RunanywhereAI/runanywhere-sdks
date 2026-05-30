@@ -108,7 +108,7 @@ export async function ragIngest(
   const native = ensureNative();
   let document: RAGDocument;
   if (typeof textOrDocument === 'string') {
-    // IDL-13: `metadata_json` proto field was deleted. Best-effort parse
+    // The `metadata_json` proto field was deleted. Best-effort parse
     // of the legacy JSON blob into the typed `metadata` map.
     document = RAGDocument.create({
       id: '',

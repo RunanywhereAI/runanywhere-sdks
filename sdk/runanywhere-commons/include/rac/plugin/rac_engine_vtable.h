@@ -2,8 +2,6 @@
  * @file rac_engine_vtable.h
  * @brief Unified engine plugin vtable.
  *
- * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * A single vtable type replaces the per-domain `rac_llm_service_ops_t`,
  * `rac_stt_service_ops_t`, `rac_tts_service_ops_t`, … structs. Every engine
  * backend (llama.cpp, ONNX, whispercpp, WhisperKit CoreML, MetalRT, …)
@@ -65,7 +63,7 @@ struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_servi
  * populate this struct with `RAC_ENGINE_METADATA_FROM_MANIFEST(...)` instead
  * of maintaining a second hand-written metadata block.
  *
- * Layout note: bumped to ABI v2 in GAP 04 Phase 11 — the previous
+ * Layout note: bumped to ABI v2 — the previous
  * `reserved_0/_1` (8 bytes) were promoted into the routing-extension fields
  * below. See `RAC_PLUGIN_API_VERSION` in `rac_plugin_entry.h` for the version
  * policy.
@@ -97,7 +95,7 @@ typedef struct rac_engine_metadata {
      * decoding, …). See rac_backend_caps.h. */
     uint64_t capability_flags;
 
-    /* ─────── GAP 04 + T4.1 routing extension ─────── */
+    /* ─────── routing extension ─────── */
 
     /** L1 runtimes this engine can consume (CPU / Metal / CoreML / CUDA /
      *  QNN / NNAPI / WebGPU / …). MAY be NULL when the plugin doesn't care
@@ -105,7 +103,7 @@ typedef struct rac_engine_metadata {
      *  scoring. The pointer must reference plugin-owned .rodata; the
      *  registry does not copy.
      *
-     *  T4.1: runtimes are now first-class
+     *  Runtimes are now first-class
      *  plugins registered via `rac_runtime_register()`. The engine router
      *  gives plugins a small scoring bonus when at least one of their
      *  declared runtimes is *registered* in the runtime registry, on top of

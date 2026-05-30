@@ -10,8 +10,7 @@
 
 // RunAnywhere v2 IDL — LLM generation options + result.
 //
-// Phase 3 of v2 IDL Exhaustiveness migration. These two messages were
-// hand-rolled in 5 SDKs:
+// These two messages were hand-rolled in 5 SDKs:
 //   - Swift  Public/Extensions/LLM/LLMTypes.swift (LLMGenerationOptions, LLMGenerationResult)
 //   - Kotlin commonMain/.../LLMOptions.kt
 //   - Dart   lib/public/types/llm_options.dart

@@ -2,7 +2,7 @@
  * @file test_plugin_entry_whisperkit_coreml.cpp
  * @brief Locks the WhisperKit CoreML plugin-entry manifest contract.
  *
- * commons-013 (review RUN=20260527-122639-review): mirrors the parallel
+ * Mirrors the parallel
  * test_plugin_entry_{llamacpp,onnx,genie,sherpa}.cpp smoke tests so any future
  * edit to rac_plugin_entry_whisperkit_coreml.cpp (dropping a runtime, flipping
  * availability, losing the STT ops slot) is caught at ctest time rather than at
@@ -14,7 +14,7 @@
  *     router can pick whisperkit_coreml over sherpa / whispercpp when the
  *     caller pins preferred_runtime=ANE.
  *   - manifest publishes RAC_PRIMITIVE_TRANSCRIBE, availability=PRIVATE,
- *     priority=110, package owner/name (CPP-04 declarative metadata block).
+ *     priority=110, package owner/name (declarative metadata block).
  *   - vtable populates stt_ops only; llm/tts/vad/vlm/embedding/diffusion slots
  *     stay NULL (disjoint-slot routing invariant).
  *
@@ -68,7 +68,7 @@ int main() {
 
     // Stable engine name is the dedup key the registry uses; mis-naming would
     // collide with engines/sherpa or engines/whispercpp under ANE-preferred
-    // routing (CPP-04).
+    // routing.
     if (vt->metadata.name == nullptr ||
         std::strcmp(vt->metadata.name, "whisperkit_coreml") != 0) {
         std::fprintf(stderr, "manifest name mismatch: got '%s'\n",

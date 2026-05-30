@@ -3,8 +3,6 @@
  * @brief Verifies that RAC_STATIC_PLUGIN_REGISTER schedules registration
  *        before main() and survives compile-time dead-code analysis.
  *
- * GAP 03 Phase 6.
- *
  * Scenario:
  *   * The fixture below uses RAC_STATIC_PLUGIN_REGISTER(test_static).
  *   * `g_test_static_vtable` is exposed via a private rac_plugin_entry_test_static

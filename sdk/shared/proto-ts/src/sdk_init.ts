@@ -72,7 +72,7 @@ export function sdkInitPhaseToJSON(object: SdkInitPhase): string {
  * (development=0, staging=1, production=2). Numeric values are part of the
  * wire format; do not reorder.
  *
- * idl-002 (PHASE8-RETRY 20260526-121300): the prior FIXLOOP-iter1 attempt to
+ * The prior attempt to
  * add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
  * Swift iOS at runtime — the shipped librac_commons.a in
  * sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
@@ -193,7 +193,7 @@ export interface SdkInitResult {
   /** Wall-clock duration for this phase. */
   durationMs: number;
   /**
-   * flutter-core-009: explicit two-phase HTTP-setup completion flag,
+   * Explicit two-phase HTTP-setup completion flag,
    * decoupled from services-init completion so SDKs that initialize
    * offline (no connectivity) can still report success=true with
    * has_completed_http_setup=false and retry HTTP later via the

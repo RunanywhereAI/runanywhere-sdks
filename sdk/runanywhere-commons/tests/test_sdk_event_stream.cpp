@@ -258,7 +258,7 @@ int main() {
 
     rac_state_shutdown();
 
-    // FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006 regression (CLUSTER-15):
+    // Regression:
     //
     // Async SDK bindings (Flutter Dart `NativeCallable.listener`, React
     // Native NitroModules) cannot safely dereference the pointer that
@@ -316,7 +316,7 @@ int main() {
     rac_sdk_event_unsubscribe(burst_sub);
     rac_sdk_event_clear_queue();
 
-    // commons-core-infra-014: concurrent publish from two threads must not
+    // Concurrent publish from two threads must not
     // invalidate the buffer a subscriber callback is reading. Each publish
     // allocates its own shared_ptr-owned byte buffer; the synchronous
     // callback pins that buffer via the function-local shared_ptr inside

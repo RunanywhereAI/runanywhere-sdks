@@ -2,7 +2,7 @@
  * @file rac_llm_thinking.cpp
  * @brief Implementation of the rac_llm_thinking C ABI.
  *
- * v2 close-out Phase 5. Behavioral equivalence target: Swift's
+ * Behavioral equivalence target: Swift's
  * ThinkingContentParser.{extract,splitTokens,strip} (RunAnywhere+TextGeneration.swift).
  * Same character-ratio heuristic for token splits, same trim semantics,
  * same handling of trailing unclosed <think> on streaming output.

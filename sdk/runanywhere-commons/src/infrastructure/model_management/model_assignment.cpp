@@ -70,7 +70,7 @@ static bool is_cache_valid() {
     return std::cmp_less(elapsed, g_cache_timeout_seconds);
 }
 
-// commons-core-infra-007: JSON string extraction that honours escaped
+// JSON string extraction that honours escaped
 // quotes and brace-depth tracking. The previous implementation walked
 // to the next `"` without escape handling and looked at byte
 // substrings (e.g. `find("null", pos)`), so a value containing `\"`,
@@ -234,7 +234,7 @@ static bool json_get_bool(const std::string& json, const std::string& key,
     return val == "true";
 }
 
-// commons-core-infra-007: walk from `pos` to the end of the next
+// Walk from `pos` to the end of the next
 // top-level JSON value (object/array/string/scalar), honouring strings
 // and escapes. Returns the one-past-end index of the value, or npos
 // when the JSON is truncated.
@@ -322,7 +322,7 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
     if (arr_start == std::string::npos)
         return models;
 
-    // commons-core-infra-007: depth- and escape-aware scan over the
+    // Depth- and escape-aware scan over the
     // models array. The previous implementation only counted braces,
     // so a quote-balanced string containing `{` or `}` could pull the
     // wrong substring as an object.

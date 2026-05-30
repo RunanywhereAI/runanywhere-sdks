@@ -422,7 +422,7 @@ extern "C" {
 // `src/core/rac_error.cpp` provides the human-readable strings.
 // =============================================================================
 
-/* ─────────── GAP 02: engine plugin errors ─────────── */
+/* ─────────── engine plugin errors ─────────── */
 /** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
 #define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
 /** Plugin's `capability_check()` returned non-zero (silent reject; engine
@@ -431,12 +431,12 @@ extern "C" {
 /** Plugin registration rejected due to duplicate `metadata.name`. */
 #define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)
 
-/* ─────────── GAP 03: dynamic plugin loader errors ─────────── */
+/* ─────────── dynamic plugin loader errors ─────────── */
 /** dlopen / dlsym failed (file not found, missing entry symbol, arch mismatch,
  *  unresolved dependency). Use `dlerror()` for details on POSIX hosts. */
 #define RAC_ERROR_PLUGIN_LOAD_FAILED ((rac_result_t) - 820)
 /** Plugin cannot be unloaded because outstanding sessions still hold its
- *  primitive. The session-refcount mechanism is wired by GAP 04. */
+ *  primitive. */
 #define RAC_ERROR_PLUGIN_BUSY ((rac_result_t) - 821)
 
 // =============================================================================

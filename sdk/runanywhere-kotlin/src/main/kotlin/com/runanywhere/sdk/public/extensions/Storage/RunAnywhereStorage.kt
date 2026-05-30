@@ -78,7 +78,7 @@ suspend fun RunAnywhere.registerModel(
     requireStorageInitialized(this)
 
     // Delegate the full build-and-save flow to commons via the canonical
-    // `rac_register_model_from_url_proto` ABI (P2-T6) — mirrors Swift's
+    // `rac_register_model_from_url_proto` ABI — mirrors Swift's
     // `RunAnywhere+Storage.swift:19-72`. The native helper translates a
     // RegisterModelFromUrlRequest → ModelInfoMakeRequest (framework-aware
     // defaulting + artifact inference + id/name derivation) and persists

@@ -10,8 +10,6 @@
 
 // RunAnywhere IDL — voice agent streaming service.
 //
-// GAP 09 Phase 12 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
-//
 // gRPC-style service whose `Stream` rpc returns a server-streaming sequence
 // of `VoiceEvent` messages (defined in voice_events.proto). This is NOT
 // transported over network gRPC — frontends use the codegen-emitted client
@@ -20,7 +18,7 @@
 // adapter (~150 LOC per language).
 //
 // The service definition is the abstract contract; the per-language
-// adapter is the only hand-written piece (see GAP 09 Phases 16-19).
+// adapter is the only hand-written piece.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -67,7 +65,7 @@ public nonisolated struct RAVoiceAgentRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: One-shot voice-turn result.
+/// One-shot voice-turn result.
 ///
 /// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
 /// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
@@ -248,7 +246,7 @@ public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Voice session behavior configuration.
+/// Voice session behavior configuration.
 ///
 /// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
 /// Controls runtime behavior of the voice agent's session loop — silence
@@ -312,7 +310,7 @@ public nonisolated struct RAVoiceSessionConfig: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Audio pipeline state-manager configuration.
+/// Audio pipeline state-manager configuration.
 ///
 /// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
 /// to prevent microphone/TTS feedback loops.
@@ -334,7 +332,7 @@ public nonisolated struct RAAudioPipelineConfig: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Aggregated voice-agent compose configuration.
+/// Aggregated voice-agent compose configuration.
 ///
 /// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
 /// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
@@ -571,7 +569,7 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// Wave D-7 helper-level proto requests for voice-agent sub-components.
+/// Helper-level proto requests for voice-agent sub-components.
 public nonisolated struct RAVoiceAgentTranscribeProtoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for

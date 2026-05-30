@@ -1,10 +1,10 @@
 /**
  * @file test_libarchive_zlib_linked.cpp
- * @brief Regression test for CLUSTER-14 / WEB-EXTRACT-001 (Emscripten/WASM
- *        libarchive `gzip -d` program-fallback failure on OPFS).
+ * @brief Regression test for the Emscripten/WASM libarchive `gzip -d`
+ *        program-fallback failure on OPFS.
  *
  * Background:
- *   CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed iOS slices of RACommons.xcframework:
+ *   An earlier fix to the iOS slices of RACommons.xcframework addressed this:
  *   libarchive's `FIND_PACKAGE(ZLIB 1.2.1)` rejected the cached `v1.3.2`
  *   (RAC_ZLIB_VERSION sourced from VERSIONS), HAVE_ZLIB_H was left undefined,
  *   filter_gzip.c silently re-enabled the
@@ -12,15 +12,15 @@
  *   sandboxes block fork+exec(/usr/bin/gzip), so every .tar.gz extraction
  *   failed at runtime with "Can't initialize filter; unable to run program".
  *
- *   The iter-2 web lane surfaced the EXACT same failure on Emscripten/OPFS:
+ *   The web lane surfaced the EXACT same failure on Emscripten/OPFS:
  *
  *     RAC ERROR Extraction: Failed to open archive:
  *     /opfs/RunAnywhere/Downloads/sherpa-onnx-whisper-tiny.en.tar.gz
  *     (Can't initialize filter; unable to run program "gzip -d")
  *
- *   The CLUSTER-02 CMake fix already covered EMSCRIPTEN in its
- *   `if(EMSCRIPTEN OR ANDROID OR IOS ...)` predicate, but iter-2 web shipped
- *   a build that pre-dated CLUSTER-02-FOLLOWUP's v-strip and the artifact
+ *   The CMake fix already covered EMSCRIPTEN in its
+ *   `if(EMSCRIPTEN OR ANDROID OR IOS ...)` predicate, but the web lane shipped
+ *   a build that pre-dated the v-strip and the artifact
  *   went out with HAVE_ZLIB_H undefined.
  *
  *   This test complements test_extraction_no_program_fallback by exercising
@@ -35,16 +35,16 @@
  *
  *     - Emscripten / cross-compile: ctest is not invoked on Emscripten host
  *       runs, so the failure mode lands first in the wasm/scripts/build.sh
- *       libarchive config.h grep — see CLUSTER-14 in that script and the
+ *       libarchive config.h grep and the
  *       configure-time assertion block in sdk/runanywhere-commons/CMakeLists.txt.
  *       This file documents the contract so future maintainers don't move
  *       the assertions without preserving the regression coverage.
  *
- * @see test_extraction_no_program_fallback.cpp (CLUSTER-02 sibling test)
+ * @see test_extraction_no_program_fallback.cpp (sibling test)
  * @see sdk/runanywhere-commons/CMakeLists.txt (HAVE_ZLIB_H / HAVE_BZLIB_H
- *      configure-time assertion under CLUSTER-14)
+ *      configure-time assertion)
  * @see sdk/runanywhere-web/wasm/scripts/build.sh (post-build wasm string
- *      scan + config.h grep, both CLUSTER-14)
+ *      scan + config.h grep)
  */
 
 #include "test_common.h"
@@ -130,7 +130,7 @@ static bool write_file(const std::string& path, const void* data, size_t size) {
     return f.good();
 }
 
-/// CLUSTER-14: the load-bearing test. libarchive must successfully decode the
+/// The load-bearing test. libarchive must successfully decode the
 /// gzip stream using the in-process zlib inflate path. If libarchive was
 /// built with HAVE_ZLIB_H undefined, archive_read_support_filter_gzip
 /// silently registers the program("gzip -d") fallback. With our explicit
@@ -156,7 +156,7 @@ static TestResult test_libarchive_decodes_targz_in_process() {
     ASSERT_TRUE(a != nullptr, "Should allocate libarchive reader");
 
     archive_read_support_format_all(a);
-    // Same explicit filter set as rac_extract_archive_native — see CLUSTER-02
+    // Same explicit filter set as rac_extract_archive_native — see the
     // comment in rac_extraction.cpp. The omission of
     // archive_read_support_filter_all is the load-bearing change.
     archive_read_support_filter_none(a);
@@ -206,7 +206,7 @@ static TestResult test_libarchive_decodes_targz_in_process() {
     return TEST_PASS();
 }
 
-/// CLUSTER-14: also assert the public C ABI extraction round-trips end-to-end.
+/// Also assert the public C ABI extraction round-trips end-to-end.
 /// This is the same behaviour test_extraction_no_program_fallback exercises;
 /// repeating it here keeps both tests independent so a regression in one
 /// surface area cannot mask the other.

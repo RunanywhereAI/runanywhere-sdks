@@ -161,7 +161,7 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
-// idl-005: pick the canonical system_prompt from the embedded
+// Pick the canonical system_prompt from the embedded
 // LLMGenerationOptions when set, falling back to the legacy inline field.
 std::string system_prompt_from_request(const LLMGenerateRequest& request) {
     if (request.has_options() && request.options().has_system_prompt() &&
@@ -177,7 +177,7 @@ std::string system_prompt_from_request(const LLMGenerateRequest& request) {
 // into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
 // copies stopSequences into the canonical proto request.
 //
-// idl-005: prefer values from the canonical `request.options()` embedded
+// Prefer values from the canonical `request.options()` embedded
 // LLMGenerationOptions message when set; fall back to the legacy inline
 // scalar fields for backwards compatibility with callers that have not
 // yet migrated.
@@ -218,7 +218,7 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
         options.top_p = request.top_p();
     }
 
-    // commons-030-A: thread the remaining sampling knobs the proto exposes
+    // Thread the remaining sampling knobs the proto exposes
     // (idl/llm_options.proto) into the C ABI so they reach the engine vtable.
     // For every field except repetition_penalty the proto3 zero IS the
     // documented "disabled" sentinel, so passing it through is identical to the
@@ -387,7 +387,7 @@ size_t find_earliest_tag(const std::string& text, const char* const* tags, size_
 // populate the same LLMStreamEvent shape so Swift iOS, Web, and Kotlin
 // Android consumers see identical wire bytes for identical inputs.
 //
-// pass3-syn-039: optional `tool_call` populates proto field 18 on
+// Optional `tool_call` populates proto field 18 on
 // LLMStreamEvent (idl/llm_service.proto:179). Producers pass it on the
 // synthesized TOOL_CALL boundary event when the streaming output contains
 // a parseable tool call; non-tool-call events leave it nullptr so legacy
@@ -420,7 +420,7 @@ void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_f
     ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);
 }
 
-// pass3-syn-039: parse the accumulated streaming response_text for a tool
+// Parse the accumulated streaming response_text for a tool
 // call boundary using the canonical commons parser (rac_tool_call_parse_proto
 // over runanywhere.v1.ToolParseRequest/Result). Returns true and populates
 // out_tool_call when a structured tool call is recognized; false when the
@@ -570,7 +570,7 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     flush_pending_stream_text(ctx);
     ctx->terminal_sent = true;
 
-    // pass3-syn-039: surface a structured tool call on LLMStreamEvent.tool_call
+    // Surface a structured tool call on LLMStreamEvent.tool_call
     // (proto field 18) when the streaming output contains one. The terminal
     // event still carries the same finish_reason / result; this emission is
     // an additional in-stream event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL
@@ -805,7 +805,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
     } else {
-        // commons-features-llm-rag-002: mirror the OpenAI-style finish_reason
+        // Mirror the OpenAI-style finish_reason
         // contract from llm_component.cpp:867-884 and rac_llm_generate_proto's
         // set_result_from_raw — when the backend stopped because it generated
         // the requested max_tokens, the terminal proto event must report

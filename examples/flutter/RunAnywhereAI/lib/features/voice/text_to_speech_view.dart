@@ -153,7 +153,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
       });
-      // B-FL-12-002: surface TTS load failures via SnackBar in addition to the
+      // Surface TTS load failures via SnackBar in addition to the
       // inline error text.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -221,7 +221,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         options,
       );
 
-      // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
+      // TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
       final samples =
           Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(

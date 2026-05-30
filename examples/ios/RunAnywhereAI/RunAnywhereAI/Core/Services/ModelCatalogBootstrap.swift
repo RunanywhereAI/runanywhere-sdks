@@ -199,7 +199,7 @@ enum ModelCatalogBootstrap {
             // Actual silero_vad.onnx artifact size (verified Content-Length).
             // memoryRequirement doubles as downloadSizeBytes (see
             // RunAnywhere+Storage.swift), which feeds the post-finalize download
-            // size guard (CLUSTER-13). An over-stated 5 MB tripped the guard on a
+            // size guard. An over-stated 5 MB tripped the guard on a
             // valid ~2.3 MB download.
             memoryRequirement: 2_327_524
         )
@@ -223,7 +223,7 @@ enum ModelCatalogBootstrap {
 
         // MetalRT, WhisperKit, and Diffusion (CoreML) backends are deferred
         // scope for Swift v1. Their model catalog entries are intentionally
-        // omitted. See `thoughts/shared/plans/curious-greeting-panda.md`.
+        // omitted.
 
         logger.info("All modules and models registered")
     }

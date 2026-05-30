@@ -1,6 +1,6 @@
 /**
  * @file test_device_identity.cpp
- * @brief Unit tests for rac_device_get_or_create_persistent_id (P2-T13).
+ * @brief Unit tests for rac_device_get_or_create_persistent_id.
  *
  * Mocks the rac_platform_adapter_t secure_get / secure_set / get_vendor_id
  * slots and exercises every branch of the resolution chain. Mirrors the test

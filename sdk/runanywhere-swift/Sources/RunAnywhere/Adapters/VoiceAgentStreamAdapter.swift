@@ -2,14 +2,11 @@
 //  VoiceAgentStreamAdapter.swift
 //  RunAnywhere
 //
-//  Swift simplification Phase 1 — see
-//  gaps/gaps/simplification/swift-bridge-duplication.md §1 Pattern C.
-//
 //  This file used to carry ~197 LOC of fan-out machinery (per-handle
 //  registry, OSAllocatedUnfairLock-guarded continuations, retained-Unmanaged
 //  trampoline) that was bit-for-bit identical to `LLMStreamAdapter`
 //  except for the native handle / proto event types and the
-//  register/unregister C symbols. Phase 1 P1-T6 extracted that machinery
+//  register/unregister C symbols. That machinery was extracted
 //  into the generic `HandleStreamAdapter<Handle, Event>`; this file is
 //  now a thin specialization that wires the voice-agent-specific symbols.
 //
@@ -25,7 +22,7 @@
 
 import CRACommons
 
-/// AsyncStream-based wrapper over the GAP 09 proto-byte voice agent ABI.
+/// AsyncStream-based wrapper over the proto-byte voice agent ABI.
 ///
 /// Backed by the generic `HandleStreamAdapter<rac_voice_agent_handle_t, RAVoiceEvent>`.
 /// All fan-out, lifecycle, and cancellation semantics live in the

@@ -30,7 +30,7 @@ instead of ad hoc root folders like `build-cpp*`, `build-link*`, or
 
 ## Per-SDK `sdk/runanywhere-<lang>/scripts/`
 
-Each client SDK has a `scripts/` folder next to its source. After GAP 07 (single-root CMake), the per-SDK build orchestrators have been removed — native artifacts are produced by the repo-root `scripts/build-core-*.sh` scripts above, and the SDK itself is compiled directly by its native toolchain (Xcode/SwiftPM, Gradle, Vite, Melos, Yarn).
+Each client SDK has a `scripts/` folder next to its source. With the single-root CMake layout, the per-SDK build orchestrators have been removed — native artifacts are produced by the repo-root `scripts/build-core-*.sh` scripts above, and the SDK itself is compiled directly by its native toolchain (Xcode/SwiftPM, Gradle, Vite, Melos, Yarn).
 
 The one canonical per-SDK script is the release packager:
 

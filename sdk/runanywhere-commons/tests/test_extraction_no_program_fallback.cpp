@@ -1,7 +1,6 @@
 /**
  * @file test_extraction_no_program_fallback.cpp
- * @brief Regression test for CLUSTER-02 / COMMONS-LIBARCHIVE-001 (iOS gzip
- *        program() sandbox failure).
+ * @brief Regression test for the iOS gzip program() sandbox failure.
  *
  * Background:
  *   libarchive registers gzip/bzip2/xz filters via `program("gzip -d")` etc.
@@ -156,7 +155,7 @@ static TestResult test_detect_canned_targz_no_subprocess() {
 
 /// End-to-end #2: extract the canned archive via the public C ABI. This is
 /// the load-bearing test: rac_extract_archive_native() now only registers
-/// the in-process zlib gzip filter (per the CLUSTER-02 fix), so this call
+/// the in-process zlib gzip filter, so this call
 /// must succeed without invoking `/usr/bin/gzip`. If extraction silently
 /// regresses to the program() fallback, the iOS lane will fail at runtime
 /// inside the sandbox — but this host-side test would also fail (because

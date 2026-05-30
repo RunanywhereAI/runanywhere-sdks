@@ -32,7 +32,7 @@
 
 static const char* LOG_CAT = "LLM.Service";
 
-// Phase 2.6 (engine independence refactor): identity stringify of the
+// Identity stringify of the
 // framework enum to the plugin's metadata.name. Kept identical to the
 // matching helpers in rac_stt_service.cpp / rac_tts_service.cpp /
 // rac_embeddings_service.cpp; if this drifts, move to a shared header
@@ -126,7 +126,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
                         result, static_cast<int>(framework));
     }
 
-    // v3 Phase B8: Route through the unified plugin registry instead of the
+    // Route through the unified plugin registry instead of the
     // deleted rac_service_create path. framework -> plugin-name pin is a
     // HINT; the router may still fall back to any primitive-compatible
     // plugin if the pinned one is unavailable (e.g. when the app
@@ -166,7 +166,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     }
     service->ops = vt->llm_ops;
     service->impl = impl;
-    // commons-features-llm-rag-005: strdup can return NULL on allocation
+    // strdup can return NULL on allocation
     // failure. Previously the result was assigned without checking, so a
     // failing strdup left service->model_id NULL and the service shipped
     // with a half-initialized record. Honor RAC_ERROR_OUT_OF_MEMORY and
@@ -180,7 +180,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     }
     *out_handle = service;
 
-    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // Single source of truth for the "*.backend.created" telemetry
     // event. Previously each backend fired this from its own *_create path;
     // now it fires once from the commons service layer so future backends
     // inherit the emit for free (and can't silently drop it).

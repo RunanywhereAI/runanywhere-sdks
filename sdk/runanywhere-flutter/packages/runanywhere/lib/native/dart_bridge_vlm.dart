@@ -95,7 +95,7 @@ class DartBridgeVLM {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        // flutter-003 fix (mirrors dart_bridge_llm.dart): use `isolateLocal`
+        // Mirrors dart_bridge_llm.dart: use `isolateLocal`
         // (not `.listener`) so the callback fires SYNCHRONOUSLY on the Dart
         // isolate that invokes `rac_vlm_stream_proto`. Commons serializes each
         // VLMStreamEvent into a thread-local scratch vector and calls the
@@ -155,7 +155,7 @@ class DartBridgeVLM {
         }
       } finally {
         calloc.free(requestPtr);
-        // CONSOLIDATE-D / flutter-003 teardown: with `isolateLocal` every event
+        // Teardown: with `isolateLocal` every event
         // has already drained by the time `fn` returns, but
         // `rac_vlm_proto_quiesce()` is still invoked as a defensive barrier in
         // case a future commons revision posts a late callback from a worker

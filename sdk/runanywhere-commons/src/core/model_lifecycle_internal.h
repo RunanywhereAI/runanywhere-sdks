@@ -7,7 +7,7 @@
  * `rac_model_lifecycle.h` C entry points or the per-feature lifecycle
  * bridge headers under `src/features/`.
  *
- * commons-core-infra-010 (SRP split): the original `model_lifecycle.cpp`
+ * SRP split: the original `model_lifecycle.cpp`
  * mixed proto<->C translation, artifact resolution, auto-download
  * orchestration, lifecycle accessor namespaces, and the C ABI entry
  * points in a single 2.2 KLoC TU. This header is the contract through

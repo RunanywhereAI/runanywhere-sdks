@@ -7,7 +7,7 @@
  * The new test exercises the contract-level negative paths that don't need
  * a fully-wired vector store / LLM:
  *   - NULL service handles return RAC_ERROR_INVALID_STATE (precondition guard).
- *   - The token-sink early-cancel path (commons-features-llm-rag-008) is the
+ *   - The token-sink early-cancel path is the
  *     exclusive entry point that engages `scheduler.cancel_all()`; this test
  *     reproduces the contract by asserting that a sink returning false from a
  *     fully-self-contained scheduler run propagates through to the result.
@@ -59,7 +59,7 @@ void test_null_handles_return_invalid_state() {
 
 void test_token_sink_is_assignable() {
     // Lock the token-sink contract: signature must remain
-    // bool(const std::string&) so commons-features-llm-rag-008's cancel path
+    // bool(const std::string&) so the cancel path
     // can keep its keep_going semantics. The compile-time check guards
     // against accidental changes to the sink type alias.
     using namespace runanywhere::rag;

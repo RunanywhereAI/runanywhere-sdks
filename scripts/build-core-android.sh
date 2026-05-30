@@ -9,8 +9,6 @@
 #   - Flutter runanywhere/runanywhere_llamacpp/runanywhere_onnx/runanywhere_genie
 #     (`android/src/main/jniLibs`)
 #
-# GAP 07 Phase 6 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # Usage:
 #   ./scripts/build-core-android.sh                  # build all 3 ABIs
 #   ./scripts/build-core-android.sh arm64-v8a        # single ABI
@@ -35,7 +33,7 @@ RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/a
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
 RN_CORE_INCLUDE_DEST="${RN_CORE_JNI_DEST}/include"
 
-# Flutter destinations (new — T0.1).
+# Flutter destinations.
 FLUTTER_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
 FLUTTER_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/android/src/main/jniLibs"
 FLUTTER_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/android/src/main/jniLibs"
@@ -240,7 +238,7 @@ for ABI in "${ABIS[@]}"; do
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
     LIB_ONNX_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_onnx_jni.so"   -print -quit || true)"
     LIB_RAG_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_rag_jni.so"     -print -quit || true)"
-    # GAP 06 T5.1 — new Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
+    # New Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
     LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
 
     # commons core + JNI go to Kotlin, RN core and Flutter core.

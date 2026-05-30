@@ -5,9 +5,9 @@
  * NOT part of the public C ABI; only files under
  * `src/features/voice_agent/` may include this header.
  *
- * commons-features-voice-003 (SRP split): the original 2,291-LoC
- * `voice_agent.cpp` mixed lifecycle, model loading, legacy non-proto ABI,
- * generated-proto ABI, Wave D-7 full-session ABI, audio pipeline state
+ * SRP split: the original `voice_agent.cpp` mixed lifecycle, model
+ * loading, legacy non-proto ABI,
+ * generated-proto ABI, full-session ABI, audio pipeline state
  * machine, and the shared emit/state-snapshot helpers in one translation
  * unit. This header is the contract through which the new per-ABI TUs
  * share access to the helpers; the helper implementations live in
@@ -32,7 +32,7 @@
 
 namespace rac::voice_agent::detail {
 
-// commons-042: RAII admission guard for every long-running voice-agent entry
+// RAII admission guard for every long-running voice-agent entry
 // point (process_voice_turn{,_proto}, process_stream, process_turn_proto,
 // transcribe_proto, synthesize_speech_proto, detect_speech). Implements the
 // canonical TOCTOU-safe sequence the lock-free design relies on:
@@ -119,7 +119,7 @@ rac_voice_agent_config_t config_from_proto(const runanywhere::v1::VoiceAgentComp
 // Validate all four voice-agent modalities are READY (lifecycle preferred,
 // per-handle component as legacy fallback). Public to the voice-agent TUs
 // so both the legacy non-proto path and the proto path can gate execution
-// uniformly (commons-features-voice-004).
+// uniformly.
 rac_result_t validate_all_components_ready(rac_voice_agent_handle_t handle);
 
 }  // namespace rac::voice_agent::detail

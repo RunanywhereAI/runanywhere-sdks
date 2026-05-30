@@ -1,11 +1,11 @@
 /**
  * @file model_info_make_proto.cpp
- * @brief Canonical RAModelInfo factory (P2-T4).
+ * @brief Canonical RAModelInfo factory.
  *
  * Commons-owned implementation of Swift's RAModelInfo.make(...) which lives
  * in sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/
  * ModelTypes+Artifacts.swift. Every field-set in this file mirrors the
- * Swift implementation 1:1 so the Swift extension can be deleted in P3-T3.
+ * Swift implementation 1:1 so the Swift extension can be deleted.
  *
  * Field semantics summary:
  *   id, name             — derived from URL via rac_model_generate_id /

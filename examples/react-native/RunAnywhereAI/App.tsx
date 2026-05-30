@@ -403,7 +403,7 @@ async function registerModulesAndModels(): Promise<void> {
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       // Actual silero_vad.onnx artifact size (verified Content-Length).
       // memoryRequirement doubles as downloadSizeBytes, which feeds the
-      // post-finalize download size guard (CLUSTER-13). An over-stated 5 MB
+      // post-finalize download size guard. An over-stated 5 MB
       // tripped the guard on a valid ~2.3 MB download.
       memoryRequirement: 2_327_524,
     }),

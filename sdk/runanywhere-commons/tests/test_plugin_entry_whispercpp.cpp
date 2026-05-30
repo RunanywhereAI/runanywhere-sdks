@@ -2,7 +2,7 @@
  * @file test_plugin_entry_whispercpp.cpp
  * @brief Verifies the whisper.cpp plugin entry point owns STT only.
  *
- * commons-012 (review RUN=20260527-122639-review): mirrors the parallel
+ * Mirrors the parallel
  * test_plugin_entry_{llamacpp,onnx,genie,sherpa}.cpp smoke tests so any future
  * edit to rac_plugin_entry_whispercpp.cpp (e.g. dropping a primitive, flipping
  * availability, bumping the priority above sherpa's 90, or missing ops-slot
@@ -14,7 +14,7 @@
  * `manifest->priority`, so the priority literal (80) is load-bearing — a
  * silent bump to >= 90 would flip every transcription request from sherpa to
  * whispercpp across all five SDKs. This test asserts:
- *   - abi_version + name dedup key (router invariant CPP-04).
+ *   - abi_version + name dedup key (router invariant).
  *   - STT ops slot is populated; llm/tts/vad/vlm/embedding/diffusion/rerank
  *     slots are NULL (disjoint-slot invariant the router scoring relies on).
  *   - Manifest priority == 80 (must stay below sherpa's 90).
@@ -55,7 +55,7 @@ int main() {
     }
 
     // Stable engine name is the dedup key the registry uses; mis-naming would
-    // cause router collisions with engines/sherpa (CPP-04).
+    // cause router collisions with engines/sherpa.
     if (vt->metadata.name == nullptr || std::strcmp(vt->metadata.name, "whispercpp") != 0) {
         std::fprintf(stderr, "manifest name mismatch: got '%s'\n",
                      vt->metadata.name ? vt->metadata.name : "(null)");

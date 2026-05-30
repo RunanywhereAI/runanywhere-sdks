@@ -1,7 +1,6 @@
 /**
  * @file test_artifact_helpers_proto.cpp
- * @brief Parity tests for the canonical artifact ExpectedModelFiles helper
- *        (P2-T7).
+ * @brief Parity tests for the canonical artifact ExpectedModelFiles helper.
  *
  * Exercises rac_artifact_expected_files_proto for every artifact subtype
  * Swift's RAModelInfo.expectedArtifactFiles +

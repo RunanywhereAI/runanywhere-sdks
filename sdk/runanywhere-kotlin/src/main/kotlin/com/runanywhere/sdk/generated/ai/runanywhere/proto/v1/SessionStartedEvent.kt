@@ -31,7 +31,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: Voice session lifecycle markers.
+ * Voice session lifecycle markers.
  *
  * Mirror the AsyncSequence / Flow lifecycle signals emitted by the per-SDK
  * VoiceAgent extensions. Carry no payload of their own — the surrounding

@@ -707,7 +707,7 @@ bool PlatformAdapter_httpDownloadCancel(const char* taskId) {
 // Directory Enumeration (Platform Adapter Slots)
 //
 // Cross-SDK parity with Swift CppBridge+PlatformAdapter (the source of truth)
-// and the Kotlin / Flutter siblings of CLUSTER-280-SPLIT. The same logic
+// and the Kotlin / Flutter siblings. The same logic
 // powers the C++ model-registry refresh path (rescan_local) and the
 // rac_model_info_make_proto is_downloaded probe for multi-file artifacts.
 // ============================================================================

@@ -2,11 +2,9 @@
  * @file rac_plugin_registry.cpp
  * @brief Unified engine plugin registry — keyed by `rac_primitive_t`.
  *
- * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
- * v3.0.0: this is the SOLE plugin registration path. The legacy
+ * This is the SOLE plugin registration path. The legacy
  * `service_registry.cpp` / `rac_service_register_provider()` path was
- * removed in Phase C1. All engine backends (llamacpp, onnx, whispercpp,
+ * removed. All engine backends (llamacpp, onnx, whispercpp,
  * whisperkit_coreml, metalrt, platform) register via
  * `rac_plugin_register(rac_plugin_entry_<name>())`, and commons consumers
  * route through `rac_plugin_route` + `vt->ops->create`.
@@ -56,7 +54,7 @@ struct State {
     std::unordered_map<rac_primitive_t, std::vector<Entry>> by_primitive;
     /** Name → vtable, used for dedup + unregister. */
     std::unordered_map<std::string, const rac_engine_vtable_t*> by_name;
-    /** GAP 03: name → dlopen handle for plugins loaded via
+    /** Name → dlopen handle for plugins loaded via
      *  `rac_registry_load_plugin()`. Statically-registered plugins have no
      *  entry here. Populated by the loader, drained by `rac_plugin_unregister`. */
     std::unordered_map<std::string, void*> dl_handles;
@@ -65,7 +63,7 @@ struct State {
         manifests_by_vtable;
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
-    /** commons-007: process-wide count of routers that have snapshotted vtable
+    /** Process-wide count of routers that have snapshotted vtable
      *  pointers from `rac_plugin_list` and are still dereferencing them.
      *  `rac_registry_unload_plugin` spin-waits this to zero AFTER the plugin
      *  is unregistered but BEFORE the OS library mapping is `dlclose`d, so
@@ -602,7 +600,7 @@ size_t rac_plugin_count(void) noexcept {
 }
 
 // =============================================================================
-// GAP 03 internal: dl_handle bookkeeping (plugin_registry_internal.h)
+// Internal: dl_handle bookkeeping (plugin_registry_internal.h)
 // =============================================================================
 
 void rac_plugin_registry_set_dl_handle(const char* name, void* handle) noexcept {
@@ -642,11 +640,11 @@ void* rac_plugin_registry_take_dl_handle(const char* name) noexcept {
 }
 
 size_t rac_plugin_registry_snapshot_names(const char*** out_names) noexcept {
-    /* C ABI boundary: noexcept. Resolves commons-062 (leak on partial
-     * allocation failure) and commons-063 (POSIX `strdup` not MSVC-portable
-     * + silent truncation on NULL slots): use the portable rac_strdup
-     * helper, roll back every previously-allocated entry on any NULL
-     * return, reject sizes that would overflow size_t multiplication. */
+    /* C ABI boundary: noexcept. Guards against a leak on partial allocation
+     * failure and against POSIX `strdup` (not MSVC-portable + silent
+     * truncation on NULL slots): use the portable rac_strdup helper, roll
+     * back every previously-allocated entry on any NULL return, reject sizes
+     * that would overflow size_t multiplication. */
     try {
         if (out_names == nullptr)
             return 0;
@@ -696,7 +694,7 @@ size_t rac_plugin_registry_snapshot_names(const char*** out_names) noexcept {
 }
 
 // =============================================================================
-// commons-007: router in-flight bookkeeping (plugin_registry_internal.h)
+// Router in-flight bookkeeping (plugin_registry_internal.h)
 // =============================================================================
 //
 // EngineRouter::route brackets its snapshot/score/sort window with
@@ -811,7 +809,7 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_
 }
 
 // =============================================================================
-// Legacy ABI shim — rac_service_register_provider (B-RN-Genie-002)
+// Legacy ABI shim — rac_service_register_provider
 // =============================================================================
 //
 // The unified plugin registry above replaces per-service provider

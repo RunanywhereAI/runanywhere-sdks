@@ -422,7 +422,7 @@ class ErrorCode extends $pb.ProtobufEnum {
   static const ErrorCode ERROR_CODE_INTERNAL =
       ErrorCode._(805, _omitEnumNames ? '' : 'ERROR_CODE_INTERNAL');
 
-  /// -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+  /// -- Plugin (-810..-829) ------------------------------------------------
   static const ErrorCode ERROR_CODE_ABI_VERSION_MISMATCH =
       ErrorCode._(810, _omitEnumNames ? '' : 'ERROR_CODE_ABI_VERSION_MISMATCH');
   static const ErrorCode ERROR_CODE_CAPABILITY_UNSUPPORTED = ErrorCode._(

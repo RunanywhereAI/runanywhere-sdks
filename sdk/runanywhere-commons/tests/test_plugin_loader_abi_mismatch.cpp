@@ -3,8 +3,6 @@
  * @brief Verifies the loader rejects a plugin whose ABI version does not
  *        match the host's RAC_PLUGIN_API_VERSION.
  *
- * GAP 03 Phase 6 — see v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md.
- *
  * The fixture under RAC_TEST_PLUGIN_BAD_ABI_PATH is the same as the good
  * fixture but compiled with -DRAC_TEST_PLUGIN_FORCE_BAD_ABI so its
  * `metadata.abi_version` equals the host's plus 99. The registry MUST

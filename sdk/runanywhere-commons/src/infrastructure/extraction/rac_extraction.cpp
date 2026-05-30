@@ -302,7 +302,7 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 
     // Enable all supported formats for auto-detection.
     archive_read_support_format_all(a);
-    // CLUSTER-02 / COMMONS-LIBARCHIVE-001: register ONLY the built-in
+    // Register ONLY the built-in
     // decompression filters that link against statically-bundled libraries
     // (zlib, bzip2, xz). DO NOT call archive_read_support_filter_all() — that
     // registers libarchive's `program("gzip -d" / "bzip2 -d" / "xz -d")`

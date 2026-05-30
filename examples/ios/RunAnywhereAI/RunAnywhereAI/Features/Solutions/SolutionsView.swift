@@ -2,7 +2,7 @@
 //  SolutionsView.swift
 //  RunAnywhereAI
 //
-//  Wave 3 Step 3.3 (G-E6): Demo screen for `RunAnywhere.solutions.run(yaml:)`.
+//  Demo screen for `RunAnywhere.solutions.run(yaml:)`.
 //
 //  Two buttons run the canonical voice_agent.yaml and rag.yaml solutions
 //  via the SDK's solutions capability namespace. The YAML payloads are

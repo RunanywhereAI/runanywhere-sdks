@@ -7,10 +7,8 @@
 # WASM ONNX ships via onnxruntime-web from the frontend. Force off there.
 #
 # =============================================================================
-# TODO(WAVE D-2 follow-up): WASM ONNX unblock — exact remaining work
+# TODO: WASM ONNX unblock — exact remaining work
 # =============================================================================
-# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
-# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
 #
 # To flip this engine on for EMSCRIPTEN the following vendored artifact is
 # required:
@@ -125,7 +123,7 @@ set(ONNX_BACKEND_SOURCES
     rac_plugin_entry_onnx.cpp
 )
 
-# ONNX embedding provider (ENG-ONNX-02): engine-owned primitive. The
+# ONNX embedding provider: engine-owned primitive. The
 # ONNXEmbeddingProvider class + its embeddings_service vtable adapter
 # live in this directory so the engine fully owns its primitives
 # (no cross-module surgery into commons/src/features/rag/). The files
@@ -190,7 +188,7 @@ rac_add_engine_plugin(onnx
 )
 
 # =============================================================================
-# Self-registration carrier (ENG-SHERPA-03)
+# Self-registration carrier
 # =============================================================================
 # Matches the llamacpp / sherpa pattern: thin shim that wraps
 # RAC_STATIC_PLUGIN_REGISTER(onnx). On RAC_STATIC_PLUGINS=ON hosts

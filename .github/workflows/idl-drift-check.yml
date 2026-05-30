@@ -19,7 +19,7 @@ on:
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
-    # v2 close-out (B34): include long-lived integration branches so a
+    # Include long-lived integration branches so a
     # direct push that touches IDL-adjacent files without a PR still
     # gets the drift gate.
     branches: [main, feat/v2-architecture]
@@ -39,7 +39,7 @@ permissions:
 jobs:
   check:
     name: Verify generated code matches IDL
-    # T1.7: macos-15 ships Xcode 16 with Swift 6, which is the minimum
+    # macos-15 ships Xcode 16 with Swift 6, which is the minimum
     # required by Homebrew's grpc-swift v2 formula. On macos-14 the formula
     # bails with "protoc-gen-grpc-swift: An unsatisfied requirement failed
     # this build", which previously masked the Swift gRPC plugin install and
@@ -64,7 +64,7 @@ jobs:
             ~/Library/Caches/Homebrew
           key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup-toolchain.sh') }}
 
-      # T4.3: bootstrap the Mintfile so the Swift dev-tool versions pinned
+      # Bootstrap the Mintfile so the Swift dev-tool versions pinned
       # at the repo root (SwiftLint / Periphery / swift-format /
       # swift-protobuf / grpc-swift) are the single source of truth across
       # every CI workflow. The brew steps below intentionally remain — this
@@ -95,11 +95,11 @@ jobs:
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
-          # T1.7: grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
+          # grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
           # Fail loud if the install does not produce protoc-gen-grpc-swift —
           # silently skipping previously let Swift gRPC drift through CI.
           #
-          # v2 close-out Phase 3: grpc-swift formula installs the binary as
+          # grpc-swift formula installs the binary as
           # protoc-gen-grpc-swift-2; symlink to the legacy name the codegen
           # script expects so `protoc --grpc-swift_out=` invocations resolve.
           brew install grpc-swift
@@ -116,7 +116,7 @@ jobs:
           brew install wire || echo "wire bottle unavailable; Gradle Wire plugin will handle Kotlin codegen"
 
       - name: Install Dart 3.x
-        # T1.7: macos-{14,15} runners do not ship Dart by default, so the
+        # macos-{14,15} runners do not ship Dart by default, so the
         # previous `command -v dart` gate silently skipped the Dart codegen
         # and let Flutter bindings drift (e.g. tool_call additions to
         # LLMStreamEvent / LLMStreamFinalResult in idl/llm_service.proto were

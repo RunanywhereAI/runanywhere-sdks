@@ -16,6 +16,16 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
+/**
+ * HTTP transport download status — numeric values MUST match
+ * rac_http_download_status_t (RAC_HTTP_DL_*) in
+ * sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+ * rac_http_download_execute returns this int directly through the C ABI;
+ * every SDK consumes the proto-generated enum so a new RAC_HTTP_DL_* value
+ * added in commons fails compilation across all bindings until the enum is
+ * extended here. OK = 0 mirrors the C ABI's success sentinel (no separate
+ * UNSPECIFIED needed — success is the proto3 zero default).
+ */
 public enum class HttpDownloadStatus(
   override val `value`: Int,
 ) : WireEnum {

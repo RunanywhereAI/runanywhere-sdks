@@ -11,7 +11,7 @@
  *   - Callback registration and session create/stop/cancel are fully wired.
  *   - The diffusion engine emits progress/completed events via
  *     `dispatch_diffusion_stream_event()` once
- *     `rac_diffusion_proto_abi.cpp` is taught to use it (TODO CPP-03
+ *     `rac_diffusion_proto_abi.cpp` is taught to use it (TODO
  *     follow-up).
  *   - start_proto today seeds a session — actual generation kickoff still
  *     flows through the existing `rac_diffusion_generate_with_progress_proto`
@@ -37,13 +37,13 @@
 
 namespace {
 
-// pass2-syn-001-followup-diffusion: lift the voice_agent in_flight quiesce
+// Lift the voice_agent in_flight quiesce
 // pattern to the diffusion proto-byte dispatcher. See rac_llm_stream.cpp
 // and rac_vlm_proto_abi.cpp for the canonical reference; this guards
 // dispatch_diffusion_stream_event so destroy/teardown can spin-wait until
 // any in-flight slot.fn() returns before freeing user_data.
 //
-// pass3-syn-089 (commons-101): complete the voice_agent pattern by adding
+// Complete the voice_agent pattern by adding
 // an is_shutting_down barrier (voice_agent.cpp:569 / 1212-1221). Without it
 // a new caller could acquire the in_flight counter mid-quiesce and extend
 // the spin-wait indefinitely (and worse, dispatch into a freed engine).
@@ -114,7 +114,7 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-// commons-features-other-003: the previous next_session_id() helper was
+// The previous next_session_id() helper was
 // inlined into rac_diffusion_stream_start_proto, but that entry point now
 // returns RAC_ERROR_NOT_IMPLEMENTED until the diffusion engine kickoff is
 // wired into dispatch_diffusion_stream_event(). The session id allocator
@@ -155,14 +155,14 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// pass2-syn-001-followup-diffusion: public quiesce helper. Mirrors
+// Public quiesce helper. Mirrors
 // rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
 // in-flight dispatch_diffusion_stream_event invocation has returned. Callers
 // freeing user_data registered via rac_diffusion_set_stream_proto_callback,
 // or tearing down the diffusion component, MUST call this after the unset to
 // avoid a use-after-free in the dispatch thread.
 //
-// pass3-syn-089 (commons-101): set the is_shutting_down barrier FIRST so any
+// Set the is_shutting_down barrier FIRST so any
 // caller that tries to enter the dispatcher after quiesce begins is rejected
 // by DiffusionInFlightGuard, then spin-wait until currently-in-flight calls
 // drain. Mirrors rac_vlm_proto_quiesce / voice_agent.cpp:569-592.
@@ -210,7 +210,7 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     }
     (void)parsed;
 
-    // CPP-03 follow-up: until the diffusion engine kickoff is wired into
+    // Until the diffusion engine kickoff is wired into
     // dispatch_diffusion_stream_event(), this entrypoint cannot honour the
     // contract documented in rac_diffusion_stream.h ("Session started"
     // implies STARTED/PROGRESS/COMPLETED/ERROR will be dispatched). The
@@ -243,7 +243,7 @@ rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id) {
     auto it = g_sessions().find(session_id);
     if (it == g_sessions().end())
         return RAC_ERROR_INVALID_ARGUMENT;
-    // commons-027: use release ordering so any writes the cancelling thread
+    // Use release ordering so any writes the cancelling thread
     // made before the store (e.g. draining session state) are visible to a
     // consumer on another core that observes is_cancelled == true. Mirrors
     // tool_calling_session.cpp:805/883 (cancel_requested.store release) and
@@ -268,10 +268,10 @@ void dispatch_diffusion_stream_event(rac_handle_t handle,
                                      const runanywhere::v1::DiffusionProgress* progress,
                                      const runanywhere::v1::DiffusionResult* result,
                                      const char* error_message, int error_code) {
-    // pass2-syn-001-followup-diffusion: hold the InFlightGuard across the
+    // Hold the InFlightGuard across the
     // whole dispatch so rac_diffusion_proto_quiesce() can spin-wait on the
     // counter before user_data is freed by a concurrent teardown thread.
-    // pass3-syn-089 (commons-101): if the proto dispatcher is shutting down,
+    // If the proto dispatcher is shutting down,
     // the guard refuses admission and we must skip the slot lookup + callback
     // invocation entirely — slot.fn / user_data may already be freed.
     DiffusionInFlightGuard in_flight_guard;

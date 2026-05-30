@@ -43,11 +43,11 @@
 
 namespace {
 
-// pass2-syn-001-followup-vad: lift the voice_agent in_flight quiesce pattern
-// to the VAD proto-byte dispatcher. See rac_llm_stream.cpp and
-// rac_vlm_proto_abi.cpp for the canonical reference; this guards
-// dispatch_vad_stream_event so destroy/teardown can spin-wait until any
-// in-flight slot.fn() returns before freeing user_data.
+// Lift the voice_agent in_flight quiesce pattern to the VAD proto-byte
+// dispatcher. See rac_llm_stream.cpp and rac_vlm_proto_abi.cpp for the
+// canonical reference; this guards dispatch_vad_stream_event so
+// destroy/teardown can spin-wait until any in-flight slot.fn() returns
+// before freeing user_data.
 std::atomic<int>& vad_in_flight() {
     static std::atomic<int> counter{0};
     return counter;
@@ -71,7 +71,7 @@ struct StreamSession {
     std::string request_id;
     std::atomic<bool> is_cancelled{false};
     int32_t sample_rate = 16000;
-    // hotspot-commons-features-voice-003: per-session VAD threshold override
+    // Per-session VAD threshold override
     // captured from VADOptions.threshold (0.0f = no override → use the
     // component's configured threshold). Applied per-frame in
     // rac_vad_stream_feed_audio_proto via the same set/restore pattern that
@@ -116,8 +116,8 @@ namespace rac::vad {
 // rac_vad_stream_feed_audio_proto() to emit FRAME events. session_id
 // correlates emitted events back to the originating session so multiple
 // concurrent sessions on one component handle do not cross-attribute their
-// request_ids (hotspot-commons-features-voice-002). session_id == 0 falls
-// back to legacy handle-only first-match scan.
+// request_ids. session_id == 0 falls back to legacy handle-only first-match
+// scan.
 void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEventKind kind,
                                const runanywhere::v1::VADResult* result,
                                const runanywhere::v1::SpeechActivityEvent* activity,
@@ -150,7 +150,7 @@ rac_result_t rac_vad_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// pass2-syn-001-followup-vad: public quiesce helper. Mirrors
+// Public quiesce helper. Mirrors
 // rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
 // in-flight dispatch_vad_stream_event invocation has returned. Callers
 // freeing user_data registered via rac_vad_set_stream_proto_callback, or
@@ -193,14 +193,13 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         // VADOptions does not carry a sample rate today; default to 16 kHz
         // which matches RAC_VAD_DEFAULT_SAMPLE_RATE / Silero / energy VAD.
         s.sample_rate = 16000;
-        // hotspot-commons-features-voice-003: capture the per-call energy
-        // threshold override (0.0f = use the component's configured value).
+        // Capture the per-call energy threshold override (0.0f = use the
+        // component's configured value).
         // The min_speech_duration_ms / min_silence_duration_ms /
         // max_speech_duration_ms / include_statistics fields on VADOptions
         // are debounce gates owned by the VAD backend itself; the streaming
         // ABI cannot retune the backend per session today, so they are
-        // intentionally not propagated. Tracked under
-        // hotspot-commons-features-voice-003.
+        // intentionally not propagated.
         s.threshold_override = parsed.threshold() > 0.0f ? parsed.threshold() : 0.0f;
     }
     *out_session_id = id;
@@ -266,13 +265,12 @@ rac_result_t rac_vad_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         num_samples > 0 ? static_cast<float>(std::sqrt(sum_sq / static_cast<double>(num_samples)))
                         : 0.0f;
 
-    // hotspot-commons-features-voice-003: apply VADOptions.threshold per
-    // frame using the same set/restore pattern that
-    // rac_vad_component_process_proto uses (vad_component.cpp:1019-1041).
+    // Apply VADOptions.threshold per frame using the same set/restore pattern
+    // that rac_vad_component_process_proto uses (vad_component.cpp:1019-1041).
     // Without this gate the streaming proto path silently ignored every
     // per-call threshold tuning while the one-shot proto path honored it.
     //
-    // pass3-syn-088: serialize the entire get→set→process→restore window
+    // Serialize the entire get→set→process→restore window
     // on a per-handle mutex so concurrent sessions on the same component
     // handle cannot interleave each other's overrides and leave the
     // persistent threshold drifted. We only acquire the per-handle mutex
@@ -379,7 +377,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
                                const runanywhere::v1::SpeechActivityEvent* activity,
                                const runanywhere::v1::VADStatistics* statistics,
                                const char* error_message, int error_code, uint64_t session_id) {
-    // pass2-syn-001-followup-vad: hold the InFlightGuard across the whole
+    // Hold the InFlightGuard across the whole
     // dispatch so rac_vad_proto_quiesce() can spin-wait on the counter
     // before user_data is freed by a concurrent teardown thread.
     VadInFlightGuard in_flight_guard;

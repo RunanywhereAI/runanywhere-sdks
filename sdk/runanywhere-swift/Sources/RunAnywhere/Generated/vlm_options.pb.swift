@@ -12,9 +12,8 @@
 //
 // Every enum / message below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, Web SDKs, and the C ABI.
-// The pre-IDL drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap
-// Matters") is what motivated this schema. Every SDK consumes generated
-// output; nothing is hand-written.
+// The pre-IDL drift table is what motivated this schema. Every SDK consumes
+// generated output; nothing is hand-written.
 //
 // Drift sources (file:line):
 //   Swift   sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/VLMTypes.swift:23

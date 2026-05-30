@@ -2,12 +2,10 @@
 //
 // voice_agent_stream_adapter.dart
 //
-// GAP 09 Phase 18 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
-//
 // Wraps `rac_voice_agent_set_proto_callback` (declared in
-// `rac_voice_event_abi.h`, GAP 09 Phase 15) as a Dart `Stream<VoiceEvent>`.
+// `rac_voice_event_abi.h`) as a Dart `Stream<VoiceEvent>`.
 // VoiceEvent is the protoc_plugin-generated type from
-// `idl/voice_events.proto` (GAP 01).
+// `idl/voice_events.proto`.
 //
 // Public API:
 //     final stream = VoiceAgentStreamAdapter(handle).stream();
@@ -22,7 +20,7 @@ import 'dart:ffi' as ffi;
 import 'dart:ffi' show NativeCallable;
 import 'dart:typed_data' show Uint8List;
 
-// Wire-via-protoc generated VoiceEvent — see GAP 01 codegen output at
+// Wire-via-protoc generated VoiceEvent — see codegen output at
 // sdk/runanywhere-flutter/packages/runanywhere/lib/generated/voice_events.pb.dart.
 import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
@@ -84,7 +82,7 @@ class _VoiceHandleFanOut {
   bool attach(StreamController<VoiceEvent> controller) {
     // Add the controller BEFORE calling _install() so that a
     // synchronously-fired first event (legal per the commons contract; see
-    // HandleStreamAdapter.swift:123-129 mlt-002 record) is not dropped
+    // HandleStreamAdapter.swift:123-129) is not dropped
     // because _broadcast() snapshots an empty set.  Roll back on failure.
     _controllers.add(controller);
     if (_nativeCb == null && !_install()) {
@@ -102,7 +100,7 @@ class _VoiceHandleFanOut {
   }
 
   bool _install() {
-    // FLUTTER-VOICE-035: NativeCallable.listener dispatches the closure body
+    // NativeCallable.listener dispatches the closure body
     // asynchronously on the Dart isolate event loop — the C trampoline returns
     // immediately and the commons dispatcher is free to overwrite its
     // thread_local scratch buffer before this closure runs. The copy on line
@@ -113,7 +111,6 @@ class _VoiceHandleFanOut {
     // or an ABI that heap-allocates the proto bytes and transfers ownership
     // to the caller (rac_proto_buffer_t pattern). Until that commons ABI
     // exists, this listener-based path is the only available mechanism.
-    // See expansion_needed in CLUSTER-174/STATE.json.
     final cb = NativeCallable<_CCallbackNative>.listener((
       ffi.Pointer<ffi.Uint8> bytesPtr,
       int bytesLen,
@@ -166,7 +163,7 @@ class _VoiceHandleFanOut {
   void _tearDown() {
     final cb = _nativeCb;
     if (cb == null) return;
-    // CONSOLIDATE-D ordering: (1) unregister the C callback so no NEW
+    // Teardown ordering: (1) unregister the C callback so no NEW
     // dispatches will fire, (2) `rac_voice_agent_proto_quiesce()` spins
     // until every in-flight dispatch returns, (3) close the NativeCallable
     // whose `user_data` was the dispatcher's argument. Skipping the quiesce

@@ -122,7 +122,7 @@ class ChatViewModel(
             }
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
                 Timber.i("✅ Generation completed: ${event.tokens_used} tokens")
-                // B-AK-7-002 — force-clear isGenerating in case generateAndCollect's
+                // Force-clear isGenerating in case generateAndCollect's
                 // Flow never received is_final=true. Also sync the conversation store.
                 if (_uiState.value.isGenerating) {
                     _uiState.value = _uiState.value.copy(isGenerating = false)
@@ -430,7 +430,7 @@ class ChatViewModel(
         Timber.i("📤 Starting streaming generation")
 
         try {
-            // v2 close-out Phase G-2: generateStream now returns
+            // generateStream now returns
             // Flow<LLMStreamEvent>; collect token text off each event.
             // Use transformWhile so the flow terminates as soon as is_final=true
             // arrives — plain return@collect does NOT close the upstream flow,
@@ -771,7 +771,7 @@ class ChatViewModel(
      */
     private fun createCurrentModelInfo(): MessageModelInfo? {
         val modelName = _uiState.value.loadedModelName ?: return null
-        // Round 1 (G-A8): currentLLMModelId removed. Reuse loadedModelName as
+        // currentLLMModelId removed. Reuse loadedModelName as
         // the modelId fallback; the proper resolved id is captured in
         // [refreshLoraState] / [checkModelStatus] via currentLLMModel().
         return MessageModelInfo(
@@ -926,7 +926,7 @@ class ChatViewModel(
                         Timber.i("✅ Chat model loaded successfully: ${chatModel.name}")
                     } catch (e: Throwable) {
                         // Cold-start best-effort load — DO NOT propagate to UI as
-                        // an error dialog (B-AK-1-002). Just log and let the user
+                        // an error dialog. Just log and let the user
                         // pick a model from the sheet.
                         Timber.w(e, "Cold-start auto-load skipped (${e.message})")
                         _uiState.value =
@@ -954,7 +954,7 @@ class ChatViewModel(
                 Timber.i("❌ SDK not ready")
             }
         } catch (e: Throwable) {
-            // Outer try also degrades silently on cold start (B-AK-1-002).
+            // Outer try also degrades silently on cold start.
             Timber.w(e, "checkModelStatus skipped: ${e.message}")
             _uiState.value =
                 _uiState.value.copy(

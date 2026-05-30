@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — shared component-lifecycle types.
 //
-// Extracted into its own proto file (Wave H-2 / IDL-04) to break the
+// Extracted into its own proto file to break the
 // `sdk_events.proto` ↔ `voice_events.proto` import cycle. Both files need the
 // canonical ComponentLifecycleState enum, so it lives here and is imported
 // from either side without circularity.
@@ -106,7 +106,7 @@ public nonisolated enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.Cas
 /// Canonical event category carried by every SDKEvent envelope. Lives here
 /// (instead of sdk_events.proto) so voice_events.proto and voice_agent_service
 /// .proto can reference it without importing sdk_events.proto (which itself
-/// imports voice_events.proto — IDL-07 cycle resolution).
+/// imports voice_events.proto — cycle resolution).
 public nonisolated enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -148,7 +148,7 @@ public nonisolated enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable 
   case network // = 34
   case error // = 35
 
-  /// IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+  /// Absorbed from former VoiceEventCategory (voice_events.proto).
   /// AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
   /// previously only on the voice-pipeline side.
   case audio // = 36

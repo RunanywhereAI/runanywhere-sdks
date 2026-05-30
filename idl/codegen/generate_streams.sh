@@ -6,7 +6,7 @@
 # generated files via the @runanywhere/proto-ts package, so a single
 # render pass writes the canonical output once.
 #
-# hotspot-idl-005: replaces the byte-identical pair generate_rn_streams.sh
+# Replaces the byte-identical pair generate_rn_streams.sh
 # + generate_web_streams.sh, both of which used to write to the same
 # OUT_DIR (sdk/shared/proto-ts/src/streams). Running both in sequence was
 # a silent overwrite trap — any unilateral edit to one script would be
@@ -30,7 +30,7 @@ TEMPLATE="${SCRIPT_DIR}/templates/ts_async_iterable.njk"
 mkdir -p "${OUT_DIR}"
 
 if ! command -v node >/dev/null 2>&1; then
-    echo "error: node not found. GAP 09 stream codegen requires Node 18+." >&2
+    echo "error: node not found. Stream codegen requires Node 18+." >&2
     exit 127
 fi
 
@@ -51,7 +51,7 @@ const tuples = [
     ['VoiceAgent',       'voice_agent',       'VoiceAgentRequest',          'VoiceEvent',                  'Stream',         '../voice_agent_service', '../voice_events'],
     ['LLM',              'llm',               'LLMGenerateRequest',         'LLMStreamEvent',              'Generate',       '../llm_service',         '../llm_service'],
     ['Download',         'download',          'DownloadSubscribeRequest',   'DownloadProgress',            'Subscribe',      '../download_service',    '../download_service'],
-    // hotspot-idl-001 — generate AsyncIterable wrappers for the remaining
+    // Generate AsyncIterable wrappers for the remaining
     // 9 server-streaming RPCs so RN and Web consumers can consume them
     // through the same generated pattern as VoiceAgent / LLM / Download.
     ['VLM',              'vlm',               'VLMGenerationRequest',       'VLMStreamEvent',              'Stream',         '../vlm_options',         '../vlm_options'],

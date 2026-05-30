@@ -1,8 +1,8 @@
 /**
  * @file voice_agent_legacy_abi.cpp
- * @brief Legacy non-proto voice-agent C ABI — scheduled for removal in
- *        commons-features-voice-007 once iOS Swift + Playground/linux-voice
- *        consumers migrate to the proto + Wave D-7 surfaces.
+ * @brief Legacy non-proto voice-agent C ABI — scheduled for removal once
+ *        iOS Swift + Playground/linux-voice consumers migrate to the proto
+ *        + full-session surfaces.
  *
  * Hosts:
  *   - model loading API (`rac_voice_agent_load_{stt,llm,tts}_*`,
@@ -19,13 +19,13 @@
  *   - the legacy result struct freeing helper
  *     (`rac_voice_agent_result_free`).
  *
- * Split out of voice_agent.cpp under commons-features-voice-003. Public
+ * Public
  * ABI unchanged; the rac_voice_agent struct definition + the
  * VoiceAgentPipeline forward-declaration live in voice_agent_internal.h /
  * voice_agent_pipeline.hpp.
  */
 
-// commons-features-voice-007: this TU implements the deprecated legacy
+// This TU implements the deprecated legacy
 // non-proto entry points declared with RAC_VOICE_AGENT_LEGACY_DEPRECATED.
 // Suppress -Wdeprecated-declarations in our own definitions; external
 // callers still see the warning at the call site.
@@ -299,7 +299,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // commons-042: admit under the in-flight barrier before blocking on the
+    // Admit under the in-flight barrier before blocking on the
     // mutex so destroy()'s drain loop covers this long-running turn and a
     // concurrent destroy fails us fast instead of waiting out STT+LLM+TTS.
     rac::voice_agent::detail::InFlightGuard guard(handle);
@@ -413,7 +413,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // commons-042: admit under the in-flight barrier before the mutex so
+    // Admit under the in-flight barrier before the mutex so
     // destroy()'s drain loop waits for this streaming run and a concurrent
     // destroy fails us fast instead of blocking behind the pipeline drain.
     rac::voice_agent::detail::InFlightGuard guard(handle);
@@ -446,7 +446,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return validation_result;
     }
 
-    // GAP 05 Phase 2 — drive the request through the GraphScheduler-backed
+    // Drive the request through the GraphScheduler-backed
     // VoiceAgentPipeline (VAD → STT → LLM → TTS → Sink).
     auto pipeline =
         std::make_shared<rac::voice_agent::VoiceAgentPipeline>(handle, callback, user_data);
@@ -571,7 +571,7 @@ rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, cons
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // commons-042: shared in-flight admission guard (was hand-rolled here).
+    // Shared in-flight admission guard (was hand-rolled here).
     rac::voice_agent::detail::InFlightGuard guard(handle);
     if (!guard.admitted()) {
         return RAC_ERROR_INVALID_STATE;

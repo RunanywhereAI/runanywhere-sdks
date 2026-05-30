@@ -5,7 +5,7 @@
 ///
 /// Mirrors Swift's ModelTypes+CppBridge.swift exactly. Enum mappers
 /// (proto integer ↔ C integer) delegate to commons' `rac_*_from_proto` /
-/// `rac_*_to_proto` ABIs (T15a + Wave 7A) so the conversion logic stays
+/// `rac_*_to_proto` ABIs so the conversion logic stays
 /// single-sourced in C++.
 library;
 
@@ -36,7 +36,7 @@ abstract class RacArtifactKind {
 }
 
 // =============================================================================
-// FFI bindings for commons enum mappers (T15a + Wave 7A)
+// FFI bindings for commons enum mappers
 //
 // Each pair maps a Dart proto enum integer (e.g.
 // `pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP.value`) to/from the

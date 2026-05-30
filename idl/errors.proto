@@ -411,7 +411,7 @@ enum ErrorCode {
     ERROR_CODE_UNKNOWN                    = 804;  // RAC_ERROR_UNKNOWN
     ERROR_CODE_INTERNAL                   = 805;  // RAC_ERROR_INTERNAL
 
-    // -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+    // -- Plugin (-810..-829) ------------------------------------------------
     ERROR_CODE_ABI_VERSION_MISMATCH       = 810;  // RAC_ERROR_ABI_VERSION_MISMATCH
     ERROR_CODE_CAPABILITY_UNSUPPORTED     = 811;  // RAC_ERROR_CAPABILITY_UNSUPPORTED
     ERROR_CODE_PLUGIN_DUPLICATE           = 812;  // RAC_ERROR_PLUGIN_DUPLICATE

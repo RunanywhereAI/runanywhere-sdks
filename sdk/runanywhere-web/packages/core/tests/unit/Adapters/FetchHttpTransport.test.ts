@@ -1,8 +1,8 @@
 /**
- * FetchHttpTransport.test.ts — CLUSTER-43 / web-core-001 + web-core-009
+ * FetchHttpTransport.test.ts
  *
- * Covers the chunked body-delivery behavior introduced by web-core-001 and
- * the install/uninstall lifecycle that the Stage 3d trampolines depend on.
+ * Covers the chunked body-delivery behavior and
+ * the install/uninstall lifecycle that the JS-side trampolines depend on.
  *
  * The transport's `request_stream` op buffers the response in `xhr.response`
  * (sync XHR has no streaming choice on the main thread) and then fans the
@@ -10,7 +10,7 @@
  * `STREAM_CHUNK_SIZE`-bounded slices. These tests stub `XMLHttpRequest`
  * and a minimal Emscripten module so we can assert:
  *
- *   1. install() returns null when the module lacks the Stage 3d export
+ *   1. install() returns null when the module lacks the JS-side transport export
  *      (so the emscripten_fetch fallback stays active).
  *   2. install() registers the request_send + request_stream + request_resume
  *      trampolines and returns a transport handle when the export is present.
@@ -294,7 +294,7 @@ describe('FetchHttpTransport', () => {
     vi.restoreAllMocks();
   });
 
-  it('install() returns null when the module lacks the Stage 3d export', () => {
+  it('install() returns null when the module lacks the JS-side transport export', () => {
     const handle = makeFakeModule({ withRegister: false });
     const transport = FetchHttpTransport.install(handle.module);
     expect(transport).toBeNull();
@@ -347,7 +347,7 @@ describe('FetchHttpTransport', () => {
     expect(handle.chunkCalls[0].contentLength).toBe(XHRStub.config.body.length);
   });
 
-  it('fans a multi-MiB body out across multiple chunk callbacks (web-core-001)', () => {
+  it('fans a multi-MiB body out across multiple chunk callbacks', () => {
     const handle = makeFakeModule();
     // 2.5 MiB body — STREAM_CHUNK_SIZE is 1 MiB, so this should produce
     // 3 callbacks (1 MiB, 1 MiB, 0.5 MiB).

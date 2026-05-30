@@ -36,7 +36,7 @@ const ACTION_LOG_PREFIX = '[RN_VALIDATION_ACTION]';
 // turn calls rac_vad_process_lifecycle_proto. Without a loaded VAD model the
 // commons ABI returns "VAD lifecycle model is not loaded" — the harness must
 // load silero-vad up-front so the synthetic_silence / synthetic_tone actions
-// have a deterministic precondition (CLUSTER-03 / RN-VAD-001).
+// have a deterministic precondition.
 const SILERO_VAD_MODEL_ID = 'silero-vad';
 
 type VadReadiness = 'idle' | 'loading' | 'ready' | 'failed';
@@ -153,14 +153,14 @@ export const ValidationHarnessScreen: React.FC = () => {
   // Mirrors Voice Assistant Setup → silero-vad auto-load on iOS
   // (VoiceAgentViewModel.swift): without this precondition the underlying
   // rac_vad_process_lifecycle_proto returns RAC_ERROR_NOT_INITIALIZED with
-  // "VAD lifecycle model is not loaded" — see CLUSTER-03 / RN-VAD-001.
+  // "VAD lifecycle model is not loaded".
   //
   // Commons `rac_model_lifecycle_load_proto` owns the canonical
   // download→load atom when `validateAvailability=true`: if the registered
   // ModelInfo has no local artifact and advertises a download source, the
   // SDK drives the download plan→start→poll cycle internally before
   // proceeding with the load. The example never reaches into multi-step
-  // orchestration (see CLUSTER-19 / examples-react-native-002).
+  // orchestration.
   useEffect(() => {
     let cancelled = false;
     const ensureVadLoaded = async () => {

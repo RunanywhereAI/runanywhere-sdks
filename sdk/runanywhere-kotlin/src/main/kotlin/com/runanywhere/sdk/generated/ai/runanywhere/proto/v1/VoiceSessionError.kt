@@ -31,14 +31,14 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: Voice session error taxonomy.
+ * Voice session error taxonomy.
  *
  * Mirrors Swift `VoiceSessionError`, Kotlin `VoiceSessionError`. The
  * `failed_component` field is populated only for component-failure mappings —
  * naming the sub-component that produced the underlying error ("stt", "llm",
  * "tts", "vad", "wakeword").
  *
- * IDL-08: The private `VoiceSessionErrorCode` enum was removed in favour of
+ * The private `VoiceSessionErrorCode` enum was removed in favour of
  * the canonical `ErrorCode` from `errors.proto`. Mapping from legacy cases:
  *   - MICROPHONE_PERMISSION_DENIED -> ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 282
  *   - NOT_READY                    -> ERROR_CODE_COMPONENT_NOT_READY          = 230

@@ -1,6 +1,6 @@
 /**
  * @file device_identity.cpp
- * @brief Implementation of rac_device_get_or_create_persistent_id (P2-T13).
+ * @brief Implementation of rac_device_get_or_create_persistent_id.
  *
  * Centralizes the device-UUID resolution chain that Swift / Kotlin / RN /
  * Flutter / Web each used to reimplement:

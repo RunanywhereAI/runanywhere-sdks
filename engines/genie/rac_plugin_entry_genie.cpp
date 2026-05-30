@@ -2,7 +2,7 @@
  * @file rac_plugin_entry_genie.cpp
  * @brief Unified-ABI entry point for the Qualcomm Genie (NPU) backend.
  *
- * GAP 02 + GAP 06 T5.2. Shell plugin: the entry point remains inspectable,
+ * Shell plugin: the entry point remains inspectable,
  * but registration is rejected and no LLM/routing metadata is advertised
  * until real Genie LLM ops are wired. SDK discovery alone is not enough:
  * the current public implementation still returns
@@ -13,7 +13,7 @@
  * module) can load the shell without platform-specific branches while the
  * router only sees Genie when the Qualcomm SDK-backed ops are real.
  *
- * CPP-04: declarative manifest publishes package ownership, Qualcomm-only
+ * Declarative manifest publishes package ownership, Qualcomm-only
  * (private) availability and the served primitive set alongside the routing
  * metadata. The manifest mirrors the conditional ops slots so registry
  * validation accepts both routable and shell builds.

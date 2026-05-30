@@ -2,9 +2,7 @@
  * @file rac_engine_router.h
  * @brief Hardware-aware scorer that picks the best engine plugin for a primitive.
  *
- * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
- * The router consumes the global plugin registry (populated via GAP 02 + 03)
+ * The router consumes the global plugin registry
  * and a `HardwareProfile`, then scores every plugin that serves the
  * requested primitive. The highest-scoring plugin wins; ties break
  * deterministically (priority desc, then metadata.name asc) so the same
@@ -12,7 +10,7 @@
  *
  * Layered on top of `rac_plugin_find` (which only knows priority); callers
  * who don't need scoring continue to call `rac_plugin_find` directly. The
- * routing-aware C ABI wrapper `rac_plugin_route` (Phase 12) lets non-C++
+ * routing-aware C ABI wrapper `rac_plugin_route` lets non-C++
  * callers use the router without instantiating the class manually.
  */
 
@@ -71,7 +69,7 @@ struct RouteResult {
  * each `route()` call snapshots the registry under its lock, then scores
  * outside the lock so concurrent registrations don't block routing.
  *
- * commons-007: scoring runs without holding the registry mutex, but the
+ * Scoring runs without holding the registry mutex, but the
  * snapshotted vtable pointers are pinned against concurrent dynamic unload
  * for the lifetime of the call. `rac_registry_unload_plugin` spin-waits the
  * registry's in-flight router counter to zero AFTER `rac_plugin_unregister`
@@ -80,7 +78,7 @@ struct RouteResult {
  */
 class EngineRouter {
    public:
-    /* commons-098: store the profile by value rather than by reference so the
+    /* Store the profile by value rather than by reference so the
      * router has no lifetime contract on its constructor argument — temporaries
      * such as `EngineRouter(HardwareProfile::detect())` are safe. The profile
      * struct is small (a few enums + bools + one short string) so the

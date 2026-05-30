@@ -9,7 +9,7 @@
  *     lifecycle manager owns. start() seeds a session, stop()/cancel()
  *     tear it down. Unloading a model SHOULD walk all sessions for the
  *     handle and cancel them — wired in via the lifecycle service when
- *     the SDK migration lands (CPP-03 follow-up).
+ *     the SDK migration lands.
  *   - dispatch_stt_stream_event() is invoked by stt_component.cpp and
  *     the streaming engines to emit serialized STTStreamEvent bytes.
  *
@@ -47,7 +47,7 @@
 
 namespace {
 
-// pass2-syn-001-followup-stt: lift the voice_agent in_flight quiesce pattern
+// Lift the voice_agent in_flight quiesce pattern
 // to the STT proto-byte dispatcher. See rac_llm_stream.cpp and
 // rac_vlm_proto_abi.cpp for the canonical reference; this guards
 // dispatch_stt_stream_event so destroy/teardown can spin-wait until any
@@ -85,7 +85,7 @@ struct StreamSession {
     int32_t max_speakers = 0;
     bool enable_timestamps = true;
     bool detect_language = false;
-    // CPP-14: per-session backend recognizer handle. Lazily created on the
+    // Per-session backend recognizer handle. Lazily created on the
     // first accepted audio chunk via the new stream_create vtable slot.
     // Backends that don't implement the slot leave this nullptr and
     // rac_stt_stream_feed_audio_proto falls back to the legacy per-chunk
@@ -192,7 +192,7 @@ namespace rac::stt {
 // rac_stt_stream_feed_audio_proto() to emit PARTIAL / FINAL events.
 // session_id correlates the emitted event with the originating session so
 // concurrent sessions on the same component handle do not cross-pollinate
-// request_ids (hotspot-commons-features-voice-002). A session_id of 0 falls
+// request_ids. A session_id of 0 falls
 // back to the legacy handle-scan path used by error emissions where the
 // session context is not threaded.
 void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEventKind kind,
@@ -228,7 +228,7 @@ rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// pass2-syn-001-followup-stt: public quiesce helper. Mirrors
+// Public quiesce helper. Mirrors
 // rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
 // in-flight dispatch_stt_stream_event invocation has returned. Callers
 // freeing user_data registered via rac_stt_set_stream_proto_callback, or
@@ -268,7 +268,7 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.handle = handle;
         s.request_id = "stt-" + std::to_string(id);
         s.is_cancelled.store(false, std::memory_order_relaxed);
-        // hotspot-commons-features-voice-003: honor every STTOptions field
+        // Honor every STTOptions field
         // the C ABI's rac_stt_options_t can carry. Previously this dropped
         // language_code, sample_rate, audio_format, and detect_language
         // before they could reach the backend stream_create / feed_audio
@@ -327,7 +327,7 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         }
         // STTOptions.beam_size and .max_alternatives have no equivalent slots
         // on rac_stt_options_t today; backends that need them must surface
-        // them through STTConfiguration. Tracking: hotspot-commons-features-voice-003.
+        // them through STTConfiguration.
     }
     *out_session_id = id;
     return RAC_SUCCESS;
@@ -400,7 +400,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     options.sample_rate = sample_rate;
     options.audio_format = audio_format;
 
-    // CPP-14: try the persistent-handle path first. Backends that advertise
+    // Try the persistent-handle path first. Backends that advertise
     // stream_create + stream_feed_audio_chunk keep their recognizer state
     // alive for the whole session. On first chunk we lazily spin up the
     // backend stream; subsequent chunks reuse the handle until the session
@@ -500,7 +500,7 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
 
     // Legacy fallback: backend doesn't expose per-session streams. Forward
     // the chunk through the existing transcribe_stream path; Sherpa will
-    // pay the per-chunk init cost here (CPP-14 pre-fix behavior) for
+    // pay the per-chunk init cost here (pre-fix behavior) for
     // backends that haven't migrated yet.
 
     // Bridge struct: forwards per-chunk transcribe_stream callbacks to the
@@ -626,7 +626,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
                                const runanywhere::v1::STTPartialResult* partial,
                                const runanywhere::v1::STTOutput* final_output,
                                const char* error_message, int error_code, uint64_t session_id) {
-    // pass2-syn-001-followup-stt: hold the InFlightGuard across the whole
+    // Hold the InFlightGuard across the whole
     // dispatch so rac_stt_proto_quiesce() can spin-wait on the counter
     // before destroy threads free user_data.
     SttInFlightGuard in_flight_guard;

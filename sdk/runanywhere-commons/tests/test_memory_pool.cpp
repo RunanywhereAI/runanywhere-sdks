@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// test_memory_pool.cpp — v3.1 Phase 9 unit tests (GAP 05 Phase 2).
+// test_memory_pool.cpp — unit tests.
 //
 // Covers MemoryPool<T>:
 //   * pool_reuse                — release+reacquire returns the recycled slot

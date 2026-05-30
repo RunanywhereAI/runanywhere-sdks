@@ -2,7 +2,7 @@
  * @file model_lifecycle_translation.cpp
  * @brief Proto<->C translation + event-publish helpers for model lifecycle.
  *
- * commons-core-infra-010: extracted from the original `model_lifecycle.cpp`
+ * Extracted from the original `model_lifecycle.cpp`
  * SRP split. Owns the small, side-effect-free helpers that translate
  * protobuf enums to C enums, build identifiers/timestamps, escape paths,
  * and publish lifecycle SDKEvents. No global state ownership.

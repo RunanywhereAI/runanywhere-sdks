@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// test_graph_primitives.cpp — v3.1 Phase 9 unit tests (GAP 05).
+// test_graph_primitives.cpp — unit tests.
 //
 // Covers CancelToken + RingBuffer + StreamEdge primitives under
 // include/rac/graph/. Test flavor matches the existing minimal

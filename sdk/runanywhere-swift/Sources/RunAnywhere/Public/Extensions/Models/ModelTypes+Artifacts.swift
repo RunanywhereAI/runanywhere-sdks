@@ -5,15 +5,15 @@
 //  Artifact/archive/expected-files helpers for the generated model contract
 //  types. Heavy logic (factory defaults, expected-files derivation, on-disk
 //  probe, archive inference) lives in commons; this file is now a thin
-//  shim that routes through `rac_model_info_make_proto` (P2-T4),
-//  `rac_artifact_expected_files_proto` (P2-T7) and
+//  shim that routes through `rac_model_info_make_proto`,
+//  `rac_artifact_expected_files_proto` and
 //  `rac_path_is_non_empty_directory`.
 //
 
 import CRACommons
 import Foundation
 
-// MARK: - Native ABI bindings (P2-T4 / P2-T7)
+// MARK: - Native ABI bindings
 
 private enum ArtifactProtoABI {
     static let makeModelInfo = NativeProtoABI.load(
@@ -243,7 +243,7 @@ public extension RAModelInfo {
     /// Build a fully-populated `RAModelInfo`. Defaults (id/name/format/
     /// framework/category/source/context-length/thinking-pattern/artifact/
     /// artifact_type) come from the canonical commons factory
-    /// (`rac_model_info_make_proto`, P2-T4); caller-supplied non-request
+    /// (`rac_model_info_make_proto`); caller-supplied non-request
     /// fields are layered on top.
     static func make(
         id: String,
@@ -373,7 +373,7 @@ public extension RAModelInfo {
     }
 
     /// Canonical expected-files manifest. Routes through
-    /// `rac_artifact_expected_files_proto` (P2-T7) which mirrors the legacy
+    /// `rac_artifact_expected_files_proto` which mirrors the legacy
     /// Swift fall-through (top-level manifest → artifact-attached manifest →
     /// pattern shorthand → multi-file descriptor seed).
     var expectedArtifactFiles: RAExpectedModelFiles {

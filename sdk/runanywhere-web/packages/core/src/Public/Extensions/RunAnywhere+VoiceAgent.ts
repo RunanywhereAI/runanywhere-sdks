@@ -27,7 +27,7 @@ import {
   type VoiceAgentComponentStates,
   type VoiceEvent,
 } from '@runanywhere/proto-ts/voice_events';
-// IDL-03/04/07: VoiceEventCategory/VoiceEventSeverity/ComponentLoadState were
+// VoiceEventCategory/VoiceEventSeverity/ComponentLoadState were
 // consolidated into EventCategory/ErrorSeverity/ComponentLifecycleState.
 import { EventCategory, ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ErrorSeverity } from '@runanywhere/proto-ts/errors';

@@ -3,7 +3,7 @@
 #
 # build-ios.sh — package-local compatibility wrapper.
 #
-# WAVE W1.1 (2026-05-15): the original per-package iOS/macOS build entry
+# The original per-package iOS/macOS build entry
 # point was deleted in favour of repo-root scripts/build-core-xcframework.sh,
 # but `.github/workflows/release.yml` (native_ios job) and the
 # README/CLAUDE.md docs continue to invoke this path. This shim restores

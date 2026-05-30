@@ -6,8 +6,8 @@
 //  Allows LLMs to request external actions (API calls, device functions, etc.)
 //
 //  ARCHITECTURE:
-//  - C++ owns the orchestration loop (`rac_tool_calling_run_loop_proto`,
-//    P2-T8). Swift only carries the tool registry (closures) and trampolines
+//  - C++ owns the orchestration loop (`rac_tool_calling_run_loop_proto`).
+//    Swift only carries the tool registry (closures) and trampolines
 //    a Swift `ToolExecutor` invocation through the C executor callback.
 //  - All parsing, validation, prompt formatting, and follow-up generation
 //    happens in commons. There is no Swift-side orchestration loop.
@@ -65,7 +65,7 @@ private enum ToolCallingRunLoopProtoABI {
         UnsafeMutableRawPointer?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
-    // pass2-syn-007: with-handle variant publishes a cancel handle.
+    // With-handle variant publishes a cancel handle.
     typealias RunLoopWithHandle = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
@@ -207,7 +207,7 @@ public extension RunAnywhere {
     /// Generates a response with tool calling support (CANONICAL_API §3).
     ///
     /// Delegates the entire generate -> parse -> validate -> execute -> follow-up
-    /// loop to the C++ commons layer (`rac_tool_calling_run_loop_proto`, P2-T8).
+    /// loop to the C++ commons layer (`rac_tool_calling_run_loop_proto`).
     /// Swift only registers a `@convention(c)` trampoline so the C loop can
     /// reach the Swift `ToolExecutor` closures stored in `ToolRegistry`.
     ///
@@ -243,7 +243,7 @@ public extension RunAnywhere {
     /// Note: `tool_choice` / `forced_tool_name` live on the
     /// `RAToolCallingOptions` proto (fields 13/14, idl/tool_calling.proto).
     /// They are applied here on the effective options so future commons
-    /// support (pass2-syn-006 parent) automatically picks them up; the
+    /// support automatically picks them up; the
     /// session-create request itself has reserved-7-10 today, so end-to-end
     /// propagation to native parse/validate helpers is pending the commons
     /// builder that snapshots options from the request.
@@ -278,7 +278,7 @@ public extension RunAnywhere {
             validateCalls: validateCalls
         )
         let requestBytes = try request.serializedData()
-        // pass2-syn-007: prefer the with-handle variant so the surrounding
+        // Prefer the with-handle variant so the surrounding
         // Task can cancel the in-flight native loop via
         // `withTaskCancellationHandler`. Falls back to the legacy ABI if the
         // newer entry point isn't exported by the loaded libcommons (e.g.
@@ -361,7 +361,7 @@ public extension RunAnywhere {
     /// the with-handle ABI and wires `withTaskCancellationHandler` to fan a
     /// Swift Task cancel into `rac_tool_calling_run_loop_cancel_proto`.
     ///
-    /// pass3-syn-059: the handle slot MUST be stable cross-thread storage
+    /// The handle slot MUST be stable cross-thread storage
     /// that the C ABI writes to synchronously (commons writes
     /// `*out_run_loop_handle = handle` at
     /// `tool_calling_run_loop.cpp:391-393`, BEFORE any iteration work
@@ -467,7 +467,7 @@ public extension RunAnywhere {
         error: String? = nil,
         toolCallID: String? = nil
     ) -> RAToolResult {
-        // IDL-13: the typed `result` map was removed — `resultJson` is the
+        // The typed `result` map was removed — `resultJson` is the
         // canonical wire shape (the C++ tool-prompt formatter reads it
         // directly when building follow-up LLM prompts).
         var toolResult = RAToolResult()
@@ -525,7 +525,7 @@ public extension RunAnywhere {
         request.formatHint = toolOptions.resolvedFormatName
         request.maxIterations = UInt32(max(toolOptions.maxToolCallCount, 0))
         request.keepToolsAvailable = toolOptions.keepToolsAvailable
-        // pass3-syn-149: `validate_calls` is `optional bool` on the proto so
+        // `validate_calls` is `optional bool` on the proto so
         // hosts that delegate validation/authorization to their executor (or
         // use dynamic tool registries where argument inspection happens
         // inside the executor) can opt out via `validateCalls: false`. When
@@ -534,7 +534,7 @@ public extension RunAnywhere {
         if let validateCalls {
             request.validateCalls = validateCalls
         }
-        // pass2-syn-006-followup-swift: thread tool_choice / forced_tool_name
+        // Thread tool_choice / forced_tool_name
         // all the way through to the commons request envelope (fields 7/8 on
         // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
         // them — not just the inline RAToolCallingOptions snapshot.
@@ -564,7 +564,7 @@ private final class ToolExecuteContext: @unchecked Sendable {
 /// a generous timeout. Using `NSCondition` instead of `DispatchSemaphore`
 /// keeps libdispatch's worker-thread budget free for the cooperative pool
 /// to make progress under high concurrency (50× simultaneous tool calls in
-/// the regression test, swift-public-features-013): semaphore wait pins one
+/// the regression test): semaphore wait pins one
 /// libdispatch worker per in-flight tool, while `NSCondition.wait` releases
 /// the underlying mutex and parks the thread on a kernel wait queue with no
 /// libdispatch entanglement. The timeout caps the worst case so a hung
@@ -624,7 +624,7 @@ private let toolExecuteTrampoline: ToolCallingRunLoopProtoABI.ExecuteCallback = 
 /// detached executor Task delivers the result. This avoids
 /// `DispatchSemaphore`'s tendency to occupy a libdispatch worker thread for
 /// the duration of the wait, which under heavy concurrent tool-call load
-/// (swift-public-features-013) could starve the libdispatch pool the
+/// could starve the libdispatch pool the
 /// cooperative scheduler also draws from.
 private final class ToolResultBox: @unchecked Sendable {
     private let condition = NSCondition()
@@ -653,7 +653,7 @@ private final class ToolResultBox: @unchecked Sendable {
     }
 }
 
-/// pass2-syn-007 / pass3-syn-059: shared handle slot between the
+/// Shared handle slot between the
 /// DispatchQueue thread that owns the in-flight C call and the `onCancel`
 /// closure that may fire from any thread.
 ///

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2 VLM capability — uses proto VLMImage / VLMGenerationOptions / VLMResult.
+// VLM capability — uses proto VLMImage / VLMGenerationOptions / VLMResult.
 
 import 'dart:async';
 

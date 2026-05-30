@@ -2,8 +2,6 @@
  * @file plugin_loader.cpp
  * @brief Dynamic plugin loader implementation.
  *
- * GAP 03 — see v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md.
- *
  * Two compile paths:
  *   - RAC_PLUGIN_MODE_STATIC (iOS / WASM / forced) — `rac_registry_load_plugin`
  *     returns RAC_ERROR_FEATURE_NOT_AVAILABLE so calling it never half-loads

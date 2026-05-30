@@ -2,8 +2,7 @@
  * @file rac_engine_router.cpp
  * @brief Engine-router scoring implementation.
  *
- * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- * T4.1 extension. CPP-05 hardening: declared runtimes are now an executable
+ * Declared runtimes are an executable
  * contract — engines whose declared L1 runtimes are not registered on this
  * host are removed from candidate selection and surface a dedicated
  * `RAC_ERROR_RUNTIME_UNAVAILABLE` through `rac_plugin_route`.
@@ -133,7 +132,7 @@ std::vector<const rac_engine_vtable_t*> snapshot_for_primitive(rac_primitive_t p
     return v;
 }
 
-/* commons-007: RAII guard that pins every vtable currently registered against
+/* RAII guard that pins every vtable currently registered against
  * concurrent dynamic unload for the lifetime of the scoring/sorting window.
  * Pairs with `rac_registry_unload_plugin`, which spin-waits the registry's
  * router-inflight counter to zero AFTER `rac_plugin_unregister` (so no NEW
@@ -268,7 +267,7 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
 }
 
 RouteResult EngineRouter::route(const RouteRequest& req) const {
-    /* commons-007: pin every snapshotted vtable for the lifetime of this
+    /* Pin every snapshotted vtable for the lifetime of this
      * call. See RouterInflightGuard comment for the unload-side handshake. */
     RouterInflightGuard inflight_guard;
 
@@ -291,7 +290,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
      * the C ABI maps to `RAC_ERROR_RUNTIME_UNAVAILABLE`. */
     bool any_runtime_reject = false;
     bool any_other_reject = false;
-    /* commons-160: when the pinned engine itself was rejected purely because
+    /* When the pinned engine itself was rejected purely because
      * its declared runtimes are all unregistered, the user-visible failure is
      * "runtime unavailable" even if other (non-pin) plugins serve the same
      * primitive and were rejected for the pin mismatch. Without this, the
@@ -348,7 +347,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
      * Determinism is required by the spec — same RouteRequest in same process
      * MUST yield same winner across 1000 calls.
      *
-     * commons-090: defensive null-guard on `metadata.name` for the final
+     * Defensive null-guard on `metadata.name` for the final
      * tiebreak. The registry rejects null-name vtables at register time, so a
      * reachable vtable can only have null name if its underlying storage was
      * repurposed concurrently. With the RouterInflightGuard above that
@@ -372,7 +371,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
 }
 
 std::vector<RouteResult> EngineRouter::route_all(const RouteRequest& req) const {
-    /* commons-007: same pin window as route() — every vtable observed via
+    /* Same pin window as route() — every vtable observed via
      * `snapshot_for_primitive` must outlive its dereferences in score(). */
     RouterInflightGuard inflight_guard;
 

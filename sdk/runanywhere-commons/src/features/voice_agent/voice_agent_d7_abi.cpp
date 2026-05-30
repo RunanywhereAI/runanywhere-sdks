@@ -1,6 +1,6 @@
 /**
  * @file voice_agent_d7_abi.cpp
- * @brief Wave D-7 full-session voice-agent C ABI — proto-byte streaming
+ * @brief Full-session voice-agent C ABI — proto-byte streaming
  *        path used by SDK frontends to drive a complete voice turn with
  *        session/turn/request correlation.
  *
@@ -14,8 +14,6 @@
  *     per-call turn-event callback, (b) the per-handle proto callback
  *     registered via `rac_voice_agent_set_proto_callback`, and (c) the
  *     global SDKEvent publisher.
- *
- * Split out of voice_agent.cpp under commons-features-voice-003.
  */
 
 #include <cstdint>
@@ -124,7 +122,7 @@ void d7_emit_state(rac_voice_agent_handle_t handle, runanywhere::v1::PipelineSta
                    runanywhere::v1::PipelineState current, const std::string& session_id,
                    const std::string& turn_id, const std::string& request_id,
                    rac_voice_agent_turn_event_callback_fn cb, void* user_data) {
-    // commons-044: gate against the documented state machine
+    // Gate against the documented state machine
     // (rac_audio_pipeline_is_valid_transition). Invalid transitions still
     // emit so downstream subscribers see the desync, but we log a warning
     // so frontend authors notice when the pipeline takes an unsanctioned
@@ -134,7 +132,7 @@ void d7_emit_state(rac_voice_agent_handle_t handle, runanywhere::v1::PipelineSta
     if (rac_audio_pipeline_is_valid_transition(from, to) != RAC_TRUE) {
         RAC_LOG_WARNING(
             "VoiceAgent",
-            "D-7 invalid pipeline transition %s -> %s; emitting anyway for observability",
+            "Invalid pipeline transition %s -> %s; emitting anyway for observability",
             rac_audio_pipeline_state_name(from), rac_audio_pipeline_state_name(to));
     }
 
@@ -264,7 +262,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
     const std::string request_id = request.request_id();
     const std::string turn_id = d7_pick_turn_id(request_id);
 
-    // commons-042: admit under the in-flight barrier so rac_voice_agent_destroy's
+    // Admit under the in-flight barrier so rac_voice_agent_destroy's
     // drain loop covers this full STT+LLM+TTS turn. The d7 path reads
     // is_configured below outside handle->mutex, so without the barrier a
     // concurrent destroy could flip is_shutting_down after that read and tear
@@ -331,7 +329,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   runanywhere::v1::PIPELINE_STATE_LISTENING, session_id, turn_id, request_id,
                   event_callback, user_data);
 
-    // commons-043-A: surface a real VAD verdict for the turn instead of
+    // Surface a real VAD verdict for the turn instead of
     // emitting a hard-coded SPEECH_STARTED/SPEECH_ENDED pair around STT.
     // The per-turn d7 path receives a pre-framed audio buffer, so we run
     // the VAD component once over the whole buffer and emit a single
@@ -372,7 +370,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   runanywhere::v1::PIPELINE_STATE_PROCESSING_SPEECH, session_id, turn_id,
                   request_id, event_callback, user_data);
 
-    // commons-features-voice-001: dispatch through lifecycle refs when the
+    // Dispatch through lifecycle refs when the
     // canonical lifecycle bridge owns the loaded models; fall back to the
     // voice-agent's per-handle component for legacy load paths.
     rac::lifecycle::LifecycleSttRef stt_ref{};
@@ -407,7 +405,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                                "STT transcription was empty");
         return RAC_ERROR_INVALID_STATE;
     }
-    // commons-043-A: only emit the matching "speech ended" event if we
+    // Only emit the matching "speech ended" event if we
     // previously emitted "speech started" for this turn. Emitting
     // SPEECH_ENDED unconditionally would still desynchronize frontends
     // tracking VAD state when the turn contained no detected speech.
@@ -487,7 +485,7 @@ extern "C" rac_result_t rac_voice_agent_process_turn_proto(
                   tts.sample_rate > 0 ? tts.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE, true,
                   session_id, turn_id, request_id, event_callback, user_data);
 
-    // commons-044: honor the documented PLAYING_TTS -> COOLDOWN -> IDLE
+    // Honor the documented PLAYING_TTS -> COOLDOWN -> IDLE
     // pathway so frontends gating the microphone on
     // rac_audio_pipeline_can_activate_microphone() get the 800ms feedback-
     // prevention window the architecture promises. Skipping COOLDOWN here
@@ -551,7 +549,7 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
                                           "transcribe request is missing audio_data");
     }
 
-    // commons-042: admit under the in-flight barrier so destroy()'s drain loop
+    // Admit under the in-flight barrier so destroy()'s drain loop
     // covers this STT inference call (which takes no handle->mutex at all).
     InFlightGuard guard(handle);
     if (!guard.admitted()) {
@@ -559,7 +557,7 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
                                           "voice agent is shutting down");
     }
 
-    // commons-features-voice-001: prefer the canonical lifecycle STT ref; fall back
+    // Prefer the canonical lifecycle STT ref; fall back
     // to the component-handle path so legacy callers still work end-to-end.
     rac::lifecycle::LifecycleSttRef stt_ref{};
     const bool have_lifecycle_stt = rac::lifecycle::acquire_lifecycle_stt(&stt_ref) == RAC_SUCCESS;
@@ -637,7 +635,7 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
                                           "synthesize request is missing text");
     }
 
-    // commons-042: admit under the in-flight barrier so destroy()'s drain loop
+    // Admit under the in-flight barrier so destroy()'s drain loop
     // covers this TTS synthesis call (which takes no handle->mutex at all).
     InFlightGuard guard(handle);
     if (!guard.admitted()) {
@@ -645,7 +643,7 @@ extern "C" rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_
                                           "voice agent is shutting down");
     }
 
-    // commons-features-voice-001: prefer the canonical lifecycle TTS ref; fall back
+    // Prefer the canonical lifecycle TTS ref; fall back
     // to the component-handle path so legacy callers still work end-to-end.
     rac::lifecycle::LifecycleTtsRef tts_ref{};
     const bool have_lifecycle_tts = rac::lifecycle::acquire_lifecycle_tts(&tts_ref) == RAC_SUCCESS;

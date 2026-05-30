@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// voice_agent_pipeline.hpp — GAP 05 Phase 2 consumer #1.
+// voice_agent_pipeline.hpp
 //
 // Internal C++ class that rebuilds the voice agent's request→response
 // pipeline as a `rac::graph::GraphScheduler`-driven DAG:

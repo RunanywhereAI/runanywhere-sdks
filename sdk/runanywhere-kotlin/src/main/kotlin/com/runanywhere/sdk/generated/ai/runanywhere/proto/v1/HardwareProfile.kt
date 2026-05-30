@@ -108,6 +108,17 @@ public class HardwareProfile(
     schemaIndex = 8,
   )
   public val platform: String = "",
+  /**
+   * resolved NPU vendor family (commons-classified)
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.NPUChip#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "npuChip",
+    schemaIndex = 9,
+  )
+  public val npu_chip: NPUChip = NPUChip.NPU_CHIP_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HardwareProfile, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -129,6 +140,7 @@ public class HardwareProfile(
     if (efficiency_cores != other.efficiency_cores) return false
     if (architecture != other.architecture) return false
     if (platform != other.platform) return false
+    if (npu_chip != other.npu_chip) return false
     return true
   }
 
@@ -145,6 +157,7 @@ public class HardwareProfile(
       result = result * 37 + efficiency_cores.hashCode()
       result = result * 37 + architecture.hashCode()
       result = result * 37 + platform.hashCode()
+      result = result * 37 + npu_chip.hashCode()
       super.hashCode = result
     }
     return result
@@ -161,6 +174,7 @@ public class HardwareProfile(
     result += """efficiency_cores=$efficiency_cores"""
     result += """architecture=${sanitize(architecture)}"""
     result += """platform=${sanitize(platform)}"""
+    result += """npu_chip=$npu_chip"""
     return result.joinToString(prefix = "HardwareProfile{", separator = ", ", postfix = "}")
   }
 
@@ -174,8 +188,9 @@ public class HardwareProfile(
     efficiency_cores: Int = this.efficiency_cores,
     architecture: String = this.architecture,
     platform: String = this.platform,
+    npu_chip: NPUChip = this.npu_chip,
     unknownFields: ByteString = this.unknownFields,
-  ): HardwareProfile = HardwareProfile(chip, has_neural_engine, acceleration_mode, total_memory_bytes, core_count, performance_cores, efficiency_cores, architecture, platform, unknownFields)
+  ): HardwareProfile = HardwareProfile(chip, has_neural_engine, acceleration_mode, total_memory_bytes, core_count, performance_cores, efficiency_cores, architecture, platform, npu_chip, unknownFields)
 
   public companion object {
     @JvmField
@@ -216,6 +231,9 @@ public class HardwareProfile(
         if (value.platform != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.platform)
         }
+        if (value.npu_chip != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          size += NPUChip.ADAPTER.encodedSizeWithTag(10, value.npu_chip)
+        }
         return size
       }
 
@@ -247,11 +265,17 @@ public class HardwareProfile(
         if (value.platform != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.platform)
         }
+        if (value.npu_chip != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          NPUChip.ADAPTER.encodeWithTag(writer, 10, value.npu_chip)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HardwareProfile) {
         writer.writeBytes(value.unknownFields)
+        if (value.npu_chip != ai.runanywhere.proto.v1.NPUChip.NPU_CHIP_UNSPECIFIED) {
+          NPUChip.ADAPTER.encodeWithTag(writer, 10, value.npu_chip)
+        }
         if (value.platform != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.platform)
         }
@@ -291,6 +315,7 @@ public class HardwareProfile(
         var efficiency_cores: Int = 0
         var architecture: String = ""
         var platform: String = ""
+        var npu_chip: NPUChip = NPUChip.NPU_CHIP_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> chip = ProtoAdapter.STRING.decode(reader)
@@ -302,6 +327,11 @@ public class HardwareProfile(
             7 -> efficiency_cores = ProtoAdapter.UINT32.decode(reader)
             8 -> architecture = ProtoAdapter.STRING.decode(reader)
             9 -> platform = ProtoAdapter.STRING.decode(reader)
+            10 -> try {
+              npu_chip = NPUChip.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -315,6 +345,7 @@ public class HardwareProfile(
           efficiency_cores = efficiency_cores,
           architecture = architecture,
           platform = platform,
+          npu_chip = npu_chip,
           unknownFields = unknownFields
         )
       }

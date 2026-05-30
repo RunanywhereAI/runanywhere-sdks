@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  The main entry point for the RunAnywhere SDK.
-//  Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
+//  Two-phase initialization is owned by commons (rac_sdk_init.h):
 //    * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
 //    * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
 //      assignments, HTTP-state snapshot)

@@ -1,7 +1,7 @@
 /**
  * NitroVoiceAgentSpec.ts
  *
- * v3-readiness Phase A3 / GAP 09 #6. Hand-written companion to the
+ * Hand-written companion to the
  * Nitrogen-generated HybridObject spec (mirrors the pattern used by
  * TelemetryService.ts for RunAnywhereCore). Exposes the singleton
  * `VoiceAgent` HybridObject that `VoiceAgentStreamAdapter.ts` imports.

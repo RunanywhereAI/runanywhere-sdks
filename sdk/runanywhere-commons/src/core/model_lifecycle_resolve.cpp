@@ -2,7 +2,7 @@
  * @file model_lifecycle_resolve.cpp
  * @brief Model-artifact resolution + result/snapshot builders.
  *
- * commons-core-infra-010: extracted from the original `model_lifecycle.cpp`
+ * Extracted from the original `model_lifecycle.cpp`
  * SRP split. Owns the artifact-resolution path that bridges a registered
  * `ModelInfo` (single-file or multi-file) into a primary path + optional
  * mmproj + companion descriptors, plus the helpers that copy that result

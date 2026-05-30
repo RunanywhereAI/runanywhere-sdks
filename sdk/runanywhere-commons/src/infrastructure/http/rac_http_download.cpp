@@ -10,7 +10,7 @@
  * @brief Implementation of `rac_http_download_execute` — native
  * download runner that replaces Kotlin's HttpURLConnection loop.
  *
- * v2 close-out Phase H. See `rac_http_download.h` for the contract;
+ * See `rac_http_download.h` for the contract;
  * platform adapters own HTTP execution.
  *
  * The runner:
@@ -245,7 +245,7 @@ struct dl_ctx {
     bool io_error;
 };
 
-// CLUSTER-13 / HTTP-416-STRICT (iter 3): treat any response body smaller than
+// Treat any response body smaller than
 // this threshold as "could be an error stub" — gguf / safetensors / sherpa-onnx
 // WASM model payloads are all multi-MB at minimum, so a body smaller than
 // `kSuspiciousResponseThreshold` arriving alongside a 4xx/5xx status (or
@@ -360,11 +360,11 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // Bug C: when a fresh download was requested (`resume_from_byte == 0`)
+    // When a fresh download was requested (`resume_from_byte == 0`)
     // but a non-trivial partial file already lives at the destination
     // (e.g. from a previous attempt that left a real gguf prefix on disk),
     // truncating-then-replaying erases the only good copy of the prefix.
-    // If the next attempt then trips Bug B's shift-left fallback or a 416
+    // If the next attempt then trips the shift-left fallback or a 416
     // error stub, the file ends up as a 49-byte HTML page.
     //
     // Defensive policy:
@@ -413,7 +413,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
                 RAC_LOG_WARNING(
                     kTag,
                     "fresh download but %llu bytes already on disk; promoting to resume to "
-                    "preserve prior partial (Bug C / COMMONS-DOWNLOAD-001)",
+                    "preserve prior partial",
                     static_cast<unsigned long long>(existing_size));
                 effective_resume_from = existing_size;
             }
@@ -525,7 +525,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         }
     }
 
-    // CLUSTER-13 / HTTP-416-STRICT (iter 3): observe the response Content-Type
+    // Observe the response Content-Type
     // so the strict 416/error-body rollback below can distinguish "text/html
     // CDN error stub" from "application/octet-stream truncated payload". We
     // also fold "no content-type" into the suspicious-body class — a 4xx with
@@ -567,17 +567,16 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         return RAC_HTTP_DL_CANCELLED;
     }
 
-    // ---- CLUSTER-13 / HTTP-416-STRICT (iter 3): strict body validation -----
+    // ---- strict body validation -----
     //
-    // CLUSTER-01 (commit d0a5885b6) gated the shift-left fallback on
+    // An earlier change (commit d0a5885b6) gated the shift-left fallback on
     // status == 200 || (206 + Range-Honored:false), which prevents HTTP 416
     // from chopping the file down to the error stub size. But the body itself
     // was still APPENDED (resume) or WRITTEN (fresh) to the destination by the
     // chunk callback before the runner observed the status. In the resume
     // path this leaves `[386 MB valid prefix][49 B HTML stub]` on disk; the
     // 49 B suffix corrupts the file even though the gross size only changed
-    // by a tiny fraction. iter 2 surfaced this as FLUTTER-AND-DL-002,
-    // FLUTTER-IOS-004, and WEB-DOWNLOAD-001 — all three lanes saw the 49 B
+    // by a tiny fraction. Multiple platform lanes saw the 49 B
     // HTML overwrite the gguf on the post-relaunch retry.
     //
     // Policy (strict gate, scoped to HTTP 416 per task spec):
@@ -607,8 +606,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     if (rc == RAC_SUCCESS && status_is_416 && body_is_tiny && body_is_textlike_or_unknown) {
         RAC_LOG_WARNING(
             kTag,
-            "HTTP 416 returned %llu-byte %s body; rejecting write and rolling back to %llu bytes "
-            "(CLUSTER-13 / HTTP-416-STRICT)",
+            "HTTP 416 returned %llu-byte %s body; rejecting write and rolling back to %llu bytes",
             static_cast<unsigned long long>(ctx.bytes_written),
             response_content_type_is_textlike ? "text/* (error-stub-shaped)"
                                               : "unknown-content-type",
@@ -657,7 +655,7 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     // expect from a CDN that does not honor Range (e.g. some S3 / GCS
     // configurations and proxies that strip the header).
     //
-    // Bug B / COMMONS-DOWNLOAD-001: the previous gate (`http_status == 200
+    // The previous gate (`http_status == 200
     // || range_honored_signal_header`) ALSO fired for HTTP 416 + Range-
     // not-honored header, which is the canonical CDN response to a resume
     // request whose offset is past the resource end. The body for 416 is

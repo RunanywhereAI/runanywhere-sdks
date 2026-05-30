@@ -381,7 +381,7 @@ RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_boo
                                                   const char* error_message, char** out_json);
 
 // =============================================================================
-// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
 // =============================================================================
 
 /**
@@ -409,7 +409,7 @@ RAC_API rac_result_t rac_tool_value_from_json_proto(
     rac_proto_buffer_t* out_tool_value);
 
 // =============================================================================
-// TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
+// TOOL CALLING RUN LOOP - Single-call native orchestration
 // =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up

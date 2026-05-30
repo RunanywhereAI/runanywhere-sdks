@@ -38,7 +38,7 @@ if [ -f "${VERSIONS_FILE}" ]; then
 fi
 PROTOC_GEN_DART_VERSION="${PROTOC_GEN_DART_VERSION:-25.0.0}"
 
-# IDL-16 / CPP-10: pin Dart + protoc_plugin versions so local + CI runs
+# Pin Dart + protoc_plugin versions so local + CI runs
 # produce byte-identical output. Older Dart / protoc_plugin combos emit
 # subtly different code (e.g. accidental .pbgrpc.dart) that trips the
 # idl-drift-check CI gate on unrelated PRs.
@@ -69,7 +69,7 @@ if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     exit 127
 fi
 
-# IDL-16 / CPP-10: verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
+# Verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
 # (loaded from VERSIONS). The plugin does not expose --version in older
 # releases; fall back to a best-effort check.
 #
@@ -87,9 +87,9 @@ if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version </dev/null 2>&1)"; then
     fi
 fi
 
-# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
-# IDL-19b: router.proto is now included (empty exclusion list) so Flutter has
+# router.proto is now included (empty exclusion list) so Flutter has
 # future-proof parity with Kotlin / C++; no active Dart consumer today, but
 # generated router.pb.dart exists for symmetry.
 #

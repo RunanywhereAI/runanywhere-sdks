@@ -529,7 +529,7 @@ static void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artif
     for (size_t i = 0; i < artifact->file_descriptor_count; ++i) {
         const rac_model_file_descriptor_t& in = artifact->file_descriptors[i];
         ModelFileDescriptor* file = out->add_files();
-        // CLUSTER-10: emit the real URL when the descriptor carries one.
+        // Emit the real URL when the descriptor carries one.
         // Previously this always emitted relative_path as the URL, so a
         // local filename like "lfm2-vl-1.2b-q4_k_m.gguf" was serialized as
         // ModelFileDescriptor.url and the planner downstream rejected it as
@@ -761,7 +761,7 @@ static bool apply_proto_artifact_to_model(const ModelInfo& proto, rac_model_info
                     out.destination_path = dup_optional_proto_string(destination);
                     out.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
                     out.role = model_file_role_from_proto(file.role());
-                    // CLUSTER-10: preserve ModelFileDescriptor.url through the
+                    // Preserve ModelFileDescriptor.url through the
                     // registry round-trip. Previously this field was dropped,
                     // which caused the round-trip serializer to emit
                     // relative_path as the URL (i.e. a local filename pretending
@@ -2135,8 +2135,8 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
             ModelInfo existing =
                 model_snapshot_locked(handle, proto_model.id(), existing_it->second);
             // register_proto is an authoritative replace: an explicit empty
-            // local_path is a deliberate reset that must win (commons-014
-            // override escape hatch), so do NOT preserve an empty path.
+            // local_path is a deliberate reset that must win (override
+            // escape hatch), so do NOT preserve an empty path.
             preserve_absent_proto_fields(existing, &proto_model,
                                          /*preserve_empty_local_path=*/false);
         }
@@ -3399,7 +3399,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 
         if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
                                       callbacks->user_data) != RAC_SUCCESS) {
-            // commons-core-infra-016: defensive guard. The list_directory
+            // Defensive guard. The list_directory
             // contract says "no allocation on failure"; the C ABI is
             // implemented by every platform SDK and a future regression
             // could leave a partial allocation here. If callers DID populate
@@ -3492,7 +3492,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 }
 
 // =============================================================================
-// PUBLIC API - REFRESH (T4.9)
+// PUBLIC API - REFRESH
 // =============================================================================
 
 rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
@@ -3606,7 +3606,7 @@ void rac_discovery_result_free(rac_discovery_result_t* result) {
 }
 
 // =============================================================================
-// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
+// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Web WASM)
 // =============================================================================
 
 rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,

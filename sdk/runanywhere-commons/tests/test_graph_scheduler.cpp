@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// test_graph_scheduler.cpp — v3.1 Phase 9 unit tests (GAP 05 Phase 2).
+// test_graph_scheduler.cpp — GraphScheduler unit tests.
 //
 // Covers GraphScheduler from include/rac/graph/graph_scheduler.hpp. Uses the
 // concrete node types in pipeline_node.hpp (PrimitiveNode / SplitNode /
@@ -248,7 +248,7 @@ TEST(cancel_all_mid_stream) {
 // ---------------------------------------------------------------------------
 // Split + merge topology — proves the scheduler's overloaded connect() works
 // for the fan-out / fan-in shape that will back RAG query → embed × N →
-// rerank in T4.6.
+// rerank.
 //
 //   producer → [identity] → Split → (A, B) → Merge → [sink]
 //

@@ -8,7 +8,7 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — streaming events emitted by the VoiceAgent solution.
+// RunAnywhere IDL — streaming events emitted by the VoiceAgent solution.
 //
 // Every frontend binds to this schema via its native proto3 codegen
 // (swift-protobuf, Wire, protobuf.dart, ts-proto). There is NO hand-written
@@ -522,7 +522,7 @@ public nonisolated struct RAVoiceEvent: @unchecked Sendable {
     set {_uniqueStorage()._payload = .metrics(newValue)}
   }
 
-  /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+  /// Voice agent lifecycle events. Mirror Swift VoiceSessionError /
   /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
   /// signals consumed by the cross-platform VoiceAgent extensions
   /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
@@ -649,7 +649,7 @@ public nonisolated struct RAVoiceEvent: @unchecked Sendable {
     case state(RAStateChangeEvent)
     case error(RAErrorEvent)
     case metrics(RAMetricsEvent)
-    /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+    /// Voice agent lifecycle events. Mirror Swift VoiceSessionError /
     /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
     /// signals consumed by the cross-platform VoiceAgent extensions
     /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
@@ -756,7 +756,7 @@ public nonisolated struct RAAudioFrameEvent: Sendable {
 
 /// Voice Activity Detection output. Frontends usually do not need this —
 /// exposed for debugging and custom UIs (waveform highlighting, etc.).
-/// IDL-18: `type` uses the canonical VADStreamEventKind enum from
+/// `type` uses the canonical VADStreamEventKind enum from
 /// vad_options.proto (the hand-rolled VADEventType was deleted).
 public nonisolated struct RAVADEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -862,7 +862,7 @@ public nonisolated struct RAMetricsEvent: Sendable {
   /// dashboards without re-computing the threshold themselves.
   public var isOverBudget: Bool = false
 
-  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+  /// Monotonic producer-side timestamp in nanoseconds. Set by the
   /// producer (C++ dispatcher) at event-emit time; read by consumers
   /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
   /// latency without relying on wall-clock sync. Encoded as int64 so
@@ -924,7 +924,7 @@ public nonisolated struct RAComponentProgressEvent: Sendable {
 /// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
 /// `VoiceAgentComponentStates`.
 ///
-/// IDL-04: The former `ComponentLoadState` enum was consolidated into the
+/// The former `ComponentLoadState` enum was consolidated into the
 /// canonical richer `ComponentLifecycleState` (component_types.proto). Where
 /// the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
 /// component is ready to use", callers now use

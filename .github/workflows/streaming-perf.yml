@@ -1,6 +1,6 @@
 name: streaming-perf
 
-# v2 close-out Phase I-1: cross-SDK streaming-parity perf gate.
+# Cross-SDK streaming-parity perf gate.
 # Runs the C++ producers + Python aggregators on Linux for any change
 # touching tests/streaming/** or the voice-agent commons surface.
 # Per-SDK runners run in their respective SDK CI; this workflow gates the
@@ -80,8 +80,8 @@ jobs:
         run: cmake --preset linux-debug -DRAC_BUILD_TESTS=ON
 
       # NOTE: parity_test_cpp / perf_producer / cancel_producer are
-      # placeholder targets not yet wired into the CMake graph (planned
-      # under v2 close-out Phase I-1). Build/test steps stay as
+      # placeholder targets not yet wired into the CMake graph. Build/test
+      # steps stay as
       # best-effort so this workflow still exercises the linux-debug
       # configure path (which is the actual regression gate touched by
       # this PR via cmake/** path filter) without blocking on the

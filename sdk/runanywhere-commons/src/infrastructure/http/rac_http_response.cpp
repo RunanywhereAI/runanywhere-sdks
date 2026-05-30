@@ -2,7 +2,7 @@
  * @file rac_http_response.cpp
  * @brief Shared implementation of `rac_http_response_free`.
  *
- * commons-core-infra-015: the same body was duplicated in
+ * The same body was duplicated in
  * `rac_http_client_default.cpp` and `rac_http_client_emscripten.cpp`.
  * Since the function is platform-independent (relies only on std::free,
  * which both TUs already use for the allocations they hand back), it

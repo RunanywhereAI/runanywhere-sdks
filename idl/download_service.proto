@@ -1,6 +1,6 @@
 // RunAnywhere IDL — model download progress streaming service.
 //
-// GAP 09 Phase 12. Server-streaming rpc returning per-chunk download
+// Server-streaming rpc returning per-chunk download
 // progress + extraction + validation events. Replaces the per-SDK download
 // observers (Kotlin DownloadProgress channel, Dart Stream<DownloadProgress>,
 // Swift Combine.PassthroughSubject) with one schema + 5 thin adapters.

@@ -18,7 +18,7 @@ sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/
 sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeTTS.kt
 sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeVAD.kt
 
-# Kotlin SDK — Wave H/W6 proto helpers + tool-calling DTOs still hand-written
+# Kotlin SDK — proto helpers + tool-calling DTOs still hand-written
 # pending the LLM/RAG proto-bytes migration. commonTest helper test pairs the
 # main StructuredOutputProtoHelpers.kt; both follow the same migration owner.
 sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/LLM/StructuredOutputProtoHelpers.kt

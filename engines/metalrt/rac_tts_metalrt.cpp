@@ -18,7 +18,7 @@
 
 static const char* LOG_CAT = "TTS.MetalRT";
 
-// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// See rac_llm_metalrt.cpp for the full ADR. Same
 // acquire/release pin pattern: destroy waits on cv_ for in-flight synthesize
 // pins to drain before tearing down the TTS handle and freeing impl.
 struct rac_tts_metalrt_impl {

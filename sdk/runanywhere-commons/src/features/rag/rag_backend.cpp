@@ -373,7 +373,7 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
 // Query — GraphScheduler-driven DAG
 // =============================================================================
 //
-// GAP 05 / T4.6: the entire orchestration (embed → retrieve → assemble →
+// The entire orchestration (embed → retrieve → assemble →
 // generate) now lives in `run_rag_query()` which builds and runs a typed
 // `GraphScheduler` per call. This method is just the snapshot+dispatch
 // shim that hands the right inputs to the graph and translates its

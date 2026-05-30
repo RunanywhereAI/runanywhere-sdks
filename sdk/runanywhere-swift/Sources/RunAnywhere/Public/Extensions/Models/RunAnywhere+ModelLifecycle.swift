@@ -12,11 +12,9 @@
 //  actor handles (`CppBridge.{STT,TTS,VAD,VLM}.shared`) remain only for
 //  legacy direct-handle ops still on `rac_*_component_*` (supports_streaming,
 //  introspection, etc.) and are not consulted for inference or compose-
-//  readiness. See gaps/gaps/inconsistencies/swift.md
-//  SWIFT-VOICE-AGENT-001 (closed in 4dc98989a) and the rac_vlm_process_proto
-//  precedent from Phase 6j. Wave 7 / T23 removed the last remnant of the
-//  VLM-specific synchroniser that mirrored the lifecycle into the Swift
-//  actor — there is now nothing to mirror.
+//  readiness. The last remnant of the VLM-specific synchroniser that
+//  mirrored the lifecycle into the Swift actor has been removed — there is
+//  now nothing to mirror.
 //
 
 

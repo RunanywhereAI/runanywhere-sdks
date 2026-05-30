@@ -724,7 +724,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
   /// RAC_ERROR_INTERNAL
   case `internal` // = 805
 
-  /// -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+  /// -- Plugin (-810..-829) ------------------------------------------------
   case abiVersionMismatch // = 810
 
   /// RAC_ERROR_CAPABILITY_UNSUPPORTED

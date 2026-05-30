@@ -1,7 +1,7 @@
 /**
  * HybridVoiceAgent.cpp
  *
- * v3-readiness Phase A3 / GAP 09 #6. Implementation for the Nitro
+ * Implementation for the Nitro
  * VoiceAgent HybridObject defined in VoiceAgent.nitro.ts.
  *
  * Lifecycle of one subscription:
@@ -34,7 +34,7 @@
  * wins; earlier ones go silent). This matches the Kotlin + Dart
  * adapters' behavior and is documented on the spec interface.
  *
- * --- Lifetime / concurrency protocol (pass3-syn-045) ----------------
+ * --- Lifetime / concurrency protocol --------------------------------
  *
  * Commons voice_event dispatch (`rac_voice_event_abi.cpp`) copies the
  * registered slot {fn, user_data} under its lock, RELEASES the lock,

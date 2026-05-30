@@ -3,7 +3,7 @@
 #
 # build-android.sh — package-local compatibility wrapper.
 #
-# WAVE W1.1 (2026-05-15): the original per-package Android build entry
+# The original per-package Android build entry
 # point was deleted in favour of repo-root scripts/build-core-android.sh,
 # but `.github/workflows/release.yml` (native_android matrix job) and the
 # README/CLAUDE.md docs continue to invoke this path. This shim restores

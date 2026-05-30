@@ -18,8 +18,8 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * AccelerationPreference enum moved to hardware_profile.proto (Wave H-2 /
- * IDL-01). Hardware preference is a pure hardware concern; consolidating it
+ * AccelerationPreference enum moved to hardware_profile.proto.
+ * Hardware preference is a pure hardware concern; consolidating it
  * there avoids cyclic proto imports and collapses the prior duplicate
  * AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
  * (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this

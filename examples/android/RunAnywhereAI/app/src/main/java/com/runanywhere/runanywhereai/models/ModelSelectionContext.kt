@@ -7,7 +7,7 @@
  * the Android example's ModelSelectionSheet / ModelRequiredOverlay flows.
  *
  * Moved out of the SDK's `commonMain/public/extensions/Models/ModelTypes.kt`
- * per kotlin.md KOT-15 — the only consumer was this example app, so it does
+ * — the only consumer was this example app, so it does
  * not belong in the public SDK surface.
  */
 

@@ -3,8 +3,6 @@
  * @brief One-line shim: opt-in static registration of the llama.cpp engine
  *        plugin at process start.
  *
- * GAP 03 Phase 5 — see v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md.
- *
  * Compile-time behavior:
  *   - When `RAC_PLUGIN_MODE_STATIC` is set (iOS / WASM hosts, or
  *     `cmake -DRAC_STATIC_PLUGINS=ON`), this TU schedules a file-scope ctor to

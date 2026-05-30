@@ -35,7 +35,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * Tool-calling session state machine (Wave D-4).
+ * Tool-calling session state machine.
  * ---------------------------------------------------------------------------
  */
 public class ToolCallingSessionCreateRequest(

@@ -138,6 +138,28 @@ public class SdkInitResult(
     schemaIndex = 8,
   )
   public val duration_ms: Long = 0L,
+  /**
+   * Explicit two-phase HTTP-setup completion flag,
+   * decoupled from services-init completion so SDKs that initialize
+   * offline (no connectivity) can still report success=true with
+   * has_completed_http_setup=false and retry HTTP later via the
+   * SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+   * (`internal static var hasCompletedHTTPSetup`) and is the canonical
+   * signal Flutter / Web / RN consume to decide whether the next
+   * download/authenticated call can proceed without a retryHTTP step.
+   *
+   * Distinct from `http_configured` (field 4) which historically meant
+   * "HTTP transport wired up at this phase's call site"; this field is
+   * the cross-phase latched bit that survives between phase calls.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "hasCompletedHttpSetup",
+    schemaIndex = 9,
+  )
+  public val has_completed_http_setup: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SdkInitResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -159,6 +181,7 @@ public class SdkInitResult(
     if (discovered_orphans != other.discovered_orphans) return false
     if (warning != other.warning) return false
     if (duration_ms != other.duration_ms) return false
+    if (has_completed_http_setup != other.has_completed_http_setup) return false
     return true
   }
 
@@ -175,6 +198,7 @@ public class SdkInitResult(
       result = result * 37 + discovered_orphans.hashCode()
       result = result * 37 + warning.hashCode()
       result = result * 37 + duration_ms.hashCode()
+      result = result * 37 + has_completed_http_setup.hashCode()
       super.hashCode = result
     }
     return result
@@ -191,6 +215,7 @@ public class SdkInitResult(
     result += """discovered_orphans=$discovered_orphans"""
     result += """warning=${sanitize(warning)}"""
     result += """duration_ms=$duration_ms"""
+    result += """has_completed_http_setup=$has_completed_http_setup"""
     return result.joinToString(prefix = "SdkInitResult{", separator = ", ", postfix = "}")
   }
 
@@ -204,8 +229,9 @@ public class SdkInitResult(
     discovered_orphans: Int = this.discovered_orphans,
     warning: String = this.warning,
     duration_ms: Long = this.duration_ms,
+    has_completed_http_setup: Boolean = this.has_completed_http_setup,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitResult = SdkInitResult(phase, success, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, unknownFields)
+  ): SdkInitResult = SdkInitResult(phase, success, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, unknownFields)
 
   public companion object {
     @JvmField
@@ -246,6 +272,9 @@ public class SdkInitResult(
         if (value.duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.duration_ms)
         }
+        if (value.has_completed_http_setup != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.has_completed_http_setup)
+        }
         return size
       }
 
@@ -277,11 +306,17 @@ public class SdkInitResult(
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
+        if (value.has_completed_http_setup != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.has_completed_http_setup != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
+        }
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
@@ -321,6 +356,7 @@ public class SdkInitResult(
         var discovered_orphans: Int = 0
         var warning: String = ""
         var duration_ms: Long = 0L
+        var has_completed_http_setup: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -336,6 +372,7 @@ public class SdkInitResult(
             7 -> discovered_orphans = ProtoAdapter.UINT32.decode(reader)
             8 -> warning = ProtoAdapter.STRING.decode(reader)
             9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
+            10 -> has_completed_http_setup = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -349,6 +386,7 @@ public class SdkInitResult(
           discovered_orphans = discovered_orphans,
           warning = warning,
           duration_ms = duration_ms,
+          has_completed_http_setup = has_completed_http_setup,
           unknownFields = unknownFields
         )
       }

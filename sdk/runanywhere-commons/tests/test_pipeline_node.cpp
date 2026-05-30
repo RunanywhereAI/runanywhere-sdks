@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// test_pipeline_node.cpp — v3.1 Phase 9 unit tests (GAP 05 Phase 2).
+// test_pipeline_node.cpp — unit tests.
 //
 // Covers PipelineNode / PrimitiveNode / SplitNode / MergeNode from
 // include/rac/graph/pipeline_node.hpp.

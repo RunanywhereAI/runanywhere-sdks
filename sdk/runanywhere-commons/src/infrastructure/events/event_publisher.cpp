@@ -63,7 +63,7 @@ std::vector<Subscription> g_all_subscriptions;
 std::mutex g_sdk_event_mutex;
 std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
 
-// commons-162: in-flight guard for the synchronous SDK-event callback
+// In-flight guard for the synchronous SDK-event callback
 // dispatch. rac_sdk_event_publish_proto snapshots the subscription list
 // under g_sdk_event_mutex, releases the lock, then invokes each
 // sub.callback. An SDK's unsubscribe sets sub.alive=false AND immediately
@@ -81,18 +81,18 @@ struct SDKEventInFlightGuard {
     SDKEventInFlightGuard& operator=(const SDKEventInFlightGuard&) = delete;
 };
 
-// commons-core-infra-005 / -014: each publish allocates an owned byte
+// Each publish allocates an owned byte
 // buffer wrapped in a shared_ptr. The same shared_ptr is enqueued for
 // `rac_sdk_event_poll` consumers AND captured into the snapshot used to
 // deliver synchronous callbacks. The buffer stays alive until both the
 // queue entry is drained (or evicted) and the last callback consumer
 // drops its reference, eliminating the prior race where a concurrent
 // publish overwrote a stack-shared 64-slot ring before subscribers had
-// read the pointer (commons-core-infra-014).
+// read the pointer.
 using SDKEventBytes = std::shared_ptr<std::vector<uint8_t>>;
 std::deque<SDKEventBytes> g_sdk_event_queue;
 
-// commons-core-infra-005: cap the poll-side queue. When no consumer
+// Cap the poll-side queue. When no consumer
 // polls, prior behavior grew g_sdk_event_queue without bound. We
 // retain the most recent kSdkEventQueueMaxSize entries (drop-oldest);
 // the cap is comfortably above the 256-event burst that
@@ -501,7 +501,7 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // commons-core-infra-014: per-publish ownership. The serialized bytes
+    // Per-publish ownership. The serialized bytes
     // live in a heap buffer owned by a shared_ptr, copied into the poll
     // queue AND captured by the synchronous-callback snapshot. The buffer
     // outlives every subscriber callback regardless of how many subsequent
@@ -510,7 +510,7 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
     // async bindings (Flutter `NativeCallable.listener`, RN NitroModules)
     // dereferenced their pointer.
     //
-    // commons-core-infra-005: the queue itself is capped at
+    // The queue itself is capped at
     // kSdkEventQueueMaxSize entries with drop-oldest eviction so an
     // SDK that publishes without a corresponding poll consumer cannot
     // pin unbounded memory.
@@ -536,7 +536,7 @@ rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t prot
     // documented on rac_sdk_event_publish_proto: subscribers MUST NOT block.
     const uint8_t* callback_data = buffer->empty() ? nullptr : buffer->data();
     const size_t callback_size = buffer->size();
-    // commons-162: hold the in-flight guard across the whole dispatch loop so
+    // Hold the in-flight guard across the whole dispatch loop so
     // rac_sdk_event_quiesce() can spin-wait on the counter before a concurrent
     // rac_sdk_event_unsubscribe lets its caller free the box backing user_data.
     SDKEventInFlightGuard in_flight_guard;

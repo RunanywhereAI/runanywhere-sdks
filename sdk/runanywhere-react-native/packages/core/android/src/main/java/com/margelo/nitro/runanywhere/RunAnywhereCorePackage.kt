@@ -25,8 +25,8 @@ class RunAnywhereCorePackage : BaseReactPackage() {
             System.loadLibrary("runanywherecore")
             Log.i(TAG, "Loaded native library: runanywherecore")
 
-            // Install the OkHttp-backed platform HTTP transport (v2 close-out
-            // Phase H6). Routes rac_http_request_* through OkHttp so Android
+            // Install the OkHttp-backed platform HTTP transport.
+            // Routes rac_http_request_* through OkHttp so Android
             // consumers get the system CA trust store, HTTP/2, proxies, and
             // NetworkSecurityConfig for free instead of libcurl.
             //

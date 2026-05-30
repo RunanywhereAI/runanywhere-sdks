@@ -3,7 +3,7 @@
  * @brief Proto-byte C ABI for the synchronous voice-agent surface
  *        (initialize / component_states / process_voice_turn).
  *
- * Split out of voice_agent.cpp under commons-features-voice-003. Public
+ * Public
  * C ABI unchanged. Shared emit/state-snapshot helpers live in
  * `voice_agent_internal_helpers.h`.
  */
@@ -238,7 +238,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                           "voice agent is not initialized");
     }
 
-    // commons-042: admit under the in-flight barrier so rac_voice_agent_destroy's
+    // Admit under the in-flight barrier so rac_voice_agent_destroy's
     // drain loop covers this multi-second STT+LLM+TTS turn. Without it the proto
     // path read is_configured above outside the mutex, so a destroy that flipped
     // is_shutting_down after that read could tear the agent down while this turn
@@ -276,7 +276,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
                                           "VAD component is not initialized");
     }
 
-    // commons-045: hold handle->mutex while the pipeline runs (serializes
+    // Hold handle->mutex while the pipeline runs (serializes
     // against load/cleanup/destroy), but defer every user-visible event
     // dispatch to a queue and flush it AFTER the lock is released — the
     // emit_* helpers ultimately invoke the registered proto callback
@@ -299,7 +299,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
         std::lock_guard<std::mutex> lock(handle->mutex);
 
         pending_emits.emplace_back([handle]() { emit_component_states(handle); });
-        // commons-149: the synchronous one-shot path has no VAD-driven
+        // The synchronous one-shot path has no VAD-driven
         // speech detection between STARTED and STT, so only STARTED →
         // TRANSCRIPTION_FINAL → COMPLETED are meaningful here. The d7
         // path emits USER_SPEECH_STARTED/_ENDED around the actual VAD
@@ -309,7 +309,7 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t h
             emit_turn_lifecycle(handle, runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_STARTED);
         });
 
-        // SWIFT-VOICE-AGENT-001 (T16/Path X): prefer the global lifecycle
+        // Prefer the global lifecycle
         // (level-1 impl + ops); fall back to the per-handle component for legacy
         // load paths.
         rac::lifecycle::LifecycleSttRef stt_ref{};

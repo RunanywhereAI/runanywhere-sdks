@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// voice_agent_pipeline.cpp — GAP 05 Phase 2 consumer #1.
+// voice_agent_pipeline.cpp
 // See voice_agent_pipeline.hpp for the contract / threading notes.
 
 #include "voice_agent_pipeline.hpp"
@@ -35,7 +35,7 @@
 #include "rac/graph/pipeline_node.hpp"
 #include "rac/graph/stream_edge.hpp"
 
-// commons-features-voice-004: pipeline nodes prefer the global lifecycle
+// Pipeline nodes prefer the global lifecycle
 // bridge (level-1 impl + ops) so callers that loaded models via
 // rac_model_lifecycle_load_proto / RunAnywhere.loadModel are served by the
 // graph pipeline too. Fallback to the per-handle component preserves the
@@ -58,7 +58,7 @@ namespace {
 /// to read from any worker thread even if the caller's stack frame is torn
 /// down or a future refactor reduces the outer-mutex hold time. The typical
 /// 16 kHz int16 PCM utterance is <= ~32 KB so the copy is cheap relative
-/// to the cost of running STT/LLM/TTS downstream (commons-078).
+/// to the cost of running STT/LLM/TTS downstream.
 struct AudioFrame {
     std::vector<uint8_t> bytes;
 };
@@ -156,14 +156,13 @@ class VADGateNode : public rac::graph::PipelineNode<AudioFrame, AudioFrame> {
         // VAD-processed and are surfaced as RAC_ERROR_INVALID_FORMAT
         // rather than silently skipped, so callers passing the wrong
         // format (e.g. raw float32 WebAudio buffers) get a deterministic
-        // failure instead of bogus speech-detection results
-        // (commons-147).
+        // failure instead of bogus speech-detection results.
         const size_t bytes = frame.bytes.size();
         if (vad_ && bytes >= 2 && (bytes % sizeof(int16_t)) == 0) {
             const int16_t* pcm = reinterpret_cast<const int16_t*>(frame.bytes.data());
             const size_t count = bytes / sizeof(int16_t);
             std::vector<float> floats(count);
-            // commons-112: route through the shared helper so any future
+            // Route through the shared helper so any future
             // tuning (SIMD path, saturating clamp) applies here too.
             rac::audio::rac_audio_pcm16_to_float32(pcm, count, floats.data());
             rac_bool_t is_speech = RAC_FALSE;
@@ -212,7 +211,7 @@ class STTNode : public rac::graph::PipelineNode<AudioFrame, Transcript> {
 
    protected:
     void process(AudioFrame frame, OutputEdge& out) override {
-        // commons-features-voice-004: prefer the canonical lifecycle STT
+        // Prefer the canonical lifecycle STT
         // ref so callers that loaded models via the lifecycle bridge are
         // served by the pipeline. Fall back to the per-handle component
         // for legacy load paths.
@@ -264,7 +263,7 @@ class LLMNode : public rac::graph::PipelineNode<Transcript, Response> {
 
    protected:
     void process(Transcript prompt, OutputEdge& out) override {
-        // commons-features-voice-004: prefer lifecycle LLM ref with
+        // Prefer lifecycle LLM ref with
         // per-handle fallback.
         rac::llm::LifecycleLlmRef ref{};
         const bool have_lifecycle = rac::llm::acquire_lifecycle_llm(&ref) == RAC_SUCCESS;
@@ -316,7 +315,7 @@ class TTSNode : public rac::graph::PipelineNode<Response, ProcessedPayload> {
 
    protected:
     void process(Response resp, OutputEdge& out) override {
-        // commons-features-voice-004: prefer lifecycle TTS ref with
+        // Prefer lifecycle TTS ref with
         // per-handle fallback.
         rac::lifecycle::LifecycleTtsRef ref{};
         const bool have_lifecycle = rac::lifecycle::acquire_lifecycle_tts(&ref) == RAC_SUCCESS;
@@ -521,7 +520,7 @@ rac_result_t VoiceAgentPipeline::run_once(const void* audio_data, size_t audio_s
     scheduler->start();
 
     // Single-shot: copy the caller's audio into an owned AudioFrame
-    // (commons-078: removes the outer-mutex-coupled borrow), push it,
+    // (removes the outer-mutex-coupled borrow), push it,
     // then close the input so each downstream stage observes EOF and the
     // graph drains naturally.
     AudioFrame frame;

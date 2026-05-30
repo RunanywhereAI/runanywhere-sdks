@@ -1,8 +1,8 @@
 /**
  * @file voice_agent_internal_helpers.cpp
  * @brief Implementation of shared voice-agent helpers declared in
- *        `voice_agent_internal_helpers.h` (commons-features-voice-003 SRP
- *        split out of the legacy 2,291-LoC voice_agent.cpp).
+ *        `voice_agent_internal_helpers.h` (SRP split out of the legacy
+ *        voice_agent.cpp).
  */
 
 #include "voice_agent_internal_helpers.h"
@@ -28,9 +28,9 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
-// SWIFT-VOICE-AGENT-001 (T16 / Path X) — voice agent proto path consults
-// the global model lifecycle (level 1: impl + ops) instead of dereferencing
-// the per-component handles stored on the rac_voice_agent struct (level 3).
+// Voice agent proto path consults the global model lifecycle (level 1:
+// impl + ops) instead of dereferencing the per-component handles stored on
+// the rac_voice_agent struct (level 3).
 #include "rac_voice_event_abi_internal.h"
 #include "voice_agent_internal.h"
 
@@ -39,7 +39,7 @@
 
 namespace rac::voice_agent::detail {
 
-// commons-042: per-handle in-flight admission guard. See the header for the
+// Per-handle in-flight admission guard. See the header for the
 // race it closes. The flag/counter live on the rac_voice_agent struct, so
 // rac_voice_agent_destroy's existing `while (handle->in_flight > 0)` drain
 // loop now covers every long-running entry point that wraps its body here.
@@ -95,7 +95,7 @@ std::string event_id(const char* prefix) {
 
 namespace {
 
-// T16/Path X: probe the global lifecycle for each modality. A successful
+// Probe the global lifecycle for each modality. A successful
 // acquire/release pair means the modality is READY (level-1 impl + ops are
 // bound to a loaded model). Anything else -> NOT_LOADED.
 runanywhere::v1::ComponentLifecycleState lifecycle_state_stt() {
@@ -240,7 +240,7 @@ void emit_component_failure(rac_voice_agent_handle_t handle, const char* compone
     event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
     event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_AGENT);
     auto* session_error = event.mutable_session_error();
-    // IDL-08: VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
+    // VoiceSessionError.code now uses canonical ErrorCode from errors.proto.
     session_error->set_code(runanywhere::v1::ERROR_CODE_PROCESSING_FAILED);
     session_error->set_message(message ? message : rac_error_message(code));
     if (component) {

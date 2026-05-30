@@ -1,9 +1,7 @@
 name: PR build matrix
 
-# GAP 07 Phase 7 rewrite — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # This file replaces the previous 601-line workflow that called per-SDK
-# build-*.sh scripts. After GAP 07 the canonical entry point is the root
+# build-*.sh scripts. The canonical entry point is the root
 # CMake + presets:
 #
 #   cmake --preset <preset>
@@ -31,7 +29,7 @@ permissions:
 
 jobs:
   # =============================================================================
-  # Centralization gates — defend the T4 invariant that toolchain + library
+  # Centralization gates — defend the invariant that toolchain + library
   # pins live in a single source of truth (sdk/runanywhere-commons/VERSIONS,
   # dependencies/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
   # gradle/libs.versions.toml). Fast-fail before kicking off the SDK matrix.
@@ -197,7 +195,7 @@ jobs:
         run: ./scripts/build-core-xcframework.sh
       - name: swift build
         run: swift build --target RunAnywhere
-      # pass3-syn-024: per-SDK lint lane — fail PRs that introduce SwiftLint
+      # Per-SDK lint lane — fail PRs that introduce SwiftLint
       # violations or unused declarations. Soft (continue-on-error) until the
       # baseline is clean; flip to required gate once the backlog clears.
       - name: SwiftLint (lint lane)
@@ -258,7 +256,7 @@ jobs:
         with:
           platform: flutter
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
-      # pass3-syn-024: per-SDK lint lane — run melos analyze across the full
+      # Per-SDK lint lane — run melos analyze across the full
       # Flutter workspace (not just the single `runanywhere` package). Soft
       # gate (continue-on-error) until baseline is clean.
       - name: melos bootstrap + analyze (workspace lint lane)
@@ -296,13 +294,13 @@ jobs:
         run: yarn install --immutable
       - name: Typecheck @runanywhere/core
         run: yarn workspace @runanywhere/core typecheck
-      # pass3-syn-024: per-SDK lint lane — run eslint via the package's lint
+      # Per-SDK lint lane — run eslint via the package's lint
       # script when an eslint config is present. Soft (continue-on-error) until
       # the lint config is committed and baseline is clean.
       - name: ESLint (@runanywhere/core lint lane)
         continue-on-error: true
         run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
-      # CLUSTER-07 / cross-cutting-006: per-SDK unit-test lane. Smoke tests
+      # Per-SDK unit-test lane. Smoke tests
       # cover Foundation/Errors and services/Proto* utilities; the runner
       # (ts-jest) is wired in `packages/core/jest.config.js`. Soft
       # (continue-on-error) until the in-tree jest devDependencies are
@@ -338,14 +336,14 @@ jobs:
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: sdk/runanywhere-web
         run: npm run typecheck
-      # pass3-syn-024: per-SDK lint lane — run eslint across the web workspace.
+      # Per-SDK lint lane — run eslint across the web workspace.
       # Soft (continue-on-error) until baseline is clean.
       - name: ESLint (web workspace lint lane)
         continue-on-error: true
         working-directory: sdk/runanywhere-web
         run: npm run lint || echo "eslint not yet wired"
 
-  # pass3-syn-024: dedicated validation lane — runs the source-of-truth
+  # Dedicated validation lane — runs the source-of-truth
   # validation scripts so deprecated-surface drift and RAC_API export drift
   # are caught in CI rather than landing silently. Soft (continue-on-error)
   # while we baseline; flip to required gate once both scripts exit 0 cleanly

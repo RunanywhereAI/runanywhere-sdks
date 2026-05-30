@@ -1,4 +1,4 @@
-// solutions_view.dart — Wave 3 Step 3.3 (G-E6) demo for
+// solutions_view.dart — demo for
 // `RunAnywhere.solutions.run(yaml: ...)`.
 //
 // Two buttons run the canonical voice_agent.yaml + rag.yaml solutions

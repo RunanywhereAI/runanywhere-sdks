@@ -225,6 +225,12 @@ def _emit_message_validate(
         # Wire constructor args use snake_case verbatim — same name on the
         # extension receiver, so we reference the field by `field.name`.
         kt_field = field.name
+        # Wire emits proto3 `optional` scalars as nullable Kotlin types, so a
+        # bare relational comparison (`field < min`) is prohibited on the
+        # nullable receiver. Range checks on such fields are guarded with a
+        # non-null precondition: an unset optional field carries no value to
+        # range-check (the canonical default applies elsewhere).
+        is_optional = field.proto3_optional
 
         def _throw(message_literal: str) -> list[str]:
             """Canonical `{ code, category, fieldPath, message }` shape via
@@ -242,7 +248,14 @@ def _emit_message_validate(
         if is_required:
             t = field.type
             if t == TYPE_STRING:
-                checks.append(f"    if ({kt_field}.isEmpty()) {{")
+                # A nullable (optional) required string is missing when null OR
+                # empty; `?.isEmpty() != false` captures both without an
+                # operator call on a null receiver.
+                empty_check = (
+                    f"{kt_field}?.isEmpty() != false" if is_optional
+                    else f"{kt_field}.isEmpty()"
+                )
+                checks.append(f"    if ({empty_check}) {{")
                 checks.extend(_throw(f"\"{field.name} is required\""))
                 checks.append("    }")
             elif t in INTEGER_TYPES or t in FLOAT_TYPES:
@@ -267,6 +280,8 @@ def _emit_message_validate(
             if max_int is not None:
                 parts.append(f"{kt_field} > {max_int}")
             cond = " || ".join(parts)
+            if is_optional:
+                cond = f"{kt_field} != null && ({cond})"
             if min_int is not None and max_int is not None:
                 range_desc = f"{min_int}...{max_int}"
             elif min_int is not None:
@@ -288,6 +303,8 @@ def _emit_message_validate(
             if max_f is not None:
                 parts.append(f"{kt_field} > {max_f}")
             cond = " || ".join(parts)
+            if is_optional:
+                cond = f"{kt_field} != null && ({cond})"
             if min_f is not None and max_f is not None:
                 range_desc = f"{min_f}...{max_f}"
             elif min_f is not None:

@@ -5,7 +5,7 @@
  * JVM/Android tool-calling orchestrator: owns the platform-side tool registry
  * and bridges executor callbacks through the native session ABI.
  *
- * P2-T8: All orchestration — generate, parse, validate, execute loop,
+ * All orchestration — generate, parse, validate, execute loop,
  * follow-up prompt construction — lives in commons via the single-call
  * run-loop ABI `rac_tool_calling_run_loop_with_handle_and_cb_proto`. Kotlin
  * keeps only the tool registry + a synchronous executor callback, and fans
@@ -230,7 +230,7 @@ internal object ToolCallingOrchestrator {
                     format_hint = effectiveOpts.effectiveToolFormatHint(),
                     max_iterations = effectiveOpts.effectiveMaxIterations(),
                     keep_tools_available = effectiveOpts.keep_tools_available ?: false,
-                    // Swift parity (`makeRunLoopRequest`, pass3-syn-149):
+                    // Swift parity (`makeRunLoopRequest`):
                     // `validate_calls` is `optional bool` on the proto. When the
                     // caller did not supply a value leave it unset (null) so
                     // commons applies its documented default (true — enforce
@@ -238,7 +238,7 @@ internal object ToolCallingOrchestrator {
                     // to their executor pass `validateCalls = false`.
                     validate_calls = validateCalls,
                     tools = tools,
-                    // pass2-syn-006-followup-kotlin: thread the OpenAI-style
+                    // Thread the OpenAI-style
                     // tool_choice / forced_tool_name knobs all the way through to
                     // the canonical request envelope (idl/tool_calling.proto
                     // fields 7/8). Commons build_options_snapshot copies them onto
@@ -276,7 +276,7 @@ internal object ToolCallingOrchestrator {
                     runLoopHandle.set(handle)
                 }
 
-            // pass3-syn-042: fan coroutine cancellation into the native loop
+            // Fan coroutine cancellation into the native loop
             // eagerly via a dedicated cancel-watcher on a NonCancellable
             // context. The watcher suspends on the parent Job's `join()` and
             // inspects the cancellation state once awoken — which happens on

@@ -12,7 +12,7 @@
 //
 // Every enum below is the *union* of cases currently declared by hand across
 // Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL drift table
-// (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what motivated
+// is what motivated
 // this schema. Every SDK consumes generated output; nothing is hand-written.
 
 import SwiftProtobuf
@@ -2594,7 +2594,7 @@ public nonisolated struct RAModelRegistryFetchAssignmentsResult: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+/// Inputs for the canonical RAModelInfo factory. Replaces Swift's
 /// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
 /// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
 /// (id, name, category/format/framework defaults, context-length defaults,
@@ -2659,8 +2659,8 @@ public nonisolated struct RAModelInfoMakeRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
-/// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+/// Inputs for the canonical "register a model from a URL" entry point.
+/// Composes ModelInfoMakeRequest with the existing registry save path
 /// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
 /// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
 /// shape).

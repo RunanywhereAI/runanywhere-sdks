@@ -6,8 +6,6 @@
  * profile and accelerator list.  The C ABI here returns proto-serialised
  * HardwareProfileResult bytes (idl/hardware_profile.proto) so that each
  * frontend can decode the payload with its own generated proto classes.
- *
- * Blocking item: CPP-blocked G-C6 (round 1 reports).
  */
 
 #ifndef RAC_ROUTER_HARDWARE_ABI_H

@@ -17,7 +17,7 @@
 #   ts-proto               2.11.x   (TypeScript message types)      — TS_PROTO_VERSION
 #   google-protobuf Python 4.25.x   (Python message types)
 #
-# GAP 09 streaming services (server-streaming gRPC client stubs):
+# Streaming services (server-streaming gRPC client stubs):
 #   protoc-gen-grpc-swift  1.21.x   (Swift AsyncStream client wrappers)
 #   grpcio-tools           1.65.x   (Python AsyncIterator client wrappers)
 #   protoc-gen-grpckt      NOT installed by default — see generate_kotlin.sh
@@ -64,7 +64,7 @@ WIRE_EXPECTED="${WIRE_VERSION:-5.5.1}"
 PROTOC_PLUGIN_DART_EXPECTED="${PROTOC_GEN_DART_VERSION:-25.0.0}"
 TS_PROTO_EXPECTED="${TS_PROTO_VERSION:-2.11.8}"
 PYTHON_PROTOBUF_EXPECTED="4.25"
-# GAP 09 streaming additions:
+# Streaming additions:
 GRPC_SWIFT_EXPECTED="1.21"
 GRPCIO_TOOLS_EXPECTED="1.65"
 
@@ -125,7 +125,7 @@ install_wire() {
 }
 
 install_dart_plugin() {
-    # IDL-16 / CPP-10: Dart codegen requires Dart 3.0+ AND protoc_plugin
+    # Dart codegen requires Dart 3.0+ AND protoc_plugin
     # pinned at PROTOC_PLUGIN_DART_EXPECTED (loaded from VERSIONS). Older
     # Dart / plugin combos emit subtly different code that trips
     # idl-drift-check on unrelated PRs. `generate_dart.sh` enforces both at
@@ -162,7 +162,7 @@ install_python_protobuf() {
     if have python3; then
         python3 -m pip install --user --upgrade \
             "protobuf>=${PYTHON_PROTOBUF_EXPECTED},<5" \
-            "grpcio-tools>=${GRPCIO_TOOLS_EXPECTED}"   # GAP 09: AsyncIterator client stubs
+            "grpcio-tools>=${GRPCIO_TOOLS_EXPECTED}"   # AsyncIterator client stubs
     else
         echo "warning: python3 not on PATH — skipping pip install." >&2
     fi
@@ -178,7 +178,7 @@ install_grpc_swift() {
         brew install grpc-swift 2>/dev/null || \
             echo "warning: 'brew install grpc-swift' failed — install from https://github.com/grpc/grpc-swift" >&2
     else
-        echo "warning: GAP 09 Swift streaming codegen needs protoc-gen-grpc-swift on Linux/Win." >&2
+        echo "warning: Swift streaming codegen needs protoc-gen-grpc-swift on Linux/Win." >&2
         echo "         Build from https://github.com/grpc/grpc-swift (release/1.x) and put on PATH." >&2
     fi
 }
@@ -283,13 +283,13 @@ check_versions() {
             rc=1
         fi
     else
-        echo "grpcio-tools:      not present (GAP 09 Python streaming stubs unavailable)" >&2
+        echo "grpcio-tools:      not present (Python streaming stubs unavailable)" >&2
     fi
 
     if have protoc-gen-grpc-swift; then
         echo "protoc-gen-grpc-swift: present (expected >=${GRPC_SWIFT_EXPECTED})"
     else
-        echo "protoc-gen-grpc-swift: not present (GAP 09 Swift streaming stubs unavailable)" >&2
+        echo "protoc-gen-grpc-swift: not present (Swift streaming stubs unavailable)" >&2
     fi
 
     return $rc
@@ -307,7 +307,7 @@ install_wire
 install_dart_plugin
 install_ts_proto
 install_python_protobuf
-install_grpc_swift   # GAP 09 streaming codegen for Swift (Apple-only Homebrew bottle).
+install_grpc_swift   # Streaming codegen for Swift (Apple-only Homebrew bottle).
 
 echo ""
 echo "▶ Verifying installed versions:"

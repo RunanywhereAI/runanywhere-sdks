@@ -483,7 +483,7 @@ async function resolveHydratedModelPath(
  * `getModel()` / `downloadedModels()` reflect on-disk state immediately.
  * Matches iOS `RunAnywhere+Storage.persistDownloadCompletion` → `importModel`.
  *
- * CPP-02 self-heal inside the C++ download orchestrator may update only the
+ * Self-heal inside the C++ download orchestrator may update only the
  * commons WASM's `s_model_registry`. `registerModel` broadcasts to every
  * known module via `ModelRegistryAdapter`.
  */
@@ -574,7 +574,7 @@ async function planDownloadWithSelfHeal(
   return DownloadsCapability.plan(request);
 }
 
-// commons-core-infra (web-core-005 DEMOTE): the previous in-TS multi-file
+// The previous in-TS multi-file
 // orchestrator that walked `model.multiFile.files`, fetched each URL,
 // wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
 // download orchestrator already drives the same flow via
@@ -1141,7 +1141,7 @@ export const RunAnywhere = {
       );
     }
 
-    // web-core-005 DEMOTE: multi-file models (VLM = primary GGUF + mmproj
+    // Multi-file models (VLM = primary GGUF + mmproj
     // sidecar, embeddings = model.onnx + vocab.txt) now flow through the
     // same canonical plan/start/poll path. The C++ orchestrator's
     // multi_file_plan branch reports the folder path as
@@ -1229,7 +1229,7 @@ export const RunAnywhere = {
         });
         if (!progress) continue;
         lastProgress = progress;
-        // Defer COMPLETED to onProgress until OPFS flush finishes (WEB-001).
+        // Defer COMPLETED to onProgress until OPFS flush finishes.
         // UI/E2E often triggers loadModel on COMPLETED; firing it early races
         // the async MEMFS→OPFS persist that follows the poll loop.
         if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -1247,7 +1247,7 @@ export const RunAnywhere = {
       );
     }
 
-    // BUG-WEB-002 / OPFS persistence: the C++ download orchestrator wrote
+    // OPFS persistence: the C++ download orchestrator wrote
     // bytes via `std::ofstream` which on Emscripten lands on MEMFS — an
     // in-memory filesystem invisible to `navigator.storage.estimate()` and
     // destroyed on tab reload. Flush the freshly-written file into the
@@ -1280,14 +1280,14 @@ export const RunAnywhere = {
       }
     }
 
-    // Single canonical COMPLETED emit (WEB-001): both the start.initialProgress
+    // Single canonical COMPLETED emit: both the start.initialProgress
     // branch and the poll loop intentionally suppress COMPLETED so the only
     // place this fires is HERE, AFTER OPFSBridge.ensureDownloadPersisted has
     // resolved. UI/E2E observers gate loadModel on this; firing earlier races
     // the MEMFS→OPFS persist.
     request.onProgress?.(lastProgress);
 
-    // CPP-02 self-heal may only update the commons WASM registry. Mirror
+    // Self-heal may only update the commons WASM registry. Mirror
     // localPath + isDownloaded into every module so harness/UI polls succeed.
     if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
       try {
@@ -1326,7 +1326,7 @@ export const RunAnywhere = {
 
       const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
 
-      // WEB-REDOWNLOAD-WAIT-001: clearSiteStorage (or manual OPFS purge)
+      // clearSiteStorage (or manual OPFS purge)
       // wipes bytes but the registry can still report isDownloaded=true from
       // a prior session. Reconcile: if the canonical OPFS path is gone, clear
       // the flag so the next downloadModel() re-fetches instead of no-oping.
@@ -1348,7 +1348,7 @@ export const RunAnywhere = {
       } catch { /* ignore */ }
     }
     if (patched > 0) {
-      // WEB-OPFS-HYDRATE-UI-001: notify UI subscribers (Storage tab, model
+      // Notify UI subscribers (Storage tab, model
       // sheet) so they re-query the registry and render Downloaded/Load
       // instead of Download after a fresh page load.
       EventBus.shared.emit(
@@ -1556,15 +1556,15 @@ export const RunAnywhere = {
       logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
     });
 
-    // Tear down the T6.1 Worker streaming pipeline. The pass-1 fix
-    // established `clearRunanywhereModule()` + `disposeSpeechProvider()`
-    // as the WASM ownership boundary, but the Worker singletons
+    // Tear down the Worker streaming pipeline. The WASM ownership boundary
+    // is `clearRunanywhereModule()` + `disposeSpeechProvider()`,
+    // but the Worker singletons
     // (`OffscreenRuntimeBridge._instance`, `_init` payload, and the
     // `StreamWorkerFactoryRegistry._factory`) live outside that
     // boundary. Without explicit teardown the spawned worker keeps its
     // mirror Emscripten module + loaded model weights alive across
     // logout / account-switch / test reset, and the next `initialize()`
-    // would reuse the stale bridge. See pass2-syn-033.
+    // would reuse the stale bridge.
     try {
       OffscreenRuntimeBridge.disposeShared();
     } catch (err) {

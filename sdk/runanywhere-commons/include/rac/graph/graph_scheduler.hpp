@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/graph_scheduler.hpp — v3.1 Phase 9 DAG runtime (GAP 05 Phase 2).
+// rac/graph/graph_scheduler.hpp — DAG runtime.
 //
 // Owns the lifecycle of a streaming DAG: a bag of IPipelineNodes plus a
 // root CancelToken that cascades to every node.

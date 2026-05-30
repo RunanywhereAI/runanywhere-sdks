@@ -1,6 +1,6 @@
 /**
  * @file test_tool_calling_session_proto.cpp
- * @brief Wave D-4 tests for rac_tool_calling_session_*_proto.
+ * @brief Tests for rac_tool_calling_session_*_proto.
  */
 
 #include <cstdio>

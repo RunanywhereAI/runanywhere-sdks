@@ -452,14 +452,14 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
         rac_lifecycle_destroy(component->lifecycle);
     }
 
-    // B-FL-5-001 sibling fix: clear any lingering proto-stream callback
+    // Clear any lingering proto-stream callback
     // registration keyed by this component handle BEFORE freeing the memory.
     // If the allocator later hands the same address back to a fresh component
     // (rac_stt_component_create), the new component would otherwise inherit
     // the previous slot's stale seq counter / callback pointer — corrupting
     // the STT stream wire seq and pointing user_data at freed SDK memory.
     rac_stt_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-stt: spin-wait for any in-flight
+    // Spin-wait for any in-flight
     // dispatch_stt_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
     rac_stt_proto_quiesce();
@@ -481,14 +481,14 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // Clear any prior proto-stream callback
     // registration BEFORE re-creating the internal service for a new model.
     // Without this, the wire-seq counter in g_slots() retains its prior value
     // and corrupts the proto stream on the very first transcribe after a model
     // switch (the load_model path elides destroy → original destroy-time fix
     // never fires for handle reuse).
     rac_stt_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-stt: drain any in-flight dispatcher bound to the
+    // Drain any in-flight dispatcher bound to the
     // previous model before swapping in the new service so user_data captured
     // by the previous registration can be safely freed.
     rac_stt_proto_quiesce();
@@ -1107,7 +1107,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
 }
 
 // =============================================================================
-// CPP-14 (Wave 1): persistent per-session streaming handles.
+// Persistent per-session streaming handles.
 //
 // Route straight through the service vtable. When a backend leaves the
 // stream_* slots NULL, these helpers report RAC_ERROR_NOT_SUPPORTED and
@@ -1145,8 +1145,8 @@ extern "C" rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
     std::lock_guard<std::mutex> lock(component->mtx);
 
     // Acquire (not require) so the lifecycle service refcount is held for
-    // the lifetime of the stream. This is the key fix for
-    // hotspot-commons-features-voice-001 — a concurrent unload now waits
+    // the lifetime of the stream. This is the key fix so that
+    // a concurrent unload now waits
     // for stream_destroy before tearing down the backend service.
     rac_handle_t service_handle = nullptr;
     rac_result_t rc = rac_lifecycle_acquire_service(component->lifecycle, &service_handle);

@@ -15,10 +15,8 @@
 # =============================================================================
 
 # =============================================================================
-# TODO(WAVE D-2 follow-up): WASM Sherpa unblock — exact remaining work
+# TODO: WASM Sherpa unblock — exact remaining work
 # =============================================================================
-# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
-# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
 #
 # Sherpa-ONNX does NOT publish a prebuilt static archive for WASM.
 # sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh currently builds a
@@ -403,7 +401,7 @@ if(RAC_PLATFORM_ANDROID)
 endif()
 
 # =============================================================================
-# Self-registration carrier (ENG-SHERPA-03)
+# Self-registration carrier
 # =============================================================================
 # Matches the llamacpp pattern: thin shim that wraps
 # RAC_STATIC_PLUGIN_REGISTER(sherpa). On RAC_STATIC_PLUGINS=ON hosts

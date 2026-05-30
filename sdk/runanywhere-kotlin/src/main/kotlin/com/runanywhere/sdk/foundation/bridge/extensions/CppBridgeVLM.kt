@@ -12,13 +12,13 @@
  * scaffold that mirrors the sibling modalities (LLM / STT / TTS / VAD)
  * for shape uniformity — the canonical VLM model state is owned by the
  * C++ lifecycle (`rac_model_lifecycle_load_proto`), and the proto
- * inference helpers route through the lifecycle whenever it is loaded
- * (Phase 6j / Wave 7 / T23). The vtable's `createFn` returns 0L by
+ * inference helpers route through the lifecycle whenever it is loaded.
+ * The vtable's `createFn` returns 0L by
  * design (see `ComponentVTable.jvmAndroid.kt`), so `getHandle()` on the
  * actor is intentionally non-functional; callers pass handle `0L` into
  * the proto ABI and commons acquires the lifecycle-owned VLM service.
  *
- * VLM-specific surfaces kept here (mirrors Swift's slim post-Wave-7
+ * VLM-specific surfaces kept here (mirrors Swift's slim
  * CppBridge+VLM.swift):
  *   - [cancel] — routes through `rac_vlm_cancel_lifecycle_proto` (no
  *     handle threaded), with a handle-based fallback for the transition
@@ -94,8 +94,8 @@ object CppBridgeVLM {
     /**
      * Cancel ongoing generation via the lifecycle cancel proto.
      *
-     * Replaces the legacy handle-based `rac_vlm_component_cancel` path
-     * (Wave 7 / T23). The lifecycle ABI acquires the lifecycle-owned
+     * Replaces the legacy handle-based `rac_vlm_component_cancel` path.
+     * The lifecycle ABI acquires the lifecycle-owned
      * VLM service internally, dispatches `cancel` on its vtable, and
      * emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
      * the cancel path consistent with LLM cancellation semantics.

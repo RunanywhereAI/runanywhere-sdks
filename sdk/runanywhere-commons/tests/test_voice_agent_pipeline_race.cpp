@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // test_voice_agent_pipeline_race.cpp — concurrent stress test for the
-// `commons-features-voice-003` fix.
+// pipeline_mutex fix.
 //
 // Background
 // ----------
@@ -14,8 +14,8 @@
 // external mutex synchronises them — which is exactly what
 // `rac_voice_agent::pipeline_mutex` provides.
 //
-// The W1 commit landed the fix but did not land a regression test. The
-// other W1 fixes (`engine_router` pinned-runtime, HTTP-200-on-resume,
+// The fix landed but did not land a regression test. The
+// other related fixes (`engine_router` pinned-runtime, HTTP-200-on-resume,
 // plugin double-load) all shipped with regression tests; this test
 // completes the matrix for `pipeline_mutex`.
 //

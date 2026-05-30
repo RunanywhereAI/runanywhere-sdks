@@ -245,7 +245,7 @@ class LlamaCppTextGeneration {
     nlohmann::json model_config_;
 
     int context_size_ = 0;
-    // CLUSTER-12 (WEB-LLM-COHERENCE): raised from 1024 to 2048 so small
+    // Raised from 1024 to 2048 so small
     // base models like SmolLM2-360M get enough room for a chat-template
     // system+user+assistant turn (~600-900 tokens of template scaffolding
     // alone) on Web/CPU builds where common_fit_params is not used. The

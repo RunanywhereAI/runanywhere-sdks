@@ -29,8 +29,8 @@ import kotlinx.coroutines.withContext
 // The C++ lifecycle service is the canonical source of truth for "is this
 // modality loaded". Inference paths consult it via `acquire_lifecycle_*`, so
 // there is nothing to mirror onto a Kotlin-side VLM bridge handle anymore.
-// Wave 7 / T23 removed the last remnant of the VLM-specific synchroniser on
-// Swift; this Kotlin counterpart was removed in parity with that wave.
+// The last remnant of the VLM-specific synchroniser was removed on Swift;
+// this Kotlin counterpart was removed in parity with that.
 
 private val logger = SDKLogger("ModelLifecycle")
 

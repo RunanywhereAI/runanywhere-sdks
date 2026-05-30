@@ -266,7 +266,7 @@ runanywhere-commons/
 │   # (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt). Each
 │   # ships a rac_plugin_entry_<name>.cpp that publishes a
 │   # rac_engine_vtable_t via RAC_STATIC_PLUGIN_REGISTER or a dlopen'd
-│   # entry symbol. See ../../engines/ and GAP 06.
+│   # entry symbol. See ../../engines/.
 │
 ├── cmake/                          # CMake modules
 ├── scripts/                        # Build automation

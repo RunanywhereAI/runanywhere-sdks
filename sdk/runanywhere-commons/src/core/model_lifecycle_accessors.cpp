@@ -2,7 +2,7 @@
  * @file model_lifecycle_accessors.cpp
  * @brief Per-modality lifecycle accessor namespaces for model lifecycle.
  *
- * commons-core-infra-010: extracted from the original `model_lifecycle.cpp`
+ * Extracted from the original `model_lifecycle.cpp`
  * SRP split. Owns the `rac::llm`, `rac::vlm`, and `rac::lifecycle`
  * namespace functions used by feature TUs to pin the currently-loaded
  * component implementation across the lifecycle of an inference.

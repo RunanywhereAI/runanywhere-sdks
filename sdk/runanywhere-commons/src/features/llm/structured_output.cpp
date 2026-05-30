@@ -1037,7 +1037,7 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
 // GET SYSTEM PROMPT - Ported from Swift lines 10-30
 // =============================================================================
 
-// CLUSTER-12 (COMMONS-STRUCT-001): Small base models (e.g. SmolLM2-360M)
+// Small base models (e.g. SmolLM2-360M)
 // cannot reliably produce structured JSON from a free-form prompt because
 // they have not been instruction-tuned on the "schema → JSON" task and the
 // llama.cpp backend currently does not pipe a grammar/json-mode parameter
@@ -1067,7 +1067,7 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
 
     // Build the system prompt - matches Swift getSystemPrompt(for:)
     //
-    // CLUSTER-12: the leading "Your reply MUST begin with %s" line was
+    // The leading "Your reply MUST begin with %s" line was
     // added to give base models (SmolLM2/TinyLlama family) a stronger
     // first-token cue. Without grammar-constrained decoding this is the
     // best heuristic nudge available.

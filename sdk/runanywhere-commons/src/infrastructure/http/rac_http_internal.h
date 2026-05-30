@@ -1,7 +1,7 @@
 /**
  * @file rac_http_internal.h
  * @brief Internal C++ HTTP facade used by every commons component
- *        that needs HTTP (v2 close-out Phase H, Stage 2).
+ *        that needs HTTP.
  *
  * Internal C++ facade. Always routes through the registered
  * `rac_http_transport_ops_t` adapter; when none is registered, the
@@ -9,7 +9,7 @@
  * Used by all internal commons components that need HTTP (download
  * orchestrator, diffusion tokenizer, JNI bridges).
  *
- * Stage 2 of the HTTP refactor generalises the pre-existing
+ * The HTTP facade generalises the pre-existing
  * telemetry-delegate pattern into a single entry point. Callers no
  * longer touch `rac_http_client_create` / `rac_http_client_destroy`
  * lifecycle nor the async platform adapter `rac_http_download` —

@@ -2,7 +2,7 @@
  * @file model_lifecycle_download.cpp
  * @brief Auto-download orchestration helpers for model lifecycle.
  *
- * commons-core-infra-010: extracted from the original `model_lifecycle.cpp`
+ * Extracted from the original `model_lifecycle.cpp`
  * SRP split. Owns the `rac_model_lifecycle_load_proto` opt-in path that
  * drives the canonical download orchestrator and waits for completion
  * before letting the load continue.
@@ -71,7 +71,7 @@ bool model_has_download_source(const runanywhere::v1::ModelInfo& model) {
     return false;
 }
 
-// pass3-syn-cluster19: orchestrate plan→start→poll for a single model. Used
+// Orchestrate plan→start→poll for a single model. Used
 // by `rac_model_lifecycle_load_proto` when the caller opts into
 // `validate_availability=true` and the registry entry has no resolved
 // artifact yet, so SDK callers can collapse the legacy

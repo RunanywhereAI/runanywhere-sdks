@@ -2,13 +2,11 @@
  * @file rac_plugin_entry_sherpa.cpp
  * @brief Unified-ABI entry point for the Sherpa-ONNX backend.
  *
- * GAP 02 Phase 9 + GAP 06 T5.1 — see the matching specs.
- *
  * The sherpa engine owns Sherpa-ONNX-backed STT / TTS / VAD primitives.
  * It only advertises those primitives when both the Sherpa-ONNX prebuilt and
  * the real RAC speech ops are compiled into this target.
  *
- * CPP-04: declarative manifest publishes package ownership, availability and
+ * Declarative manifest publishes package ownership, availability and
  * the served primitive set alongside the routing metadata. The manifest mirrors
  * the conditional ops slots so registry validation accepts both routable and
  * stub builds.

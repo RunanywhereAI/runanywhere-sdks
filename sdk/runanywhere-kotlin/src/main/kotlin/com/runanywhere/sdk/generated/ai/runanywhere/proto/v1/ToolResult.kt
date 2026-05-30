@@ -54,7 +54,7 @@ public class ToolResult(
   /**
    * JSON-encoded tool execution result.
    *
-   * AUDIT (IDL-13): the C++ tool-prompt formatter
+   * The C++ tool-prompt formatter
    * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
    * reads `result_json` directly when building follow-up LLM prompts after
    * tool execution. It is the canonical wire shape.

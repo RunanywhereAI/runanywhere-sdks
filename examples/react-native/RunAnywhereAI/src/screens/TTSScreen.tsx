@@ -364,7 +364,7 @@ export const TTSScreen: React.FC = () => {
 
     setIsSpeaking(true);
     try {
-      // Proto-canonical TTSOptions (Wave 2: aligned to
+      // Proto-canonical TTSOptions (aligned to
       // @runanywhere/proto-ts/tts_options).
       const sdkConfig = {
         voice: 'default',

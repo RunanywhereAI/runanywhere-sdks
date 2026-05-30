@@ -2,8 +2,8 @@
  * @file rac_runtime_helpers.h
  * @brief Shared helpers for L1 runtime adapters.
  *
- * Wave H-3 cleanup (runtime-tensor-dup): consolidates the per-runtime
- * `release_tensor` and `copy_buffer` range-check boilerplate that used to be
+ * Consolidates the per-runtime `release_tensor` and `copy_buffer`
+ * range-check boilerplate that used to be
  * duplicated across every runtime adapter. Each runtime owns its private
  * buffer struct (CpuRuntimeBuffer, rac_runtime_buffer, …), so the helpers take
  * plain byte-level inputs (raw pointers + sizes) and, for tensor release, a

@@ -34,7 +34,7 @@ class OnnxBindings {
   // (which is just librac_backend_onnx.so on Android). On iOS/macOS the
   // statically linked XCFramework already exposes every symbol through
   // `DynamicLibrary.process()`, so this collapses to the same lookup we use
-  // for the ONNX backend. See FLUTTER-AND-001 (E2E-LOOP iter1 CLUSTER-06).
+  // for the ONNX backend.
   final DynamicLibrary _pluginRegistryLib;
 
   // Function pointers - only registration functions
@@ -90,8 +90,7 @@ class OnnxBindings {
   /// the Sherpa entry symbols and (via the NEEDED dependency) the
   /// commons-side plugin registry symbols. This is the same workaround the
   /// React-Native ONNX hybrid uses (it calls the C entry points directly
-  /// from native C++, never through `RTLD_DEFAULT`). See FLUTTER-AND-SHERPA-002
-  /// (E2E-LOOP iter3 CLUSTER-17).
+  /// from native C++, never through `RTLD_DEFAULT`).
   ///
   /// On iOS/macOS everything is statically linked into the host binary, so
   /// `DynamicLibrary.process()` finds every exported symbol — the same lookup
@@ -200,7 +199,7 @@ class OnnxBindings {
     // if absent (iOS XCFramework drops the wrapper), bind the plugin-entry
     // pair so we can register Sherpa through the unified plugin registry.
     //
-    // FLUTTER-AND-001 fix: resolve these via `_pluginRegistryLib`
+    // Resolve these via `_pluginRegistryLib`
     // (`DynamicLibrary.process()` on Android, statically linked binary on
     // iOS/macOS) instead of `_lib`. `_lib` is just `librac_backend_onnx.so` on
     // Android — it does NOT export `rac_backend_sherpa_register`,

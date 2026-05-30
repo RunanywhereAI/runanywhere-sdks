@@ -2,7 +2,7 @@
  * @file model_lifecycle.cpp
  * @brief Canonical model lifecycle C ABI over generated proto bytes.
  *
- * commons-core-infra-010 SRP split: the load/unload/snapshot ABI entry
+ * SRP split: the load/unload/snapshot ABI entry
  * points plus the shared lifecycle state live here. Translation helpers,
  * artifact resolution, auto-download, and per-modality lifecycle accessors
  * each live in their own TU under the same directory:
@@ -342,7 +342,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         return detail::parse_error(out_result, "failed to parse registered ModelInfo");
     }
 
-    // CLUSTER-19 examples-react-native-002: collapse the legacy
+    // Collapse the legacy
     // `getModel → downloadModel(asyncIterator) → loadModel` chain into a
     // single `loadModel(id)` call when callers opt in via
     // `validate_availability=true`. If the registry says the model is

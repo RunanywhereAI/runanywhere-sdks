@@ -2,9 +2,7 @@
  * @file rac_plugin_entry_whispercpp.cpp
  * @brief Unified-ABI entry point for whisper.cpp STT backend.
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
- * CPP-04: declarative manifest publishes package ownership, availability and
+ * Declarative manifest publishes package ownership, availability and
  * the served primitive set alongside the routing metadata.
  */
 

@@ -30,7 +30,7 @@
 #include "rac/features/llm/rac_llm_stream.h"
 #include "rac/infrastructure/events/rac_events.h"
 
-// v2 close-out Phase G-2 / BUG-STREAMING-001: pull in the canonical
+// BUG-STREAMING-001: pull in the canonical
 // 13-field LLM stream emitter shared with rac_llm_proto_service.cpp.
 // We invoke `rac::llm::dispatch_llm_stream_event()` once per token and
 // once on terminal events so any collectors registered via
@@ -103,7 +103,7 @@ static std::string generate_unique_id() {
 }
 
 // =============================================================================
-// EOS / SPECIAL TOKEN STRIPPING (CLUSTER-19 examples-react-native-004)
+// EOS / SPECIAL TOKEN STRIPPING
 // =============================================================================
 
 /**
@@ -112,7 +112,7 @@ static std::string generate_unique_id() {
  *
  * Backends occasionally leak end-of-utterance / end-of-text sentinels into
  * the streaming callback when the runtime swallow path missed them (notably
- * SmolVLM, Qwen-VL, Llama-3 — see B-RN-14-001 / CLUSTER-19). Without this
+ * SmolVLM, Qwen-VL, Llama-3 — see B-RN-14-001). Without this
  * filter the angle-bracket artifacts (`<|im_end|>`, `<|eot_id|>`,
  * `<|endoftext|>`, `<eot>`, `<end_of_utterance>`) appear in chat UIs.
  *
@@ -354,7 +354,7 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     // protobuf decoder to throw "end-group tag did not match" on the first
     // generate after a model switch.
     rac_llm_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-llm: spin-wait for any in-flight
+    // Spin-wait for any in-flight
     // dispatch_llm_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy:350.
     rac_llm_proto_quiesce();
@@ -384,7 +384,7 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
     // load_model path elides destroy → original B-FL-5-001 fix in destroy()
     // never fires for handle reuse).
     rac_llm_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-llm: drain any in-flight dispatcher invocation
+    // Drain any in-flight dispatcher invocation
     // bound to the previous model before swapping in the new service. The
     // unset above clears the slot but a concurrent dispatcher that already
     // copied the slot keeps running until it finishes; spin-wait until that
@@ -671,7 +671,7 @@ struct llm_stream_context {
     // Benchmark timing (optional, NULL when not benchmarking)
     rac_benchmark_timing_t* timing_out;
 
-    // v2 close-out Phase G-2: component handle for the proto-byte stream
+    // Component handle for the proto-byte stream
     // dispatcher. Each delivered token fires a LLMStreamEvent to any
     // collector registered via rac_llm_set_stream_proto_callback().
     rac_handle_t component_handle;
@@ -680,7 +680,7 @@ struct llm_stream_context {
 /**
  * Internal token callback that wraps user callback and tracks metrics.
  *
- * CLUSTER-19 examples-react-native-004: every emitted token is run through
+ * Every emitted token is run through
  * `llm_strip_eos_tokens()` before it reaches the user callback or the
  * proto stream dispatcher. Backends occasionally leak EOS sentinels
  * (`<|im_end|>`, `<|eot_id|>`, `<end_of_utterance>`, …) which the example
@@ -750,7 +750,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         }
     }
 
-    // v2 close-out Phase G-2: fan-out the token as an LLMStreamEvent to
+    // Fan-out the token as an LLMStreamEvent to
     // any proto-byte subscribers. `is_final=false` on every per-token
     // event; the terminal is_final=true event is emitted by the
     // generate_stream() caller once the engine returns (below). Pure-
@@ -914,7 +914,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_message = "Streaming generation failed";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
 
-        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        // Terminal error event on the proto stream.
         rac::llm::dispatch_llm_stream_event(handle,
                                             /*token*/ "",
                                             /*is_final*/ true,
@@ -994,7 +994,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
 
-    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // Terminal success event on the proto stream.
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str = "stop";
@@ -1175,7 +1175,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
             timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
 
-        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        // Terminal error event on the proto stream.
         rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, /*kind*/ 0, 0, 0.0f,
                                             /*finish_reason*/ "error",
                                             /*error_message*/ "Streaming generation failed");
@@ -1280,7 +1280,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
 
-    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // Terminal success event on the proto stream.
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str_t = "stop";

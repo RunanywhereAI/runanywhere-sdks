@@ -6,7 +6,7 @@
  * contract types. Mirrors the Swift counterpart at
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes+Artifacts.swift`.
  *
- * The `RA*` typealiases land in workstream L2; for now these helpers operate
+ * The `RA*` typealiases are pending; for now these helpers operate
  * on the Wire-generated proto types directly.
  *
  * NOTE: filesystem-aware checks (`isDownloadedOnDisk`) defer to the proto's
@@ -243,7 +243,7 @@ val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
  * downloader. Mirrors Swift's `expectedArtifactFiles`: a top-level manifest
  * short-circuits; otherwise the canonical fall-through (artifact-attached
  * manifest → pattern shorthand → multi-file descriptor seed) is computed by
- * commons via `rac_artifact_expected_files_proto` (P2-T7) so the Kotlin,
+ * commons via `rac_artifact_expected_files_proto` so the Kotlin,
  * Swift, and download-planner views can never drift.
  */
 val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles

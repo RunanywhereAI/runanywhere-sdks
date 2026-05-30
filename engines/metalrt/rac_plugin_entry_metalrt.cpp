@@ -2,13 +2,11 @@
  * @file rac_plugin_entry_metalrt.cpp
  * @brief Unified-ABI entry point for MetalRT backend (Apple only).
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * MetalRT is a multi-primitive engine: it serves LLM + STT + TTS + VLM all
  * from custom Metal shaders. `capability_check()` gates on both __APPLE__
  * and the private engine binary so stub builds do not advertise primitives.
  *
- * CPP-04: declarative manifest publishes package ownership, Apple-only
+ * Declarative manifest publishes package ownership, Apple-only
  * (private) availability and the served primitive set alongside the routing
  * metadata. The manifest mirrors the conditional ops slots so registry
  * validation accepts both routable and stub builds.

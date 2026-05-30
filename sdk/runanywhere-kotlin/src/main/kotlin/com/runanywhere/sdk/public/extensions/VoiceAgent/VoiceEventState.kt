@@ -34,7 +34,7 @@ fun RAVoiceEvent.pipelineStateOrNull(): PipelineState? {
 fun RAVoiceEvent.speechDetectedOrNull(): Boolean? =
     when {
         audio_level != null -> audio_level!!.is_speech
-        // IDL-18: VADEvent.type uses VADStreamEventKind; speech start/end
+        // VADEvent.type uses VADStreamEventKind; speech start/end
         // both ride SPEECH_ACTIVITY with direction on the is_speech bool.
         vad?.type == VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY -> vad!!.is_speech
         speech_turn_detection?.kind == SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED -> true

@@ -143,7 +143,7 @@ public class VoiceEvent(
   )
   public val metrics: MetricsEvent? = null,
   /**
-   * v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+   * Voice agent lifecycle events. Mirror Swift VoiceSessionError /
    * VoiceAgentComponentStates and the AsyncSequence-style lifecycle
    * signals consumed by the cross-platform VoiceAgent extensions
    * (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN

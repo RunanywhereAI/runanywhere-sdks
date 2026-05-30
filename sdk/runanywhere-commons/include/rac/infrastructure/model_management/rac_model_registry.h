@@ -603,7 +603,7 @@ RAC_API rac_result_t rac_model_registry_discover_downloaded(
 RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
 
 // =============================================================================
-// REFRESH - Unified cross-SDK registry refresh (T4.9)
+// REFRESH - Unified cross-SDK registry refresh
 // =============================================================================
 
 /**
@@ -756,9 +756,9 @@ RAC_API rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_by
                                                        rac_proto_buffer_t* out_result);
 
 // =============================================================================
-// REGISTER MODEL FROM URL (P2-T6) — single-call URL+name+framework → save
+// REGISTER MODEL FROM URL — single-call URL+name+framework → save
 //
-// Composes the canonical RAModelInfo factory (rac_model_info_make_proto, P2-T4)
+// Composes the canonical RAModelInfo factory (rac_model_info_make_proto)
 // with the existing registry persistence path so SDKs replace the ~60 LOC
 // build-and-save body of Swift's RunAnywhere.registerModel(...) (and the
 // equivalent Kotlin/Flutter/RN/Web glue) with a single ABI call. Output is

@@ -1,6 +1,6 @@
 /**
  * @file sdk_init.cpp
- * @brief Canonical two-phase SDK initialization C ABI (P2-T9).
+ * @brief Canonical two-phase SDK initialization C ABI.
  *
  * Implementation of rac_sdk_init.h. The bodies are deliberately thin: they
  * delegate to existing internal subsystems (rac_state, rac_auth_*,

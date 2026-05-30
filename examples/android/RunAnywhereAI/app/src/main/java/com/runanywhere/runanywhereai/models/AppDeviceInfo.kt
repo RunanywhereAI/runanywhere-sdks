@@ -7,7 +7,6 @@
  * canonical hardware profile does not carry (model name, OS version string).
  *
  * This replaces the deleted SDK `com.runanywhere.sdk.models.DeviceInfo`.
- * See gaps/gaps/inconsistencies/kotlin.md (KOT-15) for context.
  */
 
 package com.runanywhere.runanywhereai.models

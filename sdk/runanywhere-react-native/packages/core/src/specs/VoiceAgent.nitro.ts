@@ -1,7 +1,7 @@
 /**
  * VoiceAgent Nitrogen Spec
  *
- * Closes the RN half of GAP 09 #6 (v3-readiness Phase A3). The existing
+ * Provides the RN VoiceAgent streaming surface. The existing
  * VoiceAgentStreamAdapter.ts imports
  * `'../Internal/Nitro/NitroVoiceAgentSpec'` as `NitroVoiceAgent` and calls
  * `NitroVoiceAgent.subscribeProtoEvents(handle, onBytes, onDone, onError)`.

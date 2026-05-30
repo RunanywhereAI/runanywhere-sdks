@@ -2,7 +2,7 @@
 #
 # check_rac_api_exports.sh
 #
-# Wave D-1 drift gate: parse every RAC_API-decorated declaration under
+# Drift gate: parse every RAC_API-decorated declaration under
 # sdk/runanywhere-commons/include/rac/**/*.h, parse the curated exports list at
 # sdk/runanywhere-commons/exports/RACommons.exports, and report any public
 # RAC_API symbol missing from the exports list.
@@ -10,8 +10,8 @@
 # Default behavior: prints a non-zero-exit report listing the drift but is
 # advisory-only when invoked without `--strict`. Many of the currently
 # "missing" symbols are candidates for RAC_API stripping (internalization)
-# rather than additions to the exports list — that cleanup is tracked as a
-# follow-up to Wave D-1. Once internalization is done, the script should be
+# rather than additions to the exports list — that cleanup is a follow-up.
+# Once internalization is done, the script should be
 # wired as `--strict` into `run_commons_proto_checks.sh`.
 #
 # Usage:
@@ -51,7 +51,7 @@ if [[ ! -f "${EXPORTS_FILE}" ]]; then
     exit 1
 fi
 
-# pass2-syn-002: backend-conditional sibling exports files are appended to
+# Backend-conditional sibling exports files are appended to
 # the main list by CMake at configure time. Treat them as part of the
 # canonical export surface for drift accounting so backend-conditional
 # RAC_API decls don't show up as missing.

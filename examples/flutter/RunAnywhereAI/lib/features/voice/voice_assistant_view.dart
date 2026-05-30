@@ -188,7 +188,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     }
   }
 
-  /// Drive UI state from canonical VoiceEvent proto messages (v3.1).
+  /// Drive UI state from canonical VoiceEvent proto messages.
   ///
   /// Switches on `event.whichPayload()`. Turn-completion aggregation (was
   /// VoiceSessionTurnCompleted) is rebuilt locally from the proto state
@@ -236,7 +236,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
       case sdk.VoiceEvent_Payload.vad:
         final vad = event.vad;
-        // IDL-18: VADEvent.type is VADStreamEventKind; start/end ride
+        // VADEvent.type is VADStreamEventKind; start/end ride
         // SPEECH_ACTIVITY with direction on the is_speech bool.
         if (vad.type ==
             sdk.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
@@ -511,7 +511,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               onTap: _showTTSModelSelection,
             ),
             const SizedBox(height: AppSpacing.smallMedium),
-            // B-FL-13-002: short-circuit row for the platform's built-in
+            // Short-circuit row for the platform's built-in
             // TTS engine — bypasses the model selection sheet entirely.
             // Apple-only: the commons `platform` engine plugin is gated
             // behind `if(APPLE AND RAC_BUILD_PLATFORM)` and

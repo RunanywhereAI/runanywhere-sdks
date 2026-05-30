@@ -2,10 +2,10 @@
  * @file rac_plugin_entry_diffusion_coreml.cpp
  * @brief Unified-ABI plugin entry for the CoreML diffusion engine.
  *
- * GAP 02 + GAP 06 T5.3. Apple-only Stable Diffusion plugin backed by
+ * Apple-only Stable Diffusion plugin backed by
  * CoreML MLModel components.
  *
- * CPP-04: declarative manifest publishes package ownership, Apple-only
+ * Declarative manifest publishes package ownership, Apple-only
  * (private) availability and the served primitive set alongside the routing
  * metadata. The manifest mirrors the conditional ops slot so registry
  * validation accepts both routable and stub builds.

@@ -2,7 +2,7 @@
  * @file genie_backend.cpp
  * @brief Qualcomm Genie engine shell implementation.
  *
- * GAP 06 T5.2. This shell compiles on every host regardless of SDK
+ * This shell compiles on every host regardless of SDK
  * availability. When `RAC_GENIE_SDK_AVAILABLE=0`, registration is rejected
  * before the router can select Genie; any direct stub invocation still returns
  * `RAC_ERROR_BACKEND_UNAVAILABLE`.
@@ -13,7 +13,7 @@
 #include "rac/core/rac_logger.h"
 
 #if RAC_GENIE_SDK_AVAILABLE
-// Phase 2 — real Qualcomm Genie integration. The headers listed below
+// Real Qualcomm Genie integration. The headers listed below
 // ship with QAIRT / QNN 2.24+ and are not vendored in this repo.
 //   #include <GenieCommon.h>
 //   #include <GenieDialog.h>

@@ -1,18 +1,16 @@
 /**
  * VoiceAgentStreamAdapter.ts (Web / WASM)
  *
- * GAP 09 Phase 19 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
- *
  * Wraps an Emscripten Module.addFunction() callback as an
  * `AsyncIterable<VoiceEvent>` using the codegen'd transport wrapper
- * from `idl/codegen/templates/ts_async_iterable.njk` (Phase 14).
+ * from `idl/codegen/templates/ts_async_iterable.njk`.
  *
  * Cancellation: `AsyncIterator.return()` (triggered by `for-await break`)
  * calls our cancel function, which removes the subscriber from the
  * fan-out set and, if it was the last subscriber, tears down the
  * Emscripten function table entry and tells C++ to clear the callback slot.
  *
- * Multi-collector fan-out (B29):
+ * Multi-collector fan-out:
  *   The underlying C ABI exposes a SINGLE proto-callback slot per handle.
  *   Without fan-out, a second `stream()` collector silently replaces the
  *   first by re-calling `_rac_voice_agent_set_proto_callback(handle, cbPtr, 0)`.

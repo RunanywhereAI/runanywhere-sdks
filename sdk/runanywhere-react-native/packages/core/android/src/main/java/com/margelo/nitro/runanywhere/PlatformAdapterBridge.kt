@@ -531,8 +531,8 @@ object PlatformAdapterBridge {
     // ========================================================================
     // Directory Enumeration (Platform Adapter Slots)
     //
-    // Cross-SDK parity with the Kotlin SDK sibling
-    // (CLUSTER-280-SPLIT-sdk-kotlin) and Swift / Flutter / Web. The C++
+    // Cross-SDK parity with the Kotlin SDK sibling and Swift / Flutter /
+    // Web. The C++
     // model-registry refresh path (rescan_local) and
     // rac_model_info_make_proto's is_downloaded probe for multi-file
     // artifacts read these via JNI from InitBridge.cpp.

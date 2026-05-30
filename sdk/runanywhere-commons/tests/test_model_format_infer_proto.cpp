@@ -5,7 +5,7 @@
  * Exercises rac_model_format_from_url_proto and
  * rac_artifact_infer_from_url_proto. These are the commons-side
  * replacements for the Dart withInferredArtifact / protoModelFormatFromPath
- * and Kotlin detectFormatFromUrl / inferArtifactFields helpers (Wave D-3).
+ * and Kotlin detectFormatFromUrl / inferArtifactFields helpers.
  */
 
 #include <cstdio>

@@ -4,7 +4,7 @@
 //
 // Mirrors Kotlin `SystemTTSModule.MODEL_ID` and iOS `RAModelInfo.systemTTS`
 // so callers no longer hard-code the `'system-tts'` magic string at the
-// example layer. See CLUSTER-15 / examples-flutter-009.
+// example layer.
 
 /// Built-in System TTS module identifiers.
 ///

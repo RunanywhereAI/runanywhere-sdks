@@ -3,13 +3,11 @@
  * @brief Unified-ABI entry point for WhisperKit CoreML STT backend (Apple
  * only).
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * `capability_check()` returns RAC_ERROR_CAPABILITY_UNSUPPORTED on non-Apple
  * hosts so the plugin silently declines registration when building Linux or
  * Windows hosts that link this TU by accident.
  *
- * CPP-04: declarative manifest publishes package ownership, Apple-only
+ * Declarative manifest publishes package ownership, Apple-only
  * availability and the served primitive set alongside the routing metadata.
  */
 

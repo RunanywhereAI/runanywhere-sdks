@@ -28,7 +28,7 @@ import com.runanywhere.sdk.public.extensions.solutions
 import kotlinx.coroutines.launch
 
 /**
- * Wave 3 Step 3.3 (G-E6): demo for `RunAnywhere.solutions.run(yaml = ...)`.
+ * Demo for `RunAnywhere.solutions.run(yaml = ...)`.
  *
  * Embeds the canonical voice_agent.yaml + rag.yaml from
  * sdk/runanywhere-commons/examples/solutions/ as inline string constants

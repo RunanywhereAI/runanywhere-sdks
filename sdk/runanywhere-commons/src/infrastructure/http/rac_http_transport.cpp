@@ -1,6 +1,6 @@
 /**
  * @file rac_http_transport.cpp
- * @brief Platform HTTP transport registry (v2 close-out Phase H2).
+ * @brief Platform HTTP transport registry.
  *
  * Holds a process-wide pointer to a platform-provided HTTP transport
  * vtable. The `rac_http_request_*` entry points consult this registry
@@ -14,7 +14,7 @@
  * caller can release the lock before invoking adapter callbacks
  * (avoids cross-library reentrancy deadlocks).
  *
- * commons-core-infra-006: previously the snapshot pattern allowed
+ * Previously the snapshot pattern allowed
  * `prev_ops->destroy(prev_ud)` in `register()` to race with an in-flight
  * `request_send(ud)` on another thread — the caller had a stale pointer
  * to a now-freed `user_data`. The registry now wraps {ops, user_data}

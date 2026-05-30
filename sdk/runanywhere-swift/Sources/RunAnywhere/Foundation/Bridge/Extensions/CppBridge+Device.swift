@@ -319,7 +319,7 @@ extension CppBridge {
             return String(cString: ptr)
         }
 
-        // v3.0.0 (C2): `buildRegistrationJSON` DELETED. Use registerIfNeeded()
+        // `buildRegistrationJSON` DELETED. Use registerIfNeeded()
         // — all registration logic now lives in C++ via the rac_device_manager
         // API; Swift no longer needs to hand-build the JSON request.
     }

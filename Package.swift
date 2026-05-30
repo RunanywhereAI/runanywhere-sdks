@@ -1,5 +1,5 @@
 // swift-tools-version: 5.9
-// T5.4: attempted bump to 6.0 was rolled back. Bumping the manifest tools
+// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
 // version forces Swift 6 language mode on all targets, which turns several
 // pre-existing patterns in the SDK (mutable static registration flags,
 // closure-captured locals in AVAudioConverter / URLSession callbacks,
@@ -57,18 +57,12 @@ let useLocalNatives = false // Toggle: false for release (default committed to m
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases.
-//
-// v3.1.1: sdk minor bump. Remote XCFramework URLs expect
-// `RACommons-ios-v3.1.1.zip` at the v3.1.1 GitHub release; consumers
-// should set `useLocalNatives = true` until release automation publishes
-// the v3.1.0
-// artifacts.
 let sdkVersion = "0.19.13"
 
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
-        // T5.4: floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
+        // Floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
         // (latest minor of the same LTS line, matches Xcode 15.4 baseline).
         .iOS("17.5"),
         .macOS("14.5"),
@@ -100,26 +94,25 @@ let package = Package(
 
     ],
     dependencies: [
-        // T4.3: SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
+        // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
         // silent upstream major bump can't land in `Package.resolved` without
         // a Package.swift edit. Version floors are mirrored in
         // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift
         // (RAVersions) — keep both in sync via scripts/sync-versions.sh.
-        // T5.4: floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
+        // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
-        // T5.4: floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
+        // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
-        // T5.4: floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
+        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
         .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf for idl/*.proto generated types consumed by
-        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift
-        // (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md for rationale).
-        // T5.4: floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
+        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift.
+        // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
         // .upToNextMajor exception (needed because generated code uses
         // SwiftProtobuf._NameMap(bytecode:) from 1.28.0+) is now resolved by
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
-        // the T4.3 policy applied to the other deps.
+        // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
@@ -128,7 +121,7 @@ let package = Package(
         // are not used at runtime. Frontends consume proto events via the
         // hand-written VoiceAgentStreamAdapter that wraps the in-process C
         // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
-        // VoiceAgentStreamAdapter.swift). v3.1 audit fix.
+        // VoiceAgentStreamAdapter.swift).
         //
     ],
     targets: [
@@ -194,7 +187,7 @@ let package = Package(
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: [
                 "CRACommons",
-                // SWF-grpc delete (Wave H-2): the previously-excluded
+                // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and
                 // have been removed from the repo. Swift consumes the same services

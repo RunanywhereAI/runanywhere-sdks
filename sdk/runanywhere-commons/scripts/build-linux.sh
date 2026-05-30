@@ -3,7 +3,7 @@
 #
 # build-linux.sh — package-local compatibility wrapper.
 #
-# WAVE W1.1 (2026-05-15): the original per-package Linux build entry point
+# The original per-package Linux build entry point
 # was deleted, but `.github/workflows/release.yml` (native_linux job) still
 # invokes this path from working-directory `sdk/runanywhere-commons` and
 # expects build artifacts to land under `dist/linux/`. This shim restores

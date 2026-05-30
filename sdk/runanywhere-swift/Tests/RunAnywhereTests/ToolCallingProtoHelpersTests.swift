@@ -85,7 +85,7 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
     }
 
     func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {
-        // CLUSTER-38: parseObjectJSON used to silently swallow malformed JSON
+        // parseObjectJSON used to silently swallow malformed JSON
         // into an empty dict, so executeTool reported success=true with no
         // arguments. Now the parse failure must propagate as success=false
         // with a non-empty error message regardless of whether the native

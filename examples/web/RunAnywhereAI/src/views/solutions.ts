@@ -1,6 +1,5 @@
 /**
- * Solutions Tab — Wave 3 Step 3.3 (G-E6) demo for
- * `RunAnywhere.solutions.run({ yaml })`.
+ * Solutions Tab — demo for `RunAnywhere.solutions.run({ yaml })`.
  *
  * Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
  * shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are

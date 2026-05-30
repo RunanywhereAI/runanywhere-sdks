@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_hardware.dart — Hardware Profile capability surface
-// (canonical §14 namespace). Mirrors Swift `RunAnywhere.Hardware` and
+// runanywhere_hardware.dart — Hardware Profile capability surface.
+// Mirrors Swift `RunAnywhere.Hardware` and
 // the RN/Web `RunAnywhere.hardware.*` namespace.
 
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
@@ -19,7 +19,7 @@ class RunAnywhereHardware {
   ///
   /// Mirrors Swift `try RunAnywhere.hardware.getProfile()` — throws
   /// `SDKException` when the hardware ABI is unavailable or commons returns
-  /// a non-success result. No silent fallback (Wave H Swift parity).
+  /// a non-success result. No silent fallback (Swift parity).
   HardwareProfileResult getProfile() => DartBridgeHardware.getProfile();
 
   /// Get available accelerators as generated proto data.

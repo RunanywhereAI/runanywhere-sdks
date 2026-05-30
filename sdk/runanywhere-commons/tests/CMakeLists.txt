@@ -19,7 +19,7 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
-# MF-3 (AG-V3): rac_commons does not propagate RAC_HAVE_PROTOBUF=1 via its
+# rac_commons does not propagate RAC_HAVE_PROTOBUF=1 via its
 # PUBLIC interface (it is PRIVATE so it does not leak through the L5 ABI).
 # Tests that intentionally exercise the proto-byte path are internal consumers,
 # so re-define the macro here when the parent commons target actually enabled
@@ -99,7 +99,7 @@ rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
 
-# --- G6: audio level-meter DSP parity tests ---------------------------------
+# --- audio level-meter DSP parity tests ---------------------------------
 # Validates rac_audio_compute_level_db() — the centralised RMS->dB DSP that
 # replaces the hand-rolled level meters in Swift AudioCaptureManager.swift
 # (and equivalents in Kotlin/Flutter/RN/Web). No backend dependency.
@@ -181,7 +181,7 @@ rac_link_archive_deps(test_voice_agent_pipeline)
 target_compile_features(test_voice_agent_pipeline PRIVATE cxx_std_17)
 add_test(NAME voice_agent_pipeline_tests COMMAND test_voice_agent_pipeline)
 
-# --- commons-features-voice-003: pipeline_mutex shared_ptr race regression --
+# --- pipeline_mutex shared_ptr race regression --
 # Backend-free concurrent stress test for the `rac_voice_agent::pipeline`
 # shared_ptr slot. Drives the same store/snapshot/reset pattern that
 # `rac_voice_agent_process_stream()` and `rac_voice_agent_destroy()` use
@@ -256,7 +256,7 @@ target_compile_features(test_tool_calling PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
-# --- CONSOLIDATE-A (CLUSTER-14): commons-owned RAModelInfo heuristics --------
+# --- commons-owned RAModelInfo heuristics --------
 # Exercises rac_tool_call_format_from_model_info_proto +
 # rac_model_info_parameter_count_b_proto + rac_model_info_is_small_model_proto.
 # Replaces example-side detectToolCallFormat / isLikelySmallModel duplication.
@@ -272,7 +272,7 @@ target_compile_features(test_model_heuristics PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_heuristics)
 add_test(NAME model_heuristics_tests COMMAND test_model_heuristics)
 
-# --- G3: ToolValue <-> JSON proto-byte ABI parity tests --------------------
+# --- ToolValue <-> JSON proto-byte ABI parity tests --------------------
 # Validates the 5 oneof branches (string/number/bool/array/object) that
 # Swift/Kotlin/Dart/RN/Web previously hand-rolled. Single source of truth.
 add_executable(test_tool_value_json test_tool_value_json.cpp)
@@ -315,18 +315,17 @@ target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
 
-# --- pass3-syn-086: tool-calling cancel ABI concurrency regression -----------
-# Covers the new run_loop_with_handle / run_loop_cancel / session_cancel C
-# ABIs added by the pass-2/pass-3 fix commits. Exercises:
+# --- tool-calling cancel ABI concurrency regression -----------
+# Covers the run_loop_with_handle / run_loop_cancel / session_cancel C
+# ABIs. Exercises:
 #   1. cancel-during-publish: cancel fires while generate is blocked on
 #      another thread; the cancel ABI returns RAC_SUCCESS concurrently and
 #      the loop returns RAC_ERROR_CANCELLED in bounded time (no deadlock).
 #   2. cancel-after-natural-completion: stale-handle cancel is idempotent
-#      RAC_SUCCESS (matches pass3-syn-083 semantics).
-#   3. sticky cancel non-regression (pass3-syn-021): step_with_result after
+#      RAC_SUCCESS.
+#   3. sticky cancel non-regression: step_with_result after
 #      session_cancel returns RAC_ERROR_INVALID_STATE.
-#   4. idempotent session cancel on stale/destroyed/zero handles
-#      (pass3-syn-083).
+#   4. idempotent session cancel on stale/destroyed/zero handles.
 # Designed to be TSAN-clean — mirrors test_voice_agent_pipeline_race.cpp.
 add_executable(test_tool_calling_cancel test_tool_calling_cancel.cpp)
 target_include_directories(test_tool_calling_cancel PRIVATE
@@ -355,8 +354,7 @@ add_test(NAME structured_output_tests COMMAND test_structured_output)
 # --- JSONSchema-proto -> JSON Schema text canonical-writer parity ----
 # Verifies rac_structured_output_schema_to_json_proto produces byte-exact
 # output matching Swift's JSONSchemaWriter
-# (StructuredOutputProto+Helpers.swift) so Swift can drop its private writer
-# in P3-T9.
+# (StructuredOutputProto+Helpers.swift) so Swift can drop its private writer.
 add_executable(test_schema_to_json test_schema_to_json.cpp)
 target_include_directories(test_schema_to_json PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -726,10 +724,9 @@ add_test(NAME tts_config_defaults_tests COMMAND test_tts_config_defaults)
 # RAG symbols are folded into rac_commons only when the RAG OBJECT target is
 # enabled, so guard these tests the same way as test_advanced_modality_proto_abi.
 if(TARGET rac_backend_rag)
-    # commons-features-llm-rag-007: direct ctest for the GraphScheduler-driven
-    # RAG pipeline (rag_pipeline_graph.cpp). Exercises run_rag_query() input
-    # validation and the RAGTokenSink cancel contract that
-    # commons-features-llm-rag-008 relies on.
+    # Direct ctest for the GraphScheduler-driven RAG pipeline
+    # (rag_pipeline_graph.cpp). Exercises run_rag_query() input validation
+    # and the RAGTokenSink cancel contract.
     add_executable(test_rag_pipeline_graph test_rag_pipeline_graph.cpp)
     target_include_directories(test_rag_pipeline_graph PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -789,7 +786,7 @@ rac_link_archive_deps(test_model_string_accessors)
 target_compile_features(test_model_string_accessors PRIVATE cxx_std_17)
 add_test(NAME model_string_accessors_tests COMMAND test_model_string_accessors)
 
-# --- Proto enum ↔ C enum mapper parity tests (T15a) --------------------------
+# --- Proto enum ↔ C enum mapper parity tests --------------------------
 # Exercises rac_inference_framework_from/to_proto, rac_model_category_*,
 # rac_model_format_*, rac_model_source_* and rac_archive_type_*. Pure C ABI,
 # no protobuf required.
@@ -951,7 +948,7 @@ target_compile_features(test_speech_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_speech_proto_abi)
 add_test(NAME speech_proto_abi_tests COMMAND test_speech_proto_abi)
 
-# --- CPP-STREAM-EVENT-01: generated STT/VAD stream-event payload tests -------
+# --- generated STT/VAD stream-event payload tests -------
 add_executable(test_stt_vad_stream_events test_stt_vad_stream_events.cpp)
 target_include_directories(test_stt_vad_stream_events PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -977,7 +974,7 @@ target_compile_features(test_storage_analyzer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_storage_analyzer_proto)
 add_test(NAME storage_analyzer_proto_tests COMMAND test_storage_analyzer_proto)
 
-# RT-CPU-03: ProviderRegistry<T> template unit tests (always built — no backend dep).
+# ProviderRegistry<T> template unit tests (always built — no backend dep).
 add_executable(test_provider_registry test_provider_registry.cpp)
 target_include_directories(test_provider_registry PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1012,7 +1009,7 @@ rac_link_archive_deps(test_runtime_loader)
 target_compile_features(test_runtime_loader PRIVATE cxx_std_17)
 add_test(NAME runtime_loader_tests COMMAND test_runtime_loader)
 
-# A2.1: CPU runtime session dispatch. Tests the built-in CPU runtime's
+# CPU runtime session dispatch. Tests the built-in CPU runtime's
 # provider hook without depending on a real GGUF model or llama.cpp.
 add_executable(test_runtime_cpu_session test_runtime_cpu_session.cpp)
 target_include_directories(test_runtime_cpu_session PRIVATE
@@ -1024,7 +1021,7 @@ rac_link_archive_deps(test_runtime_cpu_session)
 target_compile_features(test_runtime_cpu_session PRIVATE cxx_std_17)
 add_test(NAME runtime_cpu_session_tests COMMAND test_runtime_cpu_session)
 
-# A2.4: anti-regression that an engine create path can be wired to the
+# Anti-regression that an engine create path can be wired to the
 # runtime session vtable instead of allocating its own private session.
 add_executable(test_engine_uses_runtime test_engine_uses_runtime.cpp)
 target_include_directories(test_engine_uses_runtime PRIVATE
@@ -1165,11 +1162,11 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-# Note: whispercpp plugin-entry test (commons-012) is wired in the root
+# Note: whispercpp plugin-entry test is wired in the root
 # CMakeLists.txt for the same reason as sherpa — rac_backend_whispercpp lives
 # under engines/ and is not yet configured at this point.
 
-# Note: metalrt plugin-entry test (commons-009) is wired in the root
+# Note: metalrt plugin-entry test is wired in the root
 # CMakeLists.txt for the same reason as sherpa — rac_backend_metalrt is built
 # by engines/ (Apple-only OBJECT library folded into rac_commons) and is not
 # yet configured at this point.
@@ -1212,7 +1209,7 @@ rac_link_archive_deps(test_extraction)
 target_compile_features(test_extraction PRIVATE cxx_std_17)
 add_test(NAME extraction_tests COMMAND test_extraction --run-all)
 
-# --- CLUSTER-02 / COMMONS-LIBARCHIVE-001: program("gzip -d") fallback regression
+# --- program("gzip -d") fallback regression
 # Verifies rac_extract_archive_native() works on tar.gz via the in-process
 # zlib gzip filter ONLY — i.e. without ever fork/exec'ing /usr/bin/gzip.
 # This is the iOS sandbox failure mode (the sandbox blocks fork+exec), so the
@@ -1229,8 +1226,8 @@ target_compile_features(test_extraction_no_program_fallback PRIVATE cxx_std_17)
 add_test(NAME extraction_no_program_fallback_tests
          COMMAND test_extraction_no_program_fallback --run-all)
 
-# --- CLUSTER-14 / WEB-EXTRACT-001: libarchive zlib link assertion.
-# CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed iOS slices but the iter-2 Web lane
+# --- libarchive zlib link assertion.
+# An earlier fix corrected iOS slices but the Web lane
 # shipped an Emscripten WASM that still had the libarchive `program("gzip -d")`
 # fallback registered (HAVE_ZLIB_H undefined). This test asserts the in-process
 # gzip/bzip2/xz filters succeed at registration time and that opening a canned

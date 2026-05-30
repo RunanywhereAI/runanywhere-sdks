@@ -1,6 +1,6 @@
 /**
  * @file rac_http_client.h
- * @brief Platform-routed HTTP client C ABI (v2 close-out Phase H).
+ * @brief Platform-routed HTTP client C ABI.
  *
  * Canonical request/response structs and public entry points for HTTP
  * operations needed by commons. The actual network execution belongs
@@ -268,7 +268,7 @@ RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
                                                       const char* on_conflict_field);
 
 // =============================================================================
-// CANONICAL DEFAULT HEADERS (P2-T11)
+// CANONICAL DEFAULT HEADERS
 // =============================================================================
 
 /**
@@ -305,7 +305,7 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
 // =============================================================================
 // RESULT CODES
 // =============================================================================
-// Phase H consumers only need to check against RAC_SUCCESS; the other
+// Consumers only need to check against RAC_SUCCESS; the other
 // result codes come from rac/core/rac_error.h. For convenience:
 //
 //   RAC_SUCCESS                     — transfer completed (check .status

@@ -3,7 +3,7 @@
  * @brief Behavioral parity test for rac_llm_thinking C ABI vs Swift
  *        ThinkingContentParser (the type it replaces).
  *
- * v2 close-out Phase 5. Each test mirrors a unit-test scenario from the
+ * Each test mirrors a unit-test scenario from the
  * Swift implementation to lock in byte-equivalent behavior across SDKs.
  */
 

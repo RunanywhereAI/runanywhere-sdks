@@ -1,13 +1,13 @@
 /**
- * SDK smoke test — Wave E G-11 MVP harness.
+ * SDK smoke test — MVP harness.
  *
  * Loads the RunAnywhereAI example app in a real browser, waits for the
  * SDK initialization flow to hit the "interactive" readiness state, and
  * asserts the public API surfaces exist on `window.RunAnywhere`.
  *
  * Scope is intentionally tight: we do not download models or run actual
- * inference here. End-to-end LLM/STT/TTS testing comes after G-01 unblocks
- * ONNX WASM on Emscripten.
+ * inference here. End-to-end LLM/STT/TTS testing comes after ONNX WASM is
+ * unblocked on Emscripten.
  */
 import { test, expect } from '@playwright/test';
 

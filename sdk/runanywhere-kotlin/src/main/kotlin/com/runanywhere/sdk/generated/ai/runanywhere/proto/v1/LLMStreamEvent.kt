@@ -31,7 +31,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * v2 close-out Phase G-2: unified per-token streaming event. Replaces
+ * Unified per-token streaming event. Replaces
  * LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
  * callbackFlow / StreamController / tokenQueue. One serialized event
  * per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
@@ -84,8 +84,8 @@ public class LLMStreamEvent(
   )
   public val is_final: Boolean = false,
   /**
-   * Token semantic category (answer / thought / tool-call). IDL-06:
-   * canonical TokenKind from voice_events.proto.
+   * Token semantic category (answer / thought / tool-call).
+   * Canonical TokenKind from voice_events.proto.
    */
   @field:WireField(
     tag = 5,

@@ -1,6 +1,6 @@
 /**
  * @file rac_proto_adapters.h
- * @brief RunAnywhere Commons - C ABI <-> Proto adapters (Phase C6).
+ * @brief RunAnywhere Commons - C ABI <-> Proto adapters.
  *
  * Field-by-field adapters between the legacy C ABI structs (rac_*_t) and the
  * canonical wire-format proto messages declared under idl/ (and generated to
@@ -17,7 +17,7 @@
  *     return false. Callers SHOULD guard usage with `#ifdef RAC_HAVE_PROTOBUF`
  *     when they need a real conversion.
  *
- * Coverage (Phase C6 deliverable):
+ * Coverage:
  *   - STT  : config <-> proto STTConfiguration
  *            options <-> proto STTOptions (with STTLanguage enum mapping)
  *            output  <-> proto STTOutput  (rac_stt_output_t / rac_stt_result_t)
@@ -78,8 +78,7 @@
  *       proto set        -> C value
  *     Inverse direction maps the C sentinel back to proto unset.
  *
- * Drift table (recorded for the Phase C6 deliverable; see .cpp for inline
- * notes per adapter):
+ * Drift table (see .cpp for inline notes per adapter):
  *   - STTLanguage        : C uses BCP-47 string ("en-US"), proto uses enum.
  *                          Adapter strips region, looks up base code (see
  *                          stt_language_from_string / stt_language_to_string).
@@ -113,7 +112,7 @@
  *                                  adapter computes used / total * 100.0f
  *                                  on the to-proto path.
  *
- * Files added in Phase C6:
+ * Files:
  *   - sdk/runanywhere-commons/include/rac/foundation/rac_proto_adapters.h (this file)
  *   - sdk/runanywhere-commons/src/foundation/rac_proto_adapters.cpp
  */
@@ -137,7 +136,7 @@
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
-// commons-core-infra-003: foundation/ MUST NOT depend on features/.
+// foundation/ MUST NOT depend on features/.
 // The per-modality adapter declarations that previously lived in this
 // header (and forced six features/ includes) now live alongside their
 // C ABI type headers:
@@ -152,7 +151,7 @@
 
 #ifdef __cplusplus
 
-// MF-3 (AG-V3): proto types are forward-declared here instead of included via
+// Proto types are forward-declared here instead of included via
 // the generated `*.pb.h` headers. This keeps `runanywhere::v1::*` symbols and
 // the entire google::protobuf / absl transitive include set OUT of the public
 // interface of rac_commons — L5 consumers (Swift CRACommons, Kotlin JNI, Web,

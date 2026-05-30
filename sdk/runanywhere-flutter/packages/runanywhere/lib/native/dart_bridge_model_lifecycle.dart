@@ -19,13 +19,13 @@ import 'package:runanywhere/native/types/basic_types.dart';
 /// live model lifecycle truth in commons instead of mirroring component state in
 /// Dart maps or DTOs.
 ///
-/// **Wave-H note (2026-05-12)**: `load()` runs the C++ call on the main Dart
-/// isolate — earlier Wave-G `Isolate.run` wrap caused universal model-load
-/// SIGABRTs on both Android (FLUTTER-ANDROID-004) and iOS (FLUTTER-IOS-009)
+/// `load()` runs the C++ call on the main Dart
+/// isolate — an earlier `Isolate.run` wrap caused universal model-load
+/// SIGABRTs on both Android and iOS
 /// because `model_lifecycle.cpp` publishes events via Dart-side
 /// `NativeCallable` that's registered on the main isolate; calling it from
 /// a worker isolate trips Dart 3.10's `DLRT_GetFfiCallbackMetadata` assert.
-/// The pre-Wave-G `FLUTTER-IOS-003` Piper-on-iOS crash may recur; track
+/// The earlier Piper-on-iOS crash may recur; track
 /// separately. Long-term fix is commons-side: either (a) queue events
 /// instead of publishing synchronously during load, or (b) ensure the Dart
 /// SDK event-publish callback uses `NativeCallable.listener` (cross-isolate
@@ -61,7 +61,7 @@ class DartBridgeModelLifecycle {
       );
     }
 
-    // Main-isolate FFI call (Wave H — reverts Wave-G `Isolate.run` wrap).
+    // Main-isolate FFI call (reverts an earlier `Isolate.run` wrap).
     // See class-level note: cross-isolate event publish from
     // `model_lifecycle.cpp` is unsafe with Dart 3.10's stricter callback
     // metadata checks. We accept the main-isolate cost (≤30s for Piper /

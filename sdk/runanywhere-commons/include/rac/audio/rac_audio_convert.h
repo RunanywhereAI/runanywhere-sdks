@@ -2,7 +2,7 @@
  * @file rac_audio_convert.h
  * @brief Shared inline audio-conversion helpers for engine backends.
  *
- * Wave H-3 cleanup (DUP-01): the sherpa and whispercpp STT backends previously
+ * The sherpa and whispercpp STT backends previously
  * hand-rolled identical Int16 -> Float32 PCM conversion routines inside their
  * `vtable_transcribe` trampolines. This header centralizes that conversion so
  * every STT backend can normalize Int16 PCM to Float32 in [-1.0, 1.0] without

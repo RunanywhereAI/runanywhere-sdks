@@ -2,7 +2,7 @@
  * @file test_hardware_profile.cpp
  * @brief Sanity test for HardwareProfile detection.
  *
- * GAP 04 Phase 12. We can't assert exact values (depends on the host) but
+ * We can't assert exact values (depends on the host) but
  * we can assert invariants:
  *   - cached() returns a stable copy (same fields across back-to-back calls).
  *   - refresh() invalidates the cache.

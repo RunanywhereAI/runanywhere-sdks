@@ -9,7 +9,7 @@
 #include <utility>
 
 // =============================================================================
-// Platform HTTP transport registration (v2 close-out Phase H6)
+// Platform HTTP transport registration
 //
 // On iOS, rn_register_urlsession_transport() installs a URLSession-backed
 // rac_http_transport_ops vtable so subsequent rac_http_request_* calls route
@@ -319,7 +319,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
 
         LOGI("Destroying Core SDK...");
 
-        // HOTSPOT-RN-CORE-002: tear down voice/component globals + the
+        // Tear down voice/component globals + the
         // commons lifecycle registry FIRST so any in-flight component
         // callbacks/streams stop referencing soon-to-be-destroyed bridges.
         // Defined in HybridRunAnywhereCore+Voice.cpp.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/stream_edge.hpp — v3.1 Phase 9 DAG primitive (GAP 05).
+// rac/graph/stream_edge.hpp — DAG primitive.
 //
 // Typed, bounded, thread-safe queue connecting two DAG nodes. Three
 // overflow policies:

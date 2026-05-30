@@ -7,8 +7,8 @@
 // registry).
 //
 // Scope today:
-//   * Streaming proto callbacks (voice agent, LLM) — Phase A2 audit gap.
-//   * Phase H HTTP client (`rac_http_client_*`, `rac_http_request_send`,
+//   * Streaming proto callbacks (voice agent, LLM).
+//   * HTTP client (`rac_http_client_*`, `rac_http_request_send`,
 //     `rac_http_response_free`, `rac_http_request_stream`) and the
 //     blocking file download (`rac_http_download_execute`). These
 //     replace the per-SDK hand-rolled HTTP transports.
@@ -56,7 +56,7 @@ typedef RacProtoBufferFreeDart = void Function(
 );
 
 // ============================================================================
-// Voice agent + LLM proto streaming (Phase A2 / Phase G-2)
+// Voice agent + LLM proto streaming
 // ============================================================================
 
 /// Matches `rac_voice_agent_proto_event_callback_fn` in
@@ -468,7 +468,7 @@ typedef RacEmbeddingsInitializeDart = int Function(
 );
 
 // ============================================================================
-// Tool-calling proto APIs (Wave D-4 / FLT-07)
+// Tool-calling proto APIs
 // ============================================================================
 
 typedef RacToolCallProtoRequestNative = ffi.Int32 Function(
@@ -519,14 +519,14 @@ typedef RacToolCallingSessionDestroyProtoNative = ffi.Int32 Function(
 );
 typedef RacToolCallingSessionDestroyProtoDart = int Function(int);
 
-// pass2-syn-007: cancel ABI for the tool-calling session.
+// Cancel ABI for the tool-calling session.
 typedef RacToolCallingSessionCancelProtoNative = ffi.Int32 Function(
   ffi.Uint64,
 );
 typedef RacToolCallingSessionCancelProtoDart = int Function(int);
 
 // ============================================================================
-// Model format + artifact inference proto APIs (Wave D-3 / FLT-MODELS-REGISTER-INFER)
+// Model format + artifact inference proto APIs
 // ============================================================================
 
 typedef RacModelFormatFromUrlProtoNative = ffi.Int32 Function(
@@ -552,7 +552,7 @@ typedef RacArtifactInferFromUrlProtoDart = int Function(
 );
 
 // ============================================================================
-// STT stream lifecycle proto API (Wave D-5 / FLT-LIFECYCLE-OP-APIS)
+// STT stream lifecycle proto API
 // ============================================================================
 
 /// `void (*)(const uint8_t*, size_t, void*)` matching
@@ -577,7 +577,7 @@ typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
 );
 
 // ============================================================================
-// Voice agent Wave D-7 proto APIs (session + helpers + lifecycle-owned handle)
+// Voice agent proto APIs (session + helpers + lifecycle-owned handle)
 // ============================================================================
 
 typedef RacVoiceAgentProcessTurnProto2Native = ffi.Int32 Function(
@@ -627,7 +627,7 @@ typedef RacVoiceAgentComponentDestroyProtoDart = int Function(
 );
 
 // ============================================================================
-// Phase H HTTP client (rac_http_client.h)
+// HTTP client (rac_http_client.h)
 // ============================================================================
 
 /// Matches `rac_http_header_kv_t`.
@@ -714,7 +714,7 @@ typedef RacHttpDefaultHeadersDart = int Function(
 );
 
 // ============================================================================
-// Phase H HTTP download (rac_http_download.h)
+// HTTP download (rac_http_download.h)
 // ============================================================================
 
 /// Matches `rac_http_download_request_t`.
@@ -762,7 +762,7 @@ typedef RacHttpDownloadExecuteDart = int Function(
 );
 
 // ============================================================================
-// Model registry refresh (rac_model_registry.h — T4.9)
+// Model registry refresh (rac_model_registry.h)
 // ============================================================================
 
 /// Matches `rac_model_registry_refresh_opts_t`.
@@ -1128,7 +1128,7 @@ typedef RacSdkEventPublishFailureDart = int Function(
 );
 
 // ============================================================================
-// Audio utils (Phase G — rac_audio_utils.h)
+// Audio utils (rac_audio_utils.h)
 // ============================================================================
 
 /// Matches `rac_audio_compute_level_db(const float*, size_t, float*)` →
@@ -1758,7 +1758,7 @@ class RacBindings {
             'rac_tool_calling_session_destroy_proto',
           ),
         ),
-        // pass2-syn-007: cancel ABI lookup. Optional so older xcframework
+        // Cancel ABI lookup. Optional so older xcframework
         // bundles without the cancel symbol fall back to destroy-only.
         rac_tool_calling_session_cancel_proto =
             _lookupOptional<RacToolCallingSessionCancelProtoDart>(
@@ -1969,7 +1969,7 @@ class RacBindings {
 
   /// `rac_vlm_cancel_lifecycle_proto` — cancel lifecycle-owned VLM
   /// generation and return a serialized SDKEvent describing the
-  /// cancellation. Null when the commons binary predates Wave 7B.
+  /// cancellation. Null on older commons binaries.
   final RacOutOnlyProtoDart? rac_vlm_cancel_lifecycle_proto;
 
   final RacCreateWithModelDart? rac_embeddings_create;
@@ -2049,7 +2049,7 @@ class RacBindings {
 
   final RacHttpResponseFreeDart rac_http_response_free;
 
-  /// commons-core-infra-flutter-core-006: canonical SDK header list.
+  /// Canonical SDK header list.
   ///
   /// Optional (older RACommons binaries may not export it) — falls back to
   /// hard-coded defaults in adapters/http_client_adapter.dart when null.
@@ -2151,7 +2151,7 @@ class RacBindings {
 
   final RacSdkEventPublishFailureDart? rac_sdk_event_publish_failure;
 
-  // Tool-calling proto APIs (Wave D-4 / FLT-07) --------------------------
+  // Tool-calling proto APIs --------------------------
 
   final RacToolCallProtoRequestDart? rac_tool_call_parse_proto;
 
@@ -2168,22 +2168,22 @@ class RacBindings {
   final RacToolCallingSessionDestroyProtoDart?
       rac_tool_calling_session_destroy_proto;
 
-  // pass2-syn-007: cancel an in-flight tool-calling session.
+  // Cancel an in-flight tool-calling session.
   final RacToolCallingSessionCancelProtoDart?
       rac_tool_calling_session_cancel_proto;
 
-  // Model format + artifact inference proto APIs (Wave D-3) -----------------
+  // Model format + artifact inference proto APIs -----------------
 
   final RacModelFormatFromUrlProtoDart? rac_model_format_from_url_proto;
 
   final RacArtifactInferFromUrlProtoDart? rac_artifact_infer_from_url_proto;
 
-  // STT stream lifecycle proto API (Wave D-5) -------------------------------
+  // STT stream lifecycle proto API -------------------------------
 
   final RacSttTranscribeStreamLifecycleProtoDart?
       rac_stt_transcribe_stream_lifecycle_proto;
 
-  // Voice agent Wave D-7 proto APIs -----------------------------------------
+  // Voice agent proto APIs -----------------------------------------
 
   final RacVoiceAgentProcessTurnProto2Dart? rac_voice_agent_process_turn_proto;
 
@@ -2218,21 +2218,21 @@ class RacBindings {
 
   /// `rac_structured_output_schema_to_json_proto` — serializes a
   /// `JSONSchema` proto to canonical compact, key-sorted JSON Schema text.
-  /// Mirrors Swift `RAJSONSchema.jsonSchemaString` (P2-T15). Output bytes
+  /// Mirrors Swift `RAJSONSchema.jsonSchemaString`. Output bytes
   /// are raw UTF-8 text, NOT a proto message; callers extract the string
   /// directly from the `rac_proto_buffer_t` data field. Null when the
-  /// commons binary predates the P2-T15 export.
+  /// commons binary predates the export.
   final RacLifecycleRequestProtoDart?
       rac_structured_output_schema_to_json_proto;
 
-  // Audio utils (Phase G — rac_audio_utils.h) -------------------------------
+  // Audio utils (rac_audio_utils.h) -------------------------------
 
   /// `rac_audio_compute_level_db` — RMS→dB DSP for level meters. Centralises
   /// the hand-rolled DSP that used to live in each platform SDK's audio
   /// capture manager. Null when the commons binary predates the export.
   final RacAudioComputeLevelDbDart? rac_audio_compute_level_db;
 
-  // Tool value ↔ JSON proto APIs (Phase G — rac_tool_calling.h) -------------
+  // Tool value ↔ JSON proto APIs (rac_tool_calling.h) -------------
 
   /// `rac_tool_value_to_json_proto` — serializes a `ToolValue` proto into a
   /// `ToolValueJSON` wrapper carrying the canonical JSON text. Null when the
@@ -2276,8 +2276,7 @@ class RacBindings {
   final RacProtoQuiesceDart? rac_voice_agent_proto_quiesce;
 
   /// `rac_tool_calling_session_proto_quiesce` — spin-wait tool-calling session
-  /// dispatches. Null when the loaded commons binary predates the export
-  /// (commit `9f7030fa2` `[FIXLOOP iter1 CLUSTER-03/commons-features-llm-rag-003]`).
+  /// dispatches. Null when the loaded commons binary predates the export.
   final RacProtoQuiesceDart? rac_tool_calling_session_proto_quiesce;
 }
 

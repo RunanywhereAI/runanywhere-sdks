@@ -51,7 +51,7 @@ class DartBridgeTTS {
     _synthesizeLifecycleProtoForTesting = override;
   }
 
-  // Streaming test seam (pass2-syn-023). Symmetric to
+  // Streaming test seam. Symmetric to
   // `setSynthesizeLifecycleProtoForTesting` but for the streaming path —
   // tests use this to drive `synthesizeStreamLifecycleProto` without a real
   // FFI binding. The override receives the same `dispatch` closure the
@@ -62,7 +62,7 @@ class DartBridgeTTS {
   // (`TTSServiceState`) so the seam contract is identical to the real call.
   // The override's return value is discarded at the call site today, but
   // aligning the type eliminates refactor friction when commons-side stop
-  // state is propagated. (pass3-syn-163)
+  // state is propagated.
   static TTSServiceState Function()? _stopLifecycleProtoForTesting;
 
   /// Inject a fake native-stream driver. Pass `null` to clear.
@@ -181,7 +181,7 @@ class DartBridgeTTS {
     // `RacNative.bindings` triggers a `dlopen` of librac_commons, which fails
     // in the unit-test harness where no native library is staged. The test
     // group `DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake
-    // FFI` (pass2-syn-023) covers the production wrapper without the FFI.
+    // FFI` covers the production wrapper without the FFI.
     final fn = streamOverride == null
         ? RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto
         : null;
@@ -200,7 +200,7 @@ class DartBridgeTTS {
     // Shared dispatch closure — used by both the real NativeCallable.listener
     // and the test-injected fake FFI. Centralizing this guarantees the test
     // path exercises the same listener-body behavior (closed-controller
-    // guard, terminal-kind tracking) as production. (pass2-syn-023)
+    // guard, terminal-kind tracking) as production.
     void dispatchEvent(TTSStreamEvent event) {
       if (controller.isClosed) return;
       sawTerminalEvent = sawTerminalEvent ||
@@ -243,7 +243,7 @@ class DartBridgeTTS {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        // FLUTTER-IOS-006 fix (mirrors DartBridgeLLM.generateStreamProto):
+        // Mirrors DartBridgeLLM.generateStreamProto:
         // use `isolateLocal` (not `.listener`) so the callback runs
         // synchronously on the same thread that invoked
         // `rac_tts_synthesize_stream_lifecycle_proto`. The commons producer
@@ -288,7 +288,7 @@ class DartBridgeTTS {
         }
       } finally {
         calloc.free(requestPtr);
-        // CONSOLIDATE-D fix: drain in-flight TTS chunk dispatches before
+        // Drain in-flight TTS chunk dispatches before
         // closing the NativeCallable. `rac_tts_synthesize_stream_lifecycle_proto`
         // may post the terminal COMPLETED/ERROR callback from a worker
         // thread that copies the user_data slot under commons' internal
@@ -322,7 +322,7 @@ class DartBridgeTTS {
       } catch (e) {
         _logger.debug('stopLifecycleProto on stream cancel failed: $e');
       }
-      // Same CONSOLIDATE-D ordering as the run() teardown — quiesce first.
+      // Same ordering as the run() teardown — quiesce first.
       _quiesceBestEffort();
       callback?.close();
       callback = null;
@@ -453,8 +453,8 @@ class DartBridgeTTS {
       final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
 
       try {
-        // FLUTTER-IOS-006 fix (same root cause as
-        // synthesizeStreamLifecycleProto): `isolateLocal` so the callback runs
+        // Same root cause as
+        // synthesizeStreamLifecycleProto: `isolateLocal` so the callback runs
         // inline on the synchronous-FFI thread. `rac_tts_component_synthesize_
         // stream_proto`'s `bridge` (tts_component.cpp) serializes each chunk
         // into a stack-local buffer and invokes the callback inline; with
@@ -495,7 +495,7 @@ class DartBridgeTTS {
       } finally {
         calloc.free(textPtr);
         calloc.free(optionPtr);
-        // CONSOLIDATE-D: same quiesce-before-close ordering as the
+        // Same quiesce-before-close ordering as the
         // lifecycle-owned stream wrapper above. See
         // `synthesizeStreamLifecycleProto`.
         _quiesceBestEffort();
@@ -538,7 +538,7 @@ class DartBridgeTTS {
     }
   }
 
-  /// CONSOLIDATE-D best-effort quiesce. Wraps the FFI lookup in a try/catch
+  /// Best-effort quiesce. Wraps the FFI lookup in a try/catch
   /// so the unit-test harness (which can't `dlopen` librac_commons via the
   /// test seams' `streamOverride` path) does not crash when the production
   /// onCancel / finally cleanup runs without a native library staged.
@@ -551,8 +551,8 @@ class DartBridgeTTS {
   }
 }
 
-/// Test seam type for [DartBridgeTTS.synthesizeStreamLifecycleProto]
-/// (pass2-syn-023). The override receives:
+/// Test seam type for [DartBridgeTTS.synthesizeStreamLifecycleProto].
+/// The override receives:
 ///   - [request]: the TTSSynthesisRequest the production code received.
 ///   - [dispatch]: the same closure the production NativeCallable invokes —
 ///     pass a `TTSStreamEvent` to deliver it through the real wrapper's

@@ -15,7 +15,7 @@
  * a composite (STT + LLM + TTS + VAD) and create() is async. VoiceAgent
  * keeps its own bespoke scaffold (mirrors Swift's exception).
  *
- * Kotlin SDK W2-1 mirror of Swift's
+ * Kotlin SDK mirror of Swift's
  * `Sources/RunAnywhere/Foundation/Bridge/ComponentVTable.swift`.
  * Design (Option A): expect/class with a companion object that
  * exposes the 5 modality instances (`llm`, `stt`, `tts`, `vad`, `vlm`).
@@ -116,8 +116,7 @@ public class ComponentVTable internal constructor(
                 component = SDKComponent.SDK_COMPONENT_VLM,
                 // VLM in the Kotlin SDK never owns a bare component handle
                 // (load+create are fused at the proto service layer).
-                // Mirrors Swift Wave 7 / T23 note: the slot is kept for
-                // shape uniformity but is dead in practice.
+                // The slot is kept for shape uniformity but is dead in practice.
                 createFn = { 0L },
                 destroyFn = { handle -> RunAnywhereBridge.racVlmDestroy(handle) },
                 // Slot kept for shape uniformity.

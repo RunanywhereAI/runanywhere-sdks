@@ -2,8 +2,6 @@
  * @file rac_plugin_entry.h
  * @brief Plugin entry-point declaration + registration macros.
  *
- * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * A plugin is a collection of static or dynamic library symbols that, when
  * the host calls `rac_plugin_entry_<name>()`, returns a pointer to a filled
  * `rac_engine_vtable_t`. The registry takes ownership of the returned
@@ -45,10 +43,10 @@ extern "C" {
  * Do NOT bump for additive metadata (new flags in `capability_flags`).
  *
  * Version history:
- *   1u (GAP 02) — initial release. 8 primitive slots + 10 reserved slots.
+ *   1u — initial release. 8 primitive slots + 10 reserved slots.
  *                 Metadata = abi_version, name, display_name, engine_version,
  *                 priority, capability_flags, reserved_0, reserved_1.
- *   2u (GAP 04) — replaced metadata.reserved_0/_1 (8 bytes total) with the
+ *   2u — replaced metadata.reserved_0/_1 (8 bytes total) with the
  *                 routing extension: runtimes[] + runtimes_count +
  *                 formats[] + formats_count (48 bytes total). Plugins built
  *                 against v1 will be rejected at register time with
@@ -137,7 +135,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *        - macOS / iOS:   `-Wl,-force_load,libplugin.a`
  *        - GNU / Android: `-Wl,--whole-archive libplugin.a -Wl,--no-whole-archive`
  *        - MSVC:          add `/INCLUDE:_g_rac_plugin_autoreg_<name>` per plugin
- *      `cmake/plugins.cmake` (introduced in GAP 07) wraps these into a single
+ *      `cmake/plugins.cmake` wraps these into a single
  *      `rac_force_load(plugin_target)` helper.
  *
  * ## Init ordering

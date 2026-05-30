@@ -1,7 +1,7 @@
 /**
  * AsyncQueue.ts
  *
- * v2 close-out Phase 14 helper. Extracts the `tokenQueue: T[] +
+ * Helper that extracts the `tokenQueue: T[] +
  * resolveNext` async-iteration pattern that was inlined inside multiple
  * Web SDK files (RunAnywhere+TextGeneration.ts, RunAnywhere+STT.ts, etc.)
  * into one reusable producer/consumer pair.

@@ -231,7 +231,7 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     rac_stt_proto_stream_event_callback_fn callback, void* user_data);
 
 // =============================================================================
-// CPP-14 (Wave 1): persistent per-session streaming handles.
+// Persistent per-session streaming handles.
 //
 // Commons exposes these thin wrappers so `rac_stt_stream.cpp` can reach the
 // backend vtable without hard-coding knowledge of the service struct layout.

@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — two-phase SDK initialization.
 //
-// P2-T9: Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
+// Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
 // list that lives in every SDK (RunAnywhere.swift, Kotlin RunAnywhere object,
 // Flutter RunAnywhereSDK, RN RunAnywhere, Web RunAnywhere) into a single C
 // ABI surface owned by commons. Platform SDKs still spawn their own
@@ -103,7 +103,7 @@ public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// (development=0, staging=1, production=2). Numeric values are part of the
 /// wire format; do not reorder.
 ///
-/// idl-002 (PHASE8-RETRY 20260526-121300): the prior FIXLOOP-iter1 attempt to
+/// The prior attempt to
 /// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
 /// Swift iOS at runtime — the shipped librac_commons.a in
 /// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
@@ -275,7 +275,7 @@ public nonisolated struct RASdkInitResult: @unchecked Sendable {
     set {_uniqueStorage()._durationMs = newValue}
   }
 
-  /// flutter-core-009: explicit two-phase HTTP-setup completion flag,
+  /// Explicit two-phase HTTP-setup completion flag,
   /// decoupled from services-init completion so SDKs that initialize
   /// offline (no connectivity) can still report success=true with
   /// has_completed_http_setup=false and retry HTTP later via the

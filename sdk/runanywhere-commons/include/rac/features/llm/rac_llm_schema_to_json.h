@@ -2,7 +2,7 @@
  * @file rac_llm_schema_to_json.h
  * @brief RunAnywhere Commons - JSONSchema proto -> JSON Schema string ABI.
  *
- * P2-T15: Exposes the canonical JSON-schema text serializer that previously
+ * Exposes the canonical JSON-schema text serializer that previously
  * lived in Swift's StructuredOutputProto+Helpers.swift JSONSchemaWriter
  * (~130 LOC). Letting commons own this serializer means every SDK can drop
  * its private JSON-schema writer and ride the same byte-exact text used by

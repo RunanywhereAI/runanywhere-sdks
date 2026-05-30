@@ -8,9 +8,9 @@
 //  `CppBridge.ComponentActor`. TTS-specific surfaces kept here:
 //  the `loadVoice` voice-terminology wrapper and `stop()` to interrupt
 //  synthesis.
-//  The public `isLoaded` accessor was removed in Wave 6C (T13) — call
-//  sites now query `RunAnywhere.currentModel(category: .speechSynthesis)`
-//  on the lifecycle as the single source of truth.
+//  The public `isLoaded` accessor was removed — call sites now query
+//  `RunAnywhere.currentModel(category: .speechSynthesis)` on the
+//  lifecycle as the single source of truth.
 //
 
 import CRACommons

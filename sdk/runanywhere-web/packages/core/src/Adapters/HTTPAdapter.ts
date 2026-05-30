@@ -1,5 +1,5 @@
 /**
- * HTTPAdapter.ts (Web / WASM) — T3.13.
+ * HTTPAdapter.ts (Web / WASM).
  *
  * Thin TypeScript wrapper around the commons libcurl-backed C ABI
  * declared in:
@@ -7,7 +7,7 @@
  *   sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h
  *
  * Why this exists:
- *   Before T3.13 every Web SDK site re-implemented HTTP with browser fetch
+ *   Previously every Web SDK site re-implemented HTTP with browser fetch
  *   + ad-hoc progress loops. Parity with the other SDKs (Swift /
  *   Kotlin / React Native / Flutter) now routes through the commons
  *   HTTP C ABI so redirects, resume, checksum, and progress semantics
@@ -88,7 +88,7 @@ export interface HTTPModule {
   _rac_http_client_destroy?(clientPtr: number): void;
   _rac_http_response_free?(respPtr: number): void;
 
-  // Transport registry (v2 close-out Phase H2 / H7). Present only on
+  // Transport registry. Present only on
   // the WASM build of commons — registers the emscripten_fetch-backed
   // adapter with the platform HTTP router so the libcurl fallback
   // (compiled out on WASM) is bypassed for every `rac_http_request_*`
@@ -96,7 +96,7 @@ export interface HTTPModule {
   _rac_http_transport_register_emscripten?(): number;
   _rac_http_transport_is_registered?(): number;
 
-  // Stage 3d — JS-side transport registration. The JS layer installs
+  // JS-side transport registration. The JS layer installs
   // function-table indices for the transport vtable directly (see
   // FetchHttpTransport.ts) so requests can be routed through `fetch()`
   // without bouncing through `emscripten_fetch`. Pass 0 for any op you
@@ -268,7 +268,7 @@ function required<T>(fn: T | undefined, name: string): T {
     throw SDKException.fromCode(
       SDKErrorCode.WASMNotLoaded,
       `HTTPAdapter: WASM module is missing export '${name}'. ` +
-      `Rebuild the WASM target with the T3.13 HTTP exports enabled.`,
+      `Rebuild the WASM target with the HTTP exports enabled.`,
     );
   }
   return fn;
@@ -582,7 +582,7 @@ export class HTTPAdapter {
   static setDefaultModule(module: HTTPModule): void {
     HTTPAdapter.defaultInstance = new HTTPAdapter(module);
 
-    // v2 close-out Phase H7: on the WASM commons build the
+    // On the WASM commons build the
     // emscripten_fetch-backed adapter registers itself via the platform
     // HTTP transport vtable so the router in rac_http_client_curl.cpp
     // short-circuits to it. The symbol is only exported from the WASM
@@ -605,10 +605,10 @@ export class HTTPAdapter {
       }
     }
 
-    // Stage 3d — JS-side adapter registration. Installed AFTER the
+    // JS-side adapter registration. Installed AFTER the
     // emscripten_fetch registration above so any subsequent HTTP request
     // goes through the JS trampolines when the module supports them. When
-    // the build lacks the Stage 3d export (`_rac_http_transport_register_from_js`)
+    // the build lacks the export (`_rac_http_transport_register_from_js`)
     // the install() call is a silent no-op and the emscripten_fetch
     // adapter above remains active.
     //

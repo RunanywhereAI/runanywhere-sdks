@@ -97,7 +97,7 @@ extension CppBridge {
                 // and rac_model_info_make_proto's multi-file is_downloaded gating
                 // work on Apple platforms without the warning fallback in
                 // ModelRegistryRefreshResult.warnings. Matches the Kotlin / Flutter /
-                // RN siblings of CLUSTER-280-SPLIT.
+                // RN siblings.
                 state.adapter.file_list_directory = platformFileListDirectoryCallback
                 state.adapter.is_non_empty_directory = platformIsNonEmptyDirectoryCallback
 
@@ -566,7 +566,7 @@ private func platformNowMsCallback(
 // MARK: - Vendor ID Callback (Apple-only)
 
 /// Provides UIDevice.identifierForVendor.uuidString to the commons
-/// device-identity resolver (P2-T13). On macOS the API is unavailable so
+/// device-identity resolver. On macOS the API is unavailable so
 /// commons falls through to its synthesized-UUID branch. The returned
 /// UUID string is guaranteed to fit in the 36-char canonical form + NUL.
 private func platformGetVendorIdCallback(

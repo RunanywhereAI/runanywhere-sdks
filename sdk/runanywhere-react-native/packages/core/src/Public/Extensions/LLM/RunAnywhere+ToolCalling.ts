@@ -35,7 +35,7 @@ const logger = new SDKLogger('RunAnywhere.ToolCalling');
  * and Kotlin's `Map<String, ToolValue>`) and returns a result in the same
  * typed form. Fields are accessed via `args.location?.stringValue`,
  * `args.count?.numberValue`, etc. — matching the Swift `RAToolValue.string`
- * / `.number` pattern on the wire-canonical oneof tree (IDL-13).
+ * / `.number` pattern on the wire-canonical oneof tree.
  */
 export type ToolExecutor = (
   args: Record<string, ToolValue>
@@ -69,7 +69,7 @@ export { ToolParameterType };
 // `{"location":"NYC","count":5}`). Swift delegates the deep walk to
 // commons via `RAToolValue.parseObjectJSON`; RN performs the equivalent
 // walk here in TypeScript so executors receive the same `ToolValue` oneof
-// tree (IDL-13) rather than `unknown`.
+// tree rather than `unknown`.
 // ---------------------------------------------------------------------------
 
 function plainJsonToToolValue(value: unknown): ToolValue {
@@ -244,7 +244,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
  * Web `fetch`-style `AbortSignal` so callers can cancel an in-flight run loop
  * via `controller.abort()`.
  *
- * pass2-syn-007: wires through to `rac_tool_calling_run_loop_cancel_proto`.
+ * Wires through to `rac_tool_calling_run_loop_cancel_proto`.
  */
 export interface GenerateWithToolsOptions {
   signal?: AbortSignal;
@@ -274,7 +274,7 @@ export async function generateWithTools(
       requestBytes: ArrayBuffer,
       onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
     ) => Promise<ArrayBuffer>;
-    // pass2-syn-007: optional cancel-aware variant. When the native module
+    // Optional cancel-aware variant. When the native module
     // ships the with-handle variant, we drive that instead so AbortSignal
     // can interrupt the in-flight C call.
     toolRunLoopProtoWithHandle?: (
@@ -304,7 +304,7 @@ export async function generateWithTools(
     maxIterations: options?.maxIterations ?? options?.maxToolCalls ?? 5,
     keepToolsAvailable: options?.keepToolsAvailable ?? false,
     validateCalls: true,
-    // pass2-syn-006-followup-rn: thread the OpenAI-style tool_choice /
+    // Thread the OpenAI-style tool_choice /
     // forced_tool_name knobs into the canonical request envelope (idl
     // fields 7/8). Commons build_options_snapshot copies them onto every
     // synthesized ToolCallingOptions before format/validate proto calls.

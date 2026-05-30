@@ -1,5 +1,5 @@
 /**
- * OkHttp Platform HTTP Transport Adapter (v2 close-out Phase H4 + R3)
+ * OkHttp Platform HTTP Transport Adapter
  *
  * JNI bridge between the C `rac_http_transport_ops` vtable and Kotlin's
  * `com.runanywhere.sdk.foundation.http.OkHttpTransport`. When registered,
@@ -93,15 +93,14 @@ OkHttpTransportGlobals& globals() {
     return g;
 }
 
-// commons-core-infra-008: snapshot the JNI handles the request entry
+// Snapshot the JNI handles the request entry
 // points need under `g.mu` so destroy() (which clears them, also under
 // `g.mu`) cannot race with a concurrent send/stream/resume. The
 // snapshot is a copy of the cached jclass / jmethodID / jfieldID
 // values; the underlying global refs stay valid for the call's
 // duration because destroy() can only run AFTER
 // `rac_http_transport_register` retires the slot (and the slot's
-// refcount drops to zero — see rac_http_transport.cpp,
-// commons-core-infra-006). Even with that registry-level guarantee,
+// refcount drops to zero — see rac_http_transport.cpp). Even with that registry-level guarantee,
 // the per-handle reads themselves must be locked to satisfy TSAN +
 // CheckJNI: a torn read of a 64-bit jmethodID would surface as an
 // undefined-method dereference, not a clean RAC_ERROR_INTERNAL.
@@ -209,7 +208,7 @@ jobjectArray build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers
     return arr;
 }
 
-// commons-153: guard the empty-headers fallback. FindClass can fail under
+// Guard the empty-headers fallback. FindClass can fail under
 // JVM shutdown / classloader pressure, so never hand a null class to
 // NewObjectArray (which throws NPE and would ship a malformed request).
 rac_result_t ensure_headers_array(JNIEnv* env, jobjectArray* headers) {
@@ -310,7 +309,7 @@ rac_result_t copy_jstring_headers(JNIEnv* env, jobjectArray arr, rac_http_header
     return RAC_SUCCESS;
 }
 
-// kotlin-025: map transport failures by inspecting the Kotlin-side error
+// Map transport failures by inspecting the Kotlin-side error
 // message prefix. OkHttpHttpTransport formats errorMessage as
 // `${e.javaClass.simpleName}: ${e.message}`, so the leading token is the
 // JVM exception class. SocketTimeoutException and InterruptedIOException
@@ -326,7 +325,7 @@ rac_result_t map_kotlin_transport_error(const std::string& msg) {
     return RAC_ERROR_NETWORK_ERROR;
 }
 
-// kotlin-026: wall-clock for `rac_http_response_t.elapsed_ms`. OkHttp's
+// Wall-clock for `rac_http_response_t.elapsed_ms`. OkHttp's
 // per-call timing isn't exposed across JNI without DTO changes, so we
 // time the dispatch boundary (JNI call → response received) which is the
 // same envelope Swift's URLSessionHttpTransport.elapsedMilliseconds(since:)
@@ -348,7 +347,7 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    // commons-core-infra-008: snapshot the JNI globals under the
+    // Snapshot the JNI globals under the
     // adapter's mutex so a concurrent destroy() can't tear the reads.
     OkHttpHandlesSnapshot g = snapshot_globals_locked();
     if (!g.ok || g.execute_request_mid == nullptr) {
@@ -389,7 +388,7 @@ rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* 
 
     jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
 
-    // kotlin-026: dispatch-boundary timing for `out_resp->elapsed_ms`.
+    // Dispatch-boundary timing for `out_resp->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
     // Call into Kotlin. OkHttpTransport.executeRequest returns a non-null
@@ -509,7 +508,7 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    // commons-core-infra-008: snapshot the JNI globals under the
+    // Snapshot the JNI globals under the
     // adapter's mutex so a concurrent destroy() can't tear the reads.
     OkHttpHandlesSnapshot g = snapshot_globals_locked();
     if (!g.ok || g.execute_streaming_request_mid == nullptr) {
@@ -552,7 +551,7 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
 
-    // kotlin-026: dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_streaming_request_mid,
@@ -638,7 +637,7 @@ rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t
     return rc;
 }
 
-// R3 + commons-core-infra-001: resume implementation. Mirrors the Swift
+// R3: resume implementation. Mirrors the Swift
 // URLSessionHttpTransport.cRequestResume contract: forwards
 // resume_from_byte plus the native chunk callback into Kotlin's
 // `executeResumeRequest`, which attaches the canonical `Range: bytes=N-`
@@ -653,7 +652,7 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     if (req->method == nullptr || req->url == nullptr)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    // commons-core-infra-008: snapshot the JNI globals under the
+    // Snapshot the JNI globals under the
     // adapter's mutex so a concurrent destroy() can't tear the reads.
     OkHttpHandlesSnapshot g = snapshot_globals_locked();
     if (!g.ok || g.execute_resume_request_mid == nullptr) {
@@ -694,7 +693,7 @@ rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t
     jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
     jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
 
-    // kotlin-026: dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
     auto t_start = std::chrono::steady_clock::now();
 
     jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
@@ -912,7 +911,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     // Signature: (String, String, String[], byte[], long, long, long, long)
     //            -> OkHttpHttpTransport$StreamResponse
     // Same StreamResponse shape as executeStreamingRequest plus the extra
-    // resume_from_byte long argument. commons-core-infra-001: this slot was
+    // resume_from_byte long argument. This slot was
     // previously left NULL, which caused rac_http_download_execute to fail
     // with RAC_ERROR_FEATURE_NOT_AVAILABLE on Android resumes.
     g.execute_resume_request_mid = env->GetStaticMethodID(

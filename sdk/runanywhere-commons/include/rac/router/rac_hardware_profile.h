@@ -2,8 +2,6 @@
  * @file rac_hardware_profile.h
  * @brief Detected hardware capabilities of the host process.
  *
- * GAP 04 Phase 9 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
  * The router uses this profile to score plugins against the caller's
  * `rac_routing_hints_t::preferred_runtime`. Detection is performed once on
  * first call to `cached()` and memoized for the process's lifetime; callers

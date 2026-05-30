@@ -2512,7 +2512,7 @@ export interface GenerationEvent {
   thinkingText: string;
   /**
    * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-   * Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+   * Enables totalTokens = input_tokens + tokens_used analytics
    * from the event stream alone.
    */
   inputTokens: number;

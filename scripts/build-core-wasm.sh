@@ -5,8 +5,6 @@
 # toolchain), builds the real runanywhere_wasm target, and verifies the
 # package-consumable artifacts under sdk/runanywhere-web/packages/llamacpp/wasm.
 #
-# GAP 07 Phase 6 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # WASM uses RAC_STATIC_PLUGINS=ON (set by the preset) — engines link
 # directly into the WASM module since dlopen is unavailable.
 #

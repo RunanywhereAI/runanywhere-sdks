@@ -1,6 +1,6 @@
 /**
  * @file test_http_default_headers.cpp
- * @brief Parity test for `rac_http_default_headers` (P2-T11).
+ * @brief Parity test for `rac_http_default_headers`.
  *
  * Verifies that the canonical default-header list returned from commons
  * matches Swift's `HTTPClientAdapter.defaultHeaders` (sans X-Platform):

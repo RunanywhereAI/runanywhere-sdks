@@ -1,11 +1,10 @@
 /**
  * @file test_model_heuristics.cpp
- * @brief Tests for CONSOLIDATE-A (CLUSTER-14) commons-owned RAModelInfo
- *        heuristics: tool-call format + parameterCountB + isSmallModel.
+ * @brief Tests for commons-owned RAModelInfo heuristics: tool-call format +
+ *        parameterCountB + isSmallModel.
  *
  * Exercises the three accessors that replace the duplicated example-side
- * detectors flagged by the reviewer (examples-flutter-005 / 006,
- * examples-ios-003, examples-android-008):
+ * detectors flagged by the reviewer:
  *
  *   - rac_tool_call_format_from_model_info_proto:
  *       LFM2-Tool variants → RAC_TOOL_FORMAT_LFM2.

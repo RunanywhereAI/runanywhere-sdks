@@ -49,7 +49,7 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         unloadRequest.category = .language
 
         do {
-            // v2 close-out Phase G-2: generateStream returns
+            // generateStream returns
             // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
             // tokens/sec from the event sequence directly.
             let warmupStart = Date()

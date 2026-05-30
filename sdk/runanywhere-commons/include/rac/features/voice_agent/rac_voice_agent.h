@@ -43,14 +43,14 @@
 #include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
-// commons-features-voice-007: legacy non-proto entry points are scheduled
+// Legacy non-proto entry points are scheduled
 // for removal. They retain external callers today (Playground/linux-voice,
 // commons tests) so we mark them deprecated with -Wdeprecated-declarations
 // instead of deleting outright — clang-tidy / -Wdeprecated-declarations
 // flags any remaining caller for follow-up migration.
 #if defined(__clang__) || defined(__GNUC__)
 #define RAC_VOICE_AGENT_LEGACY_DEPRECATED \
-    __attribute__((deprecated("Use the proto-byte / Wave D-7 voice-agent ABI instead.")))
+    __attribute__((deprecated("Use the proto-byte voice-agent ABI instead.")))
 #else
 #define RAC_VOICE_AGENT_LEGACY_DEPRECATED
 #endif
@@ -704,7 +704,7 @@ RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
 // =============================================================================
 
 /**
- * @section voice_agent_audio_ingress Audio-Ingress Contract (commons-018-A)
+ * @section voice_agent_audio_ingress Audio-Ingress Contract
  *
  * The voice-agent C ABI is a pure-CPU library and owns NO microphone access.
  * All audio must be captured by the platform SDK (iOS AVAudioEngine, Android
@@ -735,7 +735,7 @@ RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
  *      rac_voice_agent_transcribe_proto / synthesize_speech_proto /
  *      generate-LLM helpers for the remaining stages.
  *
- * Planned (NOT yet wired — tracked under commons-018-A): a streaming
+ * Planned (NOT yet wired): a streaming
  * `rac_voice_agent_feed_audio_proto(handle, samples, n, sample_rate,
  * is_final)` entry point that internally tees the audio into the STT/VAD
  * streams and emits an aggregated VoiceEvent stream identical to the
@@ -779,7 +779,7 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_ha
 }
 #endif
 
-// Wave D-7: full-session voice-agent ABI + per-helper proto wrappers.
+// Full-session voice-agent ABI + per-helper proto wrappers.
 #ifdef __cplusplus
 extern "C" {
 #endif

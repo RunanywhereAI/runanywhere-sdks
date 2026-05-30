@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * The main entry point for the RunAnywhere SDK.
- * Two-phase initialization delegates to CppBridge (P2-T9):
+ * Two-phase initialization delegates to CppBridge:
  *   * Phase 1 → CppBridge.initialize() → CppBridgeSdkInit.phase1
  *     (rac_sdk_init_phase1_proto) for validation + config/state init.
  *   * Phase 2 → CppBridge.initializeServices() — device registration, HTTP
@@ -84,7 +84,7 @@ import kotlinx.coroutines.sync.withLock
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadModel(RAModelLoadRequest)
  * - LLM: RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
+ * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream()
  *
  * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).

@@ -22,6 +22,19 @@ import kotlin.Suppress
  * sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
  * (development=0, staging=1, production=2). Numeric values are part of the
  * wire format; do not reorder.
+ *
+ * The prior attempt to
+ * add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
+ * Swift iOS at runtime — the shipped librac_commons.a in
+ * sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
+ * original 0/1/2 layout, so Swift sending the regenerated enum value 1
+ * (DEVELOPMENT) was decoded as STAGING by the old C++ side, which then failed
+ * validation with RAC_ERROR_INVALID_ARGUMENT ("API key required"). The other
+ * SDKs (Kotlin / Flutter / RN / Web) were never regenerated for the bumped
+ * layout either, so reverting to the original 0/1/2 wire-format restores
+ * cross-SDK consistency without requiring a coordinated xcframework rebuild.
+ * Re-introducing UNSPECIFIED=0 must be paired with a synchronized rebuild of
+ * every prebuilt commons binary AND regeneration of all five SDK bindings.
  * ---------------------------------------------------------------------------
  */
 public enum class SdkInitEnvironment(

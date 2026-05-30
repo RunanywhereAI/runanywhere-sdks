@@ -24,7 +24,7 @@
 
 static const char* LOG_CAT = "TTS.Service";
 
-// Phase 2.6 (engine independence refactor): identity stringify of the
+// Engine independence refactor: identity stringify of the
 // framework enum to the plugin's metadata.name. Sherpa now declares
 // framework = RAC_FRAMEWORK_SHERPA in the registry, so we no longer
 // need the legacy ONNX -> "sherpa" hack. All 4 service files
@@ -104,7 +104,7 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
                       model_info->id ? model_info->id : "NULL", framework);
     }
 
-    // v3 Phase B8: route through the plugin registry.
+    // Route through the plugin registry.
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework);
 
@@ -139,7 +139,7 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     service->model_id = strdup(voice_id);
     *out_handle = service;
 
-    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // Single source of truth for the "*.backend.created" telemetry
     // event. Previously each backend fired this from its own *_create path;
     // now it fires once from the commons service layer so future backends
     // inherit the emit for free (and can't silently drop it).

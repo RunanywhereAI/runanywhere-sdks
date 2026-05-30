@@ -105,7 +105,7 @@ export const WebModelLifecycle = {
       ModelRegistry.registerModel(modelSnapshot);
     }
 
-    // BUG-WEB-002 / OPFS persistence: model files were persisted to OPFS
+    // OPFS persistence: model files were persisted to OPFS
     // after download (see RunAnywhere.downloadModel). On a fresh tab the
     // Emscripten MEMFS is empty, so the C++ engine loader's `fopen` /
     // `mmap` against the canonical /opfs/... path would fail. Restore

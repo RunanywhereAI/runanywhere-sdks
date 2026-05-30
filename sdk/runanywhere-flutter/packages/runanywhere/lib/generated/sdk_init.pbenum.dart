@@ -50,7 +50,7 @@ class SdkInitPhase extends $pb.ProtobufEnum {
 /// (development=0, staging=1, production=2). Numeric values are part of the
 /// wire format; do not reorder.
 ///
-/// idl-002 (PHASE8-RETRY 20260526-121300): the prior FIXLOOP-iter1 attempt to
+/// The prior attempt to
 /// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
 /// Swift iOS at runtime — the shipped librac_commons.a in
 /// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the

@@ -189,7 +189,7 @@ abstract class NativeFunctions {
           'rac_voice_agent_destroy');
 
   // ---------------------------------------------------------------------------
-  // Voice Agent Proto-Byte Callback ABI (v3-readiness Phase A2 / GAP 09 #6)
+  // Voice Agent Proto-Byte Callback ABI
   //
   // `rac_voice_agent_set_proto_callback` is the canonical streaming entry
   // point for VoiceEvent. The typed instance-method-style facade lives in
@@ -226,7 +226,7 @@ abstract class NativeFunctions {
   })();
 
   // ---------------------------------------------------------------------------
-  // Solutions runtime (rac/solutions/rac_solution.h) — T4.7/T4.8.
+  // Solutions runtime (rac/solutions/rac_solution.h).
   //
   // Proto-byte / YAML driven L5 solution runtime. `solutionCreateFromProto`
   // and `solutionCreateFromYaml` allocate a `rac_solution_handle_t` via

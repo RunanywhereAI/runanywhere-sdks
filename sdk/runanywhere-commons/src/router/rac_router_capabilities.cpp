@@ -2,7 +2,7 @@
  * @file rac_router_capabilities.cpp
  * @brief Proto-byte C ABI for engine-router capability queries.
  *
- * Wave H-5 (KOT-12). Single commons-owned implementation of the
+ * Single commons-owned implementation of the
  * `SDKComponent → [InferenceFramework]` lookup. Enumerates the engine-router
  * plugin registry for the primitives mapped from the requested
  * SDKComponent, maps each plugin's metadata.name to an InferenceFramework

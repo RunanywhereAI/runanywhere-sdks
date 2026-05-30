@@ -105,7 +105,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   /// True once we've registered modules + models once. Without
   /// this guard, hot-reload (or any second call) re-runs the entire
-  /// LLM catalog registration block, which is wasteful (B-FL-3-002).
+  /// LLM catalog registration block, which is wasteful.
   static bool _modulesRegistered = false;
 
   Future<void> _registerLanguageModel({
@@ -129,7 +129,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   /// Each module explicitly owns its models - the framework is determined by the module
   Future<void> _registerModulesAndModels() async {
     if (_modulesRegistered) {
-      debugPrint('📦 Modules already registered — skipping (B-FL-3-002)');
+      debugPrint('📦 Modules already registered — skipping');
       return;
     }
     debugPrint('📦 Registering modules with their models...');
@@ -376,7 +376,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       // Actual silero_vad.onnx artifact size (verified Content-Length).
       // memoryRequirement doubles as downloadSizeBytes, which feeds the
-      // post-finalize download size guard (CLUSTER-13). An over-stated 5 MB
+      // post-finalize download size guard. An over-stated 5 MB
       // tripped the guard on a valid ~2.3 MB download.
       memoryRequirement: 2327524,
     );

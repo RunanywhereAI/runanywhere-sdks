@@ -1,7 +1,7 @@
 /**
  * EmscriptenModule.ts
  *
- * v3-readiness Phase A4. Typed surface over the Emscripten-compiled
+ * Typed surface over the Emscripten-compiled
  * RACommons module so TypeScript call sites (VoiceAgentStreamAdapter,
  * future ccall wrappers) can reference `runanywhereModule`
  * without each site re-declaring the function signatures.
@@ -37,7 +37,7 @@ import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
  */
 export interface EmscriptenRunanywhereModule {
   // =============================================================================
-  // Exported C functions (post-v3-readiness-PhaseA4)
+  // Exported C functions
   // =============================================================================
   // Must be listed in sdk/runanywhere-web/wasm/CMakeLists.txt
   // RAC_EXPORTED_FUNCTIONS to actually resolve at runtime.
@@ -58,8 +58,6 @@ export interface EmscriptenRunanywhereModule {
   ): number;
 
   /**
-   * v2 close-out Phase G-2:
-   *
    * `rac_result_t rac_llm_set_stream_proto_callback(
    *    rac_handle_t handle,
    *    rac_llm_stream_proto_callback_fn callback,  // function-table index
@@ -316,7 +314,7 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   /**
-   * pass2-syn-026: Session-based tool-calling ABI. The Web SDK uses these
+   * Session-based tool-calling ABI. The Web SDK uses these
    * (instead of the synchronous `_rac_tool_calling_run_loop_proto`) so that
    * TypeScript executors returning `Promise<ToolResult>` can be awaited
    * between commons-driven generate -> parse -> validate cycles.
@@ -357,7 +355,7 @@ export interface EmscriptenRunanywhereModule {
     sessionHandle: number | bigint,
   ): number;
   /**
-   * pass2-syn-007: `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
+   * `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
    *   Latches a cancel-requested flag on the session and asks the in-flight
    *   LifecycleLlmRef to interrupt the underlying backend `ops->generate`.
    *   Distinct from `_rac_tool_calling_session_destroy_proto` — the host
@@ -422,7 +420,7 @@ export interface EmscriptenRunanywhereModule {
   _rac_state_is_device_registered?(): number;
 
   // -----------------------------------------------------------------------------
-  // Solutions runtime (T4.7 / T4.8) — `rac/solutions/rac_solution.h`
+  // Solutions runtime — `rac/solutions/rac_solution.h`
   // -----------------------------------------------------------------------------
   // Backing the `RunAnywhere.solutions.run(...)` capability. `_create_from_proto`
   // takes a `(bytesPtr, bytesLen, outHandlePtr)` triple and populates the
@@ -460,7 +458,7 @@ export interface EmscriptenRunanywhereModule {
   _rac_solution_destroy(handle: number): void;
 
   // -----------------------------------------------------------------------------
-  // HTTP transport registry (Stage 3d — JS-side fetch adapter)
+  // HTTP transport registry (JS-side fetch adapter)
   // -----------------------------------------------------------------------------
   // The JS layer installs function-table indices (from `addFunction`) for the
   // transport vtable so HTTP requests route through `window.fetch()` directly
@@ -471,7 +469,7 @@ export interface EmscriptenRunanywhereModule {
   //
   // Pass 0 for any slot to fall back to the emscripten_fetch adapter for
   // that op; all-zero unregisters and restores the libcurl/emscripten_fetch
-  // default. Optional at type level: older WASM builds without the Stage 3d
+  // default. Optional at type level: older WASM builds without the JS-side
   // export will simply be missing this symbol — callers check with
   // `typeof mod._rac_http_transport_register_from_js === 'function'`.
   _rac_http_transport_register_from_js?(
@@ -570,8 +568,8 @@ export interface EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_proto_buffer_error_message?(): number;
 
   /**
-   * Canonical rac_result_t -> serialized SDKError proto mapping
-   * (commons-128-E). Lets SDKException route error construction through the
+   * Canonical rac_result_t -> serialized SDKError proto mapping.
+   * Lets SDKException route error construction through the
    * shared commons helper rac_result_to_proto_error.
    */
   _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
@@ -763,7 +761,7 @@ export type WasmCapability =
 /**
  * Complete set of capabilities — used as the default for the legacy
  * `setRunanywhereModule()` alias, which registers a single module against
- * everything (matches pre-P4 monolithic behavior).
+ * everything (matches the original monolithic behavior).
  */
 const ALL_CAPABILITIES: readonly WasmCapability[] = [
   'commons',

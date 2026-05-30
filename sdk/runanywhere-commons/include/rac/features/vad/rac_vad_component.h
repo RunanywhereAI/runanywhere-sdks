@@ -239,8 +239,6 @@ RAC_API void rac_vad_component_destroy(rac_handle_t handle);
  * (e.g. Silero ONNX) is loaded the function returns RAC_SUCCESS with
  * zeroes for all three outputs so callers don't need to special-case.
  *
- * Blocked on CPP implementation (Swift fix report, G-C6).
- *
  * @param handle           Component handle
  * @param ambient_level_out   Output: ambient noise level from calibration
  * @param recent_avg_out      Output: recent average energy across frames

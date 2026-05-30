@@ -186,7 +186,7 @@ RAC_API void rac_tts_result_free(rac_tts_result_t* result);
 RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json);
 
 // =============================================================================
-// CANONICAL DEFAULTS (P2-T14)
+// CANONICAL DEFAULTS
 // =============================================================================
 
 /**

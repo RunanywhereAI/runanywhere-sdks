@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// graph_scheduler.cpp — implementation of the v3.1 Phase 9 DAG runtime.
+// graph_scheduler.cpp — implementation of the DAG runtime.
 // See include/rac/graph/graph_scheduler.hpp for contract + design notes.
 
 #include "rac/graph/graph_scheduler.hpp"

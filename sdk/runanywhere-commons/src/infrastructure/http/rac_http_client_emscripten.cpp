@@ -2,7 +2,7 @@
  * @file rac_http_client_emscripten.cpp
  * @brief Emscripten Fetch-backed HTTP transport adapter.
  *
- * v2 close-out Phase H7 refactor: the Web implementation registers
+ * The Web implementation registers
  * itself through the platform HTTP transport vtable declared in
  * `include/rac/infrastructure/http/rac_http_transport.h`.
  *
@@ -12,7 +12,7 @@
  * pattern used by the Swift URLSession / Kotlin OkHttp / Flutter
  * dart:io / RN fetch adapters.
  *
- * The actual emscripten_fetch() logic below is unchanged from B03 —
+ * The actual emscripten_fetch() logic below is unchanged —
  * only the wiring is different. See `rac_http_transport.h` for the
  * ownership / threading contract every adapter must satisfy:
  *   - callbacks can be invoked from any thread (we block on
@@ -285,7 +285,7 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
 }
 
 // =============================================================================
-// Transport vtable ops (v2 close-out Phase H7)
+// Transport vtable ops
 //
 // These are the thin shims the transport router in
 // `rac_http_transport.cpp` calls into. Signature matches
@@ -335,7 +335,7 @@ const rac_http_transport_ops_t kEmscriptenOps = {
 };
 
 // =============================================================================
-// JS-side adapter (Stage 3d)
+// JS-side adapter
 //
 // Instead of the C++ calling `emscripten_fetch` (which then calls JS
 // `fetch()` under the hood — one extra hop + ASYNCIFY requirement), the
@@ -431,7 +431,7 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
 }
 
 // =============================================================================
-// JS-side registration (Stage 3d). Takes three function-table indices
+// JS-side registration. Takes three function-table indices
 // (obtained from `Module.addFunction(fn, sig)` on the JS side) that match
 // `rac_http_transport_ops_t.request_send` / `_stream` / `_resume`. Any of
 // them may be null — the corresponding op uses the Emscripten Fetch
@@ -628,7 +628,7 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_
     return dispatch_resume(req, resume_from_byte, cb, user_data, out_resp_meta);
 }
 
-// commons-core-infra-015: `rac_http_response_free` lives in
+// `rac_http_response_free` lives in
 // src/infrastructure/http/rac_http_response.cpp (compiled on every
 // target). The default and emscripten clients allocate the response
 // fields with std::malloc / strdup so the shared TU can free them

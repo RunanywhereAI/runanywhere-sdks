@@ -13,7 +13,7 @@
 //
 // Historically duplicated as `ThinkingTagPattern` (llm_options.proto, with
 // `opening_tag`/`closing_tag` fields) and `ModelThinkingTagPattern`
-// (model_types.proto, with `open_tag`/`close_tag` fields). Wave H-2 / IDL-02
+// (model_types.proto, with `open_tag`/`close_tag` fields). This file
 // collapses both into this single canonical message. Extracted into its own
 // file so it can be shared between llm_options.proto and model_types.proto
 // without introducing a proto import cycle.

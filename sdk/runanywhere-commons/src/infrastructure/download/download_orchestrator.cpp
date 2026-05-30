@@ -319,7 +319,7 @@ struct proto_progress_sink {
     // Keeping the last N serializations alive guarantees each emitted pointer
     // remains valid long enough for the slowest async binding to copy it out.
     //
-    // commons-087: bumped from 32 → 128. The original 32 was sized for the
+    // Bumped from 32 → 128. The original 32 was sized for the
     // ~64 KiB reporting interval the platform HTTP stacks use, but
     // `rac_http_download` actually emits progress on every transport-delivered
     // chunk (no time-based throttling), which on a 5 GB GGUF with 8 KiB
@@ -330,8 +330,7 @@ struct proto_progress_sink {
     // non-zero window where the slowest binding could read freed memory.
     // 128 widens the window to ~20 ms — still O(KB) of resident memory while
     // covering steady-state async-decode latencies. (Further headroom would
-    // require coalescing progress in commons; see follow-up suggestions in
-    // commons-087.)
+    // require coalescing progress in commons.)
     static constexpr size_t kRingSize = 128;
     std::array<std::string, kRingSize> bytes_ring;
     size_t ring_index = 0;
@@ -692,7 +691,7 @@ std::shared_ptr<proto_download_task> find_task(const std::string& task_id,
         }
     }
     if (!model_id.empty()) {
-        // commons-118: when looking up by model_id only, prefer non-terminal
+        // When looking up by model_id only, prefer non-terminal
         // (active) tasks over terminal ones. `proto_state().tasks` is sorted
         // by task_id, so the older (likely terminal) entry would be returned
         // first if we did a single-pass scan — cancel(model_id=X) and
@@ -1085,10 +1084,10 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
 
     int64_t completed_bytes = total_expected > 0 ? total_expected : completed_before_file;
 
-    // CLUSTER-13 / HTTP-416-STRICT (iter 3): post-finalize size guard.
+    // Post-finalize size guard.
     //
     // The per-file HTTP runner already enforces a strict body-validation gate
-    // for tiny error-stub responses (CLUSTER-13 in rac_http_download.cpp),
+    // for tiny error-stub responses (in rac_http_download.cpp),
     // but a download orchestration can still finish with a file that is
     // structurally smaller than the expected payload — e.g. when the server
     // streams 200 with a short body that doesn't match the descriptor's
@@ -1108,7 +1107,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     // 386 MB final) without forcing a false-positive failure on the slop.
     bool sanity_check_passed = true;
     std::string sanity_error;
-    // commons-150: track the index of the file that tripped the guard so the
+    // Track the index of the file that tripped the guard so the
     // FAILED progress event reports the actual offender (current_file_index +
     // storage_key) instead of mislabelling it as the LAST file of the plan.
     size_t failing_index = 0;
@@ -1139,7 +1138,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                 sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
                                std::to_string(actual) + " bytes on disk but expected " +
                                std::to_string(file.expected_bytes) +
-                               " bytes (< 80% threshold; CLUSTER-13)";
+                               " bytes (< 80% threshold)";
                 RAC_LOG_ERROR(
                     LOG_TAG,
                     "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
@@ -1188,7 +1187,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     mark_task_stopped(task);
     emit_progress(task);
 
-    // CPP-02 registry self-heal: when the SDK requested
+    // Registry self-heal: when the SDK requested
     // update_registry_on_completion, mark the model as downloaded and write
     // its resolved local_path back into the registry. Replaces the per-SDK
     // self-heal (e.g. Kotlin's markModelDownloadedInRegistry()).
@@ -1331,7 +1330,7 @@ void append_planned_file(rav1::DownloadPlanResult* result,
     out_file->set_is_resume_candidate(is_resume_candidate);
 }
 
-// security-privacy-storage-network-001 / pass3-syn-104: defensive check
+// security-privacy-storage-network-001: defensive check
 // applied to plan entries flowing in via rac_download_start_proto (which
 // lets callers skip the trusted planner). The trusted planner always emits
 // absolute paths rooted under either the per-model folder
@@ -1414,7 +1413,7 @@ std::vector<proto_plan_file> files_from_plan(const rav1::DownloadPlanResult& pla
     std::vector<proto_plan_file> files;
     files.reserve(static_cast<size_t>(plan.files_size()));
     for (const auto& input : plan.files()) {
-        // security-privacy-storage-network-001 / pass3-syn-104:
+        // security-privacy-storage-network-001:
         // DownloadPlanResult.files can originate from rac_download_plan_proto
         // (trusted, already validated by destination_from_model_file) OR from
         // a caller-supplied DownloadStartRequest.plan_files that bypasses
@@ -1627,7 +1626,7 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         return serialize_proto_to_buffer(result, out_result);
     }
 
-    // CLUSTER-10: Seed expected_files from multi_file when only multi_file
+    // Seed expected_files from multi_file when only multi_file
     // is set so the per-descriptor download loop below picks up the real
     // URLs each ModelFileDescriptor carries. Without this, multi-file VLM
     // registrations (LFM2-VL, Qwen2-VL via registerMultiFileModel) fall
@@ -1843,12 +1842,12 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         return serialize_proto_to_buffer(result, out_result);
     }
 
-    // CPP-02 idempotent start: if a non-terminal task already exists for this
+    // Idempotent start: if a non-terminal task already exists for this
     // model_id, return the in-flight task instead of spawning a duplicate
     // worker. Fixes SWIFT-IOS-001 (double-tap of Get cancelling the first
     // download) at the commons layer so every SDK gets the same guarantee.
     //
-    // commons-151: the dedup must also fire when the caller passes
+    // The dedup must also fire when the caller passes
     // resume=true. Swift/Kotlin/Flutter/RN all set resume to plan.canResume,
     // so two concurrent start(resume=true) for the same model_id used to
     // spawn two workers writing to the same destination file — data
@@ -1894,7 +1893,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // two archive models have been extracted (`find_nested_directory`
     // falls back to the root because it sees multiple subdirs).
     //
-    // pass3-syn-104: also drives the per-file destination-path containment
+    // Also drives the per-file destination-path containment
     // check performed by files_from_plan() below — must run BEFORE
     // files_from_plan() so the bypass-planner path validation has known-
     // safe roots to assert containment against.
@@ -1908,7 +1907,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         model_registry_info = nullptr;
     }
 
-    // pass3-syn-104: resolve the two known-safe roots BEFORE validating the
+    // Resolve the two known-safe roots BEFORE validating the
     // bypass-planner plan entries. files_from_plan() requires each
     // destination_path to be lexically rooted under model_folder OR under
     // downloads_dir (archive staging), in addition to rejecting '..'/'.'
@@ -2107,7 +2106,7 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
     bool worker_observed_stop = !was_running;
     if (was_running) {
         std::unique_lock<std::mutex> lock(task->mutex);
-        // commons-048: honor the cv.wait_for return value. If the worker
+        // Honor the cv.wait_for return value. If the worker
         // doesn't drain within the timeout, the partial_bytes_*/deleted
         // fields below would be stale (initial 0 or a pre-cancel snapshot)
         // and the worker may still race ahead to delete the partial file
@@ -2298,7 +2297,7 @@ extern "C" rac_result_t rac_download_progress_poll_proto(const uint8_t* request_
     return serialize_proto_to_buffer(progress, out_result);
 }
 
-// commons-core-infra-004: erase proto_state().tasks entries whose worker has
+// Erase proto_state().tasks entries whose worker has
 // reached a terminal state. Without this hook the map grows for every
 // successful, cancelled, or failed download — the SDK has no other way to
 // release the per-task slot since rac_download_cancel_proto / _resume_proto

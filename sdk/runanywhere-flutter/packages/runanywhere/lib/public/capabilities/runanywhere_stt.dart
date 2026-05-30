@@ -163,7 +163,7 @@ class RunAnywhereSTT {
     );
   }
 
-  /// Streaming transcription — Wave D-5 lifecycle-owned proto.
+  /// Streaming transcription — lifecycle-owned proto.
   ///
   /// Invokes `rac_stt_transcribe_stream_lifecycle_proto` with the canonical
   /// `STTTranscriptionRequest` and streams decoded `STTPartialResult`s from the
@@ -281,7 +281,7 @@ class RunAnywhereSTT {
       }
       ..onCancel = () {
         _isStreaming = false;
-        // CONSOLIDATE-D fix: drain in-flight STT partial dispatches before
+        // Drain in-flight STT partial dispatches before
         // closing the NativeCallable. `rac_stt_transcribe_stream_lifecycle_proto`
         // may post late partials from a worker thread that copies the
         // user_data slot under commons' internal mutex and releases it BEFORE

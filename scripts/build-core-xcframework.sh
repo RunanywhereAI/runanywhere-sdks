@@ -23,8 +23,6 @@
 #   DRY_RUN=1                only print the planned commands, don't invoke
 #                            cmake/xcodebuild. Useful in CI preflight and
 #                            the `release-swift-binaries.sh DRY_RUN=1` path.
-#
-# GAP 07 Phase 6 / v2 close-out Phase J-1.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -630,7 +628,7 @@ sync_react_native_frameworks() {
         run cp -R "${DEST}/RABackendONNX.xcframework" "${rn_root}/onnx/ios/Binaries/"
     fi
 
-    # GAP 06 T5.1 — stage the Sherpa plugin xcframework alongside ONNX's
+    # Stage the Sherpa plugin xcframework alongside ONNX's
     # (sherpa is the long-term owner of speech primitives).
     if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then
         run mkdir -p "${rn_root}/onnx/ios/Binaries"
@@ -682,7 +680,7 @@ sync_flutter_frameworks() {
         run rm -rf "${flutter_onnx}/onnxruntime.xcframework"
     fi
 
-    # GAP 06 T5.1 — ship RABackendSherpa.xcframework inside runanywhere_onnx
+    # Ship RABackendSherpa.xcframework inside runanywhere_onnx
     # for now (sherpa peers with onnx on speech). A future runanywhere_sherpa
     # plugin can consume it directly.
     if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then

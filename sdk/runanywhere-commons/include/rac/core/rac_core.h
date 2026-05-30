@@ -189,7 +189,7 @@ RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
 RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
 
 // =============================================================================
-// v3 NOTE: The legacy service-registry surface (rac_service_request_t,
+// NOTE: The legacy service-registry surface (rac_service_request_t,
 // rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
 // rac_service_register_provider, rac_service_unregister_provider,
 // rac_service_create, rac_service_list_providers, RAC_DEPRECATED_LEGACY_SVC)

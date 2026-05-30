@@ -1,9 +1,9 @@
 /**
  * @file test_register_model_from_url.cpp
- * @brief Parity tests for rac_register_model_from_url_proto (P2-T6).
+ * @brief Parity tests for rac_register_model_from_url_proto.
  *
  * Exercises the canonical "register a model from a URL" entry point — the
- * single-call composition of rac_model_info_make_proto (P2-T4) and the
+ * single-call composition of rac_model_info_make_proto and the
  * existing registry persistence path. Verifies that the returned ModelInfo
  * round-trips through rac_model_registry_get_proto by id.
  *

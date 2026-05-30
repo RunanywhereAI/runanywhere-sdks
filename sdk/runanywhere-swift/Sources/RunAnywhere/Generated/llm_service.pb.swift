@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — LLM token streaming service.
 //
-// GAP 09 Phase 12. Server-streaming rpc returning per-token deltas during
+// Server-streaming rpc returning per-token deltas during
 // LLM generation. Replaces the 5 hand-written token-stream implementations
 // (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
 // RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
@@ -340,7 +340,7 @@ public nonisolated struct RALLMStreamFinalResult: Sendable {
   fileprivate var _thinkingContent: String? = nil
 }
 
-/// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+/// Unified per-token streaming event. Replaces
 /// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
 /// callbackFlow / StreamController / tokenQueue. One serialized event
 /// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
@@ -377,8 +377,8 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._isFinal = newValue}
   }
 
-  /// Token semantic category (answer / thought / tool-call). IDL-06:
-  /// canonical TokenKind from voice_events.proto.
+  /// Token semantic category (answer / thought / tool-call).
+  /// Canonical TokenKind from voice_events.proto.
   public var kind: RATokenKind {
     get {_storage._kind}
     set {_uniqueStorage()._kind = newValue}

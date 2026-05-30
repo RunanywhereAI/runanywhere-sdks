@@ -3,8 +3,7 @@
  *
  * Domain implementation for HybridRunAnywhereCore.
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
- * "Bridge Layer Audit"):
+ * Bridge classification:
  *   - SDK-facing pass-through: every `*Proto` method (LLM gen/cancel,
  *     STT/TTS/VAD/VLM/diffusion/embeddings proto thunks, voice agent
  *     proto thunks, LoRA proto thunks). Each takes/returns ArrayBuffer
@@ -16,7 +15,6 @@
  *     target: source the live LLM handle from
  *     `rac_model_lifecycle_load_proto` (which returns the handle on
  *     load) so this bridge no longer creates components on its own.
- *     Tracked under react-native gap.
  *   - Other helpers (`callLoraRequestProto`, `callLoraCatalogProto`,
  *     proto callbacks, VAD activity callback) are pure pass-through.
  */
@@ -82,7 +80,7 @@ std::shared_ptr<ArrayBuffer> copyVoiceProtoBuffer(rac_proto_buffer_t& protoBuffe
     return buffer;
 }
 
-// --- Request-shaped stream callback lifetime (rn-002) -----------------------
+// --- Request-shaped stream callback lifetime --------------------------------
 //
 // `rac_llm_generate_stream_proto` and its STT/TTS/VLM siblings copy the
 // {callback, user_data} slot under an internal mutex and RELEASE that mutex
@@ -1008,7 +1006,7 @@ static rac_voice_agent_handle_t getGlobalVoiceAgentHandle() {
     return g_voice_agent_handle;
 }
 
-// v3.1: Expose the global voice-agent handle as a JS number. The
+// Expose the global voice-agent handle as a JS number. The
 // VoiceAgent.subscribeProtoEvents(handle, ...) Nitro method casts it
 // back to rac_voice_agent_handle_t on the C side. 0 means the handle
 // isn't allocated yet (pre-initializeVoiceAgentWithLoadedModels).
@@ -1218,7 +1216,7 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
 }
 
 // ============================================================================
-// Global component teardown (HOTSPOT-RN-CORE-002)
+// Global component teardown
 // ============================================================================
 //
 // Reset the LLM/STT/TTS/VAD/voice-agent globals plus the commons lifecycle

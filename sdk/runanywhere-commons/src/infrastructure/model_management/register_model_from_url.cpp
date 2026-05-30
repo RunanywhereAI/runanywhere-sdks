@@ -1,8 +1,8 @@
 /**
  * @file register_model_from_url.cpp
- * @brief Canonical "register a model from a URL" entry point (P2-T6).
+ * @brief Canonical "register a model from a URL" entry point.
  *
- * Composes rac_model_info_make_proto (P2-T4) with the existing registry
+ * Composes rac_model_info_make_proto with the existing registry
  * persistence path (rac_model_registry_register_proto_buffer) so SDKs replace
  * ~60 LOC of build-and-save glue (Swift's RunAnywhere.registerModel,
  * Kotlin/Flutter/RN/Web equivalents) with a single ABI call.
@@ -111,7 +111,7 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     }
 
     // -------------------------------------------------------------------------
-    // 1) Build a ModelInfo via the canonical factory (P2-T4).
+    // 1) Build a ModelInfo via the canonical factory.
     // -------------------------------------------------------------------------
     runanywhere::v1::ModelInfoMakeRequest make_request;
     translate_to_make_request(request, &make_request);

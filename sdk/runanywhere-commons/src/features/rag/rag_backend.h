@@ -81,7 +81,7 @@ class RAGBackend {
     /**
      * @brief End-to-end RAG query.
      *
-     * GAP 05 / T4.6: this method now constructs a per-call GraphScheduler-driven
+     * This method constructs a per-call GraphScheduler-driven
      * DAG (Embed → Retrieve → ContextAssembly → LLM) via `run_rag_query()`
      * instead of running the steps imperatively. When `on_token` is non-null,
      * tokens are forwarded as the LLM streams them.

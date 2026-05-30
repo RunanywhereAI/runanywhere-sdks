@@ -1,6 +1,6 @@
 /**
  * @file test_tool_calling_run_loop.cpp
- * @brief P2-T8 tests for rac_tool_calling_run_loop_proto.
+ * @brief Tests for rac_tool_calling_run_loop_proto.
  *
  * Mirrors test_tool_calling_session_proto.cpp's setup (mock LLM plugin,
  * fixture-driven responses) and exercises the synchronous single-call API:

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/ring_buffer.hpp — v3.1 Phase 9 DAG primitive (GAP 05).
+// rac/graph/ring_buffer.hpp — DAG primitive.
 //
 // Lock-free single-producer single-consumer ring buffer. Designed
 // for audio-frame fan-out (e.g. capture thread → STT thread) where

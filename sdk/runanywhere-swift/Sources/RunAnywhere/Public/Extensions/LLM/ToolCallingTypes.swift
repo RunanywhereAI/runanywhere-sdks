@@ -2,10 +2,10 @@
 //  ToolCallingTypes.swift — Swift-side helpers for generated tool-calling protos.
 //
 //  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
-//  `argumentsJson` / `resultJson` (IDL-13 oneof tree), and tight RA*
+//  `argumentsJson` / `resultJson` (oneof tree), and tight RA*
 //  convenience inits/getters consumed by the example app or SDK internals.
 //
-//  G3: the recursive ToolValue <-> JSON walk now lives in commons behind
+//  The recursive ToolValue <-> JSON walk now lives in commons behind
 //  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
 //  no longer hand-rolls it. Public API shape is preserved.
 //
@@ -59,9 +59,9 @@ public extension RAToolValue {
     var array: [RAToolValue]? { if case .arrayValue(let value)? = kind { return value.values }; return nil }
     var object: [String: RAToolValue]? { if case .objectValue(let value)? = kind { return value.fields }; return nil }
 
-    // JSON bridge — required by IDL-13 (`argumentsJson` / `resultJson`).
+    // JSON bridge — required by `argumentsJson` / `resultJson`.
     // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
-    // The recursive walk lives in commons (G3); Swift only marshals bytes.
+    // The recursive walk lives in commons; Swift only marshals bytes.
 
     func toJSONString(pretty: Bool = false) -> String? {
         guard let wrapper: RAToolValueJSON = try? NativeProtoABI.invoke(

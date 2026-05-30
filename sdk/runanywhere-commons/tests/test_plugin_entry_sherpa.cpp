@@ -2,7 +2,7 @@
  * @file test_plugin_entry_sherpa.cpp
  * @brief Verifies the Sherpa-ONNX plugin entry point owns STT / TTS / VAD only.
  *
- * commons-010 (review RUN=20260527-122639-review): mirrors the parallel
+ * Mirrors the parallel
  * test_plugin_entry_{llamacpp,onnx,genie}.cpp smoke tests so any future edit
  * to rac_plugin_entry_sherpa.cpp (e.g. dropping a primitive, flipping
  * availability, missing ops-slot population) is caught at ctest time rather
@@ -44,7 +44,7 @@ int main() {
     }
 
     // Stable engine name is the dedup key the registry uses; mis-naming would
-    // cause router collisions with engines/onnx (CPP-04).
+    // cause router collisions with engines/onnx.
     if (vt->metadata.name == nullptr || std::strcmp(vt->metadata.name, "sherpa") != 0) {
         std::fprintf(stderr, "manifest name mismatch: got '%s'\n",
                      vt->metadata.name ? vt->metadata.name : "(null)");

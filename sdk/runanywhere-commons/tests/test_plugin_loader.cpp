@@ -1,6 +1,6 @@
 /**
  * @file test_plugin_loader.cpp
- * @brief Happy-path test for the GAP 03 dynamic plugin loader.
+ * @brief Happy-path test for the dynamic plugin loader.
  *
  * Loads the in-tree fixture .so, asserts the plugin appears under its
  * registered name, and unloads it cleanly. Skipped on RAC_PLUGIN_MODE_STATIC

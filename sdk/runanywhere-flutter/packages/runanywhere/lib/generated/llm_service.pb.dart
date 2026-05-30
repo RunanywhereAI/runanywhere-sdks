@@ -710,7 +710,7 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   $pb.PbList<$1.ToolResult> get toolResults => $_getList(14);
 }
 
-/// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+/// Unified per-token streaming event. Replaces
 /// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
 /// callbackFlow / StreamController / tokenQueue. One serialized event
 /// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
@@ -860,8 +860,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearIsFinal() => $_clearField(4);
 
-  /// Token semantic category (answer / thought / tool-call). IDL-06:
-  /// canonical TokenKind from voice_events.proto.
+  /// Token semantic category (answer / thought / tool-call).
+  /// Canonical TokenKind from voice_events.proto.
   @$pb.TagNumber(5)
   $2.TokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)

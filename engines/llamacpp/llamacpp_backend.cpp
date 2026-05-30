@@ -351,7 +351,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     common_params_fit_status fit_status = COMMON_PARAMS_FIT_STATUS_FAILURE;
 
 #if defined(__EMSCRIPTEN__)
-    // WEB-LLM-LOAD-001 / CLUSTER-29: common_fit_params probes
+    // common_fit_params probes
     // llama_max_devices() (16 on WASM) and never returns within practical
     // timeouts on CPU WASM. Skip fit on Emscripten; ctx sizing falls through
     // to max_default_context_ after model load (see below).

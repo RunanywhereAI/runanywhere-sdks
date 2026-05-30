@@ -6,7 +6,7 @@
  *        whether the mic can be turned on or TTS can be played given the
  *        current pipeline phase.
  *
- * Split out of voice_agent.cpp under commons-features-voice-003.
+ * Split out of voice_agent.cpp.
  */
 
 #include "rac/core/rac_platform_adapter.h"

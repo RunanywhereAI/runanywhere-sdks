@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/pipeline_node.hpp — v3.1 Phase 9 DAG primitive (GAP 05 Phase 2).
+// rac/graph/pipeline_node.hpp — DAG primitive.
 //
 // Node abstraction for the streaming DAG runtime. Each node owns:
 //   * one worker thread that drains its input edge

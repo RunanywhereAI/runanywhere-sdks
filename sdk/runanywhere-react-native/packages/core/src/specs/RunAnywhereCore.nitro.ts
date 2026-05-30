@@ -199,7 +199,7 @@ export interface RunAnywhereCore extends HybridObject<{
   importModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Refresh the model registry — T4.9 unified cross-SDK surface.
+   * Refresh the model registry — unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is
    * independent and interpreted by the native registry implementation.
@@ -619,7 +619,7 @@ export interface RunAnywhereCore extends HybridObject<{
   /**
    * Get the native voice-agent handle as a JS number. Pass to
    * `VoiceAgent.subscribeProtoEvents(handle, ...)` to subscribe to
-   * streaming events. v3.1 addition — exposes the underlying
+   * streaming events. Exposes the underlying
    * `rac_voice_agent_handle_t` so the adapter pattern works.
    *
    * @returns handle as number (0 if voice agent not yet initialized).
@@ -725,7 +725,7 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<ArrayBuffer>;
 
   /**
-   * Cancellation-aware variant of toolRunLoopProto (pass2-syn-007).
+   * Cancellation-aware variant of toolRunLoopProto.
    *
    * Backed by `rac_tool_calling_run_loop_with_handle_proto`. Commons publishes
    * an opaque `run_loop_handle` synchronously, before the iteration loop
@@ -738,7 +738,7 @@ export interface RunAnywhereCore extends HybridObject<{
    * with-handle ABI is unavailable on this commons build.
    *
    * Mirrors Swift `generateWithToolsCancellable` in
-   * `RunAnywhere+ToolCalling.swift` (pass3-syn-047).
+   * `RunAnywhere+ToolCalling.swift`.
    */
   toolRunLoopProtoWithHandle(
     requestBytes: ArrayBuffer,
@@ -748,7 +748,7 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Cancel an in-flight tool-calling run loop started via
-   * `toolRunLoopProtoWithHandle` (pass2-syn-007).
+   * `toolRunLoopProtoWithHandle`.
    *
    * Backed by `rac_tool_calling_run_loop_cancel_proto`. Idempotent: safe to
    * call after the loop has already returned (the handle will be stale and
@@ -862,7 +862,7 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<ArrayBuffer>;
 
   // ===========================================================================
-  // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+  // Solutions Runtime (rac/solutions/rac_solution.h)
   //
   // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
   // `runanywhere.v1.SolutionConfig` (or PipelineSpec) protobuf or a YAML

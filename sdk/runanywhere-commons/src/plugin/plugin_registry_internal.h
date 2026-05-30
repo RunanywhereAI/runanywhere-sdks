@@ -1,7 +1,7 @@
 /**
  * @file plugin_registry_internal.h
  * @brief Internal coupling between the unified plugin registry and the
- *        dynamic loader (GAP 03).
+ *        dynamic loader.
  *
  * The PUBLIC ABI lives in `rac/plugin/rac_plugin_loader.h`. This header is
  * intentionally not installed; only the two internal TUs
@@ -63,7 +63,7 @@ size_t rac_plugin_registry_snapshot_names(const char*** out_names) RAC_PLUGIN_RE
  * Pin/unpin the vtables snapshotted from the registry against concurrent
  * dynamic unload.
  *
- * commons-007: `EngineRouter::route` returns a list of raw vtable pointers
+ * `EngineRouter::route` returns a list of raw vtable pointers
  * from `rac_plugin_list` and then dereferences `vt->metadata` AFTER releasing
  * the registry lock. On hosts that allow `rac_registry_unload_plugin`
  * (Android / Linux / macOS dynamic builds) the underlying `.rodata` for those

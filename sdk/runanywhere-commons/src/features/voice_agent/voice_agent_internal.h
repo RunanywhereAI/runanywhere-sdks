@@ -44,7 +44,7 @@ struct rac_voice_agent {
     /// Protects mutable operations (load, process, cleanup).
     std::mutex mutex;
 
-    /// GAP 05 Phase 2: GraphScheduler-driven streaming pipeline. Lazily
+    /// GraphScheduler-driven streaming pipeline. Lazily
     /// constructed when the first `process_stream()` call arrives so we
     /// don't pay the cost when the agent only services synchronous
     /// `process_voice_turn()` requests.
@@ -52,7 +52,7 @@ struct rac_voice_agent {
     /// Held via shared_ptr so destroy() can hand a reference to the
     /// in-flight cancel path without racing the agent destructor.
     ///
-    /// commons-features-voice-003: a dedicated mutex protects every read,
+    /// A dedicated mutex protects every read,
     /// assign, and reset of `pipeline`. The outer `mutex` field is held by
     /// `rac_voice_agent_process_stream` for the entire pipeline run, so
     /// destroy()/cleanup() cannot acquire it to snapshot the active

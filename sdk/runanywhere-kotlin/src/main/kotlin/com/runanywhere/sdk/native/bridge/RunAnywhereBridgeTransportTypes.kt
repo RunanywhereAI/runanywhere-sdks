@@ -10,7 +10,7 @@ package com.runanywhere.sdk.native.bridge
  * thread that called `RunAnywhereBridge.racHttpDownloadExecute(...)`
  * on every libcurl chunk.
  *
- * v2 close-out Phase H. Kept as a top-level type in this package so the
+ * Kept as a top-level type in this package so the
  * JNI `FindClass(..., "onProgress", "(JJ)Z")` contract stays stable while
  * RunAnywhereBridge retains the external function declarations.
  *

@@ -3,12 +3,12 @@
  * @brief Default HTTP client implementation that dispatches every
  *        public C ABI call into the platform transport vtable.
  *
- * Stage S5: libcurl + mbedTLS removed from the build. The public
+ * libcurl + mbedTLS removed from the build. The public
  * `rac_http_client_*` / `rac_http_request_*` / `rac_http_response_free`
  * symbols are still part of the SDK contract — they are the entry
  * points Kotlin's JNI `httpRequest` bridge, RN's
  * `HybridRunAnywhereCore+Http.cpp`, the Web SDK's `HTTPAdapter.ts`,
- * and `rac_http_download.cpp` all call into. After S5 the only
+ * and `rac_http_download.cpp` all call into. The only
  * implementation behind these symbols is the platform transport
  * adapter registered via `rac_http_transport_register` (OkHttp on
  * Android, URLSession on Apple, emscripten_fetch / JS fetch on
@@ -16,9 +16,8 @@
  *
  * When no adapter is registered the calls fail cleanly with
  * `RAC_ERROR_FEATURE_NOT_AVAILABLE`. Every SDK is responsible for
- * installing an adapter during init (see R1-R5 in the H refactor
- * plan); a silent fallback to libcurl is no longer possible because
- * libcurl is gone.
+ * installing an adapter during init; a silent fallback to libcurl
+ * is no longer possible because libcurl is gone.
  *
  * This TU is compiled on every target EXCEPT Emscripten — on WASM
  * `rac_http_client_emscripten.cpp` already provides direct
@@ -204,7 +203,7 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_
     return dispatch_resume(req, resume_from_byte, cb, user_data, out_resp_meta);
 }
 
-// commons-core-infra-015: `rac_http_response_free` lives in
+// `rac_http_response_free` lives in
 // src/infrastructure/http/rac_http_response.cpp (compiled on every
 // target). The default and emscripten clients allocate the response
 // fields with std::malloc / strdup so the shared TU can free them

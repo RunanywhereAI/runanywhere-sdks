@@ -838,7 +838,7 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
 // =============================================================================
-// CANONICAL RAModelInfo FACTORY (P2-T4)
+// CANONICAL RAModelInfo FACTORY
 // =============================================================================
 //
 // Commons-owned implementation of Swift's RAModelInfo.make(...). Consumes a
@@ -917,7 +917,7 @@ RAC_API rac_result_t rac_model_info_make_proto(const uint8_t* in_request_bytes,
 RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 
 // =============================================================================
-// CANONICAL ARTIFACT EXPECTED-FILES HELPER (P2-T7)
+// CANONICAL ARTIFACT EXPECTED-FILES HELPER
 // =============================================================================
 //
 // Commons-owned port of Swift's RAModelInfo.expectedArtifactFiles and the
@@ -934,7 +934,7 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 // shape every SDK already consumes.
 
 // =============================================================================
-// PROTO ENUM ↔ C ENUM MAPPERS (T15a / SWIFT-DUP-MODELTYPES-COMPUTED)
+// PROTO ENUM ↔ C ENUM MAPPERS
 // =============================================================================
 //
 // Bidirectional mappers between the proto-wire `int32` enum values declared in
@@ -1163,15 +1163,13 @@ RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_b
                                                        rac_proto_buffer_t* out_proto);
 
 // =============================================================================
-// MODEL HEURISTICS (CONSOLIDATE-A) — DERIVED FROM RAModelInfo
+// MODEL HEURISTICS — DERIVED FROM RAModelInfo
 // =============================================================================
 //
 // Commons-owned accessors that derive cross-SDK display state from a
 // serialized `runanywhere.v1.ModelInfo`. Centralizes the model-naming
 // heuristics that examples-flutter, examples-ios, examples-android, and
-// examples-react-native were each duplicating (reviewer cluster
-// CONSOLIDATE-A: examples-flutter-005 / 006, examples-ios-003,
-// examples-android-008). Companion tool-call accessor lives in
+// examples-react-native were each duplicating. Companion tool-call accessor lives in
 // `rac/features/llm/rac_tool_calling.h` (`rac_tool_call_format_from_model_info_proto`).
 
 /**

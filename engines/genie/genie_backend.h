@@ -5,7 +5,7 @@
  * @file genie_backend.h
  * @brief Shell header for the Qualcomm Genie / NPU engine plugin.
  *
- * GAP 06 T5.2. The public surface is intentionally minimal until the
+ * The public surface is intentionally minimal until the
  * Qualcomm Genie C API is wired. Without the Qualcomm SDK, the plugin shell
  * stays buildable but rejects registration so the router cannot advertise it
  * as a functional LLM backend.

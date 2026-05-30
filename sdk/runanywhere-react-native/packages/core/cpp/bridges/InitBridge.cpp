@@ -489,7 +489,7 @@ namespace AndroidBridge {
         return result == JNI_TRUE;
     }
 
-    // CLUSTER-280-SPLIT-sdk-react-native: directory enumeration via
+    // Directory enumeration via
     // java.io.File.listFiles(). Two-call semantics matching
     // rac_file_list_directory_fn. Truncation contract: skip oversized
     // names rather than write a half-name that aliases a different
@@ -629,7 +629,7 @@ extern "C" {
 
     bool PlatformAdapter_httpDownloadCancel(const char* taskId);
 
-    // Directory enumeration + Apple vendor-id (CLUSTER-280-SPLIT-sdk-react-native).
+    // Directory enumeration + Apple vendor-id.
     // Mirrors `PlatformDirectoryEntry` in PlatformAdapterBridge.h field-for-field
     // with `rac_directory_entry_t` so we can memcpy entries straight across.
     typedef struct PlatformDirectoryEntry {
@@ -1557,7 +1557,7 @@ void InitBridge::registerPlatformAdapter() {
     // Archive extraction (handled by JS layer)
     adapter_.extract_archive = nullptr;
 
-    // CLUSTER-280-SPLIT-sdk-react-native: directory enumeration + Apple
+    // Directory enumeration + Apple
     // vendor-id slots. Cross-SDK parity with Swift / Kotlin / Flutter / Web.
     // file_list_directory + is_non_empty_directory are populated on both
     // platforms (FileManager.contentsOfDirectory on iOS, java.io.File.listFiles

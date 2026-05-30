@@ -423,7 +423,7 @@ RAC_API const char* rac_framework_display_name(rac_inference_framework_t framewo
 RAC_API const char* rac_framework_analytics_key(rac_inference_framework_t framework);
 
 // =============================================================================
-// WIRE STRING / DISPLAY NAME / FROM-STRING ABIs (Phase 2 — proto-aligned)
+// WIRE STRING / DISPLAY NAME / FROM-STRING ABIs (proto-aligned)
 // =============================================================================
 //
 // These accessors centralize the per-SDK switch tables that used to live in
@@ -466,7 +466,7 @@ RAC_API rac_result_t rac_inference_framework_from_string(const char* s,
                                                          rac_inference_framework_t* out);
 
 // =============================================================================
-// PROTO <-> C ENUM MAPPERS (T15a — Wave 6D)
+// PROTO <-> C ENUM MAPPERS
 // =============================================================================
 //
 // Bidirectional mappers between proto enum int32 values and the corresponding
@@ -652,7 +652,7 @@ RAC_API const char* rac_model_format_extension(rac_model_format_t format);
 RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len);
 
 /**
- * @brief Generate a stable, NUL-terminated model id from a URL (P2-T5).
+ * @brief Generate a stable, NUL-terminated model id from a URL.
  *
  * Strict, return-coded port of Swift's `RunAnywhere.generateModelId(fromURL:)`.
  * Iteratively strips known archive/model extensions (`gz, bz2, tar, zip,
@@ -796,7 +796,7 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
 // =============================================================================
-// CANONICAL RAModelInfo FACTORY (P2-T4)
+// CANONICAL RAModelInfo FACTORY
 // =============================================================================
 //
 // Commons-owned implementation of Swift's RAModelInfo.make(...). Consumes a
@@ -822,7 +822,7 @@ RAC_API rac_result_t rac_model_info_make_proto(
 RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 
 // =============================================================================
-// CANONICAL ARTIFACT EXPECTED-FILES HELPER (P2-T7)
+// CANONICAL ARTIFACT EXPECTED-FILES HELPER
 // =============================================================================
 
 /**

@@ -1,9 +1,9 @@
 /**
  * @file tool_calling_run_loop.cpp
- * @brief P2-T8: Synchronous, single-call tool-calling loop.
+ * @brief Synchronous, single-call tool-calling loop.
  *
  * Collapses Swift's RunAnywhere+ToolCalling.swift::generateWithTools (~100 LOC)
- * to ~10 LOC. Same logic that the Wave D-4 session API uses, but exposed as a
+ * to ~10 LOC. Same logic that the session API uses, but exposed as a
  * single C ABI call: the host SDK passes in the full request plus a
  * synchronous tool-execute callback, and commons owns the entire
  *   build_prompt -> generate -> parse -> validate -> execute -> follow_up
@@ -19,7 +19,7 @@
  * session API uses), so this honors the same plugin routing, cancel, and
  * refcount semantics.
  *
- * Mirrors tool_calling_session.cpp (Wave D-4) — share the same design but as
+ * Mirrors tool_calling_session.cpp — share the same design but as
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 

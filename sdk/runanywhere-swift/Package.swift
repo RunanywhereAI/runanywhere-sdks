@@ -1,5 +1,5 @@
 // swift-tools-version: 5.9
-// T5.4: attempted bump to 6.0 was rolled back. Bumping the manifest tools
+// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
 // version forces Swift 6 language mode on all targets, which turns several
 // pre-existing patterns in the SDK (mutable static registration flags,
 // closure-captured locals in AVAudioConverter / URLSession callbacks,
@@ -29,7 +29,7 @@ import PackageDescription
 let package = Package(
     name: "RunAnywhere",
     platforms: [
-        // T5.4: floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
+        // Floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
         // (latest minor of the same LTS line, matches Xcode 15.4 baseline).
         .iOS("17.5"),
         .macOS("14.5"),
@@ -57,25 +57,25 @@ let package = Package(
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
     ],
     dependencies: [
-        // T4.3: SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
+        // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
         // silent upstream major bump can't land in `Package.resolved` without
         // a Package.swift edit. Version floors are mirrored in
         // Sources/RunAnywhere/Generated/Versions.swift (RAVersions) — keep
         // both in sync via scripts/sync-versions.sh.
-        // T5.4: floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
+        // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
-        // T5.4: floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
+        // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
-        // T5.4: floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
+        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
         .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
-        // T5.4: floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
+        // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
         // .upToNextMajor exception (needed because generated code uses
         // SwiftProtobuf._NameMap(bytecode:) from 1.28.0+) is now resolved by
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
-        // the T4.3 policy applied to the other deps.
+        // the dep-version policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
     ],
     targets: [
@@ -145,14 +145,14 @@ let package = Package(
                 // exclude from this target's source list to avoid a double
                 // compile.
                 "CRACommons",
-                // SWF-grpc delete (Wave H-2): the previously-excluded
+                // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and
                 // have been removed from the repo. The hand-written VoiceAgentStreamAdapter /
                 // LLMStreamAdapter expose the same AsyncStream surface over the
                 // in-process C callback, so no compilation target needs them.
                 //
-                // SWIFT-DUP-UNUSED-PROTO-TYPES (Wave 6A / T8): the two proto
+                // The two proto
                 // schemas below are still emitted by codegen but have zero
                 // consumers in the Swift SDK. Excluding them avoids compiling
                 // ~2154 lines of dead generated code. Keep `pipeline.pb.swift`

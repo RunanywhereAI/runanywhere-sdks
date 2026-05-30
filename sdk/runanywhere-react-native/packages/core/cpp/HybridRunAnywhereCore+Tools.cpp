@@ -3,15 +3,14 @@
  *
  * Domain implementation for HybridRunAnywhereCore.
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
- * "Bridge Layer Audit"):
+ * Bridge classification:
  *   - SDK-facing pass-through: toolParseProto, toolFormatPromptProto,
  *     toolValidateProto, structuredOutputParseProto,
  *     structuredOutputPreparePromptProto, structuredOutputValidateProto,
  *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
  *     ragQueryProto, ragClearProto, ragStatsProto,
  *     embeddingsEmbedBatchProto.
- *   - Bridge limitation tracked on commons backlog: embeddingsCreateProto
+ *   - Bridge limitation: embeddingsCreateProto
  *     still calls `rac_embeddings_create` / `rac_embeddings_initialize`
  *     because no `rac_embeddings_create_proto` lifecycle ABI exists yet.
  */
@@ -389,7 +388,7 @@ HybridRunAnywhereCore::toolRunLoopProto(
         });
 }
 
-// pass3-syn-047: cancellation-aware variant of toolRunLoopProto. Binds to the
+// Cancellation-aware variant of toolRunLoopProto. Binds to the
 // commons `rac_tool_calling_run_loop_with_handle_and_cb_proto` ABI, which
 // fires `on_handle_published(handle, user_data)` SYNCHRONOUSLY on the worker
 // thread the moment the cancellable handle is minted and BEFORE the first
@@ -463,7 +462,7 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
         });
 }
 
-// pass3-syn-047: cancel an in-flight tool-calling run loop. Idempotent per the
+// Cancel an in-flight tool-calling run loop. Idempotent per the
 // commons contract — a stale or already-retired handle still returns
 // RAC_SUCCESS, so callers can wire this directly to AbortSignal abort events.
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::toolRunLoopCancelProto(

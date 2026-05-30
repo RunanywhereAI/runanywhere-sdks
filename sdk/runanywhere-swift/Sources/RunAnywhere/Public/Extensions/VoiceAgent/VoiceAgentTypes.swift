@@ -21,7 +21,7 @@ public typealias VoiceSessionError = RAVoiceSessionError
 // MARK: - RAComponentLifecycleState
 
 public extension RAComponentLifecycleState {
-    // IDL-04: former RAComponentLoadState.loaded → RAComponentLifecycleState.ready.
+    // Former RAComponentLoadState.loaded → RAComponentLifecycleState.ready.
     var isLoaded: Bool { self == .ready }
     var isLoading: Bool { self == .loading }
 }

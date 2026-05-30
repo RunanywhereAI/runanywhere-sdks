@@ -288,10 +288,10 @@ extension StructuredOutputOptionsDefaults on StructuredOutputOptions {
 extension JSONSchemaStringHelpers on JSONSchema {
   /// JSON Schema text consumed by the structured-output C ABI.
   ///
-  /// Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15) so
+  /// Delegates to `rac_structured_output_schema_to_json_proto` so
   /// every SDK shares the same byte-exact, key-sorted, compact serializer —
   /// mirroring Swift `RAJSONSchema.jsonSchemaString`. Falls back to the
-  /// `raw_json` field (or `'{}'`) when the commons binary predates P2-T15.
+  /// `raw_json` field (or `'{}'`) when the commons binary predates that ABI.
   String get jsonSchemaString {
     final fn = RacNative.bindings.rac_structured_output_schema_to_json_proto;
     if (fn == null) {

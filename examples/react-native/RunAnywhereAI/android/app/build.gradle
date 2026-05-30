@@ -12,7 +12,7 @@ react {
 }
 
 // =============================================================================
-// Auto-sync SDK native libraries into node_modules before each build (B-RN-Setup-001)
+// Auto-sync SDK native libraries into node_modules before each build
 // =============================================================================
 // node_modules/@runanywhere/<pkg> is a real copy (not symlink), so .so files from
 // the SDK source tree never automatically reach the Gradle modules that read from
@@ -75,7 +75,7 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn syncSdkNativeLibs
 }
 
-// CLUSTER-23 (RN-AND-PREFAB-001): react-native-vision-camera 4.7.3 + Gradle 9.0
+// react-native-vision-camera 4.7.3 + Gradle 9.0
 // has a task-dependency race where :app:configureCMakeDebug[<abi>] tries to read
 // the vision-camera prefab directory before :react-native-vision-camera:prefabDebugPackage
 // has produced it. AGP only auto-wires prefabDebugConfigurePackage (which sets up the

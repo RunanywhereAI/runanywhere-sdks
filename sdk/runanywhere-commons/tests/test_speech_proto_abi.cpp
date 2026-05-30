@@ -756,7 +756,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
 }
 
 // -----------------------------------------------------------------------------
-// Wave D-7 — full-session voice-agent ABI coverage.
+// Full-session voice-agent ABI coverage.
 // -----------------------------------------------------------------------------
 
 int test_voice_agent_d7_process_turn_proto_full_flow() {

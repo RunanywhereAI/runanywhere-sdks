@@ -1,6 +1,6 @@
 /**
  * @file rac_proto_adapters.cpp
- * @brief Phase C6 — implementation of the C ABI <-> proto adapters declared
+ * @brief Implementation of the C ABI <-> proto adapters declared
  *        in include/rac/foundation/rac_proto_adapters.h.
  *
  * Each adapter is a straightforward field-by-field copy. Drift between the
@@ -23,8 +23,8 @@
 // without a `std::` qualifier.
 #include "rac/foundation/rac_proto_adapters.h"
 
-// Per-modality adapter declarations now live in features/ headers
-// (commons-core-infra-003). The .cpp pulls them in alongside the
+// Per-modality adapter declarations now live in features/ headers.
+// The .cpp pulls them in alongside the
 // foundation header so it can define all adapter bodies.
 #include <cmath>
 #include <cstddef>
@@ -44,7 +44,7 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 
-// MF-3 (AG-V3): the generated .pb.h files live here, NOT in the public
+// The generated .pb.h files live here, NOT in the public
 // header. The header forward-declares every proto class; the full message
 // definitions are only needed inside the adapter implementation TU. Anyone
 // editing this file should add new proto includes here, not in the header.
@@ -909,7 +909,7 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
             break;
     }
 
-    // hotspot-syn-091: round-trip the chat-template + image-marker overrides
+    // Round-trip the chat-template + image-marker overrides
     // that the C ABI carries (rac_vlm_options_t.custom_chat_template,
     // .image_marker_override). VLMChatTemplate has 3 string fields
     // (template_text, image_marker, default_system_prompt) — only set the
@@ -928,7 +928,7 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
         out->set_image_marker_override(in->image_marker_override);
     }
 
-    // pass3-syn-128: extended sampling knobs added to rac_vlm_options_t so the
+    // Extended sampling knobs added to rac_vlm_options_t so the
     // proto/C ABI boundary stays in sync. Only emit non-default scalars so the
     // wire stays sparse (matches the convention used for top_k above).
     if (in->seed != 0) {
@@ -982,7 +982,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
             break;
     }
 
-    // hotspot-engine-llamacpp-001: carry request-owned strings into
+    // Carry request-owned strings into
     // rac_vlm_options_t so the llama.cpp VLM engine can actually apply
     // them. The engine reads options->system_prompt directly when building
     // the VLM prompt; stop_sequences is in the C ABI struct for future
@@ -1015,7 +1015,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         }
     }
 
-    // hotspot-syn-091: allocate a heap rac_vlm_chat_template_t and its owned
+    // Allocate a heap rac_vlm_chat_template_t and its owned
     // strings when the proto carries a custom_chat_template, and rac_strdup
     // image_marker_override. rac_vlm_options_free_owned releases both.
     if (in.has_custom_chat_template()) {
@@ -1039,7 +1039,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         out->image_marker_override = rac_strdup(in.image_marker_override().c_str());
     }
 
-    // pass3-syn-128: extended sampling knobs round-trip into the C struct so
+    // Extended sampling knobs round-trip into the C struct so
     // the llama.cpp VLM engine can honor them in configure_sampler(). All
     // scalars — no allocation needed; rac_vlm_options_free_owned is unaffected.
     if (in.top_k() > 0) {
@@ -1081,7 +1081,7 @@ void rac_vlm_options_free_owned(rac_vlm_options_t* options) {
     options->stop_sequences = nullptr;
     options->num_stop_sequences = 0;
 
-    // hotspot-syn-091: free adapter-owned chat-template + marker override
+    // Free adapter-owned chat-template + marker override
     // allocations produced by rac_vlm_options_from_proto.
     if (options->custom_chat_template) {
         auto* tpl = const_cast<rac_vlm_chat_template_t*>(options->custom_chat_template);
@@ -1177,7 +1177,7 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         // the proto boundary — mirrors RAVLMImage.fromUIImage's CGContext
         // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
         // which reads it as 3 B/px, overshoots the heap by 33%, and either
-        // hallucinates or EXC_BAD_ACCESSes (see commons-004-A).
+        // hallucinates or EXC_BAD_ACCESSes.
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
         const ::std::string& src = in.raw_rgb();
         if (in.format() == ::runanywhere::v1::VLM_IMAGE_FORMAT_RAW_RGBA) {

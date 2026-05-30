@@ -1,11 +1,6 @@
 # AGENTS.md — RunAnywhere Flutter SDK
 
-Verified state: 2026-05-12 against working tree on `feat/v2-architecture` (post Wave-G + Wave-H Phase-B parity + FIX-C revert).
-For exhaustive file-by-file inventory, see `gaps/gaps/file organization/flutter.md`.
-
-Wave history:
-- **Wave G (2026-05-12, commit `407d50819`)**: 4 Swift-alignment bug fixes (FIX-A through FIX-D) + 290 LOC dead-code purge.
-- **Wave H (2026-05-12)**: 7 Phase-B Swift-parity items (`INIT-001`, `EVENT-001`, `LOG-001`, `STOR-001`, `HW-001`, `STRUCT-001`, `THINK-001` audit-no-op) + revert of Wave-G FIX-C (`Isolate.run` wrap of lifecycle load was triggering cross-isolate FFI callback aborts on every model load).
+Verified state: 2026-05-12 against working tree on `feat/v2-architecture`.
 
 ## Repository Structure
 
@@ -92,7 +87,7 @@ LlamaCpp | Sherpa/ONNX | Genie NPU   (Backend engines registered via vtable v3)
 
 1. **Proto-driven public surface.** All public API types (LLM/STT/TTS/VAD/VLM/voice/RAG/tools/etc.) are protobuf-generated. 58 runtime `.pb.dart` / `.pbenum.dart` files live under `lib/generated/`. Never hand-edit generated output.
 2. **FFI scheduling discipline.** Blocking calls stay on the main isolate unless their C++ path is known not to publish back through a Dart callback, or unless the callback path is proven safe with `NativeCallable.listener`. Streaming and SDK event fan-out use **`NativeCallable.listener`** with broadcast `StreamController`s (`dart:async`, never rxdart).
-3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2. **Wave-H INIT-001** made this truly fire-and-forget — Phase 2 is now assigned to `_servicesInitFuture` without awaiting (Swift `Task.detached` parity); previously the implementation eagerly awaited despite the doc claim.
+3. **Two-phase SDK init.** Phase 1 (sync): library load → register `rac_platform_adapter_t` → `rac_sdk_init` → configure logging → register events/device/file-manager/telemetry callbacks. Phase 2 (async, fire-and-forget): device registration + authentication + model assignment + telemetry flush. Offline inference works without Phase 2. This is truly fire-and-forget — Phase 2 is now assigned to `_servicesInitFuture` without awaiting (Swift `Task.detached` parity); previously the implementation eagerly awaited despite the doc claim.
 4. **Platform HTTP transport injection.** iOS registers a URLSession-backed `rac_http_transport_ops_t` vtable from ObjC++; Android registers an OkHttp-backed vtable via JNI. C++ uses the installed transport for all HTTP.
 5. **EventBus = pure `dart:async`.** `lib/public/events/event_bus.dart` is a `StreamController.broadcast()` singleton. rxdart is **not** a dependency.
 6. **Secure storage vtable.** C++ auth manager calls Dart secure storage callbacks synchronously via a `_secureCache` map; Dart side wraps `flutter_secure_storage`.
@@ -136,7 +131,7 @@ RunAnywhere.rag       // RunAnywhereRAG
 RunAnywhere.solutions // RunAnywhereSolutions
 RunAnywhere.embeddings // RunAnywhereEmbeddings
 RunAnywhere.lora      // RunAnywhereLoRACapability
-RunAnywhere.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Wave-H HW-001 Swift parity; was previously returning an empty fallback)
+RunAnywhere.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Swift parity; was previously returning an empty fallback)
 // + RunAnywherePluginLoader
 ```
 
@@ -303,7 +298,7 @@ Each Flutter plugin package (`runanywhere`, `runanywhere_llamacpp`, `runanywhere
 
 ### LlamaCPP Is One Package; LLM + VLM Are Two Modalities of the Same Engine
 
-After the P2-P3 unification, `runanywhere_llamacpp` exposes a **single registration call** that registers a unified plugin vtable with both `llm_ops` and `vlm_ops` slots filled:
+`runanywhere_llamacpp` exposes a **single registration call** that registers a unified plugin vtable with both `llm_ops` and `vlm_ops` slots filled:
 
 ```dart
 await LlamaCpp.register();   // Registers a single vtable: llm_ops + vlm_ops both populated

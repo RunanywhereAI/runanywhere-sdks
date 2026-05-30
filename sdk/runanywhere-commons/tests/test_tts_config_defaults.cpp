@@ -1,12 +1,12 @@
 /**
  * @file test_tts_config_defaults.cpp
- * @brief Parity tests for rac_tts_configuration_defaults_proto (P2-T14).
+ * @brief Parity tests for rac_tts_configuration_defaults_proto.
  *
  * Verifies the canonical TTSConfiguration defaults emitted by commons match
  * Swift's `RATTSConfiguration.defaults()`
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/
- * RATTSConfiguration+Helpers.swift). When the Swift extension is slimmed in
- * P3, every SDK will call into this ABI for default-population so a single
+ * RATTSConfiguration+Helpers.swift). When the Swift extension is slimmed,
+ * every SDK will call into this ABI for default-population so a single
  * source of truth governs the values.
  */
 

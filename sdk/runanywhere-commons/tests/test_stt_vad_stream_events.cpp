@@ -164,14 +164,14 @@ int test_stt_stream_events() {
 }
 
 // -----------------------------------------------------------------------------
-// CPP-14 (Wave 1): persistent per-session streaming handles.
+// Persistent per-session streaming handles.
 //
 // Installs a mock plugin that implements the new stream_create /
 // stream_feed_audio_chunk / stream_destroy vtable slots and counts each
 // call. The test starts a stream session and feeds 100 audio chunks via
 // rac_stt_stream_feed_audio_proto; we assert the backend was created
 // exactly once and torn down exactly once — this is the whole point of
-// the CPP-14 fix (previously Sherpa allocated state per chunk).
+// the persistent-stream fix (previously Sherpa allocated state per chunk).
 // -----------------------------------------------------------------------------
 
 struct MockStreamState {

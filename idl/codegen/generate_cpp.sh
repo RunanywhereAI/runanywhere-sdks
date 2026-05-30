@@ -31,7 +31,7 @@ if ! command -v protoc >/dev/null 2>&1; then
     exit 127
 fi
 
-# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone. C++ is the authoritative
 # consumer and emits every proto in idl/ — no exclusions.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then

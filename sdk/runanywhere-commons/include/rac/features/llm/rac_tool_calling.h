@@ -347,7 +347,7 @@ RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_na
 /**
  * @brief Derive the tool-call format from a serialized RAModelInfo.
  *
- * CONSOLIDATE-A canonical replacement for per-example heuristics like Swift's
+ * Canonical replacement for per-example heuristics like Swift's
  * `LLMViewModel.detectToolCallFormat(for:)`, Flutter's
  * `_detectToolCallFormat()`, Kotlin's `ToolSettingsViewModel.detectToolCallFormat()`,
  * and the React Native equivalent. Every example was duplicating the same
@@ -571,7 +571,7 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
                                           char** out_json);
 
 // =============================================================================
-// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
 // =============================================================================
 //
 // SDKs treat ToolValue (the recursive JSON-typed carrier defined in
@@ -612,7 +612,7 @@ RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_byt
                                                     rac_proto_buffer_t* out_tool_value);
 
 // =============================================================================
-// TOOL CALLING SESSION (Wave D-4) - Native orchestration state machine
+// TOOL CALLING SESSION - Native orchestration state machine
 // =============================================================================
 
 typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
@@ -649,7 +649,7 @@ RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_hand
 
 /**
  * @brief Spin-wait until all in-flight tool-calling session event dispatches
- *        have returned (commons-features-llm-rag-003).
+ *        have returned.
  *
  * The tool-calling session event dispatcher (drain_and_dispatch) snapshots
  * (callback, user_data) under the session mutex, releases the lock, then
@@ -669,7 +669,7 @@ RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_hand
 RAC_API void rac_tool_calling_session_proto_quiesce(void);
 
 // =============================================================================
-// TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
+// TOOL CALLING RUN LOOP - Single-call native orchestration
 // =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up

@@ -4,7 +4,7 @@
 //
 // §15 type-discipline: tool-calling types come from
 // `generated/tool_calling.pb.dart`; orchestration runs inside commons
-// via the Wave D-4 tool-calling session state machine
+// via the tool-calling session state machine
 // (`rac_tool_calling_session_*_proto`). Dart is a thin executor adapter
 // that runs registered closures when commons requests them.
 //
@@ -61,7 +61,7 @@ class RunAnywhereTools {
   static final Map<String, ToolDefinition> _toolDefinitions = {};
   static final _logger = SDKLogger('RunAnywhere.ToolCalling');
 
-  // pass3-syn-029: tracks the in-flight session handle so callers can issue
+  // Tracks the in-flight session handle so callers can issue
   // a structured-cancel via `cancelGeneration()`. Mirrors the Swift
   // `withTaskCancellationHandler` / Kotlin `invokeOnCompletion` /
   // RN `AbortSignal` / Web `AbortController.abort()` surfaces. Single
@@ -197,7 +197,7 @@ class RunAnywhereTools {
     final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
 
-    // pass2-syn-006-followup-flutter: thread tool_choice / forced_tool_name
+    // Thread tool_choice / forced_tool_name
     // all the way through to the commons request envelope (fields 7/8 on
     // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
     // them — not just the inline ToolCallingOptions snapshot. Top-level
@@ -227,7 +227,7 @@ class RunAnywhereTools {
     );
 
     final session = DartBridgeToolCalling.shared.createSession(request);
-    // pass3-syn-029: publish the active session handle so consumers can
+    // Publish the active session handle so consumers can
     // call `RunAnywhereTools.shared.cancelGeneration()` to interrupt the
     // in-flight loop (mirrors RunAnywhereLLM.cancelGeneration).
     _activeSessionHandle = session.sessionHandle;
@@ -310,7 +310,7 @@ class RunAnywhereTools {
     try {
       return await completer.future;
     } finally {
-      // pass3-syn-029: clear the published handle BEFORE close — once close
+      // Clear the published handle BEFORE close — once close
       // returns, any pending cancelGeneration() call would race a freshly
       // started session.
       if (_activeSessionHandle == session.sessionHandle) {
@@ -322,7 +322,7 @@ class RunAnywhereTools {
 
   /// Cancel the in-flight `generateWithTools` call, if any.
   ///
-  /// pass3-syn-029: routes through `rac_tool_calling_session_cancel_proto`
+  /// Routes through `rac_tool_calling_session_cancel_proto`
   /// via [DartBridgeToolCalling.cancelSession]. Idempotent — a no-op when no
   /// session is in flight (returns `false`). Safe to call from any isolate
   /// for which the bridge is loaded; the underlying ABI is documented as

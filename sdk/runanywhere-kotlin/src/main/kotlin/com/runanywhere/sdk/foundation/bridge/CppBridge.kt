@@ -142,7 +142,7 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
-            // F3 fix: initialize the native auth manager with a secure-storage
+            // Initialize the native auth manager with a secure-storage
             // vtable backed by the platform adapter secureGet/secureSet/
             // secureDelete callbacks. Must happen AFTER the adapter is
             // registered (the JNI-side vtable delegates to it) and BEFORE any
@@ -150,7 +150,7 @@ object CppBridge {
             // restart because rac_auth_save_tokens / rac_auth_clear are no-ops.
             CppBridgeAuth.initialize()
 
-            // v2 close-out Phase H4: install the OkHttp HTTP transport BEFORE
+            // Install the OkHttp HTTP transport BEFORE
             // any network I/O happens (device registration, model assignment
             // fetch, telemetry, auth all go through rac_http_request_*). The
             // adapter gives us the Android system trust store + proxy +
@@ -673,7 +673,7 @@ object CppBridge {
             CppBridgeTelemetry.unregister()
             CppBridgeSDKEvents.unregister()
 
-            // v2 close-out Phase H4: release the OkHttp transport before the
+            // Release the OkHttp transport before the
             // platform adapter, so any final rac_http_request_* inside shutdown
             // (e.g. telemetry flush) still has a working HTTP path.
             unregisterOkHttpTransport()

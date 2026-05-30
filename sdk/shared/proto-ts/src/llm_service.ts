@@ -204,7 +204,7 @@ export interface LLMStreamFinalResult {
 }
 
 /**
- * v2 close-out Phase G-2: unified per-token streaming event. Replaces
+ * Unified per-token streaming event. Replaces
  * LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
  * callbackFlow / StreamController / tokenQueue. One serialized event
  * per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
@@ -229,8 +229,8 @@ export interface LLMStreamEvent {
   /** True on the last event of a generation. */
   isFinal: boolean;
   /**
-   * Token semantic category (answer / thought / tool-call). IDL-06:
-   * canonical TokenKind from voice_events.proto.
+   * Token semantic category (answer / thought / tool-call).
+   * Canonical TokenKind from voice_events.proto.
    */
   kind: TokenKind;
   /**

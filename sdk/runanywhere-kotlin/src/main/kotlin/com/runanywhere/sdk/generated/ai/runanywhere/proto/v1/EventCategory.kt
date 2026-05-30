@@ -20,7 +20,7 @@ import kotlin.Suppress
  * Canonical event category carried by every SDKEvent envelope. Lives here
  * (instead of sdk_events.proto) so voice_events.proto and voice_agent_service
  * .proto can reference it without importing sdk_events.proto (which itself
- * imports voice_events.proto — IDL-07 cycle resolution).
+ * imports voice_events.proto — cycle resolution).
  */
 public enum class EventCategory(
   override val `value`: Int,
@@ -65,7 +65,7 @@ public enum class EventCategory(
   EVENT_CATEGORY_NETWORK(34),
   EVENT_CATEGORY_ERROR(35),
   /**
-   * IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+   * Absorbed from former VoiceEventCategory (voice_events.proto).
    * AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
    * previously only on the voice-pipeline side.
    */

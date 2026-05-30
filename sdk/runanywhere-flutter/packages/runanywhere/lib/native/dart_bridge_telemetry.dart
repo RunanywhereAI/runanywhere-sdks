@@ -62,7 +62,7 @@ class DartBridgeTelemetry {
 
   /// Detect unfilled .env / dart-define template placeholders.
   /// Returns true for strings like "YOUR_SUPABASE_PROJECT_URL",
-  /// `<your-key>`, "REPLACE_ME", etc. (B-FL-1-004 / B-WEB-9-001).
+  /// `<your-key>`, "REPLACE_ME", etc.
   static bool _looksLikePlaceholder(String? value) {
     if (value == null) return false;
     return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
@@ -98,7 +98,7 @@ class DartBridgeTelemetry {
       return;
     }
 
-    // B-FL-1-004: bail out if the example app forwarded an unfilled
+    // Bail out if the example app forwarded an unfilled
     // .env / dart-define placeholder. We don't want to POST telemetry
     // to a literal "YOUR_SUPABASE_PROJECT_URL" string.
     if (_looksLikePlaceholder(baseURL) || _looksLikePlaceholder(accessToken)) {

@@ -34,7 +34,7 @@ option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 
-# [FIXLOOP iter1 FINAL-LINT/scripts-ci] Ensure EMSCRIPTEN is always defined so
+# Ensure EMSCRIPTEN is always defined so
 # generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
 # CMake's --warn-uninitialized check on native (non-Emscripten) builds. The
 # Emscripten toolchain file sets EMSCRIPTEN=1 itself; we only paper over the
@@ -56,7 +56,7 @@ option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # safely default ON whenever the ONNX backend is requested for the same
 # build.
 #
-# RAC_WASM_RAG_STANDALONE (CLUSTER-05 / WEB-RAG-001): the Web Docs/RAG tab
+# RAC_WASM_RAG_STANDALONE: the Web Docs/RAG tab
 # ships against the auto-loaded llamacpp WASM bundle, which is built with
 # RAC_BACKEND_ONNX=OFF. Forcing RAC_BACKEND_RAG=OFF on that artifact strips
 # the `rac_rag_*_proto` exports from the JS glue, so the TS bridge can't
@@ -72,7 +72,7 @@ if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX AND NOT RAC_WASM_RAG_STANDALONE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
-# B20: Opt-in proto regeneration.
+# Opt-in proto regeneration.
 #
 # The 23 `*.pb.cc` / `*.pb.h` pairs under `src/generated/proto/` are committed
 # so CI / release builds never need a working protoc on-path. However, the
@@ -155,7 +155,7 @@ include(FetchContent)
 # Cross-compilation targets that bundle zlib/BZip2 need a stable archive
 # output directory so downstream FetchContent projects can consume concrete
 # file paths instead of unresolved logical library names.
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: iOS is added here too because we now
+# iOS is added here too because we now
 # force-bundle zlib for iOS slices (see comment below); libarchive's internal
 # find_package(ZLIB) needs a concrete archive path on cross-compile targets
 # the same way Android/Emscripten do.
@@ -191,7 +191,7 @@ endif()
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
 #
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled zlib for iOS and
+# Also force bundled zlib for iOS and
 # Android cross-compilation. Without this, libarchive's own
 # `FIND_PACKAGE(ZLIB 1.2.1)` inside its FetchContent CMake project occasionally
 # fails when cross-compiling for iOS / iOS-simulator slices (the host toolchain
@@ -211,7 +211,7 @@ if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
 endif()
 
-# CLUSTER-14 / WEB-EXTRACT-001: defense-in-depth normalization of the
+# Defense-in-depth normalization of the
 # ZLIB_VERSION cache. LoadVersions.cmake now strips a leading 'v' from
 # ZLIB_VERSION specifically (so engines that re-`include(LoadVersions)` don't
 # restore the raw form). Re-assert the strip here in case a future caller
@@ -224,7 +224,7 @@ endif()
 if(DEFINED ZLIB_VERSION AND ZLIB_VERSION MATCHES "^v")
     string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
     set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
-    message(STATUS "CLUSTER-14: pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
+    message(STATUS "Pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
                    "(GIT_TAG '${RAC_ZLIB_VERSION}' preserved on RAC_ZLIB_VERSION for FetchContent) "
                    "so libarchive's find_package(ZLIB 1.2.1) accepts it.")
 endif()
@@ -284,7 +284,7 @@ if(NOT ZLIB_FOUND)
         set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
     endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
-    # CLUSTER-02-FOLLOWUP: VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
+    # VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
     # form madler/zlib uses). libarchive's bundled CMake module runs
     # `find_package(ZLIB 1.2.1)`, which dispatches to CMake's FindZLIB module
     # with `VERSION_VAR ZLIB_VERSION`. FindZLIB normally derives ZLIB_VERSION
@@ -322,7 +322,7 @@ endif()
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
 #
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled BZip2 on iOS for the
+# Also force bundled BZip2 on iOS for the
 # same reason as zlib above. The Apple iOS SDK does ship libbz2.dylib, but
 # libarchive's `program("bzip2 -d")` fallback path (analogous to gzip) is
 # similarly blocked by the iOS sandbox. Forcing the bundled in-process
@@ -461,19 +461,19 @@ if(TARGET zlibstatic AND TARGET archive_static)
 endif()
 
 # -----------------------------------------------------------------------------
-# CLUSTER-14 / WEB-EXTRACT-001: configure-time assertion that libarchive's
+# Configure-time assertion that libarchive's
 # generated config.h has HAVE_ZLIB_H defined on every cross-compile target
 # where the platform CANNOT fork+exec /usr/bin/gzip. Without this, an
 # accidentally-undefined HAVE_ZLIB_H silently re-enables the
 # archive_read_support_filter_program("gzip -d") fallback inside libarchive's
 # filter_gzip.c — which iOS app sandboxes and Emscripten/WASM both block.
 #
-# CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed this for iOS by:
+# This was fixed for iOS by:
 #   (a) forcing bundled zlib for IOS|ANDROID|EMSCRIPTEN
 #   (b) stripping the 'v' prefix from ZLIB_VERSION so libarchive's internal
 #       find_package(ZLIB 1.2.1) version check succeeds
 #
-# But the cross-compile cache is order-sensitive (the iter-2 web lane shipped
+# But the cross-compile cache is order-sensitive (the web lane once shipped
 # a build with HAVE_ZLIB_H still undefined because the libarchive subbuild
 # already ran before the v-strip lines executed in a stale FetchContent
 # state). Surface that class of regression here, while we still have a CMake
@@ -487,7 +487,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         # Look for an active `#define HAVE_ZLIB_H 1` (NOT `/* #undef HAVE_ZLIB_H */`).
         if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_ZLIB_H[ \t]+1")
             message(FATAL_ERROR
-                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "libarchive's generated config.h "
                 "is missing #define HAVE_ZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
                 "libarchive will fall back to archive_read_support_filter_program(\"gzip -d\"), "
                 "which iOS sandbox and Emscripten/WASM both block, so every .tar.gz "
@@ -498,7 +498,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
                 "  ZLIB_INCLUDE_DIR cache: ${ZLIB_INCLUDE_DIR}\n"
                 "Fix: ensure ZLIB_VERSION is a plain numeric string (e.g. 1.3.2, "
                 "NOT v1.3.2) and re-configure from a clean build dir. See the "
-                "CLUSTER-02-FOLLOWUP v-strip block above for the canonical fix.")
+                "v-strip block above for the canonical fix.")
         endif()
         # Same check for bzip2 — the iOS sandbox + Emscripten also block
         # program(\"bzip2 -d\"), and the same find_package(BZip2) version
@@ -506,7 +506,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         # cache already shows this can fail independently.
         if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_BZLIB_H[ \t]+1")
             message(FATAL_ERROR
-                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "libarchive's generated config.h "
                 "is missing #define HAVE_BZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
                 "libarchive will fall back to archive_read_support_filter_program(\"bzip2 -d\"), "
                 "which iOS sandbox and Emscripten/WASM both block.\n"
@@ -516,7 +516,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         message(STATUS "libarchive config.h verified: HAVE_ZLIB_H + HAVE_BZLIB_H both defined (${RAC_PLATFORM_NAME})")
     else()
         message(WARNING
-            "CLUSTER-14: libarchive config.h not yet generated at ${_RAC_LIBARCHIVE_CONFIG_H} — "
+            "libarchive config.h not yet generated at ${_RAC_LIBARCHIVE_CONFIG_H} — "
             "skipping HAVE_ZLIB_H assertion. Re-configure once libarchive has materialized "
             "its build dir to enable the regression guard.")
     endif()
@@ -674,7 +674,7 @@ set(RAC_CORE_SOURCES
     src/core/sdk_state.cpp
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
-    # commons-core-infra-010: model_lifecycle.cpp was split per SRP into
+    # model_lifecycle.cpp was split per SRP into
     # five TUs (proto<->C translation, artifact resolution, auto-download,
     # per-modality accessors, and the C ABI entry points). All five share
     # the internal layout declared in `model_lifecycle_internal.h`.
@@ -751,7 +751,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     #   adapter yet needs to handle the "no adapter registered" case).
     $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_default.cpp>
     $<$<BOOL:${EMSCRIPTEN}>:src/infrastructure/http/rac_http_client_emscripten.cpp>
-    # commons-core-infra-015 — single `rac_http_response_free` TU shared
+    # Single `rac_http_response_free` TU shared
     # by the default + emscripten clients (was duplicated before).
     src/infrastructure/http/rac_http_response.cpp
     src/infrastructure/http/rac_http_download.cpp
@@ -821,12 +821,12 @@ set(RAC_FEATURES_SOURCES
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
-    # CONSOLIDATE-A (CLUSTER-14): commons-owned heuristics derived from
+    # Commons-owned heuristics derived from
     # RAModelInfo (tool-call format + parameterCountB + isSmallModel). Replaces
     # the duplicated detectToolCallFormat / isLikelySmallModel helpers that
     # examples-flutter, -ios, -android, -react-native were each hand-rolling.
     src/features/llm/rac_model_heuristics.cpp
-    # G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
+    # ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
     src/features/llm/rac_tool_value_json.cpp
     # Tool-calling session state machine (collapses per-SDK
     # 200-400 LOC orchestration loop into one native session).
@@ -861,7 +861,7 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # Lifecycle-owned proto-byte VADStreamEvent ABI
     src/features/vad/rac_vad_stream.cpp
-    # commons-features-voice-001/006: shared per-handle threshold-mutex registry.
+    # Shared per-handle threshold-mutex registry.
     src/features/vad/vad_threshold_registry.cpp
     # Wake Word — high-level service scaffold was removed. All real
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
@@ -890,7 +890,7 @@ set(RAC_FEATURES_SOURCES
     src/features/platform/rac_platform_services.cpp
     # LoRA
     src/features/lora/rac_lora_service.cpp
-    # Voice Agent — commons-features-voice-003 SRP split:
+    # Voice Agent — SRP split:
     #   voice_agent.cpp                       — lifecycle (create/destroy/init)
     #   voice_agent_legacy_abi.cpp            — legacy non-proto C ABI
     #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
@@ -1045,13 +1045,13 @@ endif()
 # _rac_* symbols currently called by the 5 SDKs (Swift / Kotlin / Flutter /
 # React Native / Web). Matters for App Store symbol analysis; Android keeps
 # the default-visibility workaround above until RAC_API annotations are
-# complete (TODO v0.21 / B19). Note: target_link_options only takes effect
+# complete (TODO v0.21). Note: target_link_options only takes effect
 # when the target is linked as a dynamic library — static-archive builds
 # ignore it, which is fine because symbol visibility only matters at final
 # link time. Use scripts/validation/check_rac_api_exports.sh to verify the
 # list stays in sync; update the count here when it changes materially.
 #
-# pass3-syn-081 / pass3-syn-169: this block is additionally gated on
+# This block is additionally gated on
 # RAC_BUILD_SHARED. `-exported_symbols_list` is a no-op for STATIC
 # archives (which is the default for every Apple preset in
 # CMakePresets.json — macos-{debug,release}, ios-{device,simulator}),
@@ -1065,7 +1065,7 @@ endif()
 # whose definitions live in src/features/rag/ — i.e. inside commons —
 # so a future SHARED Apple build with any plugin-link mode is safe.
 if(APPLE AND RAC_BUILD_SHARED)
-    # pass2-syn-002: backend-conditional exports live in sibling files and
+    # Backend-conditional exports live in sibling files and
     # are concatenated into a single per-build merged list under
     # ${CMAKE_CURRENT_BINARY_DIR}. The Apple linker takes exactly one
     # `-exported_symbols_list` argument, so we cannot list the conditional
@@ -1077,7 +1077,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         list(APPEND _rac_exports_merged_inputs
             "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.rag.exports")
     endif()
-    # pass3-syn-002: the onnx_embeddings and whisperkit_coreml sibling
+    # The onnx_embeddings and whisperkit_coreml sibling
     # exports siblings were dropped here — those `_rac_backend_*_register`
     # symbols are defined in the engine targets (engines/onnx,
     # engines/whisperkit_coreml), not in librac_commons. Listing them in
@@ -1099,7 +1099,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         file(APPEND "${_rac_exports_merged}" "${_rac_exports_part_contents}\n")
     endforeach()
     unset(_rac_exports_part_contents)
-    # pass3-syn-082: also register a build-time custom command with a
+    # Also register a build-time custom command with a
     # DEPENDS edge on the source .exports files. `file(WRITE/APPEND)`
     # above runs only at *configure* time and is not tracked by the
     # Ninja/Make/Xcode dependency graph; without this custom command,
@@ -1113,7 +1113,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         "${CMAKE_CURRENT_BINARY_DIR}/_RACommons_MergeExports.cmake")
     file(WRITE "${_rac_exports_merge_script}"
 "# Auto-generated by sdk/runanywhere-commons/CMakeLists.txt for the\n"
-"# pass3-syn-082 build-time merge of RACommons exports siblings.\n"
+"# build-time merge of RACommons exports siblings.\n"
 "# Invoked via: cmake -DRAC_EXPORTS_OUT=<path> -DRAC_EXPORTS_IN=<list> -P\n"
 "file(WRITE \"\${RAC_EXPORTS_OUT}\"\n"
 "    \"# Auto-generated by RACommons exports merge step. DO NOT EDIT.\\n\")\n"
@@ -1177,7 +1177,7 @@ if(EMSCRIPTEN)
 endif()
 
 # =============================================================================
-# B20: Reproducible proto C++ codegen
+# Reproducible proto C++ codegen
 # =============================================================================
 # Committed `.pb.{cc,h}` pairs in `src/generated/proto/` must stay in sync with
 # `idl/*.proto`. When RAC_REGENERATE_PROTO=ON AND `protoc` is on-path, rerun
@@ -1216,7 +1216,7 @@ if(RAC_REGENERATE_PROTO)
             )
             add_custom_target(rac_proto_gen DEPENDS "${_RAC_PROTO_STAMP}")
             add_dependencies(rac_commons rac_proto_gen)
-            message(STATUS "B20: rac_proto_gen wired (idl/*.proto → ${_RAC_PROTO_OUT}); rac_commons depends on it")
+            message(STATUS "rac_proto_gen wired (idl/*.proto → ${_RAC_PROTO_OUT}); rac_commons depends on it")
         else()
             message(WARNING "RAC_REGENERATE_PROTO=ON but ${_RAC_IDL_CODEGEN} or idl/*.proto missing — skipping regen target")
         endif()

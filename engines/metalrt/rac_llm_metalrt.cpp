@@ -22,7 +22,7 @@ static const char* LOG_CAT = "LLM.MetalRT";
 // INTERNAL HANDLE
 // =============================================================================
 
-// engines-003 (CLUSTER-211): MetalRT's underlying engine is a closed-source
+// MetalRT's underlying engine is a closed-source
 // vendor library with no documented thread-safety guarantee, and the public
 // `destroy` entrypoint races any in-flight `generate` / `generate_stream`.
 // The previous design guarded only `handle` / `loaded` with `mutex_` + an

@@ -84,7 +84,7 @@ typedef struct rac_stt_service_ops {
                                     const rac_stt_options_t* options, char** out_language);
 
     // -------------------------------------------------------------------------
-    // CPP-14 (Wave 1): persistent per-session streaming handles.
+    // Persistent per-session streaming handles.
     //
     // These three slots let the commons streaming dispatcher keep a stable
     // backend recognizer handle alive across chunks. Sherpa-ONNX in
@@ -297,7 +297,7 @@ RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data);
 
 // =============================================================================
-// CANONICAL DEFAULTS (P2-T14)
+// CANONICAL DEFAULTS
 // =============================================================================
 
 /**

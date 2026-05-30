@@ -37,10 +37,10 @@ static std::vector<uint8_t> rgb_to_rgba(const uint8_t* rgb, uint32_t w, uint32_t
     return rgba;
 }
 
-// engines-003 (CLUSTER-211): see rac_llm_metalrt.cpp for the full ADR. Same
+// See rac_llm_metalrt.cpp for the full ADR. Same
 // acquire/release pin pattern: destroy waits on cv_ for in-flight
 // process / process_stream pins to drain before tearing down the vision
-// handle and freeing impl. Mirrors the pass3-syn UAF callout in
+// handle and freeing impl. Mirrors the UAF callout in
 // voice_agent.cpp — we fix it at the engine wrapper here.
 struct rac_vlm_metalrt_impl {
     void* handle = nullptr;  // metalrt_vision_create() handle
@@ -52,13 +52,13 @@ struct rac_vlm_metalrt_impl {
 
 namespace {
 
-// pass3-syn-128 / engines-011: build the engine's vision-options struct from
+// Build the engine's vision-options struct from
 // the caller's rac_vlm_options_t. Mirrors llamacpp_vlm sampler handling for the
 // fields the MetalRT engine ABI exposes today (max_tokens, temperature, top_k)
 // and emits a single WARNING when callers set sampler fields metalrt cannot
 // forward (top_p, seed, repetition_penalty, min_p, emit_image_embeddings).
 // Without the warning, an app pinning metalrt would see callers' seeds /
-// penalties silently discarded — the exact regression engines-011 calls out.
+// penalties silently discarded.
 //
 // When the MetalRT engine ABI grows top_p/seed/etc., the stub layout in
 // engines/metalrt/stubs/metalrt_c_api.h must be extended in lockstep and the
