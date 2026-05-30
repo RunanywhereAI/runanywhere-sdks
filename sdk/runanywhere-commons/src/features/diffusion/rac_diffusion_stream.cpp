@@ -167,14 +167,16 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
 // by DiffusionInFlightGuard, then spin-wait until currently-in-flight calls
 // drain. Mirrors rac_vlm_proto_quiesce / voice_agent.cpp:569-592.
 //
-// Diffusion-specific divergence from VLM: diffusion_component.cpp calls this
-// quiesce both at destroy AND on every model swap via load_model (see
-// diffusion_component.cpp:369). To keep model-swap reuse working, clear the
-// barrier after the drain completes. The barrier+drain window is still
-// sufficient to close the TOCTOU race because any dispatcher entry that
-// observed the false→true transition (or was about to) has either been
-// rejected (admitted_=false) or drained (counter decremented). VLM does not
-// need this clear because it only quiesces at destroy.
+// diffusion_component.cpp calls this quiesce both at destroy AND on every
+// model swap via load_model (see diffusion_component.cpp:369). To keep
+// model-swap reuse working, clear the barrier after the drain completes. The
+// barrier+drain window is still sufficient to close the TOCTOU race because
+// any dispatcher entry that observed the false→true transition (or was about
+// to) has either been rejected (admitted_=false) or drained (counter
+// decremented). VLM (rac_vlm_proto_quiesce) now clears the barrier the same
+// way: the RN and Flutter VLM bridges invoke it as a per-stream drain after
+// every rac_vlm_stream_proto, so a sticky barrier would reject all subsequent
+// streams with RAC_ERROR_INVALID_STATE (see e2e-rn-vlm-fix note there).
 void rac_diffusion_proto_quiesce(void) {
     diffusion_proto_shutting_down().store(true, std::memory_order_release);
     while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {

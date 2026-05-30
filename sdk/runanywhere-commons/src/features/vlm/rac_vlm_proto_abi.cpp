@@ -445,17 +445,36 @@ extern "C" {
 // pass3-syn-089: set the is_shutting_down barrier FIRST so any caller that
 // tries to enter the dispatcher after quiesce begins is rejected by
 // VlmInFlightGuard, then spin-wait until currently-in-flight calls drain.
-// This mirrors voice_agent.cpp:569-592 exactly. The flag is intentionally
-// process-lifetime sticky: there is no resume contract — once VLM proto-byte
-// dispatch is quiesced, the lifecycle has already been torn down and the
-// only valid next step is destroying the SDK or re-initializing it (which
-// constructs a fresh process). If a future caller needs to resume, add a
-// matching rac_vlm_proto_resume() that clears the flag.
+// This mirrors voice_agent.cpp:569-592 and rac_diffusion_proto_quiesce.
+//
+// e2e-rn-vlm-fix: the barrier MUST be cleared after the drain completes.
+// The original implementation left the flag process-lifetime sticky on the
+// assumption that VLM only quiesces at destroy. That assumption was wrong:
+// the RN core Nitro bridge (HybridRunAnywhereCore+Voice.cpp:952) and the
+// Flutter VLM bridge (dart_bridge_vlm.dart:164/175) both invoke this quiesce
+// as a per-stream drain after EVERY rac_vlm_stream_proto call — the exact
+// teardown recipe documented in rac_vlm_service.h:236-243 and shared with the
+// LLM/STT/TTS dispatchers, whose quiesce helpers are pure idempotent drains.
+// Leaving the flag latched poisoned the ABI: the SECOND describe (and the
+// first RN describe after any earlier stream) was rejected by
+// VlmInFlightGuard with RAC_ERROR_INVALID_STATE, surfacing in JS/Dart as
+// "rac_vlm_stream_proto failed: invalid state". Clearing the barrier after
+// the drain — identical to rac_diffusion_proto_quiesce, which already does
+// this for its per-model-swap reuse — keeps the ABI reusable across streams
+// while preserving the TOCTOU-safe barrier+drain window (any dispatcher entry
+// that observed false→true was rejected or already drained before the clear).
+// Swift is unaffected: its VLM stream path never calls this quiesce per
+// stream (it cancels via rac_vlm_cancel_proto in onTermination). The destroy
+// paths (vlm_component.cpp:350, rac_vlm_service.cpp:274) remain safe because
+// they tear down the lifecycle immediately afterwards, so a post-clear
+// acquire_lifecycle_vlm returns RAC_ERROR_NOT_INITIALIZED rather than
+// dispatching into freed state.
 void rac_vlm_proto_quiesce(void) {
     vlm_proto_shutting_down().store(true, std::memory_order_release);
     while (vlm_in_flight().load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
+    vlm_proto_shutting_down().store(false, std::memory_order_release);
 }
 
 rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
