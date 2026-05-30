@@ -105,7 +105,7 @@ import ONNXRuntime
 struct LocalAIPlaygroundApp: App {
     @StateObject private var modelService = ModelService()
     @State private var isSDKInitialized = false
-
+    
     var body: some Scene {
         WindowGroup {
             Group {
@@ -119,23 +119,23 @@ struct LocalAIPlaygroundApp: App {
             .task { await initializeSDK() }
         }
     }
-
+    
     @MainActor
     private func initializeSDK() async {
         do {
             // Step 1: Initialize core SDK
             try RunAnywhere.initialize(environment: .development)
-
+            
             // Step 2: Register backends BEFORE models
             LlamaCPP.register()  // For LLM
             ONNX.register()      // For STT, TTS, VAD
-
+            
             // Step 3: Register models with URLs
             ModelService.registerDefaultModels()
-
+            
             print("✅ RunAnywhere SDK v\(RunAnywhere.version) initialized")
             isSDKInitialized = true
-
+            
             // Step 4: Check what's already loaded
             await modelService.refreshLoadedStates()
         } catch {
@@ -231,7 +231,7 @@ func generateResponse(to prompt: String) async throws -> String {
     )
 
     let result = try await RunAnywhere.generateStream(prompt, options: options)
-
+    
     var fullResponse = ""
     for try await token in result.stream {
         fullResponse += token
@@ -240,11 +240,11 @@ func generateResponse(to prompt: String) async throws -> String {
             self.responseText = fullResponse
         }
     }
-
+    
     // Get metrics
     let metrics = try await result.result.value
     print("Speed: \(metrics.tokensPerSecond) tok/s")
-
+    
     return fullResponse
 }
 ```
@@ -304,7 +304,7 @@ Piper outputs **Float32 PCM at 22kHz**. You must convert to WAV for `AVAudioPlay
 func playTTSAudio(_ data: Data) throws {
     // Check if already WAV
     let isWAV = data.prefix(4) == Data("RIFF".utf8)
-
+    
     let audioData: Data
     if isWAV {
         audioData = data
@@ -312,12 +312,12 @@ func playTTSAudio(_ data: Data) throws {
         // Convert Float32 PCM to Int16 WAV
         audioData = convertFloat32ToWAV(data, sampleRate: 22050)
     }
-
+    
     // Write to temp file (more reliable)
     let tempURL = FileManager.default.temporaryDirectory
         .appendingPathComponent("tts_\(UUID()).wav")
     try audioData.write(to: tempURL)
-
+    
     // Play
     let player = try AVAudioPlayer(contentsOf: tempURL)
     player.play()
@@ -327,7 +327,7 @@ func convertFloat32ToWAV(_ floatData: Data, sampleRate: Int) -> Data {
     // Convert Float32 samples to Int16
     let sampleCount = floatData.count / 4
     var int16Data = Data()
-
+    
     floatData.withUnsafeBytes { buffer in
         let floats = buffer.bindMemory(to: Float.self)
         for i in 0..<sampleCount {
@@ -336,7 +336,7 @@ func convertFloat32ToWAV(_ floatData: Data, sampleRate: Int) -> Data {
             int16Data.append(contentsOf: withUnsafeBytes(of: int16.littleEndian) { Array($0) })
         }
     }
-
+    
     // Add WAV header
     return createWAVHeader(dataSize: int16Data.count, sampleRate: sampleRate) + int16Data
 }
@@ -378,14 +378,14 @@ let silenceDuration: TimeInterval = 1.5 // Seconds of silence before auto-stop
 func startVADMonitoring() {
     Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
         let level = audioService.inputLevel
-
+        
         // Detect speech start
         if !isSpeechDetected && level > speechThreshold {
             isSpeechDetected = true
             silenceStartTime = nil
             print("🎤 Speech detected")
         }
-
+        
         // Detect speech end
         if isSpeechDetected {
             if level < silenceThreshold {
@@ -411,27 +411,27 @@ func runVoicePipeline() async throws {
     // 1. Start recording with VAD
     try await audioService.startRecording()
     startVADMonitoring()
-
+    
     // ... VAD auto-stops when user finishes speaking ...
-
+    
     // 2. Get audio and transcribe
     let audioData = try await audioService.stopRecording()
     let userText = try await RunAnywhere.transcribe(audioData)
-
+    
     // 3. Generate LLM response
     let prompt = """
     You are a helpful voice assistant. Keep responses SHORT (2-3 sentences).
-
+    
     User: \(userText)
     Assistant:
     """
-
+    
     var response = ""
     let stream = try await RunAnywhere.generateStream(prompt, options: .init(maxTokens: 100))
     for try await token in stream.stream {
         response += token
     }
-
+    
     // 4. Speak the response
     let speech = try await RunAnywhere.synthesize(response, options: TTSOptions())
     try audioService.playAudio(speech.audioData)

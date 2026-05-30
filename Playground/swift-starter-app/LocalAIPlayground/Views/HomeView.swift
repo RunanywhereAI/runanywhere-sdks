@@ -27,17 +27,17 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var modelService: ModelService
     @Environment(\.colorScheme) var colorScheme
-
+    
     /// Callback when a feature is selected
     let onFeatureSelected: (Feature) -> Void
-
+    
     /// Available features in the app
     enum Feature: CaseIterable {
         case chat
         case speechToText
         case textToSpeech
         case voicePipeline
-
+        
         var title: String {
             switch self {
             case .chat: return "Chat"
@@ -46,20 +46,20 @@ struct HomeView: View {
             case .voicePipeline: return "Voice Pipeline"
             }
         }
-
+        
         var description: String {
             switch self {
-            case .chat:
+            case .chat: 
                 return "Chat with an on-device LLM. Streaming responses, complete privacy."
-            case .speechToText:
+            case .speechToText: 
                 return "Transcribe speech using Whisper. Works entirely offline."
-            case .textToSpeech:
+            case .textToSpeech: 
                 return "Natural voice synthesis with Piper neural TTS."
-            case .voicePipeline:
+            case .voicePipeline: 
                 return "Full voice agent: Speak → Transcribe → Generate → Speak"
             }
         }
-
+        
         var icon: String {
             switch self {
             case .chat: return "bubble.left.and.bubble.right.fill"
@@ -68,7 +68,7 @@ struct HomeView: View {
             case .voicePipeline: return "person.wave.2.fill"
             }
         }
-
+        
         var gradientColors: [Color] {
             switch self {
             case .chat: return [.aiPrimary, .aiPrimary.opacity(0.7)]
@@ -78,20 +78,20 @@ struct HomeView: View {
             }
         }
     }
-
+    
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: AISpacing.xl) {
                     // Hero section
                     heroSection
-
+                    
                     // Model status
                     modelStatusSection
-
+                    
                     // Feature cards
                     featureCardsSection
-
+                    
                     // Footer
                     footerSection
                 }
@@ -102,11 +102,11 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.large)
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Hero Section
     // -------------------------------------------------------------------------
-
+    
     private var heroSection: some View {
         VStack(spacing: AISpacing.md) {
             // App icon
@@ -121,24 +121,24 @@ struct HomeView: View {
                     )
                     .frame(width: 80, height: 80)
                     .shadow(color: .aiPrimary.opacity(0.4), radius: 16, y: 8)
-
+                
                 Image(systemName: "cpu")
                     .font(.system(size: 36, weight: .semibold))
                     .foregroundStyle(.white)
             }
-
+            
             // Title
             Text("On-Device AI")
                 .font(.aiDisplayLarge)
                 .foregroundStyle(.primary)
-
+            
             // Subtitle
             Text("Privacy-first AI capabilities powered by RunAnywhere SDK. All processing happens locally on your device.")
                 .font(.aiBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-
+            
             // Privacy badges
             HStack(spacing: AISpacing.md) {
                 PrivacyBadge(icon: "lock.shield.fill", text: "100% Private")
@@ -148,24 +148,24 @@ struct HomeView: View {
         }
         .padding(.vertical, AISpacing.lg)
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Model Status Section
     // -------------------------------------------------------------------------
-
+    
     private var modelStatusSection: some View {
         VStack(alignment: .leading, spacing: AISpacing.md) {
             HStack {
                 Text("Model Status")
                     .font(.aiHeading)
-
+                
                 Spacer()
-
+                
                 if modelService.isVoiceAgentReady {
                     AIStatusBadge(status: .ready, text: "All Ready")
                 }
             }
-
+            
             VStack(spacing: AISpacing.sm) {
                 ModelStatusRow(
                     name: "LLM",
@@ -175,7 +175,7 @@ struct HomeView: View {
                     isDownloading: modelService.isLLMDownloading,
                     downloadProgress: modelService.llmDownloadProgress
                 )
-
+                
                 ModelStatusRow(
                     name: "STT",
                     model: "Whisper Tiny",
@@ -184,7 +184,7 @@ struct HomeView: View {
                     isDownloading: modelService.isSTTDownloading,
                     downloadProgress: modelService.sttDownloadProgress
                 )
-
+                
                 ModelStatusRow(
                     name: "TTS",
                     model: "Piper Lessac",
@@ -198,16 +198,16 @@ struct HomeView: View {
             .aiCardStyle()
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Feature Cards Section
     // -------------------------------------------------------------------------
-
+    
     private var featureCardsSection: some View {
         VStack(alignment: .leading, spacing: AISpacing.md) {
             Text("Features")
                 .font(.aiHeading)
-
+            
             ForEach(Feature.allCases, id: \.title) { feature in
                 AIFeatureCard(
                     icon: feature.icon,
@@ -220,38 +220,38 @@ struct HomeView: View {
             }
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Footer Section
     // -------------------------------------------------------------------------
-
+    
     private var footerSection: some View {
         VStack(spacing: AISpacing.sm) {
             Divider()
-
+            
             Text("Powered by RunAnywhere SDK")
                 .font(.aiCaption)
                 .foregroundStyle(.tertiary)
-
+            
             HStack(spacing: AISpacing.xs) {
                 Text("v0.16.0")
                     .font(.aiCaption)
                     .foregroundStyle(.tertiary)
-
+                
                 Text("•")
                     .foregroundStyle(.tertiary)
-
+                
                 Link("Documentation", destination: URL(string: "https://docs.runanywhere.ai")!)
                     .font(.aiCaption)
             }
         }
         .padding(.top, AISpacing.lg)
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Background
     // -------------------------------------------------------------------------
-
+    
     private var backgroundGradient: some View {
         Group {
             if colorScheme == .dark {
@@ -273,13 +273,13 @@ struct HomeView: View {
 struct PrivacyBadge: View {
     let icon: String
     let text: String
-
+    
     var body: some View {
         HStack(spacing: AISpacing.xs) {
             Image(systemName: icon)
                 .font(.system(size: 12))
                 .foregroundStyle(Color.aiPrimary)
-
+            
             Text(text)
                 .font(.aiCaption)
                 .foregroundStyle(.secondary)
@@ -305,26 +305,26 @@ struct ModelStatusRow: View {
     let isLoading: Bool
     let isDownloading: Bool
     let downloadProgress: Double
-
+    
     var body: some View {
         HStack(spacing: AISpacing.md) {
             // Status indicator
             Circle()
                 .fill(statusColor)
                 .frame(width: 10, height: 10)
-
+            
             // Name
             Text(name)
                 .font(.aiLabel)
                 .frame(width: 40, alignment: .leading)
-
+            
             // Model name
             Text(model)
                 .font(.aiBodySmall)
                 .foregroundStyle(.secondary)
-
+            
             Spacer()
-
+            
             // Status
             Group {
                 if isDownloading {
@@ -341,7 +341,7 @@ struct ModelStatusRow: View {
             }
         }
     }
-
+    
     private var statusColor: Color {
         if isLoaded {
             return .aiSuccess
@@ -351,7 +351,7 @@ struct ModelStatusRow: View {
             return .secondary
         }
     }
-
+    
     private var statusText: String {
         if isLoaded {
             return "Ready"

@@ -60,84 +60,84 @@ import RunAnywhere
 // =============================================================================
 @MainActor
 final class ModelService: ObservableObject {
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Model IDs
     // -------------------------------------------------------------------------
     // These IDs must match the IDs used when registering models.
     // They are used to download and load the correct model.
     // -------------------------------------------------------------------------
-
+    
     /// LLM model ID - LiquidAI LFM2 350M with Q4_K_M quantization
     static let llmModelId = "lfm2-350m-q4_k_m"
-
+    
     /// STT model ID - Whisper Tiny (English)
     static let sttModelId = "sherpa-onnx-whisper-tiny.en"
-
+    
     /// TTS voice ID - Piper US English (Lessac Medium)
     static let ttsModelId = "vits-piper-en_US-lessac-medium"
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Download State
     // -------------------------------------------------------------------------
-
+    
     @Published var isLLMDownloading = false
     @Published var isSTTDownloading = false
     @Published var isTTSDownloading = false
-
+    
     @Published var llmDownloadProgress: Double = 0.0
     @Published var sttDownloadProgress: Double = 0.0
     @Published var ttsDownloadProgress: Double = 0.0
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Load State
     // -------------------------------------------------------------------------
-
+    
     @Published var isLLMLoading = false
     @Published var isSTTLoading = false
     @Published var isTTSLoading = false
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Loaded State
     // -------------------------------------------------------------------------
-
+    
     @Published private(set) var isLLMLoaded = false
     @Published private(set) var isSTTLoaded = false
     @Published private(set) var isTTSLoaded = false
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Computed Properties
     // -------------------------------------------------------------------------
-
+    
     /// Whether all models for voice agent are ready
     var isVoiceAgentReady: Bool {
         isLLMLoaded && isSTTLoaded && isTTSLoaded
     }
-
+    
     /// Whether any model is currently downloading
     var isAnyDownloading: Bool {
         isLLMDownloading || isSTTDownloading || isTTSDownloading
     }
-
+    
     /// Whether any model is currently loading
     var isAnyLoading: Bool {
         isLLMLoading || isSTTLoading || isTTSLoading
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Initialization
     // -------------------------------------------------------------------------
-
+    
     init() {
         Task {
             await refreshLoadedStates()
         }
     }
-
+    
     // =========================================================================
     // MARK: - Model Registration
     // =========================================================================
-
+    
     /// Registers default models with the SDK.
     ///
     /// This must be called AFTER SDK initialization and backend registration,
@@ -167,7 +167,7 @@ final class ModelService: ObservableObject {
                 memoryRequirement: 250_000_000
             )
         }
-
+        
         // -----------------------------------------------------------------
         // Register STT Model
         // -----------------------------------------------------------------
@@ -185,7 +185,7 @@ final class ModelService: ObservableObject {
                 memoryRequirement: 75_000_000
             )
         }
-
+        
         // -----------------------------------------------------------------
         // Register TTS Voice
         // -----------------------------------------------------------------
@@ -203,14 +203,14 @@ final class ModelService: ObservableObject {
                 memoryRequirement: 65_000_000
             )
         }
-
+        
         print("✅ Models registered: LLM, STT, TTS")
     }
-
+    
     // =========================================================================
     // MARK: - State Refresh
     // =========================================================================
-
+    
     /// Refreshes the loaded state of all models.
     ///
     /// Queries the SDK to check which models are currently loaded into memory.
@@ -220,11 +220,11 @@ final class ModelService: ObservableObject {
         isSTTLoaded = await RunAnywhere.isSTTModelLoaded
         isTTSLoaded = await RunAnywhere.isTTSVoiceLoaded
     }
-
+    
     // =========================================================================
     // MARK: - LLM Operations
     // =========================================================================
-
+    
     /// Downloads and loads the LLM model.
     ///
     /// This method:
@@ -238,7 +238,7 @@ final class ModelService: ObservableObject {
     // -------------------------------------------------------------------------
     func downloadAndLoadLLM() async {
         guard !isLLMDownloading && !isLLMLoading else { return }
-
+        
         // Try to load first if already downloaded
         isLLMLoading = true
         do {
@@ -251,11 +251,11 @@ final class ModelService: ObservableObject {
             print("LLM load attempt failed (will download): \(error)")
             isLLMLoading = false
         }
-
+        
         // If loading failed, download the model
         isLLMDownloading = true
         llmDownloadProgress = 0.0
-
+        
         do {
             // -----------------------------------------------------------------
             // Download Model with Progress
@@ -266,7 +266,7 @@ final class ModelService: ObservableObject {
             // - stage: .downloading, .extracting, .completed, etc.
             // -----------------------------------------------------------------
             let progressStream = try await RunAnywhere.downloadModel(Self.llmModelId)
-
+            
             for await progress in progressStream {
                 llmDownloadProgress = progress.overallProgress
                 if progress.stage == .completed {
@@ -278,9 +278,9 @@ final class ModelService: ObservableObject {
             isLLMDownloading = false
             return
         }
-
+        
         isLLMDownloading = false
-
+        
         // Load the model after download
         isLLMLoading = true
         do {
@@ -291,7 +291,7 @@ final class ModelService: ObservableObject {
         }
         isLLMLoading = false
     }
-
+    
     /// Unloads the LLM model from memory.
     // -------------------------------------------------------------------------
     func unloadLLM() async {
@@ -303,16 +303,16 @@ final class ModelService: ObservableObject {
             print("⚠️ LLM unload error: \(error)")
         }
     }
-
+    
     // =========================================================================
     // MARK: - STT Operations
     // =========================================================================
-
+    
     /// Downloads and loads the STT (Speech-to-Text) model.
     // -------------------------------------------------------------------------
     func downloadAndLoadSTT() async {
         guard !isSTTDownloading && !isSTTLoading else { return }
-
+        
         // Try to load first if already downloaded
         isSTTLoading = true
         do {
@@ -325,14 +325,14 @@ final class ModelService: ObservableObject {
             print("STT load attempt failed (will download): \(error)")
             isSTTLoading = false
         }
-
+        
         // If loading failed, download the model
         isSTTDownloading = true
         sttDownloadProgress = 0.0
-
+        
         do {
             let progressStream = try await RunAnywhere.downloadModel(Self.sttModelId)
-
+            
             for await progress in progressStream {
                 sttDownloadProgress = progress.overallProgress
                 if progress.stage == .completed {
@@ -344,9 +344,9 @@ final class ModelService: ObservableObject {
             isSTTDownloading = false
             return
         }
-
+        
         isSTTDownloading = false
-
+        
         // Load the model after download
         isSTTLoading = true
         do {
@@ -357,7 +357,7 @@ final class ModelService: ObservableObject {
         }
         isSTTLoading = false
     }
-
+    
     /// Unloads the STT model from memory.
     // -------------------------------------------------------------------------
     func unloadSTT() async {
@@ -369,16 +369,16 @@ final class ModelService: ObservableObject {
             print("⚠️ STT unload error: \(error)")
         }
     }
-
+    
     // =========================================================================
     // MARK: - TTS Operations
     // =========================================================================
-
+    
     /// Downloads and loads the TTS (Text-to-Speech) voice.
     // -------------------------------------------------------------------------
     func downloadAndLoadTTS() async {
         guard !isTTSDownloading && !isTTSLoading else { return }
-
+        
         // Try to load first if already downloaded
         isTTSLoading = true
         do {
@@ -391,14 +391,14 @@ final class ModelService: ObservableObject {
             print("TTS load attempt failed (will download): \(error)")
             isTTSLoading = false
         }
-
+        
         // If loading failed, download the model
         isTTSDownloading = true
         ttsDownloadProgress = 0.0
-
+        
         do {
             let progressStream = try await RunAnywhere.downloadModel(Self.ttsModelId)
-
+            
             for await progress in progressStream {
                 ttsDownloadProgress = progress.overallProgress
                 if progress.stage == .completed {
@@ -410,9 +410,9 @@ final class ModelService: ObservableObject {
             isTTSDownloading = false
             return
         }
-
+        
         isTTSDownloading = false
-
+        
         // Load the voice after download
         isTTSLoading = true
         do {
@@ -423,7 +423,7 @@ final class ModelService: ObservableObject {
         }
         isTTSLoading = false
     }
-
+    
     /// Unloads the TTS voice from memory.
     // -------------------------------------------------------------------------
     func unloadTTS() async {
@@ -435,11 +435,11 @@ final class ModelService: ObservableObject {
             print("⚠️ TTS unload error: \(error)")
         }
     }
-
+    
     // =========================================================================
     // MARK: - Batch Operations
     // =========================================================================
-
+    
     /// Downloads and loads all models for the voice agent.
     ///
     /// Note: Downloads run sequentially to avoid SDK concurrency issues.
@@ -449,7 +449,7 @@ final class ModelService: ObservableObject {
         await downloadAndLoadSTT()
         await downloadAndLoadTTS()
     }
-
+    
     /// Unloads all models to free memory.
     // -------------------------------------------------------------------------
     func unloadAllModels() async {

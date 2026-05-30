@@ -46,32 +46,32 @@ struct SpeechToTextView: View {
     // -------------------------------------------------------------------------
     // MARK: - State Properties
     // -------------------------------------------------------------------------
-
+    
     /// Service managing AI model loading
     @EnvironmentObject var modelService: ModelService
-
+    
     /// Service managing audio capture
     @StateObject private var audioService = AudioService.shared
-
+    
     /// List of transcription results
     @State private var transcriptions: [TranscriptionResult] = []
-
+    
     /// Whether we're currently transcribing
     @State private var isTranscribing = false
-
+    
     /// Error message to display
     @State private var errorMessage: String?
-
+    
     /// Show permission alert
     @State private var showPermissionAlert = false
-
+    
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Body
     // -------------------------------------------------------------------------
-
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -94,7 +94,7 @@ struct SpeechToTextView: View {
                         dismiss()
                     }
                 }
-
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     if !transcriptions.isEmpty {
                         Button(action: clearTranscriptions) {
@@ -123,11 +123,11 @@ struct SpeechToTextView: View {
             }
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Model Loader State
     // -------------------------------------------------------------------------
-
+    
     private var modelLoaderState: ModelState {
         if modelService.isSTTLoaded {
             return .ready
@@ -139,15 +139,15 @@ struct SpeechToTextView: View {
             return .notLoaded
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Model Loader View
     // -------------------------------------------------------------------------
-
+    
     private var modelLoaderView: some View {
         VStack(spacing: AISpacing.xl) {
             Spacer()
-
+            
             ModelLoaderView(
                 modelName: "Whisper Tiny (English)",
                 modelDescription: "Fast on-device speech recognition using OpenAI's Whisper architecture, optimized for mobile via Sherpa-ONNX.",
@@ -165,7 +165,7 @@ struct SpeechToTextView: View {
                 }
             )
             .padding(.horizontal)
-
+            
             // Info about STT
             InfoCard(
                 icon: "waveform",
@@ -173,35 +173,35 @@ struct SpeechToTextView: View {
                 description: "Whisper converts your speech to text entirely on-device. No audio data leaves your phone."
             )
             .padding(.horizontal)
-
+            
             Spacer()
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Permission View
     // -------------------------------------------------------------------------
-
+    
     private var permissionView: some View {
         VStack(spacing: AISpacing.xl) {
             Spacer()
-
+            
             // Icon
             Image(systemName: "mic.slash.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
-
+            
             // Title
             Text("Microphone Access Needed")
                 .font(.aiHeading)
-
+            
             // Description
             Text("To transcribe your speech, we need permission to access your microphone. Audio is processed entirely on-device.")
                 .font(.aiBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, AISpacing.xl)
-
+            
             // Request button
             Button(action: requestPermission) {
                 HStack {
@@ -212,15 +212,15 @@ struct SpeechToTextView: View {
             }
             .buttonStyle(.aiPrimary)
             .padding(.horizontal, AISpacing.xl)
-
+            
             Spacer()
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Recording Interface
     // -------------------------------------------------------------------------
-
+    
     private var recordingInterface: some View {
         VStack(spacing: 0) {
             // Transcription history
@@ -236,32 +236,32 @@ struct SpeechToTextView: View {
                 }
                 .padding()
             }
-
+            
             Divider()
-
+            
             // Recording controls
             recordingControls
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Empty State
     // -------------------------------------------------------------------------
-
+    
     private var emptyStateView: some View {
         VStack(spacing: AISpacing.lg) {
             Image(systemName: "waveform.badge.mic")
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
-
+            
             Text("Ready to Transcribe")
                 .font(.aiHeading)
-
+            
             Text("Tap and hold the record button to capture speech. Release to transcribe.")
                 .font(.aiBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
+            
             // Tips
             VStack(alignment: .leading, spacing: AISpacing.sm) {
                 TipRow(icon: "speaker.wave.2", text: "Speak clearly for best results")
@@ -276,11 +276,11 @@ struct SpeechToTextView: View {
         }
         .padding(.top, AISpacing.xxl)
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Recording Controls
     // -------------------------------------------------------------------------
-
+    
     private var recordingControls: some View {
         VStack(spacing: AISpacing.md) {
             // Recording indicator
@@ -289,7 +289,7 @@ struct SpeechToTextView: View {
                     isRecording: true,
                     duration: audioService.recordingDuration
                 )
-
+                
                 // Audio visualizer
                 WaveformVisualizer(
                     level: audioService.inputLevel,
@@ -299,7 +299,7 @@ struct SpeechToTextView: View {
                 .frame(height: 40)
                 .padding(.horizontal)
             }
-
+            
             // Record button
             HStack(spacing: AISpacing.xl) {
                 // Cancel button (when recording)
@@ -312,14 +312,14 @@ struct SpeechToTextView: View {
                             .background(Circle().fill(Color.secondary))
                     }
                 }
-
+                
                 // Main record button
                 RecordButton(
                     isRecording: audioService.state == .recording,
                     isProcessing: isTranscribing,
                     onTap: toggleRecording
                 )
-
+                
                 // Done button (when recording)
                 if audioService.state == .recording {
                     Button(action: stopAndTranscribe) {
@@ -331,7 +331,7 @@ struct SpeechToTextView: View {
                     }
                 }
             }
-
+            
             // Instructions
             Text(instructionText)
                 .font(.aiCaption)
@@ -344,7 +344,7 @@ struct SpeechToTextView: View {
                 .ignoresSafeArea()
         )
     }
-
+    
     private var instructionText: String {
         switch audioService.state {
         case .recording:
@@ -358,11 +358,11 @@ struct SpeechToTextView: View {
             return ""
         }
     }
-
+    
     // =========================================================================
     // MARK: - Actions
     // =========================================================================
-
+    
     private func requestPermission() {
         Task {
             let granted = await audioService.requestPermission()
@@ -371,7 +371,7 @@ struct SpeechToTextView: View {
             }
         }
     }
-
+    
     private func toggleRecording() {
         if audioService.state == .recording {
             stopAndTranscribe()
@@ -379,7 +379,7 @@ struct SpeechToTextView: View {
             startRecording()
         }
     }
-
+    
     private func startRecording() {
         Task {
             do {
@@ -389,11 +389,11 @@ struct SpeechToTextView: View {
             }
         }
     }
-
+    
     private func cancelRecording() {
         audioService.cancelRecording()
     }
-
+    
     /// Stops recording and transcribes the captured audio.
     ///
     /// ## RunAnywhere SDK Usage
@@ -402,28 +402,28 @@ struct SpeechToTextView: View {
     private func stopAndTranscribe() {
         Task {
             isTranscribing = true
-
+            
             do {
                 let audioData = try await audioService.stopRecording()
-
+                
                 print("🎤 Captured \(audioData.count) bytes of audio")
-
+                
                 guard audioData.count > 3200 else {
                     throw TranscriptionError.audioTooShort
                 }
-
+                
                 let startTime = Date()
-
+                
                 // ---------------------------------------------------------
                 // Transcribe with RunAnywhere SDK
                 // ---------------------------------------------------------
                 let transcribedText = try await RunAnywhere.transcribe(audioData)
-
+                
                 let duration = Date().timeIntervalSince(startTime)
-
+                
                 let cleanedText = transcribedText
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-
+                
                 if !cleanedText.isEmpty {
                     let result = TranscriptionResult(
                         text: cleanedText,
@@ -431,21 +431,21 @@ struct SpeechToTextView: View {
                         processingTime: duration
                     )
                     transcriptions.insert(result, at: 0)
-
+                    
                     print("✅ Transcription: \"\(cleanedText)\" in \(String(format: "%.2f", duration))s")
                 } else {
                     throw TranscriptionError.noSpeechDetected
                 }
-
+                
             } catch {
                 print("❌ Transcription failed: \(error)")
                 errorMessage = error.localizedDescription
             }
-
+            
             isTranscribing = false
         }
     }
-
+    
     private func clearTranscriptions() {
         transcriptions.removeAll()
     }
@@ -467,7 +467,7 @@ enum TranscriptionError: LocalizedError {
     case audioTooShort
     case noSpeechDetected
     case modelNotLoaded
-
+    
     var errorDescription: String? {
         switch self {
         case .audioTooShort:
@@ -483,19 +483,19 @@ enum TranscriptionError: LocalizedError {
 struct TranscriptionCard: View {
     let result: TranscriptionResult
     @Environment(\.colorScheme) var colorScheme
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: AISpacing.sm) {
             Text(result.text)
                 .font(.aiBody)
                 .textSelection(.enabled)
-
+            
             HStack(spacing: AISpacing.md) {
                 Label(String(format: "%.1fs audio", result.duration), systemImage: "waveform")
                 Label(String(format: "%.2fs to transcribe", result.processingTime), systemImage: "cpu")
-
+                
                 Spacer()
-
+                
                 Text(formattedTime)
             }
             .font(.aiCaption)
@@ -513,7 +513,7 @@ struct TranscriptionCard: View {
             }
         }
     }
-
+    
     private var formattedTime: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
@@ -525,9 +525,9 @@ struct RecordButton: View {
     let isRecording: Bool
     let isProcessing: Bool
     let onTap: () -> Void
-
+    
     @State private var pulseScale: CGFloat = 1
-
+    
     var body: some View {
         Button(action: onTap) {
             ZStack {
@@ -537,15 +537,15 @@ struct RecordButton: View {
                         .frame(width: 100, height: 100)
                         .scaleEffect(pulseScale)
                 }
-
+                
                 Circle()
                     .stroke(isRecording ? Color.aiPrimary : Color.secondary.opacity(0.3), lineWidth: 4)
                     .frame(width: 80, height: 80)
-
+                
                 Circle()
                     .fill(isRecording ? Color.aiPrimary : Color.aiPrimary.opacity(0.9))
                     .frame(width: 64, height: 64)
-
+                
                 if isProcessing {
                     ProgressView()
                         .tint(.white)
@@ -573,18 +573,18 @@ struct InfoCard: View {
     let icon: String
     let title: String
     let description: String
-
+    
     var body: some View {
         HStack(spacing: AISpacing.md) {
             Image(systemName: icon)
                 .font(.system(size: 24))
                 .foregroundStyle(Color.aiSecondary)
                 .frame(width: 40)
-
+            
             VStack(alignment: .leading, spacing: AISpacing.xs) {
                 Text(title)
                     .font(.aiLabel)
-
+                
                 Text(description)
                     .font(.aiBodySmall)
                     .foregroundStyle(.secondary)
@@ -601,14 +601,14 @@ struct InfoCard: View {
 struct TipRow: View {
     let icon: String
     let text: String
-
+    
     var body: some View {
         HStack(spacing: AISpacing.sm) {
             Image(systemName: icon)
                 .font(.system(size: 14))
                 .foregroundStyle(Color.aiSecondary)
                 .frame(width: 20)
-
+            
             Text(text)
                 .font(.aiBodySmall)
                 .foregroundStyle(.secondary)

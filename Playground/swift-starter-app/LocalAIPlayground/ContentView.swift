@@ -30,17 +30,17 @@ struct ContentView: View {
     // -------------------------------------------------------------------------
     // MARK: - Environment & State
     // -------------------------------------------------------------------------
-
+    
     /// Model service passed from App
     @EnvironmentObject var modelService: ModelService
-
+    
     /// Currently selected feature (drives sheet presentation)
     @State private var selectedFeature: HomeView.Feature?
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Body
     // -------------------------------------------------------------------------
-
+    
     var body: some View {
         // Home view with feature cards
         HomeView { feature in
@@ -53,11 +53,11 @@ struct ContentView: View {
                 .environmentObject(modelService)
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Feature Views
     // -------------------------------------------------------------------------
-
+    
     /// Returns the appropriate view for a given feature.
     ///
     /// Each feature demonstrates a different RunAnywhere SDK capability:
@@ -81,7 +81,7 @@ struct ContentView: View {
             // - LLMGenerationOptions for temperature, max tokens, etc.
             // -----------------------------------------------------------------
             ChatView()
-
+            
         case .speechToText:
             // -----------------------------------------------------------------
             // Speech to Text View
@@ -94,7 +94,7 @@ struct ContentView: View {
             // - RunAnywhere.transcribe()
             // -----------------------------------------------------------------
             SpeechToTextView()
-
+            
         case .textToSpeech:
             // -----------------------------------------------------------------
             // Text to Speech View
@@ -108,7 +108,7 @@ struct ContentView: View {
             // - TTSOptions for rate, pitch, volume
             // -----------------------------------------------------------------
             TextToSpeechView()
-
+            
         case .voicePipeline:
             // -----------------------------------------------------------------
             // Voice Pipeline View

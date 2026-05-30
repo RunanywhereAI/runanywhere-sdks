@@ -28,63 +28,63 @@ import SwiftUI
 /// creating an approachable yet professional AI interface.
 // =============================================================================
 extension Color {
-
+    
     // -------------------------------------------------------------------------
     // Primary Colors
     // -------------------------------------------------------------------------
-
+    
     /// Primary brand color - warm coral/orange
     /// Used for primary actions, active states, and key UI elements
     static let aiPrimary = Color(red: 1.0, green: 0.45, blue: 0.35)
-
+    
     /// Secondary brand color - soft teal
     /// Used for secondary actions and complementary accents
     static let aiSecondary = Color(red: 0.25, green: 0.75, blue: 0.75)
-
+    
     /// Accent color - golden amber
     /// Used for highlights, badges, and special states
     static let aiAccent = Color(red: 1.0, green: 0.75, blue: 0.25)
-
+    
     // -------------------------------------------------------------------------
     // Semantic Colors
     // -------------------------------------------------------------------------
-
+    
     /// Success state - soft green
     static let aiSuccess = Color(red: 0.35, green: 0.78, blue: 0.55)
-
+    
     /// Warning state - warm amber
     static let aiWarning = Color(red: 1.0, green: 0.65, blue: 0.25)
-
+    
     /// Error state - coral red
     static let aiError = Color(red: 0.95, green: 0.35, blue: 0.35)
-
+    
     // -------------------------------------------------------------------------
     // Background Colors
     // -------------------------------------------------------------------------
-
+    
     /// Primary background - adapts to light/dark mode
     static let aiBackground = Color("AIBackground", bundle: nil)
-
+    
     /// Card/surface background
     static let aiSurface = Color("AISurface", bundle: nil)
-
+    
     /// Elevated surface (modals, popovers)
     static let aiElevated = Color("AIElevated", bundle: nil)
-
+    
     // -------------------------------------------------------------------------
     // Text Colors
     // -------------------------------------------------------------------------
-
+    
     /// Primary text color
     static let aiTextPrimary = Color("AITextPrimary", bundle: nil)
-
+    
     /// Secondary/muted text color
     static let aiTextSecondary = Color("AITextSecondary", bundle: nil)
-
+    
     // -------------------------------------------------------------------------
     // Gradient Definitions
     // -------------------------------------------------------------------------
-
+    
     /// Primary gradient for buttons and headers
     static var aiGradientPrimary: LinearGradient {
         LinearGradient(
@@ -96,7 +96,7 @@ extension Color {
             endPoint: .bottomTrailing
         )
     }
-
+    
     /// Subtle background gradient
     static var aiGradientBackground: LinearGradient {
         LinearGradient(
@@ -108,7 +108,7 @@ extension Color {
             endPoint: .bottom
         )
     }
-
+    
     /// Dark mode background gradient
     static var aiGradientBackgroundDark: LinearGradient {
         LinearGradient(
@@ -120,7 +120,7 @@ extension Color {
             endPoint: .bottom
         )
     }
-
+    
     /// Mesh gradient for hero sections
     static var aiMeshGradient: some ShapeStyle {
         AngularGradient(
@@ -143,53 +143,53 @@ extension Color {
 /// Follows a modular scale for visual harmony across the app.
 // =============================================================================
 extension Font {
-
+    
     // -------------------------------------------------------------------------
     // Display Fonts (Hero sections, large headers)
     // -------------------------------------------------------------------------
-
+    
     /// Extra large display text
     static let aiDisplayLarge = Font.system(size: 40, weight: .bold, design: .rounded)
-
+    
     /// Standard display text
     static let aiDisplay = Font.system(size: 32, weight: .bold, design: .rounded)
-
+    
     // -------------------------------------------------------------------------
     // Heading Fonts
     // -------------------------------------------------------------------------
-
+    
     /// Large heading (page titles)
     static let aiHeadingLarge = Font.system(size: 28, weight: .semibold, design: .rounded)
-
+    
     /// Standard heading (section titles)
     static let aiHeading = Font.system(size: 22, weight: .semibold, design: .rounded)
-
+    
     /// Small heading (card titles)
     static let aiHeadingSmall = Font.system(size: 18, weight: .semibold, design: .rounded)
-
+    
     // -------------------------------------------------------------------------
     // Body Fonts
     // -------------------------------------------------------------------------
-
+    
     /// Large body text
     static let aiBodyLarge = Font.system(size: 17, weight: .regular, design: .default)
-
+    
     /// Standard body text
     static let aiBody = Font.system(size: 15, weight: .regular, design: .default)
-
+    
     /// Small body text
     static let aiBodySmall = Font.system(size: 13, weight: .regular, design: .default)
-
+    
     // -------------------------------------------------------------------------
     // Specialized Fonts
     // -------------------------------------------------------------------------
-
+    
     /// Monospace font for code/technical content
     static let aiMono = Font.system(size: 14, weight: .medium, design: .monospaced)
-
+    
     /// Caption text
     static let aiCaption = Font.system(size: 12, weight: .medium, design: .default)
-
+    
     /// Button/label text
     static let aiLabel = Font.system(size: 15, weight: .semibold, design: .rounded)
 }
@@ -202,19 +202,19 @@ extension Font {
 enum AISpacing {
     /// Extra small spacing (4pt)
     static let xs: CGFloat = 4
-
+    
     /// Small spacing (8pt)
     static let sm: CGFloat = 8
-
+    
     /// Medium spacing (16pt)
     static let md: CGFloat = 16
-
+    
     /// Large spacing (24pt)
     static let lg: CGFloat = 24
-
+    
     /// Extra large spacing (32pt)
     static let xl: CGFloat = 32
-
+    
     /// 2X large spacing (48pt)
     static let xxl: CGFloat = 48
 }
@@ -227,16 +227,16 @@ enum AISpacing {
 enum AIRadius {
     /// Small radius for tags, badges (6pt)
     static let sm: CGFloat = 6
-
+    
     /// Medium radius for buttons, inputs (12pt)
     static let md: CGFloat = 12
-
+    
     /// Large radius for cards (16pt)
     static let lg: CGFloat = 16
-
+    
     /// Extra large radius for modals (24pt)
     static let xl: CGFloat = 24
-
+    
     /// Full radius for circular elements
     static let full: CGFloat = 9999
 }
@@ -251,13 +251,13 @@ enum AIRadius {
 /// Applies consistent card styling with background, shadow, and corner radius.
 struct AICardStyle: ViewModifier {
     @Environment(\.colorScheme) var colorScheme
-
+    
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: AIRadius.lg)
-                    .fill(colorScheme == .dark
-                          ? Color(white: 0.15)
+                    .fill(colorScheme == .dark 
+                          ? Color(white: 0.15) 
                           : Color.white)
                     .shadow(
                         color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08),
@@ -282,7 +282,7 @@ extension View {
 /// A prominent button style with gradient background and press animation.
 struct AIPrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) var isEnabled
-
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.aiLabel)
@@ -310,7 +310,7 @@ extension ButtonStyle where Self == AIPrimaryButtonStyle {
 /// A subtle button style with outline and transparent background.
 struct AISecondaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) var isEnabled
-
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.aiLabel)
@@ -339,12 +339,12 @@ extension ButtonStyle where Self == AISecondaryButtonStyle {
 struct AIIconButtonStyle: ButtonStyle {
     let size: CGFloat
     let backgroundColor: Color
-
+    
     init(size: CGFloat = 44, backgroundColor: Color = .aiPrimary) {
         self.size = size
         self.backgroundColor = backgroundColor
     }
-
+    
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: size * 0.45, weight: .semibold))
@@ -365,7 +365,7 @@ struct AIIconButtonStyle: ButtonStyle {
 /// Applies a frosted glass effect background.
 struct AIGlassBackground: ViewModifier {
     @Environment(\.colorScheme) var colorScheme
-
+    
     func body(content: Content) -> some View {
         content
             .background(
@@ -394,7 +394,7 @@ extension View {
 /// A shimmer animation for loading states.
 struct AIShimmer: ViewModifier {
     @State private var phase: CGFloat = 0
-
+    
     func body(content: Content) -> some View {
         content
             .overlay(
@@ -435,9 +435,9 @@ struct AIFeatureCard: View {
     let description: String
     let gradientColors: [Color]
     let action: () -> Void
-
+    
     @Environment(\.colorScheme) var colorScheme
-
+    
     var body: some View {
         Button(action: action) {
             HStack(spacing: AISpacing.md) {
@@ -452,26 +452,26 @@ struct AIFeatureCard: View {
                             )
                         )
                         .frame(width: 56, height: 56)
-
+                    
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(.white)
                 }
-
+                
                 // Text content
                 VStack(alignment: .leading, spacing: AISpacing.xs) {
                     Text(title)
                         .font(.aiHeadingSmall)
                         .foregroundStyle(colorScheme == .dark ? .white : .primary)
-
+                    
                     Text(description)
                         .font(.aiBodySmall)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
-
+                
                 Spacer()
-
+                
                 // Chevron
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
@@ -491,7 +491,7 @@ struct AIFeatureCard: View {
 struct AIStatusBadge: View {
     enum Status {
         case ready, loading, error, success
-
+        
         var color: Color {
             switch self {
             case .ready: return .aiSecondary
@@ -500,7 +500,7 @@ struct AIStatusBadge: View {
             case .success: return .aiSuccess
             }
         }
-
+        
         var icon: String {
             switch self {
             case .ready: return "checkmark.circle.fill"
@@ -510,10 +510,10 @@ struct AIStatusBadge: View {
             }
         }
     }
-
+    
     let status: Status
     let text: String
-
+    
     var body: some View {
         HStack(spacing: AISpacing.xs) {
             Image(systemName: status.icon)
@@ -521,12 +521,12 @@ struct AIStatusBadge: View {
                 .foregroundStyle(status.color)
                 .rotationEffect(status == .loading ? .degrees(360) : .zero)
                 .animation(
-                    status == .loading
-                    ? .linear(duration: 1).repeatForever(autoreverses: false)
+                    status == .loading 
+                    ? .linear(duration: 1).repeatForever(autoreverses: false) 
                     : .default,
                     value: status == .loading
                 )
-
+            
             Text(text)
                 .font(.aiCaption)
                 .foregroundStyle(.secondary)
@@ -551,14 +551,14 @@ struct AIStatusBadge: View {
             description: "On-device LLM for private conversations",
             gradientColors: [.aiPrimary, .aiPrimary.opacity(0.7)]
         ) {}
-
+        
         AIFeatureCard(
             icon: "waveform",
             title: "Speech to Text",
             description: "Transcribe audio using Whisper",
             gradientColors: [.aiSecondary, .aiSecondary.opacity(0.7)]
         ) {}
-
+        
         AIFeatureCard(
             icon: "speaker.wave.2.fill",
             title: "Text to Speech",
@@ -573,10 +573,10 @@ struct AIStatusBadge: View {
     VStack(spacing: AISpacing.md) {
         Button("Primary Button") {}
             .buttonStyle(.aiPrimary)
-
+        
         Button("Secondary Button") {}
             .buttonStyle(.aiSecondary)
-
+        
         HStack(spacing: AISpacing.md) {
             AIStatusBadge(status: .ready, text: "Ready")
             AIStatusBadge(status: .loading, text: "Loading")
@@ -597,29 +597,29 @@ struct AIStatusBadge: View {
 enum ModelState: Equatable {
     /// Model has not been downloaded or loaded
     case notLoaded
-
+    
     /// Model is currently downloading (progress 0.0 - 1.0)
     case downloading(progress: Double)
-
+    
     /// Model is loading into memory
     case loading
-
+    
     /// Model is ready for use
     case ready
-
+    
     /// An error occurred
     case error(message: String)
-
+    
     // -------------------------------------------------------------------------
     // Convenience Properties
     // -------------------------------------------------------------------------
-
+    
     /// Whether the model is ready to use
     var isReady: Bool {
         if case .ready = self { return true }
         return false
     }
-
+    
     /// Whether the model is in a loading state (downloading or loading)
     var isLoading: Bool {
         switch self {
@@ -629,7 +629,7 @@ enum ModelState: Equatable {
             return false
         }
     }
-
+    
     /// SF Symbol name for this state
     var statusIcon: String {
         switch self {
@@ -645,7 +645,7 @@ enum ModelState: Equatable {
             return "exclamationmark.circle.fill"
         }
     }
-
+    
     /// Color for this state
     var statusColor: Color {
         switch self {
@@ -659,7 +659,7 @@ enum ModelState: Equatable {
             return Color.aiError
         }
     }
-
+    
     /// Human-readable status text
     var statusText: String {
         switch self {
