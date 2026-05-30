@@ -71,6 +71,36 @@ Pod::Spec.new do |s|
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }
 
+  # ---------------------------------------------------------------------------
+  # user_target_xcconfig — flags that must reach the HOSTING APP target so the
+  # commons proto ABIs survive into the final RunAnywhereAI dylib.
+  #
+  # Why: the RN C++ bridge resolves the VLM/STT/TTS/diffusion proto entry points
+  # (e.g. cpp/HybridRunAnywhereCore+Voice.cpp → dlsym(RTLD_DEFAULT,
+  # "rac_vlm_stream_proto")) PURELY at runtime via dlsym — there is no link-time
+  # reference. CocoaPods links the vendored static archive with a plain
+  # `-l"rac_commons"`, which only pulls archive members that satisfy an
+  # *undefined* symbol, so the linker dead-strips every dlsym-only proto object
+  # (rac_vlm_*/rac_stt_*/rac_tts_*/diffusion). rac_llm_*/structured_output_*
+  # survive only because they ARE referenced at link time. This mirrors how the
+  # Flutter plugin keeps its FFI symbols (runanywhere.podspec user_target_xcconfig
+  # uses -all_load + DEAD_CODE_STRIPPING=NO).
+  #
+  #   -force_load .../librac_commons.a  link EVERY object in the commons archive
+  #        regardless of whether a symbol is referenced (targeted: only commons,
+  #        not the whole app like -all_load). CocoaPods stages the vendored
+  #        xcframework slice into ${PODS_XCFRAMEWORKS_BUILD_DIR}/RunAnywhereCore
+  #        and the binary is librac_commons.a (linked as -l"rac_commons").
+  #   -Wl,-export_dynamic  keep the force-loaded symbols in the dynamic symbol
+  #        table so dlsym(RTLD_DEFAULT, ...) can still find them at runtime.
+  #   DEAD_CODE_STRIPPING=NO  belt-and-suspenders: don't let the app target drop
+  #        the now-linked-but-unreferenced proto objects.
+  # ---------------------------------------------------------------------------
+  s.user_target_xcconfig = {
+    "OTHER_LDFLAGS" => '$(inherited) -force_load "${PODS_XCFRAMEWORKS_BUILD_DIR}/RunAnywhereCore/librac_commons.a" -Wl,-export_dynamic',
+    "DEAD_CODE_STRIPPING" => "NO",
+  }
+
   s.libraries = "c++", "archive", "bz2", "z"
   s.frameworks = "Accelerate", "Foundation", "CoreML", "AudioToolbox", "CFNetwork", "Security", "SystemConfiguration"
 
