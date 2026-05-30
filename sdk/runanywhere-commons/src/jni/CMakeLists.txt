@@ -66,7 +66,7 @@ endif()
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
-    # H4: OkHttp-backed rac_http_transport_ops adapter. Routes
+    # OkHttp-backed rac_http_transport_ops adapter. Routes
     # rac_http_request_* calls through Kotlin's
     # `com.runanywhere.sdk.foundation.http.OkHttpTransport` so Android
     # consumers get the system trust store + NetworkSecurityConfig +

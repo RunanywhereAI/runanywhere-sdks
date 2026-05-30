@@ -251,19 +251,17 @@ if(RAC_WASM_ONNX AND NOT TARGET rac_backend_onnx)
         "Configure the root build with ONNX enabled. "
         "Note: under Emscripten, engines/onnx requires the vendored static archive at "
         "sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a. "
-        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
     )
 endif()
 # Sherpa backend provides STT/TTS/VAD under the ONNX umbrella on WASM.
 # It's optional: the build continues when the vendored Sherpa archives
 # aren't present, but STT/TTS/VAD routing will return BackendNotAvailable
-# at runtime. See CPP-13 / WEB-01.
+# at runtime.
 if(RAC_WASM_ONNX AND NOT TARGET rac_backend_sherpa)
     message(STATUS
         "RAC_WASM_ONNX=ON: rac_backend_sherpa not available (no vendored "
         "sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/ archives). "
         "STT/TTS/VAD calls will return BackendNotAvailable. "
-        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
     )
 endif()
 
@@ -318,7 +316,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_proto_buffer_copy_to_raw"
     "_rac_proto_buffer_free_data"
 
-    # HTTP client / download (T3.13 — Web SDK migration off hand-rolled
+    # HTTP client / download (Web SDK migration off hand-rolled
     # fetch() onto the commons libcurl-backed C ABI). See
     # sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
     # and rac_http_download.h. TypeScript wrapper lives at
@@ -333,7 +331,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_response_free"
     "_rac_http_download_execute"
 
-    # Platform HTTP transport registry (v2 close-out Phase H2 / H7). The
+    # Platform HTTP transport registry. The
     # WASM shim in rac_http_client_emscripten.cpp registers an
     # emscripten_fetch()-backed adapter via this vtable so the router in
     # rac_http_client_curl.cpp short-circuits to it. TypeScript side calls
@@ -405,7 +403,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_registry_free_plugin_list"
 
     # Service registry
-    # v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_*
+    # Legacy rac_service_* exports DELETED. Use rac_plugin_*
     # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
 
     # Events
@@ -704,20 +702,20 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_detect_speech"
     "_rac_voice_agent_result_free"
 
-    # Voice Agent — proto-byte streaming ABI (GAP 09 Phase 15 / v3 Phase A4)
+    # Voice Agent — proto-byte streaming ABI
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
     # VoiceAgentStreamAdapter.ts, which calls it through
     # m._rac_voice_agent_set_proto_callback(handle, cbPtr, 0). Pair with
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
     # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
     "_rac_voice_agent_set_proto_callback"
-    # commons-features-voice-002: caller-side shutdown helper.
+    # Caller-side shutdown helper.
     "_rac_voice_agent_proto_quiesce"
     "_rac_voice_agent_initialize_proto"
     "_rac_voice_agent_component_states_proto"
     "_rac_voice_agent_process_voice_turn_proto"
 
-    # Solutions runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8.
+    # Solutions runtime (rac/solutions/rac_solution.h).
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
     # SolutionAdapter.ts (proto-byte / YAML driven L5 pipeline runtime).
     # `rac_solution_create_from_proto` consumes a serialized

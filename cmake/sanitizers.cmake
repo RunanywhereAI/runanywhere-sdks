@@ -1,8 +1,6 @@
 # =============================================================================
 # cmake/sanitizers.cmake — RAC_SANITIZER switch
 #
-# GAP 07 Phase 3 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # RAC_SANITIZER ∈ { "" | "asan" | "tsan" | "ubsan" } — set at the root
 # CMakeLists.txt and read here. Apply via `rac_apply_sanitizer(<target>)`.
 #

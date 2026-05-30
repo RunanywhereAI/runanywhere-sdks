@@ -2,7 +2,7 @@
 # LlamaCPP Backend - Text Generation via llama.cpp
 # =============================================================================
 
-# T5.4: per-engine build toggle owned locally. Self-gating via return() keeps
+# Per-engine build toggle owned locally. Self-gating via return() keeps
 # this decision out of commons and out of engines/CMakeLists.txt.
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 if(NOT RAC_BACKEND_LLAMACPP)
@@ -196,7 +196,7 @@ list(LENGTH _RAC_MTMD_MODEL_SOURCES _RAC_MTMD_MODEL_COUNT)
 message(STATUS "VLM mtmd model implementations discovered: ${_RAC_MTMD_MODEL_COUNT} (llama.cpp ${LLAMACPP_VERSION})")
 list(APPEND LLAMACPP_BACKEND_SOURCES ${_RAC_MTMD_MODEL_SOURCES})
 
-# GAP 06 close-out (Phase 1 / B1): migrated to rac_add_engine_plugin().
+# Migrated to rac_add_engine_plugin().
 #
 # Two distinct outputs share the same source list:
 #

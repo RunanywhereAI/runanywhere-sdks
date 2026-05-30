@@ -43,7 +43,7 @@ if(NOT DEFINED EMSCRIPTEN)
     set(EMSCRIPTEN "")
 endif()
 
-# T5.4: per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
+# Per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
 # Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 
@@ -561,7 +561,7 @@ endif()
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
 # =============================================================================
-# HTTP transport (v2 close-out Phase H, Stage S5 — libcurl removed)
+# HTTP transport (libcurl removed)
 # =============================================================================
 # The native `rac_http_client_*` C ABI no longer bundles libcurl or any
 # TLS backend. Every SDK registers a platform HTTP transport adapter
@@ -686,7 +686,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_error_model.cpp
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
-    # P2-T9: canonical two-phase SDK init ABI. Wraps existing rac_state /
+    # Canonical two-phase SDK init ABI. Wraps existing rac_state /
     # rac_auth / rac_device_manager / rac_model_assignment internals behind
     # one rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto surface so
     # platform SDKs collapse their duplicated step list.
@@ -697,23 +697,23 @@ set(RAC_CORE_SOURCES
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
-    # v3.0.0 (C1): legacy service_registry.cpp DELETED. Plugin registration
+    # Legacy service_registry.cpp DELETED. Plugin registration
     # now flows exclusively through rac_plugin_registry.cpp below.
     src/plugin/rac_plugin_registry.cpp
-    # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
+    # Dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
-    # T4.1: L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
+    # L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
-    # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
+    # HardwareProfile + EngineRouter (hardware-aware plugin scoring).
     src/router/rac_hardware_profile.cpp
     src/router/rac_engine_router.cpp
-    # GAP 04 Phase 12: C ABI wrapper around EngineRouter (rac_plugin_route).
+    # C ABI wrapper around EngineRouter (rac_plugin_route).
     src/router/rac_route.cpp
-    # Round-1 CPP fix (G-C6): proto-serialised hardware profile C ABI for all 5 frontends.
+    # Proto-serialised hardware profile C ABI for all 5 frontends.
     src/router/rac_hardware_abi.cpp
-    # Wave H-5 (KOT-12): proto-serialised SDKComponent → [InferenceFramework] query.
+    # Proto-serialised SDKComponent → [InferenceFramework] query.
     src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
@@ -738,12 +738,12 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
-    # v2 close-out Phase H / H7 / S5 — native HTTP transport.
+    # Native HTTP transport.
     # - Native targets (macOS/iOS/Android/Windows/Linux): the default
     #   client in rac_http_client_default.cpp dispatches every request
     #   through the platform transport vtable registered by the owning
     #   SDK (OkHttp, URLSession, dart:io, ...). libcurl + mbedTLS were
-    #   deleted in S5; every SDK MUST register an adapter during init.
+    #   deleted; every SDK MUST register an adapter during init.
     # - Emscripten/WASM: the emscripten_fetch shim provides both the
     #   `rac_http_transport_register_emscripten` / `_from_js` entry
     #   points AND direct implementations of the public C ABI (it's
@@ -755,23 +755,23 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # by the default + emscripten clients (was duplicated before).
     src/infrastructure/http/rac_http_response.cpp
     src/infrastructure/http/rac_http_download.cpp
-    # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
+    # Platform HTTP transport vtable / registry.
     # Platform SDKs register a native-stack adapter here (Swift URLSession,
     # Kotlin OkHttp, Web fetch, Flutter dart:io, RN fetch/JSI); when no
     # adapter is registered, native public HTTP calls fail with
     # RAC_ERROR_FEATURE_NOT_AVAILABLE. Emscripten uses its Web fetch adapter.
     src/infrastructure/http/rac_http_transport.cpp
-    # v2 close-out Phase H Stage 2 — internal C++ HTTP facade.
+    # Internal C++ HTTP facade.
     # Every commons component that needs HTTP funnels through
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
-    # P2-T10 — Supabase-style upsert request flag. Lets platform SDKs
+    # Supabase-style upsert request flag. Lets platform SDKs
     # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
     # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
     # consume it and apply the on_conflict URL rewrite + Prefer header.
     src/infrastructure/http/rac_http_upsert_mode.cpp
-    # P2-T11 — single canonical default-header list shared across SDKs
+    # Single canonical default-header list shared across SDKs
     # (RunAnywhereSDK / commons VERSION / application-json). Lets every
     # platform's `defaultHeaders` block resolve through one C entry point
     # so they stay in lockstep with the commons VERSION file.
@@ -780,12 +780,12 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
-    # P2-T13: persistent device-id resolution chain
+    # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
     src/infrastructure/device/device_identity.cpp
     src/infrastructure/extraction/rac_extraction.cpp
-    # v3.1 Phase 9: DAG streaming runtime (GAP 05 Phase 2). The primitives
+    # DAG streaming runtime. The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
     # MemoryPool / PipelineNode) are header-only templates; only the
     # non-templated GraphScheduler has a .cpp to compile here.
@@ -814,10 +814,10 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
-    # P2-T15: JSONSchema-proto -> JSON Schema text canonical writer (replaces
+    # JSONSchema-proto -> JSON Schema text canonical writer (replaces
     # Swift JSONSchemaWriter / per-SDK serializers).
     src/features/llm/schema_to_json.cpp
-    # v2 close-out Phase 5: thinking-content split (replaces Swift
+    # Thinking-content split (replaces Swift
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
@@ -828,14 +828,14 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/rac_model_heuristics.cpp
     # G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
     src/features/llm/rac_tool_value_json.cpp
-    # Wave D-4: tool-calling session state machine (collapses per-SDK
+    # Tool-calling session state machine (collapses per-SDK
     # 200-400 LOC orchestration loop into one native session).
     src/features/llm/tool_calling_session.cpp
-    # P2-T8: synchronous single-call tool-calling loop (parse -> validate ->
+    # Synchronous single-call tool-calling loop (parse -> validate ->
     # execute -> follow-up). Collapses Swift's ~100 LOC generateWithTools
     # to ~10 LOC; same loop will benefit Kotlin/RN over the same ABI.
     src/features/llm/tool_calling_run_loop.cpp
-    # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
+    # Proto-byte LLM stream ABI (mirrors
     # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).
     src/features/llm/rac_llm_stream.cpp
@@ -843,28 +843,27 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte STTStreamEvent ABI
+    # Lifecycle-owned proto-byte STTStreamEvent ABI
     src/features/stt/rac_stt_stream.cpp
-    # P2-T14: canonical STTConfiguration defaults helper
+    # Canonical STTConfiguration defaults helper
     src/features/stt/rac_stt_config_defaults.cpp
     # TTS
     src/features/tts/tts_component.cpp
     src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte TTSStreamEvent ABI
+    # Lifecycle-owned proto-byte TTSStreamEvent ABI
     src/features/tts/rac_tts_stream.cpp
-    # P2-T14: canonical TTSConfiguration defaults helper
+    # Canonical TTSConfiguration defaults helper
     src/features/tts/rac_tts_config_defaults.cpp
     # VAD
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte VADStreamEvent ABI
+    # Lifecycle-owned proto-byte VADStreamEvent ABI
     src/features/vad/rac_vad_stream.cpp
     # commons-features-voice-001/006: shared per-handle threshold-mutex registry.
     src/features/vad/vad_threshold_registry.cpp
-    # Wake Word — high-level service scaffold was removed in Phase F of the
-    # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
+    # Wake Word — high-level service scaffold was removed. All real
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
     # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
@@ -878,7 +877,7 @@ set(RAC_FEATURES_SOURCES
     src/features/diffusion/rac_diffusion_proto_abi.cpp
     src/features/diffusion/diffusion_model_registry.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
-    # CPP-03: lifecycle-owned proto-byte DiffusionStreamEvent ABI
+    # Lifecycle-owned proto-byte DiffusionStreamEvent ABI
     src/features/diffusion/rac_diffusion_stream.cpp
     # Embeddings
     src/features/embeddings/rac_embeddings_service.cpp
@@ -895,7 +894,7 @@ set(RAC_FEATURES_SOURCES
     #   voice_agent.cpp                       — lifecycle (create/destroy/init)
     #   voice_agent_legacy_abi.cpp            — legacy non-proto C ABI
     #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
-    #   voice_agent_d7_abi.cpp                — Wave D-7 full-session proto ABI
+    #   voice_agent_d7_abi.cpp                — full-session proto ABI
     #   voice_agent_audio_pipeline_state.cpp  — audio pipeline state helpers
     #   voice_agent_internal_helpers.cpp      — shared emit/state helpers
     src/features/voice_agent/voice_agent.cpp
@@ -904,10 +903,10 @@ set(RAC_FEATURES_SOURCES
     src/features/voice_agent/voice_agent_proto_abi.cpp
     src/features/voice_agent/voice_agent_d7_abi.cpp
     src/features/voice_agent/voice_agent_audio_pipeline_state.cpp
-    # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
+    # Proto-byte event ABI (coexists with struct callback).
     src/features/voice_agent/rac_voice_event_abi.cpp
-    # GAP 05 Phase 2: GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
-    # First v3.1 Phase 9 DAG consumer; replaces the in-line process_stream
+    # GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
+    # First DAG consumer; replaces the in-line process_stream
     # orchestration with typed PipelineNodes + bounded StreamEdge
     # backpressure + hierarchical CancelToken propagation.
     src/features/voice_agent/voice_agent_pipeline.cpp
@@ -932,11 +931,11 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# T5.4: WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
+# WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
 # which declares its own rac_backend_whisperkit_coreml target (via
 # rac_add_engine_plugin). Commons no longer compiles those TUs directly.
 
-# T4.7 Solutions C ABI — always-built fallback.
+# Solutions C ABI — always-built fallback.
 #
 # The full SolutionRunner implementation (rac_solution.cpp + companions)
 # requires the Solutions runtime and is added to rac_commons only when
@@ -1161,7 +1160,7 @@ else()
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
-# HTTP transport — S5: libcurl deleted. On Emscripten we still link
+# HTTP transport — libcurl deleted. On Emscripten we still link
 # the `-sFETCH=1` runtime glue so emscripten_fetch is available inside
 # `rac_http_client_emscripten.cpp`. On every other target the default
 # client dispatches through the platform transport vtable and needs
@@ -1280,7 +1279,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
     ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
-    # P2-T9: two-phase SDK init request/result envelope.
+    # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
     # rac_options.proto — custom FieldOptions / EnumValueOptions extensions
     # imported by codegen post-processors and several option protos. Required
@@ -1305,7 +1304,7 @@ if(RAC_ENABLE_PROTOBUF)
     # synthesized version string. Accept either so local dev on macOS works
     # without requiring a vendored FetchContent build.
     #
-    # T1.1: require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
+    # Require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
     # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
     # FetchContent fetches the centralized PROTOBUF_VERSION below. The
     # checked-in generated headers under src/generated/proto/ are Protobuf
@@ -1338,7 +1337,7 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
         set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
-        # T1.1 follow-up: FIND_PACKAGE_ARGS was removed because on Ubuntu CI
+        # FIND_PACKAGE_ARGS was removed because on Ubuntu CI
         # the internal find_package(Protobuf ... NAMES Protobuf) call silently
         # registered `protobuf::libprotobuf-lite` as an IMPORTED target from
         # a config file even when the EXACT version check failed. Protobuf
@@ -1432,7 +1431,7 @@ if(RAC_ENABLE_PROTOBUF)
     # Shared builds with some system protobuf packages still need explicit absl
     # link targets. Vendored protobuf normally propagates these transitively.
     #
-    # T1.1: only collect absl components whose imported targets actually
+    # Only collect absl components whose imported targets actually
     # exist. Ubuntu 22.04's libabsl-dev (20210324) is missing absl::log —
     # which lands in 20220623 — and `target_link_libraries` on a missing
     # target reports "Target ... links to absl::log but the target was not
@@ -1487,7 +1486,7 @@ if(RAC_ENABLE_SOLUTIONS)
     )
     target_compile_definitions(rac_commons PRIVATE RAC_HAVE_SOLUTIONS=1)
     set(RAC_SOLUTIONS_RUNTIME_ENABLED ON CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
-    message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
+    message(STATUS "SolutionRunner + PipelineExecutor compiled into rac_commons")
 else()
     message(STATUS "RAC_ENABLE_SOLUTIONS=OFF — rac_solution_* symbols served by rac_solution_stub.cpp (RAC_ERROR_FEATURE_NOT_AVAILABLE)")
 endif()
@@ -1516,7 +1515,7 @@ if(RAC_PLATFORM_WINDOWS)
 endif()
 
 # =============================================================================
-# GAP 03: Plugin Loading Mode (static vs. dynamic)
+# Plugin Loading Mode (static vs. dynamic)
 # =============================================================================
 # Two paths share one plugin entry-point convention:
 #   - STATIC: plugin TUs compiled directly into rac_commons; registration
@@ -1591,7 +1590,7 @@ endif()
 # =============================================================================
 # COMMONS-LOCAL BACKENDS (RAG)
 #
-# T5.4: engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
+# Engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
 # are wired exclusively from engines/<name>/CMakeLists.txt via the root
 # add_subdirectory(engines) path. Commons no longer instantiates or forwards
 # engine targets — only commons-local OBJECT libraries (RAG) are folded into

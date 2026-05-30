@@ -73,8 +73,8 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 # subdirectory of the top-level project.
 include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
 
-# --- v3.1 Phase 9: DAG graph primitives unit tests --------------------------
-# CancelToken + RingBuffer + StreamEdge (GAP 05 skeleton). Header-only
+# --- DAG graph primitives unit tests --------------------------
+# CancelToken + RingBuffer + StreamEdge. Header-only
 # primitives; no backend dependency. Always built.
 add_executable(test_graph_primitives test_graph_primitives.cpp)
 target_include_directories(test_graph_primitives PRIVATE
@@ -86,7 +86,7 @@ rac_link_archive_deps(test_graph_primitives)
 target_compile_features(test_graph_primitives PRIVATE cxx_std_17)
 add_test(NAME graph_primitives_tests COMMAND test_graph_primitives)
 
-# --- P2-T12: log redaction policy parity tests ------------------------------
+# --- Log redaction policy parity tests ------------------------------
 # Validates rac_log_metadata_should_redact() against the same fixture set
 # Swift's SDKLogger.swift honors. Pure-C++ helper, no backend dependency.
 add_executable(test_log_redact test_log_redact.cpp)
@@ -113,7 +113,7 @@ rac_link_archive_deps(test_audio_compute_level_db)
 target_compile_features(test_audio_compute_level_db PRIVATE cxx_std_17)
 add_test(NAME audio_compute_level_db_tests COMMAND test_audio_compute_level_db --run-all)
 
-# --- P2-T13: persistent device-id resolution chain --------------------------
+# --- Persistent device-id resolution chain --------------------------
 # Validates rac_device_get_or_create_persistent_id() against a mocked
 # rac_platform_adapter_t (secure_get / secure_set / get_vendor_id). Replaces
 # the local Keychain -> identifierForVendor -> generate-UUID chain that each
@@ -128,7 +128,7 @@ rac_link_archive_deps(test_device_identity)
 target_compile_features(test_device_identity PRIVATE cxx_std_17)
 add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
 
-# --- v3.1 Phase 9 Phase 2: MemoryPool<T> tests ------------------------------
+# --- MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
 # concurrent stress test.
 add_executable(test_memory_pool test_memory_pool.cpp)
@@ -141,7 +141,7 @@ rac_link_archive_deps(test_memory_pool)
 target_compile_features(test_memory_pool PRIVATE cxx_std_17)
 add_test(NAME memory_pool_tests COMMAND test_memory_pool)
 
-# --- v3.1 Phase 9 Phase 2: PipelineNode family tests ------------------------
+# --- PipelineNode family tests ------------------------
 # Exercises PrimitiveNode, SplitNode, MergeNode, and the 3-node linear graph
 # wiring that GraphScheduler::connect() relies on.
 add_executable(test_pipeline_node test_pipeline_node.cpp)
@@ -154,7 +154,7 @@ rac_link_archive_deps(test_pipeline_node)
 target_compile_features(test_pipeline_node PRIVATE cxx_std_17)
 add_test(NAME pipeline_node_tests COMMAND test_pipeline_node)
 
-# --- v3.1 Phase 9 Phase 2: GraphScheduler tests -----------------------------
+# --- GraphScheduler tests -----------------------------
 # Streaming correctness + backpressure + cancellation + lifecycle.
 add_executable(test_graph_scheduler test_graph_scheduler.cpp)
 target_include_directories(test_graph_scheduler PRIVATE
@@ -166,7 +166,7 @@ rac_link_archive_deps(test_graph_scheduler)
 target_compile_features(test_graph_scheduler PRIVATE cxx_std_17)
 add_test(NAME graph_scheduler_tests COMMAND test_graph_scheduler)
 
-# --- GAP 05 Phase 2: VoiceAgentPipeline unit tests --------------------------
+# --- VoiceAgentPipeline unit tests --------------------------
 # Backend-free tests for the GraphScheduler-driven voice pipeline. Verifies
 # the public C ABI input contract, error-propagation, and cancel hooks
 # wired into rac_voice_agent_destroy / cleanup. End-to-end coverage with
@@ -200,7 +200,7 @@ rac_link_archive_deps(test_voice_agent_pipeline_race)
 target_compile_features(test_voice_agent_pipeline_race PRIVATE cxx_std_17)
 add_test(NAME voice_agent_pipeline_race_tests COMMAND test_voice_agent_pipeline_race)
 
-# --- T4.7: PipelineExecutor + SolutionRunner (Solutions-gated) ---------------
+# --- PipelineExecutor + SolutionRunner (Solutions-gated) ---------------
 # The executor / runner / C ABI live behind RAC_ENABLE_SOLUTIONS. Each test
 # TU compiles a SKIP-style stub when the symbol is undefined (e.g. CI
 # builds with RAC_ENABLE_SOLUTIONS=OFF), so the test executables always link
@@ -227,7 +227,7 @@ target_compile_features(test_solution_runner PRIVATE cxx_std_17)
 rac_test_define_have_solutions(test_solution_runner)
 add_test(NAME solution_runner_tests COMMAND test_solution_runner)
 
-# --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
+# --- Rac_llm_thinking C ABI test -----------------------
 # Behavioral parity with Swift ThinkingContentParser. 10 scenarios covering
 # extract / strip / split-tokens incl. malformed inputs.
 add_executable(test_llm_thinking test_llm_thinking.cpp)
@@ -240,7 +240,7 @@ rac_link_archive_deps(test_llm_thinking)
 target_compile_features(test_llm_thinking PRIVATE cxx_std_17)
 add_test(NAME llm_thinking_tests COMMAND test_llm_thinking)
 
-# --- v2 close-out Phase G-1: rac_tool_call_* C ABI test ----------------------
+# --- Rac_tool_call_* C ABI test ----------------------
 # Behavioral tests for the single-source-of-truth tool-calling API shared by
 # Swift, Kotlin, Flutter, Web, and React Native SDKs. Covers parse (default +
 # LFM2), free-form, format_prompt, build_initial/followup_prompt, normalize_json,
@@ -286,7 +286,7 @@ target_compile_features(test_tool_value_json PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_value_json)
 add_test(NAME tool_value_json_tests COMMAND test_tool_value_json)
 
-# --- Wave D-4: tool-calling session state machine ---------------------------
+# --- Tool-calling session state machine ---------------------------
 add_executable(test_tool_calling_session_proto test_tool_calling_session_proto.cpp)
 target_include_directories(test_tool_calling_session_proto PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -299,7 +299,7 @@ target_compile_features(test_tool_calling_session_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_session_proto)
 add_test(NAME tool_calling_session_proto_tests COMMAND test_tool_calling_session_proto)
 
-# --- P2-T8: synchronous tool-calling run loop --------------------------------
+# --- Synchronous tool-calling run loop --------------------------------
 # Mirrors the session proto test setup but exercises the single-call API
 # (rac_tool_calling_run_loop_proto). Verifies executor callback wiring,
 # iteration cap, validation failure path, and no-tool-call completion.
@@ -340,7 +340,7 @@ target_compile_features(test_tool_calling_cancel PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_cancel)
 add_test(NAME tool_calling_cancel_tests COMMAND test_tool_calling_cancel)
 
-# --- CPP-09A: structured-output helper tests --------------------------------
+# --- Structured-output helper tests --------------------------------
 add_executable(test_structured_output test_structured_output.cpp)
 target_include_directories(test_structured_output PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -352,7 +352,7 @@ target_compile_features(test_structured_output PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_structured_output)
 add_test(NAME structured_output_tests COMMAND test_structured_output)
 
-# --- P2-T15: JSONSchema-proto -> JSON Schema text canonical-writer parity ----
+# --- JSONSchema-proto -> JSON Schema text canonical-writer parity ----
 # Verifies rac_structured_output_schema_to_json_proto produces byte-exact
 # output matching Swift's JSONSchemaWriter
 # (StructuredOutputProto+Helpers.swift) so Swift can drop its private writer
@@ -369,9 +369,9 @@ target_compile_features(test_schema_to_json PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_schema_to_json)
 add_test(NAME schema_to_json_tests COMMAND test_schema_to_json)
 
-# --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
+# --- Proto-byte event dispatch test --------------------
 # Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
-# VoiceEvent → SerializeToArray → callback path that GAP 09 Phase 15 declared
+# VoiceEvent → SerializeToArray → callback path that was declared
 # but left as a stub. Tests round-trip per oneof arm + monotonic seq +
 # unregister-stops-dispatch. SKIP-style when RAC_HAVE_PROTOBUF is undefined.
 add_executable(test_proto_event_dispatch test_proto_event_dispatch.cpp)
@@ -385,9 +385,9 @@ target_compile_features(test_proto_event_dispatch PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_proto_event_dispatch)
 add_test(NAME proto_event_dispatch_tests COMMAND test_proto_event_dispatch)
 
-# --- v2 close-out Phase G-2: LLM proto-byte stream dispatch test --------------
+# --- LLM proto-byte stream dispatch test --------------
 # Exercises rac::llm::dispatch_llm_stream_event() — the token → LLMStreamEvent
-# → SerializeToArray → callback path that Phase G-2 declared. Tests synthetic
+# → SerializeToArray → callback path that was declared. Tests synthetic
 # token schedule, monotonic seq, terminal stop/error events, unregister-stops-
 # dispatch. SKIP-style when RAC_HAVE_PROTOBUF is undefined.
 add_executable(test_llm_stream_proto test_llm_stream_proto.cpp)
@@ -401,7 +401,7 @@ target_compile_features(test_llm_stream_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_llm_stream_proto)
 add_test(NAME llm_stream_proto_tests COMMAND test_llm_stream_proto)
 
-# --- CPP-09A: lifecycle-owned generated-proto LLM service ABI tests ----------
+# --- Lifecycle-owned generated-proto LLM service ABI tests ----------
 add_executable(test_llm_proto_service test_llm_proto_service.cpp)
 target_include_directories(test_llm_proto_service PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -427,7 +427,7 @@ target_compile_features(test_proto_runtime_smoke PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_proto_runtime_smoke)
 add_test(NAME proto_runtime_smoke_tests COMMAND test_proto_runtime_smoke)
 
-# --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
+# --- Unified engine plugin registry tests --------------------
 # No backend dependency; all three link directly against rac_commons.
 # test_engine_vtable.cpp includes the generated runanywhere.v1
 # model_types.pb.h directly, which transitively pulls in
@@ -460,7 +460,7 @@ rac_link_archive_deps(test_legacy_coexistence)
 target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
 add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
 
-# GAP 04 Phase 12: engine router + hardware profile tests (always built;
+# Engine router + hardware profile tests (always built;
 # pure C++, no backend dependency).
 add_executable(test_engine_router test_engine_router.cpp)
 target_include_directories(test_engine_router PRIVATE
@@ -540,7 +540,7 @@ target_compile_features(test_auth_sdk_events PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_auth_sdk_events)
 add_test(NAME auth_sdk_event_tests COMMAND test_auth_sdk_events)
 
-# --- P2-T9: canonical two-phase SDK init ABI tests --------------------------
+# --- Canonical two-phase SDK init ABI tests --------------------------
 # Drives rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto with hand
 # built request bytes; verifies the SdkInitResult envelope mirrors Swift's
 # Phase 1 / Phase 2 / retryHTTPSetup behaviour.
@@ -633,7 +633,7 @@ add_test(NAME model_assignment_proto_tests COMMAND test_model_assignment_proto)
 
 # --- Model format/artifact inference proto ABI tests -------------------------
 # Exercises URL → ModelFormat / ArtifactType inference via serialized generated
-# proto bytes. Replaces the per-SDK Dart/Kotlin helpers in Wave D-3.
+# proto bytes. Replaces the per-SDK Dart/Kotlin helpers.
 add_executable(test_model_format_infer_proto test_model_format_infer_proto.cpp)
 target_include_directories(test_model_format_infer_proto PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -645,7 +645,7 @@ target_compile_features(test_model_format_infer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_format_infer_proto)
 add_test(NAME model_format_infer_proto_tests COMMAND test_model_format_infer_proto)
 
-# --- Canonical RAModelInfo factory parity tests (P2-T4) ----------------------
+# --- Canonical RAModelInfo factory parity tests ----------------------
 # Exercises rac_model_info_make_proto — the commons-owned factory that
 # replaces Swift's ModelTypes+Artifacts.swift::RAModelInfo.make. Verifies
 # the 18-field defaulting logic plus the rac_path_is_non_empty_directory
@@ -661,10 +661,10 @@ target_compile_features(test_model_info_make_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_info_make_proto)
 add_test(NAME model_info_make_proto_tests COMMAND test_model_info_make_proto)
 
-# --- Register model from URL parity tests (P2-T6) ----------------------------
+# --- Register model from URL parity tests ----------------------------
 # Exercises rac_register_model_from_url_proto — the canonical
 # RegisterModelFromUrlRequest → save → ModelInfo entry point. Composes
-# rac_model_info_make_proto (P2-T4) with the existing registry persistence
+# rac_model_info_make_proto with the existing registry persistence
 # path. End-to-end test: call the new ABI; round-trip via
 # rac_model_registry_get_proto for the returned id; verify equality.
 add_executable(test_register_model_from_url test_register_model_from_url.cpp)
@@ -678,7 +678,7 @@ target_compile_features(test_register_model_from_url PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_register_model_from_url)
 add_test(NAME register_model_from_url_tests COMMAND test_register_model_from_url)
 
-# --- Artifact ExpectedModelFiles parity tests (P2-T7) ------------------------
+# --- Artifact ExpectedModelFiles parity tests ------------------------
 # Exercises rac_artifact_expected_files_proto — the commons-owned port of
 # Swift's RAModelInfo.expectedArtifactFiles + OneOf_Artifact.expectedFiles.
 # Verifies every artifact subtype (single_file/archive/multi_file) plus the
@@ -695,7 +695,7 @@ target_compile_features(test_artifact_helpers_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_artifact_helpers_proto)
 add_test(NAME artifact_helpers_proto_tests COMMAND test_artifact_helpers_proto)
 
-# --- STT/TTS configuration defaults parity tests (P2-T14) --------------------
+# --- STT/TTS configuration defaults parity tests --------------------
 # Exercises rac_stt_configuration_defaults_proto / rac_tts_configuration_defaults_proto
 # — the commons-owned ports of Swift's RA{STT,TTS}Configuration.defaults()
 # helpers. Each test decodes the returned proto bytes and pins the canonical
@@ -907,7 +907,7 @@ target_compile_features(test_lora_service_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_lora_service_proto_abi)
 add_test(NAME lora_service_proto_abi_tests COMMAND test_lora_service_proto_abi)
 
-# --- T2.2: lifecycle-aware LoRA proto ABI tests -----------------------------
+# --- Lifecycle-aware LoRA proto ABI tests -----------------------------
 # Pins the v2 contract: each rac_lora_*_proto resolves its backend through
 # the model-lifecycle service (no rac_handle_t llm_component arg). Covers the
 # COMPONENT_NOT_READY guard plus apply/list/state/remove against a
@@ -988,7 +988,7 @@ rac_link_archive_deps(test_provider_registry)
 target_compile_features(test_provider_registry PRIVATE cxx_std_17)
 add_test(NAME provider_registry_tests COMMAND test_provider_registry)
 
-# T4.1: L1 runtime-plugin registry tests (always built — no backend dep).
+# L1 runtime-plugin registry tests (always built — no backend dep).
 add_executable(test_runtime_registry test_runtime_registry.cpp)
 target_include_directories(test_runtime_registry PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -999,7 +999,7 @@ rac_link_archive_deps(test_runtime_registry)
 target_compile_features(test_runtime_registry PRIVATE cxx_std_17)
 add_test(NAME runtime_registry_tests COMMAND test_runtime_registry)
 
-# T4.1: runtime loader smoke test — exercises the RAC_STATIC_RUNTIME_REGISTER
+# Runtime loader smoke test — exercises the RAC_STATIC_RUNTIME_REGISTER
 # path and the rac_runtime_entry_<name> symbol convention that the future
 # dlopen loader will share with the engine-plugin loader.
 add_executable(test_runtime_loader test_runtime_loader.cpp)
@@ -1036,7 +1036,7 @@ rac_link_archive_deps(test_engine_uses_runtime)
 target_compile_features(test_engine_uses_runtime PRIVATE cxx_std_17)
 add_test(NAME engine_uses_runtime_tests COMMAND test_engine_uses_runtime)
 
-# GAP 03 Phase 6: static registration test (always built — exercises the
+# Static registration test (always built — exercises the
 # RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
 add_executable(test_static_registration test_static_registration.cpp)
 target_include_directories(test_static_registration PRIVATE
@@ -1048,7 +1048,7 @@ rac_link_archive_deps(test_static_registration)
 target_compile_features(test_static_registration PRIVATE cxx_std_17)
 add_test(NAME static_registration_tests COMMAND test_static_registration)
 
-# GAP 03 Phase 6: dynamic loader tests — only meaningful in SHARED-plugins
+# Dynamic loader tests — only meaningful in SHARED-plugins
 # mode. iOS / WASM / RAC_STATIC_PLUGINS=ON skip these targets entirely.
 if(NOT RAC_STATIC_PLUGINS)
     # Two fixture libraries from one source — the BAD_ABI variant flips a
@@ -1251,10 +1251,10 @@ target_compile_features(test_libarchive_zlib_linked PRIVATE cxx_std_17)
 add_test(NAME libarchive_zlib_linked_tests
          COMMAND test_libarchive_zlib_linked --run-all)
 
-# --- v2 close-out Phase H / S5: rac_http_client C ABI tests ------------------
+# --- rac_http_client C ABI tests ------------------
 # These were written against the old libcurl-backed client — they drove a
 # loopback HTTP/1.1 server and relied on libcurl to actually send the bytes.
-# Stage S5 deleted libcurl. The C ABI now dispatches to whatever platform
+# Libcurl was deleted. The C ABI now dispatches to whatever platform
 # transport each SDK registers (OkHttp / URLSession / dart:io / fetch). To
 # run these end-to-end the test harness has to register its own
 # rac_http_transport_ops_t adapter. test_http_download does this and is
@@ -1271,7 +1271,7 @@ if(UNIX)
     target_link_libraries(test_http_client PRIVATE rac_commons)
     rac_link_archive_deps(test_http_client)
     target_compile_features(test_http_client PRIVATE cxx_std_17)
-    # S5: not registered with ctest — needs a test-side rac_http_transport
+    # Not registered with ctest — needs a test-side rac_http_transport
     # adapter (follow-up task). Uncomment add_test once ported.
     # add_test(NAME http_client_tests COMMAND test_http_client)
 
@@ -1288,7 +1288,7 @@ if(UNIX)
     add_test(NAME http_download_tests COMMAND test_http_download)
 endif()
 
-# --- P2-T10: rac_http_request_set_upsert_mode parity test ---------------
+# --- Rac_http_request_set_upsert_mode parity test ---------------
 # Pure ABI / dispatch test — registers a stub rac_http_transport_ops_t,
 # arms the upsert flag, and verifies the URL/header rewrite the SDKs rely
 # on. No sockets, so it builds on every platform.
@@ -1302,7 +1302,7 @@ rac_link_archive_deps(test_http_upsert_mode)
 target_compile_features(test_http_upsert_mode PRIVATE cxx_std_17)
 add_test(NAME http_upsert_mode_tests COMMAND test_http_upsert_mode)
 
-# --- P2-T11: rac_http_default_headers parity test ----------------------
+# --- Rac_http_default_headers parity test ----------------------
 # Pure ABI test — verifies the canonical default-header list matches
 # Swift's HTTPClientAdapter.defaultHeaders content (sans X-Platform),
 # returns the same static-array pointer across calls, and rejects NULL
@@ -1330,7 +1330,7 @@ rac_test_define_have_protobuf(test_download_orchestrator)
 add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
 
 # --- Sherpa-ONNX speech tests (VAD, STT, TTS, WakeWord) ---
-# Phase 2.7 (engine independence refactor): tests link rac_backend_sherpa
+# Engine-independence refactor: tests link rac_backend_sherpa
 # (which owns the speech ops) and depend on rac_backend_onnx only for the
 # ONNX-named typedefs used in their config defaults. The engines/sherpa/
 # include path exposes the public sherpa function declarations.
@@ -1464,7 +1464,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     # GoogleTest pinned via sdk/runanywhere-commons/VERSIONS::GOOGLETEST_VERSION
     # so the RAG and benchmark suites below agree on a single tag (previously
     # this block requested release-1.12.1 while the benchmark block fetched
-    # v1.14.0 — FetchContent dedupes by name and silently used whichever
+    # FetchContent dedupes by name and silently used whichever
     # declaration ran first, creating ABI-mismatch link errors).
     FetchContent_Declare(
         googletest

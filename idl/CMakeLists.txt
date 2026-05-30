@@ -8,7 +8,7 @@
 # each uses its own protoc plugin invocation under idl/codegen/*.sh so CI
 # reuses identical commands for PR drift detection.
 
-# T1.1: require Protobuf >= 5.0 — the renumbered runtime that emits
+# Require Protobuf >= 5.0 — the renumbered runtime that emits
 # .pb.h files including `google/protobuf/runtime_version.h`. System
 # protobuf 3.x (Ubuntu 22.04/24.04 apt) is rejected so we don't build
 # rac_idl against a header set incompatible with the commons checked-in
@@ -28,15 +28,15 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/voice_events.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/solutions.proto
-    # GAP 09 Phase 12 — streaming service definitions (gRPC-style).
+    # Streaming service definitions (gRPC-style).
     ${CMAKE_CURRENT_SOURCE_DIR}/voice_agent_service.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/llm_service.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/download_service.proto
-    # Phase 3 IDL exhaustiveness — duplicated data shapes across SDKs.
+    # IDL exhaustiveness — duplicated data shapes across SDKs.
     ${CMAKE_CURRENT_SOURCE_DIR}/llm_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/chat.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/tool_calling.proto
-    # Phase B — additional duplicated data shapes (per-modality options + shared types).
+    # Additional duplicated data shapes (per-modality options + shared types).
     ${CMAKE_CURRENT_SOURCE_DIR}/diffusion_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/embeddings_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/errors.proto
@@ -49,20 +49,20 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/tts_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/vad_options.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/vlm_options.proto
-    # Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
+    # Hardware profile types for hardware namespace.
     ${CMAKE_CURRENT_SOURCE_DIR}/hardware_profile.proto
-    # CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
+    # Model lifecycle service stub mirroring rac_model_lifecycle.h.
     ${CMAKE_CURRENT_SOURCE_DIR}/lifecycle_service.proto
-    # Wave H-2 / IDL-02 — canonical ThinkingTagPattern shared by llm_options and model_types.
+    # Canonical ThinkingTagPattern shared by llm_options and model_types.
     ${CMAKE_CURRENT_SOURCE_DIR}/thinking_tag_pattern.proto
-    # Wave H-2 / IDL-04 — shared ComponentLifecycleState + EventCategory (import-cycle break).
+    # Shared ComponentLifecycleState + EventCategory (import-cycle break).
     ${CMAKE_CURRENT_SOURCE_DIR}/component_types.proto
-    # Wave H-5 (KOT-12) — engine-router capability query types.
+    # Engine-router capability query types.
     ${CMAKE_CURRENT_SOURCE_DIR}/router.proto
-    # Phase 4 — custom FieldOptions / EnumValueOptions extensions consumed by
+    # Custom FieldOptions / EnumValueOptions extensions consumed by
     # SDK codegen post-processors (defaults(), validate(), wire-string).
     ${CMAKE_CURRENT_SOURCE_DIR}/rac_options.proto
-    # P2-T9 — canonical two-phase SDK init request/result messages
+    # Canonical two-phase SDK init request/result messages
     # (SdkInitPhase1Request / SdkInitPhase2Request / SdkInitResult). The
     # other 28 protos above keep parity with idl/codegen/generate_*.sh
     # which emit sdk_init for every other language target; this entry
@@ -87,9 +87,9 @@ if(TARGET protobuf::libprotobuf)
 else()
     target_link_libraries(rac_idl PUBLIC ${Protobuf_LIBRARIES})
 endif()
-# v2 close-out: SHARED consumers need explicit absl deps; see cmake/protobuf.cmake.
+# SHARED consumers need explicit absl deps; see cmake/protobuf.cmake.
 #
-# T1.1: cmake/protobuf.cmake now probes each absl::* target before adding it
+# cmake/protobuf.cmake now probes each absl::* target before adding it
 # to RAC_ABSL_LIBS so this link line stays valid even when the system absl
 # install is missing newer components (e.g. absl::log on Ubuntu 22.04's
 # libabsl-dev). Filter once more as defense-in-depth in case a consumer

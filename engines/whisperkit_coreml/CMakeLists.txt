@@ -5,10 +5,10 @@
 # The C++ side provides callback storage, vtable dispatch, and registration.
 # Actual inference happens in Swift via registered callbacks to CoreML.
 #
-# v3.1.2: target declaration migrated to rac_add_engine_plugin().
+# Target declaration migrated to rac_add_engine_plugin().
 # =============================================================================
 
-# T5.4: per-engine build toggle owned locally. Apple-only — force OFF
+# Per-engine build toggle owned locally. Apple-only — force OFF
 # elsewhere so non-Apple builds don't accidentally enable it from a cached
 # value.
 if(APPLE)
@@ -41,7 +41,7 @@ set(WHISPERKIT_COREML_BACKEND_SOURCES
     rac_plugin_entry_whisperkit_coreml.cpp
 )
 
-# v3.1.2: TARGET_NAME=rac_backend_whisperkit_coreml preserves the
+# TARGET_NAME=rac_backend_whisperkit_coreml preserves the
 # historical CMake target name (referenced by the Swift xcframework
 # build + tests). CXX_STANDARD=20 matches the original.
 rac_add_engine_plugin(whisperkit_coreml

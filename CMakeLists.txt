@@ -2,8 +2,6 @@
 # RunAnywhere SDKs — Root CMake project
 # =============================================================================
 #
-# GAP 07 Phase 1 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # This is the SINGLE entry point for native builds across the monorepo.
 # Subdirectories:
 #   - sdk/runanywhere-commons/ — the C++ runtime library (rac_commons)
@@ -13,8 +11,8 @@
 #                                a `rac_engine_vtable_t` at
 #                                `RAC_PLUGIN_API_VERSION=3u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
-#                                `rac_plugin_entry` symbol (GAP 02 + GAP 06).
-#   - tools/plugin-loader-smoke/ — CLI smoke test for the GAP 03 loader
+#                                `rac_plugin_entry` symbol.
+#   - tools/plugin-loader-smoke/ — CLI smoke test for the plugin loader
 #
 # Common builds:
 #   cmake --preset macos-release && cmake --build --preset macos-release
@@ -46,7 +44,7 @@ project(runanywhere
     HOMEPAGE_URL "https://github.com/RunanywhereAI/runanywhere-sdks"
 )
 
-# GAP 06 T5.3: enable Objective-C++ at the root project level so
+# Enable Objective-C++ at the root project level so
 # engines/diffusion-coreml/*.mm (and any future Apple-framework
 # bridge TU) compile correctly. `enable_language` inside a subdirectory
 # doesn't populate the CMAKE_OBJCXX_* toolchain variables the build
@@ -71,7 +69,7 @@ option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Mode
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 
-# Plugin loading mode (GAP 03)
+# Plugin loading mode
 # RAC_STATIC_PLUGINS:
 #   ON  → engine TUs are linked into rac_commons; iOS/WASM force this.
 #   OFF → engines build as standalone librunanywhere_<name>.so/.dylib/.dll
@@ -80,7 +78,7 @@ option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 # so subdirectory consumers see the final value.
 option(RAC_STATIC_PLUGINS "Link engine plugins statically into rac_commons (forced ON on iOS/WASM)" OFF)
 
-# Sanitizers (GAP 07 Phase 3)
+# Sanitizers
 set(RAC_SANITIZER "" CACHE STRING "Enable a sanitizer: '', 'asan', 'tsan', 'ubsan'")
 set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 
@@ -160,15 +158,15 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs after the GAP 06 reorg
+    "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs
 )
 
-# These four helpers ship in subsequent phases of GAP 07; the includes are
-# tolerant so this CMakeLists works incrementally as the helpers land.
-include(platform   OPTIONAL)   # rac_detect_platform()  — Phase 3
-include(sanitizers OPTIONAL)   # rac_apply_sanitizer()  — Phase 3
-include(plugins    OPTIONAL)   # rac_add_engine_plugin() / rac_force_load() — Phase 4
-include(protobuf   OPTIONAL)   # rac_protobuf_generate() — Phase 5
+# Shared cmake/ helper modules. The includes are OPTIONAL so a missing
+# helper degrades gracefully rather than failing configure.
+include(platform   OPTIONAL)   # rac_detect_platform()
+include(sanitizers OPTIONAL)   # rac_apply_sanitizer()
+include(plugins    OPTIONAL)   # rac_add_engine_plugin() / rac_force_load()
+include(protobuf   OPTIONAL)   # rac_protobuf_generate()
 
 if(COMMAND rac_detect_platform)
     rac_detect_platform()
@@ -200,7 +198,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/idl/CMakeLists.txt")
     add_subdirectory(idl)
 endif()
 
-# runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
+# runtimes/ — L1 compute-runtime plugins. Mirrors engines/ but scoped
 # to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
 # is always folded into rac_commons; adapter runtimes are linked by their
 # owning engines.
@@ -250,7 +248,7 @@ if(EMSCRIPTEN
     add_subdirectory(sdk/runanywhere-web/wasm)
 endif()
 
-# Smoke test for the plugin loader (GAP 03). Only built when explicitly
+# Smoke test for the plugin loader. Only built when explicitly
 # requested so headless CI nodes don't pay the build cost.
 if(RAC_BUILD_PLUGIN_SMOKE
    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin-loader-smoke/CMakeLists.txt")
@@ -476,7 +474,7 @@ if(RAC_BUILD_TESTS)
                  COMMAND test_plugin_entry_diffusion_coreml)
     endif()
 
-    # GAP 09 / v2 close-out Phase 4 — cross-SDK parity test harness.
+    # Cross-SDK parity test harness.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/streaming/CMakeLists.txt")
         add_subdirectory(tests/streaming)
     endif()

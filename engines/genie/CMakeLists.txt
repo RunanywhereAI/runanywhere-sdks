@@ -1,8 +1,6 @@
 # =============================================================================
 # Genie Backend — Qualcomm Genie / QNN NPU LLM engine
 #
-# GAP 06 T5.2 — see v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md.
-#
 # Qualcomm Genie is a closed-source SDK that exposes an LLM inference C API
 # running on Snapdragon NPUs (Hexagon DSP + HTP). Its headers
 # (GenieCommon.h, GenieDialog.h, GenieLog.h, …) are not vendored in this

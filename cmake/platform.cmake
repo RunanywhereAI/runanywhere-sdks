@@ -1,8 +1,6 @@
 # =============================================================================
 # cmake/platform.cmake — host/target platform detection
 #
-# GAP 07 Phase 3 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # Hoists the if(EMSCRIPTEN) ... elseif(IOS) ... cascade currently duplicated
 # inside `sdk/runanywhere-commons/CMakeLists.txt` into one shared function.
 # Subdirectories call `rac_detect_platform()` and read the resulting

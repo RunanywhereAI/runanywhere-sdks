@@ -34,7 +34,7 @@ if(EMSCRIPTEN)
     # ==========================================================================
     # Emscripten/WASM: Prefer the vendored static archive if present.
     # When sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a
-    # is staged (CPP-13 / WEB-01 unblock), create a STATIC IMPORTED target so
+    # is staged, create a STATIC IMPORTED target so
     # engines/onnx and engines/sherpa link against it. Otherwise fall back to
     # an INTERFACE-only target so builds that don't enable ONNX still work —
     # sherpa-onnx's build tree has historically supplied the headers.
@@ -151,7 +151,7 @@ elseif(ANDROID)
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
     # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
     # Anchor on this module's location so the lookup is stable under the
-    # GAP_07 single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
+    # single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
     # root but download-sherpa-onnx.sh populates sdk/runanywhere-commons/third_party/.
     set(SHERPA_ONNX_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party/sherpa-onnx-android")
 

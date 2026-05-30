@@ -2,7 +2,7 @@
 # WhisperCPP Backend - Speech-to-Text via whisper.cpp
 # =============================================================================
 
-# T5.4: per-engine build toggle owned locally.
+# Per-engine build toggle owned locally.
 # Opt-in fallback for Whisper-family models; use sherpa for all other STT.
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(NOT RAC_BACKEND_WHISPERCPP)
@@ -98,7 +98,7 @@ endif()
 # =============================================================================
 # WhisperCPP Backend Library
 # =============================================================================
-# v3.1.2: target declaration migrated to rac_add_engine_plugin() macro.
+# Target declaration migrated to rac_add_engine_plugin() macro.
 # whisper.cpp FetchContent + GGML_* platform option setup above stays
 # inline — engine-specific.
 
@@ -157,7 +157,7 @@ elseif(RAC_PLATFORM_WINDOWS)
     message(STATUS "Configuring WhisperCPP backend for Windows")
 endif()
 
-# v3.1.2: TARGET_NAME=rac_backend_whispercpp preserves the historical
+# TARGET_NAME=rac_backend_whispercpp preserves the historical
 # CMake target name; CXX_STANDARD=20 matches the original.
 rac_add_engine_plugin(whispercpp
     TARGET_NAME         rac_backend_whispercpp

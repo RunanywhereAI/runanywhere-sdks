@@ -1,8 +1,6 @@
 # =============================================================================
 # Diffusion CoreML Backend — Apple-only Stable Diffusion via CoreML MLModel
 #
-# GAP 06 T5.3 — see v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md.
-#
 # Wraps Apple's compiled Stable Diffusion MLModel bundles (.mlmodelc /
 # .mlpackage) behind the rac_diffusion_service_ops_t vtable.
 # =============================================================================

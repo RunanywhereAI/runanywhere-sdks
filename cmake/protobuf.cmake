@@ -1,8 +1,6 @@
 # =============================================================================
 # cmake/protobuf.cmake — protobuf detection + helper macros
 #
-# GAP 07 Phase 5 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # Wraps `find_package(Protobuf)` and exposes a single helper that the IDL
 # subdirectory and any future C++ TU consuming proto-encoded buffers calls
 # instead of running its own conditional skip-if-missing block.
@@ -24,7 +22,7 @@
 
 include_guard(GLOBAL)
 
-# T1.1: bumped to protobuf 5.x for runtime_version.h + absl::log linkage.
+# Protobuf 5.x is required for runtime_version.h + absl::log linkage.
 #
 # Checked-in generated headers under sdk/runanywhere-commons/src/generated/proto
 # (Protobuf C++ Version 7.34.1) include `google/protobuf/runtime_version.h`,
@@ -42,7 +40,7 @@ set(RAC_PROTOBUF_MIN_VERSION "5.0" CACHE STRING
 
 find_package(Protobuf ${RAC_PROTOBUF_MIN_VERSION} QUIET)
 
-# v2 close-out: SHARED-build consumers of proto-generated .pb.cc.o files
+# SHARED-build consumers of proto-generated .pb.cc.o files
 # (rac_voice_event_abi.cpp, pipeline.pb.cc, etc.) need absl symbols at
 # link time (absl::log_internal::Check*, absl::hash_internal::*).
 # Modern Homebrew protobuf 22+ ships with absl as a separate package;
