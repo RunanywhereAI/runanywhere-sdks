@@ -14,12 +14,17 @@
 
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir
+#else
+#include <unistd.h>  // for symlink/readlink/unlink (espeak data-dir path shortening)
 #endif
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <functional>  // for std::hash (short espeak symlink name)
 #include <vector>
 
 #include "rac/core/rac_logger.h"
@@ -849,6 +854,138 @@ bool SherpaTTS::is_ready() const {
 }
 
 /**
+ * Returns an espeak-ng data dir path that is guaranteed to fit inside
+ * espeak-ng's fixed-size internal path buffer, creating a short symlink to the
+ * real directory when the real path is too long.
+ *
+ * ROOT CAUSE (iOS TTS abort): espeak-ng stores its data dir in a fixed
+ * `char path_home[N_PATH_HOME]` buffer (N_PATH_HOME == 255 on POSIX, see
+ * espeak-ng speech.h). `espeak_ng_InitializePath()` validates a candidate via
+ *     snprintf(path_home, sizeof(path_home), "%s/espeak-ng-data", path);
+ *     ... snprintf(path_home, sizeof(path_home), "%s", path);
+ * then stat()s it. When the candidate path is >= 255 bytes snprintf TRUNCATES
+ * it, the stat() of the truncated path fails, the probe returns 0, and espeak
+ * falls through to the COMPILE-TIME default "/usr/share/espeak-ng-data" and
+ * aborts (exit(1)) because phontab is absent there.
+ *
+ * The iOS sandbox model dir
+ *   .../CoreSimulator/Devices/<UUID>/data/Containers/Data/Application/<UUID>/
+ *   Documents/RunAnywhere/Models/Sherpa/<model>/<model>/espeak-ng-data
+ * is ~278 bytes — over the limit. Android's app data dirs are short (~60-100
+ * bytes) so the same code path never truncates there, which is exactly why
+ * Android TTS passes with the identical espeak/sherpa code while iOS aborts.
+ *
+ * FIX: if the real path (or its "+/espeak-ng-data" probe form) would not fit
+ * comfortably in the buffer, create a short-named symlink under the system
+ * temp dir pointing at the real espeak-ng-data directory and hand espeak the
+ * short path instead. Cross-platform and self-limiting: on platforms/paths
+ * that already fit (Android), this returns the original path unchanged, so it
+ * cannot regress the working path. On Windows symlink creation may require
+ * privileges; we simply fall back to the original path there (Windows resolves
+ * espeak data via the registry/default and does not hit the sandbox-length
+ * problem in practice).
+ */
+static std::string espeak_data_dir_within_buffer_limit(const std::string& real_data_dir) {
+    // espeak's buffer is char[255]; its probe appends "/espeak-ng-data" (15)
+    // to the *parent*, and at synth time appends file names like "/phontab".
+    // Keep a safe ceiling well under 255 so neither probe form truncates.
+    constexpr size_t kEspeakPathBuffer = 255;
+    constexpr size_t kSuffixHeadroom = 32;  // "/espeak-ng-data" + "/phontab" etc.
+    constexpr size_t kSafeMax = kEspeakPathBuffer - kSuffixHeadroom;
+
+    if (real_data_dir.size() <= kSafeMax) {
+        return real_data_dir;  // already short enough (e.g. Android) — no-op.
+    }
+
+#ifdef _WIN32
+    // Symlinks need privileges on Windows; espeak does not hit this problem
+    // there. Return the original path unchanged.
+    return real_data_dir;
+#else
+    // Pick the shortest available writable temp base. NB: on the iOS simulator
+    // TMPDIR is itself a ~230-byte CoreSimulator container path, which would
+    // make the symlink path overflow the very buffer we are working around (and
+    // the guard below would then give up, leaving TTS broken). Prefer "/tmp"
+    // (writable on the simulator, macOS and Linux; short) and fall back to
+    // TMPDIR only when /tmp is not writable (e.g. a real iOS device sandbox,
+    // where enlarging espeak's path_home buffer is the documented follow-up).
+    std::string temp_base;
+    if (access("/tmp", W_OK) == 0) {
+        temp_base = "/tmp";
+    } else if (const char* t = std::getenv("TMPDIR")) {
+        temp_base = t;
+    }
+    if (temp_base.empty()) {
+        temp_base = "/tmp";
+    }
+    while (temp_base.size() > 1 && temp_base.back() == '/') {
+        temp_base.pop_back();
+    }
+
+    // Short, stable, per-real-path link name so concurrent / repeat loads reuse
+    // the same link. std::hash keeps the name tiny regardless of the real path.
+    const size_t key = std::hash<std::string>{}(real_data_dir);
+    char link_buf[64];
+    std::snprintf(link_buf, sizeof(link_buf), "%s/rae_%zx", temp_base.c_str(), key);
+    std::string link_path = link_buf;
+
+    // If the resulting symlink path would itself be too long, give up and use
+    // the original path (never make things worse than the baseline).
+    if (link_path.size() > kSafeMax) {
+        RAC_LOG_WARNING("Sherpa.TTS",
+                        "espeak data dir is %zu bytes (>%zu) but temp-dir symlink "
+                        "path would also be too long (%zu) — using original path",
+                        real_data_dir.size(), kSafeMax, link_path.size());
+        return real_data_dir;
+    }
+
+    // Create / refresh the symlink -> real espeak-ng-data dir. symlink() fails
+    // with EEXIST if the link already exists; verify it points where we expect
+    // and recreate if not.
+    struct stat lst;
+    bool need_create = true;
+    if (lstat(link_path.c_str(), &lst) == 0) {
+        if (S_ISLNK(lst.st_mode)) {
+            char target[1024];
+            ssize_t n = readlink(link_path.c_str(), target, sizeof(target) - 1);
+            if (n > 0) {
+                target[n] = '\0';
+                if (real_data_dir == target) {
+                    need_create = false;  // already correct
+                }
+            }
+            if (need_create) {
+                unlink(link_path.c_str());
+            }
+        } else {
+            // A non-symlink squatting on our name — do not clobber arbitrary
+            // files; fall back to the original path.
+            RAC_LOG_WARNING("Sherpa.TTS",
+                            "espeak symlink path %s exists and is not a symlink — "
+                            "using original data dir",
+                            link_path.c_str());
+            return real_data_dir;
+        }
+    }
+
+    if (need_create && symlink(real_data_dir.c_str(), link_path.c_str()) != 0) {
+        // Could not create the short link; fall back to the (long) real path.
+        RAC_LOG_WARNING("Sherpa.TTS",
+                        "Failed to create short espeak symlink %s -> %s (errno=%d) — "
+                        "using original data dir",
+                        link_path.c_str(), real_data_dir.c_str(), errno);
+        return real_data_dir;
+    }
+
+    RAC_LOG_INFO("Sherpa.TTS",
+                 "espeak data dir path (%zu bytes) exceeds espeak's buffer; using "
+                 "short symlink %s -> %s",
+                 real_data_dir.size(), link_path.c_str(), real_data_dir.c_str());
+    return link_path;
+#endif
+}
+
+/**
  * Ensures espeak-ng voice files from lang/ subdirectories are also
  * accessible directly under voices/ so that espeak_SetVoiceByName()
  * can find them via the fast direct-file-lookup path.
@@ -1194,11 +1331,49 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
         RAC_LOG_DEBUG("Sherpa.TTS", "Using lexicon file: %s", lexicon_path.c_str());
     }
 
-    espeak_data_dir_ = espeak_data_dir;
     if (!espeak_data_dir.empty()) {
+        // ROOT-CAUSE FIX (iOS TTS abort): espeak-ng stores its data dir in a
+        // fixed char[255] buffer and silently TRUNCATES longer paths during its
+        // internal stat() probe, then aborts to "/usr/share/espeak-ng-data".
+        // The iOS sandbox path here is ~278 bytes (over the limit) whereas
+        // Android's app data dirs are short and always fit — which is why
+        // Android TTS works with the identical sherpa/espeak code and iOS does
+        // not. Hand espeak a path that fits (short symlink when necessary).
+        // On Android / short paths this is a transparent no-op.
+        espeak_data_dir_ = espeak_data_dir_within_buffer_limit(espeak_data_dir);
+
         tts_config.model.vits.data_dir = espeak_data_dir_.c_str();
         RAC_LOG_INFO("Sherpa.TTS", "Using espeak data_dir: %s", espeak_data_dir_.c_str());
+
+        // Belt-and-braces: also export ESPEAK_DATA_PATH = parent-of(data_dir).
+        // espeak_ng_InitializePath() consults getenv("ESPEAK_DATA_PATH") as a
+        // fallback (via "<ESPEAK_DATA_PATH>/espeak-ng-data") BEFORE the
+        // hardcoded "/usr/share" default, so this provides a second resolution
+        // route through the *shortened* path. Set before
+        // SherpaOnnxCreateOfflineTts so it is honored even through sherpa's
+        // one-time std::call_once espeak initialization. Inert on Android (the
+        // primary data_dir probe already wins) so it cannot regress that path.
+        std::string espeak_parent_dir = espeak_data_dir_;
+        const std::string kEspeakLeaf = "/espeak-ng-data";
+        if (espeak_parent_dir.size() > kEspeakLeaf.size() &&
+            espeak_parent_dir.compare(espeak_parent_dir.size() - kEspeakLeaf.size(),
+                                      kEspeakLeaf.size(), kEspeakLeaf) == 0) {
+            espeak_parent_dir.erase(espeak_parent_dir.size() - kEspeakLeaf.size());
+        }
+        if (!espeak_parent_dir.empty()) {
+#ifdef _WIN32
+            // POSIX setenv() is unavailable on MSVC; _putenv_s is the portable
+            // equivalent. (Windows espeak resolves via the registry, so this is
+            // build-portability only.)
+            _putenv_s("ESPEAK_DATA_PATH", espeak_parent_dir.c_str());
+#else
+            setenv("ESPEAK_DATA_PATH", espeak_parent_dir.c_str(), /*overwrite=*/1);
+#endif
+            RAC_LOG_INFO("Sherpa.TTS", "Exported ESPEAK_DATA_PATH=%s",
+                         espeak_parent_dir.c_str());
+        }
     } else {
+        espeak_data_dir_ = espeak_data_dir;
         RAC_LOG_WARNING("Sherpa.TTS",
                         "espeak-ng-data NOT FOUND in model dir — Piper TTS will fail");
     }

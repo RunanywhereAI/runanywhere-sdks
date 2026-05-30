@@ -161,7 +161,17 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    std::string source_preview = text.substr(0, 100);
+    // Truncate the source preview at a UTF-8 character boundary, not a raw
+    // byte offset: a mid-sequence cut emits invalid UTF-8, which strict proto
+    // decoders (e.g. SwiftProtobuf) reject when this flows into RAGResult's
+    // string fields. Lenient decoders (Android/Wire, Flutter/dart) tolerated
+    // it via U+FFFD substitution, masking the corruption on those platforms.
+    size_t preview_len = text.size() < 100 ? text.size() : 100;
+    while (preview_len > 0 && preview_len < text.size() &&
+           (static_cast<unsigned char>(text[preview_len]) & 0xC0) == 0x80) {
+        --preview_len;
+    }
+    std::string source_preview = text.substr(0, preview_len);
     std::vector<DocumentChunk> doc_chunks;
     doc_chunks.reserve(chunks.size());
 
